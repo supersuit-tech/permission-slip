@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useCookieConsent } from "../../components/CookieConsentContext";
+import { Footer } from "../../components/Footer";
 
 interface PolicyLayoutProps {
   title: string;
@@ -14,8 +14,6 @@ interface PolicyLayoutProps {
  * Renders outside the auth gate so anyone can view legal documents.
  */
 export function PolicyLayout({ title, lastUpdated, children }: PolicyLayoutProps) {
-  const { reset: resetConsent } = useCookieConsent();
-
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
@@ -48,22 +46,7 @@ export function PolicyLayout({ title, lastUpdated, children }: PolicyLayoutProps
           {children}
         </main>
 
-        <footer className="mt-12 border-t pt-6">
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <Link to="/policy/privacy" className="hover:text-foreground transition-colors">
-              Privacy Policy
-            </Link>
-            <Link to="/policy/terms" className="hover:text-foreground transition-colors">
-              Terms of Service
-            </Link>
-            <Link to="/policy/cookies" className="hover:text-foreground transition-colors">
-              Cookie Policy
-            </Link>
-            <button type="button" onClick={resetConsent} className="hover:text-foreground transition-colors">
-              Manage Cookies
-            </button>
-          </div>
-        </footer>
+        <Footer className="mt-12 border-t pt-6" />
       </div>
     </div>
   );
