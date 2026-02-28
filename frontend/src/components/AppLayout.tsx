@@ -73,8 +73,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <footer className="mx-auto mt-12 hidden max-w-[1200px] border-t pt-4 md:block">
-        <div className="flex gap-4 text-xs text-muted-foreground">
+      <footer className="mx-auto mt-12 max-w-[1200px] border-t pt-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
           <Link to="/policy/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
           <Link to="/policy/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
           <Link to="/policy/cookies" className="hover:text-foreground transition-colors">Cookie Policy</Link>
