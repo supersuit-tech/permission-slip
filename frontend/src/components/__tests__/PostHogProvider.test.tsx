@@ -99,8 +99,17 @@ describe("PostHogProvider", () => {
     expect(mockOptOutPostHog).toHaveBeenCalledTimes(1);
   });
 
-  it("captures a page view on initial render", () => {
+  it("does not capture page views without consent", () => {
     renderWithProviders("/dashboard");
+    expect(mockCapturePageView).not.toHaveBeenCalled();
+  });
+
+  it("captures a page view after consent is granted", async () => {
+    renderWithProviders("/dashboard");
+    mockCapturePageView.mockClear();
+
+    await userEvent.click(screen.getByText("Accept"));
+
     expect(mockCapturePageView).toHaveBeenCalled();
   });
 

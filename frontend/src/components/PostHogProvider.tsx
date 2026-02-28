@@ -41,11 +41,13 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
     }
   }, [consent]);
 
-  // Capture page views on route changes.
+  // Capture page views on route changes — only when consent is granted.
+  // PostHog's SDK also guards internally, but we add an application-level
+  // check as defense-in-depth against potential SDK opt-out bugs.
   useEffect(() => {
-    if (!initializedRef.current) return;
+    if (!initializedRef.current || consent !== "accepted") return;
     capturePageView();
-  }, [location.pathname]);
+  }, [location.pathname, consent]);
 
   return <>{children}</>;
 }

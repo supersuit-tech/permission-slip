@@ -165,6 +165,9 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking — panics and 5xx errors are captured automatically |
 | `VITE_SENTRY_DSN` | Optional | Sentry DSN for frontend error tracking (build-time) — React errors, failed API calls, and performance data |
 | `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint — captures Content-Security-Policy violations as Sentry events |
+| `VITE_POSTHOG_KEY` | Optional | PostHog project API key for product analytics (build-time) — consent-gated, no data sent until user accepts cookies |
+| `VITE_POSTHOG_HOST` | Optional | PostHog API host (build-time, default: `https://us.i.posthog.com`) — use a custom host if self-hosting PostHog |
+| `POSTHOG_HOST` | Optional | PostHog API host added to CSP `connect-src` — must match `VITE_POSTHOG_HOST` (runtime) |
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
@@ -196,6 +199,21 @@ make test-frontend     # frontend tests (no database needed)
 ```
 
 Backend tests run against a real Postgres database. Frontend tests use a mocked Supabase client. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.
+
+## Observability
+
+### Error Tracking (Sentry)
+
+Sentry captures backend panics/5xx errors and frontend React errors. Set `SENTRY_DSN` (backend) and `VITE_SENTRY_DSN` (frontend) to enable.
+
+### Product Analytics (PostHog)
+
+PostHog provides privacy-focused product analytics. It is **fully consent-gated** — no data is collected until the user explicitly accepts cookies via the consent banner.
+
+- Set `VITE_POSTHOG_KEY` and optionally `VITE_POSTHOG_HOST` to enable (build-time).
+- Set `POSTHOG_HOST` to add the PostHog API host to the CSP `connect-src` directive (runtime).
+- If `VITE_POSTHOG_KEY` is not set, PostHog is completely disabled — no SDK code executes.
+- Events are defined in `frontend/src/lib/posthog-events.ts`. To add a new event, add a constant there and use `trackEvent()` from `@/lib/posthog`.
 
 ## Contributing
 

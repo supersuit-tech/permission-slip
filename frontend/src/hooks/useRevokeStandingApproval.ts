@@ -2,8 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { getApiErrorMessage } from "@/api/errors";
-import { trackEvent } from "@/lib/posthog";
-import { PostHogEvents } from "@/lib/posthog-events";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 export function useRevokeStandingApproval() {
   const { session } = useAuth();

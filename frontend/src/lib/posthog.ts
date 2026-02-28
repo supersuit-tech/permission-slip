@@ -12,6 +12,11 @@
 import posthog from "posthog-js";
 import type { PostHogEventName } from "./posthog-events";
 
+// Re-export so consumers can import everything from a single module:
+//   import { trackEvent, PostHogEvents } from "@/lib/posthog";
+export { PostHogEvents } from "./posthog-events";
+export type { PostHogEventName } from "./posthog-events";
+
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 const POSTHOG_HOST =
   (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ||

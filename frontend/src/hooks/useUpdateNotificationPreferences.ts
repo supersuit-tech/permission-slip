@@ -2,8 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
-import { trackEvent } from "@/lib/posthog";
-import { PostHogEvents } from "@/lib/posthog-events";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 type NotificationPreference = components["schemas"]["NotificationPreference"];
 
