@@ -24,6 +24,7 @@ type Deps struct {
 	Notifier              *notify.Dispatcher   // notification fan-out; nil means notifications are disabled
 	VAPIDPublicKey        string               // VAPID public key for Web Push; empty if not configured
 	Connectors            *connectors.Registry // connector execution registry; nil means no connectors are available
+	BillingEnabled        bool                 // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
 	DevMode               bool                 // true when MODE=development; disables rate limiting
 	RateLimiter           *RateLimiter         // pre-auth rate limiter (per-IP + global); nil disables
 	AgentRateLimiter      *RateLimiter         // post-auth rate limiter (per verified agent); nil disables

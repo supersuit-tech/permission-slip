@@ -149,6 +149,30 @@ func UpdateSubscriptionPeriod(ctx context.Context, db DBTX, userID string, perio
 	return s, err
 }
 
+// EnsureAllUsersSubscribed creates subscriptions for any users that don't have one.
+// When billing is disabled, users get the unlimited pay_as_you_go plan. When enabled,
+// users get the free plan. This handles the case where users were created before
+// the subscriptions table existed or before the billing gate was configured.
+//
+// Returns the number of subscriptions created.
+func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool) (int64, error) {
+	planID := PlanPayAsYouGo
+	if billingEnabled {
+		planID = PlanFree
+	}
+	tag, err := db.Exec(ctx,
+		`INSERT INTO subscriptions (user_id, plan_id)
+		 SELECT p.id, $1
+		 FROM profiles p
+		 LEFT JOIN subscriptions s ON s.user_id = p.id
+		 WHERE s.id IS NULL`,
+		planID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // SubscriptionWithPlan combines a subscription with its associated plan details
 // in a single query. This avoids the N+1 pattern of fetching subscription then plan.
 type SubscriptionWithPlan struct {

@@ -163,6 +163,7 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking — panics and 5xx errors are captured automatically |
 | `VITE_SENTRY_DSN` | Optional | Sentry DSN for frontend error tracking (build-time) — React errors, failed API calls, and performance data |
 | `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint — captures Content-Security-Policy violations as Sentry events |
+| `BILLING_ENABLED` | Optional | Set to `true` to enable billing (Stripe, metering, plan limits). Default: `false` (all users get unlimited access) |
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
