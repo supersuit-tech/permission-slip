@@ -16,7 +16,7 @@ export function CookieConsentBanner() {
     <div
       role="region"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-14 z-50 border-t bg-card p-4 shadow-lg md:bottom-0 md:p-6"
+      className="fixed inset-x-0 bottom-0 z-50 border-t bg-card p-4 shadow-lg md:p-6"
     >
       <div className="mx-auto flex max-w-[1200px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <p className="text-sm text-card-foreground">
