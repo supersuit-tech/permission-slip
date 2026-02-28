@@ -93,15 +93,10 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Create a subscription for the new user. When billing is enabled,
-		// new users start on the free plan. When disabled (self-hosted),
-		// users get the unlimited pay_as_you_go plan so enforcement code
-		// sees no limits without needing billing-specific guards.
-		planID := db.PlanPayAsYouGo
-		if deps.BillingEnabled {
-			planID = db.PlanFree
-		}
-		if _, err := db.CreateSubscription(r.Context(), deps.DB, profile.ID, planID); err != nil {
+		// Create a subscription for the new user. Plan selection is
+		// centralized in db.DefaultPlanID to avoid duplicating the
+		// billing-enabled logic.
+		if _, err := db.CreateSubscription(r.Context(), deps.DB, profile.ID, db.DefaultPlanID(deps.BillingEnabled)); err != nil {
 			log.Printf("[%s] Onboarding: create subscription: %v", TraceID(r.Context()), err)
 			// Non-fatal: the profile was created successfully. Log the error
 			// but still return the profile so the user isn't blocked.

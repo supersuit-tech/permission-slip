@@ -102,6 +102,16 @@ func TestGetPlanByID_NotFound(t *testing.T) {
 	}
 }
 
+func TestDefaultPlanID(t *testing.T) {
+	t.Parallel()
+	if got := db.DefaultPlanID(false); got != db.PlanPayAsYouGo {
+		t.Errorf("DefaultPlanID(false) = %q, want %q", got, db.PlanPayAsYouGo)
+	}
+	if got := db.DefaultPlanID(true); got != db.PlanFree {
+		t.Errorf("DefaultPlanID(true) = %q, want %q", got, db.PlanFree)
+	}
+}
+
 func TestListPlans(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

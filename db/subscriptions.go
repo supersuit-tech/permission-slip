@@ -156,17 +156,13 @@ func UpdateSubscriptionPeriod(ctx context.Context, db DBTX, userID string, perio
 //
 // Returns the number of subscriptions created.
 func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool) (int64, error) {
-	planID := PlanPayAsYouGo
-	if billingEnabled {
-		planID = PlanFree
-	}
 	tag, err := db.Exec(ctx,
 		`INSERT INTO subscriptions (user_id, plan_id)
 		 SELECT p.id, $1
 		 FROM profiles p
 		 LEFT JOIN subscriptions s ON s.user_id = p.id
 		 WHERE s.id IS NULL`,
-		planID)
+		DefaultPlanID(billingEnabled))
 	if err != nil {
 		return 0, err
 	}
