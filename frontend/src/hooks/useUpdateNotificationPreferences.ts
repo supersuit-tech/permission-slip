@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
 import { trackEvent } from "@/lib/posthog";
+import { PostHogEvents } from "@/lib/posthog-events";
 
 type NotificationPreference = components["schemas"]["NotificationPreference"];
 
@@ -32,7 +33,7 @@ export function useUpdateNotificationPreferences() {
       return data;
     },
     onSuccess: () => {
-      trackEvent("notification_preferences_updated");
+      trackEvent(PostHogEvents.NOTIFICATION_PREFERENCES_UPDATED);
       queryClient.invalidateQueries({
         queryKey: ["notification-preferences"],
       });

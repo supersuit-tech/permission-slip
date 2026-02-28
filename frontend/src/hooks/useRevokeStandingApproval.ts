@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { getApiErrorMessage } from "@/api/errors";
 import { trackEvent } from "@/lib/posthog";
+import { PostHogEvents } from "@/lib/posthog-events";
 
 export function useRevokeStandingApproval() {
   const { session } = useAuth();
@@ -31,7 +32,7 @@ export function useRevokeStandingApproval() {
       return data;
     },
     onSuccess: () => {
-      trackEvent("standing_approval_revoked");
+      trackEvent(PostHogEvents.STANDING_APPROVAL_REVOKED);
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
     },
   });

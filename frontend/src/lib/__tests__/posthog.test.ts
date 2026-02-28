@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { PostHogEvents } from "../posthog-events";
 
 // Mock posthog-js before importing our module.
 const mockInit = vi.fn();
@@ -44,7 +45,7 @@ describe("posthog utilities", () => {
 
     it("trackEvent does not call posthog.capture", async () => {
       const mod = await import("../posthog");
-      mod.trackEvent("test_event", { key: "value" });
+      mod.trackEvent(PostHogEvents.APPROVAL_APPROVED, { key: "value" });
       expect(mockCapture).not.toHaveBeenCalled();
     });
 

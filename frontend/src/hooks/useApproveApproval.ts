@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { trackEvent } from "@/lib/posthog";
+import { PostHogEvents } from "@/lib/posthog-events";
 
 export function useApproveApproval() {
   const { session } = useAuth();
@@ -23,7 +24,7 @@ export function useApproveApproval() {
       return data;
     },
     onSuccess: () => {
-      trackEvent("approval_approved");
+      trackEvent(PostHogEvents.APPROVAL_APPROVED);
     },
     // No query invalidation — the approved row stays visible so the user
     // can read/copy the confirmation code. The 5-second polling in useApprovals

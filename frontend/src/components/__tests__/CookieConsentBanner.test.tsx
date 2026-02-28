@@ -31,7 +31,7 @@ describe("CookieConsentBanner", () => {
   it("renders the banner when no consent has been given", () => {
     renderBanner();
     expect(screen.getByRole("region", { name: /cookie consent/i })).toBeInTheDocument();
-    expect(screen.getByText(/we use cookies/i)).toBeInTheDocument();
+    expect(screen.getByText(/we use essential cookies/i)).toBeInTheDocument();
     expect(screen.getByText("Accept All")).toBeInTheDocument();
     expect(screen.getByText("Reject All")).toBeInTheDocument();
   });
@@ -62,9 +62,9 @@ describe("CookieConsentBanner", () => {
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
 
-  it("contains a link to the privacy policy", () => {
+  it("contains a link to the cookie policy", () => {
     renderBanner();
-    const link = screen.getByRole("link", { name: /privacy policy/i });
-    expect(link).toHaveAttribute("href", "/policy/privacy");
+    const link = screen.getByRole("link", { name: /cookie policy/i });
+    expect(link).toHaveAttribute("href", "/policy/cookies");
   });
 });

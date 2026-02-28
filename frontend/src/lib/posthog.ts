@@ -10,6 +10,7 @@
  * enabled. This ensures zero data is sent before explicit consent.
  */
 import posthog from "posthog-js";
+import type { PostHogEventName } from "./posthog-events";
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 const POSTHOG_HOST =
@@ -19,13 +20,26 @@ const POSTHOG_HOST =
 /** Whether PostHog is configured (API key is present). */
 export const isPostHogConfigured = Boolean(POSTHOG_KEY);
 
+const isDev = import.meta.env.DEV;
+
+/** Dev-mode logging prefixed with [PostHog]. Stripped in production builds. */
+function devLog(...args: unknown[]): void {
+  if (isDev) {
+    console.log("[PostHog]", ...args);
+  }
+}
+
 /**
  * Initialize the PostHog client. Must be called once at app startup.
  * Starts with capturing disabled — consent must be granted first.
  */
 export function initPostHog(): void {
-  if (!POSTHOG_KEY) return;
+  if (!POSTHOG_KEY) {
+    devLog("disabled (VITE_POSTHOG_KEY not set)");
+    return;
+  }
 
+  devLog("initializing →", POSTHOG_HOST);
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
     // Start opted out — no events are sent until the user consents.
@@ -46,12 +60,14 @@ export function initPostHog(): void {
 /** Enable PostHog capturing after consent is granted. */
 export function optInPostHog(): void {
   if (!isPostHogConfigured) return;
+  devLog("consent granted → capturing enabled");
   posthog.opt_in_capturing();
 }
 
 /** Disable PostHog capturing when consent is rejected or reset. */
 export function optOutPostHog(): void {
   if (!isPostHogConfigured) return;
+  devLog("consent revoked → capturing disabled");
   posthog.opt_out_capturing();
 }
 
@@ -80,11 +96,15 @@ export function capturePageView(): void {
  * Track a product analytics event. No-ops if PostHog is not configured
  * or if the user has not consented (PostHog's internal opt-out flag
  * prevents capture calls from sending data).
+ *
+ * Event names are typed — use constants from `posthog-events.ts` to
+ * get autocomplete and prevent typos.
  */
 export function trackEvent(
-  eventName: string,
+  eventName: PostHogEventName,
   properties?: Record<string, string | number | boolean>,
 ): void {
   if (!isPostHogConfigured) return;
+  devLog("event:", eventName, properties ?? "");
   posthog.capture(eventName, properties);
 }

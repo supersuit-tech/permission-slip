@@ -4,6 +4,7 @@ import client from "@/api/client";
 import { getApiErrorMessage } from "@/api/errors";
 import type { components } from "@/api/schema";
 import { trackEvent } from "@/lib/posthog";
+import { PostHogEvents } from "@/lib/posthog-events";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -33,7 +34,7 @@ export function useCreateStandingApproval() {
       return data;
     },
     onSuccess: () => {
-      trackEvent("standing_approval_created");
+      trackEvent(PostHogEvents.STANDING_APPROVAL_CREATED);
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
     },
   });

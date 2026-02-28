@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
 import { trackEvent } from "@/lib/posthog";
+import { PostHogEvents } from "@/lib/posthog-events";
 
 export type InviteResponse =
   components["schemas"]["CreateRegistrationInviteResponse"];
@@ -27,7 +28,7 @@ export function useCreateInvite() {
       return data;
     },
     onSuccess: () => {
-      trackEvent("invite_created");
+      trackEvent(PostHogEvents.INVITE_CREATED);
     },
   });
 
