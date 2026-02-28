@@ -14,7 +14,7 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 		USING subscriptions s
 		JOIN plans p ON p.id = s.plan_id
 		WHERE ae.user_id = s.user_id
-		  AND ae.created_at < now() - (p.audit_retention_days || ' days')::interval`)
+		  AND ae.created_at < now() - make_interval(days => p.audit_retention_days)`)
 	if err != nil {
 		return 0, fmt.Errorf("purge expired audit events: %w", err)
 	}

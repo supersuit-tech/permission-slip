@@ -1,5 +1,7 @@
 import { Clock, Loader2 } from "lucide-react";
 import { useDataRetention } from "@/hooks/useDataRetention";
+import { Button } from "@/components/ui/button";
+import { FormError } from "@/components/FormError";
 import {
   Card,
   CardContent,
@@ -9,7 +11,7 @@ import {
 } from "@/components/ui/card";
 
 export function DataRetentionSection() {
-  const { dataRetention, isLoading } = useDataRetention();
+  const { dataRetention, isLoading, error, refetch } = useDataRetention();
 
   return (
     <Card>
@@ -31,6 +33,13 @@ export function DataRetentionSection() {
           >
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
+        ) : error ? (
+          <div className="space-y-3">
+            <FormError error="Failed to load data retention policy." />
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Try Again
+            </Button>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="rounded-lg border p-4 space-y-3">
@@ -46,14 +55,16 @@ export function DataRetentionSection() {
                   {dataRetention?.audit_retention_days ?? 7} days
                 </span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Account Data</span>
+                <span className="text-sm text-muted-foreground">
+                  Until account deletion
+                </span>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
               Audit log events older than your retention period are automatically
               deleted. Upgrade to a paid plan for 90-day retention.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Account data (profile, credentials) is retained until you
-              explicitly delete your account.
             </p>
           </div>
         )}

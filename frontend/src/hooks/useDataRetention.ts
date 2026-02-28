@@ -9,7 +9,7 @@ export function useDataRetention() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["data-retention"],
     queryFn: async () => {
       if (!accessToken) throw new Error("Missing access token");
@@ -23,5 +23,5 @@ export function useDataRetention() {
     staleTime: 60_000,
   });
 
-  return { dataRetention: data ?? null, isLoading, error };
+  return { dataRetention: data ?? null, isLoading, error, refetch };
 }

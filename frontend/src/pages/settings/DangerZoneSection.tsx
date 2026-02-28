@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
@@ -74,8 +74,18 @@ function DeleteAccountDialog({
   const { signOut } = useAuth();
   const { deleteAccount, isDeleting } = useDeleteAccount();
   const [confirmText, setConfirmText] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const isConfirmed = confirmText === "DELETE";
+
+  // Auto-focus the confirmation input when the dialog opens.
+  useEffect(() => {
+    if (open) {
+      // Small delay to let the dialog animation complete.
+      const timer = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -84,10 +94,11 @@ function DeleteAccountDialog({
     try {
       await deleteAccount();
       toast.success("Account deleted successfully.");
-      // Sign out after deletion — clears the session.
       await signOut();
-    } catch {
-      toast.error("Failed to delete account. Please try again.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete account";
+      toast.error(message);
     }
   }
 
@@ -124,6 +135,7 @@ function DeleteAccountDialog({
               Type <span className="font-mono font-bold">DELETE</span> to confirm
             </Label>
             <Input
+              ref={inputRef}
               id="delete-confirm"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
