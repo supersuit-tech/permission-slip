@@ -524,20 +524,81 @@ When running multiple instances, VAPID keys and `INVITE_HMAC_KEY` must be set as
 
 ### Rotating Secrets
 
+Setting any secret via `fly secrets set` triggers an automatic redeploy.
+
+#### Rotation Schedule
+
+| Secret | Cadence | Impact of Rotation |
+|---|---|---|
+| `DATABASE_URL` (password) | Every 90 days | None — new connections use the new password immediately |
+| `INVITE_HMAC_KEY` | Every 90 days | **Invalidates pending (unused) invite links.** Accepted invites are unaffected |
+| `SENDGRID_API_KEY` | Every 90 days | None — revoke the old key in SendGrid after deploying the new one |
+| `TWILIO_AUTH_TOKEN` | Every 90 days | None — regenerate in Twilio console, then update Fly |
+| `STRIPE_SECRET_KEY` | Every 90 days | None — roll the key in Stripe dashboard, update Fly, then revoke the old key |
+| `STRIPE_WEBHOOK_SECRET` | Every 90 days | None — create a new webhook endpoint in Stripe, update Fly, then delete the old endpoint |
+| `SENTRY_DSN` | Rarely (only if compromised) | None — DSNs are project-scoped and low-risk |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Rarely (only if compromised) | **Invalidates all push subscriptions.** Users must re-subscribe to browser notifications |
+| `SENTRY_AUTH_TOKEN` (build-time) | Every 90 days | None — only used during Docker builds for source map uploads |
+| `FLY_API_TOKEN` (CI/CD) | Every 90 days | None — regenerate via `fly tokens create deploy`, update in GitHub Actions secrets |
+
+#### How to Rotate Each Secret
+
+**Database password:**
+
+1. Change the password in your database provider (e.g., Supabase dashboard > Settings > Database)
+2. Update the connection string:
+   ```bash
+   fly secrets set DATABASE_URL="postgres://postgres.[ref]:[new-pass]@[host]:6543/postgres?sslmode=require"
+   ```
+
+**HMAC key:**
+
+Invalidates any pending invite links that haven't been accepted yet. Already-accepted invites are unaffected.
+
 ```bash
-# Generate new HMAC key
 fly secrets set INVITE_HMAC_KEY="$(openssl rand -hex 32)"
-
-# Rotate VAPID keys (WARNING: invalidates all push subscriptions)
-# Users will need to re-subscribe to push notifications
-go run ./cmd/generate-vapid-keys --format=fly
-# Copy the output and run the fly secrets set command
-
-# Rotate SendGrid API key
-fly secrets set SENDGRID_API_KEY="SG.new-key"
 ```
 
-Setting a secret triggers an automatic redeploy.
+**SendGrid API key:**
+
+1. Create a new API key in the [SendGrid console](https://app.sendgrid.com/settings/api_keys) with the same permissions
+2. Deploy the new key:
+   ```bash
+   fly secrets set SENDGRID_API_KEY="SG.new-key"
+   ```
+3. After verifying email still works, revoke the old key in SendGrid
+
+**Twilio auth token:**
+
+1. In the [Twilio console](https://console.twilio.com), go to Account > API keys and tokens and regenerate the auth token
+2. Deploy the new token:
+   ```bash
+   fly secrets set TWILIO_AUTH_TOKEN="new-token"
+   ```
+
+**Stripe keys:**
+
+1. In the [Stripe dashboard](https://dashboard.stripe.com/apikeys), roll the secret key (Stripe supports rolling keys with an overlap period)
+2. Deploy the new key:
+   ```bash
+   fly secrets set STRIPE_SECRET_KEY="sk_live_new"
+   ```
+3. For webhook secrets: create a new webhook endpoint, update `STRIPE_WEBHOOK_SECRET`, then delete the old endpoint
+
+**VAPID keys (avoid unless compromised):**
+
+This invalidates **all** existing push subscriptions. Users will see push notifications stop working until they re-visit the app and re-subscribe.
+
+```bash
+go run ./cmd/generate-vapid-keys --format=fly
+# Copy the output and run the fly secrets set command it prints
+```
+
+**Sentry auth token (build-time):**
+
+1. Create a new auth token in [Sentry](https://sentry.io/settings/auth-tokens/)
+2. Update the build arg in `fly.toml` or your CI pipeline
+3. Revoke the old token in Sentry
 
 ### Database Migrations
 
@@ -620,7 +681,6 @@ These are tracked under [#321](https://github.com/supersuit-tech/permission-slip
 - Automated backup restore tests
 - Penetration test / security audit
 - Auth endpoint rate limiting (brute force protection)
-- Secret rotation schedule (documented cadence)
 - Dependency update automation (Dependabot or Renovate)
 
 ## Troubleshooting
