@@ -169,6 +169,8 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
 | `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
 
+**Billing (`BILLING_ENABLED`):** Controls whether billing features are active. When unset or `false` (the default), all users are automatically assigned the unlimited `pay_as_you_go` plan — no Stripe keys, metering, or plan restrictions needed. Set to `true` for managed deployments that require plan-based limits and Stripe integration. The server logs the billing mode at startup. The frontend can query `GET /v1/config` to adapt its UI based on whether billing is enabled.
+
 **VAPID keys (Web Push):** Set all three to enable Web Push notifications. If none are set, Web Push is disabled. If partially configured, the server will refuse to start. In development mode (`MODE=development`), keys are auto-generated and stored in the database for convenience.
 
 Generate keys and set them as env vars for your platform:

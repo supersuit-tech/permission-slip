@@ -3,8 +3,14 @@ config:
     summary: Get server configuration
     description: |
       Returns server-level feature flags that the frontend uses to adapt its UI.
-      For example, when `billing_enabled` is false, billing-related pages and
-      upgrade prompts should be hidden.
+
+      **`billing_enabled`**: When `false` (the default for self-hosted deployments),
+      all users are auto-assigned the unlimited `pay_as_you_go` plan and billing-related
+      UI (plan selection, upgrade prompts, usage meters) should be hidden. When `true`,
+      the server enforces plan limits and integrates with Stripe for subscription management.
+
+      This endpoint requires authentication but does not require a profile, so it can
+      be called during the onboarding flow to determine what UI to show.
     operationId: getConfig
     tags:
       - Config
@@ -17,5 +23,7 @@ config:
           application/json:
             schema:
               $ref: '../schemas/config.yaml#/ConfigResponse'
+            example:
+              billing_enabled: false
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'

@@ -2,6 +2,9 @@ package api
 
 import "net/http"
 
+// configResponse exposes server-level feature flags to the frontend.
+// Add new fields here as more server config needs to be exposed
+// (e.g., feature flags for upcoming features).
 type configResponse struct {
 	BillingEnabled bool `json:"billing_enabled"`
 }
