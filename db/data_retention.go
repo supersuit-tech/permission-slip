@@ -7,18 +7,36 @@ import (
 
 // PurgeExpiredAuditEvents deletes audit events older than the retention period
 // for each user's plan. Free-tier users retain 7 days; paid users retain 90 days.
+//
+// Users without a subscription row (shouldn't happen, but defensive) are treated
+// as free-tier and get the 7-day default retention.
+//
 // Returns the total number of rows deleted.
 func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
-	tag, err := db.Exec(ctx, `
+	// Pass 1: Purge events for users with a subscription, using their plan's
+	// retention period.
+	tag1, err := db.Exec(ctx, `
 		DELETE FROM audit_events ae
 		USING subscriptions s
 		JOIN plans p ON p.id = s.plan_id
 		WHERE ae.user_id = s.user_id
 		  AND ae.created_at < now() - make_interval(days => p.audit_retention_days)`)
 	if err != nil {
-		return 0, fmt.Errorf("purge expired audit events: %w", err)
+		return 0, fmt.Errorf("purge expired audit events (subscribed users): %w", err)
 	}
-	return tag.RowsAffected(), nil
+
+	// Pass 2: Purge events for users without a subscription row, using the
+	// free-tier default (7 days). This is defensive — every user should have
+	// a subscription, but we don't want orphaned events to accumulate.
+	tag2, err := db.Exec(ctx, `
+		DELETE FROM audit_events ae
+		WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = ae.user_id)
+		  AND ae.created_at < now() - interval '7 days'`)
+	if err != nil {
+		return tag1.RowsAffected(), fmt.Errorf("purge expired audit events (unsubscribed users): %w", err)
+	}
+
+	return tag1.RowsAffected() + tag2.RowsAffected(), nil
 }
 
 // DeleteAccount deletes a user's profile and all associated data. Because most

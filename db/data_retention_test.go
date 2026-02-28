@@ -70,6 +70,41 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 		}
 	})
 
+	t.Run("PurgesOldEventsForUserWithoutSubscription", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+		// Deliberately do NOT insert a subscription — tests the fallback purge.
+
+		// Insert an event dated 10 days ago — should be purged (>7-day default).
+		testhelper.MustExec(t, tx,
+			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_nosub', 'approval', '{}', now() - interval '10 days')`,
+			uid, agentID)
+
+		// Insert a recent event — should NOT be purged.
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
+
+		deleted, err := db.PurgeExpiredAuditEvents(ctx, tx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if deleted != 1 {
+			t.Errorf("expected 1 deleted row, got %d", deleted)
+		}
+
+		// Verify the recent event still exists.
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Errorf("expected 1 remaining event, got %d", len(page.Events))
+		}
+	})
+
 	t.Run("PurgesOldPaidPlanEvents", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
