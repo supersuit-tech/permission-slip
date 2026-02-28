@@ -75,6 +75,12 @@ func validateConfig() (errs []configError, warnings []configError) {
 	}
 
 	// Optional but recommended — warn in all modes.
+	if os.Getenv("SUPABASE_SERVICE_ROLE_KEY") == "" {
+		warnings = append(warnings, configError{
+			envVar:  "SUPABASE_SERVICE_ROLE_KEY",
+			message: "not set; account deletion will not remove the Supabase auth user (recommended: set for production)",
+		})
+	}
 	if os.Getenv("INVITE_HMAC_KEY") == "" {
 		warnings = append(warnings, configError{
 			envVar:  "INVITE_HMAC_KEY",

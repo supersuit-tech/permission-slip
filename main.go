@@ -106,12 +106,14 @@ func main() {
 	deps.Logger = logger
 	deps.SupabaseJWTSecret = os.Getenv("SUPABASE_JWT_SECRET")
 	deps.SupabaseJWKSURL = os.Getenv("SUPABASE_JWKS_URL")
+	deps.SupabaseURL = strings.TrimRight(os.Getenv("SUPABASE_URL"), "/")
+	deps.SupabaseServiceRoleKey = os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
 	// Derive JWKS URL from SUPABASE_URL if not explicitly set.
 	// Supabase CLI v2+ uses ES256 (asymmetric signing); the JWKS endpoint
 	// provides the public key. Legacy CLI v1 and tests use HS256 + JWT secret.
 	if deps.SupabaseJWKSURL == "" {
-		if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
-			deps.SupabaseJWKSURL = strings.TrimRight(supabaseURL, "/") + "/auth/v1/.well-known/jwks.json"
+		if deps.SupabaseURL != "" {
+			deps.SupabaseJWKSURL = deps.SupabaseURL + "/auth/v1/.well-known/jwks.json"
 		}
 	}
 	if deps.SupabaseJWKSURL != "" {

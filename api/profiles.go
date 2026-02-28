@@ -207,6 +207,13 @@ func handleDeleteAccount(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Delete the Supabase Auth user. This is best-effort after the
+		// profile has been deleted — even if this fails, the user can no
+		// longer access any application data.
+		if err := deleteSupabaseAuthUser(r.Context(), deps, profile.ID); err != nil {
+			log.Printf("[%s] handleDeleteAccount: supabase auth cleanup (non-fatal): %v", TraceID(r.Context()), err)
+		}
+
 		RespondJSON(w, http.StatusOK, deleteAccountResponse{
 			Deleted: true,
 			Message: "Account and all associated data have been permanently deleted.",
@@ -248,4 +255,33 @@ func handleGetDataRetention(deps *Deps) http.HandlerFunc {
 			AuditRetentionDays: sp.Plan.AuditRetentionDays,
 		})
 	}
+}
+
+// deleteSupabaseAuthUser calls the Supabase Admin API to delete the auth user.
+// Requires SupabaseURL and SupabaseServiceRoleKey to be configured. If either
+// is missing, it logs a warning and returns nil (no-op).
+func deleteSupabaseAuthUser(ctx context.Context, deps *Deps, userID string) error {
+	if deps.SupabaseURL == "" || deps.SupabaseServiceRoleKey == "" {
+		log.Printf("Warning: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set; skipping auth user deletion for %s", userID)
+		return nil
+	}
+
+	url := fmt.Sprintf("%s/auth/v1/admin/users/%s", deps.SupabaseURL, userID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+deps.SupabaseServiceRoleKey)
+	req.Header.Set("apikey", deps.SupabaseServiceRoleKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("supabase admin API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("supabase admin API returned %d for user %s", resp.StatusCode, userID)
+	}
+	return nil
 }
