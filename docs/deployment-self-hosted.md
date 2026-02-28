@@ -363,6 +363,18 @@ Permission Slip is stateless (all state is in PostgreSQL), so horizontal scaling
 - **VAPID keys:** When running multiple instances, set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` explicitly so all instances use the same keys (don't rely on auto-generation)
 - **Action token signing:** Keys are ephemeral (generated per-instance on startup). Tokens are short-lived (max 5 min), so this works without shared key storage
 
+## Secret Rotation
+
+Rotate secrets on a regular cadence (every 90 days recommended for API keys and passwords). Key things to know:
+
+- **`DATABASE_URL`** — change the password in your database provider, then update the env var. No downtime.
+- **`INVITE_HMAC_KEY`** — regenerate with `openssl rand -hex 32`. **Invalidates pending invite links** (accepted invites are unaffected).
+- **`SENDGRID_API_KEY` / `TWILIO_AUTH_TOKEN`** — create a new key in the provider console, deploy it, then revoke the old key.
+- **`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`** — only rotate if compromised. **Invalidates all push subscriptions** (users must re-subscribe).
+- **`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`** — roll keys in Stripe dashboard (supports overlap periods), update env var, then revoke old key.
+
+For detailed rotation instructions and a full schedule, see the [Production Deployment Guide — Rotating Secrets](deployment-production.md#rotating-secrets).
+
 ## Troubleshooting
 
 **Server won't start — "required configuration value(s) missing":**
