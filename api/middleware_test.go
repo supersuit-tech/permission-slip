@@ -13,7 +13,7 @@ func TestSecurityHeadersMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware()(inner)
+	handler := SecurityHeadersMiddleware("")(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -44,7 +44,7 @@ func TestSecurityHeadersMiddleware(t *testing.T) {
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"font-src 'self' https://fonts.gstatic.com",
 		"img-src 'self' data:",
-		"connect-src 'self'",
+		"connect-src 'self' https://*.ingest.sentry.io",
 		"frame-ancestors 'none'",
 	}
 	for _, d := range requiredDirectives {
@@ -60,13 +60,13 @@ func TestSecurityHeadersMiddleware_ExtraConnectSrc(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware("https://abc.supabase.co", "https://other.example.com")(inner)
+	handler := SecurityHeadersMiddleware("", "https://abc.supabase.co", "https://other.example.com")(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	if !strings.Contains(csp, "connect-src 'self' https://abc.supabase.co https://other.example.com") {
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://abc.supabase.co https://other.example.com") {
 		t.Errorf("CSP connect-src missing extra origins; full CSP: %s", csp)
 	}
 }
@@ -87,15 +87,15 @@ func TestSecurityHeadersMiddleware_InvalidExtraConnectSrc(t *testing.T) {
 		`javascript:alert(1)`,                  // javascript scheme
 	}
 
-	handler := SecurityHeadersMiddleware(malicious...)(inner)
+	handler := SecurityHeadersMiddleware("", malicious...)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	// connect-src should only contain 'self' — all malicious entries rejected.
-	if !strings.Contains(csp, "connect-src 'self'; ") {
-		t.Errorf("CSP connect-src should be only 'self'; full CSP: %s", csp)
+	// connect-src should only contain 'self' + Sentry — all malicious entries rejected.
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io; ") {
+		t.Errorf("CSP connect-src should be only 'self' + sentry; full CSP: %s", csp)
 	}
 	for _, m := range malicious {
 		if strings.Contains(csp, m) {
@@ -114,7 +114,7 @@ func TestSecurityHeadersMiddleware_MixedValidAndInvalid(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware(
+	handler := SecurityHeadersMiddleware("",
 		"https://good.supabase.co",
 		`https://evil.com; script-src *`,
 		"http://also-good.example.com",
@@ -142,18 +142,80 @@ func TestSecurityHeadersMiddleware_EmptyExtraConnectSrc(t *testing.T) {
 	})
 
 	// Empty strings and whitespace-only strings should be ignored.
-	handler := SecurityHeadersMiddleware("", "  ")(inner)
+	handler := SecurityHeadersMiddleware("", "", "  ")(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	// connect-src should be exactly "'self'" with no trailing spaces from empty inputs.
-	if !strings.Contains(csp, "connect-src 'self'; ") {
+	// connect-src should be "'self' https://*.ingest.sentry.io" with no trailing spaces from empty inputs.
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io; ") {
 		t.Errorf("CSP connect-src has incorrect base formatting; full CSP: %s", csp)
 	}
-	if strings.Contains(csp, "connect-src 'self'  ") {
+	if strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io  ") {
 		t.Errorf("CSP connect-src has trailing whitespace from empty extra sources; full CSP: %s", csp)
+	}
+}
+
+func TestSecurityHeadersMiddleware_SentryCSPReportURI(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	endpoint := "https://o0.ingest.sentry.io/api/0/security/?sentry_key=abc"
+	handler := SecurityHeadersMiddleware(endpoint)(inner)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "report-uri "+endpoint) {
+		t.Errorf("CSP missing report-uri directive; full CSP: %s", csp)
+	}
+}
+
+func TestSecurityHeadersMiddleware_SentryCSPReportURIInjection(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	malicious := []string{
+		`https://evil.com; script-src *`,         // semicolon injection
+		"https://evil.com\nscript-src: *",        // newline injection
+		`https://evil.com' 'unsafe-inline`,       // single-quote injection
+		`http://evil.com/report`,                 // non-https
+		`not-a-url`,                              // invalid URL
+	}
+
+	for _, endpoint := range malicious {
+		handler := SecurityHeadersMiddleware(endpoint)(inner)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		csp := rec.Header().Get("Content-Security-Policy")
+		if strings.Contains(csp, "report-uri") {
+			t.Errorf("CSP should not contain report-uri for malicious endpoint %q; full CSP: %s", endpoint, csp)
+		}
+	}
+}
+
+func TestSecurityHeadersMiddleware_NoReportURIWhenEmpty(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := SecurityHeadersMiddleware("")(inner)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if strings.Contains(csp, "report-uri") {
+		t.Errorf("CSP should not contain report-uri when endpoint is empty; full CSP: %s", csp)
 	}
 }
 
@@ -163,7 +225,7 @@ func TestSecurityHeadersMiddleware_HeadersPresentOnAllMethods(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware()(inner)
+	handler := SecurityHeadersMiddleware("")(inner)
 
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions} {
 		req := httptest.NewRequest(method, "/test", nil)

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Permission Slip",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5",
+    "anchors": {
+      "from": "#6366F1",
+      "to": "#818CF8"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Sign In",
+      "url": "https://app.permissionslip.dev"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "https://app.permissionslip.dev"
+  },
+  "tabs": [
+    {
+      "name": "Guides",
+      "url": "guides"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/supersuit-tech/permission-slip-web"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Overview",
+      "pages": [
+        "introduction",
+        "how-it-works"
+      ]
+    },
+    {
+      "group": "Getting Started",
+      "pages": [
+        "getting-started/create-account",
+        "getting-started/secure-your-account",
+        "getting-started/register-first-agent"
+      ]
+    },
+    {
+      "group": "Agents",
+      "pages": [
+        "agents/overview",
+        "agents/register",
+        "agents/configure",
+        "agents/deactivate"
+      ]
+    },
+    {
+      "group": "Connectors",
+      "pages": [
+        "connectors/overview",
+        "connectors/enable-connector",
+        "connectors/action-configurations",
+        "connectors/credentials"
+      ]
+    },
+    {
+      "group": "Approvals",
+      "pages": [
+        "approvals/overview",
+        "approvals/review-requests",
+        "approvals/standing-approvals"
+      ]
+    },
+    {
+      "group": "Monitoring",
+      "pages": [
+        "activity/audit-log"
+      ]
+    },
+    {
+      "group": "Settings",
+      "pages": [
+        "settings/account",
+        "settings/notifications",
+        "settings/credential-vault"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/agent-integration"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/supersuit-tech/permission-slip-web"
+  }
+}

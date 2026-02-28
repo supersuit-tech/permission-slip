@@ -1,0 +1,76 @@
+---
+title: Standing Approvals
+description: Pre-authorize agents for repeated actions
+---
+
+# Standing Approvals
+
+Standing approvals let you pre-authorize an agent to execute a specific action type without asking for approval each time. They're useful for routine, trusted actions that you don't want to review individually.
+
+## How They Work
+
+When a standing approval is active and an agent submits a matching request:
+
+1. Permission Slip checks the action type and parameters against the standing approval's constraints.
+2. If everything matches, the request is **automatically approved** — no notification, no manual review.
+3. The execution count increments.
+4. The action is logged in the activity feed.
+
+If no standing approval matches, the request falls through to the normal one-off approval flow.
+
+## Create a Standing Approval
+
+<Steps>
+
+<Step title="Open the Standing Approvals card">
+  On your dashboard, find the **Standing Approvals** card and click **Create Standing Approval**.
+</Step>
+
+<Step title="Fill in the details">
+  - **Agent** — select which agent this applies to (deactivated agents are excluded).
+  - **Action Type** — the action type to pre-authorize (e.g., `github.create_issue`).
+  - **Version** — the action version (defaults to `1`).
+  - **Max Executions** — how many times the agent can use this approval. Leave blank for unlimited.
+  - **Expires At** — when the standing approval expires. Defaults to 30 days, maximum 90 days.
+</Step>
+
+<Step title="Create">
+  Click **Create**. The standing approval is immediately active and appears in the table.
+</Step>
+
+</Steps>
+
+## Monitoring Usage
+
+The Standing Approvals table shows:
+
+| Column | Description |
+|--------|-------------|
+| **Action** | The pre-authorized action type |
+| **Agent** | Which agent can use it |
+| **Executions** | Current count vs. maximum (e.g., `5 / 20` or `12 / ∞`) |
+| **Expires** | When the standing approval expires |
+
+The execution badge turns red when usage reaches 90% of the maximum, so you know when it's about to be exhausted.
+
+## Standing Approval States
+
+| State | Description |
+|-------|-------------|
+| **Active** | Can be used by the agent |
+| **Expired** | Duration has elapsed |
+| **Revoked** | You manually cancelled it |
+| **Exhausted** | Max execution count reached |
+
+## Revoke a Standing Approval
+
+To revoke a standing approval at any time:
+
+1. Click **Revoke** on the standing approval row.
+2. Confirm in the dialog.
+
+After revocation, the agent will need per-request approval for that action type going forward. Revocation cannot be undone — you'll need to create a new standing approval if you want to re-authorize the action.
+
+<Info>
+  Standing approvals are also automatically revoked when you deactivate an agent or remove a connector.
+</Info>

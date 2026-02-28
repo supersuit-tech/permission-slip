@@ -1,0 +1,61 @@
+---
+title: Configure an Agent
+description: Rename agents, manage connectors, and view credentials
+---
+
+# Configure an Agent
+
+The agent configuration page lets you manage everything about a registered agent — its name, connectors, credentials, and lifecycle.
+
+To access it, click **Configure** on any active agent in the Registered Agents card on your dashboard.
+
+## Agent Info
+
+At the top of the page, you'll see the agent's details:
+
+- **Agent ID** — the numeric identifier used in API calls.
+- **Status** — registered, pending, or deactivated.
+- **Registered** — when the agent completed verification.
+- **Last Active** — when the agent last made a request.
+
+### Rename an Agent
+
+Click the pencil icon next to the agent's name to edit it inline. Press Enter to save or Escape to cancel. Names can be up to 128 characters.
+
+## Enabled Connectors
+
+This section shows which connectors are active for the agent. Each row displays:
+
+- The connector name and description
+- Available action types
+- When it was enabled
+- Buttons to **Configure** (opens the connector detail page) or **Remove**
+
+Click **Add Connector** to enable a new integration for this agent.
+
+<Warning>
+  Removing a connector automatically revokes any standing approvals for actions from that connector.
+</Warning>
+
+## Credentials
+
+This section shows the authentication status for each service required by the agent's enabled connectors. Each credential shows:
+
+- The service name and auth type
+- **Connected** (green) if credentials are stored, or **Not configured** if missing
+
+Missing credentials mean the agent won't be able to execute actions for that service, even if approved. See [Credentials](/connectors/credentials) for setup details.
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Enable a connector" icon="plug" href="/connectors/enable-connector">
+  Add integrations to define what the agent can do.
+</Card>
+
+<Card title="Action configurations" icon="sliders" href="/connectors/action-configurations">
+  Set parameter constraints for how the agent uses actions.
+</Card>
+
+</CardGroup>

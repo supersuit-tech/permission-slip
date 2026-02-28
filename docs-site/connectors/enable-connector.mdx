@@ -1,0 +1,58 @@
+---
+title: Enable a Connector
+description: Add an integration to an agent
+---
+
+# Enable a Connector
+
+Enabling a connector for an agent allows that agent to submit approval requests for the connector's actions.
+
+## Add a Connector to an Agent
+
+<Steps>
+
+<Step title="Open the agent's config page">
+  From the dashboard, click **Configure** on the agent you want to set up.
+</Step>
+
+<Step title="Click Add Connector">
+  In the **Enabled Connectors** section, click **Add Connector**.
+</Step>
+
+<Step title="Select a connector">
+  Choose from the available connector templates. Each template shows the connector name, description, and available actions.
+</Step>
+
+<Step title="Configure and save">
+  The connector is now enabled for this agent. You'll see it listed in the Enabled Connectors table.
+</Step>
+
+</Steps>
+
+## After Enabling
+
+Once a connector is enabled, you'll typically want to:
+
+1. **Add credentials** — store the authentication tokens the connector needs to execute actions (e.g., a GitHub personal access token). Without credentials, actions can be approved but not executed.
+2. **Create action configurations** — optionally define parameter constraints that control exactly how the agent can use each action.
+
+## Connector Detail Page
+
+Click **Configure** on an enabled connector to open its detail page, where you can:
+
+- View the connector's description and auth type
+- See all available actions and their descriptions
+- Manage action configurations
+- Add or remove credentials
+- Disable the connector
+
+## Remove a Connector
+
+To remove a connector from an agent:
+
+1. On the agent's config page, click **Remove** next to the connector.
+2. Confirm the removal in the dialog.
+
+<Warning>
+  Removing a connector automatically revokes any active standing approvals for actions from that connector.
+</Warning>

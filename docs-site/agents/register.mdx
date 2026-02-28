@@ -1,0 +1,47 @@
+---
+title: Register an Agent
+description: Create an invite and walk through the registration flow
+---
+
+# Register an Agent
+
+To connect an agent to Permission Slip, you generate a single-use invite, share it with the agent, and then verify the agent using a confirmation code.
+
+## Step 1: Generate an Invite
+
+1. On the dashboard, find the **Registered Agents** card.
+2. Click **Add an Agent**.
+3. Click **Generate Invite Instructions**.
+
+Permission Slip generates a set of instructions containing:
+- The API endpoint
+- A single-use invite code
+- Details on how to authenticate
+
+Copy the instructions and send them to your agent.
+
+<Info>
+  Invites expire in **15 minutes** and can only be used once. If one expires, generate a new one.
+</Info>
+
+## Step 2: Agent Registers
+
+The agent calls `POST /invite/{invite_code}` with:
+- An Ed25519 public key (used for all future authentication)
+- A unique request ID (for replay protection)
+- The request signed with the corresponding private key
+
+On success, the agent receives its `agent_id` and appears in your dashboard with a **Pending** status.
+
+## Step 3: Verify with Confirmation Code
+
+1. On the dashboard, click **Review** next to the pending agent.
+2. Copy the **confirmation code** (format: `ABC-DEF`) and the verification instructions.
+3. Send these to the agent.
+4. The agent submits the confirmation code via `POST /v1/agents/{id}/verify`.
+
+Once verified, the agent's status changes to **Registered** and it can start submitting approval requests.
+
+## Post-Registration Instructions
+
+After successful verification, Permission Slip displays post-registration instructions you can share with the agent. These include details on how to submit approval requests and what endpoints are available.

@@ -42,10 +42,12 @@ typecheck: generate
 	cd frontend && npx tsc --noEmit
 
 # Build for production (generates API client first, then compiles)
+# Embeds the git SHA as the Sentry release version via -ldflags.
+GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 build: generate
 	cd frontend && npm run build
 	touch frontend/dist/.gitkeep
-	go build -o bin/server .
+	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
 
 # Run the production binary
 run:

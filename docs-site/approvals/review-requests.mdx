@@ -1,0 +1,61 @@
+---
+title: Review Approval Requests
+description: How to review, approve, and deny agent requests
+---
+
+# Review Approval Requests
+
+When an agent submits an approval request, it appears on your dashboard in the **Pending Approvals** card. New requests show up in real time — no page refresh needed.
+
+## Getting Notified
+
+You'll be notified about new requests through your configured channels:
+
+- **Dashboard** — updates instantly via server-sent events.
+- **Email** — if enabled, sends to your contact email.
+- **Browser push** — real-time browser notifications.
+- **SMS** — text message notifications for urgent requests.
+
+Configure your notification preferences in [Settings → Notifications](/settings/notifications).
+
+## Reviewing a Request
+
+Each pending request shows:
+
+- **Agent** — which agent is making the request.
+- **Action type** — what the agent wants to do (e.g., `github.create_issue`).
+- **Risk level** — Low, Medium, or High.
+- **Summary** — a human-readable summary of the action parameters.
+- **Time remaining** — a countdown until the request expires.
+
+Click **Review** to open the full details dialog.
+
+### Review Dialog
+
+The review dialog shows:
+
+- **Agent info** — name and ID.
+- **Action details** — the full action type, risk badge, time remaining, and description.
+- **Action summary** — key parameters in a readable format.
+- **Expandable parameters** — click to see the complete parameter set.
+- **High-risk warning** — if the risk level is High, a red alert box is displayed prominently.
+
+## Making a Decision
+
+- Click **Approve** to authorize the action. A confirmation code will be displayed — share this with the agent.
+- Click **Deny** to reject the request. The agent is notified that the request was denied.
+
+<Warning>
+  If the request has expired (countdown reached zero), the Approve button is disabled. The agent will need to submit a new request.
+</Warning>
+
+## After Approval
+
+When you approve a request:
+
+1. A **confirmation code** is displayed on screen (format: `ABC-DEF`).
+2. Copy the code and share it with the agent.
+3. The agent submits the code to receive a **single-use execution token**.
+4. The agent uses the token to execute the action.
+
+The approval and execution are recorded in the [Activity Log](/activity/audit-log).

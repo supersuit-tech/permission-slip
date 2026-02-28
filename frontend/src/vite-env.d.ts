@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY: string;
   /** Set to "true" to load the standalone React DevTools connector (dev only). */
   readonly VITE_REACT_DEVTOOLS?: string;
+  /** Sentry DSN for error tracking. Omit to disable Sentry. */
+  readonly VITE_SENTRY_DSN?: string;
 }
 
 interface ImportMeta {

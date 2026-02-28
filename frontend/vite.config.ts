@@ -2,9 +2,34 @@ import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+
+// Source maps are only generated when all Sentry upload vars are present.
+// This prevents .map files from being left in dist/ and accidentally served
+// publicly by the Go SPA handler when the upload step is skipped.
+const sentryUploadEnabled = Boolean(
+  process.env.SENTRY_AUTH_TOKEN &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT,
+);
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // Sentry source-map upload runs only during production builds when the
+    // required env vars are set. Place after other plugins so Sentry can
+    // process the final bundle output.
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: {
+        filesToDeleteAfterUpload: ["./dist/**/*.map"],
+      },
+      disable: !sentryUploadEnabled,
+    }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -31,5 +56,11 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    // Generate source maps only when Sentry upload is configured.
+    // "hidden" generates .map files without adding sourceMappingURL comments
+    // to the bundles. The Sentry plugin uploads then deletes them.
+    // When upload is not configured, skip generation entirely so .map files
+    // don't end up in dist/ and get served publicly.
+    sourcemap: sentryUploadEnabled ? "hidden" : false,
   },
 });

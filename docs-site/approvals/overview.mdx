@@ -1,0 +1,56 @@
+---
+title: Approvals Overview
+description: How the approval workflow keeps you in control
+---
+
+# Approvals
+
+Approvals are the core of Permission Slip. Every time an agent wants to take an action, it submits an approval request. You review the request, and either approve or deny it before anything happens.
+
+## Two Types of Approvals
+
+### One-Off Approvals
+
+The default flow. An agent submits a request, you review it, and you decide. Each request is independent — approving one doesn't affect future requests.
+
+**Flow:**
+1. Agent submits request → you get notified.
+2. You review the action type, parameters, and risk level.
+3. You approve or deny.
+4. If approved, the agent receives a confirmation code and can execute the action.
+
+### Standing Approvals
+
+Pre-authorizations for repeated actions. Instead of reviewing the same type of request every time, you create a standing approval that lets the agent execute a specific action type automatically — within the constraints you set.
+
+**Guardrails:**
+- Execution limits (or unlimited)
+- Automatic expiration (up to 90 days)
+- Revocable at any time
+
+[Learn more about standing approvals →](/approvals/standing-approvals)
+
+## Approval States
+
+| State | Description |
+|-------|-------------|
+| **Pending** | Awaiting your review. Has a countdown timer. |
+| **Approved** | You approved the request. Agent can verify and execute. |
+| **Denied** | You denied the request. Agent is notified. |
+| **Cancelled** | Agent cancelled the request before you reviewed it. |
+
+## Risk Levels
+
+Every approval request includes a risk level set by the agent:
+
+- **Low** — routine or read-only actions. Displayed with a green badge.
+- **Medium** — actions that modify data. Displayed with a yellow badge.
+- **High** — sensitive actions like financial transactions or data deletion. Displayed with a red badge and a prominent warning.
+
+## Confirmation Codes
+
+After you approve a request, Permission Slip generates a 6-character confirmation code (format: `ABC-DEF`). This code is displayed on screen and can be copied. The agent uses this code to verify the approval and receive a single-use execution token.
+
+<Info>
+  Confirmation codes use an unambiguous character set — no `0/O` or `1/I` confusion. The agent has up to 5 attempts to submit the correct code.
+</Info>

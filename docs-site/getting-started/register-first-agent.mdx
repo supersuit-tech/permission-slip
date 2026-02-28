@@ -1,0 +1,45 @@
+---
+title: Register Your First Agent
+description: Add an AI agent to Permission Slip and connect it
+---
+
+# Register Your First Agent
+
+Agents are AI systems that connect to Permission Slip to request approval before taking actions. Here's how to get one registered.
+
+## Generate an Invite
+
+<Steps>
+
+<Step title="Open the dashboard">
+  From your dashboard, find the **Registered Agents** card and click **Add an Agent**.
+</Step>
+
+<Step title="Generate invite instructions">
+  Click **Generate Invite Instructions**. Permission Slip creates a single-use invite that expires in 15 minutes.
+</Step>
+
+<Step title="Share with your agent">
+  Copy the registration instructions and send them to your AI agent. The instructions contain everything the agent needs to register: the API endpoint, invite code, and authentication details.
+</Step>
+
+</Steps>
+
+## What Happens Next
+
+1. **The agent registers** — it calls the Permission Slip API with its public key and the invite code.
+2. **You see it as "Pending"** — the agent appears in your Registered Agents list with a pending status and a confirmation code.
+3. **Share the confirmation code** — click **Review** on the pending agent to see the confirmation code and verification instructions. Copy and send these to the agent.
+4. **The agent verifies** — once the agent submits the confirmation code, its status changes to **Registered** and it's ready to submit approval requests.
+
+<Info>
+  Invites are single-use and expire in 15 minutes. If one expires, just generate a new one.
+</Info>
+
+## After Registration
+
+Your agent is now connected. The next step is to enable connectors so the agent knows what actions it can request.
+
+<Card title="Enable a connector" icon="plug" href="/connectors/enable-connector">
+  Set up integrations so your agent can submit action requests.
+</Card>

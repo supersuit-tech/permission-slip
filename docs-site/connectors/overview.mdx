@@ -1,0 +1,56 @@
+---
+title: Connectors Overview
+description: Integrations that define what actions agents can take
+---
+
+# Connectors
+
+A **connector** is an integration that defines a set of actions an agent can request. When you enable a connector for an agent, you're telling Permission Slip: "this agent is allowed to request these types of actions."
+
+## How Connectors Work
+
+Each connector provides:
+
+- **Actions** — the specific operations the agent can request (e.g., `github.create_issue`, `github.merge_pr`).
+- **Parameter schemas** — what data each action requires, defined as JSON Schema.
+- **Credential requirements** — what authentication the connector needs to execute actions on your behalf (e.g., a GitHub personal access token).
+
+When an agent submits an approval request, Permission Slip checks that the action type belongs to a connector enabled for that agent. When the action is executed, Permission Slip uses your stored credentials to authenticate with the external service — the agent never sees your credentials.
+
+## Available Connectors
+
+Connectors can be built-in or loaded from the filesystem:
+
+| Connector | Actions | Auth Type |
+|-----------|---------|-----------|
+| **GitHub** | Create issues, merge pull requests | API key (personal access token) |
+
+<Info>
+  More connectors are being added. You can also build custom connectors — see the [Agent Integration Guide](/guides/agent-integration) for details.
+</Info>
+
+## Connector per Agent
+
+Connectors are enabled on a per-agent basis. This means:
+
+- Agent A might have GitHub enabled but not Slack.
+- Agent B might have both GitHub and Slack enabled.
+- Each agent can have its own action configurations and credential bindings for the same connector.
+
+## Next Steps
+
+<CardGroup cols={3}>
+
+<Card title="Enable a connector" icon="plug" href="/connectors/enable-connector">
+  Add a connector to an agent.
+</Card>
+
+<Card title="Action configurations" icon="sliders" href="/connectors/action-configurations">
+  Constrain how agents use actions.
+</Card>
+
+<Card title="Credentials" icon="key" href="/connectors/credentials">
+  Store service credentials securely.
+</Card>
+
+</CardGroup>

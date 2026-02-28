@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/react";
+import { type ReactNode, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
@@ -5,7 +7,6 @@ import LoginPage from "./auth/LoginPage";
 import MfaChallengePage from "./auth/MfaChallengePage";
 import OnboardingPage from "./auth/OnboardingPage";
 import { AppLayout } from "./components/AppLayout";
-import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Dashboard } from "./pages/dashboard/Dashboard";
 import { AgentConfigPage } from "./pages/agents/AgentConfigPage";
 import { ConnectorConfigPage } from "./pages/agents/connectors/ConnectorConfigPage";
@@ -15,6 +16,8 @@ import { PrivacyPolicyPage } from "./pages/policy/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/policy/TermsOfServicePage";
 import { CookiePolicyPage } from "./pages/policy/CookiePolicyPage";
 import { useProfile } from "./hooks/useProfile";
+
+const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
 /** Full-page placeholder shown while auth or profile data is loading. */
 function LoadingFallback() {
@@ -45,18 +48,28 @@ function LoadingFallback() {
  */
 function App() {
   const { pathname } = useLocation();
-  const { authStatus } = useAuth();
+  const { authStatus, user } = useAuth();
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
+
+  // Set Sentry user context so errors include the user's identity.
+  // Only the opaque Supabase user ID is sent — no email or PII.
+  useEffect(() => {
+    if (authStatus === "authenticated" && user) {
+      Sentry.setUser({ id: user.id });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [authStatus, user]);
 
   // Policy pages are public — render without auth.
   if (pathname.startsWith("/policy/")) {
     return (
-      <Routes>
+      <SentryRoutes>
         <Route path="/policy/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/policy/terms" element={<TermsOfServicePage />} />
         <Route path="/policy/cookies" element={<CookiePolicyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </SentryRoutes>
     );
   }
 
@@ -81,18 +94,48 @@ function App() {
   }
 
   return (
-    <ErrorBoundary>
+    <Sentry.ErrorBoundary fallback={<AppCrashFallback />} showDialog>
       <AppLayout>
-        <Routes>
-          <Route path="/" element={<ErrorBoundary fallback={<RouteErrorFallback />}><Dashboard /></ErrorBoundary>} />
-          <Route path="/agents/:agentId" element={<ErrorBoundary fallback={<RouteErrorFallback />}><AgentConfigPage /></ErrorBoundary>} />
-          <Route path="/agents/:agentId/connectors/:connectorId" element={<ErrorBoundary fallback={<RouteErrorFallback />}><ConnectorConfigPage /></ErrorBoundary>} />
-          <Route path="/activity" element={<ErrorBoundary fallback={<RouteErrorFallback />}><ActivityPage /></ErrorBoundary>} />
-          <Route path="/settings" element={<ErrorBoundary fallback={<RouteErrorFallback />}><SettingsPage /></ErrorBoundary>} />
+        <SentryRoutes>
+          <Route path="/" element={<RouteWithBoundary><Dashboard /></RouteWithBoundary>} />
+          <Route path="/agents/:agentId" element={<RouteWithBoundary><AgentConfigPage /></RouteWithBoundary>} />
+          <Route path="/agents/:agentId/connectors/:connectorId" element={<RouteWithBoundary><ConnectorConfigPage /></RouteWithBoundary>} />
+          <Route path="/activity" element={<RouteWithBoundary><ActivityPage /></RouteWithBoundary>} />
+          <Route path="/settings" element={<RouteWithBoundary><SettingsPage /></RouteWithBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        </SentryRoutes>
       </AppLayout>
-    </ErrorBoundary>
+    </Sentry.ErrorBoundary>
+  );
+}
+
+/** Wraps a route's content in Sentry.ErrorBoundary so a crash on one page
+ *  doesn't take down the entire app — the nav and layout remain usable. */
+function RouteWithBoundary({ children }: { children: ReactNode }) {
+  return (
+    <Sentry.ErrorBoundary fallback={<RouteErrorFallback />}>
+      {children}
+    </Sentry.ErrorBoundary>
+  );
+}
+
+/** Full-page crash fallback when the outer ErrorBoundary catches an error. */
+function AppCrashFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-8">
+      <div className="text-center">
+        <h1 className="mb-2 text-2xl font-semibold">Something went wrong</h1>
+        <p className="text-muted-foreground mb-4">
+          An unexpected error occurred. Please try refreshing the page.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Refresh Page
+        </button>
+      </div>
+    </div>
   );
 }
 

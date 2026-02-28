@@ -159,6 +159,7 @@ var jwksHTTPClient = &http.Client{Timeout: 10 * time.Second}
 // The algorithm is read from the incoming token's "alg" header — no config
 // needed per-request. Both modes enforce aud="authenticated" and expiry.
 func RequireSession(deps *Deps) func(http.Handler) http.Handler {
+	var jwksMisconfigOnce sync.Once
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -193,6 +194,9 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 			case "ES256":
 				if deps.JWKSCache == nil {
 					log.Printf("[%s] ES256 token but JWKS cache not configured", TraceID(r.Context()))
+					jwksMisconfigOnce.Do(func() {
+						CaptureError(r.Context(), fmt.Errorf("ES256 token received but JWKS cache not configured"))
+					})
 					RespondError(w, r, http.StatusInternalServerError, InternalError("Session authentication not configured"))
 					return
 				}
@@ -243,6 +247,9 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 			}
 
 			ctx := context.WithValue(r.Context(), userIDKey{}, sub)
+			// Tag Sentry events with the authenticated user so error reports
+			// show which user was affected.
+			SetSentryUser(ctx, sub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -273,6 +280,7 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 			profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 			if err != nil {
 				log.Printf("[%s] RequireProfile: profile lookup: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify profile"))
 				return
 			}

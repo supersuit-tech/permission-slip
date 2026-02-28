@@ -1,0 +1,62 @@
+---
+title: Action Configurations
+description: Define parameter constraints for how agents use actions
+---
+
+# Action Configurations
+
+Action configurations let you define exactly how an agent can use a specific action. You set which parameters are locked to specific values and which the agent can choose freely.
+
+## Why Use Action Configurations?
+
+Without configurations, an agent can request any action from its enabled connectors with any parameters. Configurations add guardrails:
+
+- **Lock parameters** — force specific values (e.g., only allow creating issues in a specific repository).
+- **Constrain values** — use wildcard patterns to limit what the agent can pass.
+- **Bind credentials** — link a specific credential to the configuration so the right account is used.
+
+When an agent includes a `configuration_id` in its approval request, Permission Slip validates the action parameters against the configuration's constraints before processing the request.
+
+## Create a Configuration
+
+<Steps>
+
+<Step title="Open the connector detail page">
+  Navigate to the agent's config page, then click **Configure** on the connector.
+</Step>
+
+<Step title="Click Add Configuration">
+  In the **Action Configurations** section, click **Add Configuration**.
+</Step>
+
+<Step title="Fill in the details">
+  - **Name** — a human-readable label for this configuration.
+  - **Action** — select which action this configuration applies to.
+  - **Parameters** — set values or constraints for each parameter.
+  - **Credential** — optionally bind a stored credential.
+  - **Enabled** — toggle whether the configuration is active.
+</Step>
+
+<Step title="Save">
+  Click **Create**. The configuration appears in the table and is immediately active.
+</Step>
+
+</Steps>
+
+## Manage Configurations
+
+Each configuration in the table shows:
+
+| Column | Description |
+|--------|-------------|
+| **Name** | The configuration's label |
+| **Action** | Which action type it applies to |
+| **Parameters** | Number of constrained parameters |
+| **Credential** | Which stored credential is bound (if any) |
+| **Status** | Enabled or disabled |
+
+Use the pencil icon to **edit** a configuration or the trash icon to **delete** it.
+
+## Configuration Templates
+
+Some connectors provide pre-built templates that you can use as a starting point. Templates pre-fill the action type and common parameter values, so you only need to customize the parts specific to your use case.

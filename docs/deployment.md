@@ -98,11 +98,31 @@ curl https://your-app.fly.dev/api/health
 | `ALLOWED_ORIGINS` | Recommended | CORS origins (e.g., `https://app.permissionslip.dev`). Defaults to same-origin only if unset |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
 | `SUPABASE_JWT_SECRET` | Legacy only | JWT secret for HS256 verification. Not needed when using ES256/JWKS (derived automatically from `SUPABASE_URL`) |
+| `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking |
+| `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint for CSP violation tracking |
 | `VAPID_PUBLIC_KEY` | Optional | VAPID public key for Web Push (auto-generated if unset) |
 | `VAPID_PRIVATE_KEY` | Optional | VAPID private key for Web Push (auto-generated if unset) |
 | `VAPID_SUBJECT` | Optional | `mailto:` URL for VAPID (e.g., `mailto:admin@mycompany.com`) |
 
 **Note:** `VAULT_SECRET_KEY` is configured on the Supabase side (in `supabase/config.toml`), not as a Fly secret. Your hosted Supabase project manages its own vault encryption key.
+
+### Error tracking (Sentry)
+
+Frontend error tracking requires `VITE_SENTRY_DSN` as a **build arg** (it's inlined at build time like other `VITE_*` variables):
+
+```bash
+fly deploy --build-arg VITE_SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
+```
+
+To upload source maps during builds, also set these as build args or CI secrets:
+
+```bash
+fly deploy \
+  --build-arg VITE_SENTRY_DSN="https://..." \
+  --build-arg SENTRY_AUTH_TOKEN="sntrys_..." \
+  --build-arg SENTRY_ORG="your-org" \
+  --build-arg SENTRY_PROJECT="your-project"
+```
 
 ### Optional notification secrets
 

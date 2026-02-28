@@ -177,6 +177,7 @@ func handleTokenPath(w http.ResponseWriter, r *http.Request, deps *Deps, agent *
 			return
 		}
 		log.Printf("[%s] ExecuteActionToken: connector execution: %v", TraceID(r.Context()), execErr)
+		CaptureError(r.Context(), execErr)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute action"))
 		return
 	} else if result != nil {
@@ -322,6 +323,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 			return
 		}
 		log.Printf("[%s] ExecuteActionStanding: connector execution: %v", TraceID(r.Context()), execErr)
+		CaptureError(r.Context(), execErr)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
 		return
 	} else if result != nil {

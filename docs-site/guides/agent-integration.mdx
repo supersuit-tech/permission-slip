@@ -1,0 +1,227 @@
+---
+title: Agent Integration Guide
+description: How to integrate an AI agent with Permission Slip
+---
+
+# Agent Integration Guide
+
+This guide covers how to build an AI agent that works with Permission Slip — from registration to executing approved actions.
+
+## Prerequisites
+
+Your agent needs:
+
+- An **Ed25519 key pair** for signing requests.
+- The ability to make **HTTPS requests** to the Permission Slip API.
+- The **base URL**: `https://app.permissionslip.dev`
+
+## Authentication
+
+All agent API requests are authenticated using Ed25519 request signatures. Every request must include the `X-Permission-Slip-Signature` header with the following fields:
+
+```
+agent_id="42", algorithm="Ed25519", timestamp="1709136000", signature="<base64url_signature>"
+```
+
+The signature is computed over a canonical string with the following format:
+
+```
+<METHOD>\n<PATH>\n<QUERY>\n<TIMESTAMP>\n<BODY_HASH>
+```
+
+Where:
+- **METHOD** — uppercase HTTP method (e.g., `POST`)
+- **PATH** — the request path (e.g., `/v1/approvals/request`)
+- **QUERY** — query parameters sorted lexicographically, percent-encoded (empty string if none)
+- **TIMESTAMP** — Unix timestamp (must be within ±5 minutes of server time)
+- **BODY_HASH** — lowercase hex SHA-256 hash of the request body (use the SHA-256 of an empty string for bodyless requests)
+
+The signature is the Ed25519 signature of this canonical string, encoded as base64url (no padding).
+
+## Registration Flow
+
+### 1. Receive Invite Instructions
+
+Your user generates invite instructions from the Permission Slip dashboard and shares them with you.
+
+### 2. Register with Public Key
+
+```
+POST /invite/{invite_code}
+```
+
+Request body:
+```json
+{
+  "request_id": "unique-uuid",
+  "public_key": "ssh-ed25519 AAAA...",
+  "metadata": {}
+}
+```
+
+The request must be signed with your private key. On success, you receive your `agent_id`.
+
+### 3. Verify with Confirmation Code
+
+Your user shares a 6-character confirmation code (format: `ABC-DEF`).
+
+```
+POST /v1/agents/{agent_id}/verify
+```
+
+```json
+{
+  "confirmation_code": "ABC-DEF"
+}
+```
+
+After verification, your status changes to **registered** and you can start submitting requests.
+
+## Approval Flow
+
+### 1. Request Approval
+
+```
+POST /v1/approvals/request
+```
+
+```json
+{
+  "request_id": "unique-uuid",
+  "agent_id": 42,
+  "approver": "username",
+  "action": {
+    "type": "github.create_issue",
+    "version": "1",
+    "parameters": {
+      "owner": "acme",
+      "repo": "app",
+      "title": "Bug report",
+      "body": "Description of the issue"
+    }
+  },
+  "context": {
+    "description": "Create a bug report for the login issue",
+    "risk_level": "low"
+  }
+}
+```
+
+<Info>
+  The `agent_id` in the request body must match the `agent_id` in the signature header. The `approver` field is the username of the person who will review the request.
+</Info>
+
+Response includes:
+- `approval_id` — track the request
+- `approval_url` — deep link for the approver to review
+- `status` — initially `"pending"`
+- `expires_at` — when the request expires
+
+### 2. Wait for Decision
+
+The approver reviews the request on their dashboard. You can either:
+- **Poll** by re-requesting and checking the status
+- **Cancel** the request if it's no longer needed via `POST /v1/approvals/{approval_id}/cancel`
+
+### 3. Verify Approval
+
+Once approved, your user shares the 6-character confirmation code displayed on their screen.
+
+```
+POST /v1/approvals/{approval_id}/verify
+```
+
+```json
+{
+  "request_id": "unique-uuid",
+  "confirmation_code": "RK3-P7M"
+}
+```
+
+On success, you receive a single-use JWT token:
+
+```json
+{
+  "status": "approved",
+  "approved_at": "2026-02-11T13:20:45Z",
+  "token": {
+    "access_token": "eyJhbGci...",
+    "expires_at": "2026-02-11T13:25:45Z",
+    "scope": "github.create_issue",
+    "scope_version": "1"
+  }
+}
+```
+
+<Warning>
+  You have a maximum of **5 attempts** to submit the correct confirmation code. After 5 failures, the approval is locked out.
+</Warning>
+
+### 4. Execute the Action
+
+```
+POST /v1/actions/execute
+```
+
+Pass the token in the JSON request body (not in the Authorization header). The request must also be signed with your Ed25519 key.
+
+```json
+{
+  "token": "<access_token from verify response>",
+  "action_id": "github.create_issue",
+  "parameters": {
+    "owner": "acme",
+    "repo": "app",
+    "title": "Bug report",
+    "body": "Description of the issue"
+  }
+}
+```
+
+Permission Slip verifies the token, fetches the user's stored credentials, calls the external service, and returns the result. The token is consumed after use — it cannot be reused.
+
+## Standing Approvals
+
+If your user has created a standing approval for your action type, you can skip the one-off approval flow. Submit the action directly to the execute endpoint without a token:
+
+```json
+{
+  "request_id": "unique-uuid",
+  "action": {
+    "type": "github.create_issue",
+    "version": "1",
+    "parameters": {
+      "owner": "acme",
+      "repo": "app",
+      "title": "Bug report",
+      "body": "Description of the issue"
+    }
+  }
+}
+```
+
+Permission Slip checks for matching standing approvals and executes automatically if one matches. If no standing approval matches, you'll get a `404` with a hint to use the one-off approval flow instead.
+
+## Error Handling
+
+| Status Code | Meaning |
+|-------------|---------|
+| `400` | Invalid request (missing fields, bad parameters, invalid action type) |
+| `401` | Invalid signature, unknown agent, or incorrect confirmation code |
+| `403` | Agent not authorized, token scope mismatch, or parameters don't match |
+| `404` | Approval/resource not found, or no matching standing approval |
+| `409` | Duplicate request ID (replay protection) |
+| `410` | Approval expired or standing approval expired |
+| `429` | Rate limited or too many verification attempts (max 5) |
+| `502` | External service returned an error |
+
+## Discovering Available Connectors
+
+Connector discovery endpoints are public (no authentication required):
+
+```
+GET /v1/connectors          # List all available connectors
+GET /v1/connectors/{id}     # Get connector details including actions and parameter schemas
+```
+
+Use these to discover what actions are available and what parameters each action expects.

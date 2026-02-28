@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"sync"
+
+	"github.com/getsentry/sentry-go"
 )
 
 // PreferenceChecker determines whether a channel is enabled for a given user.
@@ -96,6 +98,10 @@ func (d *Dispatcher) sendAll(ctx context.Context, senders []Sender, approval App
 			defer wg.Done()
 			if err := s.Send(ctx, approval, recipient); err != nil {
 				log.Printf("notify: channel %q failed for approval %s: %v", s.Name(), approval.ApprovalID, err)
+				hub := sentry.CurrentHub().Clone()
+				hub.Scope().SetTag("channel", s.Name())
+				hub.Scope().SetTag("approval_id", approval.ApprovalID)
+				hub.CaptureException(err)
 			}
 		}(sender)
 	}

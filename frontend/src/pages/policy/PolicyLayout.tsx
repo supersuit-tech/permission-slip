@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 interface PolicyLayoutProps {
   title: string;
+  lastUpdated?: string;
   children: ReactNode;
 }
 
@@ -11,7 +12,7 @@ interface PolicyLayoutProps {
  * Shared layout for public-facing policy pages (Privacy, Terms, Cookies).
  * Renders outside the auth gate so anyone can view legal documents.
  */
-export function PolicyLayout({ title, children }: PolicyLayoutProps) {
+export function PolicyLayout({ title, lastUpdated, children }: PolicyLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
@@ -33,6 +34,11 @@ export function PolicyLayout({ title, children }: PolicyLayoutProps) {
             <span className="text-lg font-bold">Permission Slip</span>
           </div>
           <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+          {lastUpdated && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Last updated: {lastUpdated}
+            </p>
+          )}
         </header>
 
         <main className="prose prose-neutral dark:prose-invert max-w-none">

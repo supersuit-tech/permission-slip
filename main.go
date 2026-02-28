@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -33,6 +34,10 @@ import (
 //go:embed all:frontend/dist
 var distFS embed.FS
 
+// version is set at build time via -ldflags.
+// Example: go build -ldflags "-X main.version=abc1234" -o bin/server .
+var version = "dev"
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
@@ -41,6 +46,42 @@ func main() {
 	// Set up structured JSON logger for production use.
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+
+	// Initialize Sentry error tracking. When SENTRY_DSN is not set the call
+	// is a no-op — sentry.Init returns nil error and the SDK remains inactive,
+	// so no events are sent. This keeps dev/test environments clean.
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		environment := os.Getenv("MODE")
+		if environment == "" {
+			environment = "production"
+		}
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Environment:      environment,
+			Release:          version,
+			AttachStacktrace: true,
+			// Sample 100% of error events. Adjust if volume becomes a concern.
+			SampleRate: 1.0,
+			// Scrub sensitive data before sending events to Sentry.
+			// sentryhttp captures request headers AND a separate Cookies field;
+			// both must be cleared to prevent PII/credential leakage.
+			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				if event.Request != nil {
+					for _, h := range []string{"Authorization", "Cookie", "X-Api-Key"} {
+						delete(event.Request.Headers, h)
+					}
+					event.Request.Cookies = ""
+				}
+				return event
+			},
+		}); err != nil {
+			logger.Error("sentry initialization failed", "error", err)
+		} else {
+			logger.Info("sentry initialized", "environment", environment, "release", version)
+		}
+	} else {
+		logger.Info("sentry disabled (SENTRY_DSN not set)")
+	}
 
 	// Validate required configuration before proceeding.
 	if errs, warnings := validateConfig(); len(errs) > 0 || len(warnings) > 0 {
@@ -124,11 +165,15 @@ func main() {
 		// Run pending migrations
 		log.Println("Running database migrations...")
 		if err := db.Migrate(ctx, dbURL); err != nil {
+			sentry.CaptureException(err)
+			sentry.Flush(2 * time.Second)
 			log.Fatalf("Failed to run migrations: %v", err)
 		}
 
 		pool, err := db.Connect(ctx, dbURL)
 		if err != nil {
+			sentry.CaptureException(err)
+			sentry.Flush(2 * time.Second)
 			log.Fatalf("Failed to connect to database: %v", err)
 		}
 		defer pool.Close()
@@ -253,7 +298,10 @@ func main() {
 
 	// Wrap all routes with security headers (outermost layer).
 	// Include the Supabase URL in CSP connect-src so the frontend can reach
-	// the auth/API endpoints in production.
+	// the auth/API endpoints in production. Sentry's ingest domain is always
+	// allowed in connect-src; the optional SENTRY_CSP_ENDPOINT enables
+	// report-uri so CSP violations show up as Sentry events.
+	sentryCSPEndpoint := os.Getenv("SENTRY_CSP_ENDPOINT")
 	var extraConnectSrc []string
 	if rawSupabaseURL := strings.TrimSpace(os.Getenv("SUPABASE_URL")); rawSupabaseURL != "" {
 		parsed, err := url.Parse(rawSupabaseURL)
@@ -263,7 +311,7 @@ func main() {
 			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
 		}
 	}
-	handler = api.SecurityHeadersMiddleware(extraConnectSrc...)(handler)
+	handler = api.SecurityHeadersMiddleware(sentryCSPEndpoint, extraConnectSrc...)(handler)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -321,6 +369,9 @@ func main() {
 	} else {
 		logger.Info("server stopped gracefully")
 	}
+
+	// Flush buffered Sentry events before the process exits.
+	sentry.Flush(2 * time.Second)
 
 	// Exit non-zero when the server failed (e.g., "address already in use")
 	// so process supervisors detect the failure. os.Exit bypasses remaining

@@ -1,0 +1,62 @@
+---
+title: How It Works
+description: The approval flow from request to execution
+---
+
+# How It Works
+
+Permission Slip sits between your AI agents and the actions they want to take. Here's what happens when an agent submits a request.
+
+## The Approval Flow
+
+<Steps>
+
+<Step title="Agent Submits a Request">
+  Your agent calls the Permission Slip API with the action it wants to perform — for example, sending an email or making an API call. The request includes the action type, parameters, and a risk level.
+</Step>
+
+<Step title="You Get Notified">
+  Permission Slip sends you a notification through your configured channels — email, SMS, or browser push notification. The dashboard also updates in real time via server-sent events.
+</Step>
+
+<Step title="You Review the Details">
+  On your dashboard, you see exactly what the agent wants to do: the action type, all parameters, the risk level, and which agent is making the request. You have full context to make a decision.
+</Step>
+
+<Step title="You Approve or Deny">
+  Click **Approve** to let the action proceed, or **Deny** to block it. High-risk actions are flagged with a warning so you can review them more carefully.
+</Step>
+
+<Step title="Agent Gets the Result">
+  If approved, the agent receives a confirmation code it can use to verify the approval. If denied, the agent is notified and can handle the rejection gracefully.
+</Step>
+
+</Steps>
+
+## Standing Approvals
+
+For routine actions you trust, you can create **standing approvals** that pre-authorize an agent to perform a specific action type without asking you each time.
+
+Standing approvals have built-in guardrails:
+
+- **Execution limits** — cap how many times the agent can use the approval (or set it to unlimited).
+- **Expiration** — standing approvals automatically expire, up to a maximum of 90 days.
+- **Revocation** — you can revoke a standing approval at any time.
+
+When a standing approval is in place, the agent's request is automatically approved and the execution count increments. You can monitor all executions in the activity log.
+
+## Risk Levels
+
+Every action has an associated risk level:
+
+| Level | Description |
+|-------|-------------|
+| **Low** | Routine, read-only, or low-impact actions |
+| **Medium** | Actions that modify data or have moderate impact |
+| **High** | Sensitive actions — financial transactions, data deletion, external communications |
+
+High-risk actions display a prominent warning during review to make sure you're paying attention.
+
+## Real-Time Updates
+
+The dashboard uses server-sent events (SSE) so new approval requests appear instantly — you don't need to refresh the page. Combined with push notifications, you'll know about pending requests within seconds.

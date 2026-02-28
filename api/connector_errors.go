@@ -35,16 +35,19 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 
 	case connectors.IsExternalError(err):
 		log.Printf("[%s] connector external error: %v", traceID, err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service returned an error", true))
 		return true
 
 	case connectors.IsAuthError(err):
 		log.Printf("[%s] connector auth error: %v", traceID, err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service rejected credentials", true))
 		return true
 
 	case connectors.IsTimeoutError(err):
 		log.Printf("[%s] connector timeout: %v", traceID, err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, "External service did not respond in time", true))
 		return true
 

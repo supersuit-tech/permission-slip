@@ -21,6 +21,13 @@ RUN npm ci
 # Pass these as Docker build args (--build-arg) or via [build.args] in fly.toml.
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SENTRY_DSN
+
+# Sentry source-map upload (optional — skip if not set).
+# @sentry/vite-plugin reads these during the Vite build to upload maps.
+ARG SENTRY_AUTH_TOKEN
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
 
 # Copy frontend source and build
 COPY frontend/ ./

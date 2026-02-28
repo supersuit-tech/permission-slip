@@ -1,0 +1,54 @@
+---
+title: Agents Overview
+description: Understanding agents in Permission Slip
+---
+
+# Agents
+
+An **agent** is any AI system that connects to Permission Slip to request approval before taking actions. Agents authenticate using Ed25519 key pairs and communicate with Permission Slip through a signed API.
+
+## Agent Lifecycle
+
+Agents move through three statuses:
+
+| Status | Description |
+|--------|-------------|
+| **Pending** | Agent has registered but hasn't completed verification yet. |
+| **Registered** | Agent is verified and can submit approval requests. |
+| **Deactivated** | Agent has been permanently disabled. All standing approvals are revoked. |
+
+## How Agents Authenticate
+
+When an agent registers, it provides an Ed25519 public key. Every subsequent API request from the agent is signed with the corresponding private key using the `X-Permission-Slip-Signature` header. This ensures:
+
+- **Identity** — Permission Slip knows which agent is making the request.
+- **Integrity** — requests can't be tampered with in transit.
+- **Replay protection** — timestamps and request IDs prevent replayed requests.
+
+## What Agents Can Do
+
+Once registered and verified, an agent can:
+
+- **Request approvals** — submit an action for your review before executing it.
+- **Cancel requests** — withdraw a pending approval request if no longer needed.
+- **Verify confirmation codes** — exchange an approval's confirmation code for a single-use execution token.
+- **Execute actions** — run an approved action using the execution token.
+- **Use standing approvals** — execute pre-authorized actions without per-request approval.
+
+## Managing Agents
+
+<CardGroup cols={3}>
+
+<Card title="Register" icon="plus" href="/agents/register">
+  Add a new agent via invite code.
+</Card>
+
+<Card title="Configure" icon="gear" href="/agents/configure">
+  Rename agents, manage connectors, and view credentials.
+</Card>
+
+<Card title="Deactivate" icon="ban" href="/agents/deactivate">
+  Permanently disable an agent.
+</Card>
+
+</CardGroup>

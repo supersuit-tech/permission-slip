@@ -37,8 +37,13 @@ func TraceID(ctx context.Context) string {
 // (e.g., the Supabase project URL in production). Each entry is validated as
 // an http(s) origin (scheme://host); invalid entries are logged and skipped
 // to prevent CSP directive injection.
-func SecurityHeadersMiddleware(extraConnectSrc ...string) func(http.Handler) http.Handler {
-	connectSrc := "'self'"
+//
+// sentryCSPEndpoint, when non-empty, adds a report-uri directive pointing to
+// Sentry's CSP reporting endpoint so that CSP violations are captured as
+// Sentry events. Obtain the URL from your Sentry project under
+// Settings → Security Headers → report-uri.
+func SecurityHeadersMiddleware(sentryCSPEndpoint string, extraConnectSrc ...string) func(http.Handler) http.Handler {
+	connectSrc := "'self' https://*.ingest.sentry.io"
 	for _, src := range extraConnectSrc {
 		origin := sanitizeCSPOrigin(src)
 		if origin != "" {
@@ -46,7 +51,7 @@ func SecurityHeadersMiddleware(extraConnectSrc ...string) func(http.Handler) htt
 		}
 	}
 
-	csp := strings.Join([]string{
+	directives := []string{
 		"default-src 'self'",
 		"script-src 'self'",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -55,7 +60,13 @@ func SecurityHeadersMiddleware(extraConnectSrc ...string) func(http.Handler) htt
 		"connect-src " + connectSrc,
 		"worker-src 'self'",
 		"frame-ancestors 'none'",
-	}, "; ")
+	}
+
+	if endpoint := sanitizeCSPReportURI(sentryCSPEndpoint); endpoint != "" {
+		directives = append(directives, "report-uri "+endpoint)
+	}
+
+	csp := strings.Join(directives, "; ")
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,6 +80,31 @@ func SecurityHeadersMiddleware(extraConnectSrc ...string) func(http.Handler) htt
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// sanitizeCSPReportURI validates a report-uri value for CSP. It must be a
+// valid https URL without characters that could inject additional CSP
+// directives (semicolons, quotes, newlines). Returns the validated URL
+// string or empty string (with a log warning) on failure.
+func sanitizeCSPReportURI(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if strings.ContainsAny(raw, ";'\"\n\r") {
+		log.Printf("SecurityHeaders: rejecting CSP report-uri with unsafe characters: %q", raw)
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		log.Printf("SecurityHeaders: rejecting invalid CSP report-uri: %q", raw)
+		return ""
+	}
+	if parsed.Scheme != "https" {
+		log.Printf("SecurityHeaders: rejecting non-https CSP report-uri: %q", raw)
+		return ""
+	}
+	return raw
 }
 
 // sanitizeCSPOrigin validates a string as an http(s) origin suitable for a CSP

@@ -1,0 +1,57 @@
+---
+title: Introduction
+description: Human approval for AI agent actions
+---
+
+# Permission Slip
+
+Permission Slip gives you a human-in-the-loop approval layer for your AI agents. When an agent wants to take a sensitive action — sending an email, calling an API, modifying data — Permission Slip pauses execution and asks you to approve or deny the request before anything happens.
+
+## Why Permission Slip?
+
+AI agents are getting more capable, but "capable" and "trusted to act unsupervised" are different things. Permission Slip bridges that gap:
+
+- **You stay in control.** Every action an agent wants to take can require your explicit approval before it executes.
+- **You see what's happening.** A real-time dashboard shows pending requests, recent activity, and which agents are active.
+- **You set the rules.** Standing approvals let you pre-authorize routine actions so you're only interrupted for things that matter.
+- **You get notified instantly.** Email, SMS, and browser push notifications make sure you never miss a request.
+
+## Core Concepts
+
+<CardGroup cols={2}>
+
+<Card title="Agents" icon="robot" href="/agents/overview">
+  AI systems that connect to Permission Slip and submit actions for approval.
+</Card>
+
+<Card title="Connectors" icon="plug" href="/connectors/overview">
+  Integrations that define what actions an agent can take — email, APIs, databases, and more.
+</Card>
+
+<Card title="Approvals" icon="check" href="/approvals/overview">
+  The review process where you approve or deny each action request from your agents.
+</Card>
+
+<Card title="Standing Approvals" icon="shield-check" href="/approvals/standing-approvals">
+  Pre-authorizations that let agents repeat trusted actions without asking every time.
+</Card>
+
+</CardGroup>
+
+## How It Fits Together
+
+```
+Agent wants to act → Permission Slip intercepts → You approve or deny → Action executes (or doesn't)
+```
+
+1. You **register an agent** and give it credentials to connect to Permission Slip.
+2. You **enable connectors** that define what the agent is allowed to request.
+3. When the agent wants to act, it **submits a request** through the Permission Slip API.
+4. You **review and approve** (or deny) the request from your dashboard or via notification.
+5. The agent receives a **confirmation code** and proceeds — or stops.
+
+Ready to get started? [Create your account →](/getting-started/create-account)
+
+<Info>
+  **Building an agent?** Skip straight to the [Agent Integration Guide](/guides/agent-integration) for the full API walkthrough — registration, authentication, approval flow, and action execution.
+</Info>

@@ -20,8 +20,9 @@ export function CookieConsentBanner() {
     >
       <div className="mx-auto flex max-w-[1200px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <p className="text-sm text-card-foreground">
-          We use cookies to analyze site usage and improve your experience. You
-          can accept or reject non-essential cookies. See our{" "}
+          We use cookies and local storage for authentication and to improve
+          your experience. You can accept or reject non-essential cookies. See
+          our{" "}
           <a href="/policy/privacy" className="underline underline-offset-4 hover:text-primary">
             Privacy Policy
           </a>{" "}

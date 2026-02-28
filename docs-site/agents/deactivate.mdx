@@ -1,0 +1,29 @@
+---
+title: Deactivate an Agent
+description: Permanently disable an agent and revoke its permissions
+---
+
+# Deactivate an Agent
+
+Deactivating an agent permanently disables it. The agent can no longer submit requests or execute actions, and all of its standing approvals are automatically revoked.
+
+<Warning>
+  Deactivation cannot be undone. If you need the agent again, you'll have to register a new one.
+</Warning>
+
+## How to Deactivate
+
+1. Navigate to the agent's configuration page by clicking **Configure** on the agent in your dashboard.
+2. Scroll to the **Danger Zone** section at the bottom.
+3. Click **Deactivate**.
+4. In the confirmation dialog, review the warning and click **Deactivate** to confirm.
+
+## What Happens
+
+When you deactivate an agent:
+
+- The agent's status changes to **Deactivated**.
+- All active standing approvals for this agent are **revoked**.
+- Any pending approval requests from this agent are no longer actionable.
+- The agent's API requests will be rejected going forward.
+- The agent remains visible in your dashboard (filtered under the **Deactivated** tab) for audit purposes.

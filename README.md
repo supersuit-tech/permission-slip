@@ -46,6 +46,7 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 
 ## Documentation
 
+- **[Docs Site](docs-site/)** — Mintlify-powered user-facing documentation (run `npx mintlify dev` from `docs-site/` to preview)
 - **[SPEC.md](SPEC.md)** — protocol overview, architecture, and security model
 - **[Terminology](docs/spec/terminology.md)** — core concepts and definitions
 - **[Authentication](docs/spec/authentication.md)** — agent identity, request signing, and security
@@ -159,6 +160,9 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `SUPABASE_URL` | Yes | Your Supabase project URL (for JWT verification) |
 | `BASE_URL` | Yes | Public URL of your deployment (e.g. `https://app.permissionslip.dev`) |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — generate with `openssl rand -hex 32` |
+| `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking — panics and 5xx errors are captured automatically |
+| `VITE_SENTRY_DSN` | Optional | Sentry DSN for frontend error tracking (build-time) — React errors, failed API calls, and performance data |
+| `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint — captures Content-Security-Policy violations as Sentry events |
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |

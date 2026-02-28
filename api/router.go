@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -74,6 +75,18 @@ func NewRouter(deps *Deps) http.Handler {
 	if deps.Logger != nil {
 		handler = RequestLoggerMiddleware(deps.Logger, deps.TrustedProxyHeader)(handler)
 	}
+	// Middleware execution order (outermost → innermost):
+	//   TraceIDMiddleware → sentryhttp.Handler → SentryTraceIDMiddleware → ...
+	//
+	// TraceID generates the trace ID first, sentryhttp puts a Sentry hub in
+	// context, then SentryTraceIDMiddleware tags the hub with the trace ID.
+	// sentryhttp also captures panics with full stack traces. Repanic: true
+	// re-panics so net/http or an upstream supervisor can also observe them.
+	sentryHandler := sentryhttp.New(sentryhttp.Options{
+		Repanic: true,
+	})
+	handler = SentryTraceIDMiddleware(handler)
+	handler = sentryHandler.Handle(handler)
 	handler = TraceIDMiddleware(handler)
 	return handler
 }
