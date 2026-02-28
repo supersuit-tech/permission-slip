@@ -42,14 +42,17 @@ func IsValidAuditEventType(t AuditEventType) bool {
 
 // AuditEvent represents a single activity event in the audit trail.
 type AuditEvent struct {
-	ID        int64
-	EventType AuditEventType
-	Timestamp time.Time
-	AgentID   int64
-	AgentMeta []byte // raw JSONB (agent metadata snapshot at event time)
-	Action    []byte // raw JSONB (approval action details, nullable)
-	Outcome   string // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
-	SourceID  string // unique ID per event source (e.g. approval_id)
+	ID              int64
+	EventType       AuditEventType
+	Timestamp       time.Time
+	AgentID         int64
+	AgentMeta       []byte  // raw JSONB (agent metadata snapshot at event time)
+	Action          []byte  // raw JSONB (approval action details, nullable)
+	Outcome         string  // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
+	SourceID        string  // unique ID per event source (e.g. approval_id)
+	ConnectorID     *string // which connector handled the action (nullable for lifecycle events)
+	ExecutionStatus *string // "success", "failure", "timeout", "skipped" (nullable)
+	ExecutionError  *string // failure details (nullable)
 }
 
 // AuditEventPage holds a page of audit events plus a flag indicating whether more exist.
@@ -79,25 +82,37 @@ const MaxAuditEventListSize = 100
 // DefaultAuditEventLimit is the default page size.
 const DefaultAuditEventLimit = 20
 
+// ExecutionStatus constants for audit event execution tracking.
+const (
+	ExecStatusSuccess = "success"
+	ExecStatusFailure = "failure"
+	ExecStatusTimeout = "timeout"
+	ExecStatusSkipped = "skipped"
+)
+
 // InsertAuditEventParams holds the parameters for inserting an audit event.
 type InsertAuditEventParams struct {
-	UserID     string
-	AgentID    int64
-	EventType  AuditEventType
-	Outcome    string
-	SourceID   string
-	SourceType string
-	AgentMeta  []byte // raw JSONB
-	Action     []byte // raw JSONB, may be nil
+	UserID          string
+	AgentID         int64
+	EventType       AuditEventType
+	Outcome         string
+	SourceID        string
+	SourceType      string
+	AgentMeta       []byte  // raw JSONB
+	Action          []byte  // raw JSONB, may be nil
+	ConnectorID     *string // which connector handled the action (nil for lifecycle events)
+	ExecutionStatus *string // "success", "failure", "timeout", "skipped" (nil for non-execution events)
+	ExecutionError  *string // failure details (nil unless ExecutionStatus is "failure")
 }
 
 // InsertAuditEvent writes a new row into the audit_events table.
 func InsertAuditEvent(ctx context.Context, db DBTX, p InsertAuditEventParams) error {
 	_, err := db.Exec(ctx,
-		`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, action)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, action, connector_id, execution_status, execution_error)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		p.UserID, p.AgentID, string(p.EventType), p.Outcome,
 		p.SourceID, p.SourceType, p.AgentMeta, p.Action,
+		p.ConnectorID, p.ExecutionStatus, p.ExecutionError,
 	)
 	if err != nil {
 		return fmt.Errorf("insert audit event: %w", err)
@@ -163,7 +178,7 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 
 	query := fmt.Sprintf(
 		`SELECT ae.id, ae.event_type, ae.created_at, ae.agent_id, ae.agent_meta, ae.action,
-		        %s AS outcome, ae.source_id
+		        %s AS outcome, ae.source_id, ae.connector_id, ae.execution_status, ae.execution_error
 		 FROM audit_events ae
 		 LEFT JOIN agents a ON ae.agent_id = a.agent_id
 		 WHERE %s
@@ -265,7 +280,7 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 
 	query := fmt.Sprintf(
 		`SELECT ae.id, ae.event_type, ae.created_at, ae.agent_id, ae.agent_meta, ae.action,
-		        %s AS outcome, ae.source_id
+		        %s AS outcome, ae.source_id, ae.connector_id, ae.execution_status, ae.execution_error
 		 FROM audit_events ae
 		 LEFT JOIN agents a ON ae.agent_id = a.agent_id
 		 WHERE %s
@@ -299,7 +314,10 @@ func scanAuditEvents(rows pgx.Rows) ([]AuditEvent, error) {
 	for rows.Next() {
 		var e AuditEvent
 		var eventType string
-		if err := rows.Scan(&e.ID, &eventType, &e.Timestamp, &e.AgentID, &e.AgentMeta, &e.Action, &e.Outcome, &e.SourceID); err != nil {
+		if err := rows.Scan(
+			&e.ID, &eventType, &e.Timestamp, &e.AgentID, &e.AgentMeta, &e.Action,
+			&e.Outcome, &e.SourceID, &e.ConnectorID, &e.ExecutionStatus, &e.ExecutionError,
+		); err != nil {
 			return nil, fmt.Errorf("scan audit event: %w", err)
 		}
 		e.EventType = AuditEventType(eventType)

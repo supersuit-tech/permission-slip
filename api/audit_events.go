@@ -16,26 +16,32 @@ import (
 // for the activity feed (GET /audit-events). Does NOT include id or source_id
 // since the activity feed is for display purposes only.
 type auditEventResponse struct {
-	EventType string    `json:"event_type"`
-	Timestamp time.Time `json:"timestamp"`
-	AgentID   int64     `json:"agent_id"`
-	AgentMeta any       `json:"agent_metadata,omitempty"`
-	Action    any       `json:"action,omitempty"`
-	Outcome   string    `json:"outcome"`
+	EventType       string    `json:"event_type"`
+	Timestamp       time.Time `json:"timestamp"`
+	AgentID         int64     `json:"agent_id"`
+	AgentMeta       any       `json:"agent_metadata,omitempty"`
+	Action          any       `json:"action,omitempty"`
+	Outcome         string    `json:"outcome"`
+	ConnectorID     *string   `json:"connector_id,omitempty"`
+	ExecutionStatus *string   `json:"execution_status,omitempty"`
+	ExecutionError  *string   `json:"execution_error,omitempty"`
 }
 
 // auditLogExportEventResponse is the JSON representation of a single audit
 // event for the export endpoint (GET /audit-logs). Includes id and source_id
 // (always present, never omitted) for SIEM deduplication and event correlation.
 type auditLogExportEventResponse struct {
-	ID        int64     `json:"id"`
-	EventType string    `json:"event_type"`
-	Timestamp time.Time `json:"timestamp"`
-	AgentID   int64     `json:"agent_id"`
-	AgentMeta any       `json:"agent_metadata,omitempty"`
-	Action    any       `json:"action,omitempty"`
-	Outcome   string    `json:"outcome"`
-	SourceID  string    `json:"source_id"`
+	ID              int64     `json:"id"`
+	EventType       string    `json:"event_type"`
+	Timestamp       time.Time `json:"timestamp"`
+	AgentID         int64     `json:"agent_id"`
+	AgentMeta       any       `json:"agent_metadata,omitempty"`
+	Action          any       `json:"action,omitempty"`
+	Outcome         string    `json:"outcome"`
+	SourceID        string    `json:"source_id"`
+	ConnectorID     *string   `json:"connector_id,omitempty"`
+	ExecutionStatus *string   `json:"execution_status,omitempty"`
+	ExecutionError  *string   `json:"execution_error,omitempty"`
 }
 
 // auditEventListResponse is the paginated JSON response for GET /audit-events.
@@ -276,12 +282,15 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 // for the activity feed endpoint.
 func toAuditEventResponse(e db.AuditEvent) auditEventResponse {
 	return auditEventResponse{
-		EventType: string(e.EventType),
-		Timestamp: e.Timestamp,
-		AgentID:   e.AgentID,
-		AgentMeta: unmarshalJSONB(e.AgentMeta),
-		Action:    unmarshalJSONB(e.Action),
-		Outcome:   e.Outcome,
+		EventType:       string(e.EventType),
+		Timestamp:       e.Timestamp,
+		AgentID:         e.AgentID,
+		AgentMeta:       unmarshalJSONB(e.AgentMeta),
+		Action:          unmarshalJSONB(e.Action),
+		Outcome:         e.Outcome,
+		ConnectorID:     e.ConnectorID,
+		ExecutionStatus: e.ExecutionStatus,
+		ExecutionError:  e.ExecutionError,
 	}
 }
 
@@ -291,14 +300,17 @@ func toAuditEventResponse(e db.AuditEvent) auditEventResponse {
 // matching the OpenAPI schema's `required` declaration.
 func toExportAuditEventResponse(e db.AuditEvent) auditLogExportEventResponse {
 	return auditLogExportEventResponse{
-		ID:        e.ID,
-		EventType: string(e.EventType),
-		Timestamp: e.Timestamp,
-		AgentID:   e.AgentID,
-		AgentMeta: unmarshalJSONB(e.AgentMeta),
-		Action:    unmarshalJSONB(e.Action),
-		Outcome:   e.Outcome,
-		SourceID:  e.SourceID,
+		ID:              e.ID,
+		EventType:       string(e.EventType),
+		Timestamp:       e.Timestamp,
+		AgentID:         e.AgentID,
+		AgentMeta:       unmarshalJSONB(e.AgentMeta),
+		Action:          unmarshalJSONB(e.Action),
+		Outcome:         e.Outcome,
+		SourceID:        e.SourceID,
+		ConnectorID:     e.ConnectorID,
+		ExecutionStatus: e.ExecutionStatus,
+		ExecutionError:  e.ExecutionError,
 	}
 }
 

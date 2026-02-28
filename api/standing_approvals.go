@@ -349,20 +349,38 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 
 // emitStandingApprovalAuditEvent writes a standing_approval.executed audit event.
 // Errors are logged but do not block the request (best-effort audit trail).
+// Also increments the usage meter for billing (standing approval executions are billable events).
 func emitStandingApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, saID, actionType string, agentMeta []byte) {
 	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
+	execStatus := db.ExecStatusSuccess
 
 	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    agentID,
-		EventType:  db.AuditEventStandingExecution,
-		Outcome:    "auto_executed",
-		SourceID:   saID,
-		SourceType: "standing_approval",
-		AgentMeta:  agentMeta,
-		Action:     actionJSON,
+		UserID:          userID,
+		AgentID:         agentID,
+		EventType:       db.AuditEventStandingExecution,
+		Outcome:         "auto_executed",
+		SourceID:        saID,
+		SourceType:      "standing_approval",
+		AgentMeta:       agentMeta,
+		Action:          actionJSON,
+		ConnectorID:     connectorIDFromActionType(actionType),
+		ExecutionStatus: &execStatus,
 	}); err != nil {
 		log.Printf("audit: failed to insert standing approval audit event: %v", err)
+	}
+
+	// Increment usage meter (best-effort, billing).
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	connectorID := ""
+	if cid := connectorIDFromActionType(actionType); cid != nil {
+		connectorID = *cid
+	}
+	if _, err := db.IncrementRequestCountWithBreakdown(ctx, d, userID, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     agentID,
+		ConnectorID: connectorID,
+		ActionType:  actionType,
+	}); err != nil {
+		log.Printf("audit: failed to increment usage count for standing approval execution: %v", err)
 	}
 }
 

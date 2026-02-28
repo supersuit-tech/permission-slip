@@ -82,11 +82,19 @@ type AgentPage struct {
 }
 
 // agentListColumns extends agentColumns with computed stats for the list query.
+// request_count_30d includes both one-off approval requests and standing
+// approval executions to accurately reflect total agent activity.
 const agentListColumns = agentColumns + `,
 	(SELECT COUNT(*)
 	 FROM approvals
 	 WHERE approvals.agent_id = agents.agent_id
-	   AND approvals.created_at > now() - interval '30 days') AS request_count_30d`
+	   AND approvals.created_at > now() - interval '30 days')
+	+
+	(SELECT COUNT(*)
+	 FROM standing_approval_executions sae
+	 JOIN standing_approvals sa ON sa.standing_approval_id = sae.standing_approval_id
+	 WHERE sa.agent_id = agents.agent_id
+	   AND sae.executed_at > now() - interval '30 days') AS request_count_30d`
 
 // scanAgentListItem scans a row selected with agentListColumns into an AgentListItem.
 func scanAgentListItem(row pgx.Row) (*AgentListItem, error) {

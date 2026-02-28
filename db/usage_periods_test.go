@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestUsagePeriodsSchema(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "usage_periods", []string{
 		"id", "user_id", "period_start", "period_end",
-		"request_count", "sms_count", "created_at",
+		"request_count", "sms_count", "breakdown", "created_at",
 	})
 }
 
@@ -348,5 +349,143 @@ func TestIncrementRequestCountConcurrent(t *testing.T) {
 	want := goroutines * incrementsPerGoroutine
 	if usage.RequestCount != want {
 		t.Errorf("expected request_count=%d after concurrent increments, got %d", want, usage.RequestCount)
+	}
+}
+
+func TestIncrementRequestCountWithBreakdown(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// First increment creates the row with breakdown
+	usage, err := db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "github",
+		ActionType:  "github.create_issue",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+	if usage.Breakdown == nil {
+		t.Fatal("expected non-nil breakdown")
+	}
+
+	// Second increment for same agent/connector
+	usage, err = db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "github",
+		ActionType:  "github.create_issue",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 2 {
+		t.Errorf("expected request_count=2, got %d", usage.RequestCount)
+	}
+
+	// Third increment with different agent/connector
+	usage, err = db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     99,
+		ConnectorID: "slack",
+		ActionType:  "slack.send_message",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 3 {
+		t.Errorf("expected request_count=3, got %d", usage.RequestCount)
+	}
+
+	// Verify breakdown JSONB is populated
+	var breakdown map[string]map[string]int
+	if err := json.Unmarshal(usage.Breakdown, &breakdown); err != nil {
+		t.Fatalf("failed to unmarshal breakdown: %v", err)
+	}
+	if breakdown["by_agent"]["42"] != 2 {
+		t.Errorf("expected by_agent[42]=2, got %d", breakdown["by_agent"]["42"])
+	}
+	if breakdown["by_agent"]["99"] != 1 {
+		t.Errorf("expected by_agent[99]=1, got %d", breakdown["by_agent"]["99"])
+	}
+	if breakdown["by_connector"]["github"] != 2 {
+		t.Errorf("expected by_connector[github]=2, got %d", breakdown["by_connector"]["github"])
+	}
+	if breakdown["by_connector"]["slack"] != 1 {
+		t.Errorf("expected by_connector[slack]=1, got %d", breakdown["by_connector"]["slack"])
+	}
+}
+
+func TestIncrementRequestCountWithBreakdownEmptyConnector(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// Increment with empty connector_id and action_type (e.g. agent lifecycle events)
+	usage, err := db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "",
+		ActionType:  "",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+}
+
+func TestBillingPeriodBounds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		input      time.Time
+		wantStart  time.Time
+		wantEnd    time.Time
+	}{
+		{
+			name:      "middle of month",
+			input:     time.Date(2026, 2, 15, 14, 30, 0, 0, time.UTC),
+			wantStart: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+			wantEnd:   time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "first of month",
+			input:     time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			wantStart: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			wantEnd:   time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "last day of year",
+			input:     time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC),
+			wantStart: time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
+			wantEnd:   time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			start, end := db.BillingPeriodBounds(tt.input)
+			if !start.Equal(tt.wantStart) {
+				t.Errorf("start: got %v, want %v", start, tt.wantStart)
+			}
+			if !end.Equal(tt.wantEnd) {
+				t.Errorf("end: got %v, want %v", end, tt.wantEnd)
+			}
+		})
 	}
 }

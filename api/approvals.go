@@ -288,14 +288,15 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 	}
 
 	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    appr.AgentID,
-		EventType:  eventType,
-		Outcome:    appr.Status,
-		SourceID:   appr.ApprovalID,
-		SourceType: "approval",
-		AgentMeta:  agentMeta,
-		Action:     redactActionToType(appr.Action),
+		UserID:      userID,
+		AgentID:     appr.AgentID,
+		EventType:   eventType,
+		Outcome:     appr.Status,
+		SourceID:    appr.ApprovalID,
+		SourceType:  "approval",
+		AgentMeta:   agentMeta,
+		Action:      redactActionToType(appr.Action),
+		ConnectorID: connectorIDFromActionType(actionTypeFromJSON(appr.Action)),
 	}); err != nil {
 		log.Printf("audit: failed to insert approval audit event: %v", err)
 	}
@@ -316,6 +317,21 @@ func redactActionToType(raw []byte) []byte {
 	}
 	redacted, _ := json.Marshal(map[string]string{"type": obj.Type})
 	return redacted
+}
+
+// actionTypeFromJSON extracts the "type" field from an action JSON blob.
+// Returns "" if the type cannot be extracted.
+func actionTypeFromJSON(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var obj struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(raw, &obj) != nil {
+		return ""
+	}
+	return obj.Type
 }
 
 // generateConfirmationCode produces a 6-character confirmation code from the

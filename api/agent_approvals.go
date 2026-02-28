@@ -443,17 +443,35 @@ func unprocessableEntity(code ErrorCode, message string) ErrorResponse {
 
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.
 // Only the action type is persisted — parameters are redacted.
+// Also increments the usage meter for billing (approval requests are billable events).
 func emitApprovalRequestAuditEvent(ctx context.Context, d db.DBTX, userID string, appr *db.Approval, agentMeta []byte) {
+	actionType := actionTypeFromJSON(appr.Action)
+
 	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    appr.AgentID,
-		EventType:  db.AuditEventApprovalRequested,
-		Outcome:    "pending",
-		SourceID:   appr.ApprovalID,
-		SourceType: "approval",
-		AgentMeta:  agentMeta,
-		Action:     redactActionToType(appr.Action),
+		UserID:      userID,
+		AgentID:     appr.AgentID,
+		EventType:   db.AuditEventApprovalRequested,
+		Outcome:     "pending",
+		SourceID:    appr.ApprovalID,
+		SourceType:  "approval",
+		AgentMeta:   agentMeta,
+		Action:      redactActionToType(appr.Action),
+		ConnectorID: connectorIDFromActionType(actionType),
 	}); err != nil {
 		log.Printf("audit: failed to insert approval request audit event: %v", err)
+	}
+
+	// Increment usage meter (best-effort, billing).
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	connectorID := ""
+	if cid := connectorIDFromActionType(actionType); cid != nil {
+		connectorID = *cid
+	}
+	if _, err := db.IncrementRequestCountWithBreakdown(ctx, d, userID, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     appr.AgentID,
+		ConnectorID: connectorID,
+		ActionType:  actionType,
+	}); err != nil {
+		log.Printf("audit: failed to increment usage count for approval request: %v", err)
 	}
 }

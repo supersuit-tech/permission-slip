@@ -707,4 +707,96 @@ func TestInsertAuditEvent(t *testing.T) {
 			t.Errorf("expected nil action, got %s", string(page.Events[0].Action))
 		}
 	})
+
+	t.Run("WithConnectorAndExecutionStatus", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert a connector so the FK is satisfied.
+		testhelper.InsertConnector(t, tx, "github")
+
+		connectorID := "github"
+		execStatus := db.ExecStatusSuccess
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			EventType:       db.AuditEventActionExecuted,
+			Outcome:         "auto_executed",
+			SourceID:        "test-approval-2",
+			SourceType:      "approval",
+			AgentMeta:       []byte(`{"name":"test"}`),
+			Action:          []byte(`{"type":"github.create_issue"}`),
+			ConnectorID:     &connectorID,
+			ExecutionStatus: &execStatus,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		e := page.Events[0]
+		if e.ConnectorID == nil || *e.ConnectorID != "github" {
+			t.Errorf("expected connector_id=github, got %v", e.ConnectorID)
+		}
+		if e.ExecutionStatus == nil || *e.ExecutionStatus != db.ExecStatusSuccess {
+			t.Errorf("expected execution_status=success, got %v", e.ExecutionStatus)
+		}
+		if e.ExecutionError != nil {
+			t.Errorf("expected nil execution_error, got %v", e.ExecutionError)
+		}
+	})
+
+	t.Run("WithExecutionFailure", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		testhelper.InsertConnector(t, tx, "slack")
+
+		connectorID := "slack"
+		execStatus := db.ExecStatusFailure
+		execError := "API rate limit exceeded"
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			EventType:       db.AuditEventStandingExecution,
+			Outcome:         "auto_executed",
+			SourceID:        "test-sa-1",
+			SourceType:      "standing_approval",
+			AgentMeta:       []byte(`{"name":"test"}`),
+			Action:          []byte(`{"type":"slack.send_message"}`),
+			ConnectorID:     &connectorID,
+			ExecutionStatus: &execStatus,
+			ExecutionError:  &execError,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		e := page.Events[0]
+		if e.ExecutionStatus == nil || *e.ExecutionStatus != db.ExecStatusFailure {
+			t.Errorf("expected execution_status=failure, got %v", e.ExecutionStatus)
+		}
+		if e.ExecutionError == nil || *e.ExecutionError != "API rate limit exceeded" {
+			t.Errorf("expected execution_error='API rate limit exceeded', got %v", e.ExecutionError)
+		}
+	})
 }
