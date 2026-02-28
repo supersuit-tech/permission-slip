@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useCookieConsent } from "../../components/CookieConsentContext";
 
 interface PolicyLayoutProps {
   title: string;
@@ -13,6 +14,8 @@ interface PolicyLayoutProps {
  * Renders outside the auth gate so anyone can view legal documents.
  */
 export function PolicyLayout({ title, lastUpdated, children }: PolicyLayoutProps) {
+  const { reset: resetConsent } = useCookieConsent();
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
@@ -56,6 +59,9 @@ export function PolicyLayout({ title, lastUpdated, children }: PolicyLayoutProps
             <Link to="/policy/cookies" className="hover:text-foreground transition-colors">
               Cookie Policy
             </Link>
+            <button type="button" onClick={resetConsent} className="hover:text-foreground transition-colors">
+              Manage Cookies
+            </button>
           </div>
         </footer>
       </div>

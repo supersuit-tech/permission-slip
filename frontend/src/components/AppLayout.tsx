@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
+import { useCookieConsent } from "./CookieConsentContext";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
 
@@ -11,6 +12,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isActivity = pathname === "/activity";
   const isSettings = pathname === "/settings";
   const { approvals } = useApprovals();
+  const { reset: resetConsent } = useCookieConsent();
   const pendingCount = approvals.length;
 
   return (
@@ -77,6 +79,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/policy/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
           <Link to="/policy/cookies" className="hover:text-foreground transition-colors">Cookie Policy</Link>
           <a href="mailto:support@supersuit.tech" className="hover:text-foreground transition-colors">Support</a>
+          <button type="button" onClick={resetConsent} className="hover:text-foreground transition-colors">Manage Cookies</button>
         </div>
       </footer>
 
