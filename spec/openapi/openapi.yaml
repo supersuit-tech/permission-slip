@@ -1,0 +1,462 @@
+openapi: 3.0.3
+info:
+  title: Permission Slip API
+  version: 1.0.0
+  description: |
+    Permission Slip is a centralized middle-man service that sits between AI agents and external 
+    APIs. Agents submit pre-defined **actions** for human approval, and Permission Slip executes 
+    them using the user's stored credentials. Agents never see user credentials and can never 
+    make arbitrary API calls.
+    
+    **Base URL**: `https://app.permissionslip.dev`
+    
+    ## Key Concepts
+    
+    - **Action**: Pre-defined, structured request with a type, validated parameters, and execution logic — the core primitive
+    - **Agent**: Automated system with a cryptographic key pair that submits actions for approval
+    - **Approver**: Human authorized to approve or deny agent actions
+    - **Connector**: Integration with an external service (e.g., Gmail, Stripe) that defines available actions
+    - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
+    - **Registration**: One-time setup where agent proves identity via public key
+    - **Approval Request**: Async request for permission to execute a specific action
+    - **Token**: Single-use credential issued after one-off approval, used to execute the approved action
+    - **Standing Approval**: Pre-authorized, constraint-scoped grant that lets an agent execute an action repeatedly without per-request approval
+
+    ## Authentication
+
+    Permission Slip uses two authentication schemes, plus some public discovery endpoints:
+
+    - **Agent-facing endpoints** (registration, approvals, actions) require Ed25519 request signatures.
+      See the `PermissionSlipSignature` security scheme.
+    - **User-facing endpoints** (agents, credentials, standing approvals, profiles) use Supabase
+      session JWTs. See the `SupabaseSession` security scheme.
+    - **Discovery endpoints** (connectors) are publicly accessible with no authentication required.
+    
+    ## Workflow
+
+    ### One-off Approval (default)
+
+    1. **Discover Actions**: Agent queries `GET /v1/connectors` to see available actions
+    2. **Registration**: Agent registers by providing public key, user approves
+    3. **Store Credentials** *(if needed)*: User connects external accounts and stores credentials in Permission Slip's vault using the credential management endpoints
+    4. **Submit Action**: Agent submits a structured action (e.g., `email.send` with parameters)
+    5. **User Approval**: Approver reviews the action in a human-readable format and approves/denies
+    6. **Verify & Get Token**: Agent submits confirmation code, receives single-use token
+    7. **Execute Action**: Agent calls `POST /v1/actions/execute` with the token — Permission Slip calls the external API using stored credentials
+
+    ### Standing Approval (pre-authorized)
+
+    1. **User creates standing approval**: Via web UI — specifies agent, action type, constraints, duration, and optional execution cap
+    2. **Agent executes**: Calls `POST /v1/actions/execute` with agent signature (no token) — Permission Slip matches the standing approval and executes immediately
+    3. **Fallthrough**: If no standing approval matches, falls through to the one-off flow above
+    
+    ## Architecture
+    
+    ```
+    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, etc.)
+                   │
+                   ▼
+              User (approve/deny)
+    ```
+    
+    Permission Slip is the **single integration point** for agents. Agents talk to 
+    `https://app.permissionslip.dev` for everything — they never need to know about individual 
+    service URLs or APIs.
+    
+    ## Related Documentation
+    
+    - Authentication Specification: Details on key generation and signature verification
+    - Notifications Specification: How users are notified of pending approvals
+    - Terminology: Definitions of core concepts
+    
+  contact:
+    name: Permission Slip
+    url: https://github.com/supersuit-tech/permission-slip-web
+  # Proprietary — all rights reserved
+
+servers:
+  - url: https://app.permissionslip.dev
+    description: Production server
+  - url: https://staging.app.permissionslip.dev
+    description: Staging server
+
+tags:
+  - name: Connectors
+    description: Discover available service integrations and actions
+  - name: Registration
+    description: Agent registration and verification
+  - name: Agents
+    description: Agent management (session-authenticated)
+  - name: Approvals
+    description: Approval request lifecycle management
+  - name: Actions
+    description: Execute approved actions via Permission Slip
+  - name: Audit Events
+    description: Activity feed and audit trail (session-authenticated)
+  - name: Action Configurations
+    description: Manage action configurations that define what agents are allowed to do
+  - name: Credentials
+    description: Manage stored credentials for external services
+  - name: Standing Approvals
+    description: Manage standing approvals for pre-authorized agent actions
+  - name: Profiles
+    description: User profile management (session-authenticated)
+  - name: Push Subscriptions
+    description: Web Push subscription management (session-authenticated)
+
+paths:
+  /v1/connectors:
+    $ref: './components/paths/connectors.yaml#/connectors'
+  
+  /v1/connectors/{connector_id}:
+    $ref: './components/paths/connectors.yaml#/connectorById'
+  
+  /invite/{invite_code}:
+    $ref: './components/paths/registration.yaml#/register'
+  
+  /v1/agents/{agent_id}/verify:
+    $ref: './components/paths/registration.yaml#/verify'
+  
+  /v1/agents:
+    $ref: './components/paths/agents.yaml#/agents'
+
+  /v1/agents/{agent_id}:
+    $ref: './components/paths/agents.yaml#/agentById'
+
+  /v1/agents/{agent_id}/deactivate:
+    $ref: './components/paths/agents.yaml#/deactivateAgent'
+
+  /v1/agents/{agent_id}/register:
+    $ref: './components/paths/agents.yaml#/registerAgent'
+
+  /v1/agents/me:
+    $ref: './components/paths/agents.yaml#/agentMe'
+
+  /v1/agents/{agent_id}/capabilities:
+    $ref: './components/paths/capabilities.yaml#/agentCapabilities'
+
+  /v1/agents/{agent_id}/connectors:
+    $ref: './components/paths/agent_connectors.yaml#/agentConnectors'
+
+  /v1/agents/{agent_id}/connectors/{connector_id}:
+    $ref: './components/paths/agent_connectors.yaml#/agentConnectorById'
+
+  /v1/registration-invites:
+    $ref: './components/paths/registration_invites.yaml#/createRegistrationInvite'
+
+  /v1/audit-logs:
+    $ref: './components/paths/audit_events.yaml#/exportAuditLogs'
+
+  /v1/audit-events:
+    $ref: './components/paths/audit_events.yaml#/listAuditEvents'
+
+  /v1/approvals/request:
+    $ref: './components/paths/approvals.yaml#/request'
+  
+  /v1/approvals/{approval_id}/verify:
+    $ref: './components/paths/approvals.yaml#/verifyApproval'
+  
+  /v1/approvals/{approval_id}/cancel:
+    $ref: './components/paths/approvals.yaml#/cancel'
+
+  /v1/approvals:
+    $ref: './components/paths/approvals.yaml#/listApprovals'
+
+  /v1/approvals/events:
+    $ref: './components/paths/approvals.yaml#/approvalEvents'
+
+  /v1/approvals/{approval_id}/approve:
+    $ref: './components/paths/approvals.yaml#/approveApproval'
+
+  /v1/approvals/{approval_id}/deny:
+    $ref: './components/paths/approvals.yaml#/denyApproval'
+
+  /v1/action-config-templates:
+    $ref: './components/paths/action_config_templates.yaml#/actionConfigTemplates'
+
+  /v1/action-configurations:
+    $ref: './components/paths/action_configurations.yaml#/actionConfigurations'
+
+  /v1/action-configurations/{config_id}:
+    $ref: './components/paths/action_configurations.yaml#/actionConfigurationById'
+
+  /v1/actions/execute:
+    $ref: './components/paths/actions.yaml#/execute'
+
+  /v1/credentials:
+    $ref: './components/paths/credentials.yaml#/credentials'
+  
+  /v1/credentials/{credential_id}:
+    $ref: './components/paths/credentials.yaml#/credentialById'
+
+  /v1/agents/{agent_id}/standing-approvals:
+    $ref: './components/paths/standing_approvals.yaml#/listStandingApprovals'
+
+  /v1/standing-approvals:
+    $ref: './components/paths/standing_approvals.yaml#/userListStandingApprovals'
+
+  /v1/standing-approvals/create:
+    $ref: './components/paths/standing_approvals.yaml#/createStandingApproval'
+
+  /v1/standing-approvals/{standing_approval_id}/revoke:
+    $ref: './components/paths/standing_approvals.yaml#/revokeStandingApproval'
+
+  /v1/standing-approvals/{standing_approval_id}/execute:
+    $ref: './components/paths/standing_approvals.yaml#/executeStandingApproval'
+
+  /v1/onboarding:
+    $ref: './components/paths/onboarding.yaml#/onboarding'
+
+  /v1/profile:
+    $ref: './components/paths/profiles.yaml#/profile'
+
+  /v1/profile/notification-preferences:
+    $ref: './components/paths/profiles.yaml#/notificationPreferences'
+
+  /v1/push-subscriptions:
+    $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptions'
+
+  /v1/push-subscriptions/{subscription_id}:
+    $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptionById'
+
+  /v1/config/vapid-key:
+    $ref: './components/paths/push_subscriptions.yaml#/vapidKey'
+
+components:
+  securitySchemes:
+    $ref: './components/securitySchemes/security.yaml'
+  
+  schemas:
+    # Registration
+    RegisterAgentRequest:
+      $ref: './components/schemas/registration.yaml#/RegisterAgentRequest'
+    RegisterAgentResponse:
+      $ref: './components/schemas/registration.yaml#/RegisterAgentResponse'
+    VerifyRegistrationRequest:
+      $ref: './components/schemas/registration.yaml#/VerifyRegistrationRequest'
+    VerifyRegistrationResponse:
+      $ref: './components/schemas/registration.yaml#/VerifyRegistrationResponse'
+    
+    # Approvals
+    ApprovalRequest:
+      $ref: './components/schemas/approvals.yaml#/ApprovalRequest'
+    ApprovalRequestResponse:
+      $ref: './components/schemas/approvals.yaml#/ApprovalRequestResponse'
+    VerifyApprovalRequest:
+      $ref: './components/schemas/approvals.yaml#/VerifyApprovalRequest'
+    VerifyApprovalResponse:
+      $ref: './components/schemas/approvals.yaml#/VerifyApprovalResponse'
+    CancelApprovalRequest:
+      $ref: './components/schemas/approvals.yaml#/CancelApprovalRequest'
+    CancelApprovalResponse:
+      $ref: './components/schemas/approvals.yaml#/CancelApprovalResponse'
+    ApprovalSummary:
+      $ref: './components/schemas/approvals.yaml#/ApprovalSummary'
+    ApprovalListResponse:
+      $ref: './components/schemas/approvals.yaml#/ApprovalListResponse'
+    ApproveApprovalResponse:
+      $ref: './components/schemas/approvals.yaml#/ApproveApprovalResponse'
+    DenyApprovalResponse:
+      $ref: './components/schemas/approvals.yaml#/DenyApprovalResponse'
+
+    # Action Configuration Templates
+    ActionConfigTemplate:
+      $ref: './components/schemas/action_config_templates.yaml#/ActionConfigTemplate'
+    ActionConfigTemplateListResponse:
+      $ref: './components/schemas/action_config_templates.yaml#/ActionConfigTemplateListResponse'
+
+    # Action Configurations
+    ActionConfiguration:
+      $ref: './components/schemas/action_configurations.yaml#/ActionConfiguration'
+    CreateActionConfigRequest:
+      $ref: './components/schemas/action_configurations.yaml#/CreateActionConfigRequest'
+    UpdateActionConfigRequest:
+      $ref: './components/schemas/action_configurations.yaml#/UpdateActionConfigRequest'
+    ActionConfigListResponse:
+      $ref: './components/schemas/action_configurations.yaml#/ActionConfigListResponse'
+    DeleteActionConfigResponse:
+      $ref: './components/schemas/action_configurations.yaml#/DeleteActionConfigResponse'
+
+    # Actions
+    ExecuteActionRequest:
+      $ref: './components/schemas/actions.yaml#/ExecuteActionRequest'
+    ExecuteActionTokenRequest:
+      $ref: './components/schemas/actions.yaml#/ExecuteActionTokenRequest'
+    ExecuteActionResponse:
+      $ref: './components/schemas/actions.yaml#/ExecuteActionResponse'
+    ExecuteActionTokenResponse:
+      $ref: './components/schemas/actions.yaml#/ExecuteActionTokenResponse'
+    
+    # Credentials
+    StoreCredentialRequest:
+      $ref: './components/schemas/credentials.yaml#/StoreCredentialRequest'
+    StoreCredentialResponse:
+      $ref: './components/schemas/credentials.yaml#/StoreCredentialResponse'
+    CredentialListResponse:
+      $ref: './components/schemas/credentials.yaml#/CredentialListResponse'
+    CredentialSummary:
+      $ref: './components/schemas/credentials.yaml#/CredentialSummary'
+    DeleteCredentialResponse:
+      $ref: './components/schemas/credentials.yaml#/DeleteCredentialResponse'
+    
+    # Connectors
+    ConnectorListResponse:
+      $ref: './components/schemas/connectors.yaml#/ConnectorListResponse'
+    ConnectorSummary:
+      $ref: './components/schemas/connectors.yaml#/ConnectorSummary'
+    ConnectorDetailResponse:
+      $ref: './components/schemas/connectors.yaml#/ConnectorDetailResponse'
+    ConnectorAction:
+      $ref: './components/schemas/connectors.yaml#/ConnectorAction'
+    RequiredCredential:
+      $ref: './components/schemas/connectors.yaml#/RequiredCredential'
+    
+    # Standing Approvals
+    StandingApproval:
+      $ref: './components/schemas/standing_approvals.yaml#/StandingApproval'
+    StandingApprovalExecuteRequest:
+      $ref: './components/schemas/standing_approvals.yaml#/StandingApprovalExecuteRequest'
+    StandingApprovalExecuteResponse:
+      $ref: './components/schemas/standing_approvals.yaml#/StandingApprovalExecuteResponse'
+    StandingApprovalListResponse:
+      $ref: './components/schemas/standing_approvals.yaml#/StandingApprovalListResponse'
+    UserStandingApprovalListResponse:
+      $ref: './components/schemas/standing_approvals.yaml#/UserStandingApprovalListResponse'
+    CreateStandingApprovalRequest:
+      $ref: './components/schemas/standing_approvals.yaml#/CreateStandingApprovalRequest'
+    RevokeStandingApprovalResponse:
+      $ref: './components/schemas/standing_approvals.yaml#/RevokeStandingApprovalResponse'
+    UserExecuteStandingApprovalRequest:
+      $ref: './components/schemas/standing_approvals.yaml#/UserExecuteStandingApprovalRequest'
+    UserExecuteStandingApprovalResponse:
+      $ref: './components/schemas/standing_approvals.yaml#/UserExecuteStandingApprovalResponse'
+
+    # Audit Events
+    AuditEvent:
+      $ref: './components/schemas/audit_events.yaml#/AuditEvent'
+    AuditEventListResponse:
+      $ref: './components/schemas/audit_events.yaml#/AuditEventListResponse'
+    AuditLogEvent:
+      $ref: './components/schemas/audit_events.yaml#/AuditLogEvent'
+    AuditLogExportResponse:
+      $ref: './components/schemas/audit_events.yaml#/AuditLogExportResponse'
+
+    # Agents
+    AgentSummary:
+      $ref: './components/schemas/agents.yaml#/AgentSummary'
+    AgentSelfResponse:
+      $ref: './components/schemas/agents.yaml#/AgentSelfResponse'
+    UpdateAgentRequest:
+      $ref: './components/schemas/agents.yaml#/UpdateAgentRequest'
+
+    # Agent Capabilities
+    AgentCapabilitiesResponse:
+      $ref: './components/schemas/capabilities.yaml#/AgentCapabilitiesResponse'
+    ConnectorCapability:
+      $ref: './components/schemas/capabilities.yaml#/ConnectorCapability'
+    ActionCapability:
+      $ref: './components/schemas/capabilities.yaml#/ActionCapability'
+    StandingApprovalCapability:
+      $ref: './components/schemas/capabilities.yaml#/StandingApprovalCapability'
+    ActionConfigCapability:
+      $ref: './components/schemas/capabilities.yaml#/ActionConfigCapability'
+
+    # Agent Connectors
+    AgentConnectorListResponse:
+      $ref: './components/schemas/agent_connectors.yaml#/AgentConnectorListResponse'
+    AgentConnectorSummary:
+      $ref: './components/schemas/agent_connectors.yaml#/AgentConnectorSummary'
+    AgentConnectorResponse:
+      $ref: './components/schemas/agent_connectors.yaml#/AgentConnectorResponse'
+    DisableAgentConnectorResponse:
+      $ref: './components/schemas/agent_connectors.yaml#/DisableAgentConnectorResponse'
+
+    # Registration Invites
+    CreateRegistrationInviteRequest:
+      $ref: './components/schemas/registration_invites.yaml#/CreateRegistrationInviteRequest'
+    CreateRegistrationInviteResponse:
+      $ref: './components/schemas/registration_invites.yaml#/CreateRegistrationInviteResponse'
+
+    # Onboarding
+    OnboardingRequest:
+      $ref: './components/schemas/onboarding.yaml#/OnboardingRequest'
+    OnboardingResponse:
+      $ref: './components/schemas/onboarding.yaml#/OnboardingResponse'
+
+    # Profiles
+    ProfileResponse:
+      $ref: './components/schemas/profiles.yaml#/ProfileResponse'
+    UpdateProfileRequest:
+      $ref: './components/schemas/profiles.yaml#/UpdateProfileRequest'
+    NotificationPreference:
+      $ref: './components/schemas/profiles.yaml#/NotificationPreference'
+    NotificationPreferencesResponse:
+      $ref: './components/schemas/profiles.yaml#/NotificationPreferencesResponse'
+    UpdateNotificationPreferencesRequest:
+      $ref: './components/schemas/profiles.yaml#/UpdateNotificationPreferencesRequest'
+
+    # Push Subscriptions
+    CreatePushSubscriptionRequest:
+      $ref: './components/schemas/push_subscriptions.yaml#/CreatePushSubscriptionRequest'
+    PushSubscriptionResponse:
+      $ref: './components/schemas/push_subscriptions.yaml#/PushSubscriptionResponse'
+    PushSubscriptionListResponse:
+      $ref: './components/schemas/push_subscriptions.yaml#/PushSubscriptionListResponse'
+    DeletePushSubscriptionResponse:
+      $ref: './components/schemas/push_subscriptions.yaml#/DeletePushSubscriptionResponse'
+    VAPIDPublicKeyResponse:
+      $ref: './components/schemas/push_subscriptions.yaml#/VAPIDPublicKeyResponse'
+
+    # Shared
+    Action:
+      $ref: './components/schemas/shared.yaml#/Action'
+    ActionContext:
+      $ref: './components/schemas/shared.yaml#/ActionContext'
+    ApprovalToken:
+      $ref: './components/schemas/shared.yaml#/ApprovalToken'
+    AlternativeUrls:
+      $ref: './components/schemas/shared.yaml#/AlternativeUrls'
+    Error:
+      $ref: './components/schemas/errors.yaml#/Error'
+    ErrorResponse:
+      $ref: './components/schemas/errors.yaml#/ErrorResponse'
+  
+  parameters:
+    ActionConfigId:
+      $ref: './components/parameters/common.yaml#/ActionConfigId'
+    AgentId:
+      $ref: './components/parameters/common.yaml#/AgentId'
+    AgentIdSigned:
+      $ref: './components/parameters/common.yaml#/AgentIdSigned'
+    ApprovalId:
+      $ref: './components/parameters/common.yaml#/ApprovalId'
+    CredentialId:
+      $ref: './components/parameters/common.yaml#/CredentialId'
+    ConnectorId:
+      $ref: './components/parameters/common.yaml#/ConnectorId'
+    InviteCode:
+      $ref: './components/parameters/common.yaml#/InviteCode'
+    StandingApprovalId:
+      $ref: './components/parameters/common.yaml#/StandingApprovalId'
+    PushSubscriptionId:
+      $ref: './components/parameters/common.yaml#/PushSubscriptionId'
+
+  responses:
+    BadRequest:
+      $ref: './components/responses/errors.yaml#/BadRequest'
+    Unauthorized:
+      $ref: './components/responses/errors.yaml#/Unauthorized'
+    Forbidden:
+      $ref: './components/responses/errors.yaml#/Forbidden'
+    NotFound:
+      $ref: './components/responses/errors.yaml#/NotFound'
+    Conflict:
+      $ref: './components/responses/errors.yaml#/Conflict'
+    Gone:
+      $ref: './components/responses/errors.yaml#/Gone'
+    TooManyRequests:
+      $ref: './components/responses/errors.yaml#/TooManyRequests'
+    InternalServerError:
+      $ref: './components/responses/errors.yaml#/InternalServerError'
+    ServiceUnavailable:
+      $ref: './components/responses/errors.yaml#/ServiceUnavailable'

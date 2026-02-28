@@ -1,0 +1,281 @@
+ConnectorListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/connectors.yaml#/ConnectorSummary'
+      description: |
+        List of available connectors. Each connector represents an external service
+        integration that Permission Slip supports.
+
+  example:
+    data:
+      - id: "github"
+        name: "GitHub"
+        description: "GitHub integration for repository management"
+        actions:
+          - "github.create_issue"
+          - "github.merge_pr"
+        required_credentials:
+          - "github"
+
+ConnectorSummary:
+  type: object
+  required:
+    - id
+    - name
+    - actions
+    - required_credentials
+  properties:
+    id:
+      type: string
+      maxLength: 128
+      pattern: '^[a-z][a-z0-9_.-]*$'
+      description: |
+        Unique connector identifier.
+      example: "github"
+
+    name:
+      type: string
+      maxLength: 256
+      description: |
+        Human-readable connector name.
+      example: "GitHub"
+
+    description:
+      type: string
+      maxLength: 500
+      description: |
+        Brief description of what this connector does.
+      example: "GitHub integration for repository management"
+
+    actions:
+      type: array
+      items:
+        type: string
+        maxLength: 128
+      description: |
+        List of action types supported by this connector.
+      example:
+        - "github.create_issue"
+        - "github.merge_pr"
+
+    required_credentials:
+      type: array
+      items:
+        type: string
+        maxLength: 128
+      description: |
+        Service identifiers for credentials required to use this connector. The user
+        must have stored credentials for these services via `POST /v1/credentials`
+        before actions from this connector can be executed.
+      example:
+        - "github"
+
+  example:
+    id: "github"
+    name: "GitHub"
+    description: "GitHub integration for repository management"
+    actions:
+      - "github.create_issue"
+      - "github.merge_pr"
+    required_credentials:
+      - "github"
+
+ConnectorDetailResponse:
+  type: object
+  required:
+    - id
+    - name
+    - actions
+    - required_credentials
+  properties:
+    id:
+      type: string
+      maxLength: 128
+      pattern: '^[a-z][a-z0-9_.-]*$'
+      description: |
+        Unique connector identifier.
+      example: "github"
+
+    name:
+      type: string
+      maxLength: 256
+      description: |
+        Human-readable connector name.
+      example: "GitHub"
+
+    description:
+      type: string
+      maxLength: 500
+      description: |
+        Brief description of what this connector does.
+      example: "GitHub integration for repository management"
+
+    actions:
+      type: array
+      items:
+        $ref: '../schemas/connectors.yaml#/ConnectorAction'
+      description: |
+        Detailed list of actions supported by this connector, including parameter schemas.
+
+    required_credentials:
+      type: array
+      items:
+        $ref: '../schemas/connectors.yaml#/RequiredCredential'
+      description: |
+        Details about the credentials required to use this connector.
+
+  example:
+    id: "github"
+    name: "GitHub"
+    description: "GitHub integration for repository management"
+    actions:
+      - action_type: "github.create_issue"
+        name: "Create Issue"
+        description: "Create a new issue in a repository"
+        risk_level: "low"
+        parameters_schema:
+          type: "object"
+          required:
+            - "repo"
+            - "title"
+          properties:
+            repo:
+              type: "string"
+              description: "Repository in owner/repo format"
+            title:
+              type: "string"
+              maxLength: 256
+              description: "Issue title"
+            body:
+              type: "string"
+              description: "Issue body (markdown)"
+      - action_type: "github.merge_pr"
+        name: "Merge Pull Request"
+        description: "Merge an open pull request"
+        risk_level: "medium"
+        parameters_schema:
+          type: "object"
+          required:
+            - "repo"
+            - "pr"
+          properties:
+            repo:
+              type: "string"
+              description: "Repository in owner/repo format"
+            pr:
+              type: "integer"
+              description: "Pull request number"
+    required_credentials:
+      - service: "github"
+        auth_type: "api_key"
+        instructions_url: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+
+ConnectorAction:
+  type: object
+  required:
+    - action_type
+    - name
+  properties:
+    action_type:
+      type: string
+      maxLength: 128
+      description: |
+        Action type identifier. Use this value as the `action.type` when submitting 
+        approval requests and as `action_id` when executing actions.
+      example: "github.create_issue"
+
+    name:
+      type: string
+      maxLength: 256
+      description: |
+        Human-readable action name.
+      example: "Create Issue"
+
+    description:
+      type: string
+      maxLength: 500
+      description: |
+        Brief description of what this action does.
+      example: "Create a new issue in a repository"
+
+    risk_level:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+      description: |
+        Default risk level for this action type.
+      example: "low"
+
+    parameters_schema:
+      type: object
+      additionalProperties: true
+      description: |
+        JSON Schema describing the expected parameters for this action. Agents can use
+        this to validate parameters before submitting approval requests.
+      example:
+        type: "object"
+        required:
+          - "repo"
+          - "title"
+        properties:
+          repo:
+            type: "string"
+          title:
+            type: "string"
+          body:
+            type: "string"
+
+  example:
+    action_type: "github.create_issue"
+    name: "Create Issue"
+    description: "Create a new issue in a repository"
+    risk_level: "low"
+    parameters_schema:
+      type: "object"
+      required:
+        - "repo"
+        - "title"
+
+RequiredCredential:
+  type: object
+  required:
+    - service
+    - auth_type
+  properties:
+    service:
+      type: string
+      maxLength: 128
+      description: |
+        Service identifier that must be provided via `POST /v1/credentials`.
+      example: "github"
+    
+    auth_type:
+      type: string
+      enum:
+        - api_key
+        - basic
+        - custom
+      description: |
+        Authentication type required by the external service.
+      example: "api_key"
+
+    instructions_url:
+      type: string
+      maxLength: 2048
+      format: uri
+      description: |
+        URL to human-readable documentation explaining how to obtain credentials
+        for this service. Only present when the connector provides setup instructions.
+      example: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+
+  example:
+    service: "github"
+    auth_type: "api_key"
+    instructions_url: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"

@@ -1,0 +1,419 @@
+ApprovalRequest:
+  type: object
+  required:
+    - agent_id
+    - request_id
+    - approver
+    - action
+    - context
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        Auto-incrementing agent identifier. MUST match the `agent_id` associated with the
+        signing key in the `X-Permission-Slip-Signature` header. If mismatch, Permission Slip
+        returns `400 Bad Request` with error code `agent_id_mismatch`.
+      example: 42
+    
+    request_id:
+      type: string
+      format: uuid
+      maxLength: 64
+      description: |
+        Unique request identifier for replay protection and idempotency. UUID v4 recommended.
+        
+        Permission Slip tracks this value within the timestamp window (300 seconds) and rejects 
+        duplicate requests with `409 Conflict` error code `duplicate_request_id`.
+      example: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+    
+    approver:
+      type: string
+      pattern: '^[a-zA-Z0-9_-]{1,64}$'
+      maxLength: 64
+      description: |
+        Permission Slip username who must approve this action. Must be registered as an
+        authorized approver for this agent.
+
+        Returns `404 Not Found` with error code `approver_not_found` if username doesn't
+        exist, or `403 Forbidden` with error code `agent_not_authorized` if approver is
+        not authorized for this agent.
+      example: "alice"
+
+    configuration_id:
+      type: string
+      pattern: '^ac_[a-f0-9]{32}$'
+      maxLength: 36
+      description: |
+        Optional reference to an action configuration. When provided, Permission Slip
+        validates:
+
+        - The configuration exists and belongs to this agent
+        - The configuration is active (not disabled)
+        - The `action.type` matches the configuration's `action_type`
+        - The `action.parameters` comply with the configuration constraints:
+          fixed parameters must match exactly, wildcard parameters accept any value
+
+        If the configuration reference is invalid, Permission Slip returns
+        `400 Bad Request` with error code `invalid_configuration`. If the
+        configuration is disabled, returns `403 Forbidden` with error code
+        `configuration_disabled`. If the configuration's `action_type` does not
+        match the request's `action.type`, returns `400 Bad Request` with error
+        code `configuration_action_type_mismatch`.
+
+        When omitted, the approval request proceeds through the standard flow
+        without configuration-based validation.
+      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+
+    action:
+      $ref: './shared.yaml#/Action'
+
+    context:
+      $ref: './shared.yaml#/ActionContext'
+
+  example:
+    agent_id: 42
+    request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+    approver: "alice"
+    configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    action:
+      type: "email.send"
+      version: "1"
+      parameters:
+        from: "alice@example.com"
+        to:
+          - "recipient@example.com"
+        subject: "Hello World"
+        body: "This is a test email."
+    context:
+      description: "Send welcome email to new user"
+      risk_level: "low"
+      details:
+        recipient_count: 1
+
+ApprovalRequestResponse:
+  type: object
+  required:
+    - approval_id
+    - approval_url
+    - status
+    - expires_at
+    - verification_required
+  properties:
+    approval_id:
+      type: string
+      pattern: '^appr_[a-zA-Z0-9]{6,64}$'
+      maxLength: 70
+      description: |
+        Unique approval identifier assigned by Permission Slip. Used to reference this approval 
+        in subsequent operations (verify, cancel).
+      example: "appr_xyz789"
+    
+    approval_url:
+      type: string
+      format: uri
+      maxLength: 4096
+      pattern: '^https://'
+      description: |
+        Primary approval URL (universal link) that the approver must visit to review and 
+        approve/deny the action. This is the canonical URL that clients MUST support.
+        
+        The URL contains context about the approval request and allows the approver to see 
+        full action details before making a decision.
+      example: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    
+    alternative_urls:
+      $ref: './shared.yaml#/AlternativeUrls'
+    
+    status:
+      type: string
+      enum:
+        - pending
+      description: |
+        Approval status. Always `pending` when first created. Status changes to `approved` 
+        or `denied` after approver makes a decision.
+      example: "pending"
+    
+    expires_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when approval expires. After this time, 
+        the approval becomes invalid and cannot be approved or verified.
+        
+        Typically set to 5 minutes from creation, but may vary based on configuration 
+        or action risk level.
+      example: "2026-02-11T13:25:00Z"
+    
+    verification_required:
+      type: boolean
+      enum: [true]
+      description: |
+        Always `true`. Indicates that a confirmation code is required to verify the approval. 
+        The approver will see this code after approving, and the agent must collect it and 
+        submit via verify endpoint.
+      example: true
+  
+  example:
+    approval_id: "appr_xyz789"
+    approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    alternative_urls:
+      deeplink: "permissionslip://permission-slip/approve/appr_xyz789"
+      web: "https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    status: "pending"
+    expires_at: "2026-02-11T13:25:00Z"
+    verification_required: true
+
+VerifyApprovalRequest:
+  type: object
+  required:
+    - request_id
+    - confirmation_code
+  properties:
+    request_id:
+      type: string
+      format: uuid
+      maxLength: 64
+      description: |
+        Unique request identifier for replay protection. UUID v4 recommended.
+      example: "a9b2e069-6374-4a65-be1d-b26cc376d7fe"
+    
+    confirmation_code:
+      type: string
+      pattern: '^[A-Za-z2-9]{3}-?[A-Za-z2-9]{3}$'
+      minLength: 6
+      maxLength: 7
+      description: |
+        6-character confirmation code shown to approver after they approve the action.
+        
+        **Format**:
+        - 6 characters from set: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 chars)
+        - Excluded confusing characters: `0`, `O`, `1`, `I`
+        - May include hyphen for readability: `XXX-XXX` or `XXXXXX`
+        - Case-insensitive (Permission Slip normalizes to uppercase)
+        
+        **Security**: Permission Slip enforces a 5 attempt limit. After 5 failed attempts, 
+        approval expires.
+      example: "RK3-P7M"
+  
+  example:
+    request_id: "a9b2e069-6374-4a65-be1d-b26cc376d7fe"
+    confirmation_code: "RK3-P7M"
+
+VerifyApprovalResponse:
+  type: object
+  required:
+    - status
+    - approved_at
+    - token
+  properties:
+    status:
+      type: string
+      enum:
+        - approved
+      description: |
+        Approval status. Always `approved` for successful verification. If the approver 
+        denied the request, the endpoint returns `403 Forbidden` with error code 
+        `approval_denied` instead.
+      example: "approved"
+    
+    approved_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when the approver approved the action.
+      example: "2026-02-11T13:20:45Z"
+    
+    token:
+      $ref: './shared.yaml#/ApprovalToken'
+  
+  example:
+    status: "approved"
+    approved_at: "2026-02-11T13:20:45Z"
+    token:
+      access_token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImF1ZCI6InBlcm1pc3Npb25zbGlwLmRldiIsImFwcHJvdmVyIjoiYWxpY2UiLCJhcHByb3ZhbF9pZCI6ImFwcHJfeHl6Nzg5Iiwic2NvcGUiOiJlbWFpbC5zZW5kIiwic2NvcGVfdmVyc2lvbiI6IjEiLCJwYXJhbXNfaGFzaCI6ImJhMDYxN2IyMzM0MTcwY2I5MzY5MTZkYjIwMjQwMDMwMGExZmRjMWZlNzFlMzZiOTExZDA4YjI1MTlmM2Q2OGMiLCJpYXQiOjE3NzA4MTYwNDUsImV4cCI6MTc3MDgxNjM0NSwianRpIjoidG9rX3VuaXF1ZTEyMyJ9.signature"
+      expires_at: "2026-02-11T13:25:45Z"
+      scope: "email.send"
+      scope_version: "1"
+
+CancelApprovalRequest:
+  type: object
+  required:
+    - request_id
+  properties:
+    request_id:
+      type: string
+      format: uuid
+      maxLength: 64
+      description: |
+        Unique request identifier for replay protection. UUID v4 recommended.
+      example: "21d9ec79-6b20-45b9-8695-83537318966d"
+  
+  example:
+    request_id: "21d9ec79-6b20-45b9-8695-83537318966d"
+
+CancelApprovalResponse:
+  type: object
+  required:
+    - status
+    - cancelled_at
+  properties:
+    status:
+      type: string
+      enum:
+        - cancelled
+      description: |
+        Approval status. Always `cancelled` for successful cancellation.
+      example: "cancelled"
+    
+    cancelled_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when the approval was cancelled.
+      example: "2026-02-11T13:21:00Z"
+  
+  example:
+    status: "cancelled"
+    cancelled_at: "2026-02-11T13:21:00Z"
+
+ApprovalSummary:
+  type: object
+  description: Summary of an approval request for the dashboard.
+  required:
+    - approval_id
+    - agent_id
+    - action
+    - context
+    - status
+    - expires_at
+    - created_at
+  properties:
+    approval_id:
+      type: string
+      description: Unique approval identifier
+      example: "appr_xyz789"
+    agent_id:
+      type: integer
+      format: int64
+      description: Agent that requested the approval
+      example: 42
+    action:
+      $ref: './shared.yaml#/Action'
+    context:
+      $ref: './shared.yaml#/ActionContext'
+    status:
+      type: string
+      enum:
+        - pending
+        - approved
+        - denied
+        - cancelled
+      description: Current approval status
+      example: "pending"
+    expires_at:
+      type: string
+      format: date-time
+      description: When the approval expires
+      example: "2026-02-11T13:25:00Z"
+    approved_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was approved (null if not approved)
+    denied_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was denied (null if not denied)
+    cancelled_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was cancelled (null if not cancelled)
+    created_at:
+      type: string
+      format: date-time
+      description: When the approval request was created
+      example: "2026-02-11T13:20:00Z"
+
+ApprovalListResponse:
+  type: object
+  description: Paginated list of approval requests.
+  required:
+    - data
+    - has_more
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/ApprovalSummary'
+    has_more:
+      type: boolean
+      description: Whether more approvals exist beyond this page.
+      example: false
+    next_cursor:
+      type: string
+      description: |
+        Opaque cursor to pass as the `after` query parameter to fetch the
+        next page. Only present when `has_more` is true. Do not construct
+        or parse cursor values — they may change format without notice.
+      example: "2026-02-11T13:20:00.123456Z,appr_xyz789"
+
+ApproveApprovalResponse:
+  type: object
+  required:
+    - approval_id
+    - status
+    - approved_at
+    - confirmation_code
+  properties:
+    approval_id:
+      type: string
+      description: Unique approval identifier
+      example: "appr_xyz789"
+    status:
+      type: string
+      enum:
+        - approved
+      description: Always `approved` for successful approval.
+      example: "approved"
+    approved_at:
+      type: string
+      format: date-time
+      description: When the approval was approved
+      example: "2026-02-21T10:30:00Z"
+    confirmation_code:
+      type: string
+      pattern: '^[A-HJ-NP-Za-hj-np-z2-9]{3}-[A-HJ-NP-Za-hj-np-z2-9]{3}$'
+      description: |
+        6-character confirmation code that the approver must share with the
+        agent. The agent submits this code via the verify endpoint to obtain
+        an action token.
+
+        Format: `XXX-XXX` from the set `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`
+        (excludes confusing characters 0/O/1/I). Case-insensitive.
+      example: "RK3-P7M"
+
+DenyApprovalResponse:
+  type: object
+  required:
+    - approval_id
+    - status
+    - denied_at
+  properties:
+    approval_id:
+      type: string
+      description: Unique approval identifier
+      example: "appr_xyz789"
+    status:
+      type: string
+      enum:
+        - denied
+      description: Always `denied` for successful denial.
+      example: "denied"
+    denied_at:
+      type: string
+      format: date-time
+      description: When the approval was denied
+      example: "2026-02-21T10:30:00Z"

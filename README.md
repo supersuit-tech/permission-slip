@@ -1,0 +1,209 @@
+# Permission Slip
+
+**The authorization layer between your AI and everything it touches.**
+
+Open-source API key vault where agents execute scoped, time-limited actions on behalf of their humans — every call approved, logged, and revocable.
+
+```
+┌─────────┐         ┌─────────────────┐         ┌──────────────┐
+│ Your AI │ ──────→ │ Permission Slip │ ──────→ │   Gmail,     │
+│  Agent  │ ←────── │   (middle-man)  │ ←────── │   Stripe,    │
+└─────────┘         └─────────────────┘         │   Expedia…   │
+                           │                    └──────────────┘
+                           │ push notification
+                           ▼
+                     ┌───────────┐
+                     │  You      │
+                     │  (approve │
+                     │  / deny)  │
+                     └───────────┘
+```
+
+## Why Permission Slip?
+
+You want your AI agent to book flights, send emails, order food — but you can't trust it with full access to your accounts.
+
+Your options today:
+- **Give the agent your passwords/API keys** — it can do anything, anytime, with no oversight
+- **Do everything manually** — defeats the purpose of having an agent
+- **Hope the agent asks permission** — it could lie, hallucinate, or get compromised
+
+Permission Slip solves this by acting as a secure proxy with human-in-the-loop approval, where **actions** are the core primitive. Agents can only submit pre-defined action types with schema-validated parameters — never arbitrary API calls. You always see exactly what the agent wants to do, and nothing executes without your consent.
+
+For the full protocol design, architecture, and security model, see [SPEC.md](SPEC.md).
+
+## Key Features
+
+- **Action-based security model** — agents submit structured actions, never arbitrary API calls
+- **Per-request approval** — push notifications with human-readable action summaries
+- **Standing approvals** — pre-authorize trusted, repetitive actions with constraints
+- **Cryptographic agent identity** — Ed25519 key pairs for request signing
+- **Zero credential exposure** — agents never see your API keys or passwords
+- **Self-hostable** — run your own instance for full control
+- **Single binary deployment** — Go server with embedded React frontend
+- **Audit trail** — every request, approval, and execution is logged
+- **User preferences** — per-channel notification settings, contact info, and credential vault management
+
+## Documentation
+
+- **[SPEC.md](SPEC.md)** — protocol overview, architecture, and security model
+- **[Terminology](docs/spec/terminology.md)** — core concepts and definitions
+- **[Authentication](docs/spec/authentication.md)** — agent identity, request signing, and security
+- **[API Reference](docs/spec/api.md)** — complete endpoint documentation
+- **[Notifications](docs/spec/notifications.md)** — push notification and webhook delivery
+- **[OpenAPI Spec](spec/openapi/)** — machine-readable API definition
+- **[Architecture](docs/architecture.md)** — system diagrams and component overview
+- **[Agent Integration Guide](docs/agents.md)** — how to integrate an autonomous agent with Permission Slip
+- **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
+- **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
+- **[Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md)** — step-by-step guide to test the invite/registration flow
+- **[Deploying to Fly.io](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 |
+| UI Components | shadcn/ui (Radix UI + Tailwind + Lucide icons) |
+| API Client | openapi-fetch with generated TypeScript types |
+| Auth | Supabase Auth (JWT-based, MFA support) |
+| Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
+| State | React Query (TanStack Query) |
+| Testing | Go test + real Postgres, Vitest + React Testing Library |
+
+## Getting Started
+
+### Prerequisites
+
+- **Go 1.24+** — [Install Go](https://go.dev/doc/install)
+- **Node.js 20+** and **npm** — [Install Node.js](https://nodejs.org/)
+- **Supabase CLI** and **Docker** — [Install Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
+- **PostgreSQL 16** (for running tests only) — [Install Postgres](https://www.postgresql.org/download/)
+
+### 1. Clone and install dependencies
+
+```bash
+git clone https://github.com/supersuit-tech/permission-slip-web.git
+cd permission-slip-web
+make install
+```
+
+### 2. Set up environment variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` as needed. See [.env.example](.env.example) for all available variables and their descriptions.
+
+### 3. Start Supabase locally
+
+Supabase provides both authentication and the development database (PostgreSQL).
+
+```bash
+supabase start                        # start local Supabase stack (requires Docker)
+supabase status                       # get local URLs and keys for .env
+```
+
+Copy the `anon key` from `supabase status` into your `.env` as `VITE_SUPABASE_ANON_KEY`. The default `DATABASE_URL` in `.env.example` already points to Supabase's local Postgres (`127.0.0.1:54322`).
+
+See the [Supabase docs](https://supabase.com/docs/guides/local-development) for more details.
+
+### 4. Run migrations
+
+```bash
+make migrate-up
+```
+
+The app starts without a database if `DATABASE_URL` is not set, so you can work on frontend-only features without Supabase running.
+
+### 5. Generate the typed API client
+
+TypeScript types are generated from the OpenAPI spec. This happens automatically after `npm install` via a postinstall hook, but you can also run it manually:
+
+```bash
+make generate
+```
+
+### 6. Run in development
+
+```bash
+# Terminal 1 — Go API server (port 8080)
+make dev-backend
+
+# Terminal 2 — Vite dev server with HMR (port 5173)
+make dev-frontend
+```
+
+Open **http://localhost:5173**. API requests to `/api/*` are automatically proxied to the Go server.
+
+## Production Build
+
+Build a single Go binary with the React frontend embedded:
+
+```bash
+make build
+./bin/server
+```
+
+The server serves both the API and the React app on a single port (default 8080). For containerized deployment, see **[Deploying to Fly.io](docs/deployment.md)** (includes Dockerfile, fly.toml, and step-by-step guide).
+
+### Production Environment Variables
+
+Beyond the variables in `.env.example`, these require attention for production:
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `SUPABASE_URL` | Yes | Your Supabase project URL (for JWT verification) |
+| `BASE_URL` | Yes | Public URL of your deployment (e.g. `https://app.permissionslip.dev`) |
+| `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — generate with `openssl rand -hex 32` |
+| `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
+| `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
+| `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
+| `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
+
+**VAPID keys (Web Push):** Set all three to enable Web Push notifications. If none are set, Web Push is disabled. If partially configured, the server will refuse to start. In development mode (`MODE=development`), keys are auto-generated and stored in the database for convenience.
+
+Generate keys and set them as env vars for your platform:
+
+```bash
+# Generate a VAPID key pair (.env format)
+make generate-vapid-keys
+
+# Fly.io — outputs a ready-to-run `fly secrets set` command
+go run ./cmd/generate-vapid-keys --format=fly
+
+# Heroku — outputs a ready-to-run `heroku config:set` command
+go run ./cmd/generate-vapid-keys --format=heroku
+```
+
+> **Warning:** Changing VAPID keys invalidates all existing Web Push subscriptions. Users will need to re-subscribe to push notifications.
+
+## Testing
+
+```bash
+make test              # all tests (backend + frontend)
+make test-backend      # Go tests (requires Postgres)
+make test-frontend     # frontend tests (no database needed)
+```
+
+Backend tests run against a real Postgres database. Frontend tests use a mocked Supabase client. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get started, our development workflow, and code standards.
+
+## License
+
+Permission Slip is licensed under the [Apache License 2.0](LICENSE).
+
+## Contact
+
+Permission Slip is developed by [SuperSuit](https://supersuit.tech). For questions or feedback, [open an issue](https://github.com/supersuit-tech/permission-slip-web/issues) or reach out at [supersuit.tech](https://supersuit.tech).
+
+## Contributors
+
+<a href="https://github.com/chiedo"><img src="https://github.com/chiedo.png" width="50" height="50" alt="chiedo" style="border-radius:50%"></a>
+<a href="https://github.com/chiedobot"><img src="https://github.com/chiedobot.png" width="50" height="50" alt="chiedobot" style="border-radius:50%"></a>

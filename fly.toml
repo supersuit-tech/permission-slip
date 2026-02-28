@@ -1,0 +1,40 @@
+# Replace with your Fly app name (fly launch will set this automatically)
+# app = 'your-app-name'
+primary_region = 'iad'
+kill_signal = 'SIGTERM'
+kill_timeout = '30s'
+
+[build]
+  # Vite inlines these into the JS bundle at build time.
+  # Set via: fly deploy --build-arg VITE_SUPABASE_URL=https://xxx.supabase.co ...
+  # Or uncomment and hardcode below for convenience:
+  # [build.args]
+  #   VITE_SUPABASE_URL = "https://your-project.supabase.co"
+  #   VITE_SUPABASE_ANON_KEY = "your-anon-key"
+
+[env]
+  PORT = '8080'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  grace_period = '10s'
+  interval = '15s'
+  method = 'GET'
+  timeout = '3s'
+  path = '/api/health'
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1

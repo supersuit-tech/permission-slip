@@ -1,0 +1,104 @@
+ActionConfigTemplate:
+  type: object
+  required:
+    - id
+    - connector_id
+    - action_type
+    - name
+    - parameters
+    - created_at
+  properties:
+    id:
+      type: string
+      maxLength: 255
+      description: |
+        Unique template identifier.
+      example: "tpl_github_create_issue_all"
+
+    connector_id:
+      type: string
+      maxLength: 128
+      description: |
+        Connector this template applies to.
+      example: "github"
+
+    action_type:
+      type: string
+      maxLength: 128
+      description: |
+        Action type this template is designed for.
+      example: "github.create_issue"
+
+    name:
+      type: string
+      maxLength: 255
+      description: |
+        Human-readable name for this template.
+      example: "Create issues (all fields open)"
+
+    description:
+      type: string
+      maxLength: 4096
+      nullable: true
+      description: |
+        Longer description of what this template configures.
+      example: "Agent can create issues in any repo with any title and body."
+
+    parameters:
+      type: object
+      additionalProperties: true
+      description: |
+        Pre-configured parameter values. Uses the same constraint syntax as
+        action configurations: fixed values, `"*"` wildcards, and
+        `{"$pattern": "<glob>"}` patterns.
+      example:
+        owner: "*"
+        repo: "*"
+        title: "*"
+        body: "*"
+
+    created_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this template was created.
+      example: "2026-02-28T10:00:00Z"
+
+  example:
+    id: "tpl_github_create_issue_all"
+    connector_id: "github"
+    action_type: "github.create_issue"
+    name: "Create issues (all fields open)"
+    description: "Agent can create issues in any repo with any title and body."
+    parameters:
+      owner: "*"
+      repo: "*"
+      title: "*"
+      body: "*"
+    created_at: "2026-02-28T10:00:00Z"
+
+ActionConfigTemplateListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/action_config_templates.yaml#/ActionConfigTemplate'
+      description: |
+        List of action configuration templates for the specified connector.
+
+  example:
+    data:
+      - id: "tpl_github_create_issue_all"
+        connector_id: "github"
+        action_type: "github.create_issue"
+        name: "Create issues (all fields open)"
+        description: "Agent can create issues in any repo with any title and body."
+        parameters:
+          owner: "*"
+          repo: "*"
+          title: "*"
+          body: "*"
+        created_at: "2026-02-28T10:00:00Z"

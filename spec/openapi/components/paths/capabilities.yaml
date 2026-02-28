@@ -1,0 +1,299 @@
+agentCapabilities:
+  get:
+    operationId: getAgentCapabilities
+    summary: Get Agent Capabilities
+    description: |
+      Returns everything an agent needs to know about what it can do on behalf of
+      a specific user — enabled connectors, available actions with full parameter
+      schemas, active standing approvals, action configurations, and credential
+      readiness.
+
+      This is the primary **discovery endpoint** for agents. Call it at startup
+      (or periodically) to build a complete picture of available capabilities
+      before submitting approval requests or executing actions.
+
+      ## What's Included
+
+      For each connector enabled for this agent:
+
+      - **Connector metadata**: ID, name, description
+      - **Credential readiness**: Whether the user has stored the required credentials
+        (boolean only — no credential values are ever exposed)
+      - **Actions**: Full list of available action types with:
+        - Human-readable name and description
+        - Risk level (`low`, `medium`, `high`)
+        - Parameter JSON Schema (for client-side validation)
+        - Active standing approvals (constraints, remaining executions, expiration)
+        - Active action configurations (pre-approved parameter sets with wildcards)
+
+      ## Action Configurations
+
+      Each action may have one or more **action configurations** — user-created
+      parameter presets that define what the agent is allowed to do. Configurations
+      are the primary mechanism for granting agents permission to act.
+
+      - **Fixed parameters** are locked in by the user and cannot be changed
+      - **Wildcard parameters** (`"*"`) let the agent supply any value
+      - The agent references a `configuration_id` in approval requests and executions
+
+      ## What's NOT Included
+
+      - Connectors that are not enabled for this agent (use `GET /v1/connectors` for
+        the full global catalog)
+      - Deactivated or expired standing approvals
+      - Disabled action configurations
+      - Credential values, types, or metadata (only presence/absence)
+
+      ## Agent Workflow
+
+      After calling this endpoint, the agent knows:
+
+      1. **Which connectors are available** → `connectors[]`
+      2. **Which are ready to use** → `credentials_ready: true`
+      3. **Which need user setup** → `credentials_ready: false` + `credentials_setup_url`
+      4. **What actions exist** → `connectors[].actions[]`
+      5. **What parameters each action expects** → `parameters_schema`
+      6. **What configurations are available** → `action_configurations[]` with `configuration_id`
+      7. **Which actions can execute immediately** → `standing_approvals` is non-empty
+      8. **Which need one-off approval** → `standing_approvals` is empty
+      9. **What constraints apply** → `standing_approvals[].constraints`
+
+      ## Authorization Flow Decision
+
+      For a given action the agent wants to perform:
+
+      ```
+      Has action configuration?
+        ├─ YES → Reference configuration_id in requests
+        │        Has standing approval with matching constraints?
+        │          ├─ YES → POST /v1/actions/execute (no token, agent signature only)
+        │          └─ NO  → POST /v1/approvals/request → user approves → verify → execute
+        └─ NO  → Ask user to create an action configuration
+      ```
+
+      If `credentials_ready` is `false` for the connector, the agent should prompt
+      the user to visit `credentials_setup_url` before attempting any actions.
+
+      ## Security
+
+      - Request MUST include valid `X-Permission-Slip-Signature` header
+      - The `agent_id` in the URL path MUST match the `agent_id` in the signature header
+      - Only connectors and standing approvals belonging to the authenticated agent's
+        user are returned
+      - Credential values are never exposed — only a boolean readiness flag
+
+    tags:
+      - Agents
+
+    security:
+      - PermissionSlipSignature: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentIdSigned'
+
+    responses:
+      '200':
+        description: Agent capabilities retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/capabilities.yaml#/AgentCapabilitiesResponse'
+            examples:
+              full_capabilities:
+                summary: Agent with multiple connectors, mixed readiness
+                value:
+                  agent_id: 42
+                  connectors:
+                    - id: "gmail"
+                      name: "Gmail"
+                      description: "Send and manage emails via Gmail API"
+                      credentials_ready: true
+                      actions:
+                        - action_type: "email.send"
+                          name: "Send Email"
+                          description: "Send an email via Gmail"
+                          risk_level: "low"
+                          parameters_schema:
+                            type: "object"
+                            required:
+                              - "to"
+                              - "subject"
+                              - "body"
+                            properties:
+                              from:
+                                type: "string"
+                                format: "email"
+                                description: "Sender address (defaults to account email)"
+                              to:
+                                type: "array"
+                                items:
+                                  type: "string"
+                                  format: "email"
+                                description: "Recipient email addresses"
+                              subject:
+                                type: "string"
+                                maxLength: 998
+                                description: "Email subject line"
+                              body:
+                                type: "string"
+                                description: "Email body (plain text or HTML)"
+                          standing_approvals:
+                            - standing_approval_id: "sa_def456"
+                              constraints:
+                                recipient_pattern: "*@mycompany.com"
+                                max_recipients: 5
+                              max_executions: 100
+                              executions_remaining: 88
+                              expires_at: "2026-05-15T00:00:00Z"
+                          action_configurations:
+                            - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+                              action_type: "email.send"
+                              name: "Send to team"
+                              parameters:
+                                to: "team@mycompany.com"
+                                subject: "*"
+                                body: "*"
+                              credential_ready: true
+                        - action_type: "email.read"
+                          name: "Read Email"
+                          description: "Read emails from Gmail inbox"
+                          risk_level: "low"
+                          parameters_schema:
+                            type: "object"
+                            properties:
+                              sender:
+                                type: "string"
+                                description: "Filter by sender address or pattern"
+                              max_results:
+                                type: "integer"
+                                minimum: 1
+                                maximum: 100
+                                description: "Maximum number of emails to return"
+                          standing_approvals:
+                            - standing_approval_id: "sa_abc123"
+                              constraints:
+                                sender: "*@github.com"
+                                max_results: 10
+                              max_executions: null
+                              executions_remaining: null
+                              expires_at: "2026-02-28T00:00:00Z"
+                          action_configurations: []
+                    - id: "stripe"
+                      name: "Stripe"
+                      description: "Payment processing via Stripe API"
+                      credentials_ready: false
+                      credentials_setup_url: "https://app.permissionslip.dev/connect/stripe"
+                      actions:
+                        - action_type: "payment.charge"
+                          name: "Charge Payment"
+                          description: "Charge a customer's payment method"
+                          risk_level: "high"
+                          parameters_schema:
+                            type: "object"
+                            required:
+                              - "amount"
+                              - "currency"
+                              - "customer_id"
+                            properties:
+                              amount:
+                                type: "integer"
+                                minimum: 1
+                                description: "Amount in smallest currency unit (e.g., cents)"
+                              currency:
+                                type: "string"
+                                pattern: "^[A-Z]{3}$"
+                                description: "ISO 4217 currency code"
+                              customer_id:
+                                type: "string"
+                                description: "Stripe customer identifier"
+                              description:
+                                type: "string"
+                                maxLength: 500
+                                description: "Payment description"
+                          standing_approvals: []
+                          action_configurations: []
+
+              no_connectors:
+                summary: Agent with no enabled connectors
+                value:
+                  agent_id: 43
+                  connectors: []
+
+              standing_approval_only:
+                summary: Single connector, all actions with standing approvals
+                value:
+                  agent_id: 44
+                  connectors:
+                    - id: "gmail"
+                      name: "Gmail"
+                      description: "Send and manage emails via Gmail API"
+                      credentials_ready: true
+                      actions:
+                        - action_type: "email.read"
+                          name: "Read Email"
+                          description: "Read emails from Gmail inbox"
+                          risk_level: "low"
+                          parameters_schema:
+                            type: "object"
+                            properties:
+                              sender:
+                                type: "string"
+                              max_results:
+                                type: "integer"
+                          standing_approvals:
+                            - standing_approval_id: "sa_read01"
+                              constraints:
+                                sender: "*@github.com"
+                              max_executions: null
+                              executions_remaining: null
+                              expires_at: "2026-03-15T00:00:00Z"
+                            - standing_approval_id: "sa_read02"
+                              constraints:
+                                sender: "*@linear.app"
+                              max_executions: 50
+                              executions_remaining: 50
+                              expires_at: "2026-03-01T00:00:00Z"
+                          action_configurations: []
+
+      '400':
+        description: Invalid request or agent ID mismatch
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_id_mismatch"
+                message: "Agent ID in path must match signature header"
+                retryable: false
+                details:
+                  path_agent_id: 42
+                  header_agent_id: 43
+                trace_id: "trace_xyz789"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent not found or not registered
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_found"
+                message: "Agent is not registered"
+                retryable: false
+                details:
+                  agent_id: 42
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

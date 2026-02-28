@@ -1,0 +1,183 @@
+agentConnectors:
+  get:
+    operationId: listAgentConnectors
+    summary: List Agent Connectors
+    description: |
+      List all connectors enabled for a specific agent. Returns connector summaries
+      for each connector the agent is allowed to use.
+
+      Uses session authentication (Supabase JWT) — this is a user-facing endpoint
+      for managing per-agent connector enablement through the dashboard.
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+
+    responses:
+      '200':
+        description: Agent connectors listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorListResponse'
+            example:
+              connectors:
+                - id: "gmail"
+                  name: "Gmail"
+                  description: "Send and manage emails via Gmail API"
+                  actions:
+                    - "email.send"
+                    - "email.read"
+                  required_credentials:
+                    - "gmail"
+                  enabled_at: "2026-02-18T10:00:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_found"
+                message: "Agent not found"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+agentConnectorById:
+  put:
+    operationId: enableAgentConnector
+    summary: Enable Connector for Agent
+    description: |
+      Enable a connector for a specific agent. Once enabled, the agent can submit
+      actions defined by this connector for approval.
+
+      This is idempotent — enabling an already-enabled connector returns 200.
+
+      Uses session authentication (Supabase JWT).
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    responses:
+      '200':
+        description: Connector enabled for agent (or was already enabled)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorResponse'
+            example:
+              agent_id: 42
+              connector_id: "gmail"
+              enabled_at: "2026-02-18T10:00:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent or connector not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_found"
+                message: "Agent not found"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+  delete:
+    operationId: disableAgentConnector
+    summary: Disable Connector for Agent
+    description: |
+      Disable a connector for a specific agent. The agent will no longer be able
+      to submit actions from this connector.
+
+      Any active standing approvals for this agent whose action type belongs to
+      the disabled connector are automatically **revoked**. This prevents
+      forgotten standing approvals from silently reactivating if the connector
+      is re-enabled later.
+
+      Uses session authentication (Supabase JWT).
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    responses:
+      '200':
+        description: Connector disabled for agent
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/DisableAgentConnectorResponse'
+            example:
+              agent_id: 42
+              connector_id: "gmail"
+              disabled_at: "2026-02-18T12:00:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent-connector association not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_connector_not_found"
+                message: "Connector not enabled for this agent"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

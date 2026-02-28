@@ -1,0 +1,108 @@
+pushSubscriptions:
+  get:
+    summary: List push subscriptions
+    description: Returns all Web Push subscriptions registered by the authenticated user.
+    operationId: listPushSubscriptions
+    tags:
+      - Push Subscriptions
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Push subscriptions retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/push_subscriptions.yaml#/PushSubscriptionListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  post:
+    summary: Register push subscription
+    description: |
+      Register a Web Push subscription from the browser. If a subscription
+      with the same endpoint already exists for this user, the keys are updated
+      (subscription refresh).
+    operationId: createPushSubscription
+    tags:
+      - Push Subscriptions
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/push_subscriptions.yaml#/CreatePushSubscriptionRequest'
+    responses:
+      '201':
+        description: Push subscription created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/push_subscriptions.yaml#/PushSubscriptionResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+pushSubscriptionById:
+  delete:
+    summary: Delete push subscription
+    description: Remove a Web Push subscription by ID.
+    operationId: deletePushSubscription
+    tags:
+      - Push Subscriptions
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: subscription_id
+        in: path
+        required: true
+        description: Push subscription ID
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: Push subscription deleted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/push_subscriptions.yaml#/DeletePushSubscriptionResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+vapidKey:
+  get:
+    summary: Get VAPID public key
+    description: |
+      Returns the server's VAPID public key, needed by the browser to create
+      a Web Push subscription. Requires authentication so VAPID keys aren't
+      publicly enumerable.
+    operationId: getVAPIDPublicKey
+    tags:
+      - Push Subscriptions
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: VAPID public key returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/push_subscriptions.yaml#/VAPIDPublicKeyResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

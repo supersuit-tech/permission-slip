@@ -1,0 +1,58 @@
+CreateRegistrationInviteRequest:
+  type: object
+  description: Request to create a registration invite.
+  properties:
+    expires_in:
+      type: integer
+      description: |
+        TTL in seconds for the invite (optional). Must be between 60 (1 minute)
+        and 86400 (24 hours). Defaults to 900 (15 minutes) if omitted.
+      minimum: 60
+      maximum: 86400
+      example: 3600
+
+CreateRegistrationInviteResponse:
+  type: object
+  description: A newly created registration invite with the plaintext invite code.
+  required:
+    - id
+    - invite_code
+    - status
+    - expires_at
+    - created_at
+  properties:
+    id:
+      type: string
+      description: Unique invite identifier
+      example: "ri_abc123def456"
+    invite_code:
+      type: string
+      description: Plaintext invite code to share with the agent (format PS-XXXX-XXXX)
+      example: "PS-ABCD-1234"
+    invite_url:
+      type: string
+      format: uri
+      description: |
+        The URL the agent should POST to in order to register. Combines the
+        public base URL with the invite code path (`/invite/{invite_code}`).
+        Only present when the server's base URL is configured.
+
+        The agent POSTs to this URL with `{ request_id, public_key }` in the
+        JSON body and an `X-Permission-Slip-Signature` header. The invite code
+        is embedded in the URL path — the agent does not need to extract it
+        or know the user's username.
+      example: "https://app.permissionslip.dev/invite/PS-ABCD-1234"
+    status:
+      type: string
+      description: Invite status (always "active" for newly created invites)
+      example: "active"
+    expires_at:
+      type: string
+      format: date-time
+      description: When the invite expires (ISO 8601)
+      example: "2026-02-19T12:15:00Z"
+    created_at:
+      type: string
+      format: date-time
+      description: When the invite was created (ISO 8601)
+      example: "2026-02-19T12:00:00Z"

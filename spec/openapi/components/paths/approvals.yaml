@@ -1,0 +1,1064 @@
+request:
+  post:
+    operationId: requestApproval
+    summary: Request Approval for Action
+    description: |
+      Request approval for a specific one-off action. The designated approver must review 
+      and approve the action before the agent can execute it.
+      
+      ## Approval Request Flow
+      
+      1. **Agent requests**: Sends action details, parameters, and context
+      2. **Permission Slip validates**: Verifies agent is registered, signature is valid
+      3. **Permission Slip responds**: Returns approval URL with unique approval_id
+      4. **Notification sent**: Permission Slip notifies approver (push notification)
+      5. **Approver reviews**: Visits URL, sees full action details, approves/denies
+      6. **Confirmation shown**: If approved, Permission Slip shows 6-character confirmation code
+      7. **Agent verifies**: Collects code from user, submits to verify endpoint
+      8. **Token issued**: Permission Slip returns single-use JWT token
+      9. **Agent executes**: Uses token to call `POST /v1/actions/execute`
+      
+      ## Action Types
+      
+      Action types follow naming conventions:
+      
+      **Standard Types** (2 segments, reserved for future standardization):
+      - Format: `<category>.<operation>` (e.g., `email.send`, `payment.charge`)
+      - Pattern: `^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`
+      - Max length: 64 characters
+      
+      **Custom Types** (4+ segments, service-specific):
+      - Format: `<reverse-domain>.<category>.<operation>` (e.g., `com.example.deploy.production`)
+      - Pattern: Reverse-DNS domain (2+ segments) + category + operation
+      - Max length: 128 characters
+      
+      Permission Slip validates action types and returns `400 Bad Request` for invalid formats or 
+      unsupported types.
+      
+      ## Security
+      
+      - Agent MUST be registered with this approver
+      - Request MUST include valid `X-Permission-Slip-Signature` header
+      - The `agent_id` in request body MUST match signature header
+      - Duplicate `request_id` rejected within timestamp window
+      - Approval expires after TTL (typically 5 minutes)
+      
+      ## Parameters Hash
+      
+      The `action.parameters` object is canonicalized using RFC 8785 (JCS) and hashed with 
+      SHA-256. This hash is embedded in the approval token as `params_hash` to prevent 
+      parameter tampering. Permission Slip verifies the hash matches request parameters before 
+      executing actions.
+    
+    tags:
+      - Approvals
+    
+    security:
+      - PermissionSlipSignature: []
+    
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/approvals.yaml#/ApprovalRequest'
+          examples:
+            email_send:
+              summary: Email send approval
+              value:
+                agent_id: 42
+                request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+                approver: "alice"
+                action:
+                  type: "email.send"
+                  version: "1"
+                  parameters:
+                    from: "alice@example.com"
+                    to:
+                      - "recipient@example.com"
+                    subject: "Hello World"
+                    body: "This is a test email."
+                context:
+                  description: "Send welcome email to new user"
+                  risk_level: "low"
+                  details:
+                    recipient_count: 1
+            
+            payment_charge:
+              summary: Payment charge approval (high risk)
+              value:
+                agent_id: 42
+                request_id: "d5a6fd23-27d8-491a-8fe1-97cda19300d8"
+                approver: "alice"
+                action:
+                  type: "payment.charge"
+                  version: "1"
+                  parameters:
+                    amount: 9900
+                    currency: "USD"
+                    customer_id: "cus_abc123"
+                    description: "Subscription renewal"
+                context:
+                  description: "Charge customer for monthly subscription"
+                  risk_level: "high"
+                  details:
+                    estimated_cost: "$99.00 USD"
+                    customer_name: "John Doe"
+            
+            custom_action:
+              summary: Service-specific custom action
+              value:
+                agent_id: 42
+                request_id: "5e982a34-5ecd-4417-b449-b4ff53343141"
+                approver: "alice"
+                action:
+                  type: "com.example.deploy.production"
+                  version: "1"
+                  parameters:
+                    repository: "myapp"
+                    branch: "main"
+                    environment: "production"
+                    commit_sha: "a1b2c3d4"
+                context:
+                  description: "Deploy myapp to production environment"
+                  risk_level: "high"
+                  details:
+                    affected_services:
+                      - "api"
+                      - "worker"
+                    estimated_downtime: "2 minutes"
+    
+    responses:
+      '200':
+        description: Approval request created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/ApprovalRequestResponse'
+            examples:
+              basic:
+                summary: Basic approval response
+                value:
+                  approval_id: "appr_xyz789"
+                  approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+                  status: "pending"
+                  expires_at: "2026-02-11T13:25:00Z"
+                  verification_required: true
+              
+              with_alternative_urls:
+                summary: Response with cross-platform URLs
+                value:
+                  approval_id: "appr_xyz789"
+                  approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+                  alternative_urls:
+                    deeplink: "permissionslip://permission-slip/approve/appr_xyz789"
+                    web: "https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789"
+                  status: "pending"
+                  expires_at: "2026-02-11T13:25:00Z"
+                  verification_required: true
+      
+      '400':
+        description: Invalid request or unsupported action type
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              invalid_action_type:
+                summary: Invalid action type format
+                value:
+                  error:
+                    code: "invalid_action_type"
+                    message: "Action type format is invalid"
+                    retryable: false
+                    details:
+                      action_type: "invalid_type"
+                      expected_format: "Standard: category.operation or Custom: com.example.category.operation"
+                    trace_id: "trace_xyz789"
+              
+              unsupported_action_type:
+                summary: Action type not supported by this service
+                value:
+                  error:
+                    code: "unsupported_action_type"
+                    message: "Action type is not supported"
+                    retryable: false
+                    details:
+                      action_type: "unsupported.action"
+                      supported_types:
+                        - "email.send"
+                        - "calendar.create"
+                    trace_id: "trace_xyz789"
+              
+              agent_id_mismatch:
+                summary: Agent ID mismatch between body and signature
+                value:
+                  error:
+                    code: "agent_id_mismatch"
+                    message: "Agent ID in request body must match signature header"
+                    retryable: false
+                    details:
+                      body_agent_id: 42
+                      header_agent_id: 43
+                    trace_id: "trace_xyz789"
+      
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      
+      '403':
+        description: Agent not authorized for this approver
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_authorized"
+                message: "Agent is not registered with this approver"
+                retryable: false
+                details:
+                  agent_id: 42
+                  approver: "alice"
+                trace_id: "trace_xyz789"
+      
+      '404':
+        description: Agent or approver not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              agent_not_found:
+                summary: Agent not registered
+                value:
+                  error:
+                    code: "agent_not_found"
+                    message: "Agent is not registered"
+                    retryable: false
+                    details:
+                      agent_id: 42
+                    trace_id: "trace_xyz789"
+              
+              approver_not_found:
+                summary: Approver username not found
+                value:
+                  error:
+                    code: "approver_not_found"
+                    message: "Approver username not found"
+                    retryable: false
+                    details:
+                      approver: "alice"
+                    trace_id: "trace_xyz789"
+      
+      '409':
+        description: Duplicate request ID
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "duplicate_request_id"
+                message: "Request ID already used"
+                retryable: false
+                details:
+                  request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+                trace_id: "trace_xyz789"
+      
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+      
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+      
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+verifyApproval:
+  post:
+    operationId: verifyApproval
+    summary: Verify Approval and Retrieve Token
+    description: |
+      Verify approval and retrieve the single-use token by submitting the confirmation code 
+      shown to the approver after they approved the action.
+      
+      ## Verification Flow
+      
+      1. **Approver approves**: Visits approval URL, reviews action details, approves
+      2. **Code displayed**: Permission Slip shows 6-character confirmation code (e.g., `RK3-P7M`)
+      3. **User provides code**: Approver communicates code to agent owner/operator
+      4. **Agent submits code**: Calls this endpoint with code
+      5. **Permission Slip verifies**: Checks code matches, hasn't expired, attempts < 5
+      6. **Token issued**: Permission Slip returns single-use JWT token with action scope
+      7. **Agent uses token**: Passes token to `POST /v1/actions/execute` to trigger execution
+      
+      ## Denial Handling
+      
+      If the approver explicitly denied the approval request, this endpoint returns 
+      `403 Forbidden` with error code `approval_denied`. The agent should NOT retry 
+      or re-request approval for the same action without user intervention.
+      
+      ## Token Structure
+      
+      The returned JWT token contains:
+      - `sub`: Agent ID
+      - `aud`: `permissionslip.dev`
+      - `approver`: Username who approved
+      - `approval_id`: Approval request ID
+      - `scope`: Action type (e.g., `email.send`)
+      - `scope_version`: Action version (e.g., `"1"`)
+      - `params_hash`: SHA-256 hash of JCS-canonicalized action parameters
+      - `iat`, `exp`: Issued/expires timestamps
+      - `jti`: Unique token ID (for single-use enforcement)
+      
+      ## Token Usage
+      
+      The token is passed to `POST /v1/actions/execute` along with the action ID and 
+      parameters. Permission Slip verifies the token and executes the action using the 
+      user's stored credentials:
+      
+      ```http
+      POST https://app.permissionslip.dev/v1/actions/execute
+      X-Permission-Slip-Signature: agent_id="...", algorithm="Ed25519", ...
+      Content-Type: application/json
+      
+      {
+        "token": "<approval_token>",
+        "action_id": "email.send",
+        "parameters": { ... }
+      }
+      ```
+      
+      Permission Slip verifies:
+      1. JWT signature (token was issued by Permission Slip)
+      2. Expiration (`exp` claim)
+      3. Scope matches `action_id`
+      4. Parameters hash matches request parameters
+      5. Token not already used (`jti` tracking)
+      
+      ## Security
+      
+      - **Attempt limit**: 5 incorrect code attempts allowed
+      - **Lockout**: After 5 failures, approval expires
+      - **Single-use code**: Code invalidated after successful verification
+      - **Single-use token**: Token invalidated after first successful action
+      - **Expiration**: Both code and token expire with approval TTL
+    
+    tags:
+      - Approvals
+    
+    security:
+      - PermissionSlipSignature: []
+    
+    parameters:
+      - $ref: '../parameters/common.yaml#/ApprovalId'
+    
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/approvals.yaml#/VerifyApprovalRequest'
+          examples:
+            with_hyphen:
+              summary: Code with hyphen
+              value:
+                request_id: "a9b2e069-6374-4a65-be1d-b26cc376d7fe"
+                confirmation_code: "RK3-P7M"
+            
+            without_hyphen:
+              summary: Code without hyphen
+              value:
+                request_id: "dcd35b63-5b5c-473c-a713-154ed643a9b4"
+                confirmation_code: "RK3P7M"
+    
+    responses:
+      '200':
+        description: Approval verified successfully, token issued
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/VerifyApprovalResponse'
+            example:
+              status: "approved"
+              approved_at: "2026-02-11T13:20:45Z"
+              token:
+                access_token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImF1ZCI6InBlcm1pc3Npb25zbGlwLmRldiIsImFwcHJvdmVyIjoiYWxpY2UiLCJhcHByb3ZhbF9pZCI6ImFwcHJfeHl6Nzg5Iiwic2NvcGUiOiJlbWFpbC5zZW5kIiwic2NvcGVfdmVyc2lvbiI6IjEiLCJwYXJhbXNfaGFzaCI6ImJhMDYxN2IyMzM0MTcwY2I5MzY5MTZkYjIwMjQwMDMwMGExZmRjMWZlNzFlMzZiOTExZDA4YjI1MTlmM2Q2OGMiLCJpYXQiOjE3NzA4MTYwNDUsImV4cCI6MTc3MDgxNjM0NSwianRpIjoidG9rX3VuaXF1ZTEyMyJ9.signature"
+                expires_at: "2026-02-11T13:25:45Z"
+                scope: "email.send"
+                scope_version: "1"
+      
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "Invalid confirmation code format"
+                retryable: false
+                details:
+                  field: "confirmation_code"
+                trace_id: "trace_xyz789"
+      
+      '401':
+        description: Invalid signature or incorrect code
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              invalid_code:
+                summary: Incorrect confirmation code
+                value:
+                  error:
+                    code: "invalid_code"
+                    message: "Incorrect confirmation code"
+                    retryable: false
+                    details:
+                      attempts_remaining: 3
+                    trace_id: "trace_xyz789"
+              
+              invalid_signature:
+                summary: Signature verification failed
+                value:
+                  error:
+                    code: "invalid_signature"
+                    message: "Signature verification failed"
+                    retryable: false
+                    trace_id: "trace_xyz789"
+      
+      '403':
+        description: Agent not authorized or approval denied
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              approval_denied:
+                summary: User explicitly denied the approval
+                value:
+                  error:
+                    code: "approval_denied"
+                    message: "User denied the approval request"
+                    retryable: false
+                    details:
+                      denied_at: "2026-02-11T13:20:30Z"
+                    trace_id: "trace_xyz789"
+              
+              agent_not_authorized:
+                summary: Agent not authorized for this approval
+                value:
+                  error:
+                    code: "agent_not_authorized"
+                    message: "Agent is not authorized for this approval"
+                    retryable: false
+                    details:
+                      agent_id: 42
+                      approval_id: "appr_xyz789"
+                    trace_id: "trace_xyz789"
+      
+      '404':
+        description: Approval not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Approval ID not found"
+                retryable: false
+                details:
+                  approval_id: "appr_xyz789"
+                trace_id: "trace_xyz789"
+      
+      '410':
+        description: Approval expired or locked out
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              expired:
+                summary: Approval TTL elapsed
+                value:
+                  error:
+                    code: "approval_expired"
+                    message: "Approval has expired"
+                    retryable: false
+                    details:
+                      expired_at: "2026-02-11T13:25:00Z"
+                    trace_id: "trace_xyz789"
+              
+              too_many_attempts:
+                summary: Too many failed code attempts (locked out)
+                value:
+                  error:
+                    code: "approval_expired"
+                    message: "Too many failed verification attempts"
+                    retryable: false
+                    details:
+                      failed_attempts: 5
+                      max_attempts: 5
+                    trace_id: "trace_xyz789"
+      
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+      
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+      
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+cancel:
+  post:
+    operationId: cancelApproval
+    summary: Cancel Approval Request
+    description: |
+      Cancel a pending approval request. This is useful when the agent no longer needs the 
+      approval (e.g., user changed their mind, action no longer relevant, or timeout occurred).
+      
+      ## Cancellation Flow
+      
+      1. **Agent decides to cancel**: User requests cancellation or timeout occurs
+      2. **Agent sends cancel request**: Calls this endpoint with approval_id
+      3. **Permission Slip validates**: Verifies agent owns the approval, signature is valid
+      4. **Permission Slip cancels**: Marks approval as cancelled, invalidates any URLs/codes
+      5. **Response returned**: Confirms cancellation with timestamp
+      
+      ## Use Cases
+      
+      - User explicitly cancels the action request
+      - Agent times out waiting for approval
+      - Action becomes irrelevant before approval completes
+      - Agent needs to modify parameters (cancel and re-request)
+      
+      ## Restrictions
+      
+      - Only the agent that created the approval can cancel it
+      - Cannot cancel approvals that are already approved, denied, or cancelled
+      - Cannot cancel expired approvals (returns `409 Conflict` or `410 Gone`)
+      
+      ## Security
+      
+      - Request MUST include valid `X-Permission-Slip-Signature` header
+      - The `agent_id` in signature header MUST match the agent that created the approval
+      - If mismatch, Permission Slip returns `403 Forbidden` with error code `agent_not_authorized`
+    
+    tags:
+      - Approvals
+    
+    security:
+      - PermissionSlipSignature: []
+    
+    parameters:
+      - $ref: '../parameters/common.yaml#/ApprovalId'
+    
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/approvals.yaml#/CancelApprovalRequest'
+          example:
+            request_id: "21d9ec79-6b20-45b9-8695-83537318966d"
+    
+    responses:
+      '200':
+        description: Approval cancelled successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/CancelApprovalResponse'
+            example:
+              status: "cancelled"
+              cancelled_at: "2026-02-11T13:21:00Z"
+      
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      
+      '403':
+        description: Agent not authorized to cancel this approval
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_authorized"
+                message: "Agent is not authorized to cancel this approval"
+                retryable: false
+                details:
+                  agent_id: 42
+                  approval_id: "appr_xyz789"
+                trace_id: "trace_xyz789"
+      
+      '404':
+        description: Approval not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Approval ID not found"
+                retryable: false
+                details:
+                  approval_id: "appr_xyz789"
+                trace_id: "trace_xyz789"
+      
+      '409':
+        description: Approval already resolved (approved, denied, or cancelled)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              already_approved:
+                summary: Approval already approved
+                value:
+                  error:
+                    code: "approval_already_resolved"
+                    message: "Approval already approved"
+                    retryable: false
+                    details:
+                      approval_id: "appr_xyz789"
+                      status: "approved"
+                      approved_at: "2026-02-11T13:20:45Z"
+                    trace_id: "trace_xyz789"
+              
+              already_denied:
+                summary: Approval already denied
+                value:
+                  error:
+                    code: "approval_already_resolved"
+                    message: "Approval already denied"
+                    retryable: false
+                    details:
+                      approval_id: "appr_xyz789"
+                      status: "denied"
+                      denied_at: "2026-02-11T13:20:30Z"
+                    trace_id: "trace_xyz789"
+              
+              already_cancelled:
+                summary: Approval already cancelled
+                value:
+                  error:
+                    code: "approval_already_resolved"
+                    message: "Approval already cancelled"
+                    retryable: false
+                    details:
+                      approval_id: "appr_xyz789"
+                      status: "cancelled"
+                      cancelled_at: "2026-02-11T13:21:00Z"
+                    trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+approvalEvents:
+  get:
+    operationId: approvalEvents
+    summary: Subscribe to Approval Events (SSE)
+    description: |
+      Server-Sent Events (SSE) endpoint for real-time approval notifications.
+      Opens a persistent connection and streams events as approvals are created,
+      resolved, or cancelled. This eliminates the need for polling the list
+      endpoint.
+
+      ## Authentication
+
+      EventSource (the browser SSE API) does not support custom headers. Pass
+      the Supabase session token as a `?token=` query parameter. The server
+      strips the token from the URL before logging to prevent leaking
+      credentials.
+
+      ## Events
+
+      | Event | Description |
+      |-------|-------------|
+      | `connected` | Sent immediately on connection. Confirms the stream is live. |
+      | `approval_created` | A new approval was requested by an agent. |
+      | `approval_resolved` | An approval was approved or denied. |
+      | `approval_cancelled` | An agent cancelled an approval. |
+
+      Each event carries a JSON `data` payload with `approval_id`:
+
+      ```
+      event: approval_created
+      data: {"approval_id":"appr_xyz789"}
+      ```
+
+      A `: heartbeat` comment is sent every 30 seconds to keep the connection
+      alive through proxies and load balancers.
+
+      ## Connection Limits
+
+      Each user may hold at most 10 concurrent SSE connections. Exceeding this
+      limit returns `429 Too Many Requests`. Close unused browser tabs to free
+      connection slots.
+
+      ## Resilience
+
+      The browser's built-in EventSource reconnection handles transient
+      disconnects automatically. A 30-second polling fallback in the frontend
+      ensures updates even when SSE is unavailable.
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: token
+        in: query
+        required: false
+        description: |
+          Supabase session token for EventSource clients (which cannot set
+          custom headers). Mutually exclusive with the Authorization header.
+        schema:
+          type: string
+
+    responses:
+      '200':
+        description: SSE stream established
+        content:
+          text/event-stream:
+            schema:
+              type: string
+            example: |
+              event: connected
+              data: {}
+
+              event: approval_created
+              data: {"approval_id":"appr_xyz789"}
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        description: Too many concurrent SSE connections
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "rate_limited"
+                message: "Too many concurrent SSE connections. Close unused tabs and retry."
+                retryable: true
+                retry_after: 5
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+listApprovals:
+  get:
+    operationId: listApprovals
+    summary: List Approvals
+    description: |
+      Returns approval requests for the authenticated user (as approver),
+      ordered by creation time (newest first). By default only returns
+      pending, non-expired approvals. Use the `status` query parameter to
+      filter by other statuses. Supports cursor-based pagination via the
+      `limit` and `after` query parameters. Uses session authentication
+      (Supabase JWT).
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: status
+        in: query
+        required: false
+        description: |
+          Filter approvals by status. Defaults to `pending` (only pending,
+          non-expired approvals). Pass `all` to include all statuses.
+        schema:
+          type: string
+          enum:
+            - pending
+            - approved
+            - denied
+            - cancelled
+            - all
+          default: pending
+        example: pending
+      - name: limit
+        in: query
+        required: false
+        description: Maximum number of approvals to return (1–100, default 50).
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+        example: 20
+      - name: after
+        in: query
+        required: false
+        description: |
+          Opaque pagination cursor. Pass the `next_cursor` value from a
+          previous response to fetch the next page. Do not construct
+          cursor values manually.
+        schema:
+          type: string
+        example: "2026-02-11T13:20:00.123456Z,appr_xyz789"
+
+    responses:
+      '200':
+        description: Approvals retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/ApprovalListResponse'
+            example:
+              data:
+                - approval_id: "appr_xyz789"
+                  agent_id: 42
+                  action:
+                    type: "email.send"
+                    version: "1"
+                    parameters:
+                      from: "alice@example.com"
+                      to:
+                        - "recipient@example.com"
+                      subject: "Hello World"
+                      body: "This is a test email."
+                  context:
+                    description: "Send welcome email to new user"
+                    risk_level: "low"
+                  status: "pending"
+                  expires_at: "2026-02-11T13:25:00Z"
+                  created_at: "2026-02-11T13:20:00Z"
+              has_more: false
+
+      '400':
+        description: Invalid query parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "limit must be a positive integer"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Profile not found for the authenticated user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "profile_not_found"
+                message: "Profile not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+approveApproval:
+  post:
+    operationId: approveApproval
+    summary: Approve Approval Request
+    description: |
+      Approve a pending approval request. The approval must belong to the
+      authenticated user (as approver) and must be in `pending` status and
+      not expired.
+
+      This is a dashboard endpoint for human approvers — distinct from the
+      agent-facing verify endpoint which uses confirmation codes.
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ApprovalId'
+
+    responses:
+      '200':
+        description: Approval approved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/ApproveApprovalResponse'
+            example:
+              approval_id: "appr_xyz789"
+              status: "approved"
+              approved_at: "2026-02-21T10:30:00Z"
+              confirmation_code: "RK3-P7M"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Approval not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Approval not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '409':
+        description: Approval already resolved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_already_resolved"
+                message: "Approval already resolved"
+                retryable: false
+                details:
+                  status: "denied"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '410':
+        description: Approval expired
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_expired"
+                message: "Approval has expired"
+                retryable: false
+                details:
+                  expired_at: "2026-02-21T10:25:00Z"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+denyApproval:
+  post:
+    operationId: denyApproval
+    summary: Deny Approval Request
+    description: |
+      Deny a pending approval request. The approval must belong to the
+      authenticated user (as approver) and must be in `pending` status and
+      not expired.
+
+      This is a dashboard endpoint for human approvers.
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ApprovalId'
+
+    responses:
+      '200':
+        description: Approval denied successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/DenyApprovalResponse'
+            example:
+              approval_id: "appr_xyz789"
+              status: "denied"
+              denied_at: "2026-02-21T10:30:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Approval not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Approval not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '409':
+        description: Approval already resolved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_already_resolved"
+                message: "Approval already resolved"
+                retryable: false
+                details:
+                  status: "approved"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '410':
+        description: Approval expired
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_expired"
+                message: "Approval has expired"
+                retryable: false
+                details:
+                  expired_at: "2026-02-21T10:25:00Z"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

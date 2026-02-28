@@ -1,0 +1,14 @@
+{
+  "username": { "minLength": 3, "maxLength": 32 },
+  "agentName": { "maxLength": 256 },
+  "actionConfigName": { "maxLength": 255 },
+  "actionConfigDescription": { "maxLength": 4096 },
+  "credentialService": { "maxLength": 128 },
+  "credentialLabel": { "maxLength": 255 },
+  "actionType": { "maxLength": 128 },
+  "actionVersion": { "maxLength": 10 },
+  "confirmationCode": { "length": 6 },
+  "constraintsBytes": { "max": 16384 },
+  "parametersBytes": { "max": 16384 },
+  "standingApprovalMaxDays": { "max": 90 }
+}

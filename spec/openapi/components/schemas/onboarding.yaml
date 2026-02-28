@@ -1,0 +1,39 @@
+OnboardingRequest:
+  type: object
+  description: Request to create a user profile during onboarding.
+  required:
+    - username
+  properties:
+    username:
+      type: string
+      description: |
+        Protocol-level username (unique). Must be 3–32 ASCII characters:
+        letters, digits, underscores, and hyphens only. Must start with
+        a letter or digit.
+      minLength: 3
+      maxLength: 32
+      pattern: "^[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}$"
+      example: "alice"
+
+OnboardingResponse:
+  type: object
+  description: The newly created (or existing) user profile.
+  required:
+    - id
+    - username
+    - created_at
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: User ID (matches Supabase Auth user ID)
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    username:
+      type: string
+      description: Protocol-level username (unique)
+      example: "alice"
+    created_at:
+      type: string
+      format: date-time
+      description: Account creation timestamp
+      example: "2026-02-16T00:27:36.123Z"

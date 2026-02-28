@@ -1,0 +1,305 @@
+BadRequest:
+  description: Bad Request - Invalid or malformed request
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      examples:
+        invalid_request:
+          summary: Generic invalid request
+          value:
+            error:
+              code: "invalid_request"
+              message: "Malformed request body"
+              retryable: false
+              details:
+                field: "request_id"
+                reason: "Field is required"
+              trace_id: "trace_xyz789"
+        
+        invalid_public_key:
+          summary: Invalid public key format
+          value:
+            error:
+              code: "invalid_public_key"
+              message: "Public key format is invalid"
+              retryable: false
+              details:
+                expected_format: "ssh-ed25519 or ecdsa-sha2-nistp256"
+              trace_id: "trace_xyz789"
+        
+        agent_id_mismatch:
+          summary: Agent ID mismatch
+          value:
+            error:
+              code: "agent_id_mismatch"
+              message: "Agent ID in request body/path must match signature header"
+              retryable: false
+              details:
+                body_agent_id: 42
+                header_agent_id: 43
+              trace_id: "trace_xyz789"
+
+Unauthorized:
+  description: Unauthorized - Authentication failed
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      examples:
+        invalid_signature:
+          summary: Signature verification failed
+          value:
+            error:
+              code: "invalid_signature"
+              message: "Signature verification failed"
+              retryable: false
+              trace_id: "trace_xyz789"
+        
+        timestamp_expired:
+          summary: Request timestamp outside acceptable window
+          value:
+            error:
+              code: "timestamp_expired"
+              message: "Request timestamp is outside the acceptable window"
+              retryable: false
+              details:
+                timestamp: "1770816000"
+                current_time: "1770816600"
+                max_age_seconds: 300
+              trace_id: "trace_xyz789"
+        
+        invalid_token:
+          summary: JWT token invalid or expired
+          value:
+            error:
+              code: "invalid_token"
+              message: "Token is invalid or has expired"
+              retryable: false
+              trace_id: "trace_xyz789"
+
+Forbidden:
+  description: Forbidden - Insufficient permissions
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      examples:
+        agent_not_authorized:
+          summary: Agent not authorized
+          value:
+            error:
+              code: "agent_not_authorized"
+              message: "Agent is not authorized for this resource"
+              retryable: false
+              details:
+                agent_id: 42
+                resource: "approval"
+              trace_id: "trace_xyz789"
+        
+        token_already_used:
+          summary: Single-use token already consumed
+          value:
+            error:
+              code: "token_already_used"
+              message: "Token has already been consumed"
+              retryable: false
+              details:
+                jti: "tok_unique123"
+                used_at: "2026-02-11T13:25:50Z"
+              trace_id: "trace_xyz789"
+        
+        insufficient_scope:
+          summary: Token lacks required scope
+          value:
+            error:
+              code: "insufficient_scope"
+              message: "Token does not have the required scope for this action"
+              retryable: false
+              details:
+                token_scope: "email.send"
+                required_scope: "email.delete"
+              trace_id: "trace_xyz789"
+        
+        invalid_parameters:
+          summary: Parameters don't match token params_hash
+          value:
+            error:
+              code: "invalid_parameters"
+              message: "Request parameters do not match the token params_hash"
+              retryable: false
+              details:
+                expected_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                computed_hash: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6"
+              trace_id: "trace_xyz789"
+
+NotFound:
+  description: Not Found - Resource does not exist
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      examples:
+        agent_not_found:
+          summary: Agent not registered
+          value:
+            error:
+              code: "agent_not_found"
+              message: "Agent is not registered"
+              retryable: false
+              details:
+                agent_id: 42
+              trace_id: "trace_xyz789"
+        
+        approver_not_found:
+          summary: Approver username not found
+          value:
+            error:
+              code: "approver_not_found"
+              message: "Approver username not found"
+              retryable: false
+              details:
+                approver: "alice"
+              trace_id: "trace_xyz789"
+        
+        approval_not_found:
+          summary: Approval ID not found
+          value:
+            error:
+              code: "approval_not_found"
+              message: "Approval ID not found"
+              retryable: false
+              details:
+                approval_id: "appr_xyz789"
+              trace_id: "trace_xyz789"
+
+Conflict:
+  description: Conflict - Resource already exists or state conflict
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      examples:
+        agent_already_registered:
+          summary: Agent already registered with this approver
+          value:
+            error:
+              code: "agent_already_registered"
+              message: "Agent is already registered with this approver"
+              retryable: false
+              details:
+                agent_id: 42
+                approver: "alice"
+                registered_at: "2026-02-11T13:00:00Z"
+              trace_id: "trace_xyz789"
+        
+        duplicate_request_id:
+          summary: Request ID already used
+          value:
+            error:
+              code: "duplicate_request_id"
+              message: "Request ID has already been used"
+              retryable: false
+              details:
+                request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+                original_timestamp: "1770816000"
+              trace_id: "trace_xyz789"
+        
+        approval_already_resolved:
+          summary: Approval already resolved (approved/denied/cancelled)
+          value:
+            error:
+              code: "approval_already_resolved"
+              message: "Approval has already been resolved"
+              retryable: false
+              details:
+                approval_id: "appr_xyz789"
+                status: "approved"
+                resolved_at: "2026-02-11T13:20:45Z"
+              trace_id: "trace_xyz789"
+
+Gone:
+  description: Gone - Resource has expired and is no longer available
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      examples:
+        registration_expired:
+          summary: Registration TTL elapsed
+          value:
+            error:
+              code: "registration_expired"
+              message: "Registration has expired"
+              retryable: false
+              details:
+                expired_at: "2026-02-11T13:25:00Z"
+              trace_id: "trace_xyz789"
+        
+        approval_expired:
+          summary: Approval TTL elapsed
+          value:
+            error:
+              code: "approval_expired"
+              message: "Approval has expired"
+              retryable: false
+              details:
+                expired_at: "2026-02-11T13:25:00Z"
+              trace_id: "trace_xyz789"
+        
+        too_many_attempts:
+          summary: Too many failed verification attempts (locked out)
+          value:
+            error:
+              code: "approval_expired"
+              message: "Too many failed verification attempts"
+              retryable: false
+              details:
+                failed_attempts: 5
+                max_attempts: 5
+              trace_id: "trace_xyz789"
+
+TooManyRequests:
+  description: Too Many Requests - Rate limit exceeded
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      example:
+        error:
+          code: "rate_limited"
+          message: "Too many requests. Please retry after 60 seconds."
+          retryable: true
+          retry_after: 60
+          details:
+            limit: 100
+            window: "1 minute"
+            reset_at: "2026-02-11T13:26:00Z"
+          trace_id: "trace_xyz789"
+
+InternalServerError:
+  description: Internal Server Error - Unexpected server error
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      example:
+        error:
+          code: "internal_error"
+          message: "An unexpected error occurred. Please retry with exponential backoff."
+          retryable: true
+          trace_id: "trace_xyz789"
+
+ServiceUnavailable:
+  description: Service Unavailable - Service temporarily unavailable
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/errors.yaml#/ErrorResponse'
+      example:
+        error:
+          code: "service_unavailable"
+          message: "Service is temporarily unavailable. Please retry later."
+          retryable: true
+          retry_after: 120
+          trace_id: "trace_xyz789"

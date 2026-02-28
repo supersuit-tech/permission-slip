@@ -1,0 +1,189 @@
+PermissionSlipSignature:
+  type: apiKey
+  in: header
+  name: X-Permission-Slip-Signature
+  description: |
+    Cryptographic signature proving agent identity. Required for all Permission Slip 
+    endpoints except connector discovery (`GET /v1/connectors`).
+    
+    ## Header Format
+    
+    ```
+    X-Permission-Slip-Signature: agent_id="<agent_id>", algorithm="<algorithm>", timestamp="<unix_timestamp>", signature="<base64url_signature>"
+    ```
+    
+    ## Fields
+    
+    - `agent_id`: Auto-incrementing agent identifier (integer)
+    - `algorithm`: Signature algorithm (`Ed25519` or `ECDSA-P256`)
+    - `timestamp`: Unix timestamp in seconds (must be within 300 seconds of current time)
+    - `signature`: Base64url-encoded signature (no padding)
+    
+    ## Canonical Request Format
+    
+    The signature is computed over a canonical representation:
+    
+    ```
+    <HTTP_METHOD>\n
+    <PATH>\n
+    <QUERY_STRING>\n
+    <TIMESTAMP>\n
+    <BODY_HASH>
+    ```
+    
+    ### Canonicalization Rules
+    
+    1. **HTTP_METHOD**: Uppercase HTTP verb (e.g., `POST`, `GET`)
+    2. **PATH**: URL path component without query string (e.g., `/invite/PS-R7K3-X9M4`)
+    3. **QUERY_STRING**: RFC 3986 percent-encoded, sorted parameters (empty string if no params)
+       - Sort parameters by name (lexicographic order)
+       - Use uppercase hex in percent-encoding (`%2F` not `%2f`)
+       - Spaces as `%20` (NOT `+`)
+       - Example: `?z=2&a=1` → `"a=1&z=2"`
+    4. **TIMESTAMP**: Unix timestamp from signature header
+    5. **BODY_HASH**: SHA-256 hash (lowercase hex) of JCS-canonicalized JSON body
+       - For JSON: Use RFC 8785 JSON Canonicalization Scheme (JCS)
+       - For empty body: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+    
+    ## Signature Algorithms
+    
+    ### Ed25519 (Recommended)
+    
+    - Signature: 64-byte raw Ed25519 signature per RFC 8032
+    - Base64url encode (no padding) for header transmission
+    
+    ### ECDSA-P256 (Optional)
+    
+    - Signature: 64-byte IEEE P1363 fixed-length encoding `r || s`
+    - Normalized to "low-S" form (s ≤ n/2) per SEC 1
+    - Base64url encode (no padding) for header transmission
+    
+    ## Replay Protection
+    
+    - **Timestamp Window**: Signatures valid for 300 seconds (5 minutes)
+    - **Request ID**: All POST endpoints require unique `request_id` in body
+    - Permission Slip tracks `request_id` values and rejects duplicates with `409 Conflict`
+    
+    ## Example
+    
+    ```
+    X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", timestamp="1770816000", signature="s7Kj9mP0qR3tU5vW8xY1zA2bC4dE6fG9hI0jL3mN5oP7qR9sT1uV3wX5yZ8aB1cD4eF7gH0iJ2kL5mN8oP0qR3s"
+    ```
+
+SupabaseSession:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: |
+    Supabase session JWT for authenticating frontend users. Used by session-authenticated
+    endpoints (profile, credentials management, etc.).
+
+    The JWT is issued by Supabase Auth after a successful OTP login and contains the user's
+    UUID in the `sub` claim. The backend validates the token using either the project's JWT
+    secret for HS256-signed tokens or Supabase's JWKS for ES256-signed tokens, automatically
+    selecting the verification method based on the JWT header (`alg`).
+
+    ## Usage
+
+    ```http
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    ```
+
+    ## Key Claims
+
+    - `sub` (string): User UUID (matches `profiles.id`)
+    - `exp` (integer): Token expiration (Unix timestamp)
+    - `aud` (string): `authenticated`
+    - `role` (string): `authenticated`
+
+BearerToken:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: |
+    JWT Bearer token issued by Permission Slip after approval verification. Used in the `POST /v1/actions/execute` endpoint.
+    
+    ## Token Structure
+    
+    Single-use JWT token issued after approval. Contains:
+    
+    ### Header
+    
+    ```json
+    {
+      "alg": "ES256",
+      "typ": "JWT",
+      "kid": "key-2026-01"
+    }
+    ```
+    
+    ### Payload Claims
+    
+    - `sub` (string): Agent ID
+    - `aud` (string): `permissionslip.dev`
+    - `approver` (string): Username who approved
+    - `approval_id` (string): Approval request ID
+    - `scope` (string): Action type (e.g., `email.send`)
+    - `scope_version` (string): Action version (e.g., `"1"`)
+    - `params_hash` (string): SHA-256 hash of JCS-canonicalized action parameters
+    - `iat` (integer): Issued at (Unix timestamp)
+    - `exp` (integer): Expires at (Unix timestamp)
+    - `jti` (string): Unique token ID (for single-use enforcement)
+    
+    ### Example Payload
+    
+    ```json
+    {
+      "sub": "42",
+      "aud": "permissionslip.dev",
+      "approver": "alice",
+      "approval_id": "appr_xyz789",
+      "scope": "email.send",
+      "scope_version": "1",
+      "params_hash": "ba0617b2334170cb936916db202400300a1fdc1fe71e36b911d08b2519f3d68c",
+      "iat": 1770816045,
+      "exp": 1770816345,
+      "jti": "tok_unique123"
+    }
+    ```
+    
+    ## Usage
+    
+    Tokens are passed in the `token` field of `POST /v1/actions/execute`:
+    
+    ```http
+    POST https://app.permissionslip.dev/v1/actions/execute
+    X-Permission-Slip-Signature: agent_id="...", algorithm="Ed25519", ...
+    Content-Type: application/json
+    
+    {
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "action_id": "email.send",
+      "parameters": {
+        "from": "alice@example.com",
+        "to": ["bob@example.com"],
+        "subject": "Hello",
+        "body": "Message body"
+      }
+    }
+    ```
+    
+    Permission Slip validates the token and executes the action using stored credentials.
+    
+    ## Token Verification (Permission Slip)
+    
+    Permission Slip verifies:
+    
+    1. **JWT Signature**: Token was issued by Permission Slip
+    2. **Expiration**: `exp` claim not exceeded
+    3. **Audience**: `aud` is `permissionslip.dev`
+    4. **Scope**: Matches the `action_id` in the execute request
+    5. **Parameters Hash**: Request parameters match `params_hash` claim
+    6. **Single-Use**: `jti` not already consumed (atomic check-and-set)
+    
+    ## Token Lifecycle
+    
+    - **Expiration**: Typically 5 minutes
+    - **Single-Use**: Token invalidated after first successful use
+    - **No Refresh**: Protocol does not support token refresh
+    - **Retry Guidance**: Use token immediately; request new approval if expired

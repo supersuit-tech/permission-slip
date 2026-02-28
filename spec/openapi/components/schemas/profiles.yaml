@@ -1,0 +1,93 @@
+ProfileResponse:
+  type: object
+  description: The authenticated user's profile.
+  required:
+    - id
+    - username
+    - created_at
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: User ID (matches Supabase Auth user ID)
+      example: "550e8400-e29b-41d4-a716-446655440000"
+    username:
+      type: string
+      description: Protocol-level username (unique)
+      maxLength: 255
+      example: "alice"
+    email:
+      type: string
+      nullable: true
+      description: Contact email address (user-provided, opt-in for email notifications)
+      example: "alice@example.com"
+    phone:
+      type: string
+      nullable: true
+      description: Contact phone number in E.164 format (user-provided, opt-in for SMS notifications)
+      example: "+15551234567"
+    created_at:
+      type: string
+      format: date-time
+      description: Account creation timestamp (ISO 8601)
+      example: "2026-02-16T00:27:36Z"
+
+UpdateProfileRequest:
+  type: object
+  description: Request body for updating profile contact fields.
+  properties:
+    email:
+      type: string
+      nullable: true
+      description: Contact email address. Pass null or empty string to clear.
+      example: "alice@example.com"
+    phone:
+      type: string
+      nullable: true
+      description: Contact phone number in E.164 format. Pass null or empty string to clear.
+      example: "+15551234567"
+
+NotificationPreference:
+  type: object
+  description: A single notification channel preference.
+  required:
+    - channel
+    - enabled
+  properties:
+    channel:
+      type: string
+      description: Notification channel identifier
+      enum:
+        - email
+        - web-push
+        - sms
+      example: "email"
+    enabled:
+      type: boolean
+      description: Whether notifications are enabled for this channel
+      example: true
+
+NotificationPreferencesResponse:
+  type: object
+  description: All notification preferences for the authenticated user.
+  required:
+    - preferences
+  properties:
+    preferences:
+      type: array
+      items:
+        $ref: '#/NotificationPreference'
+      description: List of notification channel preferences
+
+UpdateNotificationPreferencesRequest:
+  type: object
+  description: Request body for updating notification preferences.
+  required:
+    - preferences
+  properties:
+    preferences:
+      type: array
+      items:
+        $ref: '#/NotificationPreference'
+      description: Channel preferences to update. Channels not included are unchanged.
+      minItems: 1

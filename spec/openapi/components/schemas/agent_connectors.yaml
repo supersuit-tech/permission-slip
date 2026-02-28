@@ -1,0 +1,125 @@
+AgentConnectorListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/agent_connectors.yaml#/AgentConnectorSummary'
+      description: |
+        List of connectors enabled for this agent. Each entry includes the connector
+        summary plus when it was enabled.
+
+  example:
+    data:
+      - id: "gmail"
+        name: "Gmail"
+        description: "Send and manage emails via Gmail API"
+        actions:
+          - "email.send"
+          - "email.read"
+        required_credentials:
+          - "gmail"
+        enabled_at: "2026-02-18T10:00:00Z"
+
+AgentConnectorSummary:
+  allOf:
+    - $ref: '../schemas/connectors.yaml#/ConnectorSummary'
+    - type: object
+      required:
+        - enabled_at
+      properties:
+        enabled_at:
+          type: string
+          format: date-time
+          description: |
+            ISO 8601 timestamp when this connector was enabled for the agent.
+          example: "2026-02-18T10:00:00Z"
+
+  example:
+    id: "gmail"
+    name: "Gmail"
+    description: "Send and manage emails via Gmail API"
+    actions:
+      - "email.send"
+      - "email.read"
+    required_credentials:
+      - "gmail"
+    enabled_at: "2026-02-18T10:00:00Z"
+
+AgentConnectorResponse:
+  type: object
+  required:
+    - agent_id
+    - connector_id
+    - enabled_at
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        Auto-incrementing agent identifier.
+      example: 42
+
+    connector_id:
+      type: string
+      maxLength: 128
+      description: |
+        Connector identifier that was enabled.
+      example: "gmail"
+
+    enabled_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp when the connector was enabled for the agent.
+      example: "2026-02-18T10:00:00Z"
+
+  example:
+    agent_id: 42
+    connector_id: "gmail"
+    enabled_at: "2026-02-18T10:00:00Z"
+
+DisableAgentConnectorResponse:
+  type: object
+  required:
+    - agent_id
+    - connector_id
+    - disabled_at
+    - revoked_standing_approvals
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        Auto-incrementing agent identifier.
+      example: 42
+
+    connector_id:
+      type: string
+      maxLength: 128
+      description: |
+        Connector identifier that was disabled.
+      example: "gmail"
+
+    disabled_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp when the connector was disabled for the agent.
+      example: "2026-02-18T12:00:00Z"
+
+    revoked_standing_approvals:
+      type: integer
+      minimum: 0
+      description: |
+        Number of active standing approvals that were automatically revoked
+        because they referenced action types belonging to this connector.
+      example: 2
+
+  example:
+    agent_id: 42
+    connector_id: "gmail"
+    disabled_at: "2026-02-18T12:00:00Z"
+    revoked_standing_approvals: 2

@@ -1,0 +1,178 @@
+RegisterAgentRequest:
+  type: object
+  required:
+    - request_id
+    - public_key
+  properties:
+    request_id:
+      type: string
+      format: uuid
+      maxLength: 64
+      description: |
+        Unique request identifier for replay protection. UUID v4 recommended. Permission Slip tracks
+        this value and rejects duplicate requests with `409 Conflict` error.
+
+        Used for idempotency — if the same request_id is sent multiple times within the
+        timestamp window, services return the original response (if successful) or reject.
+      example: "6f1a7c30-9b2e-4d91-8c3f-2a4b6c7d8e9f"
+
+    public_key:
+      type: string
+      maxLength: 1024
+      pattern: '^(ssh-ed25519|ecdsa-sha2-nistp256) [A-Za-z0-9+/=]+'
+      description: |
+        Agent's public key in OpenSSH format. Used to verify request signatures.
+
+        **Format**: `<algorithm> <base64-key> [optional-comment]`
+
+        **Supported algorithms**:
+        - `ssh-ed25519`: Ed25519 public key (recommended)
+        - `ecdsa-sha2-nistp256`: ECDSA P-256 public key
+
+        Permission Slip derives the `agent_id` from this public key. The agent uses the
+        corresponding private key to sign all subsequent requests.
+      example: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPZj8V7K2mT9Xw4nL5rQ1pY3vN8cM6hU0oB4eW2sR7k"
+
+    metadata:
+      type: object
+      description: |
+        Optional agent metadata for display in approval UI and activity logs.
+      properties:
+        name:
+          type: string
+          maxLength: 256
+          description: Human-readable agent name shown to approvers
+          example: "My AI Assistant"
+
+        version:
+          type: string
+          maxLength: 32
+          pattern: '^\d+\.\d+\.\d+$'
+          description: Agent version using semantic versioning
+          example: "1.0.0"
+
+        capabilities:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items:
+            type: string
+            maxLength: 64
+          description: List of agent capabilities or supported action types
+          example:
+            - "email"
+            - "calendar"
+            - "payments"
+
+  example:
+    request_id: "6f1a7c30-9b2e-4d91-8c3f-2a4b6c7d8e9f"
+    public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPZj8V7K2mT9Xw4nL5rQ1pY3vN8cM6hU0oB4eW2sR7k"
+    metadata:
+      name: "My AI Assistant"
+      version: "1.0.0"
+      capabilities:
+        - "email"
+        - "calendar"
+
+RegisterAgentResponse:
+  type: object
+  required:
+    - agent_id
+    - expires_at
+    - verification_required
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        Server-assigned agent identifier. The agent should store this value and use it
+        in subsequent API calls (e.g., `POST /v1/agents/{agent_id}/verify`).
+      example: 42
+
+    expires_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when the pending registration
+        expires. Before this time, the agent must submit the confirmation code
+        via `POST /v1/agents/{agent_id}/verify` to complete registration.
+      example: "2026-02-11T13:25:00Z"
+
+    verification_required:
+      type: boolean
+      enum: [true]
+      description: |
+        Always `true`. Indicates that a confirmation code is required to complete
+        registration. The user will see this code on their dashboard after the
+        agent registers. The agent must collect the code from the user and submit
+        it via `POST /v1/agents/{agent_id}/verify`.
+      example: true
+
+  example:
+    agent_id: 42
+    expires_at: "2026-02-11T13:25:00Z"
+    verification_required: true
+
+VerifyRegistrationRequest:
+  type: object
+  required:
+    - request_id
+    - confirmation_code
+  properties:
+    request_id:
+      type: string
+      format: uuid
+      maxLength: 64
+      description: |
+        Unique request identifier for replay protection. UUID v4 recommended.
+      example: "040dacd3-fbf9-42b3-b58f-0d838502b16e"
+    
+    confirmation_code:
+      type: string
+      pattern: '^[A-Za-z2-9]{3}-?[A-Za-z2-9]{3}$'
+      minLength: 6
+      maxLength: 7
+      description: |
+        6-character confirmation code shown to approver after they approve the registration.
+        
+        **Format**:
+        - 6 characters from set: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 chars)
+        - Excluded confusing characters: `0`, `O`, `1`, `I`
+        - May include hyphen for readability: `XXX-XXX` or `XXXXXX`
+        - Case-insensitive (Permission Slip normalizes to uppercase)
+        
+        **Security**: Permission Slip enforces a 5 attempt limit. After 5 failed attempts, 
+        registration expires and agent must re-register.
+        
+        **Examples**: `XK7-M9P`, `XK7M9P`, `xk7-m9p` (all equivalent)
+      example: "XK7-M9P"
+  
+  example:
+    request_id: "040dacd3-fbf9-42b3-b58f-0d838502b16e"
+    confirmation_code: "XK7-M9P"
+
+VerifyRegistrationResponse:
+  type: object
+  required:
+    - status
+    - registered_at
+  properties:
+    status:
+      type: string
+      enum:
+        - registered
+      description: |
+        Registration status. Always `registered` for successful verification,
+        matching the agent's actual status in the database.
+      example: "registered"
+    
+    registered_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when registration was completed.
+      example: "2026-02-11T13:20:15Z"
+  
+  example:
+    status: "registered"
+    registered_at: "2026-02-11T13:20:15Z"

@@ -1,0 +1,130 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  LogOut,
+  User,
+  Mail,
+  Bell,
+  Shield,
+  KeyRound,
+  Moon,
+  LifeBuoy,
+} from "lucide-react";
+import { useAuth } from "@/auth/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useSignOut } from "@/hooks/useSignOut";
+import { useTheme } from "@/components/ThemeContext";
+import { Avatar } from "@/components/ui/avatar";
+import { EmailChangeDialog } from "@/components/EmailChangeDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MfaSettingsDialog } from "@/pages/security/MfaSettingsDialog";
+import { hasPendingEnrollment } from "@/auth/mfaPendingEnrollment";
+
+export function UserMenu() {
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const { theme, toggleTheme } = useTheme();
+  const handleSignOut = useSignOut();
+  const navigate = useNavigate();
+  const [securityOpen, setSecurityOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+
+  // Auto-open the security dialog if there's a pending MFA enrollment
+  // for this user (e.g. user switched to authenticator app and the mobile
+  // tab refreshed). Scoped to user.id so a stale entry from a previous
+  // user is ignored.
+  useEffect(() => {
+    if (user?.id && hasPendingEnrollment(user.id)) {
+      setSecurityOpen(true);
+    }
+  }, [user?.id]);
+
+  const email = user?.email ?? "unknown";
+  const username = profile?.username;
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="flex cursor-pointer select-none items-center gap-2 rounded-full border-none bg-transparent p-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          aria-label="User menu"
+        >
+          <Avatar as="span" name={username} email={email} />
+          {username && (
+            <span className="hidden text-sm font-medium md:inline">
+              {username}
+            </span>
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col gap-1">
+              {username && (
+                <p className="text-sm font-medium leading-none">{username}</p>
+              )}
+              <p className="text-xs text-muted-foreground leading-none">{email}</p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem onSelect={() => navigate("/settings")}>
+              <User />
+              <span>Profile & Account</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/settings")}>
+              <Bell />
+              <span>Notification Preferences</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/settings")}>
+              <KeyRound />
+              <span>Credential Vault</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setSecurityOpen(true)}>
+              <Shield />
+              <span>Security</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setEmailDialogOpen(true)}>
+              <Mail />
+              <span>Change Email</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <a href="mailto:support@supersuit.tech">
+              <LifeBuoy />
+              <span>Support</span>
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuCheckboxItem
+            checked={theme === "dark"}
+            onCheckedChange={toggleTheme}
+          >
+            <Moon />
+            <span>Dark Mode</span>
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSignOut} variant="destructive">
+            <LogOut />
+            <span>Sign Out</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <MfaSettingsDialog open={securityOpen} onOpenChange={setSecurityOpen} />
+      <EmailChangeDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+      />
+    </>
+  );
+}

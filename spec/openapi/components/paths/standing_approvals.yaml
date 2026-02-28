@@ -1,0 +1,538 @@
+listStandingApprovals:
+  get:
+    operationId: listStandingApprovals
+    summary: List Agent Standing Approvals
+    description: |
+      List active standing approvals for a specific agent. Standing approvals are
+      pre-authorized, constraint-scoped grants that let an agent execute a specific
+      action type without per-request human approval.
+
+      Agents use this endpoint to discover which actions they can execute immediately
+      (via standing approval) vs. which require the one-off approval flow.
+
+      ## Use Cases
+
+      - **Agent startup**: Agent queries its standing approvals to understand what it can do
+      - **Flow selection**: Agent checks if a standing approval covers a desired action before
+        deciding whether to use `POST /v1/actions/execute` (standing) or `POST /v1/approvals/request` (one-off)
+      - **Status monitoring**: Agent checks remaining executions or expiration times
+
+      ## Filtering
+
+      Only standing approvals with status `active` are returned by default. Expired,
+      revoked, and exhausted standing approvals are excluded.
+
+      ## Security
+
+      - Request MUST include valid `X-Permission-Slip-Signature` header
+      - The `agent_id` in the URL path MUST match the `agent_id` in the signature header
+      - Only standing approvals belonging to the authenticated agent are returned
+
+    tags:
+      - Standing Approvals
+
+    security:
+      - PermissionSlipSignature: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentIdSigned'
+      - name: limit
+        in: query
+        required: false
+        description: |
+          Maximum number of standing approvals to return per page.
+          Defaults to 50. Must be between 1 and 100.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+        example: 50
+      - name: after
+        in: query
+        required: false
+        description: |
+          Opaque pagination cursor from a previous response's `next_cursor`
+          field. When provided, returns the next page of results after this
+          cursor position.
+        schema:
+          type: string
+        example: "2026-02-14T10:30:00.123456789Z,sa_abc123"
+
+    responses:
+      '200':
+        description: Standing approvals listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approvals.yaml#/StandingApprovalListResponse'
+            example:
+              standing_approvals:
+                - standing_approval_id: "sa_abc123"
+                  agent_id: 42
+                  user_id: "alice"
+                  action_type: "email.read"
+                  action_version: "1"
+                  constraints:
+                    sender: "*@github.com"
+                    max_results: 10
+                  status: "active"
+                  max_executions: null
+                  execution_count: 42
+                  starts_at: "2026-02-14T00:00:00Z"
+                  expires_at: "2026-02-21T00:00:00Z"
+                  created_at: "2026-02-14T10:30:00Z"
+                  revoked_at: null
+                - standing_approval_id: "sa_def456"
+                  agent_id: 42
+                  user_id: "alice"
+                  action_type: "email.send"
+                  action_version: "1"
+                  constraints:
+                    recipient_pattern: "*@mycompany.com"
+                    max_recipients: 5
+                  status: "active"
+                  max_executions: 100
+                  execution_count: 12
+                  starts_at: "2026-02-14T00:00:00Z"
+                  expires_at: "2026-05-15T00:00:00Z"
+                  created_at: "2026-02-14T10:35:00Z"
+                  revoked_at: null
+              has_more: true
+              next_cursor: "2026-02-14T10:30:00.000000000Z,sa_abc123"
+
+      '400':
+        description: Invalid request or agent ID mismatch
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_id_mismatch"
+                message: "Agent ID in path must match signature header"
+                retryable: false
+                details:
+                  path_agent_id: 42
+                  header_agent_id: 43
+                trace_id: "trace_xyz789"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_found"
+                message: "Agent is not registered"
+                retryable: false
+                details:
+                  agent_id: 42
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+# ── User-facing endpoints (session-authenticated) ─────────────────────────────
+
+userListStandingApprovals:
+  get:
+    operationId: userListStandingApprovals
+    summary: List User Standing Approvals
+    description: |
+      Returns standing approvals for the authenticated user with cursor-based
+      pagination, ordered by creation time (newest first). By default only
+      returns active standing approvals. Use the `status` query parameter to
+      filter by other statuses. Use `limit` and `after` for pagination.
+      Uses session authentication (Supabase JWT).
+
+    tags:
+      - Standing Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: status
+        in: query
+        required: false
+        description: |
+          Filter standing approvals by status. Defaults to `active`.
+          Pass `all` to include all statuses.
+        schema:
+          type: string
+          enum:
+            - active
+            - expired
+            - revoked
+            - exhausted
+            - all
+          default: active
+        example: active
+
+      - name: limit
+        in: query
+        required: false
+        description: |
+          Maximum number of results to return per page. Must be between 1 and 100.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+        example: 50
+
+      - name: after
+        in: query
+        required: false
+        description: |
+          Opaque cursor from a previous response's `next_cursor` field.
+          Used to fetch the next page of results.
+        schema:
+          type: string
+        example: "2026-02-14T10:30:00Z,sa_abc123"
+
+    responses:
+      '200':
+        description: Standing approvals retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approvals.yaml#/UserStandingApprovalListResponse'
+            example:
+              data:
+                - standing_approval_id: "sa_abc123"
+                  agent_id: 42
+                  user_id: "00000000-0000-0000-0000-000000000001"
+                  action_type: "email.read"
+                  action_version: "1"
+                  constraints:
+                    sender: "*@github.com"
+                  status: "active"
+                  max_executions: null
+                  execution_count: 42
+                  starts_at: "2026-02-14T00:00:00Z"
+                  expires_at: "2026-02-21T00:00:00Z"
+                  created_at: "2026-02-14T10:30:00Z"
+                  revoked_at: null
+              has_more: false
+
+      '400':
+        description: Invalid query parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "Invalid status filter"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Profile not found for the authenticated user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "profile_not_found"
+                message: "Profile not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+createStandingApproval:
+  post:
+    operationId: createStandingApproval
+    summary: Create Standing Approval
+    description: |
+      Create a new standing approval for an agent. The agent must belong to
+      the authenticated user. The standing approval becomes active immediately
+      (or at `starts_at` if specified).
+
+    tags:
+      - Standing Approvals
+
+    security:
+      - SupabaseSession: []
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/standing_approvals.yaml#/CreateStandingApprovalRequest'
+          example:
+            agent_id: 42
+            action_type: "email.send"
+            action_version: "1"
+            constraints:
+              recipient_pattern: "*@mycompany.com"
+            max_executions: 100
+            expires_at: "2026-03-14T00:00:00Z"
+
+    responses:
+      '201':
+        description: Standing approval created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+
+      '400':
+        description: Invalid request (validation errors, duration exceeds 90 days, etc.)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "Duration exceeds maximum of 90 days"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_found"
+                message: "Agent not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+revokeStandingApproval:
+  post:
+    operationId: revokeStandingApproval
+    summary: Revoke Standing Approval
+    description: |
+      Revoke an active standing approval. The standing approval must belong
+      to the authenticated user and be in `active` status. Revocation is
+      immediate and irreversible.
+
+    tags:
+      - Standing Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/StandingApprovalId'
+
+    responses:
+      '200':
+        description: Standing approval revoked successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approvals.yaml#/RevokeStandingApprovalResponse'
+            example:
+              standing_approval_id: "sa_abc123"
+              status: "revoked"
+              revoked_at: "2026-02-21T10:30:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Standing approval not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Standing approval not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '409':
+        description: Standing approval already revoked
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_already_resolved"
+                message: "Standing approval already revoked"
+                retryable: false
+                details:
+                  status: "revoked"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '410':
+        description: Standing approval no longer active (expired or exhausted)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "standing_approval_expired"
+                message: "Standing approval is no longer active"
+                retryable: false
+                details:
+                  status: "expired"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+executeStandingApproval:
+  post:
+    operationId: executeStandingApproval
+    summary: Execute Standing Approval
+    description: |
+      Record an execution of an active standing approval. The standing approval
+      must belong to the authenticated user and be in `active` status. Atomically
+      increments the execution count and creates an execution record.
+
+      Emits a `standing_approval.executed` audit event on success.
+
+    tags:
+      - Standing Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/StandingApprovalId'
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/standing_approvals.yaml#/UserExecuteStandingApprovalRequest'
+          example:
+            parameters:
+              sender: "*@github.com"
+
+    responses:
+      '200':
+        description: Standing approval executed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approvals.yaml#/UserExecuteStandingApprovalResponse'
+            example:
+              standing_approval_id: "sa_abc123"
+              execution_id: 1
+              executed_at: "2026-02-22T10:30:00Z"
+
+      '400':
+        description: Invalid request body (e.g. parameters is not a JSON object)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "parameters must be a JSON object"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Standing approval not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Standing approval not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '409':
+        description: Standing approval already revoked
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_already_resolved"
+                message: "Standing approval already revoked"
+                retryable: false
+                details:
+                  status: "revoked"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '410':
+        description: Standing approval no longer active (expired or exhausted)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "standing_approval_expired"
+                message: "Standing approval is no longer active"
+                retryable: false
+                details:
+                  status: "expired"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

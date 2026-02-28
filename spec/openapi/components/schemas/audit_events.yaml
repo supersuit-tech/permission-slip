@@ -1,0 +1,177 @@
+AuditEvent:
+  type: object
+  description: A single event in the activity/audit trail.
+  required:
+    - event_type
+    - timestamp
+    - agent_id
+    - outcome
+  properties:
+    event_type:
+      type: string
+      enum:
+        - approval.approved
+        - approval.denied
+        - approval.cancelled
+        - standing_approval.executed
+        - agent.registered
+        - agent.deactivated
+      description: The type of event.
+      example: "approval.approved"
+    timestamp:
+      type: string
+      format: date-time
+      description: When the event occurred.
+      example: "2026-02-20T14:30:00Z"
+    agent_id:
+      type: integer
+      format: int64
+      description: The agent associated with this event.
+      example: 42
+    agent_metadata:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: Snapshot of agent metadata at the time the event was recorded.
+    action:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: |
+        Action details for approval and standing approval events. For one-off
+        approvals, contains `type`, `version`, and `parameters`. For standing
+        approval executions, contains `type`, `version`, `parameters` (the
+        actual parameters used in the execution), and `constraints` (the
+        boundary rules from the standing approval). Null for agent lifecycle
+        events.
+    outcome:
+      type: string
+      enum:
+        - approved
+        - denied
+        - cancelled
+        - auto_executed
+        - registered
+        - deactivated
+        - pending
+        - expired
+      description: The outcome of the event.
+      example: "approved"
+
+AuditLogEvent:
+  type: object
+  description: |
+    A single event in the audit log export. Extends the base AuditEvent with
+    `id` and `source_id` fields for SIEM deduplication and event correlation.
+  required:
+    - id
+    - event_type
+    - timestamp
+    - agent_id
+    - outcome
+    - source_id
+  properties:
+    id:
+      type: integer
+      format: int64
+      description: Unique, stable event identifier for deduplication.
+      example: 12345
+    event_type:
+      type: string
+      enum:
+        - approval.requested
+        - approval.approved
+        - approval.denied
+        - approval.cancelled
+        - action.executed
+        - standing_approval.executed
+        - agent.registered
+        - agent.deactivated
+      description: The type of event.
+      example: "approval.approved"
+    timestamp:
+      type: string
+      format: date-time
+      description: When the event occurred.
+      example: "2026-02-20T14:30:00Z"
+    agent_id:
+      type: integer
+      format: int64
+      description: The agent associated with this event.
+      example: 42
+    agent_metadata:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: Snapshot of agent metadata at the time the event was recorded.
+    action:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: |
+        Action details for approval and standing approval events.
+    outcome:
+      type: string
+      enum:
+        - approved
+        - denied
+        - cancelled
+        - auto_executed
+        - registered
+        - deactivated
+        - pending
+        - expired
+      description: The outcome of the event.
+      example: "approved"
+    source_id:
+      type: string
+      description: |
+        Identifier linking this event to its source record (e.g. approval_id,
+        standing approval execution id, agent id). Useful for correlating
+        events back to their originating resource.
+      example: "appr_abc123"
+
+AuditLogExportResponse:
+  type: object
+  description: Paginated export of audit log events in chronological order.
+  required:
+    - data
+    - has_more
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/AuditLogEvent'
+    has_more:
+      type: boolean
+      description: Whether more events exist beyond this page.
+      example: false
+    next_cursor:
+      type: string
+      description: |
+        Opaque cursor to pass as the `after` query parameter to fetch the
+        next page. Only present when `has_more` is true.
+      example: "2026-02-20T14:25:00.123456789Z,42"
+
+AuditEventListResponse:
+  type: object
+  description: Paginated list of audit events.
+  required:
+    - data
+    - has_more
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/AuditEvent'
+    has_more:
+      type: boolean
+      description: Whether more events exist beyond this page.
+      example: false
+    next_cursor:
+      type: string
+      description: |
+        Opaque cursor to pass as the `after` query parameter to fetch the
+        next page. Only present when `has_more` is true. Do not construct
+        or parse cursor values — they may change format without notice.
+      example: "2026-02-20T14:25:00.123456789Z,42"

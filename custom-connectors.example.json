@@ -1,0 +1,8 @@
+{
+  "connectors": [
+    {
+      "repo": "https://github.com/acme/ps-jira-connector",
+      "ref": "main"
+    }
+  ]
+}

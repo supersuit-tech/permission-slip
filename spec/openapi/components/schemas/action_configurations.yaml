@@ -1,0 +1,310 @@
+ActionConfiguration:
+  type: object
+  required:
+    - id
+    - agent_id
+    - connector_id
+    - action_type
+    - parameters
+    - status
+    - name
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      pattern: '^ac_[a-f0-9]{32}$'
+      maxLength: 36
+      description: |
+        Unique action configuration identifier assigned by Permission Slip.
+      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        Agent this configuration applies to.
+      example: 42
+
+    connector_id:
+      type: string
+      maxLength: 128
+      description: |
+        Connector that provides the action.
+      example: "github"
+
+    action_type:
+      type: string
+      maxLength: 128
+      description: |
+        Action type from the connector's action catalog.
+      example: "github.create_issue"
+
+    credential_id:
+      type: string
+      nullable: true
+      description: |
+        Credential bound to this configuration. Required before execution but
+        can be omitted during creation and assigned later.
+      example: "cred_abc123"
+
+    parameters:
+      type: object
+      additionalProperties: true
+      description: |
+        Configured parameter values for this action. Each parameter can be one of:
+
+        - **Fixed** (any JSON value without `$pattern` wrapper): The agent must supply
+          this exact value. Plain strings containing `*` are treated as fixed values.
+        - **Pattern** (`{"$pattern": "<glob>"}`): The agent must supply a string value
+          matching the glob pattern. `*` in the pattern matches any sequence of characters
+          (including none). Pattern parameters are required — the agent cannot omit them.
+          Examples: `{"$pattern": "*@mycompany.com"}`, `{"$pattern": "supersuit-tech/*"}`
+        - **Wildcard** (`"*"`): The agent may supply any value of any type, or omit
+          the parameter entirely.
+
+        Examples:
+        - `{"repo": "supersuit-tech/webapp", "title": "*", "body": "*"}` — locked repo, free title and body
+        - `{"to": {"$pattern": "*@mycompany.com"}, "subject": "*"}` — email must match domain pattern, free subject
+        - `{"repo": {"$pattern": "supersuit-tech/*"}, "branch": {"$pattern": "release/*"}}` — repo and branch constrained by pattern
+      example:
+        repo:
+          $pattern: "supersuit-tech/*"
+        title: "*"
+        body: "*"
+        label: "bug"
+
+    status:
+      type: string
+      enum:
+        - active
+        - disabled
+      description: |
+        Current status of this action configuration.
+
+        - **active**: Agent can reference this configuration
+        - **disabled**: Configuration exists but is not available to the agent
+      example: "active"
+
+    name:
+      type: string
+      maxLength: 255
+      description: |
+        User-facing name for this configuration.
+      example: "Create bug issues in webapp"
+
+    description:
+      type: string
+      maxLength: 4096
+      nullable: true
+      description: |
+        Optional longer description of what this configuration permits.
+      example: "Agent can create issues labeled 'bug' in the main repo. Title and body are freeform."
+
+    created_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this configuration was created.
+      example: "2026-02-25T10:00:00Z"
+
+    updated_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this configuration was last updated.
+      example: "2026-02-25T10:00:00Z"
+
+  example:
+    id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    agent_id: 42
+    connector_id: "github"
+    action_type: "github.create_issue"
+    credential_id: "cred_abc123"
+    parameters:
+      repo:
+        $pattern: "supersuit-tech/*"
+      title: "*"
+      body: "*"
+      label: "bug"
+    status: "active"
+    name: "Create bug issues in supersuit repos"
+    description: "Agent can create issues labeled 'bug' in any supersuit-tech repo."
+    created_at: "2026-02-25T10:00:00Z"
+    updated_at: "2026-02-25T10:00:00Z"
+
+CreateActionConfigRequest:
+  type: object
+  required:
+    - agent_id
+    - connector_id
+    - action_type
+    - name
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Agent this configuration applies to. Must be owned by the authenticated user.
+      example: 42
+
+    connector_id:
+      type: string
+      maxLength: 128
+      description: Connector that provides the action.
+      example: "github"
+
+    action_type:
+      type: string
+      maxLength: 128
+      description: Action type from the connector's action catalog.
+      example: "github.create_issue"
+
+    credential_id:
+      type: string
+      nullable: true
+      description: |
+        Optional credential to bind to this configuration. Can be assigned later
+        via update. Required before the agent can execute actions through this config.
+      example: "cred_abc123"
+
+    parameters:
+      type: object
+      additionalProperties: true
+      description: |
+        Parameter values for this configuration. Defaults to `{}` if omitted.
+
+        - Use `"*"` for wildcard parameters the agent can fill in freely.
+        - Use `{"$pattern": "<glob>"}` for glob pattern constraints (e.g.
+          `{"$pattern": "*@mycompany.com"}` or `{"$pattern": "supersuit-tech/*"}`).
+          `*` matches any sequence of characters. Pattern parameters are required.
+        - Any other value is treated as a fixed, exact-match constraint. Plain strings
+          containing `*` are treated as fixed values (not patterns).
+      example:
+        repo:
+          $pattern: "supersuit-tech/*"
+        title: "*"
+        body: "*"
+        label: "bug"
+
+    name:
+      type: string
+      maxLength: 255
+      description: User-facing name for this configuration.
+      example: "Create bug issues in webapp"
+
+    description:
+      type: string
+      maxLength: 4096
+      nullable: true
+      description: Optional longer description of what this configuration permits.
+      example: "Agent can create issues labeled 'bug' in the main repo."
+
+  example:
+    agent_id: 42
+    connector_id: "github"
+    action_type: "github.create_issue"
+    credential_id: "cred_abc123"
+    parameters:
+      repo: "supersuit-tech/webapp"
+      title: "*"
+      body: "*"
+      label: "bug"
+    name: "Create bug issues in webapp"
+    description: "Agent can create issues labeled 'bug' in the main repo."
+
+UpdateActionConfigRequest:
+  type: object
+  description: |
+    Partial update — only provided fields are changed. At least one field must be provided.
+  properties:
+    credential_id:
+      type: string
+      nullable: true
+      description: New credential to bind to this configuration.
+      example: "cred_def456"
+
+    parameters:
+      type: object
+      additionalProperties: true
+      description: Updated parameter values.
+      example:
+        repo: "supersuit-tech/api"
+        title: "*"
+
+    status:
+      type: string
+      enum:
+        - active
+        - disabled
+      description: New status for this configuration.
+      example: "disabled"
+
+    name:
+      type: string
+      maxLength: 255
+      description: Updated name.
+      example: "Updated config name"
+
+    description:
+      type: string
+      maxLength: 4096
+      nullable: true
+      description: Updated description.
+      example: "Updated description for this config."
+
+  example:
+    name: "Updated config name"
+    status: "disabled"
+
+ActionConfigListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/action_configurations.yaml#/ActionConfiguration'
+      description: |
+        List of action configurations for the specified agent.
+
+  example:
+    data:
+      - id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+        agent_id: 42
+        connector_id: "github"
+        action_type: "github.create_issue"
+        credential_id: "cred_abc123"
+        parameters:
+          repo: "supersuit-tech/webapp"
+          title: "*"
+          label: "bug"
+        status: "active"
+        name: "Create bug issues in webapp"
+        created_at: "2026-02-25T10:00:00Z"
+        updated_at: "2026-02-25T10:00:00Z"
+
+DeleteActionConfigResponse:
+  type: object
+  required:
+    - id
+    - deleted_at
+  properties:
+    id:
+      type: string
+      pattern: '^ac_[a-f0-9]{32}$'
+      maxLength: 36
+      description: |
+        Action configuration identifier that was deleted.
+      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+
+    deleted_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when the configuration was deleted.
+      example: "2026-02-25T15:00:00Z"
+
+  example:
+    id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    deleted_at: "2026-02-25T15:00:00Z"

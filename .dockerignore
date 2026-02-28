@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build artifacts
+bin/
+frontend/dist/
+
+# Version control
+.git/
+.gitignore
+
+# Environment and secrets (root and frontend — Vite uses .env.local, .env.production, etc.)
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test and CI
+*.test
+coverage/
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+LICENSE
+
+# Supabase local dev
+supabase/
+
+# CI, tooling, and config directories (not needed for build)
+.github/
+.claude/
+.openclaw/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,467 @@
+StandingApprovalListResponse:
+  type: object
+  required:
+    - standing_approvals
+    - has_more
+  properties:
+    standing_approvals:
+      type: array
+      items:
+        $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+      description: |
+        List of active standing approvals for the agent. Only standing approvals
+        with status `active` are included.
+
+    has_more:
+      type: boolean
+      description: |
+        Whether there are more standing approvals beyond this page.
+        When `true`, use the `next_cursor` value with the `after` query
+        parameter to fetch the next page.
+      example: false
+
+    next_cursor:
+      type: string
+      nullable: true
+      description: |
+        Opaque cursor for fetching the next page. Pass as the `after`
+        query parameter in the next request. Only present when `has_more`
+        is `true`.
+      example: "2026-02-14T10:30:00.123456789Z,sa_abc123"
+
+  example:
+    standing_approvals:
+      - standing_approval_id: "sa_abc123"
+        agent_id: 42
+        user_id: "alice"
+        action_type: "email.read"
+        action_version: "1"
+        constraints:
+          sender: "*@github.com"
+          max_results: 10
+        status: "active"
+        max_executions: null
+        execution_count: 42
+        starts_at: "2026-02-14T00:00:00Z"
+        expires_at: "2026-02-21T00:00:00Z"
+        created_at: "2026-02-14T10:30:00Z"
+        revoked_at: null
+    has_more: false
+
+StandingApproval:
+  type: object
+  required:
+    - standing_approval_id
+    - agent_id
+    - user_id
+    - action_type
+    - status
+    - execution_count
+    - starts_at
+    - expires_at
+    - created_at
+  properties:
+    standing_approval_id:
+      type: string
+      pattern: '^sa_[a-zA-Z0-9]{6,64}$'
+      maxLength: 70
+      description: |
+        Unique standing approval identifier assigned by Permission Slip.
+      example: "sa_abc123"
+
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        Auto-incrementing agent identifier this standing approval applies to.
+      example: 42
+
+    user_id:
+      type: string
+      maxLength: 64
+      description: |
+        User who created this standing approval.
+      example: "alice"
+
+    action_type:
+      type: string
+      maxLength: 128
+      description: |
+        Action type this standing approval authorizes. Same naming conventions as
+        action types in approval requests (standard or custom types).
+      example: "email.read"
+
+    action_version:
+      type: string
+      pattern: '^\d+$'
+      default: "1"
+      maxLength: 10
+      description: |
+        Action type version this standing approval applies to.
+      example: "1"
+
+    constraints:
+      type: object
+      additionalProperties: true
+      description: |
+        Constraint boundaries for this standing approval. Same schema as ACTION_CONFIG
+        constraints. Every execution is validated against these constraints — parameters
+        that fall outside the constraint bounds are rejected.
+
+        Examples for `email.read`:
+        - `sender`: Sender filter pattern (e.g., `*@github.com`)
+        - `max_results`: Maximum number of results per execution
+
+        Examples for `email.send`:
+        - `recipient_pattern`: Allowed recipient pattern (e.g., `*@mycompany.com`)
+        - `max_recipients`: Maximum number of recipients per execution
+      example:
+        sender: "*@github.com"
+        max_results: 10
+
+    status:
+      type: string
+      enum:
+        - active
+        - expired
+        - revoked
+        - exhausted
+      description: |
+        Current status of the standing approval.
+
+        - **active**: Agent can execute actions under this standing approval
+        - **expired**: Duration elapsed; agent must request a new standing approval or use one-off
+        - **revoked**: User manually cancelled this standing approval
+        - **exhausted**: Max execution count reached
+      example: "active"
+
+    max_executions:
+      type: integer
+      minimum: 1
+      nullable: true
+      description: |
+        Maximum number of times the agent can execute under this standing approval.
+        `null` means unlimited — the agent can execute as many times as it wants
+        within the duration.
+      example: null
+
+    execution_count:
+      type: integer
+      minimum: 0
+      description: |
+        Number of times this standing approval has been used so far.
+      example: 42
+
+    starts_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval becomes active.
+      example: "2026-02-14T00:00:00Z"
+
+    expires_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval expires.
+        Required when creating a standing approval. Maximum duration is 90 days from
+        `starts_at`.
+      example: "2026-02-21T00:00:00Z"
+
+    created_at:
+      type: string
+      format: date-time
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval was created.
+      example: "2026-02-14T10:30:00Z"
+
+    revoked_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval was revoked.
+        `null` if not revoked.
+      example: null
+
+  example:
+    standing_approval_id: "sa_abc123"
+    agent_id: 42
+    user_id: "alice"
+    action_type: "email.read"
+    action_version: "1"
+    constraints:
+      sender: "*@github.com"
+      max_results: 10
+    status: "active"
+    max_executions: null
+    execution_count: 42
+    starts_at: "2026-02-14T00:00:00Z"
+    expires_at: "2026-02-21T00:00:00Z"
+    created_at: "2026-02-14T10:30:00Z"
+    revoked_at: null
+
+UserStandingApprovalListResponse:
+  type: object
+  required:
+    - data
+    - has_more
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+      description: |
+        List of standing approvals for the authenticated user.
+    has_more:
+      type: boolean
+      description: |
+        Whether there are more results available beyond this page.
+      example: false
+    next_cursor:
+      type: string
+      description: |
+        Opaque cursor to pass as the `after` query parameter to fetch the next page.
+        Only present when `has_more` is `true`.
+      example: "2026-02-14T10:30:00Z,sa_abc123"
+
+  example:
+    data:
+      - standing_approval_id: "sa_abc123"
+        agent_id: 42
+        user_id: "00000000-0000-0000-0000-000000000001"
+        action_type: "email.read"
+        action_version: "1"
+        constraints:
+          sender: "*@github.com"
+          max_results: 10
+        status: "active"
+        max_executions: null
+        execution_count: 42
+        starts_at: "2026-02-14T00:00:00Z"
+        expires_at: "2026-02-21T00:00:00Z"
+        created_at: "2026-02-14T10:30:00Z"
+        revoked_at: null
+    has_more: false
+
+CreateStandingApprovalRequest:
+  type: object
+  required:
+    - agent_id
+    - action_type
+    - expires_at
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Auto-incrementing agent identifier this standing approval applies to.
+      example: 42
+
+    action_type:
+      type: string
+      maxLength: 128
+      description: Action type this standing approval authorizes.
+      example: "email.send"
+
+    action_version:
+      type: string
+      pattern: '^\d+$'
+      default: "1"
+      maxLength: 10
+      description: Action type version.
+      example: "1"
+
+    constraints:
+      type: object
+      additionalProperties: true
+      description: Constraint boundaries for this standing approval.
+      example:
+        recipient_pattern: "*@mycompany.com"
+        max_recipients: 5
+
+    max_executions:
+      type: integer
+      minimum: 1
+      nullable: true
+      description: Maximum number of executions. Null means unlimited.
+      example: 100
+
+    starts_at:
+      type: string
+      format: date-time
+      description: When this standing approval becomes active. Defaults to now if omitted.
+      example: "2026-02-14T00:00:00Z"
+
+    expires_at:
+      type: string
+      format: date-time
+      description: When this standing approval expires. Required. Maximum 90 days from starts_at.
+      example: "2026-03-14T00:00:00Z"
+
+  example:
+    agent_id: 42
+    action_type: "email.send"
+    action_version: "1"
+    constraints:
+      recipient_pattern: "*@mycompany.com"
+    max_executions: 100
+    expires_at: "2026-03-14T00:00:00Z"
+
+RevokeStandingApprovalResponse:
+  type: object
+  required:
+    - standing_approval_id
+    - status
+    - revoked_at
+  properties:
+    standing_approval_id:
+      type: string
+      example: "sa_abc123"
+    status:
+      type: string
+      enum:
+        - revoked
+      example: "revoked"
+    revoked_at:
+      type: string
+      format: date-time
+      example: "2026-02-21T10:30:00Z"
+
+UserExecuteStandingApprovalRequest:
+  type: object
+  properties:
+    parameters:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: |
+        Optional execution parameters. Must be a JSON object if provided.
+        These are recorded alongside the execution for audit purposes.
+      example:
+        sender: "*@github.com"
+        max_results: 10
+
+  example:
+    parameters:
+      sender: "*@github.com"
+
+UserExecuteStandingApprovalResponse:
+  type: object
+  required:
+    - standing_approval_id
+    - execution_id
+    - executed_at
+  properties:
+    standing_approval_id:
+      type: string
+      pattern: '^sa_[a-zA-Z0-9]{6,64}$'
+      maxLength: 70
+      description: The standing approval that was executed.
+      example: "sa_abc123"
+    execution_id:
+      type: integer
+      format: int64
+      description: Auto-incrementing execution identifier.
+      example: 1
+    executed_at:
+      type: string
+      format: date-time
+      description: When the execution was recorded.
+      example: "2026-02-22T10:30:00Z"
+
+  example:
+    standing_approval_id: "sa_abc123"
+    execution_id: 1
+    executed_at: "2026-02-22T10:30:00Z"
+
+StandingApprovalExecuteRequest:
+  type: object
+  required:
+    - request_id
+    - action
+  properties:
+    request_id:
+      type: string
+      format: uuid
+      maxLength: 64
+      description: |
+        Unique request identifier for replay protection and idempotency. UUID v4 recommended.
+      example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    configuration_id:
+      type: string
+      pattern: '^ac_[a-f0-9]{32}$'
+      maxLength: 36
+      description: |
+        Optional reference to an action configuration. When provided, Permission Slip
+        validates that the configuration exists, is active, belongs to this agent,
+        and that the `action.parameters` comply with the configuration constraints
+        (fixed parameters must match exactly, wildcard parameters accept any value).
+
+        If the configuration reference is invalid, Permission Slip returns
+        `400 Bad Request` with error code `invalid_configuration`. If the
+        configuration is disabled, returns `403 Forbidden` with error code
+        `configuration_disabled`. If the configuration's `action_type` does not
+        match the request's `action.type`, returns `400 Bad Request` with error
+        code `configuration_action_type_mismatch`.
+
+        When omitted, the execution proceeds through the standard standing approval
+        matching flow without configuration-based validation.
+      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+
+    action:
+      $ref: './shared.yaml#/Action'
+
+  example:
+    request_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+    configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    action:
+      type: "email.read"
+      version: "1"
+      parameters:
+        sender: "*@github.com"
+        max_results: 10
+
+StandingApprovalExecuteResponse:
+  type: object
+  required:
+    - result
+    - standing_approval_id
+    - executions_remaining
+  properties:
+    result:
+      type: object
+      additionalProperties: true
+      description: |
+        Action result from the external service. Structure is action-type-specific.
+      example:
+        emails:
+          - id: "msg_001"
+            subject: "PR merged"
+            sender: "noreply@github.com"
+
+    standing_approval_id:
+      type: string
+      pattern: '^sa_[a-zA-Z0-9]{6,64}$'
+      maxLength: 70
+      description: |
+        Which standing approval authorized this execution.
+      example: "sa_abc123"
+
+    executions_remaining:
+      type: integer
+      minimum: 0
+      nullable: true
+      description: |
+        Number of executions remaining under this standing approval.
+        `null` means unlimited.
+      example: null
+
+  example:
+    result:
+      emails:
+        - id: "msg_001"
+          subject: "PR merged"
+          sender: "noreply@github.com"
+    standing_approval_id: "sa_abc123"
+    executions_remaining: null

@@ -1,0 +1,163 @@
+AgentSummary:
+  type: object
+  description: Summary of an agent owned by the authenticated user.
+  required:
+    - agent_id
+    - status
+    - created_at
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Auto-incrementing agent identifier
+      example: 42
+    status:
+      type: string
+      enum:
+        - pending
+        - registered
+        - deactivated
+      description: Current agent status
+      example: "registered"
+    metadata:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: Optional agent metadata (name, version, capabilities)
+    confirmation_code:
+      type: string
+      nullable: true
+      description: |
+        Confirmation code for pending agents. Shown to the approver on
+        the dashboard so they can share it with the agent. Cleared after
+        successful verification. Only present when status is "pending".
+      example: "XK7-M9P"
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When the pending registration expires. Only relevant for agents
+        in "pending" status. After this time, the agent must re-register.
+      example: "2026-02-11T13:25:00Z"
+    registered_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the agent completed registration (null if still pending)
+      example: "2026-02-11T13:20:15Z"
+    deactivated_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the agent was deactivated (null if still active)
+      example: "2026-02-18T09:30:00Z"
+    last_active_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the agent last made a request (null if never active)
+      example: "2026-02-19T08:45:00Z"
+    request_count_30d:
+      type: integer
+      description: |
+        Number of approval requests made by this agent in the last 30 days.
+        Only included in list responses.
+      example: 42
+    created_at:
+      type: string
+      format: date-time
+      description: When the agent record was created
+      example: "2026-02-11T13:15:00Z"
+
+UpdateAgentRequest:
+  type: object
+  description: Request body for updating agent metadata.
+  required:
+    - metadata
+  properties:
+    metadata:
+      type: object
+      additionalProperties: true
+      description: |
+        Agent metadata object (must be a JSON object, not an array or
+        primitive). Shallow-merges into existing metadata: top-level
+        keys are preserved unless overridden. Nested objects are replaced
+        entirely, not deep-merged. Keys set to `null` are stored as JSON
+        null (there is no way to remove a key). Common fields include
+        `name` and `version`.
+      example:
+        name: "My Renamed Agent"
+
+AgentSelfResponse:
+  type: object
+  description: |
+    Agent's own record, returned by the agent-authenticated `GET /v1/agents/me`
+    endpoint. Excludes dashboard-only fields like `confirmation_code`,
+    `expires_at`, and `request_count_30d`.
+  required:
+    - agent_id
+    - status
+    - created_at
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Auto-incrementing agent identifier
+      example: 42
+    status:
+      type: string
+      enum:
+        - registered
+        - deactivated
+      description: Current agent status (always "registered" for successful requests, since the middleware requires it)
+      example: "registered"
+    metadata:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: Optional agent metadata (name, version, capabilities)
+    registered_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the agent completed registration
+      example: "2026-02-11T13:20:15Z"
+    deactivated_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the agent was deactivated (null if still active)
+    last_active_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the agent last made a request (null if never active)
+    created_at:
+      type: string
+      format: date-time
+      description: When the agent record was created
+      example: "2026-02-11T13:15:00Z"
+
+AgentListResponse:
+  type: object
+  description: Paginated list of agents.
+  required:
+    - data
+    - has_more
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/AgentSummary'
+    has_more:
+      type: boolean
+      description: Whether more agents exist beyond this page.
+      example: false
+    next_cursor:
+      type: string
+      description: |
+        Opaque cursor to pass as the `after` query parameter to fetch the
+        next page. Only present when `has_more` is true. Do not construct
+        or parse cursor values — they may change format without notice.
+      example: "2026-02-11T13:15:00.123456Z,42"

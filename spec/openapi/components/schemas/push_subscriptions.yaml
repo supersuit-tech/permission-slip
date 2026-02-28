@@ -1,0 +1,85 @@
+CreatePushSubscriptionRequest:
+  type: object
+  description: Register a Web Push subscription from the browser.
+  required:
+    - endpoint
+    - p256dh
+    - auth
+  properties:
+    endpoint:
+      type: string
+      format: uri
+      description: Push service endpoint URL from the browser PushSubscription
+      example: "https://fcm.googleapis.com/fcm/send/abc123..."
+    p256dh:
+      type: string
+      description: Base64url-encoded P-256 public key from the browser PushSubscription keys
+      example: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8p8REqnSw"
+    auth:
+      type: string
+      description: Base64url-encoded auth secret from the browser PushSubscription keys
+      example: "tBHItJI5svbpC7RB5gg6bQ"
+
+PushSubscriptionResponse:
+  type: object
+  description: A registered Web Push subscription.
+  required:
+    - id
+    - endpoint
+    - created_at
+  properties:
+    id:
+      type: integer
+      format: int64
+      description: Subscription ID
+      example: 1
+    endpoint:
+      type: string
+      format: uri
+      description: Push service endpoint URL
+      example: "https://fcm.googleapis.com/fcm/send/abc123..."
+    created_at:
+      type: string
+      format: date-time
+      description: When the subscription was registered
+      example: "2026-02-27T10:00:00Z"
+
+PushSubscriptionListResponse:
+  type: object
+  description: List of registered push subscriptions.
+  required:
+    - subscriptions
+  properties:
+    subscriptions:
+      type: array
+      items:
+        $ref: '#/PushSubscriptionResponse'
+
+DeletePushSubscriptionResponse:
+  type: object
+  description: Confirmation of push subscription deletion.
+  required:
+    - id
+    - deleted_at
+  properties:
+    id:
+      type: integer
+      format: int64
+      description: Deleted subscription ID
+      example: 1
+    deleted_at:
+      type: string
+      format: date-time
+      description: Deletion timestamp
+      example: "2026-02-27T10:05:00Z"
+
+VAPIDPublicKeyResponse:
+  type: object
+  description: The server's VAPID public key for Web Push subscription.
+  required:
+    - public_key
+  properties:
+    public_key:
+      type: string
+      description: Base64url-encoded VAPID public key
+      example: "BNx..."

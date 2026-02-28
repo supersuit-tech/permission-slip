@@ -1,0 +1,129 @@
+Error:
+  type: object
+  required:
+    - code
+    - message
+    - retryable
+  properties:
+    code:
+      type: string
+      maxLength: 64
+      description: |
+        Machine-readable error code. Used by clients to programmatically handle specific 
+        error conditions.
+        
+        See error code reference in API specification for complete list and descriptions.
+      enum:
+        # 400 Bad Request
+        - invalid_request
+        - invalid_action_type
+        - unsupported_action_type
+        - unsupported_action_version
+        - agent_id_mismatch
+        - invalid_public_key
+        # 401 Unauthorized
+        - invalid_signature
+        - timestamp_expired
+        - invalid_code
+        - invalid_token
+        # 403 Forbidden
+        - agent_not_authorized
+        - approval_denied
+        - token_already_used
+        - insufficient_scope
+        - invalid_parameters
+        # 404 Not Found
+        - agent_not_found
+        - approver_not_found
+        - approval_not_found
+        - credential_not_found
+        - connector_not_found
+        - agent_connector_not_found
+        - credentials_not_found
+        - no_matching_standing_approval
+        # 403 Forbidden (standing approval)
+        - standing_approval_exhausted
+        - constraint_violation
+        # 410 Gone (standing approval)
+        - standing_approval_expired
+        # 409 Conflict
+        - agent_already_registered
+        - duplicate_request_id
+        - approval_already_resolved
+        - duplicate_credential
+        # 410 Gone
+        - registration_expired
+        - verification_locked
+        - approval_expired
+        # 429 Too Many Requests
+        - rate_limited
+        # 500 Internal Server Error
+        - internal_error
+        # 502 Bad Gateway
+        - upstream_error
+        # 503 Service Unavailable
+        - service_unavailable
+      example: "invalid_signature"
+    
+    message:
+      type: string
+      maxLength: 500
+      description: |
+        Human-readable error message. Provides context about what went wrong and may include 
+        suggestions for how to fix it.
+      example: "Signature verification failed"
+    
+    retryable:
+      type: boolean
+      description: |
+        Indicates whether the client should retry the request. 
+        
+        - `true`: Transient error, retry with exponential backoff (e.g., rate limiting, server error)
+        - `false`: Permanent error, do not retry (e.g., invalid request, expired signature)
+      example: false
+    
+    details:
+      type: object
+      additionalProperties: true
+      description: |
+        Optional additional error context. Structure is error-specific and may include 
+        information like validation failures, expired timestamps, or resource identifiers.
+      example:
+        field: "confirmation_code"
+        attempts_remaining: 4
+    
+    trace_id:
+      type: string
+      maxLength: 128
+      description: |
+        Optional server-generated trace or correlation ID for debugging and support requests. 
+        This is distinct from the client-supplied `request_id` in approval requests.
+        
+        Clients SHOULD include this value when contacting support about errors.
+      example: "trace_xyz789"
+    
+    retry_after:
+      type: integer
+      minimum: 1
+      description: |
+        Present only for `rate_limited` errors. Number of seconds the client should wait 
+        before retrying the request.
+      example: 60
+
+ErrorResponse:
+  type: object
+  required:
+    - error
+  properties:
+    error:
+      $ref: '../schemas/errors.yaml#/Error'
+  
+  example:
+    error:
+      code: "invalid_signature"
+      message: "Signature verification failed"
+      retryable: false
+      details:
+        timestamp: "1770816000"
+        expected_window: "300 seconds"
+      trace_id: "trace_xyz789"

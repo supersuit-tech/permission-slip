@@ -1,0 +1,85 @@
+package db_test
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+)
+
+func TestAgentConnectorsSchema(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	testhelper.RequireColumns(t, tx, "agent_connectors", []string{
+		"agent_id", "approver_id", "connector_id", "enabled_at",
+	})
+}
+
+func TestAgentConnectorsIndex(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	testhelper.RequireIndex(t, tx, "agent_connectors", "idx_agent_connectors_connector")
+}
+
+func TestAgentConnectorsDuplicateInsert(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	connID := testhelper.GenerateID(t, "conn_")
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "user_"+uid[:8])
+	testhelper.InsertConnector(t, tx, connID)
+
+	testhelper.RequireUniqueViolation(t, tx, "(agent_id, connector_id)",
+		func() error {
+			testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+			return nil
+		},
+		func() error {
+			_, err := tx.Exec(context.Background(),
+				`INSERT INTO agent_connectors (agent_id, approver_id, connector_id) VALUES ($1, $2, $3)`,
+				agentID, uid, connID)
+			return err
+		},
+	)
+}
+
+func TestAgentConnectorsCascadeOnAgentDelete(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	connID := testhelper.GenerateID(t, "conn_")
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "user_"+uid[:8])
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	testhelper.RequireCascadeDeletes(t, tx,
+		fmt.Sprintf("DELETE FROM agents WHERE agent_id = %d", agentID),
+		[]string{"agent_connectors"},
+		fmt.Sprintf("agent_id = %d", agentID),
+	)
+}
+
+func TestAgentConnectorsCascadeOnConnectorDelete(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	connID := testhelper.GenerateID(t, "conn_")
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "user_"+uid[:8])
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	testhelper.RequireCascadeDeletes(t, tx,
+		"DELETE FROM connectors WHERE id = '"+connID+"'",
+		[]string{"agent_connectors"},
+		"connector_id = '"+connID+"'",
+	)
+}

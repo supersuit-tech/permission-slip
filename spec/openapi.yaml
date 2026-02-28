@@ -1,0 +1,1096 @@
+openapi: 3.1.0
+info:
+  title: Permission Slip Protocol API
+  version: 1.0.0
+  description: |
+    The Permission Slip protocol enables agents (AI systems, automation tools, bots) to request 
+    real-time human approval for one-off actions. This specification defines the complete HTTP API 
+    for agent registration, approval workflows, and token-based action execution.
+    
+    **Key Features:**
+    - Cryptographic agent identity (Ed25519, ECDSA-P256)
+    - Break-glass approval model (one-time actions only)
+    - Single-use tokens (not a replacement for OAuth)
+    - Human-in-the-loop verification with confirmation codes
+    
+    **Related Documentation:**
+    - [API Specification](https://github.com/supersuit-tech/permission-slip/blob/main/spec/api.md)
+    - [Authentication Specification](https://github.com/supersuit-tech/permission-slip/blob/main/spec/authentication.md)
+    - [Terminology](https://github.com/supersuit-tech/permission-slip/blob/main/spec/terminology.md)
+    
+  contact:
+    name: Permission Slip Protocol
+    url: https://github.com/supersuit-tech/permission-slip
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: https://api.permission-slip.example/v1
+    description: Example production server (replace with your service's base_url + /v1)
+  - url: https://staging-api.permission-slip.example/v1
+    description: Example staging server
+
+tags:
+  - name: Discovery
+    description: Service capability discovery
+  - name: Registration
+    description: Agent registration endpoints
+  - name: Approvals
+    description: Approval request and verification endpoints
+  - name: Tokens
+    description: Token validation and usage (service-defined endpoints)
+
+paths:
+  /.well-known/permission-slip:
+    get:
+      tags:
+        - Discovery
+      summary: Service Discovery
+      description: |
+        Discover a service's Permission Slip capabilities, base URL, and supported algorithms.
+        
+        **This endpoint is NOT under the base_url path** - it must be served at the origin root 
+        per RFC 8615.
+        
+        **Example:** For service at `api.example.com`, this endpoint is at:
+        ```
+        https://api.example.com/.well-known/permission-slip
+        ```
+      operationId: discoverService
+      responses:
+        '200':
+          description: Service discovery information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResponse'
+              examples:
+                example:
+                  value:
+                    base_url: https://api.example.com/permission-slip
+                    version: "1.0"
+                    supported_algorithms:
+                      - Ed25519
+                      - ECDSA-P256
+                    supported_token_algorithms:
+                      - ES256
+                    jwks_uri: https://api.example.com/.well-known/permission-slip-jwks.json
+      security: []
+
+  /agents/register:
+    post:
+      tags:
+        - Registration
+      summary: Register Agent
+      description: |
+        Register a new agent with the service by providing its public key. The agent owner must 
+        approve the registration via the returned URL before the agent can make approval requests.
+        
+        **Authentication:** Signed with agent's private key (the public key is in the request body).
+        
+        **Validation:** The service MUST verify:
+        1. The signature is valid for the provided public_key
+        2. The agent_id is correctly derived from the public_key
+        3. The agent_id in the body matches the agent_id in the signature header
+      operationId: registerAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAgentRequest'
+            examples:
+              ed25519:
+                summary: Ed25519 agent registration
+                value:
+                  request_id: 6f1a7c30-9b2e-4d91-8c3f-2a4b6c7d8e9f
+                  agent_id: agent_x7K9mP4nQ8rT2vW5yZ1aC3bD6eF9gH0jK4lM7nP0qR3s
+                  public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPZj8V7K2mT9Xw4nL5rQ1pY3vN8cM6hU0oB4eW2sR7k
+                  approver: alice
+                  metadata:
+                    name: My AI Assistant
+                    version: 1.0.0
+                    capabilities:
+                      - email
+                      - calendar
+                  registration_ttl: 300
+      responses:
+        '200':
+          description: Registration initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterAgentResponse'
+              examples:
+                example:
+                  value:
+                    registration_url: https://example.com/permission-slip/approve?token=eyJ...
+                    alternative_urls:
+                      deeplink: example://permission-slip/approve?token=eyJ...
+                      web: https://accounts.example.com/permission-slip/approve?token=eyJ...
+                    approver: alice
+                    expires_at: '2026-02-11T13:25:00Z'
+                    verification_required: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+        - AgentSignature: []
+
+  /agents/{agent_id}/verify:
+    post:
+      tags:
+        - Registration
+      summary: Verify Agent Registration
+      description: |
+        Complete agent registration by submitting the confirmation code shown to the approver.
+        
+        **Validation:** The agent_id in the path MUST match the agent_id in the signature header.
+      operationId: verifyAgentRegistration
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: Agent identifier (must match signature header)
+          schema:
+            type: string
+            pattern: ^agent_[A-Za-z0-9_-]+$
+          example: agent_x7K9mP4nQ8rT2vW5yZ1aC3bD6eF9gH0jK4lM7nP0qR3s
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+            examples:
+              example:
+                value:
+                  request_id: req_verify_g7h8i9j0k1l2
+                  confirmation_code: XK7-M9P
+      responses:
+        '200':
+          description: Registration verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyRegistrationResponse'
+              examples:
+                example:
+                  value:
+                    status: approved
+                    registered_at: '2026-02-11T13:20:15Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      security:
+        - AgentSignature: []
+
+  /approvals/request:
+    post:
+      tags:
+        - Approvals
+      summary: Request Approval
+      description: |
+        Request approval for a specific one-off action. The approver will receive a notification 
+        and can approve or deny the request. If approved, the agent must verify with the 
+        confirmation code to retrieve a single-use token.
+        
+        **Validation:** The agent_id in the body MUST match the agent_id in the signature header.
+      operationId: requestApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+            examples:
+              emailSend:
+                summary: Email send approval
+                value:
+                  agent_id: agent_x7K9mP4nQ8rT2vW5yZ1aC3bD6eF9gH0jK4lM7nP0qR3s
+                  request_id: req_a1b2c3d4e5f6
+                  approver: alice
+                  action:
+                    type: email.send
+                    version: "1"
+                    parameters:
+                      from: alice@example.com
+                      to:
+                        - recipient@example.com
+                      subject: Hello World
+                      body: This is a test email.
+                  context:
+                    description: Send welcome email to new user
+                    risk_level: low
+                    details:
+                      recipient_count: 1
+              customAction:
+                summary: Service-specific custom action
+                value:
+                  agent_id: agent_abc123
+                  request_id: req_custom_xyz789
+                  approver: bob
+                  action:
+                    type: com.example.deploy.production
+                    version: "2"
+                    parameters:
+                      target: production-cluster-us-east
+                      git_ref: v2.5.0
+                      rollback_enabled: true
+                  context:
+                    description: Deploy v2.5.0 to production
+                    risk_level: high
+                    details:
+                      affected_services: 3
+                      estimated_downtime: 0
+      responses:
+        '200':
+          description: Approval request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalResponse'
+              examples:
+                example:
+                  value:
+                    approval_id: appr_xyz789
+                    approval_url: https://example.com/permission-slip/approve/appr_xyz789
+                    alternative_urls:
+                      deeplink: example://permission-slip/approve/appr_xyz789
+                      web: https://accounts.example.com/permission-slip/approve/appr_xyz789
+                    status: pending
+                    expires_at: '2026-02-11T13:25:00Z'
+                    verification_required: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      security:
+        - AgentSignature: []
+
+  /approvals/{approval_id}/verify:
+    post:
+      tags:
+        - Approvals
+      summary: Verify Approval
+      description: |
+        Verify an approval and retrieve the single-use token by submitting the confirmation code 
+        shown to the approver.
+        
+        **Validation:** The agent_id in the signature header MUST match the agent associated with 
+        the approval_id.
+      operationId: verifyApproval
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          description: Approval identifier
+          schema:
+            type: string
+            pattern: ^appr_[A-Za-z0-9_-]+$
+          example: appr_xyz789
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+            examples:
+              example:
+                value:
+                  request_id: req_verify_m3n4o5p6q7r8
+                  confirmation_code: RK3-P7M
+      responses:
+        '200':
+          description: Approval verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyApprovalResponse'
+              examples:
+                approved:
+                  summary: Approval granted
+                  value:
+                    status: approved
+                    approved_at: '2026-02-11T13:20:45Z'
+                    token:
+                      access_token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0blE4clQydlc1eVoxYUMzYkQ2ZUY5Z0gwaks0bE03blAwcVIzcyIsImF1ZCI6ImV4YW1wbGUuY29tIiwiYXBwcm92ZXIiOiJhbGljZSIsImFwcHJvdmFsX2lkIjoiYXBwcl94eXo3ODkiLCJzY29wZSI6ImVtYWlsLnNlbmQiLCJzY29wZV92ZXJzaW9uIjoiMSIsInBhcmFtc19oYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImlhdCI6MTcwNzY2NzI0NSwiZXhwIjoxNzA3NjY3NTQ1LCJqdGkiOiJ0b2tfdW5pcXVlMTIzIn0.MEUCIQD...
+                      expires_at: '2026-02-11T13:25:45Z'
+                      scope: email.send
+                      scope_version: "1"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOrDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      security:
+        - AgentSignature: []
+
+  /approvals/{approval_id}/cancel:
+    post:
+      tags:
+        - Approvals
+      summary: Cancel Approval Request
+      description: |
+        Cancel a pending approval request. This can only be done by the agent that created the 
+        approval, and only if the approval has not yet been resolved (approved/denied).
+        
+        **Validation:** The agent_id in the signature header MUST match the agent associated with 
+        the approval_id.
+      operationId: cancelApproval
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          description: Approval identifier
+          schema:
+            type: string
+            pattern: ^appr_[A-Za-z0-9_-]+$
+          example: appr_xyz789
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelRequest'
+            examples:
+              example:
+                value:
+                  request_id: req_cancel_s9t0u1v2w3x4
+      responses:
+        '200':
+          description: Approval cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelResponse'
+              examples:
+                example:
+                  value:
+                    status: cancelled
+                    cancelled_at: '2026-02-11T13:21:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      security:
+        - AgentSignature: []
+
+components:
+  securitySchemes:
+    AgentSignature:
+      type: apiKey
+      in: header
+      name: X-Permission-Slip-Signature
+      description: |
+        Agent request signature proving identity and request integrity.
+        
+        **Format:**
+        ```
+        X-Permission-Slip-Signature: agent_id="<agent_id>", algorithm="<algorithm>", 
+          timestamp="<unix_timestamp>", signature="<base64url_signature>"
+        ```
+        
+        **Signature Construction:**
+        1. Construct canonical request string (METHOD, PATH, QUERY_STRING, TIMESTAMP, BODY_HASH)
+        2. Sign with agent's private key (Ed25519 or ECDSA-P256)
+        3. Base64url encode signature (no padding)
+        
+        **See:** [Authentication Specification](https://github.com/supersuit-tech/permission-slip/blob/main/spec/authentication.md)
+
+  schemas:
+    # Discovery
+    DiscoveryResponse:
+      type: object
+      required:
+        - base_url
+        - version
+        - supported_algorithms
+        - supported_token_algorithms
+        - jwks_uri
+      properties:
+        base_url:
+          type: string
+          format: uri
+          description: |
+            Base URL for all Permission Slip protocol endpoints (registration, approvals). 
+            Does NOT include version suffix. Agents construct endpoints as: base_url + /v1 + path
+          example: https://api.example.com/permission-slip
+        version:
+          type: string
+          description: Protocol version implemented by this service
+          example: "1.0"
+        supported_algorithms:
+          type: array
+          items:
+            type: string
+            enum:
+              - Ed25519
+              - ECDSA-P256
+          description: Agent signature algorithms supported for request signing
+          example:
+            - Ed25519
+            - ECDSA-P256
+        supported_token_algorithms:
+          type: array
+          items:
+            type: string
+            enum:
+              - ES256
+          description: JWT signature algorithms used for approval tokens
+          example:
+            - ES256
+        jwks_uri:
+          type: string
+          format: uri
+          description: |
+            Absolute URL to the service's JSON Web Key Set for token verification. 
+            If using .well-known, MUST be at origin root per RFC 8615.
+          example: https://api.example.com/.well-known/permission-slip-jwks.json
+
+    # Registration
+    RegisterAgentRequest:
+      type: object
+      required:
+        - request_id
+        - agent_id
+        - public_key
+        - approver
+      properties:
+        request_id:
+          type: string
+          description: Unique request identifier for replay protection (UUID v4 recommended)
+          example: 6f1a7c30-9b2e-4d91-8c3f-2a4b6c7d8e9f
+        agent_id:
+          type: string
+          pattern: ^agent_[A-Za-z0-9_-]+$
+          description: Agent identifier derived from public key. Must match signature header.
+          example: agent_x7K9mP4nQ8rT2vW5yZ1aC3bD6eF9gH0jK4lM7nP0qR3s
+        public_key:
+          type: string
+          description: |
+            Agent's public key in OpenSSH format (algorithm base64-key [comment])
+          example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPZj8V7K2mT9Xw4nL5rQ1pY3vN8cM6hU0oB4eW2sR7k
+        approver:
+          type: string
+          description: Service username who will approve agent actions
+          example: alice
+        metadata:
+          type: object
+          description: Optional agent metadata
+          properties:
+            name:
+              type: string
+              description: Human-readable agent name
+              example: My AI Assistant
+            version:
+              type: string
+              description: Agent version
+              example: 1.0.0
+            capabilities:
+              type: array
+              items:
+                type: string
+              description: List of agent capabilities
+              example:
+                - email
+                - calendar
+        registration_ttl:
+          type: integer
+          description: Registration URL TTL in seconds (default 300)
+          default: 300
+          minimum: 60
+          maximum: 3600
+          example: 300
+
+    RegisterAgentResponse:
+      type: object
+      required:
+        - registration_url
+        - approver
+        - expires_at
+        - verification_required
+      properties:
+        registration_url:
+          type: string
+          format: uri
+          description: Primary registration URL (universal link). Agents MUST support this format.
+          example: https://example.com/permission-slip/approve?token=eyJ...
+        alternative_urls:
+          type: object
+          description: Optional alternative URL formats for specific platforms
+          properties:
+            deeplink:
+              type: string
+              format: uri
+              description: Native app deep link
+              example: example://permission-slip/approve?token=eyJ...
+            web:
+              type: string
+              format: uri
+              description: Web-only URL
+              example: https://accounts.example.com/permission-slip/approve?token=eyJ...
+        approver:
+          type: string
+          description: Username who must approve
+          example: alice
+        expires_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when registration expires
+          example: '2026-02-11T13:25:00Z'
+        verification_required:
+          type: boolean
+          description: Always true (confirmation code required)
+          example: true
+
+    # Verification
+    VerifyRequest:
+      type: object
+      required:
+        - request_id
+        - confirmation_code
+      properties:
+        request_id:
+          type: string
+          description: Unique request identifier for replay protection
+          example: req_verify_g7h8i9j0k1l2
+        confirmation_code:
+          type: string
+          pattern: ^[A-Z0-9]{3}-[A-Z0-9]{3}$|^[A-Z0-9]{6}$
+          description: |
+            6-character confirmation code (with or without hyphen). 
+            Format: XXX-XXX or XXXXXX. 
+            Characters: A-Z, 2-9 (excluding 0, O, 1, I for readability)
+          example: XK7-M9P
+
+    VerifyRegistrationResponse:
+      type: object
+      required:
+        - status
+        - registered_at
+      properties:
+        status:
+          type: string
+          enum:
+            - approved
+          description: Registration status
+          example: approved
+        registered_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of registration completion
+          example: '2026-02-11T13:20:15Z'
+
+    # Approvals
+    ApprovalRequest:
+      type: object
+      required:
+        - agent_id
+        - request_id
+        - approver
+        - action
+        - context
+      properties:
+        agent_id:
+          type: string
+          pattern: ^agent_[A-Za-z0-9_-]+$
+          description: Agent identifier. Must match signature header.
+          example: agent_x7K9mP4nQ8rT2vW5yZ1aC3bD6eF9gH0jK4lM7nP0qR3s
+        request_id:
+          type: string
+          description: Unique request identifier (UUID v4 recommended)
+          example: req_a1b2c3d4e5f6
+        approver:
+          type: string
+          description: Service username who must approve this action
+          example: alice
+        action:
+          $ref: '#/components/schemas/Action'
+        context:
+          $ref: '#/components/schemas/ApprovalContext'
+
+    Action:
+      type: object
+      required:
+        - type
+        - parameters
+      properties:
+        type:
+          type: string
+          description: |
+            Action type identifier. 
+            
+            **Standard types** (2 segments, reserved for future standardization):
+            - Format: `<category>.<operation>` (e.g., `email.send`, `payment.charge`)
+            - Regex: `^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`
+            - Max length: 64 characters
+            
+            **Custom types** (4+ segments, service-defined):
+            - Format: `<reverse-domain>.<category>.<operation>` (e.g., `com.example.deploy.production`)
+            - Domain must be valid reverse-DNS (e.g., `com.example`, `io.github`)
+            - Max length: 128 characters
+          example: email.send
+        version:
+          type: string
+          description: Action type version (default "1" if omitted)
+          default: "1"
+          pattern: ^\d+$
+          example: "1"
+        parameters:
+          type: object
+          description: Action-specific parameters (service-defined schema)
+          additionalProperties: true
+          example:
+            from: alice@example.com
+            to:
+              - recipient@example.com
+            subject: Hello World
+            body: This is a test email.
+
+    ApprovalContext:
+      type: object
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          description: Brief action summary for approval UI
+          example: Send welcome email to new user
+        risk_level:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+          description: Risk level indicator
+          example: low
+        details:
+          type: object
+          description: Additional context for UI display
+          additionalProperties: true
+          example:
+            recipient_count: 1
+            estimated_cost: 0.01
+
+    ApprovalResponse:
+      type: object
+      required:
+        - approval_id
+        - approval_url
+        - status
+        - expires_at
+        - verification_required
+      properties:
+        approval_id:
+          type: string
+          pattern: ^appr_[A-Za-z0-9_-]+$
+          description: Unique approval identifier
+          example: appr_xyz789
+        approval_url:
+          type: string
+          format: uri
+          description: Primary approval URL (universal link)
+          example: https://example.com/permission-slip/approve/appr_xyz789
+        alternative_urls:
+          type: object
+          description: Optional alternative URL formats for specific platforms
+          properties:
+            deeplink:
+              type: string
+              format: uri
+              example: example://permission-slip/approve/appr_xyz789
+            web:
+              type: string
+              format: uri
+              example: https://accounts.example.com/permission-slip/approve/appr_xyz789
+        status:
+          type: string
+          enum:
+            - pending
+          description: Approval status
+          example: pending
+        expires_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when approval expires
+          example: '2026-02-11T13:25:00Z'
+        verification_required:
+          type: boolean
+          description: Always true (confirmation code required)
+          example: true
+
+    VerifyApprovalResponse:
+      type: object
+      required:
+        - status
+        - approved_at
+        - token
+      properties:
+        status:
+          type: string
+          enum:
+            - approved
+          description: Approval status
+          example: approved
+        approved_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of approval
+          example: '2026-02-11T13:20:45Z'
+        token:
+          $ref: '#/components/schemas/ApprovalToken'
+
+    ApprovalToken:
+      type: object
+      required:
+        - access_token
+        - expires_at
+        - scope
+        - scope_version
+      properties:
+        access_token:
+          type: string
+          description: |
+            JWT token for single-use action execution. 
+            
+            **JWT Claims:**
+            - `sub`: Agent ID
+            - `aud`: Service domain
+            - `approver`: Username who approved
+            - `approval_id`: Approval request ID
+            - `scope`: Action type
+            - `scope_version`: Action version
+            - `params_hash`: SHA-256 hash of RFC 8785 canonicalized parameters
+            - `iat`: Issued at (Unix timestamp)
+            - `exp`: Expires at (Unix timestamp)
+            - `jti`: Unique token ID (for single-use enforcement)
+          example: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0blE4clQydlc1eVoxYUMzYkQ2ZUY5Z0gwaks0bE03blAwcVIzcyIsImF1ZCI6ImV4YW1wbGUuY29tIiwiYXBwcm92ZXIiOiJhbGljZSIsImFwcHJvdmFsX2lkIjoiYXBwcl94eXo3ODkiLCJzY29wZSI6ImVtYWlsLnNlbmQiLCJzY29wZV92ZXJzaW9uIjoiMSIsInBhcmFtc19oYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImlhdCI6MTcwNzY2NzI0NSwiZXhwIjoxNzA3NjY3NTQ1LCJqdGkiOiJ0b2tfdW5pcXVlMTIzIn0.MEUCIQD...
+        expires_at:
+          type: string
+          format: date-time
+          description: ISO 8601 token expiration
+          example: '2026-02-11T13:25:45Z'
+        scope:
+          type: string
+          description: Action type
+          example: email.send
+        scope_version:
+          type: string
+          description: Action version
+          example: "1"
+
+    # Cancel
+    CancelRequest:
+      type: object
+      required:
+        - request_id
+      properties:
+        request_id:
+          type: string
+          description: Unique request identifier for replay protection
+          example: req_cancel_s9t0u1v2w3x4
+
+    CancelResponse:
+      type: object
+      required:
+        - status
+        - cancelled_at
+      properties:
+        status:
+          type: string
+          enum:
+            - cancelled
+          description: Cancellation status
+          example: cancelled
+        cancelled_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of cancellation
+          example: '2026-02-11T13:21:00Z'
+
+    # Errors
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - retryable
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: invalid_signature
+            message:
+              type: string
+              description: Human-readable error message
+              example: Signature verification failed
+            retryable:
+              type: boolean
+              description: Whether client should retry
+              example: false
+            details:
+              type: object
+              description: Additional error context
+              additionalProperties: true
+            trace_id:
+              type: string
+              description: Server-generated trace ID for debugging
+              example: trace_xyz789
+            retry_after:
+              type: integer
+              description: Seconds until retry allowed (for rate_limited errors)
+              example: 60
+
+  responses:
+    BadRequest:
+      description: Bad request (malformed request, invalid parameters)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidRequest:
+              summary: Malformed request
+              value:
+                error:
+                  code: invalid_request
+                  message: Malformed request body
+                  retryable: false
+                  trace_id: trace_abc123
+            invalidActionType:
+              summary: Invalid action type format
+              value:
+                error:
+                  code: invalid_action_type
+                  message: Action type format is invalid
+                  retryable: false
+            agentIdMismatch:
+              summary: Agent ID mismatch
+              value:
+                error:
+                  code: agent_id_mismatch
+                  message: Agent ID in request body doesn't match signature header
+                  retryable: false
+
+    Unauthorized:
+      description: Unauthorized (invalid signature, expired timestamp, incorrect code)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidSignature:
+              summary: Invalid signature
+              value:
+                error:
+                  code: invalid_signature
+                  message: Signature verification failed
+                  retryable: false
+            timestampExpired:
+              summary: Expired timestamp
+              value:
+                error:
+                  code: timestamp_expired
+                  message: Request timestamp outside acceptable window
+                  retryable: false
+            invalidCode:
+              summary: Invalid confirmation code
+              value:
+                error:
+                  code: invalid_code
+                  message: Confirmation code incorrect or expired
+                  retryable: false
+
+    Forbidden:
+      description: Forbidden (agent not authorized, insufficient permissions)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            agentNotAuthorized:
+              summary: Agent not authorized
+              value:
+                error:
+                  code: agent_not_authorized
+                  message: Agent not registered with specified approver
+                  retryable: false
+
+    ForbiddenOrDenied:
+      description: Forbidden (agent not authorized, approval denied)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            approvalDenied:
+              summary: Approval denied by user
+              value:
+                error:
+                  code: approval_denied
+                  message: User denied the approval request
+                  retryable: false
+                  details:
+                    denied_at: '2026-02-11T13:20:30Z'
+                  trace_id: trace_xyz789
+
+    NotFound:
+      description: Not found (agent not found, approver not found, approval not found)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            agentNotFound:
+              summary: Agent not registered
+              value:
+                error:
+                  code: agent_not_found
+                  message: Agent not registered
+                  retryable: false
+            approverNotFound:
+              summary: Approver not found
+              value:
+                error:
+                  code: approver_not_found
+                  message: Approver username not found
+                  retryable: false
+
+    Conflict:
+      description: Conflict (duplicate request, agent already registered)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            duplicateRequestId:
+              summary: Duplicate request ID
+              value:
+                error:
+                  code: duplicate_request_id
+                  message: Request ID already used
+                  retryable: false
+            agentAlreadyRegistered:
+              summary: Agent already registered
+              value:
+                error:
+                  code: agent_already_registered
+                  message: Agent already registered with this approver
+                  retryable: false
+
+    Gone:
+      description: Gone (registration or approval expired)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            registrationExpired:
+              summary: Registration TTL elapsed
+              value:
+                error:
+                  code: registration_expired
+                  message: Registration TTL elapsed
+                  retryable: false
+            approvalExpired:
+              summary: Approval TTL elapsed
+              value:
+                error:
+                  code: approval_expired
+                  message: Approval TTL elapsed
+                  retryable: false
+
+    RateLimited:
+      description: Rate limited (too many requests)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            rateLimited:
+              summary: Too many requests
+              value:
+                error:
+                  code: rate_limited
+                  message: Too many requests
+                  retryable: true
+                  retry_after: 60
+                  trace_id: trace_xyz789
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internalError:
+              summary: Server error
+              value:
+                error:
+                  code: internal_error
+                  message: Internal server error
+                  retryable: true
+                  trace_id: trace_xyz789
+
+    ServiceUnavailable:
+      description: Service temporarily unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serviceUnavailable:
+              summary: Service unavailable
+              value:
+                error:
+                  code: service_unavailable
+                  message: Service temporarily unavailable
+                  retryable: true
+                  trace_id: trace_xyz789

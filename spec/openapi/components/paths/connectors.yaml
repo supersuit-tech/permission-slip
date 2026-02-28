@@ -1,0 +1,164 @@
+connectors:
+  get:
+    operationId: listConnectors
+    summary: List Available Connectors
+    description: |
+      List all available connectors (external service integrations) that Permission Slip
+      supports. Each connector represents an external service (e.g., GitHub, Stripe, Slack)
+      and defines which actions are available.
+      
+      Agents use this endpoint to discover what actions they can submit for approval. 
+      This replaces the old service discovery model — agents don't need to know about 
+      individual service URLs, they just query Permission Slip for available actions.
+      
+      ## Use Cases
+      
+      - **Agent discovery**: Agent queries available actions before submitting approval requests
+      - **UI rendering**: Display available integrations to the user
+      - **Validation**: Check if a desired action type is supported before attempting it
+      
+      ## No Authentication Required
+      
+      This endpoint is publicly accessible (no signature required) to allow agents to 
+      discover available actions before registration.
+    
+    tags:
+      - Connectors
+    
+    security: []
+    
+    responses:
+      '200':
+        description: Connectors listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/connectors.yaml#/ConnectorListResponse'
+            example:
+              connectors:
+                - id: "github"
+                  name: "GitHub"
+                  description: "GitHub integration for repository management"
+                  actions:
+                    - "github.create_issue"
+                    - "github.merge_pr"
+                  required_credentials:
+                    - "github"
+      
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+      
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+      
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+connectorById:
+  get:
+    operationId: getConnector
+    summary: Get Connector Details
+    description: |
+      Get detailed information about a specific connector, including supported actions 
+      with full parameter schemas and required credentials.
+      
+      Agents use this endpoint to understand:
+      - What actions are available for a given service
+      - What parameters each action expects (JSON Schema)
+      - What credentials the user needs to have stored
+      - Default risk levels for each action
+      
+      ## Use Cases
+      
+      - **Parameter validation**: Agent validates action parameters before submitting
+      - **Schema discovery**: Agent constructs valid action requests based on parameter schemas
+      - **Credential checking**: Agent checks if the user has the required credentials
+      
+      ## No Authentication Required
+      
+      This endpoint is publicly accessible (no signature required) to allow agents to 
+      discover action schemas before registration.
+    
+    tags:
+      - Connectors
+    
+    security: []
+    
+    parameters:
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+    
+    responses:
+      '200':
+        description: Connector details retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/connectors.yaml#/ConnectorDetailResponse'
+            example:
+              id: "github"
+              name: "GitHub"
+              description: "GitHub integration for repository management"
+              actions:
+                - action_type: "github.create_issue"
+                  name: "Create Issue"
+                  description: "Create a new issue in a repository"
+                  risk_level: "low"
+                  parameters_schema:
+                    type: "object"
+                    required:
+                      - "repo"
+                      - "title"
+                    properties:
+                      repo:
+                        type: "string"
+                        description: "Repository in owner/repo format"
+                      title:
+                        type: "string"
+                        maxLength: 256
+                        description: "Issue title"
+                      body:
+                        type: "string"
+                        description: "Issue body (markdown)"
+                - action_type: "github.merge_pr"
+                  name: "Merge Pull Request"
+                  description: "Merge an open pull request"
+                  risk_level: "medium"
+                  parameters_schema:
+                    type: "object"
+                    required:
+                      - "repo"
+                      - "pr"
+                    properties:
+                      repo:
+                        type: "string"
+                        description: "Repository in owner/repo format"
+                      pr:
+                        type: "integer"
+                        description: "Pull request number"
+              required_credentials:
+                - service: "github"
+                  auth_type: "api_key"
+      
+      '404':
+        description: Connector not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "connector_not_found"
+                message: "Connector not found"
+                retryable: false
+                details:
+                  connector_id: "unknown-service"
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

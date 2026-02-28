@@ -1,0 +1,352 @@
+package db_test
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+)
+
+func TestUsagePeriodsSchema(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.RequireColumns(t, tx, "usage_periods", []string{
+		"id", "user_id", "period_start", "period_end",
+		"request_count", "sms_count", "created_at",
+	})
+}
+
+func TestUsagePeriodsUniqueConstraint(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	testhelper.RequireUniqueViolation(t, tx,
+		"one usage_period per user per period",
+		func() error {
+			_, err := tx.Exec(ctx,
+				`INSERT INTO usage_periods (user_id, period_start, period_end) VALUES ($1, $2, $3)`,
+				uid, periodStart, periodEnd)
+			return err
+		},
+		func() error {
+			_, err := tx.Exec(ctx,
+				`INSERT INTO usage_periods (user_id, period_start, period_end) VALUES ($1, $2, $3)`,
+				uid, periodStart, periodEnd)
+			return err
+		},
+	)
+}
+
+func TestUsagePeriodsCascadeDelete(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	_, err := tx.Exec(ctx,
+		`INSERT INTO usage_periods (user_id, period_start, period_end) VALUES ($1, $2, $3)`,
+		uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("insert usage_period: %v", err)
+	}
+
+	testhelper.RequireCascadeDeletes(t, tx,
+		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		[]string{"usage_periods"},
+		"user_id = '"+uid+"'",
+	)
+}
+
+func TestUsagePeriodsValidRangeCheck(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	// period_end must be after period_start
+	err := testhelper.WithSavepoint(t, tx, func() error {
+		_, err := tx.Exec(ctx,
+			`INSERT INTO usage_periods (user_id, period_start, period_end) VALUES ($1, $2, $3)`,
+			uid,
+			time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), // end before start
+		)
+		return err
+	})
+	if err == nil {
+		t.Error("expected CHECK constraint violation for period_end < period_start")
+	}
+
+	// equal should also fail
+	same := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	err = testhelper.WithSavepoint(t, tx, func() error {
+		_, err := tx.Exec(ctx,
+			`INSERT INTO usage_periods (user_id, period_start, period_end) VALUES ($1, $2, $3)`,
+			uid, same, same,
+		)
+		return err
+	})
+	if err == nil {
+		t.Error("expected CHECK constraint violation for period_end == period_start")
+	}
+}
+
+func TestIncrementRequestCount(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// First increment creates the row
+	usage, err := db.IncrementRequestCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+	if usage.SMSCount != 0 {
+		t.Errorf("expected sms_count=0, got %d", usage.SMSCount)
+	}
+
+	// Second increment updates the existing row
+	usage, err = db.IncrementRequestCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+	if usage.RequestCount != 2 {
+		t.Errorf("expected request_count=2, got %d", usage.RequestCount)
+	}
+
+	// Third increment
+	usage, err = db.IncrementRequestCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+	if usage.RequestCount != 3 {
+		t.Errorf("expected request_count=3, got %d", usage.RequestCount)
+	}
+}
+
+func TestIncrementSMSCount(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	usage, err := db.IncrementSMSCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementSMSCount: %v", err)
+	}
+	if usage.SMSCount != 1 {
+		t.Errorf("expected sms_count=1, got %d", usage.SMSCount)
+	}
+	if usage.RequestCount != 0 {
+		t.Errorf("expected request_count=0, got %d", usage.RequestCount)
+	}
+
+	usage, err = db.IncrementSMSCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementSMSCount: %v", err)
+	}
+	if usage.SMSCount != 2 {
+		t.Errorf("expected sms_count=2, got %d", usage.SMSCount)
+	}
+}
+
+func TestIncrementMixed(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// Increment requests first
+	_, err := db.IncrementRequestCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+
+	// Then increment SMS on the same period
+	usage, err := db.IncrementSMSCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementSMSCount: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1 after mixed, got %d", usage.RequestCount)
+	}
+	if usage.SMSCount != 1 {
+		t.Errorf("expected sms_count=1 after mixed, got %d", usage.SMSCount)
+	}
+}
+
+func TestGetLatestUsage(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	// No usage yet
+	usage, err := db.GetLatestUsage(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("GetLatestUsage: %v", err)
+	}
+	if usage != nil {
+		t.Errorf("expected nil usage, got %+v", usage)
+	}
+
+	// Create usage for Feb
+	feb := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	mar := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	_, err = db.IncrementRequestCount(ctx, tx, uid, feb, mar)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+
+	// Create usage for Jan (older)
+	jan := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	_, err = db.IncrementRequestCount(ctx, tx, uid, jan, feb)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+
+	// GetLatestUsage should return Feb (the most recent)
+	usage, err = db.GetLatestUsage(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("GetLatestUsage: %v", err)
+	}
+	if usage == nil {
+		t.Fatal("expected usage, got nil")
+	}
+	if !usage.PeriodStart.Equal(feb) {
+		t.Errorf("expected period_start=%v, got %v", feb, usage.PeriodStart)
+	}
+}
+
+func TestGetUsageByPeriod(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// Not found
+	usage, err := db.GetUsageByPeriod(ctx, tx, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage != nil {
+		t.Errorf("expected nil usage, got %+v", usage)
+	}
+
+	// Create and find
+	_, err = db.IncrementRequestCount(ctx, tx, uid, periodStart, periodEnd)
+	if err != nil {
+		t.Fatalf("IncrementRequestCount: %v", err)
+	}
+
+	usage, err = db.GetUsageByPeriod(ctx, tx, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage == nil {
+		t.Fatal("expected usage, got nil")
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+}
+
+// TestIncrementRequestCountConcurrent verifies that concurrent upserts from
+// multiple goroutines don't lose increments. This uses the shared pool (not a
+// single transaction) so each goroutine gets its own connection/transaction.
+func TestIncrementRequestCountConcurrent(t *testing.T) {
+	t.Parallel()
+	pool := testhelper.SetupPool(t)
+	ctx := context.Background()
+
+	// Create user directly via pool (not in a test transaction).
+	uid := testhelper.GenerateUID(t)
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO auth.users (id) VALUES ($1)`, uid); err != nil {
+		t.Fatalf("insert auth.users: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO profiles (id, username) VALUES ($1, $2)`, uid, "conc_"+uid[:8]); err != nil {
+		t.Fatalf("insert profiles: %v", err)
+	}
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), `DELETE FROM usage_periods WHERE user_id = $1`, uid)  //nolint:errcheck
+		pool.Exec(context.Background(), `DELETE FROM profiles WHERE id = $1`, uid)             //nolint:errcheck
+		pool.Exec(context.Background(), `DELETE FROM auth.users WHERE id = $1`, uid)           //nolint:errcheck
+	})
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	const goroutines = 20
+	const incrementsPerGoroutine = 10
+	var wg sync.WaitGroup
+	errs := make(chan error, goroutines*incrementsPerGoroutine)
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < incrementsPerGoroutine; j++ {
+				_, err := db.IncrementRequestCount(ctx, pool, uid, periodStart, periodEnd)
+				if err != nil {
+					errs <- err
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("concurrent IncrementRequestCount failed: %v", err)
+	}
+
+	// Verify the total count
+	usage, err := db.GetUsageByPeriod(ctx, pool, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage == nil {
+		t.Fatal("expected usage row, got nil")
+	}
+	want := goroutines * incrementsPerGoroutine
+	if usage.RequestCount != want {
+		t.Errorf("expected request_count=%d after concurrent increments, got %d", want, usage.RequestCount)
+	}
+}

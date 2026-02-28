@@ -1,0 +1,488 @@
+AgentCapabilitiesResponse:
+  type: object
+  required:
+    - agent_id
+    - connectors
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: |
+        The authenticated agent's identifier.
+      example: 42
+
+    connectors:
+      type: array
+      items:
+        $ref: '../schemas/capabilities.yaml#/ConnectorCapability'
+      description: |
+        Connectors enabled for this agent, with full action schemas and authorization
+        status. Only connectors the user has explicitly enabled for this agent are
+        included — not all globally available connectors.
+
+        If the agent has no enabled connectors, this array is empty.
+
+  example:
+    agent_id: 42
+    connectors:
+      - id: "gmail"
+        name: "Gmail"
+        description: "Send and manage emails via Gmail API"
+        credentials_ready: true
+        actions:
+          - action_type: "email.send"
+            name: "Send Email"
+            description: "Send an email via Gmail"
+            risk_level: "low"
+            parameters_schema:
+              type: "object"
+              required:
+                - "to"
+                - "subject"
+                - "body"
+              properties:
+                to:
+                  type: "array"
+                  items:
+                    type: "string"
+                    format: "email"
+                subject:
+                  type: "string"
+                body:
+                  type: "string"
+            standing_approvals:
+              - standing_approval_id: "sa_def456"
+                constraints:
+                  recipient_pattern: "*@mycompany.com"
+                  max_recipients: 5
+                max_executions: 100
+                executions_remaining: 88
+                expires_at: "2026-05-15T00:00:00Z"
+            action_configurations:
+              - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+                action_type: "email.send"
+                name: "Send to team"
+                parameters:
+                  to: "team@mycompany.com"
+                  subject: "*"
+                  body: "*"
+                credential_ready: true
+          - action_type: "email.read"
+            name: "Read Email"
+            description: "Read emails from Gmail inbox"
+            risk_level: "low"
+            parameters_schema:
+              type: "object"
+              properties:
+                sender:
+                  type: "string"
+                max_results:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 100
+            standing_approvals: []
+            action_configurations: []
+      - id: "stripe"
+        name: "Stripe"
+        description: "Payment processing via Stripe API"
+        credentials_ready: false
+        credentials_setup_url: "https://app.permissionslip.dev/connect/stripe"
+        actions:
+          - action_type: "payment.charge"
+            name: "Charge Payment"
+            description: "Charge a customer's payment method"
+            risk_level: "high"
+            parameters_schema:
+              type: "object"
+              required:
+                - "amount"
+                - "currency"
+              properties:
+                amount:
+                  type: "integer"
+                currency:
+                  type: "string"
+            standing_approvals: []
+            action_configurations: []
+
+ConnectorCapability:
+  type: object
+  required:
+    - id
+    - name
+    - credentials_ready
+    - actions
+  properties:
+    id:
+      type: string
+      maxLength: 128
+      pattern: '^[a-z][a-z0-9_.-]*$'
+      description: |
+        Connector identifier (e.g., `gmail`, `stripe`).
+      example: "gmail"
+
+    name:
+      type: string
+      maxLength: 256
+      description: |
+        Human-readable connector name.
+      example: "Gmail"
+
+    description:
+      type: string
+      maxLength: 500
+      description: |
+        Brief description of what this connector does.
+      example: "Send and manage emails via Gmail API"
+
+    credentials_ready:
+      type: boolean
+      description: |
+        Whether the user has stored the required credentials for this connector.
+
+        - `true`: Credentials are stored — actions can be executed.
+        - `false`: Credentials are missing — action execution will fail with
+          `404 credentials_not_found`. The agent should direct the user to
+          `credentials_setup_url` to connect their account.
+
+        **Security**: This field only indicates presence/absence. No credential
+        values, types, or metadata are exposed to the agent.
+      example: true
+
+    credentials_setup_url:
+      type: string
+      format: uri
+      maxLength: 2048
+      description: |
+        URL where the user can set up credentials for this connector (e.g., a
+        link to the provider's API key page). Only included when
+        `credentials_ready` is `false`. The agent can present this URL to the
+        user to prompt credential setup.
+      example: "https://app.permissionslip.dev/connect/stripe"
+
+    actions:
+      type: array
+      items:
+        $ref: '../schemas/capabilities.yaml#/ActionCapability'
+      description: |
+        Actions available through this connector, with full parameter schemas
+        and authorization status.
+
+  example:
+    id: "gmail"
+    name: "Gmail"
+    description: "Send and manage emails via Gmail API"
+    credentials_ready: true
+    actions:
+      - action_type: "email.send"
+        name: "Send Email"
+        description: "Send an email via Gmail"
+        risk_level: "low"
+        parameters_schema:
+          type: "object"
+          required:
+            - "to"
+            - "subject"
+            - "body"
+        standing_approvals: []
+        action_configurations: []
+
+ActionCapability:
+  type: object
+  required:
+    - action_type
+    - name
+    - standing_approvals
+    - action_configurations
+  properties:
+    action_type:
+      type: string
+      maxLength: 128
+      description: |
+        Action type identifier. Use this value as `action.type` when submitting
+        approval requests (`POST /v1/approvals/request`) and as `action_id` when
+        executing actions (`POST /v1/actions/execute`).
+      example: "email.send"
+
+    name:
+      type: string
+      maxLength: 256
+      description: |
+        Human-readable action name.
+      example: "Send Email"
+
+    description:
+      type: string
+      maxLength: 500
+      description: |
+        Brief description of what this action does.
+      example: "Send an email via Gmail"
+
+    risk_level:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+      description: |
+        Default risk level for this action type.
+
+        - **low**: Minimal impact, easily reversible (e.g., read data, send notification)
+        - **medium**: Moderate impact (e.g., update records, post content)
+        - **high**: Significant impact, hard to reverse (e.g., delete data, make payment)
+      example: "low"
+
+    parameters_schema:
+      type: object
+      additionalProperties: true
+      description: |
+        JSON Schema describing the expected parameters for this action. Agents
+        should validate parameters against this schema before submitting approval
+        requests or executing actions.
+
+        The schema follows standard JSON Schema (draft-07) conventions and includes
+        `type`, `required`, `properties`, and validation keywords like `maxLength`,
+        `minimum`, `format`, etc.
+      example:
+        type: "object"
+        required:
+          - "to"
+          - "subject"
+          - "body"
+        properties:
+          to:
+            type: "array"
+            items:
+              type: "string"
+              format: "email"
+          subject:
+            type: "string"
+            maxLength: 998
+          body:
+            type: "string"
+
+    standing_approvals:
+      type: array
+      items:
+        $ref: '../schemas/capabilities.yaml#/StandingApprovalCapability'
+      description: |
+        Active standing approvals for this action type. Each standing approval
+        defines constraints under which the agent can execute this action
+        immediately without per-request human approval.
+
+        **If non-empty**: The agent can execute this action via
+        `POST /v1/actions/execute` (without a token) as long as the request
+        parameters fall within a standing approval's constraints. Permission Slip
+        will match the best standing approval automatically.
+
+        **If empty**: The agent must use the one-off approval flow —
+        `POST /v1/approvals/request` → user approves → `POST /v1/approvals/{id}/verify`
+        → `POST /v1/actions/execute` with token.
+
+        **If parameters don't match any standing approval's constraints**: The
+        request falls through to the one-off approval flow automatically (Permission
+        Slip returns `404` with a hint to use `POST /v1/approvals/request`).
+
+    action_configurations:
+      type: array
+      items:
+        $ref: '../schemas/capabilities.yaml#/ActionConfigCapability'
+      description: |
+        Active action configurations for this action type. Each configuration
+        defines a pre-approved set of parameters (with optional wildcards) and
+        a credential binding that the agent can reference when requesting
+        approval or executing actions.
+
+        **The configuration IS the permission.** The agent picks from user-created
+        configurations rather than composing requests from scratch.
+
+        **Agent workflow:**
+        1. Find a configuration matching the desired action
+        2. Reference `configuration_id` in approval requests or execution calls
+        3. For wildcard parameters (`"*"`), supply the actual value
+        4. For fixed parameters, supply values that exactly match the configuration;
+           missing or mismatched fixed parameters are rejected
+
+        **If no configuration fits:** The agent cannot proceed and should ask
+        the human to create a suitable configuration.
+
+  example:
+    action_type: "email.send"
+    name: "Send Email"
+    description: "Send an email via Gmail"
+    risk_level: "low"
+    parameters_schema:
+      type: "object"
+      required:
+        - "to"
+        - "subject"
+        - "body"
+    standing_approvals:
+      - standing_approval_id: "sa_def456"
+        constraints:
+          recipient_pattern: "*@mycompany.com"
+        max_executions: 100
+        executions_remaining: 88
+        expires_at: "2026-05-15T00:00:00Z"
+    action_configurations:
+      - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+        action_type: "email.send"
+        name: "Send to team"
+        parameters:
+          to: "team@mycompany.com"
+          subject: "*"
+          body: "*"
+        credential_ready: true
+
+StandingApprovalCapability:
+  type: object
+  required:
+    - standing_approval_id
+    - constraints
+    - executions_remaining
+    - expires_at
+  properties:
+    standing_approval_id:
+      type: string
+      pattern: '^sa_[a-zA-Z0-9]{6,64}$'
+      maxLength: 70
+      description: |
+        Unique standing approval identifier. Included in execution responses
+        so the agent can correlate which standing approval was used.
+      example: "sa_def456"
+
+    constraints:
+      type: object
+      additionalProperties: true
+      description: |
+        Constraint boundaries for this standing approval. Every execution is
+        validated against these constraints — parameters that fall outside the
+        bounds are rejected and fall through to one-off approval.
+
+        Constraint semantics are action-type-specific. Common patterns:
+
+        - **Pattern matching**: `"sender": "*@github.com"` — parameter must match glob
+        - **Numeric bounds**: `"max_results": 10` — parameter must not exceed value
+        - **Enum restriction**: `"priority": ["low", "medium"]` — parameter must be one of these
+      example:
+        recipient_pattern: "*@mycompany.com"
+        max_recipients: 5
+
+    max_executions:
+      type: integer
+      minimum: 1
+      nullable: true
+      description: |
+        Maximum number of executions allowed under this standing approval.
+        `null` means unlimited.
+      example: 100
+
+    executions_remaining:
+      type: integer
+      minimum: 0
+      nullable: true
+      description: |
+        Number of executions remaining. `null` means unlimited (when
+        `max_executions` is null). When this reaches `0`, the standing
+        approval is exhausted and the agent must use one-off approval.
+      example: 88
+
+    expires_at:
+      type: string
+      format: date-time
+      description: |
+        When this standing approval expires (ISO 8601, UTC). After this time,
+        the standing approval is inactive and the agent must use one-off
+        approval or the user must create a new standing approval.
+      example: "2026-05-15T00:00:00Z"
+
+  example:
+    standing_approval_id: "sa_def456"
+    constraints:
+      recipient_pattern: "*@mycompany.com"
+      max_recipients: 5
+    max_executions: 100
+    executions_remaining: 88
+    expires_at: "2026-05-15T00:00:00Z"
+
+ActionConfigCapability:
+  type: object
+  required:
+    - configuration_id
+    - action_type
+    - name
+    - parameters
+    - credential_ready
+  properties:
+    configuration_id:
+      type: string
+      pattern: '^ac_[a-f0-9]{32}$'
+      maxLength: 36
+      description: |
+        Unique action configuration identifier. Reference this value as
+        `configuration_id` when submitting approval requests or executing
+        actions.
+      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+
+    action_type:
+      type: string
+      maxLength: 128
+      description: |
+        Action type this configuration applies to (e.g., `email.send`).
+      example: "email.send"
+
+    name:
+      type: string
+      maxLength: 255
+      description: |
+        User-facing name for this configuration.
+      example: "Send to team"
+
+    description:
+      type: string
+      maxLength: 1024
+      nullable: true
+      description: |
+        Optional longer description of what this configuration permits.
+      example: "Send emails to anyone at the company about anything"
+
+    parameters:
+      type: object
+      additionalProperties: true
+      description: |
+        Configured parameter values. Fixed parameters are locked in by the user;
+        wildcard parameters use `"*"` to indicate the agent has freedom.
+
+        - **Fixed value** (e.g., `"repo": "supersuit-tech/webapp"`): The agent
+          must use this exact value. Permission Slip enforces the match.
+        - **Wildcard** (e.g., `"title": "*"`): The agent supplies any value
+          that passes the action's `parameters_schema` validation.
+
+        The agent should examine this map to understand what freedom it has.
+      example:
+        to: "team@mycompany.com"
+        subject: "*"
+        body: "*"
+
+    credential_ready:
+      type: boolean
+      description: |
+        Whether the credential bound to this configuration is present and valid.
+
+        - `true`: A credential is assigned and exists — the action can be executed.
+        - `false`: Either no credential is assigned or the assigned credential
+          has been deleted. The user must assign a credential before execution.
+
+        **Security**: No credential values or identifiers are exposed to the agent.
+      example: true
+
+  example:
+    configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    action_type: "email.send"
+    name: "Send to team"
+    description: "Send emails to anyone at the company about anything"
+    parameters:
+      to: "team@mycompany.com"
+      subject: "*"
+      body: "*"
+    credential_ready: true

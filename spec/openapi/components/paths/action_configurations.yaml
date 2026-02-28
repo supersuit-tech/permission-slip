@@ -1,0 +1,374 @@
+actionConfigurations:
+  post:
+    operationId: createActionConfiguration
+    summary: Create Action Configuration
+    description: |
+      Create a new action configuration for an agent. The configuration defines exactly
+      what the agent is allowed to do — which action, which parameters are locked in,
+      and which credential to use.
+
+      The agent must belong to the authenticated user. The configuration is created
+      with status `active` by default.
+
+      ## Parameter Configuration
+
+      - Fixed parameters are locked to specific values the user sets
+      - Wildcard parameters use `"*"` to allow the agent to fill in any value
+      - This gives users fine-grained control: lock down what matters, leave open what doesn't
+
+      ## Security
+
+      - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+      - The agent must be owned by the authenticated user
+      - Connector, action type, and credential references are validated
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/action_configurations.yaml#/CreateActionConfigRequest'
+          examples:
+            with_credential:
+              summary: Configuration with locked parameters and credential
+              value:
+                agent_id: 42
+                connector_id: "github"
+                action_type: "github.create_issue"
+                credential_id: "cred_abc123"
+                parameters:
+                  repo: "supersuit-tech/webapp"
+                  title: "*"
+                  body: "*"
+                  label: "bug"
+                name: "Create bug issues in webapp"
+                description: "Agent can create issues labeled 'bug'. Title and body are freeform."
+            without_credential:
+              summary: Configuration without credential (assign later)
+              value:
+                agent_id: 42
+                connector_id: "slack"
+                action_type: "slack.send_message"
+                parameters:
+                  channel: "#releases"
+                  message: "*"
+                name: "Post to #releases"
+
+    responses:
+      '201':
+        description: Action configuration created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_configurations.yaml#/ActionConfiguration'
+
+      '400':
+        description: Invalid request (validation errors, invalid references)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              missing_field:
+                value:
+                  error:
+                    code: "invalid_request"
+                    message: "name is required"
+                    retryable: false
+                    trace_id: "trace_xyz789"
+              invalid_ref:
+                value:
+                  error:
+                    code: "invalid_reference"
+                    message: "Invalid connector, action type, or credential reference"
+                    retryable: false
+                    trace_id: "trace_xyz789"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_not_found"
+                message: "Agent not found or not owned by user"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  get:
+    operationId: listActionConfigurations
+    summary: List Action Configurations
+    description: |
+      List action configurations for a specific agent. Returns all configurations
+      (both active and disabled) belonging to the authenticated user for the given agent.
+
+      ## Security
+
+      - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+      - Only returns configurations belonging to the authenticated user
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: agent_id
+        in: query
+        required: true
+        description: |
+          Agent ID to list configurations for. The agent must belong to the
+          authenticated user.
+        schema:
+          type: integer
+          format: int64
+        example: 42
+
+    responses:
+      '200':
+        description: Action configurations listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_configurations.yaml#/ActionConfigListResponse'
+
+      '400':
+        description: Missing or invalid agent_id query parameter
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "agent_id query parameter is required"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+actionConfigurationById:
+  get:
+    operationId: getActionConfiguration
+    summary: Get Action Configuration
+    description: |
+      Retrieve a single action configuration by ID. The configuration must
+      belong to the authenticated user.
+
+      ## Security
+
+      - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+      - Only the user who created the configuration can view it
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ActionConfigId'
+
+    responses:
+      '200':
+        description: Action configuration retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_configurations.yaml#/ActionConfiguration'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Action configuration not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "action_config_not_found"
+                message: "Action configuration not found"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  put:
+    operationId: updateActionConfiguration
+    summary: Update Action Configuration
+    description: |
+      Update a single action configuration. Only provided fields are changed
+      (partial update). At least one field must be provided.
+
+      Immutable fields (agent_id, connector_id, action_type) cannot be changed.
+      To change these, delete the configuration and create a new one.
+
+      ## Security
+
+      - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+      - Only the user who created the configuration can update it
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ActionConfigId'
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/action_configurations.yaml#/UpdateActionConfigRequest'
+          examples:
+            disable:
+              summary: Disable a configuration
+              value:
+                status: "disabled"
+            update_params:
+              summary: Update parameters and name
+              value:
+                name: "Updated config name"
+                parameters:
+                  repo: "supersuit-tech/api"
+                  title: "*"
+
+    responses:
+      '200':
+        description: Action configuration updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_configurations.yaml#/ActionConfiguration'
+
+      '400':
+        description: Invalid request (validation errors, invalid references)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
+              empty_update:
+                value:
+                  error:
+                    code: "invalid_request"
+                    message: "at least one field must be provided for update"
+                    retryable: false
+                    trace_id: "trace_xyz789"
+              invalid_status:
+                value:
+                  error:
+                    code: "invalid_request"
+                    message: "status must be 'active' or 'disabled'"
+                    retryable: false
+                    trace_id: "trace_xyz789"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Action configuration not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "action_config_not_found"
+                message: "Action configuration not found"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  delete:
+    operationId: deleteActionConfiguration
+    summary: Delete Action Configuration
+    description: |
+      Permanently delete an action configuration. This action is irreversible.
+      The agent will no longer be able to reference this configuration.
+
+      ## Security
+
+      - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+      - Only the user who created the configuration can delete it
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ActionConfigId'
+
+    responses:
+      '200':
+        description: Action configuration deleted successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_configurations.yaml#/DeleteActionConfigResponse'
+            example:
+              id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+              deleted_at: "2026-02-25T15:00:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Action configuration not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "action_config_not_found"
+                message: "Action configuration not found"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'

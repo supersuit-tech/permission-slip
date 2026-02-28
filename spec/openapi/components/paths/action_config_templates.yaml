@@ -1,0 +1,64 @@
+actionConfigTemplates:
+  get:
+    operationId: listActionConfigTemplates
+    summary: List Action Configuration Templates
+    description: |
+      List predefined configuration templates for a specific connector.
+      Templates provide ready-made parameter presets for common use cases
+      (e.g., "Create issues (all fields open)", "Post to a channel") that
+      users can apply when creating a new action configuration.
+
+      Templates are system-level — they are defined in connector manifests
+      and are the same for all users. Each template ID is namespaced by
+      connector to prevent cross-connector collisions.
+
+      ## Security
+
+      - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: connector_id
+        in: query
+        required: true
+        description: |
+          Connector ID to list templates for.
+        schema:
+          type: string
+          maxLength: 128
+        example: "github"
+
+    responses:
+      '200':
+        description: Templates listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_config_templates.yaml#/ActionConfigTemplateListResponse'
+
+      '400':
+        description: Missing or invalid connector_id query parameter
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "invalid_request"
+                message: "connector_id query parameter is required"
+                retryable: false
+                trace_id: "trace_xyz789"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
