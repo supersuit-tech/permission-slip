@@ -91,3 +91,53 @@ UpdateNotificationPreferencesRequest:
         $ref: '#/NotificationPreference'
       description: Channel preferences to update. Channels not included are unchanged.
       minItems: 1
+
+DeleteAccountRequest:
+  type: object
+  description: Request body for deleting the authenticated user's account.
+  required:
+    - confirmation
+  properties:
+    confirmation:
+      type: string
+      description: Must be the literal string "DELETE" to confirm the irreversible deletion.
+      enum:
+        - DELETE
+      example: "DELETE"
+
+DeleteAccountResponse:
+  type: object
+  description: Response confirming the account was deleted.
+  required:
+    - deleted
+    - message
+  properties:
+    deleted:
+      type: boolean
+      description: Always true on success.
+      example: true
+    message:
+      type: string
+      description: Human-readable confirmation message.
+      example: "Account and all associated data have been permanently deleted."
+
+DataRetentionResponse:
+  type: object
+  description: The data retention policy for the authenticated user's current plan.
+  required:
+    - plan_id
+    - plan_name
+    - audit_retention_days
+  properties:
+    plan_id:
+      type: string
+      description: The user's current plan ID.
+      example: "free"
+    plan_name:
+      type: string
+      description: Human-readable plan name.
+      example: "Free"
+    audit_retention_days:
+      type: integer
+      description: Number of days audit log events are retained before automatic deletion.
+      example: 7

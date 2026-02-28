@@ -4329,6 +4329,79 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteAccount
+      summary: Delete Account
+      description: |
+        Permanently deletes the authenticated user's account and all associated
+        data including agents, approvals, credentials, standing approvals,
+        audit events, and subscription. This action is irreversible.
+
+        The request body must include `"confirmation": "DELETE"` as a safety
+        check to prevent accidental deletion.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+            example:
+              confirmation: DELETE
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAccountResponse'
+              example:
+                deleted: true
+                message: Account and all associated data have been permanently deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/profile/data-retention:
+    get:
+      operationId: getDataRetention
+      summary: Get Data Retention Policy
+      description: |
+        Returns the data retention policy for the authenticated user based on
+        their current plan. Free-tier users retain audit logs for 7 days;
+        paid users retain audit logs for 90 days.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Data retention policy retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataRetentionResponse'
+              example:
+                plan_id: free
+                plan_name: Free
+                audit_retention_days: 7
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/profile/notification-preferences:
     get:
       operationId: getNotificationPreferences
@@ -7693,6 +7766,53 @@ components:
             $ref: '#/components/schemas/NotificationPreference'
           description: Channel preferences to update. Channels not included are unchanged.
           minItems: 1
+    DeleteAccountRequest:
+      type: object
+      description: Request body for deleting the authenticated user's account.
+      required:
+        - confirmation
+      properties:
+        confirmation:
+          type: string
+          description: Must be the literal string "DELETE" to confirm the irreversible deletion.
+          enum:
+            - DELETE
+          example: DELETE
+    DeleteAccountResponse:
+      type: object
+      description: Response confirming the account was deleted.
+      required:
+        - deleted
+        - message
+      properties:
+        deleted:
+          type: boolean
+          description: Always true on success.
+          example: true
+        message:
+          type: string
+          description: Human-readable confirmation message.
+          example: Account and all associated data have been permanently deleted.
+    DataRetentionResponse:
+      type: object
+      description: The data retention policy for the authenticated user's current plan.
+      required:
+        - plan_id
+        - plan_name
+        - audit_retention_days
+      properties:
+        plan_id:
+          type: string
+          description: The user's current plan ID.
+          example: free
+        plan_name:
+          type: string
+          description: Human-readable plan name.
+          example: Free
+        audit_retention_days:
+          type: integer
+          description: Number of days audit log events are retained before automatic deletion.
+          example: 7
     CreatePushSubscriptionRequest:
       type: object
       description: Register a Web Push subscription from the browser.

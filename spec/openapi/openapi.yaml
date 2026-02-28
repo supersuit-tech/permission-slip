@@ -210,6 +210,9 @@ paths:
   /v1/profile:
     $ref: './components/paths/profiles.yaml#/profile'
 
+  /v1/profile/data-retention:
+    $ref: './components/paths/profiles.yaml#/dataRetention'
+
   /v1/profile/notification-preferences:
     $ref: './components/paths/profiles.yaml#/notificationPreferences'
 
@@ -394,6 +397,12 @@ components:
       $ref: './components/schemas/profiles.yaml#/NotificationPreferencesResponse'
     UpdateNotificationPreferencesRequest:
       $ref: './components/schemas/profiles.yaml#/UpdateNotificationPreferencesRequest'
+    DeleteAccountRequest:
+      $ref: './components/schemas/profiles.yaml#/DeleteAccountRequest'
+    DeleteAccountResponse:
+      $ref: './components/schemas/profiles.yaml#/DeleteAccountResponse'
+    DataRetentionResponse:
+      $ref: './components/schemas/profiles.yaml#/DataRetentionResponse'
 
     # Push Subscriptions
     CreatePushSubscriptionRequest:

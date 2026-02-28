@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -35,10 +36,14 @@ func RegisterProfileRoutes(mux *http.ServeMux, deps *Deps) {
 	// Profile CRUD
 	mux.Handle("GET /profile", requireProfile(handleGetProfile()))
 	mux.Handle("PATCH /profile", requireProfile(handleUpdateProfile(deps)))
+	mux.Handle("DELETE /profile", requireProfile(handleDeleteAccount(deps)))
 
 	// Notification preferences (sub-resource of profile)
 	mux.Handle("GET /profile/notification-preferences", requireProfile(handleGetNotificationPreferences(deps)))
 	mux.Handle("PUT /profile/notification-preferences", requireProfile(handleUpdateNotificationPreferences(deps)))
+
+	// Data retention policy
+	mux.Handle("GET /profile/data-retention", requireProfile(handleGetDataRetention(deps)))
 }
 
 func handleGetProfile() http.HandlerFunc {
@@ -139,6 +144,108 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 			Email:     updated.Email,
 			Phone:     updated.Phone,
 			CreatedAt: updated.CreatedAt,
+		})
+	}
+}
+
+// deleteAccountRequest is the JSON body for DELETE /profile.
+// The confirmation field acts as a safety check to prevent accidental deletion.
+type deleteAccountRequest struct {
+	Confirmation string `json:"confirmation"`
+}
+
+// deleteAccountResponse is the JSON shape returned by DELETE /profile.
+type deleteAccountResponse struct {
+	Deleted bool   `json:"deleted"`
+	Message string `json:"message"`
+}
+
+func handleDeleteAccount(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		var req deleteAccountRequest
+		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+
+		if req.Confirmation != "DELETE" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+				`To confirm account deletion, set "confirmation" to "DELETE"`))
+			return
+		}
+
+		// Run deletion inside a transaction so vault cleanup and profile
+		// deletion are atomic.
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] handleDeleteAccount: begin tx: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete account"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx)
+		}
+
+		// Build vault delete function if vault is available.
+		var vaultDeleteFn func(ctx context.Context, d db.DBTX, secretID string) error
+		if deps.Vault != nil {
+			vaultDeleteFn = deps.Vault.DeleteSecret
+		}
+
+		if err := db.DeleteAccount(r.Context(), tx, profile.ID, vaultDeleteFn); err != nil {
+			log.Printf("[%s] handleDeleteAccount: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete account"))
+			return
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] handleDeleteAccount: commit: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete account"))
+				return
+			}
+		}
+
+		RespondJSON(w, http.StatusOK, deleteAccountResponse{
+			Deleted: true,
+			Message: "Account and all associated data have been permanently deleted.",
+		})
+	}
+}
+
+// dataRetentionResponse is the JSON shape returned by GET /profile/data-retention.
+type dataRetentionResponse struct {
+	PlanID             string `json:"plan_id"`
+	PlanName           string `json:"plan_name"`
+	AuditRetentionDays int    `json:"audit_retention_days"`
+}
+
+func handleGetDataRetention(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		sp, err := db.GetSubscriptionWithPlan(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] handleGetDataRetention: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to load data retention policy"))
+			return
+		}
+
+		// Fallback for users without a subscription (shouldn't happen, but be safe).
+		if sp == nil {
+			RespondJSON(w, http.StatusOK, dataRetentionResponse{
+				PlanID:             db.PlanFree,
+				PlanName:           "Free",
+				AuditRetentionDays: 7,
+			})
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, dataRetentionResponse{
+			PlanID:             sp.Plan.ID,
+			PlanName:           sp.Plan.Name,
+			AuditRetentionDays: sp.Plan.AuditRetentionDays,
 		})
 	}
 }

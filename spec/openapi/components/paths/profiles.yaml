@@ -107,6 +107,97 @@ profile:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
+  delete:
+    operationId: deleteAccount
+    summary: Delete Account
+    description: |
+      Permanently deletes the authenticated user's account and all associated
+      data including agents, approvals, credentials, standing approvals,
+      audit events, and subscription. This action is irreversible.
+
+      The request body must include `"confirmation": "DELETE"` as a safety
+      check to prevent accidental deletion.
+
+    tags:
+      - Profiles
+
+    security:
+      - SupabaseSession: []
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/profiles.yaml#/DeleteAccountRequest'
+          example:
+            confirmation: "DELETE"
+
+    responses:
+      '200':
+        description: Account deleted successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/profiles.yaml#/DeleteAccountResponse'
+            example:
+              deleted: true
+              message: "Account and all associated data have been permanently deleted."
+
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+dataRetention:
+  get:
+    operationId: getDataRetention
+    summary: Get Data Retention Policy
+    description: |
+      Returns the data retention policy for the authenticated user based on
+      their current plan. Free-tier users retain audit logs for 7 days;
+      paid users retain audit logs for 90 days.
+
+    tags:
+      - Profiles
+
+    security:
+      - SupabaseSession: []
+
+    responses:
+      '200':
+        description: Data retention policy retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/profiles.yaml#/DataRetentionResponse'
+            example:
+              plan_id: "free"
+              plan_name: "Free"
+              audit_retention_days: 7
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
 notificationPreferences:
   get:
     operationId: getNotificationPreferences
