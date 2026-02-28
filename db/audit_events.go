@@ -71,9 +71,10 @@ type AuditEventCursor struct {
 
 // AuditEventFilter holds optional filters for the audit event query.
 type AuditEventFilter struct {
-	AgentID    *int64
-	EventTypes []AuditEventType // if non-empty, include only these types
-	Outcome    string           // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
+	AgentID     *int64
+	EventTypes  []AuditEventType // if non-empty, include only these types
+	Outcome     string           // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
+	ConnectorID *string          // if non-nil, include only events for this connector
 }
 
 // MaxAuditEventListSize is the hard cap on returned events.
@@ -172,6 +173,9 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 		if filter.Outcome != "" {
 			where = append(where, outcomeFilter(filter.Outcome, b))
 		}
+		if filter.ConnectorID != nil {
+			where = append(where, "ae.connector_id = "+b.addArg(*filter.ConnectorID))
+		}
 	}
 
 	limitPlaceholder := b.addArg(fetchLimit)
@@ -242,7 +246,8 @@ type AuditLogExportCursor struct {
 // Optional parameters:
 //   - until: if non-nil, only returns events created before this timestamp
 //   - eventTypes: if non-empty, only returns events matching these types
-func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Time, until *time.Time, eventTypes []AuditEventType, limit int, cursor *AuditLogExportCursor) (*AuditEventPage, error) {
+//   - connectorID: if non-nil, only returns events for the specified connector
+func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Time, until *time.Time, eventTypes []AuditEventType, connectorID *string, limit int, cursor *AuditLogExportCursor) (*AuditEventPage, error) {
 	if limit <= 0 {
 		limit = DefaultAuditLogExportLimit
 	}
@@ -268,6 +273,10 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 			placeholders[i] = b.addArg(string(et))
 		}
 		where = append(where, "ae.event_type IN ("+strings.Join(placeholders, ", ")+")")
+	}
+
+	if connectorID != nil {
+		where = append(where, "ae.connector_id = "+b.addArg(*connectorID))
 	}
 
 	if cursor != nil {

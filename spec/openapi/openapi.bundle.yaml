@@ -1555,6 +1555,15 @@ paths:
           schema:
             type: string
           example: approval.approved,approval.denied
+        - name: connector_id
+          in: query
+          required: false
+          description: |
+            Filter events to a specific connector (e.g. "github", "slack").
+            Only returns events where the action was handled by this connector.
+          schema:
+            type: string
+          example: github
         - name: limit
           in: query
           required: false
@@ -1716,6 +1725,15 @@ paths:
               - pending
               - expired
           example: approved
+        - name: connector_id
+          in: query
+          required: false
+          description: |
+            Filter events to a specific connector (e.g. "github", "slack").
+            Only returns events where the action was handled by this connector.
+          schema:
+            type: string
+          example: github
       responses:
         '200':
           description: Audit events retrieved successfully
@@ -6638,9 +6656,11 @@ components:
         event_type:
           type: string
           enum:
+            - approval.requested
             - approval.approved
             - approval.denied
             - approval.cancelled
+            - action.executed
             - standing_approval.executed
             - agent.registered
             - agent.deactivated

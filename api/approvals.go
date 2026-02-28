@@ -287,7 +287,7 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 		return
 	}
 
-	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
 		UserID:      userID,
 		AgentID:     appr.AgentID,
 		EventType:   eventType,
@@ -297,9 +297,7 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 		AgentMeta:   agentMeta,
 		Action:      redactActionToType(appr.Action),
 		ConnectorID: connectorIDFromActionType(actionTypeFromJSON(appr.Action)),
-	}); err != nil {
-		log.Printf("audit: failed to insert approval audit event: %v", err)
-	}
+	}, false)
 }
 
 // redactActionToType extracts only the "type" field from an action JSON blob,

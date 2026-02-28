@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -179,8 +180,49 @@ func GetUsageByPeriod(ctx context.Context, db DBTX, userID string, periodStart t
 	return u, err
 }
 
+// UsageBreakdown is the typed representation of the usage_periods.breakdown JSONB
+// column. Each map key is an identifier (agent ID, connector ID, or action type)
+// and the value is the number of billable requests attributed to that key.
+type UsageBreakdown struct {
+	ByAgent      map[string]int `json:"by_agent"`
+	ByConnector  map[string]int `json:"by_connector"`
+	ByActionType map[string]int `json:"by_action_type"`
+}
+
+// ParseBreakdown unmarshals the raw JSONB breakdown into a typed struct.
+// Returns a zero-value UsageBreakdown (empty maps) if the raw bytes are empty
+// or cannot be parsed.
+func (u *UsagePeriod) ParseBreakdown() UsageBreakdown {
+	var b UsageBreakdown
+	if len(u.Breakdown) > 0 {
+		_ = json.Unmarshal(u.Breakdown, &b)
+	}
+	if b.ByAgent == nil {
+		b.ByAgent = map[string]int{}
+	}
+	if b.ByConnector == nil {
+		b.ByConnector = map[string]int{}
+	}
+	if b.ByActionType == nil {
+		b.ByActionType = map[string]int{}
+	}
+	return b
+}
+
+// GetCurrentPeriodUsage returns the usage record for the current billing month
+// (based on UTC now), or nil if no usage has been recorded yet this month.
+func GetCurrentPeriodUsage(ctx context.Context, db DBTX, userID string) (*UsagePeriod, error) {
+	periodStart, _ := BillingPeriodBounds(time.Now())
+	return GetUsageByPeriod(ctx, db, userID, periodStart)
+}
+
 // BillingPeriodBounds returns the start (inclusive) and end (exclusive) of the
-// billing month containing the given time, using UTC.
+// billing month containing the given time. All calculations use UTC.
+//
+// Example:
+//
+//	BillingPeriodBounds(2026-02-15T14:30:00Z)
+//	→ (2026-02-01T00:00:00Z, 2026-03-01T00:00:00Z)
 func BillingPeriodBounds(t time.Time) (start, end time.Time) {
 	t = t.UTC()
 	start = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)

@@ -116,8 +116,9 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 		agentIDStr := r.URL.Query().Get("agent_id")
 		eventTypesStr := r.URL.Query().Get("event_type")
 		outcomeStr := r.URL.Query().Get("outcome")
+		connectorIDStr := r.URL.Query().Get("connector_id")
 
-		if agentIDStr != "" || eventTypesStr != "" || outcomeStr != "" {
+		if agentIDStr != "" || eventTypesStr != "" || outcomeStr != "" || connectorIDStr != "" {
 			filter = &db.AuditEventFilter{}
 
 			if agentIDStr != "" {
@@ -145,6 +146,10 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 					return
 				}
 				filter.Outcome = outcomeStr
+			}
+
+			if connectorIDStr != "" {
+				filter.ConnectorID = &connectorIDStr
 			}
 		}
 
@@ -241,6 +246,12 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Parse optional connector_id filter.
+		var connectorID *string
+		if v := r.URL.Query().Get("connector_id"); v != "" {
+			connectorID = &v
+		}
+
 		// Parse optional cursor (compound: "RFC3339Nano,id").
 		var cursor *db.AuditLogExportCursor
 		if v := r.URL.Query().Get("after"); v != "" {
@@ -252,7 +263,7 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			cursor = &db.AuditLogExportCursor{Timestamp: ts, ID: id}
 		}
 
-		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, limit, cursor)
+		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, connectorID, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ExportAuditLogs: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))

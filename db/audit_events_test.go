@@ -414,7 +414,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -438,7 +438,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), recent)
 
 		since := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -463,7 +463,7 @@ func TestExportAuditLogs(t *testing.T) {
 		}
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -493,7 +493,7 @@ func TestExportAuditLogs(t *testing.T) {
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Page 1
-		page1, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 2, nil)
+		page1, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, nil)
 		if err != nil {
 			t.Fatalf("page 1: %v", err)
 		}
@@ -507,7 +507,7 @@ func TestExportAuditLogs(t *testing.T) {
 		// Page 2
 		last := page1.Events[len(page1.Events)-1]
 		cursor := &db.AuditLogExportCursor{Timestamp: last.Timestamp, ID: last.ID}
-		page2, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 2, cursor)
+		page2, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor)
 		if err != nil {
 			t.Fatalf("page 2: %v", err)
 		}
@@ -529,7 +529,7 @@ func TestExportAuditLogs(t *testing.T) {
 		// Page 3
 		last2 := page2.Events[len(page2.Events)-1]
 		cursor2 := &db.AuditLogExportCursor{Timestamp: last2.Timestamp, ID: last2.ID}
-		page3, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 2, cursor2)
+		page3, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor2)
 		if err != nil {
 			t.Fatalf("page 3: %v", err)
 		}
@@ -553,7 +553,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid2, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid2, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -569,7 +569,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 0, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 0, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -593,7 +593,7 @@ func TestExportAuditLogs(t *testing.T) {
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		until := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, &until, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, &until, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -614,7 +614,7 @@ func TestExportAuditLogs(t *testing.T) {
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		eventTypes := []db.AuditEventType{db.AuditEventApprovalApproved, db.AuditEventApprovalDenied}
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

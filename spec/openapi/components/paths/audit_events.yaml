@@ -47,6 +47,15 @@ exportAuditLogs:
         schema:
           type: string
         example: "approval.approved,approval.denied"
+      - name: connector_id
+        in: query
+        required: false
+        description: |
+          Filter events to a specific connector (e.g. "github", "slack").
+          Only returns events where the action was handled by this connector.
+        schema:
+          type: string
+        example: "github"
       - name: limit
         in: query
         required: false
@@ -219,6 +228,15 @@ listAuditEvents:
             - pending
             - expired
         example: "approved"
+      - name: connector_id
+        in: query
+        required: false
+        description: |
+          Filter events to a specific connector (e.g. "github", "slack").
+          Only returns events where the action was handled by this connector.
+        schema:
+          type: string
+        example: "github"
 
     responses:
       '200':

@@ -10,9 +10,11 @@ AuditEvent:
     event_type:
       type: string
       enum:
+        - approval.requested
         - approval.approved
         - approval.denied
         - approval.cancelled
+        - action.executed
         - standing_approval.executed
         - agent.registered
         - agent.deactivated

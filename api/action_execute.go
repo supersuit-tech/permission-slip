@@ -352,6 +352,15 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 
 // connectorIDFromActionType extracts the connector ID from an action type string.
 // Action types follow the convention "connector_id.action_name" (e.g. "github.create_issue").
+// Returns nil if the action type is malformed (no dot, empty prefix, or empty string).
+//
+// Examples:
+//
+//	"github.create_issue" → &"github"
+//	"slack.send_message"  → &"slack"
+//	"malformed_type"      → nil
+//	".missing_prefix"     → nil
+//	""                    → nil
 func connectorIDFromActionType(actionType string) *string {
 	if parts := strings.SplitN(actionType, ".", 2); len(parts) == 2 && parts[0] != "" {
 		return &parts[0]
@@ -360,13 +369,13 @@ func connectorIDFromActionType(actionType string) *string {
 }
 
 // emitActionExecutedAuditEvent writes an action.executed audit event for
-// one-off token-based execution. Errors are logged but do not block the
-// request (best-effort audit trail).
+// one-off token-based execution. Not billable because the approval request
+// was already counted when it was created.
 func emitActionExecutedAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, approvalID, actionType string, agentMeta []byte) {
 	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
 	execStatus := db.ExecStatusSuccess
 
-	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
 		UserID:          userID,
 		AgentID:         agentID,
 		EventType:       db.AuditEventActionExecuted,
@@ -377,9 +386,7 @@ func emitActionExecutedAuditEvent(ctx context.Context, d db.DBTX, userID string,
 		Action:          actionJSON,
 		ConnectorID:     connectorIDFromActionType(actionType),
 		ExecutionStatus: &execStatus,
-	}); err != nil {
-		log.Printf("audit: failed to insert action executed audit event: %v", err)
-	}
+	}, false)
 }
 
 // ── JWT token parsing ──────────────────────────────────────────────────────
