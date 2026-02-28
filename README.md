@@ -58,7 +58,9 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
 - **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
 - **[Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md)** — step-by-step guide to test the invite/registration flow
-- **[Deploying to Fly.io](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
+- **[Self-Hosted Deployment](docs/deployment-self-hosted.md)** — complete guide for deploying on your own infrastructure (Docker, Fly.io, bare metal)
+- **[Production Deployment (internal)](docs/deployment-production.md)** — infrastructure, secrets, and operations for app.permissionslip.dev
+- **[Fly.io Deployment](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
 
 ## Tech Stack
 
