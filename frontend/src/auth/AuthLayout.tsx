@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -7,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Footer } from "@/components/Footer";
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -28,11 +28,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           </CardHeader>
           <CardContent className="space-y-4">{children}</CardContent>
         </Card>
-        <div className="flex justify-center gap-4 text-xs text-muted-foreground">
-          <Link to="/policy/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-          <Link to="/policy/terms" className="hover:text-foreground transition-colors">Terms</Link>
-          <Link to="/policy/cookies" className="hover:text-foreground transition-colors">Cookies</Link>
-        </div>
+        <Footer className="flex justify-center" />
       </div>
     </div>
   );

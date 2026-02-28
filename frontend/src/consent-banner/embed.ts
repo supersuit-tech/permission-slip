@@ -17,6 +17,7 @@
  */
 
 import {
+  clearConsent,
   getStoredConsent,
   persistConsent,
   type ConsentStatus,
@@ -144,5 +145,11 @@ if (document.readyState === "loading") {
   reject: () => {
     persistConsent("rejected");
     document.getElementById("ps-consent-banner")?.remove();
+  },
+  /** Clear stored consent and re-show the banner (e.g. from a "Manage Cookies" link). */
+  reset: () => {
+    clearConsent();
+    document.getElementById("ps-consent-banner")?.remove();
+    mount();
   },
 };
