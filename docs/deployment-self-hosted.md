@@ -168,6 +168,32 @@ All three are required to enable SMS. If partially configured, SMS is disabled w
 | `SENTRY_ORG` | Sentry org slug (**build-time** arg) |
 | `SENTRY_PROJECT` | Sentry project slug (**build-time** arg) |
 
+### Product Analytics (PostHog)
+
+Optional. Tracks user behavior, feature adoption, and funnel analytics.
+
+| Variable | Description |
+|---|---|
+| `VITE_POSTHOG_KEY` | PostHog project API key (**build-time**) |
+| `VITE_POSTHOG_HOST` | PostHog API host (**build-time**, default: `https://us.i.posthog.com`) |
+
+If `VITE_POSTHOG_KEY` is not set, analytics are disabled (no-op). PostHog Cloud has a free tier of 1M events/month, or you can [self-host PostHog](https://posthog.com/docs/self-host).
+
+### Billing (Stripe)
+
+Optional. Only needed if you want to enable paid tiers and usage-based billing.
+
+| Variable | Description |
+|---|---|
+| `BILLING_ENABLED` | Set to `true` to enable billing (default: `false`) |
+| `STRIPE_SECRET_KEY` | Stripe API secret key |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signature verification secret |
+| `STRIPE_PRICE_ID_REQUEST` | Metered Stripe Price for per-request billing |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for frontend (**build-time**) |
+
+When `BILLING_ENABLED=false` (the default), all users get an unlimited plan, Stripe is skipped, request metering is skipped, and billing API endpoints are disabled. This is the recommended setting for self-hosted deployments unless you want to run your own billing.
+
 ### Other Optional Variables
 
 | Variable | Default | Description |
@@ -393,5 +419,13 @@ Migrations run automatically on startup. If they fail, check database connectivi
 | `SENTRY_AUTH_TOKEN` | No | Build | Sentry source map upload |
 | `SENTRY_ORG` | No | Build | Sentry org slug |
 | `SENTRY_PROJECT` | No | Build | Sentry project slug |
+| `VITE_POSTHOG_KEY` | No | Build | PostHog project API key |
+| `VITE_POSTHOG_HOST` | No | Build | PostHog API host (default: `us.i.posthog.com`) |
+| `BILLING_ENABLED` | No | Runtime | Enable billing (`true`/`false`, default: `false`) |
+| `STRIPE_SECRET_KEY` | For billing | Runtime | Stripe API secret key |
+| `STRIPE_PUBLISHABLE_KEY` | For billing | Runtime | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | For billing | Runtime | Stripe webhook signing secret |
+| `STRIPE_PRICE_ID_REQUEST` | For billing | Runtime | Metered Stripe Price ID |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | For billing | Build | Stripe publishable key (frontend) |
 | `CONNECTORS_DIR` | No | Runtime | Custom connector directory |
 | `CUSTOM_CONNECTORS_JSON` | No | Runtime | Inline connector JSON config |

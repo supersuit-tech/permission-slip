@@ -21,14 +21,19 @@
                     │  └───────────┬────────────┘  │
                     └──────────────┼───────────────┘
                                    │
-                 ┌─────────────────┼──────────────────┐
-                 │                 │                   │
-      ┌──────────▼───┐  ┌────────▼────────┐  ┌──────▼──────┐
-      │  Supabase     │  │  Sentry         │  │  Twilio     │
-      │  - Auth (JWT) │  │  - Errors       │  │  - SendGrid │
-      │  - Postgres   │  │  - Performance  │  │  - SMS      │
-      │  - Vault      │  │  - CSP reports  │  │             │
-      └───────────────┘  └─────────────────┘  └─────────────┘
+        ┌──────────────┬───────────┼───────────┬───────────────┐
+        │              │           │           │               │
+ ┌──────▼───┐  ┌──────▼────┐  ┌──▼────┐  ┌───▼─────┐  ┌──────▼──────┐
+ │ Supabase  │  │  Sentry   │  │Twilio │  │ PostHog │  │ Better Stack│
+ │ - Auth    │  │  - Errors │  │-SGrid │  │-Analytics│  │ - Logs     │
+ │ - Postgres│  │  - Perf   │  │- SMS  │  │-Replays │  │ - Alerts   │
+ │ - Vault   │  │  - CSP    │  │       │  │         │  │            │
+ └───────────┘  └───────────┘  └───────┘  └─────────┘  └────────────┘
+                                                ┌───────────────┐
+                                                │  UptimeRobot  │
+                                                │  - Uptime     │
+                                                │  - Status page│
+                                                └───────────────┘
 ```
 
 ## Services
@@ -103,6 +108,116 @@ Source maps are uploaded during Docker builds for readable stack traces.
 - Browser push notifications via FCM / Mozilla Push Service
 - VAPID key pair must be consistent across all instances
 
+### PostHog (Product Analytics)
+
+> **Status:** Planned — see [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352)
+
+Product analytics for understanding user behavior, feature adoption, and funnel drop-off.
+
+- **Service:** [PostHog Cloud](https://posthog.com) (US or EU hosting)
+- **Free tier:** 1M events/month, 5K session recordings/month
+- **What it tracks:** Agent registration, approval flows, standing approvals, action execution, notification config
+- **Privacy:** Respects Do Not Track / cookie consent; no PII in event properties
+
+**Setup steps:**
+1. Create a PostHog Cloud project
+2. Set `VITE_POSTHOG_KEY` (build arg) — PostHog project API key
+3. Optionally set `VITE_POSTHOG_HOST` (build arg) — defaults to `https://us.i.posthog.com`
+4. Add PostHog host to the CSP `connect-src` directive
+5. If key is not set, PostHog is a no-op (safe for dev/staging)
+
+**Env vars (build-time):**
+
+| Variable | Description |
+|---|---|
+| `VITE_POSTHOG_KEY` | PostHog project API key |
+| `VITE_POSTHOG_HOST` | PostHog API host (default: `https://us.i.posthog.com`) |
+
+### Better Stack / Logtail (Log Aggregation)
+
+> **Status:** Planned — see [#331](https://github.com/supersuit-tech/permission-slip-web/issues/331)
+
+Centralized log search and alerting. The app already outputs structured JSON logs (`slog.JSONHandler`) with trace IDs, request method/path, status codes, and timing — no code changes needed.
+
+- **Service:** [Better Stack](https://betterstack.com) (Logtail)
+- **Free tier:** 1GB/month ingestion, 3-day retention
+- **Integration:** Native Fly.io log shipping (no sidecar needed)
+
+**Setup steps:**
+1. Create a Better Stack account and log source
+2. Configure Fly.io log shipping:
+   ```bash
+   # Recommended: native Fly.io → Logtail integration
+   fly logs ship --org <fly-org> --access-token <logtail-source-token>
+   ```
+3. Verify logs appear with correct JSON field parsing (`msg`, `level`, `trace_id`, `method`, `path`, `status`)
+4. Create alerts:
+   - 5xx error rate spike (>5 errors in 5 minutes)
+   - Health check failure logs
+   - Panic/crash logs
+5. Create saved views: all errors, slow requests, auth failures
+
+**No app env vars needed** — log shipping is configured at the Fly.io platform level, not in the app.
+
+### UptimeRobot (Uptime Monitoring)
+
+> **Status:** Planned — see [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332)
+
+External uptime monitoring — catches issues that Fly's internal health checks miss (DNS, TLS cert expiry, CDN/proxy problems).
+
+- **Service:** [UptimeRobot](https://uptimerobot.com)
+- **Free tier:** 50 monitors, 5-minute check intervals
+
+**Setup steps:**
+1. Create an UptimeRobot account
+2. Add HTTP monitor:
+   - **URL:** `https://app.permissionslip.dev/api/health`
+   - **Interval:** 5 minutes
+   - **Expected status:** 200
+   - **Keyword check:** `"status":"ok"` (validates response body, not just HTTP 200)
+3. Configure alert contacts (email, Slack, or webhook)
+4. Optional: set up a public status page at `status.permissionslip.dev`
+
+**No app env vars needed** — UptimeRobot is external.
+
+### Stripe (Billing & Payments)
+
+> **Status:** Planned — see [#341](https://github.com/supersuit-tech/permission-slip-web/issues/341), [#364](https://github.com/supersuit-tech/permission-slip-web/issues/364)
+
+Payment processing for the paid tier: payment method collection, subscription management, and usage-based billing.
+
+- **Service:** [Stripe](https://stripe.com)
+- **Gated by:** `BILLING_ENABLED` env var (default `false`). When disabled, all users get unlimited plan and Stripe is skipped entirely
+
+**Env vars (runtime secrets):**
+
+| Variable | Description |
+|---|---|
+| `BILLING_ENABLED` | `true` to enable billing. Default `false` — all users get unlimited plan |
+| `STRIPE_SECRET_KEY` | Stripe API secret key (`sk_live_xxxx`) |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for frontend Checkout (`pk_live_xxxx`) |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signature verification (`whsec_xxxx`) |
+| `STRIPE_PRICE_ID_REQUEST` | Metered Stripe Price ID for per-request billing |
+
+**Env vars (build-time):**
+
+| Variable | Description |
+|---|---|
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for frontend (build-time) |
+
+**Setup steps:**
+1. Create Stripe account and get API keys
+2. Create a metered Price for per-request billing ($0.005/request after 1,000 free)
+3. Set up a webhook endpoint at `https://app.permissionslip.dev/api/v1/webhooks/stripe`
+4. Configure webhook to send: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
+5. Set all env vars via `fly secrets set`
+
+**When `BILLING_ENABLED=false`:**
+- New users get `pay_as_you_go` plan (unlimited)
+- Stripe integration is skipped
+- Request metering is skipped
+- Billing API endpoints return 404
+
 ## Secrets & Environment Variables
 
 ### Fly.io Runtime Secrets
@@ -146,6 +261,16 @@ fly secrets set \
 fly secrets set \
   SENTRY_DSN="https://[key]@[org].ingest.sentry.io/[project]" \
   SENTRY_CSP_ENDPOINT="https://[org].ingest.sentry.io/api/[project]/security/?sentry_key=[key]"
+
+# ── Billing (Stripe) — when BILLING_ENABLED=true ─────────────────────────
+# Not needed until billing is enabled. See #341, #364.
+
+fly secrets set \
+  BILLING_ENABLED="true" \
+  STRIPE_SECRET_KEY="sk_live_xxxx" \
+  STRIPE_PUBLISHABLE_KEY="pk_live_xxxx" \
+  STRIPE_WEBHOOK_SECRET="whsec_xxxx" \
+  STRIPE_PRICE_ID_REQUEST="price_xxxx"
 ```
 
 **List current secrets** (values are hidden):
@@ -165,7 +290,9 @@ fly deploy \
   --build-arg VITE_SENTRY_DSN="https://[key]@[org].ingest.sentry.io/[project]" \
   --build-arg SENTRY_AUTH_TOKEN="sntrys_xxxx" \
   --build-arg SENTRY_ORG="supersuit" \
-  --build-arg SENTRY_PROJECT="permission-slip"
+  --build-arg SENTRY_PROJECT="permission-slip" \
+  --build-arg VITE_POSTHOG_KEY="phc_xxxx" \
+  --build-arg VITE_STRIPE_PUBLISHABLE_KEY="pk_live_xxxx"
 ```
 
 Or hardcode in `fly.toml` for simpler deploys:
@@ -174,6 +301,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 [build.args]
   VITE_SUPABASE_URL = "https://[project-ref].supabase.co"
   VITE_SUPABASE_ANON_KEY = "<anon key>"
+  VITE_POSTHOG_KEY = "phc_xxxx"
   # VITE_SENTRY_DSN, SENTRY_AUTH_TOKEN, etc. can go here too
 ```
 
@@ -203,6 +331,18 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `SENTRY_AUTH_TOKEN` | Build arg | **Set** | Source map upload token |
 | `SENTRY_ORG` | Build arg | **Set** | `supersuit` |
 | `SENTRY_PROJECT` | Build arg | **Set** | `permission-slip` |
+| `VITE_POSTHOG_KEY` | Build arg | **Planned** ([#352]) | PostHog project API key |
+| `VITE_POSTHOG_HOST` | Build arg | **Planned** ([#352]) | PostHog API host (default: `us.i.posthog.com`) |
+| `BILLING_ENABLED` | Runtime secret | **Planned** ([#364]) | `true` to enable billing (default: `false`) |
+| `STRIPE_SECRET_KEY` | Runtime secret | **Planned** ([#341]) | Stripe API secret key |
+| `STRIPE_PUBLISHABLE_KEY` | Runtime secret | **Planned** ([#341]) | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | Runtime secret | **Planned** ([#341]) | Stripe webhook signing secret |
+| `STRIPE_PRICE_ID_REQUEST` | Runtime secret | **Planned** ([#341]) | Metered Stripe Price ID |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Build arg | **Planned** ([#341]) | Stripe publishable key (frontend) |
+
+[#352]: https://github.com/supersuit-tech/permission-slip-web/issues/352
+[#364]: https://github.com/supersuit-tech/permission-slip-web/issues/364
+[#341]: https://github.com/supersuit-tech/permission-slip-web/issues/341
 
 ## Deployment Process
 
@@ -270,6 +410,8 @@ Fly handles TLS certificates automatically via Let's Encrypt.
 
 ## CI/CD Pipeline
 
+### CI (Testing)
+
 GitHub Actions runs on every push to `main` and on pull requests:
 
 | Job | What it does |
@@ -278,13 +420,48 @@ GitHub Actions runs on every push to `main` and on pull requests:
 | **Frontend Tests** | Vitest + React Testing Library |
 | **Build** | Full production build (Go binary + React) to catch compilation errors |
 
-The CI pipeline does **not** auto-deploy. Deploys are manual via `fly deploy`.
-
 ### Audit Workflow
 
 A separate `audit.yml` workflow runs dependency vulnerability scans:
 - `govulncheck` for Go modules
 - `npm audit` for frontend packages
+
+### CD (Deployment)
+
+> **Status:** Planned — see [#328](https://github.com/supersuit-tech/permission-slip-web/issues/328)
+
+Currently, deploys are **manual** via `fly deploy`. The planned CD workflow:
+
+- **Trigger:** Push to `main` (after CI passes)
+- **Action:** Deploy to Fly.io using `superfly/flyctl-actions`
+- **Secret:** `FLY_API_TOKEN` GitHub Actions secret (Fly.io deploy token)
+
+**Planned workflow** (`.github/workflows/deploy.yml`):
+
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, build]  # require CI to pass
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+```
+
+**GitHub Actions secrets needed:**
+
+| Secret | Description |
+|---|---|
+| `FLY_API_TOKEN` | Fly.io deploy token (generate via `fly tokens create deploy`) |
+
+**Optional:** A staging workflow deploying to `staging.app.permissionslip.dev` on a separate Fly.io app.
 
 ## Monitoring & Observability
 
@@ -411,6 +588,40 @@ Fly secrets are encrypted and can't be viewed via `fly secrets list` (it only sh
 # SSH into the machine and check the env var
 fly ssh console -C "printenv DATABASE_URL"
 ```
+
+## Service Status Overview
+
+Quick reference for what's live vs. planned.
+
+| Service | Purpose | Status | Issue |
+|---|---|---|---|
+| **Fly.io** | Compute / hosting | Live | — |
+| **Supabase** | Auth + Postgres + Vault | Live | — |
+| **Sentry** | Error tracking (backend + frontend) | Live | [#329](https://github.com/supersuit-tech/permission-slip-web/issues/329), [#330](https://github.com/supersuit-tech/permission-slip-web/issues/330) |
+| **SendGrid** | Email notifications | Live | — |
+| **Twilio** | SMS notifications | Live | — |
+| **VAPID / Web Push** | Browser push notifications | Live | — |
+| **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352) |
+| **Better Stack** | Log aggregation + alerting | Planned | [#331](https://github.com/supersuit-tech/permission-slip-web/issues/331) |
+| **UptimeRobot** | Uptime monitoring + status page | Planned | [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332) |
+| **Stripe** | Billing + payments | Planned | [#341](https://github.com/supersuit-tech/permission-slip-web/issues/341) |
+| **GitHub Actions CD** | Auto-deploy on push to main | Planned | [#328](https://github.com/supersuit-tech/permission-slip-web/issues/328) |
+
+### Future Hardening (Phase 3)
+
+These are tracked under [#321](https://github.com/supersuit-tech/permission-slip-web/issues/321) Phase 3 and should be addressed when the app has real users:
+
+- Prometheus metrics or Grafana Cloud for infrastructure metrics
+- Define SLOs and alerting thresholds
+- Database slow query logging
+- Connection pooling verification under load
+- Horizontal scaling load testing
+- Database migration linting in CI
+- Automated backup restore tests
+- Penetration test / security audit
+- Auth endpoint rate limiting (brute force protection)
+- Secret rotation schedule (documented cadence)
+- Dependency update automation (Dependabot or Renovate)
 
 ## Troubleshooting
 
