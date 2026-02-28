@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { getApiErrorMessage } from "@/api/errors";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 export function useRevokeStandingApproval() {
   const { session } = useAuth();
@@ -30,6 +31,7 @@ export function useRevokeStandingApproval() {
       return data;
     },
     onSuccess: () => {
+      trackEvent(PostHogEvents.STANDING_APPROVAL_REVOKED);
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
     },
   });

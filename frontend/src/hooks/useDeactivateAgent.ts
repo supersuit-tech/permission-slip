@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 export function useDeactivateAgent() {
   const { session } = useAuth();
@@ -22,6 +23,7 @@ export function useDeactivateAgent() {
       if (error) throw new Error("Failed to deactivate agent");
     },
     onSuccess: (_data, agentId) => {
+      trackEvent(PostHogEvents.AGENT_DEACTIVATED, { agent_id: agentId });
       queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
       queryClient.invalidateQueries({ queryKey: ["agents"] });
     },

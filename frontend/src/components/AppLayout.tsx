@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
+import { Footer } from "./Footer";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
 
@@ -71,14 +72,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <footer className="mx-auto mt-12 hidden max-w-[1200px] border-t pt-4 md:block">
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <Link to="/policy/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
-          <Link to="/policy/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
-          <Link to="/policy/cookies" className="hover:text-foreground transition-colors">Cookie Policy</Link>
-          <a href="mailto:support@supersuit.tech" className="hover:text-foreground transition-colors">Support</a>
-        </div>
-      </footer>
+      <Footer className="mx-auto mt-12 max-w-[1200px] border-t pt-4" />
 
       {/* Mobile bottom navigation */}
       <nav className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-sm md:hidden">

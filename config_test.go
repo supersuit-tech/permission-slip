@@ -55,13 +55,14 @@ func TestValidateConfig_DevelopmentModeSkipsErrors(t *testing.T) {
 
 func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "development",
-		"DATABASE_URL":        "",
-		"SUPABASE_URL":        "",
-		"SUPABASE_JWT_SECRET": "",
-		"SUPABASE_JWKS_URL":   "",
-		"INVITE_HMAC_KEY":     "test-key",
-		"BASE_URL":            "https://example.com",
+		"MODE":                       "development",
+		"DATABASE_URL":               "",
+		"SUPABASE_URL":               "",
+		"SUPABASE_JWT_SECRET":        "",
+		"SUPABASE_JWKS_URL":          "",
+		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
+		"INVITE_HMAC_KEY":            "test-key",
+		"BASE_URL":                   "https://example.com",
 	})
 
 	errs, warnings := validateConfig()
@@ -196,14 +197,15 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 
 func TestValidateConfig_AllValid(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "",
-		"DATABASE_URL":        "postgres://localhost/test",
-		"SUPABASE_URL":        "http://localhost:54321",
-		"INVITE_HMAC_KEY":     "test-key",
-		"BASE_URL":            "https://example.com",
-		"VAPID_PUBLIC_KEY":    "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":   "examplePrivateKey",
-		"VAPID_SUBJECT":       "mailto:test@example.com",
+		"MODE":                      "",
+		"DATABASE_URL":              "postgres://localhost/test",
+		"SUPABASE_URL":              "http://localhost:54321",
+		"SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
+		"INVITE_HMAC_KEY":           "test-key",
+		"BASE_URL":                  "https://example.com",
+		"VAPID_PUBLIC_KEY":          "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":         "examplePrivateKey",
+		"VAPID_SUBJECT":             "mailto:test@example.com",
 	})
 
 	errs, warnings := validateConfig()

@@ -10,9 +10,11 @@ AuditEvent:
     event_type:
       type: string
       enum:
+        - approval.requested
         - approval.approved
         - approval.denied
         - approval.cancelled
+        - action.executed
         - standing_approval.executed
         - agent.registered
         - agent.deactivated
@@ -57,6 +59,32 @@ AuditEvent:
         - expired
       description: The outcome of the event.
       example: "approved"
+    connector_id:
+      type: string
+      nullable: true
+      description: |
+        The connector that handled this action (e.g. "github", "slack").
+        Null for agent lifecycle events (registered, deactivated).
+      example: "github"
+    execution_status:
+      type: string
+      nullable: true
+      enum:
+        - success
+        - failure
+        - timeout
+        - skipped
+      description: |
+        Whether the executed action succeeded or failed at the third-party
+        service. Only present for action.executed and standing_approval.executed
+        events.
+      example: "success"
+    execution_error:
+      type: string
+      nullable: true
+      description: |
+        Details about why the execution failed. Only present when
+        execution_status is "failure".
 
 AuditLogEvent:
   type: object
@@ -130,6 +158,32 @@ AuditLogEvent:
         standing approval execution id, agent id). Useful for correlating
         events back to their originating resource.
       example: "appr_abc123"
+    connector_id:
+      type: string
+      nullable: true
+      description: |
+        The connector that handled this action (e.g. "github", "slack").
+        Null for agent lifecycle events (registered, deactivated).
+      example: "github"
+    execution_status:
+      type: string
+      nullable: true
+      enum:
+        - success
+        - failure
+        - timeout
+        - skipped
+      description: |
+        Whether the executed action succeeded or failed at the third-party
+        service. Only present for action.executed and standing_approval.executed
+        events.
+      example: "success"
+    execution_error:
+      type: string
+      nullable: true
+      description: |
+        Details about why the execution failed. Only present when
+        execution_status is "failure".
 
 AuditLogExportResponse:
   type: object

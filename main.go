@@ -106,12 +106,14 @@ func main() {
 	deps.Logger = logger
 	deps.SupabaseJWTSecret = os.Getenv("SUPABASE_JWT_SECRET")
 	deps.SupabaseJWKSURL = os.Getenv("SUPABASE_JWKS_URL")
+	deps.SupabaseURL = strings.TrimRight(os.Getenv("SUPABASE_URL"), "/")
+	deps.SupabaseServiceRoleKey = os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
 	// Derive JWKS URL from SUPABASE_URL if not explicitly set.
 	// Supabase CLI v2+ uses ES256 (asymmetric signing); the JWKS endpoint
 	// provides the public key. Legacy CLI v1 and tests use HS256 + JWT secret.
 	if deps.SupabaseJWKSURL == "" {
-		if supabaseURL := os.Getenv("SUPABASE_URL"); supabaseURL != "" {
-			deps.SupabaseJWKSURL = strings.TrimRight(supabaseURL, "/") + "/auth/v1/.well-known/jwks.json"
+		if deps.SupabaseURL != "" {
+			deps.SupabaseJWKSURL = deps.SupabaseURL + "/auth/v1/.well-known/jwks.json"
 		}
 	}
 	if deps.SupabaseJWKSURL != "" {
@@ -325,6 +327,16 @@ func main() {
 		parsed, err := url.Parse(rawSupabaseURL)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 			log.Printf("Warning: SUPABASE_URL %q is not a valid URL; skipping CSP connect-src entry", rawSupabaseURL)
+		} else {
+			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
+		}
+	}
+	// PostHog product analytics — allow the frontend to send events to the
+	// PostHog API host. Only added when POSTHOG_HOST is set.
+	if posthogHost := strings.TrimSpace(os.Getenv("POSTHOG_HOST")); posthogHost != "" {
+		parsed, err := url.Parse(posthogHost)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			log.Printf("Warning: POSTHOG_HOST %q is not a valid URL; skipping CSP connect-src entry", posthogHost)
 		} else {
 			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
 		}

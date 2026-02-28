@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestUsagePeriodsSchema(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "usage_periods", []string{
 		"id", "user_id", "period_start", "period_end",
-		"request_count", "sms_count", "created_at",
+		"request_count", "sms_count", "breakdown", "created_at",
 	})
 }
 
@@ -349,4 +350,205 @@ func TestIncrementRequestCountConcurrent(t *testing.T) {
 	if usage.RequestCount != want {
 		t.Errorf("expected request_count=%d after concurrent increments, got %d", want, usage.RequestCount)
 	}
+}
+
+func TestIncrementRequestCountWithBreakdown(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// First increment creates the row with breakdown
+	usage, err := db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "github",
+		ActionType:  "github.create_issue",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+	if usage.Breakdown == nil {
+		t.Fatal("expected non-nil breakdown")
+	}
+
+	// Second increment for same agent/connector
+	usage, err = db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "github",
+		ActionType:  "github.create_issue",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 2 {
+		t.Errorf("expected request_count=2, got %d", usage.RequestCount)
+	}
+
+	// Third increment with different agent/connector
+	usage, err = db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     99,
+		ConnectorID: "slack",
+		ActionType:  "slack.send_message",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 3 {
+		t.Errorf("expected request_count=3, got %d", usage.RequestCount)
+	}
+
+	// Verify breakdown JSONB is populated
+	var breakdown map[string]map[string]int
+	if err := json.Unmarshal(usage.Breakdown, &breakdown); err != nil {
+		t.Fatalf("failed to unmarshal breakdown: %v", err)
+	}
+	if breakdown["by_agent"]["42"] != 2 {
+		t.Errorf("expected by_agent[42]=2, got %d", breakdown["by_agent"]["42"])
+	}
+	if breakdown["by_agent"]["99"] != 1 {
+		t.Errorf("expected by_agent[99]=1, got %d", breakdown["by_agent"]["99"])
+	}
+	if breakdown["by_connector"]["github"] != 2 {
+		t.Errorf("expected by_connector[github]=2, got %d", breakdown["by_connector"]["github"])
+	}
+	if breakdown["by_connector"]["slack"] != 1 {
+		t.Errorf("expected by_connector[slack]=1, got %d", breakdown["by_connector"]["slack"])
+	}
+}
+
+func TestIncrementRequestCountWithBreakdownEmptyConnector(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// Increment with empty connector_id and action_type (e.g. agent lifecycle events)
+	usage, err := db.IncrementRequestCountWithBreakdown(ctx, tx, uid, periodStart, periodEnd, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "",
+		ActionType:  "",
+	})
+	if err != nil {
+		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+}
+
+func TestBillingPeriodBounds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		input      time.Time
+		wantStart  time.Time
+		wantEnd    time.Time
+	}{
+		{
+			name:      "middle of month",
+			input:     time.Date(2026, 2, 15, 14, 30, 0, 0, time.UTC),
+			wantStart: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+			wantEnd:   time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "first of month",
+			input:     time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			wantStart: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+			wantEnd:   time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "last day of year",
+			input:     time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC),
+			wantStart: time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC),
+			wantEnd:   time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			start, end := db.BillingPeriodBounds(tt.input)
+			if !start.Equal(tt.wantStart) {
+				t.Errorf("start: got %v, want %v", start, tt.wantStart)
+			}
+			if !end.Equal(tt.wantEnd) {
+				t.Errorf("end: got %v, want %v", end, tt.wantEnd)
+			}
+		})
+	}
+}
+
+func TestParseBreakdown(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil breakdown", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: nil}
+		b := u.ParseBreakdown()
+		if b.ByAgent == nil || b.ByConnector == nil || b.ByActionType == nil {
+			t.Fatal("expected initialized maps, got nil")
+		}
+		if len(b.ByAgent) != 0 || len(b.ByConnector) != 0 || len(b.ByActionType) != 0 {
+			t.Error("expected empty maps for nil breakdown")
+		}
+	})
+
+	t.Run("empty object", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: []byte(`{}`)}
+		b := u.ParseBreakdown()
+		if len(b.ByAgent) != 0 || len(b.ByConnector) != 0 || len(b.ByActionType) != 0 {
+			t.Error("expected empty maps for empty object")
+		}
+	})
+
+	t.Run("partial keys", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: []byte(`{"by_agent":{"42":5}}`)}
+		b := u.ParseBreakdown()
+		if b.ByAgent["42"] != 5 {
+			t.Errorf("ByAgent[42] = %d, want 5", b.ByAgent["42"])
+		}
+		if b.ByConnector == nil || b.ByActionType == nil {
+			t.Fatal("expected initialized maps for missing keys")
+		}
+	})
+
+	t.Run("full breakdown", func(t *testing.T) {
+		t.Parallel()
+		raw := `{"by_agent":{"1":10,"2":3},"by_connector":{"github":8,"slack":5},"by_action_type":{"github.create_issue":6,"slack.send_message":7}}`
+		u := &db.UsagePeriod{Breakdown: []byte(raw)}
+		b := u.ParseBreakdown()
+		if b.ByAgent["1"] != 10 || b.ByAgent["2"] != 3 {
+			t.Errorf("ByAgent = %v", b.ByAgent)
+		}
+		if b.ByConnector["github"] != 8 || b.ByConnector["slack"] != 5 {
+			t.Errorf("ByConnector = %v", b.ByConnector)
+		}
+		if b.ByActionType["github.create_issue"] != 6 || b.ByActionType["slack.send_message"] != 7 {
+			t.Errorf("ByActionType = %v", b.ByActionType)
+		}
+	})
+
+	t.Run("malformed json", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: []byte(`not json`)}
+		b := u.ParseBreakdown()
+		// Should degrade gracefully with empty initialized maps.
+		if b.ByAgent == nil || b.ByConnector == nil || b.ByActionType == nil {
+			t.Fatal("expected initialized maps, got nil")
+		}
+	})
 }

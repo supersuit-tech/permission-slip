@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { AuthError } from "@supabase/supabase-js";
 import { MemoryRouter } from "react-router-dom";
+import { CookieConsentProvider } from "@/components/CookieConsentContext";
 import EmailStep from "../EmailStep";
 
 type OnSubmit = (email: string) => Promise<{ error: AuthError | null }>;
@@ -10,7 +11,9 @@ type OnSubmit = (email: string) => Promise<{ error: AuthError | null }>;
 function renderEmailStep(onSubmit: OnSubmit) {
   return render(
     <MemoryRouter>
-      <EmailStep onSubmit={onSubmit} />
+      <CookieConsentProvider>
+        <EmailStep onSubmit={onSubmit} />
+      </CookieConsentProvider>
     </MemoryRouter>,
   );
 }

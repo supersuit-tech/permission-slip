@@ -4,6 +4,8 @@ import { AccountSection } from "./AccountSection";
 import { NotificationSection } from "./NotificationSection";
 import { SecuritySection } from "./SecuritySection";
 import { CredentialSection } from "./CredentialSection";
+import { DataRetentionSection } from "./DataRetentionSection";
+import { DangerZoneSection } from "./DangerZoneSection";
 
 export function SettingsPage() {
   return (
@@ -23,6 +25,8 @@ export function SettingsPage() {
       <SecuritySection />
       <NotificationSection />
       <CredentialSection />
+      <DataRetentionSection />
+      <DangerZoneSection />
     </div>
   );
 }

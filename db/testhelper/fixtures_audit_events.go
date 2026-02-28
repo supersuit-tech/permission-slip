@@ -34,6 +34,15 @@ func InsertAuditEventAt(t *testing.T, d db.DBTX, userID string, agentID int64, e
 		userID, agentID, eventType, outcome, sourceID, SourceTypeForEvent(eventType), createdAt)
 }
 
+// InsertAuditEventWithConnector inserts an audit event with an explicit connector_id.
+func InsertAuditEventWithConnector(t *testing.T, d db.DBTX, userID string, agentID int64, eventType, outcome, sourceID string, connectorID *string) {
+	t.Helper()
+	mustExec(t, d,
+		`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, action, connector_id, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, '{"name":"test"}', '{"type":"test.action"}', $7, $8)`,
+		userID, agentID, eventType, outcome, sourceID, SourceTypeForEvent(eventType), connectorID, time.Now())
+}
+
 // InsertAuditEventWithAction inserts an audit event with explicit agent_meta and action JSONB values.
 func InsertAuditEventWithAction(t *testing.T, d db.DBTX, userID string, agentID int64, eventType, outcome, sourceID string, agentMeta, action []byte) {
 	t.Helper()

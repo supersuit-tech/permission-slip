@@ -236,6 +236,31 @@ func TestListAuditEvents(t *testing.T) {
 		}
 	})
 
+	t.Run("FilterByConnectorID", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		github := "github"
+		slack := "slack"
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), &github)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), &slack)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "agent.registered", "registered", testhelper.GenerateID(t, "ar_"), nil)
+
+		filter := &db.AuditEventFilter{ConnectorID: &github}
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		if page.Events[0].ConnectorID == nil || *page.Events[0].ConnectorID != "github" {
+			t.Errorf("expected connector_id=github, got %v", page.Events[0].ConnectorID)
+		}
+	})
+
 	t.Run("Pagination", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
@@ -414,7 +439,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -438,7 +463,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), recent)
 
 		since := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -463,7 +488,7 @@ func TestExportAuditLogs(t *testing.T) {
 		}
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -493,7 +518,7 @@ func TestExportAuditLogs(t *testing.T) {
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Page 1
-		page1, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 2, nil)
+		page1, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, nil)
 		if err != nil {
 			t.Fatalf("page 1: %v", err)
 		}
@@ -507,7 +532,7 @@ func TestExportAuditLogs(t *testing.T) {
 		// Page 2
 		last := page1.Events[len(page1.Events)-1]
 		cursor := &db.AuditLogExportCursor{Timestamp: last.Timestamp, ID: last.ID}
-		page2, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 2, cursor)
+		page2, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor)
 		if err != nil {
 			t.Fatalf("page 2: %v", err)
 		}
@@ -529,7 +554,7 @@ func TestExportAuditLogs(t *testing.T) {
 		// Page 3
 		last2 := page2.Events[len(page2.Events)-1]
 		cursor2 := &db.AuditLogExportCursor{Timestamp: last2.Timestamp, ID: last2.ID}
-		page3, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 2, cursor2)
+		page3, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor2)
 		if err != nil {
 			t.Fatalf("page 3: %v", err)
 		}
@@ -553,7 +578,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid2, since, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid2, since, nil, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -569,7 +594,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, 0, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 0, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -593,7 +618,7 @@ func TestExportAuditLogs(t *testing.T) {
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		until := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, &until, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, &until, nil, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -614,7 +639,7 @@ func TestExportAuditLogs(t *testing.T) {
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		eventTypes := []db.AuditEventType{db.AuditEventApprovalApproved, db.AuditEventApprovalDenied}
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, nil, 100, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -625,6 +650,31 @@ func TestExportAuditLogs(t *testing.T) {
 			if e.EventType != db.AuditEventApprovalApproved && e.EventType != db.AuditEventApprovalDenied {
 				t.Errorf("unexpected event type: %s", e.EventType)
 			}
+		}
+	})
+
+	t.Run("ConnectorIDFilter", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		github := "github"
+		slack := "slack"
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), &github)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "standing_approval.executed", "auto_executed", testhelper.GenerateID(t, "sae_"), &slack)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "agent.registered", "registered", fmt.Sprintf("ar:%d", agentID), nil)
+
+		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, &slack, 100, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		if page.Events[0].ConnectorID == nil || *page.Events[0].ConnectorID != "slack" {
+			t.Errorf("expected connector_id=slack, got %v", page.Events[0].ConnectorID)
 		}
 	})
 }
@@ -705,6 +755,98 @@ func TestInsertAuditEvent(t *testing.T) {
 		}
 		if page.Events[0].Action != nil {
 			t.Errorf("expected nil action, got %s", string(page.Events[0].Action))
+		}
+	})
+
+	t.Run("WithConnectorAndExecutionStatus", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert a connector so the FK is satisfied.
+		testhelper.InsertConnector(t, tx, "github")
+
+		connectorID := "github"
+		execStatus := db.ExecStatusSuccess
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			EventType:       db.AuditEventActionExecuted,
+			Outcome:         "auto_executed",
+			SourceID:        "test-approval-2",
+			SourceType:      "approval",
+			AgentMeta:       []byte(`{"name":"test"}`),
+			Action:          []byte(`{"type":"github.create_issue"}`),
+			ConnectorID:     &connectorID,
+			ExecutionStatus: &execStatus,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		e := page.Events[0]
+		if e.ConnectorID == nil || *e.ConnectorID != "github" {
+			t.Errorf("expected connector_id=github, got %v", e.ConnectorID)
+		}
+		if e.ExecutionStatus == nil || *e.ExecutionStatus != db.ExecStatusSuccess {
+			t.Errorf("expected execution_status=success, got %v", e.ExecutionStatus)
+		}
+		if e.ExecutionError != nil {
+			t.Errorf("expected nil execution_error, got %v", e.ExecutionError)
+		}
+	})
+
+	t.Run("WithExecutionFailure", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		testhelper.InsertConnector(t, tx, "slack")
+
+		connectorID := "slack"
+		execStatus := db.ExecStatusFailure
+		execError := "API rate limit exceeded"
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			EventType:       db.AuditEventStandingExecution,
+			Outcome:         "auto_executed",
+			SourceID:        "test-sa-1",
+			SourceType:      "standing_approval",
+			AgentMeta:       []byte(`{"name":"test"}`),
+			Action:          []byte(`{"type":"slack.send_message"}`),
+			ConnectorID:     &connectorID,
+			ExecutionStatus: &execStatus,
+			ExecutionError:  &execError,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		e := page.Events[0]
+		if e.ExecutionStatus == nil || *e.ExecutionStatus != db.ExecStatusFailure {
+			t.Errorf("expected execution_status=failure, got %v", e.ExecutionStatus)
+		}
+		if e.ExecutionError == nil || *e.ExecutionError != "API rate limit exceeded" {
+			t.Errorf("expected execution_error='API rate limit exceeded', got %v", e.ExecutionError)
 		}
 	})
 }

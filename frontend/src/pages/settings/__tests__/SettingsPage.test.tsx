@@ -40,6 +40,15 @@ function mockApiFetch() {
     if (url === "/v1/credentials") {
       return Promise.resolve({ data: { credentials: [] } });
     }
+    if (url === "/v1/profile/data-retention") {
+      return Promise.resolve({
+        data: {
+          plan_id: "free",
+          plan_name: "Free",
+          audit_retention_days: 7,
+        },
+      });
+    }
     return Promise.resolve({ data: null });
   });
 }
@@ -66,7 +75,7 @@ describe("SettingsPage", () => {
     ).toHaveAttribute("href", "/");
   });
 
-  it("renders all four sections", async () => {
+  it("renders all sections", async () => {
     mockApiFetch();
 
     render(<SettingsPage />, { wrapper });
@@ -77,5 +86,7 @@ describe("SettingsPage", () => {
     expect(screen.getByText("Security")).toBeInTheDocument();
     expect(screen.getByText("Notifications")).toBeInTheDocument();
     expect(screen.getByText("Credential Vault")).toBeInTheDocument();
+    expect(screen.getByText("Data Retention")).toBeInTheDocument();
+    expect(screen.getByText("Danger Zone")).toBeInTheDocument();
   });
 });

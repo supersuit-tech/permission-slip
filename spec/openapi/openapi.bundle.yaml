@@ -1557,6 +1557,15 @@ paths:
           schema:
             type: string
           example: approval.approved,approval.denied
+        - name: connector_id
+          in: query
+          required: false
+          description: |
+            Filter events to a specific connector (e.g. "github", "slack").
+            Only returns events where the action was handled by this connector.
+          schema:
+            type: string
+          example: github
         - name: limit
           in: query
           required: false
@@ -1600,6 +1609,8 @@ paths:
                         subject: Hello
                     outcome: approved
                     source_id: appr_abc123
+                    connector_id: email
+                    execution_status: null
                   - id: 12346
                     event_type: standing_approval.executed
                     timestamp: '2026-02-20T14:35:00Z'
@@ -1611,6 +1622,8 @@ paths:
                       version: '1'
                     outcome: auto_executed
                     source_id: sae_def456
+                    connector_id: email
+                    execution_status: success
                 has_more: true
                 next_cursor: 2026-02-20T14:35:00.123456789Z,12346
         '400':
@@ -1718,6 +1731,15 @@ paths:
               - pending
               - expired
           example: approved
+        - name: connector_id
+          in: query
+          required: false
+          description: |
+            Filter events to a specific connector (e.g. "github", "slack").
+            Only returns events where the action was handled by this connector.
+          schema:
+            type: string
+          example: github
       responses:
         '200':
           description: Audit events retrieved successfully
@@ -1739,6 +1761,8 @@ paths:
                         to: alice@example.com
                         subject: Hello
                     outcome: approved
+                    connector_id: email
+                    execution_status: null
                   - event_type: standing_approval.executed
                     timestamp: '2026-02-20T14:25:00Z'
                     agent_id: 42
@@ -1750,6 +1774,8 @@ paths:
                       constraints:
                         sender: '*@mycompany.com'
                     outcome: auto_executed
+                    connector_id: email
+                    execution_status: success
                   - event_type: agent.registered
                     timestamp: '2026-02-19T10:00:00Z'
                     agent_id: 43
@@ -4331,6 +4357,96 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteAccount
+      summary: Delete Account
+      description: |
+        Permanently deletes the authenticated user's account and all associated
+        data including agents, approvals, credentials (and their vault secrets),
+        standing approvals, audit events, and subscription. The Supabase auth
+        user is also removed. This action is irreversible.
+
+        The request body must include `"confirmation": "DELETE"` as a safety
+        check to prevent accidental deletion.
+
+        **What gets deleted:**
+        - Profile and contact information
+        - All registered agents and their configurations
+        - All stored credentials (including encrypted vault secrets)
+        - All approval history and audit log events
+        - All standing approvals and their execution history
+        - Subscription and usage data
+        - Notification preferences and push subscriptions
+        - The Supabase authentication user (best-effort)
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+            example:
+              confirmation: DELETE
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteAccountResponse'
+              example:
+                deleted: true
+                message: Account and all associated data have been permanently deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/profile/data-retention:
+    get:
+      operationId: getDataRetention
+      summary: Get Data Retention Policy
+      description: |
+        Returns the data retention policy for the authenticated user based on
+        their current plan.
+
+        **Retention periods by plan:**
+        - **Free:** 7-day audit log retention
+        - **Pay As You Go:** 90-day audit log retention
+
+        Account data (profile, credentials) is retained indefinitely until
+        the user explicitly deletes their account via `DELETE /v1/profile`.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Data retention policy retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataRetentionResponse'
+              example:
+                plan_id: free
+                plan_name: Free
+                audit_retention_days: 7
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/profile/notification-preferences:
     get:
       operationId: getNotificationPreferences
@@ -6669,9 +6785,11 @@ components:
         event_type:
           type: string
           enum:
+            - approval.requested
             - approval.approved
             - approval.denied
             - approval.cancelled
+            - action.executed
             - standing_approval.executed
             - agent.registered
             - agent.deactivated
@@ -6716,6 +6834,32 @@ components:
             - expired
           description: The outcome of the event.
           example: approved
+        connector_id:
+          type: string
+          nullable: true
+          description: |
+            The connector that handled this action (e.g. "github", "slack").
+            Null for agent lifecycle events (registered, deactivated).
+          example: github
+        execution_status:
+          type: string
+          nullable: true
+          enum:
+            - success
+            - failure
+            - timeout
+            - skipped
+          description: |
+            Whether the executed action succeeded or failed at the third-party
+            service. Only present for action.executed and standing_approval.executed
+            events.
+          example: success
+        execution_error:
+          type: string
+          nullable: true
+          description: |
+            Details about why the execution failed. Only present when
+            execution_status is "failure".
     AuditEventListResponse:
       type: object
       description: Paginated list of audit events.
@@ -6810,6 +6954,32 @@ components:
             standing approval execution id, agent id). Useful for correlating
             events back to their originating resource.
           example: appr_abc123
+        connector_id:
+          type: string
+          nullable: true
+          description: |
+            The connector that handled this action (e.g. "github", "slack").
+            Null for agent lifecycle events (registered, deactivated).
+          example: github
+        execution_status:
+          type: string
+          nullable: true
+          enum:
+            - success
+            - failure
+            - timeout
+            - skipped
+          description: |
+            Whether the executed action succeeded or failed at the third-party
+            service. Only present for action.executed and standing_approval.executed
+            events.
+          example: success
+        execution_error:
+          type: string
+          nullable: true
+          description: |
+            Details about why the execution failed. Only present when
+            execution_status is "failure".
     AuditLogExportResponse:
       type: object
       description: Paginated export of audit log events in chronological order.
@@ -7724,6 +7894,53 @@ components:
             $ref: '#/components/schemas/NotificationPreference'
           description: Channel preferences to update. Channels not included are unchanged.
           minItems: 1
+    DeleteAccountRequest:
+      type: object
+      description: Request body for deleting the authenticated user's account.
+      required:
+        - confirmation
+      properties:
+        confirmation:
+          type: string
+          description: Must be the literal string "DELETE" to confirm the irreversible deletion.
+          enum:
+            - DELETE
+          example: DELETE
+    DeleteAccountResponse:
+      type: object
+      description: Response confirming the account was deleted.
+      required:
+        - deleted
+        - message
+      properties:
+        deleted:
+          type: boolean
+          description: Always true on success.
+          example: true
+        message:
+          type: string
+          description: Human-readable confirmation message.
+          example: Account and all associated data have been permanently deleted.
+    DataRetentionResponse:
+      type: object
+      description: The data retention policy for the authenticated user's current plan.
+      required:
+        - plan_id
+        - plan_name
+        - audit_retention_days
+      properties:
+        plan_id:
+          type: string
+          description: The user's current plan ID.
+          example: free
+        plan_name:
+          type: string
+          description: Human-readable plan name.
+          example: Free
+        audit_retention_days:
+          type: integer
+          description: Number of days audit log events are retained before automatic deletion.
+          example: 7
     CreatePushSubscriptionRequest:
       type: object
       description: Register a Web Push subscription from the browser.

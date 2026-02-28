@@ -35,9 +35,10 @@ export function CookiePolicyPage() {
 
       <h2>2. How We Use Cookies and Local Storage</h2>
       <p>
-        Permission Slip currently uses <strong>no third-party tracking cookies</strong>.
-        We do not use Google Analytics, advertising pixels, behavioral tracking,
-        or any similar third-party analytics or marketing tools.
+        Permission Slip does not use advertising pixels, behavioral tracking,
+        or marketing tools. We use a single, privacy-focused analytics service
+        (PostHog) that is <strong>only activated after you accept cookies</strong>{" "}
+        via our consent banner.
       </p>
       <p>
         All storage we use falls into the following categories:
@@ -102,20 +103,41 @@ export function CookiePolicyPage() {
         </tbody>
       </table>
 
-      <h3>2.3 Analytics (Future)</h3>
+      <h3>2.3 Analytics (Consent Required)</h3>
       <p>
-        We do not currently use any analytics cookies. If we introduce analytics
-        or marketing tools in the future, they will:
+        We use <strong>PostHog</strong>, a privacy-focused product analytics
+        platform, to understand how people use Permission Slip (e.g., feature
+        adoption, navigation patterns). PostHog analytics is{" "}
+        <strong>only active when you accept cookies</strong> via our consent
+        banner. If you decline or have not yet responded, no analytics data is
+        collected or sent.
       </p>
-      <ul>
-        <li>Require your consent via our cookie consent banner before activation</li>
-        <li>Be limited to operational metadata only (see our{" "}
-          <Link to="/policy/privacy">Privacy Policy</Link>, Section 4, for the
-          distinction between operational metadata and request content)
-        </li>
-        <li>Provide an opt-out mechanism</li>
-        <li>Be listed in an updated version of this policy with specific cookie names and purposes</li>
-      </ul>
+      <table>
+        <thead>
+          <tr>
+            <th>Storage Mechanism</th>
+            <th>Key / Name</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>In-memory only</td>
+            <td>PostHog anonymous ID</td>
+            <td>
+              Temporary identifier for the current session; not persisted to
+              disk and cleared on page reload
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        PostHog analytics data is limited to operational metadata only (see
+        our <Link to="/policy/privacy">Privacy Policy</Link>, Section 4, for
+        the distinction between operational metadata and request content). No
+        emails, names, or other PII are included in analytics events. Your IP
+        address is not sent to PostHog.
+      </p>
 
       <h2>3. Managing Your Preferences</h2>
 
