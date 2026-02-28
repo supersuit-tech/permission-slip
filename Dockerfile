@@ -29,6 +29,9 @@ ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 
+# Copy shared validation config (imported by frontend/src/lib/validation.ts)
+COPY shared/ /app/shared/
+
 # Copy frontend source and build
 COPY frontend/ ./
 RUN npm run build
