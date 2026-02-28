@@ -1,0 +1,8 @@
+ConfigResponse:
+  type: object
+  required:
+    - billing_enabled
+  properties:
+    billing_enabled:
+      type: boolean
+      description: Whether billing features (Stripe, metering, plan limits) are active. When false, all users have unlimited access.

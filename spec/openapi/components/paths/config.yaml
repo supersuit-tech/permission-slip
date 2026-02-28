@@ -1,0 +1,21 @@
+config:
+  get:
+    summary: Get server configuration
+    description: |
+      Returns server-level feature flags that the frontend uses to adapt its UI.
+      For example, when `billing_enabled` is false, billing-related pages and
+      upgrade prompts should be hidden.
+    operationId: getConfig
+    tags:
+      - Config
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Server configuration returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/config.yaml#/ConfigResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'

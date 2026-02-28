@@ -53,6 +53,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	RegisterActionConfigRoutes(mux, deps)
 	RegisterActionConfigTemplateRoutes(mux, deps)
+	RegisterConfigRoutes(mux, deps)
 	RegisterActionExecuteRoutes(mux, deps)
 	RegisterAgentApprovalRoutes(mux, deps)
 	RegisterAgentRoutes(mux, deps)
