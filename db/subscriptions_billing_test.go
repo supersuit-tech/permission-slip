@@ -25,7 +25,7 @@ func TestEnsureAllUsersSubscribed_BillingDisabled(t *testing.T) {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
 	if count < 2 {
-		t.Errorf("expected at least 2 backfilled, got %d", count)
+		t.Errorf("expected at least 2 affected, got %d", count)
 	}
 
 	// Verify both users got pay_as_you_go.
@@ -57,7 +57,7 @@ func TestEnsureAllUsersSubscribed_BillingEnabled(t *testing.T) {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
 	if count < 1 {
-		t.Errorf("expected at least 1 backfilled, got %d", count)
+		t.Errorf("expected at least 1 affected, got %d", count)
 	}
 
 	sub, err := db.GetSubscriptionByUserID(ctx, tx, uid)
@@ -72,47 +72,59 @@ func TestEnsureAllUsersSubscribed_BillingEnabled(t *testing.T) {
 	}
 }
 
-func TestEnsureAllUsersSubscribed_SkipsExisting(t *testing.T) {
+func TestEnsureAllUsersSubscribed_UpgradesFreeWhenBillingDisabled(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
 
-	// User with existing subscription should not be modified.
-	uid1 := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
-	testhelper.InsertSubscription(t, tx, uid1, db.PlanFree)
+	// Simulate the migration backfill: user already has a "free" subscription.
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	// User without subscription should get one.
-	uid2 := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
-
+	// Billing disabled → "free" subscriptions should be upgraded to pay_as_you_go.
 	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
 	if err != nil {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
 	if count < 1 {
-		t.Errorf("expected at least 1 backfilled (skipping existing), got %d", count)
+		t.Errorf("expected at least 1 upgraded, got %d", count)
 	}
 
-	// Existing subscription should be unchanged.
-	sub1, err := db.GetSubscriptionByUserID(ctx, tx, uid1)
+	sub, err := db.GetSubscriptionByUserID(ctx, tx, uid)
 	if err != nil {
-		t.Fatalf("GetSubscriptionByUserID(%s): %v", uid1, err)
+		t.Fatalf("GetSubscriptionByUserID: %v", err)
 	}
-	if sub1.PlanID != db.PlanFree {
-		t.Errorf("existing subscription should remain free, got %s", sub1.PlanID)
+	if sub == nil {
+		t.Fatal("expected subscription, got nil")
+	}
+	if sub.PlanID != db.PlanPayAsYouGo {
+		t.Errorf("existing free subscription should be upgraded to %s, got %s", db.PlanPayAsYouGo, sub.PlanID)
+	}
+}
+
+func TestEnsureAllUsersSubscribed_PreservesPayAsYouGo(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	// User already on pay_as_you_go should not be touched.
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+
+	// Billing enabled → should NOT downgrade pay_as_you_go to free.
+	_, err := db.EnsureAllUsersSubscribed(ctx, tx, true)
+	if err != nil {
+		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
 
-	// New subscription should be pay_as_you_go (billing disabled).
-	sub2, err := db.GetSubscriptionByUserID(ctx, tx, uid2)
+	sub, err := db.GetSubscriptionByUserID(ctx, tx, uid)
 	if err != nil {
-		t.Fatalf("GetSubscriptionByUserID(%s): %v", uid2, err)
+		t.Fatalf("GetSubscriptionByUserID: %v", err)
 	}
-	if sub2 == nil {
-		t.Fatal("expected subscription for uid2, got nil")
-	}
-	if sub2.PlanID != db.PlanPayAsYouGo {
-		t.Errorf("expected plan_id=%s, got %s", db.PlanPayAsYouGo, sub2.PlanID)
+	if sub.PlanID != db.PlanPayAsYouGo {
+		t.Errorf("expected pay_as_you_go to be preserved, got %s", sub.PlanID)
 	}
 }
 
@@ -130,7 +142,7 @@ func TestEnsureAllUsersSubscribed_Idempotent(t *testing.T) {
 		t.Fatalf("first EnsureAllUsersSubscribed: %v", err)
 	}
 
-	// Second call should find no unsubscribed users.
+	// Second call should find nothing to do.
 	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
 	if err != nil {
 		t.Fatalf("second EnsureAllUsersSubscribed: %v", err)

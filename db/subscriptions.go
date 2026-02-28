@@ -149,24 +149,47 @@ func UpdateSubscriptionPeriod(ctx context.Context, db DBTX, userID string, perio
 	return s, err
 }
 
-// EnsureAllUsersSubscribed creates subscriptions for any users that don't have one.
-// When billing is disabled, users get the unlimited pay_as_you_go plan. When enabled,
-// users get the free plan. This handles the case where users were created before
-// the subscriptions table existed or before the billing gate was configured.
+// EnsureAllUsersSubscribed makes sure every user has a subscription on the
+// correct default plan. It does two things:
 //
-// Returns the number of subscriptions created.
+//  1. Creates subscriptions for users that don't have one yet.
+//  2. When billing is disabled, updates any existing "free" subscriptions to
+//     "pay_as_you_go" so that users backfilled by older migrations (which
+//     hard-coded the "free" plan) get unlimited access.
+//
+// Returns the total number of rows created or updated.
 func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool) (int64, error) {
+	defaultPlan := DefaultPlanID(billingEnabled)
+	var total int64
+
+	// Step 1: Create subscriptions for users without one.
 	tag, err := db.Exec(ctx,
 		`INSERT INTO subscriptions (user_id, plan_id)
 		 SELECT p.id, $1
 		 FROM profiles p
 		 LEFT JOIN subscriptions s ON s.user_id = p.id
 		 WHERE s.id IS NULL`,
-		DefaultPlanID(billingEnabled))
+		defaultPlan)
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	total += tag.RowsAffected()
+
+	// Step 2: When billing is disabled, upgrade "free" subscriptions to the
+	// unlimited plan. This handles users backfilled by the initial migration
+	// (which always assigns "free") before BILLING_ENABLED existed.
+	if !billingEnabled {
+		tag, err = db.Exec(ctx,
+			`UPDATE subscriptions SET plan_id = $1, updated_at = now()
+			 WHERE plan_id = 'free'`,
+			PlanPayAsYouGo)
+		if err != nil {
+			return total, err
+		}
+		total += tag.RowsAffected()
+	}
+
+	return total, nil
 }
 
 // SubscriptionWithPlan combines a subscription with its associated plan details
