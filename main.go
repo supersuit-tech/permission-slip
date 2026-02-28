@@ -313,6 +313,16 @@ func main() {
 			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
 		}
 	}
+	// PostHog product analytics — allow the frontend to send events to the
+	// PostHog API host. Only added when POSTHOG_HOST is set.
+	if posthogHost := strings.TrimSpace(os.Getenv("POSTHOG_HOST")); posthogHost != "" {
+		parsed, err := url.Parse(posthogHost)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			log.Printf("Warning: POSTHOG_HOST %q is not a valid URL; skipping CSP connect-src entry", posthogHost)
+		} else {
+			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
+		}
+	}
 	handler = api.SecurityHeadersMiddleware(sentryCSPEndpoint, extraConnectSrc...)(handler)
 
 	srv := &http.Server{

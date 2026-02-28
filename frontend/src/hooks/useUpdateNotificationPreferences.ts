@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 type NotificationPreference = components["schemas"]["NotificationPreference"];
 
@@ -31,6 +32,7 @@ export function useUpdateNotificationPreferences() {
       return data;
     },
     onSuccess: () => {
+      trackEvent(PostHogEvents.NOTIFICATION_PREFERENCES_UPDATED);
       queryClient.invalidateQueries({
         queryKey: ["notification-preferences"],
       });

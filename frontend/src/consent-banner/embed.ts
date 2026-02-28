@@ -69,14 +69,14 @@ function createBanner(): HTMLElement | null {
   // risk of XSS if this template is ever modified to include dynamic values.
   text.appendChild(
     document.createTextNode(
-      "We use cookies to analyze site usage and improve your experience. You can accept or reject non-essential cookies. See our ",
+      "We use essential cookies for authentication. Accepting enables privacy-focused analytics to help us improve the product \u2014 no advertising or tracking. See our ",
     ),
   );
   const policyLink = document.createElement("a");
-  policyLink.href = "https://app.permissionslip.dev/policy/privacy";
+  policyLink.href = "https://app.permissionslip.dev/policy/cookies";
   policyLink.style.cssText =
     "text-decoration:underline;text-underline-offset:4px;color:inherit";
-  policyLink.textContent = "Privacy Policy";
+  policyLink.textContent = "Cookie Policy";
   text.appendChild(policyLink);
   text.appendChild(document.createTextNode(" for details."));
 
