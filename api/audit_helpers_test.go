@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -121,6 +123,27 @@ func TestResolveExecResult(t *testing.T) {
 		}
 		if *errMsg != "connection refused" {
 			t.Errorf("errMsg = %q, want %q", *errMsg, "connection refused")
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		status, errMsg := resolveExecResult(context.DeadlineExceeded)
+		if status != db.ExecStatusTimeout {
+			t.Errorf("status = %q, want %q", status, db.ExecStatusTimeout)
+		}
+		if errMsg == nil {
+			t.Fatal("errMsg = nil, want non-nil")
+		}
+	})
+
+	t.Run("wrapped timeout", func(t *testing.T) {
+		wrappedErr := fmt.Errorf("connector execution: %w", context.DeadlineExceeded)
+		status, errMsg := resolveExecResult(wrappedErr)
+		if status != db.ExecStatusTimeout {
+			t.Errorf("status = %q, want %q", status, db.ExecStatusTimeout)
+		}
+		if errMsg == nil {
+			t.Fatal("errMsg = nil, want non-nil")
 		}
 	})
 

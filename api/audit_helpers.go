@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -86,7 +87,8 @@ func actionTypeFromJSON(raw []byte) string {
 
 // resolveExecResult maps a connector execution error to the appropriate
 // execution_status and execution_error values for the audit event. Returns
-// ("success", nil) on success, or ("failure", &message) on error.
+// ("success", nil) on success, ("timeout", &message) for deadline exceeded,
+// or ("failure", &message) for all other errors.
 //
 // The error message is truncated to avoid storing excessively large strings;
 // execution_error is exposed in the API so internal details must not leak.
@@ -97,6 +99,9 @@ func resolveExecResult(execErr error) (status string, errMsg *string) {
 	msg := execErr.Error()
 	if len(msg) > 512 {
 		msg = msg[:512]
+	}
+	if errors.Is(execErr, context.DeadlineExceeded) {
+		return db.ExecStatusTimeout, &msg
 	}
 	return db.ExecStatusFailure, &msg
 }

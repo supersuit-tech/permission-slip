@@ -489,3 +489,66 @@ func TestBillingPeriodBounds(t *testing.T) {
 		})
 	}
 }
+
+func TestParseBreakdown(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil breakdown", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: nil}
+		b := u.ParseBreakdown()
+		if b.ByAgent == nil || b.ByConnector == nil || b.ByActionType == nil {
+			t.Fatal("expected initialized maps, got nil")
+		}
+		if len(b.ByAgent) != 0 || len(b.ByConnector) != 0 || len(b.ByActionType) != 0 {
+			t.Error("expected empty maps for nil breakdown")
+		}
+	})
+
+	t.Run("empty object", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: []byte(`{}`)}
+		b := u.ParseBreakdown()
+		if len(b.ByAgent) != 0 || len(b.ByConnector) != 0 || len(b.ByActionType) != 0 {
+			t.Error("expected empty maps for empty object")
+		}
+	})
+
+	t.Run("partial keys", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: []byte(`{"by_agent":{"42":5}}`)}
+		b := u.ParseBreakdown()
+		if b.ByAgent["42"] != 5 {
+			t.Errorf("ByAgent[42] = %d, want 5", b.ByAgent["42"])
+		}
+		if b.ByConnector == nil || b.ByActionType == nil {
+			t.Fatal("expected initialized maps for missing keys")
+		}
+	})
+
+	t.Run("full breakdown", func(t *testing.T) {
+		t.Parallel()
+		raw := `{"by_agent":{"1":10,"2":3},"by_connector":{"github":8,"slack":5},"by_action_type":{"github.create_issue":6,"slack.send_message":7}}`
+		u := &db.UsagePeriod{Breakdown: []byte(raw)}
+		b := u.ParseBreakdown()
+		if b.ByAgent["1"] != 10 || b.ByAgent["2"] != 3 {
+			t.Errorf("ByAgent = %v", b.ByAgent)
+		}
+		if b.ByConnector["github"] != 8 || b.ByConnector["slack"] != 5 {
+			t.Errorf("ByConnector = %v", b.ByConnector)
+		}
+		if b.ByActionType["github.create_issue"] != 6 || b.ByActionType["slack.send_message"] != 7 {
+			t.Errorf("ByActionType = %v", b.ByActionType)
+		}
+	})
+
+	t.Run("malformed json", func(t *testing.T) {
+		t.Parallel()
+		u := &db.UsagePeriod{Breakdown: []byte(`not json`)}
+		b := u.ParseBreakdown()
+		// Should degrade gracefully with empty initialized maps.
+		if b.ByAgent == nil || b.ByConnector == nil || b.ByActionType == nil {
+			t.Fatal("expected initialized maps, got nil")
+		}
+	})
+}

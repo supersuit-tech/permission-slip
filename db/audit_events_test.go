@@ -236,6 +236,31 @@ func TestListAuditEvents(t *testing.T) {
 		}
 	})
 
+	t.Run("FilterByConnectorID", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		github := "github"
+		slack := "slack"
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), &github)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), &slack)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "agent.registered", "registered", testhelper.GenerateID(t, "ar_"), nil)
+
+		filter := &db.AuditEventFilter{ConnectorID: &github}
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		if page.Events[0].ConnectorID == nil || *page.Events[0].ConnectorID != "github" {
+			t.Errorf("expected connector_id=github, got %v", page.Events[0].ConnectorID)
+		}
+	})
+
 	t.Run("Pagination", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
@@ -625,6 +650,31 @@ func TestExportAuditLogs(t *testing.T) {
 			if e.EventType != db.AuditEventApprovalApproved && e.EventType != db.AuditEventApprovalDenied {
 				t.Errorf("unexpected event type: %s", e.EventType)
 			}
+		}
+	})
+
+	t.Run("ConnectorIDFilter", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		github := "github"
+		slack := "slack"
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), &github)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "standing_approval.executed", "auto_executed", testhelper.GenerateID(t, "sae_"), &slack)
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "agent.registered", "registered", fmt.Sprintf("ar:%d", agentID), nil)
+
+		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, &slack, 100, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		if page.Events[0].ConnectorID == nil || *page.Events[0].ConnectorID != "slack" {
+			t.Errorf("expected connector_id=slack, got %v", page.Events[0].ConnectorID)
 		}
 	})
 }

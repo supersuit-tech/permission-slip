@@ -84,6 +84,10 @@ type AgentPage struct {
 // agentListColumns extends agentColumns with computed stats for the list query.
 // request_count_30d includes both one-off approval requests and standing
 // approval executions to accurately reflect total agent activity.
+//
+// Design note: this queries the source-of-truth tables (approvals,
+// standing_approval_executions) rather than audit_events, because audit event
+// insertion is best-effort and could undercount if inserts fail silently.
 const agentListColumns = agentColumns + `,
 	(SELECT COUNT(*)
 	 FROM approvals
