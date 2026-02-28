@@ -26,6 +26,7 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
 import { CookieConsentProvider } from "./components/CookieConsentContext";
+import { PostHogProvider } from "./components/PostHogProvider";
 import { ThemeProvider } from "./components/ThemeContext";
 import { Toaster } from "./components/ui/sonner";
 import App from "./App";
@@ -77,11 +78,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <CookieConsentProvider>
-            <AuthProvider>
-              <App />
-              <CookieConsentBanner />
-              <Toaster />
-            </AuthProvider>
+            <PostHogProvider>
+              <AuthProvider>
+                <App />
+                <CookieConsentBanner />
+                <Toaster />
+              </AuthProvider>
+            </PostHogProvider>
           </CookieConsentProvider>
         </ThemeProvider>
       </QueryClientProvider>

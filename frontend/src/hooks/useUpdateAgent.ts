@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
+import { trackEvent } from "@/lib/posthog";
 
 export function useUpdateAgent() {
   const { session } = useAuth();
@@ -27,6 +28,7 @@ export function useUpdateAgent() {
       return data;
     },
     onSuccess: (_data, variables) => {
+      trackEvent("agent_updated", { agent_id: variables.agentId });
       queryClient.invalidateQueries({ queryKey: ["agent", variables.agentId] });
       queryClient.invalidateQueries({ queryKey: ["agents"] });
     },

@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { getApiErrorMessage } from "@/api/errors";
 import type { components } from "@/api/schema";
+import { trackEvent } from "@/lib/posthog";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -32,6 +33,7 @@ export function useCreateStandingApproval() {
       return data;
     },
     onSuccess: () => {
+      trackEvent("standing_approval_created");
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
     },
   });

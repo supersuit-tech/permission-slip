@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
+import { trackEvent } from "@/lib/posthog";
 
 export function useApproveApproval() {
   const { session } = useAuth();
@@ -21,7 +22,10 @@ export function useApproveApproval() {
       if (error) throw new Error("Failed to approve request");
       return data;
     },
-    // No onSuccess invalidation — the approved row stays visible so the user
+    onSuccess: () => {
+      trackEvent("approval_approved");
+    },
+    // No query invalidation — the approved row stays visible so the user
     // can read/copy the confirmation code. The 5-second polling in useApprovals
     // handles eventual removal from the pending list.
   });

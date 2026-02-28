@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
+import { trackEvent } from "@/lib/posthog";
 
 export type InviteResponse =
   components["schemas"]["CreateRegistrationInviteResponse"];
@@ -24,6 +25,9 @@ export function useCreateInvite() {
       );
       if (error) throw new Error("Failed to generate invite code");
       return data;
+    },
+    onSuccess: () => {
+      trackEvent("invite_created");
     },
   });
 
