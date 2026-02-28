@@ -149,6 +149,10 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 			}
 
 			if connectorIDStr != "" {
+				if len(connectorIDStr) > 128 {
+					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id exceeds maximum length"))
+					return
+				}
 				filter.ConnectorID = &connectorIDStr
 			}
 		}
@@ -249,6 +253,10 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 		// Parse optional connector_id filter.
 		var connectorID *string
 		if v := r.URL.Query().Get("connector_id"); v != "" {
+			if len(v) > 128 {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id exceeds maximum length"))
+				return
+			}
 			connectorID = &v
 		}
 

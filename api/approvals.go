@@ -300,38 +300,6 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 	}, false)
 }
 
-// redactActionToType extracts only the "type" field from an action JSON blob,
-// discarding parameters and other user-provided data. Returns {"type":"…"} or
-// nil if the type cannot be extracted.
-func redactActionToType(raw []byte) []byte {
-	if len(raw) == 0 {
-		return nil
-	}
-	var obj struct {
-		Type string `json:"type"`
-	}
-	if json.Unmarshal(raw, &obj) != nil || obj.Type == "" {
-		return nil
-	}
-	redacted, _ := json.Marshal(map[string]string{"type": obj.Type})
-	return redacted
-}
-
-// actionTypeFromJSON extracts the "type" field from an action JSON blob.
-// Returns "" if the type cannot be extracted.
-func actionTypeFromJSON(raw []byte) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var obj struct {
-		Type string `json:"type"`
-	}
-	if json.Unmarshal(raw, &obj) != nil {
-		return ""
-	}
-	return obj.Type
-}
-
 // generateConfirmationCode produces a 6-character confirmation code from the
 // safe character set and its HMAC-SHA256 hash (or plain SHA-256 when hmacKey
 // is empty). Returns (formattedCode "XXX-XXX", hexHash, error).

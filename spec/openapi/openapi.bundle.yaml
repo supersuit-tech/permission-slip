@@ -1607,6 +1607,8 @@ paths:
                         subject: Hello
                     outcome: approved
                     source_id: appr_abc123
+                    connector_id: email
+                    execution_status: null
                   - id: 12346
                     event_type: standing_approval.executed
                     timestamp: '2026-02-20T14:35:00Z'
@@ -1618,6 +1620,8 @@ paths:
                       version: '1'
                     outcome: auto_executed
                     source_id: sae_def456
+                    connector_id: email
+                    execution_status: success
                 has_more: true
                 next_cursor: 2026-02-20T14:35:00.123456789Z,12346
         '400':
@@ -1755,6 +1759,8 @@ paths:
                         to: alice@example.com
                         subject: Hello
                     outcome: approved
+                    connector_id: email
+                    execution_status: null
                   - event_type: standing_approval.executed
                     timestamp: '2026-02-20T14:25:00Z'
                     agent_id: 42
@@ -1766,6 +1772,8 @@ paths:
                       constraints:
                         sender: '*@mycompany.com'
                     outcome: auto_executed
+                    connector_id: email
+                    execution_status: success
                   - event_type: agent.registered
                     timestamp: '2026-02-19T10:00:00Z'
                     agent_id: 43

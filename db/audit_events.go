@@ -103,7 +103,7 @@ type InsertAuditEventParams struct {
 	Action          []byte  // raw JSONB, may be nil
 	ConnectorID     *string // which connector handled the action (nil for lifecycle events)
 	ExecutionStatus *string // "success", "failure", "timeout", "skipped" (nil for non-execution events)
-	ExecutionError  *string // failure details (nil unless ExecutionStatus is "failure")
+	ExecutionError  *string // failure details (nil unless ExecutionStatus is "failure"); exposed in API — never store internal/sensitive details
 }
 
 // InsertAuditEvent writes a new row into the audit_events table.
