@@ -47,6 +47,15 @@ exportAuditLogs:
         schema:
           type: string
         example: "approval.approved,approval.denied"
+      - name: connector_id
+        in: query
+        required: false
+        description: |
+          Filter events to a specific connector (e.g. "github", "slack").
+          Only returns events where the action was handled by this connector.
+        schema:
+          type: string
+        example: "github"
       - name: limit
         in: query
         required: false
@@ -91,6 +100,8 @@ exportAuditLogs:
                       subject: "Hello"
                   outcome: "approved"
                   source_id: "appr_abc123"
+                  connector_id: "email"
+                  execution_status: null
                 - id: 12346
                   event_type: "standing_approval.executed"
                   timestamp: "2026-02-20T14:35:00Z"
@@ -102,6 +113,8 @@ exportAuditLogs:
                     version: "1"
                   outcome: "auto_executed"
                   source_id: "sae_def456"
+                  connector_id: "email"
+                  execution_status: "success"
               has_more: true
               next_cursor: "2026-02-20T14:35:00.123456789Z,12346"
 
@@ -219,6 +232,15 @@ listAuditEvents:
             - pending
             - expired
         example: "approved"
+      - name: connector_id
+        in: query
+        required: false
+        description: |
+          Filter events to a specific connector (e.g. "github", "slack").
+          Only returns events where the action was handled by this connector.
+        schema:
+          type: string
+        example: "github"
 
     responses:
       '200':
@@ -241,6 +263,8 @@ listAuditEvents:
                       to: "alice@example.com"
                       subject: "Hello"
                   outcome: "approved"
+                  connector_id: "email"
+                  execution_status: null
                 - event_type: "standing_approval.executed"
                   timestamp: "2026-02-20T14:25:00Z"
                   agent_id: 42
@@ -252,6 +276,8 @@ listAuditEvents:
                     constraints:
                       sender: "*@mycompany.com"
                   outcome: "auto_executed"
+                  connector_id: "email"
+                  execution_status: "success"
                 - event_type: "agent.registered"
                   timestamp: "2026-02-19T10:00:00Z"
                   agent_id: 43

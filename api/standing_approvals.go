@@ -320,21 +320,25 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Emit audit event (best-effort).
-		emitStandingApprovalAuditEvent(r.Context(), deps.DB, profile.ID, exec.AgentID, saID, exec.ActionType, exec.AgentMeta)
-
 		// Attempt connector execution. If no connector is registered for this
 		// action type, the existing behavior (record execution, emit audit event)
 		// still works — execution just returns no external result (graceful degradation).
-		var actionResultPtr *json.RawMessage
-		if result, execErr := executeConnectorAction(r.Context(), deps, profile.ID, exec.ActionType, req.Parameters); execErr != nil {
+		result, execErr := executeConnectorAction(r.Context(), deps, profile.ID, exec.ActionType, req.Parameters)
+
+		// Always emit the audit event with the actual execution result (best-effort).
+		emitStandingApprovalAuditEvent(r.Context(), deps.DB, profile.ID, exec.AgentID, saID, exec.ActionType, exec.AgentMeta, execErr)
+
+		if execErr != nil {
 			if handleConnectorError(w, r, execErr) {
 				return
 			}
 			log.Printf("[%s] ExecuteStandingApproval: connector execution: %v", TraceID(r.Context()), execErr)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
 			return
-		} else if result != nil {
+		}
+
+		var actionResultPtr *json.RawMessage
+		if result != nil {
 			actionResultPtr = &result.Data
 		}
 
@@ -348,22 +352,27 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 }
 
 // emitStandingApprovalAuditEvent writes a standing_approval.executed audit event.
-// Errors are logged but do not block the request (best-effort audit trail).
-func emitStandingApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, saID, actionType string, agentMeta []byte) {
+// Billable: standing approval executions count toward the user's monthly request quota.
+//
+// execErr should be the error from connector execution, or nil on success.
+// The execution_status and execution_error fields are derived from execErr.
+func emitStandingApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, saID, actionType string, agentMeta []byte, execErr error) {
 	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
+	execStatus, execErrMsg := resolveExecResult(execErr)
 
-	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    agentID,
-		EventType:  db.AuditEventStandingExecution,
-		Outcome:    "auto_executed",
-		SourceID:   saID,
-		SourceType: "standing_approval",
-		AgentMeta:  agentMeta,
-		Action:     actionJSON,
-	}); err != nil {
-		log.Printf("audit: failed to insert standing approval audit event: %v", err)
-	}
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
+		UserID:          userID,
+		AgentID:         agentID,
+		EventType:       db.AuditEventStandingExecution,
+		Outcome:         "auto_executed",
+		SourceID:        saID,
+		SourceType:      "standing_approval",
+		AgentMeta:       agentMeta,
+		Action:          actionJSON,
+		ConnectorID:     connectorIDFromActionType(actionType),
+		ExecutionStatus: &execStatus,
+		ExecutionError:  execErrMsg,
+	}, true)
 }
 
 func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse {

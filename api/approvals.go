@@ -287,35 +287,17 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 		return
 	}
 
-	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    appr.AgentID,
-		EventType:  eventType,
-		Outcome:    appr.Status,
-		SourceID:   appr.ApprovalID,
-		SourceType: "approval",
-		AgentMeta:  agentMeta,
-		Action:     redactActionToType(appr.Action),
-	}); err != nil {
-		log.Printf("audit: failed to insert approval audit event: %v", err)
-	}
-}
-
-// redactActionToType extracts only the "type" field from an action JSON blob,
-// discarding parameters and other user-provided data. Returns {"type":"…"} or
-// nil if the type cannot be extracted.
-func redactActionToType(raw []byte) []byte {
-	if len(raw) == 0 {
-		return nil
-	}
-	var obj struct {
-		Type string `json:"type"`
-	}
-	if json.Unmarshal(raw, &obj) != nil || obj.Type == "" {
-		return nil
-	}
-	redacted, _ := json.Marshal(map[string]string{"type": obj.Type})
-	return redacted
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
+		UserID:      userID,
+		AgentID:     appr.AgentID,
+		EventType:   eventType,
+		Outcome:     appr.Status,
+		SourceID:    appr.ApprovalID,
+		SourceType:  "approval",
+		AgentMeta:   agentMeta,
+		Action:      redactActionToType(appr.Action),
+		ConnectorID: connectorIDFromActionType(actionTypeFromJSON(appr.Action)),
+	}, false)
 }
 
 // generateConfirmationCode produces a 6-character confirmation code from the

@@ -171,8 +171,13 @@ func handleTokenPath(w http.ResponseWriter, r *http.Request, deps *Deps, agent *
 
 	// ── Execute the action via connector ──────────────────────────
 
-	var actionResultPtr *json.RawMessage
-	if result, execErr := executeConnectorAction(r.Context(), deps, approval.ApproverID, req.ActionID, req.Parameters); execErr != nil {
+	result, execErr := executeConnectorAction(r.Context(), deps, approval.ApproverID, req.ActionID, req.Parameters)
+
+	// Always emit the audit event with the actual execution result,
+	// regardless of success or failure.
+	emitActionExecutedAuditEvent(r.Context(), deps.DB, approval.ApproverID, agent.AgentID, claims.ApprovalID, req.ActionID, agent.Metadata, execErr)
+
+	if execErr != nil {
 		if handleConnectorError(w, r, execErr) {
 			return
 		}
@@ -180,19 +185,17 @@ func handleTokenPath(w http.ResponseWriter, r *http.Request, deps *Deps, agent *
 		CaptureError(r.Context(), execErr)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute action"))
 		return
-	} else if result != nil {
-		actionResultPtr = &result.Data
 	}
 
-	executedAt := time.Now().UTC()
-
-	// Emit audit event (best-effort).
-	emitActionExecutedAuditEvent(r.Context(), deps.DB, approval.ApproverID, agent.AgentID, claims.ApprovalID, req.ActionID, agent.Metadata)
+	var actionResultPtr *json.RawMessage
+	if result != nil {
+		actionResultPtr = &result.Data
+	}
 
 	RespondJSON(w, http.StatusOK, executeActionTokenResponse{
 		Status:     "success",
 		ActionID:   req.ActionID,
-		ExecutedAt: executedAt,
+		ExecutedAt: time.Now().UTC(),
 		Result:     actionResultPtr,
 	})
 }
@@ -311,14 +314,15 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		return
 	}
 
-	// ── Emit audit event (best-effort) ──────────────────────────
-
-	emitStandingApprovalAuditEvent(r.Context(), deps.DB, exec.UserID, exec.AgentID, sa.StandingApprovalID, exec.ActionType, exec.AgentMeta)
-
 	// ── Execute the action via connector ─────────────────────────
 
-	var actionResultPtr *json.RawMessage
-	if result, execErr := executeConnectorAction(r.Context(), deps, exec.UserID, req.Action.Type, params); execErr != nil {
+	result, execErr := executeConnectorAction(r.Context(), deps, exec.UserID, req.Action.Type, params)
+
+	// Always emit the audit event with the actual execution result,
+	// regardless of success or failure (best-effort).
+	emitStandingApprovalAuditEvent(r.Context(), deps.DB, exec.UserID, exec.AgentID, sa.StandingApprovalID, exec.ActionType, exec.AgentMeta, execErr)
+
+	if execErr != nil {
 		if handleConnectorError(w, r, execErr) {
 			return
 		}
@@ -326,7 +330,10 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		CaptureError(r.Context(), execErr)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
 		return
-	} else if result != nil {
+	}
+
+	var actionResultPtr *json.RawMessage
+	if result != nil {
 		actionResultPtr = &result.Data
 	}
 
@@ -351,23 +358,28 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 // ── Audit event emission ───────────────────────────────────────────────────
 
 // emitActionExecutedAuditEvent writes an action.executed audit event for
-// one-off token-based execution. Errors are logged but do not block the
-// request (best-effort audit trail).
-func emitActionExecutedAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, approvalID, actionType string, agentMeta []byte) {
+// one-off token-based execution. Not billable because the approval request
+// was already counted when it was created.
+//
+// execErr should be the error from connector execution, or nil on success.
+// The execution_status and execution_error fields are derived from execErr.
+func emitActionExecutedAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, approvalID, actionType string, agentMeta []byte, execErr error) {
 	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
+	execStatus, execErrMsg := resolveExecResult(execErr)
 
-	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    agentID,
-		EventType:  db.AuditEventActionExecuted,
-		Outcome:    "auto_executed",
-		SourceID:   approvalID,
-		SourceType: "approval",
-		AgentMeta:  agentMeta,
-		Action:     actionJSON,
-	}); err != nil {
-		log.Printf("audit: failed to insert action executed audit event: %v", err)
-	}
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
+		UserID:          userID,
+		AgentID:         agentID,
+		EventType:       db.AuditEventActionExecuted,
+		Outcome:         "auto_executed",
+		SourceID:        approvalID,
+		SourceType:      "approval",
+		AgentMeta:       agentMeta,
+		Action:          actionJSON,
+		ConnectorID:     connectorIDFromActionType(actionType),
+		ExecutionStatus: &execStatus,
+		ExecutionError:  execErrMsg,
+	}, false)
 }
 
 // ── JWT token parsing ──────────────────────────────────────────────────────

@@ -16,26 +16,32 @@ import (
 // for the activity feed (GET /audit-events). Does NOT include id or source_id
 // since the activity feed is for display purposes only.
 type auditEventResponse struct {
-	EventType string    `json:"event_type"`
-	Timestamp time.Time `json:"timestamp"`
-	AgentID   int64     `json:"agent_id"`
-	AgentMeta any       `json:"agent_metadata,omitempty"`
-	Action    any       `json:"action,omitempty"`
-	Outcome   string    `json:"outcome"`
+	EventType       string    `json:"event_type"`
+	Timestamp       time.Time `json:"timestamp"`
+	AgentID         int64     `json:"agent_id"`
+	AgentMeta       any       `json:"agent_metadata,omitempty"`
+	Action          any       `json:"action,omitempty"`
+	Outcome         string    `json:"outcome"`
+	ConnectorID     *string   `json:"connector_id,omitempty"`
+	ExecutionStatus *string   `json:"execution_status,omitempty"`
+	ExecutionError  *string   `json:"execution_error,omitempty"`
 }
 
 // auditLogExportEventResponse is the JSON representation of a single audit
 // event for the export endpoint (GET /audit-logs). Includes id and source_id
 // (always present, never omitted) for SIEM deduplication and event correlation.
 type auditLogExportEventResponse struct {
-	ID        int64     `json:"id"`
-	EventType string    `json:"event_type"`
-	Timestamp time.Time `json:"timestamp"`
-	AgentID   int64     `json:"agent_id"`
-	AgentMeta any       `json:"agent_metadata,omitempty"`
-	Action    any       `json:"action,omitempty"`
-	Outcome   string    `json:"outcome"`
-	SourceID  string    `json:"source_id"`
+	ID              int64     `json:"id"`
+	EventType       string    `json:"event_type"`
+	Timestamp       time.Time `json:"timestamp"`
+	AgentID         int64     `json:"agent_id"`
+	AgentMeta       any       `json:"agent_metadata,omitempty"`
+	Action          any       `json:"action,omitempty"`
+	Outcome         string    `json:"outcome"`
+	SourceID        string    `json:"source_id"`
+	ConnectorID     *string   `json:"connector_id,omitempty"`
+	ExecutionStatus *string   `json:"execution_status,omitempty"`
+	ExecutionError  *string   `json:"execution_error,omitempty"`
 }
 
 // auditEventListResponse is the paginated JSON response for GET /audit-events.
@@ -110,8 +116,9 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 		agentIDStr := r.URL.Query().Get("agent_id")
 		eventTypesStr := r.URL.Query().Get("event_type")
 		outcomeStr := r.URL.Query().Get("outcome")
+		connectorIDStr := r.URL.Query().Get("connector_id")
 
-		if agentIDStr != "" || eventTypesStr != "" || outcomeStr != "" {
+		if agentIDStr != "" || eventTypesStr != "" || outcomeStr != "" || connectorIDStr != "" {
 			filter = &db.AuditEventFilter{}
 
 			if agentIDStr != "" {
@@ -139,6 +146,14 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 					return
 				}
 				filter.Outcome = outcomeStr
+			}
+
+			if connectorIDStr != "" {
+				if len(connectorIDStr) > 128 {
+					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id exceeds maximum length"))
+					return
+				}
+				filter.ConnectorID = &connectorIDStr
 			}
 		}
 
@@ -235,6 +250,16 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Parse optional connector_id filter.
+		var connectorID *string
+		if v := r.URL.Query().Get("connector_id"); v != "" {
+			if len(v) > 128 {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id exceeds maximum length"))
+				return
+			}
+			connectorID = &v
+		}
+
 		// Parse optional cursor (compound: "RFC3339Nano,id").
 		var cursor *db.AuditLogExportCursor
 		if v := r.URL.Query().Get("after"); v != "" {
@@ -246,7 +271,7 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			cursor = &db.AuditLogExportCursor{Timestamp: ts, ID: id}
 		}
 
-		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, limit, cursor)
+		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, connectorID, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ExportAuditLogs: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))
@@ -276,12 +301,15 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 // for the activity feed endpoint.
 func toAuditEventResponse(e db.AuditEvent) auditEventResponse {
 	return auditEventResponse{
-		EventType: string(e.EventType),
-		Timestamp: e.Timestamp,
-		AgentID:   e.AgentID,
-		AgentMeta: unmarshalJSONB(e.AgentMeta),
-		Action:    unmarshalJSONB(e.Action),
-		Outcome:   e.Outcome,
+		EventType:       string(e.EventType),
+		Timestamp:       e.Timestamp,
+		AgentID:         e.AgentID,
+		AgentMeta:       unmarshalJSONB(e.AgentMeta),
+		Action:          unmarshalJSONB(e.Action),
+		Outcome:         e.Outcome,
+		ConnectorID:     e.ConnectorID,
+		ExecutionStatus: e.ExecutionStatus,
+		ExecutionError:  e.ExecutionError,
 	}
 }
 
@@ -291,14 +319,17 @@ func toAuditEventResponse(e db.AuditEvent) auditEventResponse {
 // matching the OpenAPI schema's `required` declaration.
 func toExportAuditEventResponse(e db.AuditEvent) auditLogExportEventResponse {
 	return auditLogExportEventResponse{
-		ID:        e.ID,
-		EventType: string(e.EventType),
-		Timestamp: e.Timestamp,
-		AgentID:   e.AgentID,
-		AgentMeta: unmarshalJSONB(e.AgentMeta),
-		Action:    unmarshalJSONB(e.Action),
-		Outcome:   e.Outcome,
-		SourceID:  e.SourceID,
+		ID:              e.ID,
+		EventType:       string(e.EventType),
+		Timestamp:       e.Timestamp,
+		AgentID:         e.AgentID,
+		AgentMeta:       unmarshalJSONB(e.AgentMeta),
+		Action:          unmarshalJSONB(e.Action),
+		Outcome:         e.Outcome,
+		SourceID:        e.SourceID,
+		ConnectorID:     e.ConnectorID,
+		ExecutionStatus: e.ExecutionStatus,
+		ExecutionError:  e.ExecutionError,
 	}
 }
 

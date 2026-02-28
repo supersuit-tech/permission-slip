@@ -1555,6 +1555,15 @@ paths:
           schema:
             type: string
           example: approval.approved,approval.denied
+        - name: connector_id
+          in: query
+          required: false
+          description: |
+            Filter events to a specific connector (e.g. "github", "slack").
+            Only returns events where the action was handled by this connector.
+          schema:
+            type: string
+          example: github
         - name: limit
           in: query
           required: false
@@ -1598,6 +1607,8 @@ paths:
                         subject: Hello
                     outcome: approved
                     source_id: appr_abc123
+                    connector_id: email
+                    execution_status: null
                   - id: 12346
                     event_type: standing_approval.executed
                     timestamp: '2026-02-20T14:35:00Z'
@@ -1609,6 +1620,8 @@ paths:
                       version: '1'
                     outcome: auto_executed
                     source_id: sae_def456
+                    connector_id: email
+                    execution_status: success
                 has_more: true
                 next_cursor: 2026-02-20T14:35:00.123456789Z,12346
         '400':
@@ -1716,6 +1729,15 @@ paths:
               - pending
               - expired
           example: approved
+        - name: connector_id
+          in: query
+          required: false
+          description: |
+            Filter events to a specific connector (e.g. "github", "slack").
+            Only returns events where the action was handled by this connector.
+          schema:
+            type: string
+          example: github
       responses:
         '200':
           description: Audit events retrieved successfully
@@ -1737,6 +1759,8 @@ paths:
                         to: alice@example.com
                         subject: Hello
                     outcome: approved
+                    connector_id: email
+                    execution_status: null
                   - event_type: standing_approval.executed
                     timestamp: '2026-02-20T14:25:00Z'
                     agent_id: 42
@@ -1748,6 +1772,8 @@ paths:
                       constraints:
                         sender: '*@mycompany.com'
                     outcome: auto_executed
+                    connector_id: email
+                    execution_status: success
                   - event_type: agent.registered
                     timestamp: '2026-02-19T10:00:00Z'
                     agent_id: 43
@@ -6728,9 +6754,11 @@ components:
         event_type:
           type: string
           enum:
+            - approval.requested
             - approval.approved
             - approval.denied
             - approval.cancelled
+            - action.executed
             - standing_approval.executed
             - agent.registered
             - agent.deactivated
@@ -6775,6 +6803,32 @@ components:
             - expired
           description: The outcome of the event.
           example: approved
+        connector_id:
+          type: string
+          nullable: true
+          description: |
+            The connector that handled this action (e.g. "github", "slack").
+            Null for agent lifecycle events (registered, deactivated).
+          example: github
+        execution_status:
+          type: string
+          nullable: true
+          enum:
+            - success
+            - failure
+            - timeout
+            - skipped
+          description: |
+            Whether the executed action succeeded or failed at the third-party
+            service. Only present for action.executed and standing_approval.executed
+            events.
+          example: success
+        execution_error:
+          type: string
+          nullable: true
+          description: |
+            Details about why the execution failed. Only present when
+            execution_status is "failure".
     AuditEventListResponse:
       type: object
       description: Paginated list of audit events.
@@ -6869,6 +6923,32 @@ components:
             standing approval execution id, agent id). Useful for correlating
             events back to their originating resource.
           example: appr_abc123
+        connector_id:
+          type: string
+          nullable: true
+          description: |
+            The connector that handled this action (e.g. "github", "slack").
+            Null for agent lifecycle events (registered, deactivated).
+          example: github
+        execution_status:
+          type: string
+          nullable: true
+          enum:
+            - success
+            - failure
+            - timeout
+            - skipped
+          description: |
+            Whether the executed action succeeded or failed at the third-party
+            service. Only present for action.executed and standing_approval.executed
+            events.
+          example: success
+        execution_error:
+          type: string
+          nullable: true
+          description: |
+            Details about why the execution failed. Only present when
+            execution_status is "failure".
     AuditLogExportResponse:
       type: object
       description: Paginated export of audit log events in chronological order.
