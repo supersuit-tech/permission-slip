@@ -17,6 +17,7 @@ export function useDataRetention() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (error) throw new Error("Failed to load data retention policy");
+      // Cast is safe: openapi-fetch returns typed response matching the schema
       return data as DataRetention;
     },
     enabled: !!accessToken,

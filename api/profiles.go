@@ -240,6 +240,7 @@ func handleGetDataRetention(deps *Deps) http.HandlerFunc {
 		}
 
 		// Fallback for users without a subscription (shouldn't happen, but be safe).
+	// Keep these defaults in sync with the free plan in plans seed data.
 		if sp == nil {
 			RespondJSON(w, http.StatusOK, dataRetentionResponse{
 				PlanID:             db.PlanFree,
@@ -257,13 +258,21 @@ func handleGetDataRetention(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// uuidRegex validates that a string is a well-formed UUID v4 (lowercase hex).
+// Used to prevent path traversal when constructing Supabase Admin API URLs.
+var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
 // deleteSupabaseAuthUser calls the Supabase Admin API to delete the auth user.
 // Requires SupabaseURL and SupabaseServiceRoleKey to be configured. If either
 // is missing, it logs a warning and returns nil (no-op).
 func deleteSupabaseAuthUser(ctx context.Context, deps *Deps, userID string) error {
 	if deps.SupabaseURL == "" || deps.SupabaseServiceRoleKey == "" {
-		log.Printf("Warning: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set; skipping auth user deletion for %s", userID)
+		log.Printf("[%s] Warning: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set; skipping auth user deletion", TraceID(ctx))
 		return nil
+	}
+
+	if !uuidRegex.MatchString(userID) {
+		return fmt.Errorf("invalid user ID format: %q", userID)
 	}
 
 	url := fmt.Sprintf("%s/auth/v1/admin/users/%s", deps.SupabaseURL, userID)

@@ -4334,11 +4334,22 @@ paths:
       summary: Delete Account
       description: |
         Permanently deletes the authenticated user's account and all associated
-        data including agents, approvals, credentials, standing approvals,
-        audit events, and subscription. This action is irreversible.
+        data including agents, approvals, credentials (and their vault secrets),
+        standing approvals, audit events, and subscription. The Supabase auth
+        user is also removed. This action is irreversible.
 
         The request body must include `"confirmation": "DELETE"` as a safety
         check to prevent accidental deletion.
+
+        **What gets deleted:**
+        - Profile and contact information
+        - All registered agents and their configurations
+        - All stored credentials (including encrypted vault secrets)
+        - All approval history and audit log events
+        - All standing approvals and their execution history
+        - Subscription and usage data
+        - Notification preferences and push subscriptions
+        - The Supabase authentication user (best-effort)
       tags:
         - Profiles
       security:
@@ -4377,8 +4388,14 @@ paths:
       summary: Get Data Retention Policy
       description: |
         Returns the data retention policy for the authenticated user based on
-        their current plan. Free-tier users retain audit logs for 7 days;
-        paid users retain audit logs for 90 days.
+        their current plan.
+
+        **Retention periods by plan:**
+        - **Free:** 7-day audit log retention
+        - **Pay As You Go:** 90-day audit log retention
+
+        Account data (profile, credentials) is retained indefinitely until
+        the user explicitly deletes their account via `DELETE /v1/profile`.
       tags:
         - Profiles
       security:
