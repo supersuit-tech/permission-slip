@@ -9,6 +9,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
+	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
@@ -26,6 +27,7 @@ type Deps struct {
 	Notifier              *notify.Dispatcher   // notification fan-out; nil means notifications are disabled
 	VAPIDPublicKey        string               // VAPID public key for Web Push; empty if not configured
 	Connectors            *connectors.Registry // connector execution registry; nil means no connectors are available
+	Stripe                *pstripe.Client      // Stripe API client; nil when billing is disabled or Stripe keys not set
 	BillingEnabled        bool                 // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
 	DevMode               bool                 // true when MODE=development; disables rate limiting
 	RateLimiter           *RateLimiter         // pre-auth rate limiter (per-IP + global); nil disables
@@ -73,6 +75,11 @@ func NewRouter(deps *Deps) http.Handler {
 	RegisterPushSubscriptionRoutes(mux, deps)
 	RegisterStandingApprovalRoutes(mux, deps)
 	RegisterApprovalEventRoutes(mux, deps)
+
+	// Billing routes are always registered (handlers check deps.BillingEnabled
+	// and deps.Stripe internally) so the OpenAPI spec can document them.
+	RegisterBillingRoutes(mux, deps)
+	RegisterBillingWebhookRoutes(mux, deps)
 
 	var handler http.Handler = mux
 	handler = RateLimitMiddleware(deps.RateLimiter, deps.DevMode, deps.TrustedProxyHeader)(handler)

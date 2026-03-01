@@ -49,4 +49,7 @@ const (
 	ErrAgentLimitReached        ErrorCode = "agent_limit_reached"
 	ErrStandingApprovalLimitReached ErrorCode = "standing_approval_limit_reached"
 	ErrCredentialLimitReached   ErrorCode = "credential_limit_reached"
+	ErrSubscriptionNotFound     ErrorCode = "subscription_not_found"
+	ErrAlreadySubscribed        ErrorCode = "already_subscribed"
+	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
 )

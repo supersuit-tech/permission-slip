@@ -101,6 +101,8 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
+  - name: Billing
+    description: Subscription management, checkout, and usage (session-authenticated)
 paths:
   /v1/connectors:
     get:
@@ -4675,6 +4677,122 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/billing/subscription:
+    get:
+      summary: Get current subscription
+      description: |
+        Returns the authenticated user's subscription details including plan info,
+        billing period, and current usage metrics.
+
+        Only available when `billing_enabled` is `true` in the server config.
+      operationId: getSubscription
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Subscription details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+              example:
+                plan_id: free
+                plan_name: Free
+                status: active
+                current_period_start: '2026-03-01T00:00:00Z'
+                current_period_end: '2026-04-01T00:00:00Z'
+                has_payment_method: false
+                can_upgrade: true
+                plan_limits:
+                  max_requests_per_month: 1000
+                  max_agents: 5
+                  max_standing_approvals: 10
+                  max_credentials: 5
+                  audit_retention_days: 7
+                usage:
+                  request_count: 42
+                  sms_count: 0
+                  request_limit: 1000
+                  over_limit: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/billing/checkout:
+    post:
+      summary: Create checkout session
+      description: |
+        Creates a Stripe Checkout Session for upgrading from the free plan to
+        pay-as-you-go. Returns a URL to redirect the user to Stripe's hosted
+        checkout page.
+
+        If the user doesn't have a Stripe Customer yet, one is created automatically.
+        If the user is already on a paid plan, returns 409 Conflict.
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: createCheckout
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Already subscribed to a paid plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/webhook:
+    post:
+      summary: Stripe webhook
+      description: |
+        Receives and processes Stripe webhook events. This endpoint verifies the
+        webhook signature using `STRIPE_WEBHOOK_SECRET` and processes the following
+        event types:
+
+        - `checkout.session.completed`: Stores the Stripe subscription ID and
+          atomically upgrades the user from free → pay_as_you_go (idempotent —
+          duplicate events are safely ignored).
+        - `customer.subscription.updated`: Maps the Stripe subscription status
+          (active/trialing → active, past_due/unpaid → past_due, other → cancelled)
+          to the local subscription status.
+        - `customer.subscription.deleted`: Downgrades user to free plan, marks
+          status as cancelled, and sets `downgraded_at` to trigger the 7-day
+          audit retention grace period.
+        - `invoice.payment_failed`: Marks subscription as past_due so the UI can
+          prompt the user to update their payment method.
+
+        Always returns 200 to prevent Stripe retries. Event processing failures
+        are logged server-side.
+
+        **No authentication required** — security is provided by Stripe's webhook
+        signature verification (`STRIPE_WEBHOOK_SECRET` is required in production).
+      operationId: stripeWebhook
+      tags:
+        - Billing
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Invalid signature or malformed event
   /v1/config:
     get:
       summary: Get server configuration
@@ -8141,6 +8259,88 @@ components:
           type: string
           description: Base64url-encoded VAPID public key
           example: BNx...
+    SubscriptionResponse:
+      type: object
+      required:
+        - plan_id
+        - plan_name
+        - status
+        - current_period_start
+        - current_period_end
+        - has_payment_method
+        - can_upgrade
+        - plan_limits
+      properties:
+        plan_id:
+          type: string
+          description: The plan ID (e.g., "free", "pay_as_you_go")
+          example: free
+        plan_name:
+          type: string
+          description: Human-readable plan name
+          example: Free
+        status:
+          type: string
+          enum:
+            - active
+            - past_due
+            - cancelled
+          description: Subscription status
+          example: active
+        current_period_start:
+          type: string
+          format: date-time
+          description: Start of the current billing period (inclusive)
+        current_period_end:
+          type: string
+          format: date-time
+          description: End of the current billing period (exclusive)
+        has_payment_method:
+          type: boolean
+          description: Whether the user has a Stripe payment method on file
+          example: false
+        can_upgrade:
+          type: boolean
+          description: Whether the user can upgrade to a paid plan (true when on the free plan)
+          example: true
+        plan_limits:
+          $ref: '#/components/schemas/PlanLimits'
+        usage:
+          $ref: '#/components/schemas/UsageInfo'
+    UsageInfo:
+      type: object
+      required:
+        - request_count
+        - sms_count
+        - over_limit
+      properties:
+        request_count:
+          type: integer
+          description: Number of API requests in the current billing period
+          example: 42
+        sms_count:
+          type: integer
+          description: Number of SMS messages sent in the current billing period
+          example: 0
+        request_limit:
+          type: integer
+          nullable: true
+          description: Monthly request limit for the current plan (null = unlimited)
+          example: 1000
+        over_limit:
+          type: boolean
+          description: Whether current usage exceeds the plan's request limit
+          example: false
+    CheckoutResponse:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Stripe Checkout Session URL — redirect the user here to complete payment
+          example: https://checkout.stripe.com/c/pay/cs_test_...
     ConfigResponse:
       type: object
       description: |
@@ -8547,6 +8747,35 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    PlanLimits:
+      type: object
+      required:
+        - audit_retention_days
+      properties:
+        max_requests_per_month:
+          type: integer
+          nullable: true
+          description: Monthly request limit (null = unlimited)
+          example: 1000
+        max_agents:
+          type: integer
+          nullable: true
+          description: Maximum number of agents (null = unlimited)
+          example: 5
+        max_standing_approvals:
+          type: integer
+          nullable: true
+          description: Maximum active standing approvals (null = unlimited)
+          example: 10
+        max_credentials:
+          type: integer
+          nullable: true
+          description: Maximum stored credentials (null = unlimited)
+          example: 5
+        audit_retention_days:
+          type: integer
+          description: Number of days audit logs are retained
+          example: 7
   parameters:
     ActionConfigId:
       name: config_id
