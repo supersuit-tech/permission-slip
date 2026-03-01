@@ -12,14 +12,24 @@
     "test": "jest"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@supabase/.*|react-native-url-polyfill)"
+    ]
   },
   "dependencies": {
+    "@react-navigation/native": "^7.1.31",
+    "@react-navigation/native-stack": "^7.14.2",
+    "@supabase/supabase-js": "^2.98.0",
     "expo": "~55.0.4",
+    "expo-secure-store": "^55.0.8",
     "expo-status-bar": "~55.0.4",
     "openapi-fetch": "^0.17.0",
     "react": "19.2.0",
-    "react-native": "0.83.2"
+    "react-native": "0.83.2",
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-screens": "^4.24.0",
+    "react-native-url-polyfill": "^3.0.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

@@ -81,7 +81,6 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 | Auth | Supabase Auth (JWT-based, MFA support) |
 | Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
 | State | React Query (TanStack Query) |
-| Mobile | React Native (Expo), TypeScript |
 | Testing | Go test + real Postgres, Vitest + React Testing Library, Jest (mobile) |
 
 ## Getting Started
@@ -163,6 +162,21 @@ npm start                  # launches Expo dev server
 Set `EXPO_PUBLIC_API_BASE_URL` in your `.env` (or Expo config) to point at your local backend (e.g. `http://<your-ip>:8080/api`). Without it, the app falls back to production and logs a warning in dev mode.
 
 > **Accessing via ngrok or an external URL?** Set `ALLOWED_ORIGINS` to your public URL (e.g. `ALLOWED_ORIGINS=https://your-subdomain.ngrok-free.app make dev-backend`) so the Go backend allows cross-origin requests. Without it, API calls from a non-localhost origin will be blocked with 403.
+
+### 7. Mobile app (optional)
+
+The mobile app lives in `mobile/` and uses React Native (Expo). It shares the same Supabase project and OpenAPI spec as the web frontend.
+
+```bash
+cd mobile
+npm install
+cp .env.example .env   # set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY
+npm start              # Expo dev server — scan QR with Expo Go app
+```
+
+**Auth tokens** are stored in the device's secure keychain (iOS Keychain / Android EncryptedSharedPreferences) via `expo-secure-store`, not in plain-text storage.
+
+See [`mobile/`](mobile/) for the full directory structure. Run `npm test` from the `mobile/` directory to run mobile unit tests.
 
 ## Production Build
 
