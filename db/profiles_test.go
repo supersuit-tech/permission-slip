@@ -11,7 +11,7 @@ import (
 func TestProfilesSchema(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	testhelper.RequireColumns(t, tx, "profiles", []string{"id", "username", "email", "phone", "created_at"})
+	testhelper.RequireColumns(t, tx, "profiles", []string{"id", "username", "email", "phone", "marketing_opt_in", "created_at"})
 }
 
 func TestProfilesUsernameUnique(t *testing.T) {
@@ -90,7 +90,7 @@ func TestGetProfileByUserID_NullContactFields(t *testing.T) {
 	}
 }
 
-func TestUpdateProfileContactFields(t *testing.T) {
+func TestUpdateProfileFields(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -101,9 +101,9 @@ func TestUpdateProfileContactFields(t *testing.T) {
 	phone := "+15551234567"
 
 	// Set both fields.
-	err := db.UpdateProfileContactFields(ctx, tx, uid, &email, &phone)
+	err := db.UpdateProfileFields(ctx, tx, uid, &email, &phone, nil)
 	if err != nil {
-		t.Fatalf("update contact fields: %v", err)
+		t.Fatalf("update profile fields: %v", err)
 	}
 
 	profile, err := db.GetProfileByUserID(ctx, tx, uid)
@@ -118,9 +118,9 @@ func TestUpdateProfileContactFields(t *testing.T) {
 	}
 
 	// Clear both fields.
-	err = db.UpdateProfileContactFields(ctx, tx, uid, nil, nil)
+	err = db.UpdateProfileFields(ctx, tx, uid, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("clear contact fields: %v", err)
+		t.Fatalf("clear profile fields: %v", err)
 	}
 	profile, err = db.GetProfileByUserID(ctx, tx, uid)
 	if err != nil {
@@ -142,7 +142,7 @@ func TestProfileEmailFormatConstraint(t *testing.T) {
 
 	ctx := context.Background()
 	badEmail := "not-an-email"
-	err := db.UpdateProfileContactFields(ctx, tx, uid, &badEmail, nil)
+	err := db.UpdateProfileFields(ctx, tx, uid, &badEmail, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid email format, got nil")
 	}
@@ -156,8 +156,53 @@ func TestProfilePhoneE164Constraint(t *testing.T) {
 
 	ctx := context.Background()
 	badPhone := "555-1234"
-	err := db.UpdateProfileContactFields(ctx, tx, uid, nil, &badPhone)
+	err := db.UpdateProfileFields(ctx, tx, uid, nil, &badPhone, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid phone format, got nil")
+	}
+}
+
+func TestUpdateProfileFields_MarketingOptIn(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	ctx := context.Background()
+
+	// Default should be false.
+	profile, err := db.GetProfileByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("get profile: %v", err)
+	}
+	if profile.MarketingOptIn {
+		t.Error("expected marketing_opt_in to default to false")
+	}
+
+	// Set to true.
+	optIn := true
+	err = db.UpdateProfileFields(ctx, tx, uid, nil, nil, &optIn)
+	if err != nil {
+		t.Fatalf("update marketing opt-in: %v", err)
+	}
+	profile, err = db.GetProfileByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("re-fetch: %v", err)
+	}
+	if !profile.MarketingOptIn {
+		t.Error("expected marketing_opt_in to be true")
+	}
+
+	// Nil should leave it unchanged.
+	err = db.UpdateProfileFields(ctx, tx, uid, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("update with nil: %v", err)
+	}
+	profile, err = db.GetProfileByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("re-fetch after nil: %v", err)
+	}
+	if !profile.MarketingOptIn {
+		t.Error("expected marketing_opt_in to remain true when nil passed")
 	}
 }
