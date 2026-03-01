@@ -105,6 +105,8 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
+  - name: Billing
+    description: Subscription management, checkout, and usage (session-authenticated)
 
 paths:
   /v1/connectors:
@@ -223,6 +225,15 @@ paths:
 
   /v1/push-subscriptions/{subscription_id}:
     $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptionById'
+
+  /v1/billing/subscription:
+    $ref: './components/paths/billing.yaml#/subscription'
+
+  /v1/billing/checkout:
+    $ref: './components/paths/billing.yaml#/checkout'
+
+  /v1/billing/webhook:
+    $ref: './components/paths/billing.yaml#/webhook'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -420,6 +431,14 @@ components:
       $ref: './components/schemas/push_subscriptions.yaml#/DeletePushSubscriptionResponse'
     VAPIDPublicKeyResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/VAPIDPublicKeyResponse'
+
+    # Billing
+    SubscriptionResponse:
+      $ref: './components/schemas/billing.yaml#/SubscriptionResponse'
+    UsageInfo:
+      $ref: './components/schemas/billing.yaml#/UsageInfo'
+    CheckoutResponse:
+      $ref: './components/schemas/billing.yaml#/CheckoutResponse'
 
     # Config
     ConfigResponse:

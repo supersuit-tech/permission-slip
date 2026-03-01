@@ -74,6 +74,42 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
+	// Stripe — required when BILLING_ENABLED=true and in production.
+	// If billing is enabled but keys are missing, warn (dev) or error (prod).
+	billingEnabled := os.Getenv("BILLING_ENABLED") == "true"
+	if billingEnabled {
+		hasStripeKey := os.Getenv("STRIPE_SECRET_KEY") != ""
+		hasWebhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET") != ""
+		hasPriceID := os.Getenv("STRIPE_PRICE_ID_REQUEST") != ""
+
+		if !devMode {
+			if !hasStripeKey {
+				errs = append(errs, configError{
+					envVar:  "STRIPE_SECRET_KEY",
+					message: "required when BILLING_ENABLED=true (Stripe API key for billing)",
+				})
+			}
+			if !hasWebhookSecret {
+				errs = append(errs, configError{
+					envVar:  "STRIPE_WEBHOOK_SECRET",
+					message: "required when BILLING_ENABLED=true (webhook signature verification prevents spoofed events)",
+				})
+			}
+			if !hasPriceID {
+				warnings = append(warnings, configError{
+					envVar:  "STRIPE_PRICE_ID_REQUEST",
+					message: "not set; checkout session creation will fail without a metered price ID",
+				})
+			}
+			if os.Getenv("BASE_URL") == "" {
+				errs = append(errs, configError{
+					envVar:  "BASE_URL",
+					message: "required when BILLING_ENABLED=true (checkout session success/cancel redirect URLs need a base URL)",
+				})
+			}
+		}
+	}
+
 	// Optional but recommended — warn in all modes.
 	if os.Getenv("SUPABASE_SERVICE_ROLE_KEY") == "" {
 		warnings = append(warnings, configError{
