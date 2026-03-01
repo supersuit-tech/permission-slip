@@ -172,4 +172,42 @@ describe("SecuritySection", () => {
     // Should be back to the Remove button.
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
   });
+
+  it(
+    "shows error state when listFactors times out after 10 seconds",
+    async () => {
+      mockApiFetch();
+      // Use fake timers that auto-advance so async microtasks still flush
+      // while we control setTimeout behaviour.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        // Return a promise that never resolves (simulates a hanging endpoint).
+        mockMfa.listFactors.mockReturnValue(new Promise(() => {}));
+
+        render(<SecuritySection />, { wrapper });
+
+        // Initially shows loading spinner.
+        expect(
+          screen.getByRole("status", { name: "Loading security settings" }),
+        ).toBeInTheDocument();
+
+        // Advance past the 10-second timeout so Promise.race rejects.
+        await vi.advanceTimersByTimeAsync(10001);
+
+        // Should now show the error state with a Try Again button.
+        await waitFor(
+          () => {
+            expect(
+              screen.getByText("Failed to load security settings."),
+            ).toBeInTheDocument();
+          },
+          { timeout: 3000 },
+        );
+        expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+    15000, // allow enough wall-clock time for the fake-timer dance
+  );
 });

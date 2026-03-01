@@ -58,10 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const challengeAndVerifyTotp = useCallback(
     async (factorId: string, code: string) => {
-      const { error } = await supabase.auth.mfa.challengeAndVerify({
-        factorId,
-        code,
-      });
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Request timed out")), 10000)
+      );
+      const request = supabase.auth.mfa.challengeAndVerify({ factorId, code });
+      const { error } = await Promise.race([request, timeout]).catch((err) => ({
+        error: err instanceof Error ? err : new Error(String(err)),
+      }));
       if (!error) {
         setAuthStatus("authenticated");
       }
@@ -179,8 +182,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyMfa = useCallback(
     async (code: string) => {
-      const { data: factorsData, error: listError } =
-        await supabase.auth.mfa.listFactors();
+      const listTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Request timed out")), 10000)
+      );
+      const { data: factorsData, error: listError } = await Promise.race([
+        supabase.auth.mfa.listFactors(),
+        listTimeout,
+      ]).catch((err) => ({
+        data: null,
+        error: err instanceof Error ? err : new Error(String(err)),
+      }));
       if (listError) return { error: listError };
 
       const totpFactor = getVerifiedTotpFactor(factorsData?.totp);
@@ -200,10 +211,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const enrollMfa = useCallback(async () => {
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: "totp",
-      friendlyName: "Authenticator App",
-    });
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out")), 10000)
+    );
+    const { data, error } = await Promise.race([
+      supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: "Authenticator App",
+      }),
+      timeout,
+    ]).catch((err) => ({
+      data: null,
+      error: err instanceof Error ? err : new Error(String(err)),
+    }));
     if (error) return { data: null, error };
 
     // Guard against partial/unexpected response shapes from GoTrue.
@@ -234,12 +254,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const unenrollMfa = useCallback(async (factorId: string) => {
-    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out")), 10000)
+    );
+    const { error } = await Promise.race([
+      supabase.auth.mfa.unenroll({ factorId }),
+      timeout,
+    ]).catch((err) => ({
+      error: err instanceof Error ? err : new Error(String(err)),
+    }));
     return { error: error ?? null };
   }, []);
 
   const listMfaFactors = useCallback(async () => {
-    const { data, error } = await supabase.auth.mfa.listFactors();
+    // Wrap with a 10-second timeout so a hanging Supabase MFA endpoint
+    // resolves to an error instead of leaving the UI in an infinite spinner.
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out")), 10000)
+    );
+    const request = supabase.auth.mfa.listFactors();
+    const { data, error } = await Promise.race([request, timeout]).catch(
+      (err) => ({
+        data: null,
+        error: err instanceof Error ? err : new Error(String(err)),
+      })
+    );
     // Use data.all filtered by factor_type instead of data.totp because
     // the Supabase client only puts *verified* factors in data.totp.
     // We need unverified factors too so MfaEnrollmentFlow can clean up
