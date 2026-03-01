@@ -6,9 +6,10 @@
        audit audit-backend audit-frontend \
        docker-build deploy
 
-# Install all dependencies
+# Install all dependencies (frontend + backend + mobile)
 install:
 	cd frontend && npm install
+	cd mobile && npm install
 	go mod download
 
 # Full setup: install deps + generate API client
@@ -76,7 +77,7 @@ deploy:
 
 # ---------- Testing ----------
 
-test: test-backend test-frontend
+test: test-backend test-frontend mobile-test
 
 test-backend:
 	go test ./...
@@ -110,9 +111,9 @@ mobile-install:
 mobile-start:
 	cd mobile && npm start
 
-# Run mobile tests
+# Run mobile tests (--ci for deterministic output in CI)
 mobile-test:
-	cd mobile && npm test
+	cd mobile && npm test -- --ci
 
 # ---------- Dependency Audit ----------
 

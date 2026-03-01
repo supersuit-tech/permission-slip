@@ -56,6 +56,7 @@ Always run relevant tests after making changes, before committing. Before pushin
 - **All tests:** `make test`
 - **Backend only:** `make test-backend` (runs `go test ./...`)
 - **Frontend only:** `make test-frontend` (runs `cd frontend && npm test`)
+- **Mobile only:** `make mobile-test` (runs `cd mobile && npm test -- --ci`)
 - **Database tests only:** `go test ./db/... -v`
 
 Database tests require a running Postgres instance. They use `DATABASE_URL_TEST` (defaults to `postgres://localhost:5432/permission_slip_test?sslmode=disable`).
@@ -65,6 +66,7 @@ Database tests require a running Postgres instance. They use `DATABASE_URL_TEST`
 - **Changed only non-code files (e.g. markdown, docs):** skip tests — no test run needed.
 - **Changed Go code:** run `make test-backend`
 - **Changed frontend code:** run `make test-frontend`
+- **Changed mobile code:** run `make mobile-test`
 - **Changed migrations or db/ code:** run `go test ./db/... -v` at minimum
 - **Not sure:** run `make test`
 

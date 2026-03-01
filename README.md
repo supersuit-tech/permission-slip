@@ -80,7 +80,8 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 | Auth | Supabase Auth (JWT-based, MFA support) |
 | Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
 | State | React Query (TanStack Query) |
-| Testing | Go test + real Postgres, Vitest + React Testing Library |
+| Mobile | React Native (Expo), TypeScript |
+| Testing | Go test + real Postgres, Vitest + React Testing Library, Jest (mobile) |
 
 ## Getting Started
 
@@ -203,15 +204,28 @@ go run ./cmd/generate-vapid-keys --format=heroku
 
 > **Warning:** Changing VAPID keys invalidates all existing Web Push subscriptions. Users will need to re-subscribe to push notifications.
 
+## Mobile App
+
+The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin client for approving and viewing requests from your phone.
+
+```bash
+make mobile-install    # install mobile dependencies
+make mobile-start      # start Expo development server
+make mobile-test       # run mobile tests
+```
+
+See [issue #9](https://github.com/supersuit-tech/permission-slip/issues/9) for the full mobile roadmap.
+
 ## Testing
 
 ```bash
-make test              # all tests (backend + frontend)
+make test              # all tests (backend + frontend + mobile)
 make test-backend      # Go tests (requires Postgres)
 make test-frontend     # frontend tests (no database needed)
+make mobile-test       # mobile tests (no database needed)
 ```
 
-Backend tests run against a real Postgres database. Frontend tests use a mocked Supabase client. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.
+Backend tests run against a real Postgres database. Frontend and mobile tests use mocked clients. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.
 
 ## Observability
 
