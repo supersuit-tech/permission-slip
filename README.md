@@ -19,6 +19,12 @@ Open-source API key vault where agents execute scoped, time-limited actions on b
                      └───────────┘
 ```
 
+## Get Started
+
+**[Get started for free on permissionslip.dev](https://www.permissionslip.dev)** — no setup required.
+
+Or **[self-host](docs/deployment-self-hosted.md)** on your own infrastructure for full control (Docker, Fly.io, or bare metal).
+
 ## Why Permission Slip?
 
 You want your AI agent to book flights, send emails, order food — but you can't trust it with full access to your accounts.
