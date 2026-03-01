@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
+  Pressable,
   Text,
   TextInput,
   TouchableOpacity,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
+import { authStyles } from "./styles";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
@@ -20,27 +22,37 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function EmailStep({ onSubmit }: EmailStepProps) {
   const [email, setEmail] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
+  const inputRef = useRef<TextInput>(null);
 
   const trimmedEmail = email.trim();
   const isValidEmail = EMAIL_REGEX.test(trimmedEmail);
+
+  // Auto-focus the email input on mount.
+  useEffect(() => {
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const submit = () => handleSubmit(() => onSubmit(trimmedEmail));
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={authStyles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={styles.content}>
-        <Text style={styles.title}>Permission Slip</Text>
-        <Text style={styles.subtitle}>
+      <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
+        <Text style={authStyles.title}>Permission Slip</Text>
+        <Text style={authStyles.subtitle}>
           Enter your email to sign in or create an account.
         </Text>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
+        <View style={authStyles.field}>
+          <Text style={authStyles.label}>Email</Text>
           <TextInput
-            style={styles.input}
+            ref={inputRef}
+            testID="email-input"
+            accessibilityLabel="Email address"
+            style={authStyles.input}
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
@@ -55,80 +67,29 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
           />
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text testID="email-error" style={authStyles.error}>
+            {error}
+          </Text>
+        ) : null}
 
         <TouchableOpacity
-          style={[styles.button, isSubmitting && styles.buttonDisabled]}
+          testID="email-submit"
+          accessibilityLabel={isSubmitting ? "Sending code" : "Continue"}
+          accessibilityRole="button"
+          style={[
+            authStyles.button,
+            authStyles.primaryButton,
+            (isSubmitting || !isValidEmail) && authStyles.buttonDisabled,
+          ]}
           onPress={submit}
           disabled={isSubmitting || !isValidEmail}
         >
-          <Text style={styles.buttonText}>
+          <Text style={authStyles.primaryButtonText}>
             {isSubmitting ? "Sending..." : "Continue"}
           </Text>
         </TouchableOpacity>
-      </View>
+      </Pressable>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#6B7280",
-    marginBottom: 32,
-  },
-  field: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#374151",
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#111827",
-    backgroundColor: "#fff",
-  },
-  error: {
-    color: "#DC2626",
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: "#111827",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});

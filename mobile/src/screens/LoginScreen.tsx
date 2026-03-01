@@ -13,6 +13,7 @@ export default function LoginScreen() {
       <OtpStep
         email={email}
         onVerify={(code) => verifyOtp(email, code)}
+        onResend={() => sendOtp(email)}
         onBack={() => setStep("email")}
       />
     );
