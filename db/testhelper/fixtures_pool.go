@@ -2,7 +2,6 @@ package testhelper
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -46,9 +45,8 @@ func SetupPoolUser(t *testing.T, prefix string, publicKey string) PoolUser {
 
 	t.Cleanup(func() {
 		bg := context.Background()
-		aidStr := strconv.FormatInt(agentID, 10)
 		// Delete in reverse-FK order to avoid constraint violations.
-		pool.Exec(bg, `DELETE FROM request_ids WHERE agent_id = $1`, aidStr)
+		pool.Exec(bg, `DELETE FROM request_ids WHERE agent_id = $1`, agentID)
 		pool.Exec(bg, `DELETE FROM standing_approval_executions WHERE standing_approval_id IN (SELECT standing_approval_id FROM standing_approvals WHERE agent_id = $1)`, agentID)
 		pool.Exec(bg, `DELETE FROM standing_approvals WHERE agent_id = $1`, agentID)
 		pool.Exec(bg, `DELETE FROM approvals WHERE agent_id = $1`, agentID)
