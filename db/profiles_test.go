@@ -90,7 +90,7 @@ func TestGetProfileByUserID_NullContactFields(t *testing.T) {
 	}
 }
 
-func TestUpdateProfileContactFields(t *testing.T) {
+func TestUpdateProfileFields(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -103,7 +103,7 @@ func TestUpdateProfileContactFields(t *testing.T) {
 	// Set both fields.
 	err := db.UpdateProfileFields(ctx, tx, uid, &email, &phone, nil)
 	if err != nil {
-		t.Fatalf("update contact fields: %v", err)
+		t.Fatalf("update profile fields: %v", err)
 	}
 
 	profile, err := db.GetProfileByUserID(ctx, tx, uid)
@@ -120,7 +120,7 @@ func TestUpdateProfileContactFields(t *testing.T) {
 	// Clear both fields.
 	err = db.UpdateProfileFields(ctx, tx, uid, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("clear contact fields: %v", err)
+		t.Fatalf("clear profile fields: %v", err)
 	}
 	profile, err = db.GetProfileByUserID(ctx, tx, uid)
 	if err != nil {

@@ -22,6 +22,17 @@ type profileResponse struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+func toProfileResponse(p *db.Profile) profileResponse {
+	return profileResponse{
+		ID:             p.ID,
+		Username:       p.Username,
+		Email:          p.Email,
+		Phone:          p.Phone,
+		MarketingOptIn: p.MarketingOptIn,
+		CreatedAt:      p.CreatedAt,
+	}
+}
+
 // updateProfileRaw uses json.RawMessage to detect which fields were actually
 // provided in the request body, enabling true PATCH semantics (absent fields
 // are left unchanged, explicit null clears the field).
@@ -52,14 +63,7 @@ func handleGetProfile() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
 
-		RespondJSON(w, http.StatusOK, profileResponse{
-			ID:             profile.ID,
-			Username:       profile.Username,
-			Email:          profile.Email,
-			Phone:          profile.Phone,
-			MarketingOptIn: profile.MarketingOptIn,
-			CreatedAt:      profile.CreatedAt,
-		})
+		RespondJSON(w, http.StatusOK, toProfileResponse(profile))
 	}
 }
 
@@ -169,14 +173,7 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, profileResponse{
-			ID:             updated.ID,
-			Username:       updated.Username,
-			Email:          updated.Email,
-			Phone:          updated.Phone,
-			MarketingOptIn: updated.MarketingOptIn,
-			CreatedAt:      updated.CreatedAt,
-		})
+		RespondJSON(w, http.StatusOK, toProfileResponse(updated))
 	}
 }
 

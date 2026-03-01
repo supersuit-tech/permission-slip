@@ -47,7 +47,8 @@ export function NotificationSection() {
   }
 
   async function handleToggleProductUpdates() {
-    const newValue = !profile?.marketing_opt_in;
+    if (!profile) return;
+    const newValue = !profile.marketing_opt_in;
     try {
       await updateProfile({ marketing_opt_in: newValue });
       trackEvent(PostHogEvents.MARKETING_OPT_IN_UPDATED, { enabled: newValue });
@@ -147,7 +148,7 @@ export function NotificationSection() {
                 <Button
                   variant={profile?.marketing_opt_in ? "default" : "outline"}
                   size="sm"
-                  disabled={isUpdatingProfile}
+                  disabled={isUpdatingProfile || !profile}
                   onClick={handleToggleProductUpdates}
                 >
                   {profile?.marketing_opt_in ? "Enabled" : "Disabled"}
