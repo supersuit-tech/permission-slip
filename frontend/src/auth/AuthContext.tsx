@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       const request = supabase.auth.mfa.challengeAndVerify({ factorId, code });
       const { error } = await Promise.race([request, timeout]).catch((err) => ({
-        error: err instanceof Error ? err : new Error(String(err)),
+        error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
       }));
       if (!error) {
         setAuthStatus("authenticated");
@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       timeout,
     ]).catch((err) => ({
       data: null,
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
     }));
     if (error) return { data: null, error };
 
@@ -255,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.auth.mfa.unenroll({ factorId }),
       timeout,
     ]).catch((err) => ({
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
     }));
     return { error: error ?? null };
   }, []);

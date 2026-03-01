@@ -6,7 +6,7 @@
  * aalResponse) so individual test files don't duplicate boilerplate.
  */
 import { vi } from "vitest";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, User, Factor } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
 export const mockAuth = vi.mocked(supabase.auth);
@@ -90,7 +90,7 @@ export function aalResponse(current: string, next: string) {
  */
 export function setupAuthMocks({
   authenticated = false,
-  factors = undefined as typeof verifiedFactor[] | undefined,
+  factors = undefined as Factor[] | undefined,
 } = {}) {
   // restoreAllMocks (not clearAllMocks) so mock *implementations* from
   // previous tests are removed, not just call counts.
