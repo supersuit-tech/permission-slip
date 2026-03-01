@@ -389,11 +389,15 @@ func main() {
 		serverFailed = true
 	}
 
-	// Stop background goroutines and wait for them to exit before closing
-	// the DB pool or flushing Sentry.
+	// Stop background goroutines and wait for them to exit (up to 5s)
+	// before closing the DB pool or flushing Sentry.
 	bgCancel()
 	if auditPurgeDone != nil {
-		<-auditPurgeDone
+		select {
+		case <-auditPurgeDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("audit purge goroutine did not exit in time")
+		}
 	}
 
 	// Allow up to 30 seconds for in-flight requests to complete.
@@ -434,7 +438,8 @@ func main() {
 // Cancel ctx to stop the goroutine cleanly.
 func startAuditPurge(ctx context.Context, pool db.DBTX, logger *slog.Logger) <-chan struct{} {
 	interval := auditPurgeInterval(logger)
-	logger.Info("audit purge: scheduled", "interval", interval.String())
+	logger.Info("audit purge: scheduled", "interval", interval.String(),
+		"env", "AUDIT_PURGE_INTERVAL")
 
 	done := make(chan struct{})
 	go func() {
@@ -474,20 +479,26 @@ func runAuditPurge(ctx context.Context, pool db.DBTX, logger *slog.Logger) {
 		}
 		logger.Error("audit purge: failed", "error", err)
 		sentry.CaptureException(err)
-	} else {
+	} else if deleted > 0 {
 		logger.Info("audit purge: completed", "rows_deleted", deleted)
+	} else {
+		logger.Debug("audit purge: completed", "rows_deleted", 0)
 	}
 }
 
 // auditPurgeInterval returns the purge ticker interval from the
-// AUDIT_PURGE_INTERVAL env var, defaulting to 1 hour.
+// AUDIT_PURGE_INTERVAL env var, defaulting to 1 hour. Values below
+// 1 minute are rejected to prevent accidental resource exhaustion.
 func auditPurgeInterval(logger *slog.Logger) time.Duration {
+	const minInterval = time.Minute
+
 	if v := os.Getenv("AUDIT_PURGE_INTERVAL"); v != "" {
 		d, err := time.ParseDuration(v)
-		if err == nil && d > 0 {
+		if err == nil && d >= minInterval {
 			return d
 		}
-		logger.Warn("invalid AUDIT_PURGE_INTERVAL, using default 1h", "value", v, "error", err)
+		logger.Warn("invalid AUDIT_PURGE_INTERVAL, using default 1h",
+			"value", v, "error", err, "min", minInterval.String())
 	}
 	return time.Hour
 }
