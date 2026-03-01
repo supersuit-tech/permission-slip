@@ -8,19 +8,29 @@ import (
 // PurgeExpiredAuditEvents deletes audit events older than the retention period
 // for each user's plan. Free-tier users retain 7 days; paid users retain 90 days.
 //
+// A 7-day grace period is applied after a downgrade: if a user's subscription
+// has downgraded_at set within the last 7 days, the previous paid plan's
+// retention (90 days) is used instead of the current plan's shorter retention.
+//
 // Users without a subscription row (shouldn't happen, but defensive) are treated
 // as free-tier and get the 7-day default retention.
 //
 // Returns the total number of rows deleted.
 func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	// Pass 1: Purge events for users with a subscription, using their plan's
-	// retention period.
+	// retention period. During the downgrade grace period (7 days after
+	// downgrade), use the paid plan's 90-day retention instead.
 	tag1, err := db.Exec(ctx, `
 		DELETE FROM audit_events ae
 		USING subscriptions s
 		JOIN plans p ON p.id = s.plan_id
 		WHERE ae.user_id = s.user_id
-		  AND ae.created_at < now() - make_interval(days => p.audit_retention_days)`)
+		  AND ae.created_at < now() - make_interval(days =>
+		      CASE WHEN s.downgraded_at IS NOT NULL
+		                AND s.downgraded_at > now() - interval '7 days'
+		           THEN 90
+		           ELSE p.audit_retention_days
+		      END)`)
 	if err != nil {
 		return 0, fmt.Errorf("purge expired audit events (subscribed users): %w", err)
 	}

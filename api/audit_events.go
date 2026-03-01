@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -75,6 +76,27 @@ func RegisterAuditEventRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /audit-events", requireProfile(handleListAuditEvents(deps)))
 	mux.Handle("GET /audit-logs", requireProfile(handleExportAuditLogs(deps)))
+}
+
+// defaultFreeRetentionDays is the retention window used when a user has no
+// subscription. Matches the free plan's audit_retention_days.
+const defaultFreeRetentionDays = 7
+
+// effectiveRetentionDays resolves the audit log retention window for the user.
+// Returns 0 (no filtering) when billing is disabled, and the plan-aware value
+// (with downgrade grace period) when billing is enabled.
+func effectiveRetentionDays(ctx context.Context, deps *Deps, userID string) (int, error) {
+	if !deps.BillingEnabled {
+		return 0, nil
+	}
+	sp, err := db.GetSubscriptionWithPlan(ctx, deps.DB, userID)
+	if err != nil {
+		return 0, err
+	}
+	if sp == nil {
+		return defaultFreeRetentionDays, nil
+	}
+	return sp.EffectiveRetentionDays(), nil
 }
 
 // handleListAuditEvents returns a paginated activity feed for the authenticated
@@ -157,7 +179,14 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		page, err := db.ListAuditEvents(r.Context(), deps.DB, userID, limit, cursor, filter)
+		retentionDays, err := effectiveRetentionDays(r.Context(), deps, userID)
+		if err != nil {
+			log.Printf("[%s] effectiveRetentionDays: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list audit events"))
+			return
+		}
+
+		page, err := db.ListAuditEvents(r.Context(), deps.DB, userID, limit, cursor, filter, retentionDays)
 		if err != nil {
 			log.Printf("[%s] ListAuditEvents: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list audit events"))
@@ -271,7 +300,14 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			cursor = &db.AuditLogExportCursor{Timestamp: ts, ID: id}
 		}
 
-		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, connectorID, limit, cursor)
+		retentionDays, err := effectiveRetentionDays(r.Context(), deps, userID)
+		if err != nil {
+			log.Printf("[%s] effectiveRetentionDays: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))
+			return
+		}
+
+		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, connectorID, limit, cursor, retentionDays)
 		if err != nil {
 			log.Printf("[%s] ExportAuditLogs: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))

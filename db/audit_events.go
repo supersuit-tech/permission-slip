@@ -136,10 +136,13 @@ const resolvedOutcomeExpr = `CASE
 // ListAuditEvents returns a paginated, chronologically-ordered (newest first)
 // activity feed for the given user from the audit_events table.
 //
+// retentionDays controls the retention window: if > 0, only events within the
+// last N days are returned. Pass 0 to disable retention filtering.
+//
 // Pending agent registration outcomes are resolved to "expired" at query time
 // by joining the agents table and checking whether the registration TTL has
 // elapsed while the agent is still in pending status.
-func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cursor *AuditEventCursor, filter *AuditEventFilter) (*AuditEventPage, error) {
+func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cursor *AuditEventCursor, filter *AuditEventFilter, retentionDays int) (*AuditEventPage, error) {
 	if limit <= 0 {
 		limit = DefaultAuditEventLimit
 	}
@@ -152,6 +155,10 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 	b.addArg(userID) // $1
 
 	where := []string{"ae.user_id = $1"}
+
+	if retentionDays > 0 {
+		where = append(where, "ae.created_at >= now() - make_interval(days => "+b.addArg(retentionDays)+")")
+	}
 
 	if cursor != nil {
 		tsPlaceholder := b.addArg(cursor.Timestamp)
@@ -243,11 +250,15 @@ type AuditLogExportCursor struct {
 // designed for compliance export use cases and supports cursor-based pagination
 // via a compound (created_at, id) key.
 //
+// retentionDays controls the retention window: if > 0, the effective `since`
+// is clamped to at least now()-retentionDays, even if the caller passes an
+// earlier value. Pass 0 to disable retention filtering.
+//
 // Optional parameters:
 //   - until: if non-nil, only returns events created before this timestamp
 //   - eventTypes: if non-empty, only returns events matching these types
 //   - connectorID: if non-nil, only returns events for the specified connector
-func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Time, until *time.Time, eventTypes []AuditEventType, connectorID *string, limit int, cursor *AuditLogExportCursor) (*AuditEventPage, error) {
+func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Time, until *time.Time, eventTypes []AuditEventType, connectorID *string, limit int, cursor *AuditLogExportCursor, retentionDays int) (*AuditEventPage, error) {
 	if limit <= 0 {
 		limit = DefaultAuditLogExportLimit
 	}
@@ -255,6 +266,14 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 		limit = MaxAuditLogExportSize
 	}
 	fetchLimit := limit + 1
+
+	// Clamp `since` to the retention window when enforcement is active.
+	if retentionDays > 0 {
+		retentionFloor := time.Now().AddDate(0, 0, -retentionDays)
+		if since.Before(retentionFloor) {
+			since = retentionFloor
+		}
+	}
 
 	b := &queryBuilder{}
 	b.addArg(userID)            // $1
