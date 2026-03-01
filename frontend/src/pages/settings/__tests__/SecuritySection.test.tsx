@@ -21,6 +21,7 @@ function mockApiFetch() {
         data: {
           id: "user-123",
           username: "alice",
+          marketing_opt_in: false,
           created_at: "2026-01-01T00:00:00Z",
         },
         response: { status: 200 },

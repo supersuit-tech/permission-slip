@@ -34,6 +34,7 @@ describe("useProfile", () => {
     const mockProfile = {
       id: "user-123",
       username: "janedoe",
+      marketing_opt_in: false,
       created_at: "2024-01-01T00:00:00Z",
     };
     mockGet.mockResolvedValue({
