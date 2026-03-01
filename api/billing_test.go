@@ -45,6 +45,12 @@ func TestGetSubscription_ReturnsSubscription(t *testing.T) {
 	if resp.HasPaymentMethod {
 		t.Error("expected has_payment_method=false for free plan")
 	}
+	if !resp.CanUpgrade {
+		t.Error("expected can_upgrade=true for free plan")
+	}
+	if resp.PlanLimits.AuditRetentionDays == 0 {
+		t.Error("expected plan_limits.audit_retention_days > 0")
+	}
 }
 
 func TestGetSubscription_NoSubscription(t *testing.T) {
@@ -189,5 +195,8 @@ func TestGetSubscription_HasPaymentMethodWhenStripeCustomerSet(t *testing.T) {
 	}
 	if !resp.HasPaymentMethod {
 		t.Error("expected has_payment_method=true when stripe_customer_id is set")
+	}
+	if resp.CanUpgrade {
+		t.Error("expected can_upgrade=false for pay_as_you_go plan")
 	}
 }

@@ -33,6 +33,8 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		log.Printf("[%s] StripeWebhook: received event %s type=%s", TraceID(r.Context()), event.ID, event.Type)
+
 		switch event.Type {
 		case "checkout.session.completed":
 			handleCheckoutCompleted(r, deps, event)
@@ -43,8 +45,7 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 		case "invoice.payment_failed":
 			handleInvoicePaymentFailed(r, deps, event)
 		default:
-			// Acknowledge unknown events without processing.
-			log.Printf("[%s] StripeWebhook: unhandled event type: %s", TraceID(r.Context()), event.Type)
+			log.Printf("[%s] StripeWebhook: unhandled event type: %s (event %s)", TraceID(r.Context()), event.Type, event.ID)
 		}
 
 		// Always return 200 to acknowledge receipt. Returning non-200 causes
@@ -86,7 +87,7 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 		return
 	}
 
-	log.Printf("[%s] StripeWebhook: checkout complete, user %s upgraded to pay_as_you_go", TraceID(r.Context()), sub.UserID)
+	log.Printf("[%s] StripeWebhook: checkout complete (event %s), user %s upgraded to pay_as_you_go", TraceID(r.Context()), event.ID, sub.UserID)
 }
 
 // handleSubscriptionUpdated processes subscription status changes.
@@ -143,7 +144,7 @@ func handleSubscriptionDeleted(r *http.Request, deps *Deps, event *pstripe.Webho
 		log.Printf("[%s] StripeWebhook: cancel status for %s: %v", TraceID(r.Context()), sub.UserID, err)
 	}
 
-	log.Printf("[%s] StripeWebhook: subscription deleted, user %s downgraded to free", TraceID(r.Context()), sub.UserID)
+	log.Printf("[%s] StripeWebhook: subscription deleted (event %s), user %s downgraded to free", TraceID(r.Context()), event.ID, sub.UserID)
 }
 
 // handleInvoicePaymentFailed marks the subscription as past_due when Stripe
@@ -157,12 +158,18 @@ func handleInvoicePaymentFailed(r *http.Request, deps *Deps, event *pstripe.Webh
 
 	// Extract subscription ID from the parent object (v82+ API structure).
 	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
+		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): invoice has no parent subscription, skipping", TraceID(r.Context()), event.ID)
 		return
 	}
 	stripeSubID := inv.Parent.SubscriptionDetails.Subscription.ID
 
 	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSubID)
-	if err != nil || sub == nil {
+	if err != nil {
+		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): lookup subscription %s: %v", TraceID(r.Context()), event.ID, stripeSubID, err)
+		return
+	}
+	if sub == nil {
+		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): no subscription found for %s", TraceID(r.Context()), event.ID, stripeSubID)
 		return
 	}
 

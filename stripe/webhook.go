@@ -12,6 +12,7 @@ import (
 
 // WebhookEvent is a parsed Stripe webhook event with typed data.
 type WebhookEvent struct {
+	ID   string // Stripe event ID (e.g. "evt_1234…"); useful for logging and idempotency
 	Type string
 	Raw  gostripe.Event
 }
@@ -38,6 +39,7 @@ func VerifyWebhook(r *http.Request, webhookSecret string, maxBodyBytes int64) (*
 	}
 
 	return &WebhookEvent{
+		ID:   event.ID,
 		Type: string(event.Type),
 		Raw:  event,
 	}, nil

@@ -18,7 +18,17 @@ type subscriptionResponse struct {
 	CurrentPeriodStart time.Time  `json:"current_period_start"`
 	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
 	HasPaymentMethod   bool       `json:"has_payment_method"`
+	CanUpgrade         bool       `json:"can_upgrade"`
+	PlanLimits         planLimits `json:"plan_limits"`
 	Usage              *usageInfo `json:"usage,omitempty"`
+}
+
+type planLimits struct {
+	MaxRequestsPerMonth  *int `json:"max_requests_per_month"`
+	MaxAgents            *int `json:"max_agents"`
+	MaxStandingApprovals *int `json:"max_standing_approvals"`
+	MaxCredentials       *int `json:"max_credentials"`
+	AuditRetentionDays   int  `json:"audit_retention_days"`
 }
 
 type usageInfo struct {
@@ -67,6 +77,14 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			CurrentPeriodStart: sub.CurrentPeriodStart,
 			CurrentPeriodEnd:   sub.CurrentPeriodEnd,
 			HasPaymentMethod:   sub.StripeCustomerID != nil,
+			CanUpgrade:         sub.PlanID == db.PlanFree,
+			PlanLimits: planLimits{
+				MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
+				MaxAgents:            sub.Plan.MaxAgents,
+				MaxStandingApprovals: sub.Plan.MaxStandingApprovals,
+				MaxCredentials:       sub.Plan.MaxCredentials,
+				AuditRetentionDays:   sub.Plan.AuditRetentionDays,
+			},
 		}
 
 		// Attach current period usage if available.

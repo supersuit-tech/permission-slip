@@ -82,11 +82,6 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, stripeCustomerID, su
 // billing period before per-request charges apply.
 const FreeRequestAllowance = 1000
 
-// PricePerRequestCents is the per-request price in cents ($0.005 = 0.5 cents).
-// We track this as a float to handle sub-cent pricing. Stripe Invoice Items
-// accept amounts in the smallest currency unit (cents for USD).
-const PricePerRequestCents = 0.5
-
 // CreateUsageInvoiceItem creates a Stripe Invoice Item for billable request
 // usage. It calculates the overage beyond the free allowance and charges
 // $0.005 per request. Returns nil (no error) if usage is within the free tier.

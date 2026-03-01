@@ -7,6 +7,8 @@ SubscriptionResponse:
     - current_period_start
     - current_period_end
     - has_payment_method
+    - can_upgrade
+    - plan_limits
   properties:
     plan_id:
       type: string
@@ -33,8 +35,44 @@ SubscriptionResponse:
       type: boolean
       description: Whether the user has a Stripe payment method on file
       example: false
+    can_upgrade:
+      type: boolean
+      description: Whether the user can upgrade to a paid plan (true when on the free plan)
+      example: true
+    plan_limits:
+      $ref: '#/PlanLimits'
     usage:
       $ref: '#/UsageInfo'
+
+PlanLimits:
+  type: object
+  required:
+    - audit_retention_days
+  properties:
+    max_requests_per_month:
+      type: integer
+      nullable: true
+      description: Monthly request limit (null = unlimited)
+      example: 1000
+    max_agents:
+      type: integer
+      nullable: true
+      description: Maximum number of agents (null = unlimited)
+      example: 5
+    max_standing_approvals:
+      type: integer
+      nullable: true
+      description: Maximum active standing approvals (null = unlimited)
+      example: 10
+    max_credentials:
+      type: integer
+      nullable: true
+      description: Maximum stored credentials (null = unlimited)
+      example: 5
+    audit_retention_days:
+      type: integer
+      description: Number of days audit logs are retained
+      example: 7
 
 UsageInfo:
   type: object

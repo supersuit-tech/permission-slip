@@ -90,15 +90,21 @@ func validateConfig() (errs []configError, warnings []configError) {
 				})
 			}
 			if !hasWebhookSecret {
-				warnings = append(warnings, configError{
+				errs = append(errs, configError{
 					envVar:  "STRIPE_WEBHOOK_SECRET",
-					message: "not set; Stripe webhook signature verification will be disabled",
+					message: "required when BILLING_ENABLED=true (webhook signature verification prevents spoofed events)",
 				})
 			}
 			if !hasPriceID {
 				warnings = append(warnings, configError{
 					envVar:  "STRIPE_PRICE_ID_REQUEST",
 					message: "not set; checkout session creation will fail without a metered price ID",
+				})
+			}
+			if os.Getenv("BASE_URL") == "" {
+				errs = append(errs, configError{
+					envVar:  "BASE_URL",
+					message: "required when BILLING_ENABLED=true (checkout session success/cancel redirect URLs need a base URL)",
 				})
 			}
 		}
