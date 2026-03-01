@@ -44,11 +44,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // Default staleTime of 0 causes refetches on every window focus,
-      // mount, and reconnect — even when the data hasn't changed. 30s is
-      // a reasonable baseline that avoids unnecessary network requests
-      // during rapid state transitions (e.g. MFA enrollment) while still
-      // keeping data reasonably fresh. Individual queries can override.
-      staleTime: 30_000,
+      // mount, and reconnect — even when the data hasn't changed. 5min
+      // prevents jarring full-page refreshes when switching back to the
+      // tab. Queries that need near-real-time data (approvals, agents,
+      // audit events) already use refetchInterval, which is unaffected
+      // by staleTime. Individual queries can still override.
+      staleTime: 300_000,
     },
   },
   queryCache: new QueryCache({
