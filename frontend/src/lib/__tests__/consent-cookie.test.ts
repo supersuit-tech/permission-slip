@@ -54,6 +54,11 @@ describe("consent-cookie", () => {
       persistConsent("rejected");
       expect(getCookie(CONSENT_COOKIE_NAME)).toBe("rejected");
     });
+
+    it("persisted cookie survives round-trip through getStoredConsent", () => {
+      persistConsent("accepted");
+      expect(getStoredConsent()).toBe("accepted");
+    });
   });
 
   describe("clearConsent", () => {

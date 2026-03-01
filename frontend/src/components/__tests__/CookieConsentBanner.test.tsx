@@ -62,6 +62,16 @@ describe("CookieConsentBanner", () => {
     expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
 
+  it("stays hidden after accept → unmount → remount (simulates page refresh)", async () => {
+    const { unmount } = renderBanner();
+    await userEvent.click(screen.getByText("Accept All"));
+    unmount();
+
+    // Remount fresh — consent should be read from the cookie.
+    renderBanner();
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+  });
+
   it("contains a link to the cookie policy", () => {
     renderBanner();
     const link = screen.getByRole("link", { name: /cookie policy/i });
