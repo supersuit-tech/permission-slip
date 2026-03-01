@@ -20,58 +20,62 @@ jobs:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
         run: |
-          # Test 1: hardcoded minimal payload to verify webhook accepts message field
-          echo "--- Test 1: Hardcoded payload ---"
+          echo "## Webhook Diagnostic Results" >> $GITHUB_STEP_SUMMARY
+
+          # Test 1: hardcoded minimal payload
+          echo "### Test 1: Hardcoded payload" >> $GITHUB_STEP_SUMMARY
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
             --data-raw '{"message": "test from github actions"}')
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "Status: $HTTP_STATUS"
-          echo "Response: $BODY"
+          echo "- Status: $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo '- Response: `'"$BODY"'`' >> $GITHUB_STEP_SUMMARY
 
-          # Test 2: jq-constructed payload piped via stdin
-          echo "--- Test 2: jq payload via stdin ---"
-          RESPONSE=$(jq -n --arg title "$TITLE" --arg url "$PR_URL" '{message: ($title + "\n" + $url)}' | \
-            curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
+          # Test 2: jq payload piped via stdin
+          echo "### Test 2: jq payload via stdin" >> $GITHUB_STEP_SUMMARY
+          PAYLOAD=$(jq -n --arg title "$TITLE" --arg url "$PR_URL" '{message: ($title + "\n" + $url)}')
+          echo '- Payload: `'"$PAYLOAD"'`' >> $GITHUB_STEP_SUMMARY
+          RESPONSE=$(echo "$PAYLOAD" | curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
             --data-binary @-)
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "Status: $HTTP_STATUS"
-          echo "Response: $BODY"
+          echo "- Status: $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo '- Response: `'"$BODY"'`' >> $GITHUB_STEP_SUMMARY
 
-          # Test 3: text field instead of message
-          echo "--- Test 3: text field ---"
+          # Test 3: text field
+          echo "### Test 3: text field" >> $GITHUB_STEP_SUMMARY
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
             --data-raw '{"text": "test from github actions"}')
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "Status: $HTTP_STATUS"
-          echo "Response: $BODY"
+          echo "- Status: $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo '- Response: `'"$BODY"'`' >> $GITHUB_STEP_SUMMARY
 
           # Test 4: content field
-          echo "--- Test 4: content field ---"
+          echo "### Test 4: content field" >> $GITHUB_STEP_SUMMARY
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
             --data-raw '{"content": "test from github actions"}')
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "Status: $HTTP_STATUS"
-          echo "Response: $BODY"
+          echo "- Status: $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo '- Response: `'"$BODY"'`' >> $GITHUB_STEP_SUMMARY
 
-          # Final: use test 1 result for pass/fail
+          # Use test 1 result for pass/fail
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
             --data-raw '{"message": "test from github actions"}')
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
-            echo "All tests failed - webhook may require different payload format"
+            echo "### Result: FAILED" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+          echo "### Result: SUCCESS" >> $GITHUB_STEP_SUMMARY
