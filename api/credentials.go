@@ -81,6 +81,11 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 
 		profile := Profile(r.Context())
 
+		// Check credential limit before processing the request.
+		if checkCredentialLimit(r.Context(), w, r, deps.DB, profile.ID) {
+			return
+		}
+
 		var req storeCredentialRequest
 		if !DecodeJSONOrReject(w, r, &req) {
 			return

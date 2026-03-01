@@ -69,6 +69,18 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 	return &sa, nil
 }
 
+// CountActiveStandingApprovalsByUser returns the number of standing approvals
+// with status = 'active' for the given user.
+func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID string) (int, error) {
+	var count int
+	err := db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM standing_approvals
+		 WHERE user_id = $1 AND status = 'active'`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
 // StandingApprovalError represents a domain error from standing approval operations.
 type StandingApprovalError struct {
 	Code   string

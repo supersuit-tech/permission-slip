@@ -194,6 +194,13 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Check agent limit before creating the agent. The check runs inside
+		// the transaction so that if the limit is exceeded, the consumed invite
+		// is rolled back.
+		if checkAgentLimit(r.Context(), w, r, tx, invite.UserID) {
+			return
+		}
+
 		// Insert the pending agent.
 		agent, err := db.InsertPendingAgent(
 			r.Context(), tx,

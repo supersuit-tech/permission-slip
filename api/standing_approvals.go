@@ -142,6 +142,11 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
 
+		// Check standing approval limit before processing the request.
+		if checkStandingApprovalLimit(r.Context(), w, r, deps.DB, profile.ID) {
+			return
+		}
+
 		var req createStandingApprovalRequest
 		if !DecodeJSONOrReject(w, r, &req) {
 			return

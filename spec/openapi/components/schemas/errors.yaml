@@ -41,6 +41,10 @@ Error:
         - agent_connector_not_found
         - credentials_not_found
         - no_matching_standing_approval
+        # 403 Forbidden (plan limits)
+        - agent_limit_reached
+        - standing_approval_limit_reached
+        - credential_limit_reached
         # 403 Forbidden (standing approval)
         - standing_approval_exhausted
         - constraint_violation
