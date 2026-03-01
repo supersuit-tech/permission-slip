@@ -20,7 +20,6 @@ jobs:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
         run: |
-          # Check if secrets are set
           if [ -z "$WEBHOOK_URL" ]; then
             echo "::error::WEBHOOK_URL secret is not set"
             exit 1
@@ -29,38 +28,20 @@ jobs:
             echo "::error::WEBHOOK_TOKEN secret is not set"
             exit 1
           fi
-          echo "::notice::Secrets are set, proceeding with webhook call"
 
-          # Test: hardcoded minimal payload
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
-            -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-raw '{"message": "test from github actions"}' 2>&1)
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "::notice::Test1 hardcoded status=$HTTP_STATUS body=$BODY"
+          PAYLOAD=$(jq -n --arg pr_url "$PR_URL" --arg title "$TITLE" \
+            '{pr_url: $pr_url, title: $title}')
 
-          # Test: jq payload
-          PAYLOAD=$(jq -n --arg title "$TITLE" --arg url "$PR_URL" '{message: ($title + "\n" + $url)}')
-          echo "::notice::Test2 payload=$PAYLOAD"
           RESPONSE=$(echo "$PAYLOAD" | curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
-            --data-binary @- 2>&1)
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "::notice::Test2 jq status=$HTTP_STATUS body=$BODY"
+            --data-binary @-)
 
-          # Test: text field
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
-            -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-raw '{"text": "test from github actions"}' 2>&1)
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "::notice::Test3 text status=$HTTP_STATUS body=$BODY"
+          echo "::notice::status=$HTTP_STATUS body=$BODY"
 
           if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
-            echo "::error::Webhook failed"
+            echo "::error::Webhook call failed with status $HTTP_STATUS"
             exit 1
           fi
