@@ -1,6 +1,6 @@
 import "react-native-url-polyfill/auto";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { secureStorage } from "./secureStorage";
 
 // Expo inlines EXPO_PUBLIC_* env vars at build time (SDK 49+).
 // Set these in a .env file or your shell environment.
@@ -16,7 +16,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
+    // Use expo-secure-store (Keychain / EncryptedSharedPreferences) instead
+    // of AsyncStorage to protect auth tokens on rooted/jailbroken devices.
+    storage: secureStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false, // Disable for React Native — no browser URL bar

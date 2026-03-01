@@ -24,6 +24,8 @@ interface OtpStepProps {
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
+type ResendStatus = "idle" | "sent" | "failed";
+
 export default function OtpStep({
   email,
   onVerify,
@@ -34,7 +36,8 @@ export default function OtpStep({
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
   const inputRef = useRef<TextInput>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendStatus, setResendStatus] = useState<ResendStatus>("idle");
+  const resendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Auto-focus the OTP input on mount.
   useEffect(() => {
@@ -42,28 +45,49 @@ export default function OtpStep({
     return () => clearTimeout(timer);
   }, []);
 
-  // Countdown timer for resend cooldown.
+  // Countdown timer for resend cooldown. Only re-creates when cooldown
+  // transitions between active/inactive (not on every tick) to avoid
+  // tearing down and re-creating the interval each second.
+  const isCooldownActive = resendCooldown > 0;
   useEffect(() => {
-    if (resendCooldown <= 0) return;
+    if (!isCooldownActive) return;
     const interval = setInterval(
-      () => setResendCooldown((prev) => prev - 1),
+      () =>
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        }),
       1000
     );
     return () => clearInterval(interval);
-  }, [resendCooldown]);
+  }, [isCooldownActive]);
+
+  // Clean up the resend feedback timeout on unmount.
+  useEffect(() => {
+    return () => {
+      if (resendTimerRef.current) clearTimeout(resendTimerRef.current);
+    };
+  }, []);
 
   const submit = () => handleSubmit(() => onVerify(otpCode));
 
   const handleResend = useCallback(async () => {
-    setResendMessage(null);
+    setResendStatus("idle");
     const { error: resendError } = await onResend();
     if (resendError) {
-      setResendMessage("Failed to resend. Please try again.");
+      setResendStatus("failed");
     } else {
-      setResendMessage("Code sent!");
+      setResendStatus("sent");
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
       // Clear the success message after a few seconds.
-      setTimeout(() => setResendMessage(null), 3000);
+      if (resendTimerRef.current) clearTimeout(resendTimerRef.current);
+      resendTimerRef.current = setTimeout(
+        () => setResendStatus("idle"),
+        3000
+      );
     }
   }, [onResend]);
 
@@ -89,7 +113,7 @@ export default function OtpStep({
             value={otpCode}
             onChangeText={setOtpCode}
             placeholder="000000"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.gray400}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             maxLength={6}
@@ -157,15 +181,17 @@ export default function OtpStep({
                 : "Resend code"}
             </Text>
           </TouchableOpacity>
-          {resendMessage ? (
+          {resendStatus !== "idle" ? (
             <Text
               testID="resend-message"
               style={[
                 localStyles.resendFeedback,
-                resendMessage === "Code sent!" && localStyles.resendSuccess,
+                resendStatus === "sent" && localStyles.resendSuccess,
               ]}
             >
-              {resendMessage}
+              {resendStatus === "sent"
+                ? "Code sent!"
+                : "Failed to resend. Please try again."}
             </Text>
           ) : null}
         </View>

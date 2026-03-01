@@ -12,6 +12,7 @@ import {
 import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
 import { authStyles } from "./styles";
+import { colors } from "../theme/colors";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
@@ -56,7 +57,7 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.gray400}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
