@@ -21,6 +21,7 @@ jobs:
           WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
         run: |
           PAYLOAD=$(jq -n --arg title "$TITLE" --arg url "$PR_URL" '{message: ($title + "\n" + $url)}')
+          echo "Payload: $PAYLOAD"
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
             -H "Content-Type: application/json" \
