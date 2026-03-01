@@ -75,6 +75,11 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 // This excludes approvals that have technically expired but whose status
 // hasn't yet been updated by the cleanup job, so users aren't penalized
 // by stale data.
+//
+// Note: starts_at is intentionally not checked here. Future-dated approvals
+// (starts_at > now()) still count toward the plan limit since the user
+// created them deliberately — otherwise users could bypass limits by
+// scheduling approvals far in the future.
 func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID string) (int, error) {
 	var count int
 	err := db.QueryRow(ctx,
