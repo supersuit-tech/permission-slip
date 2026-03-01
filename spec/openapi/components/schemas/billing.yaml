@@ -1,0 +1,111 @@
+SubscriptionResponse:
+  type: object
+  required:
+    - plan_id
+    - plan_name
+    - status
+    - current_period_start
+    - current_period_end
+    - has_payment_method
+    - can_upgrade
+    - plan_limits
+  properties:
+    plan_id:
+      type: string
+      description: The plan ID (e.g., "free", "pay_as_you_go")
+      example: free
+    plan_name:
+      type: string
+      description: Human-readable plan name
+      example: Free
+    status:
+      type: string
+      enum: [active, past_due, cancelled]
+      description: Subscription status
+      example: active
+    current_period_start:
+      type: string
+      format: date-time
+      description: Start of the current billing period (inclusive)
+    current_period_end:
+      type: string
+      format: date-time
+      description: End of the current billing period (exclusive)
+    has_payment_method:
+      type: boolean
+      description: Whether the user has a Stripe payment method on file
+      example: false
+    can_upgrade:
+      type: boolean
+      description: Whether the user can upgrade to a paid plan (true when on the free plan)
+      example: true
+    plan_limits:
+      $ref: '#/PlanLimits'
+    usage:
+      $ref: '#/UsageInfo'
+
+PlanLimits:
+  type: object
+  required:
+    - audit_retention_days
+  properties:
+    max_requests_per_month:
+      type: integer
+      nullable: true
+      description: Monthly request limit (null = unlimited)
+      example: 1000
+    max_agents:
+      type: integer
+      nullable: true
+      description: Maximum number of agents (null = unlimited)
+      example: 5
+    max_standing_approvals:
+      type: integer
+      nullable: true
+      description: Maximum active standing approvals (null = unlimited)
+      example: 10
+    max_credentials:
+      type: integer
+      nullable: true
+      description: Maximum stored credentials (null = unlimited)
+      example: 5
+    audit_retention_days:
+      type: integer
+      description: Number of days audit logs are retained
+      example: 7
+
+UsageInfo:
+  type: object
+  required:
+    - request_count
+    - sms_count
+    - over_limit
+  properties:
+    request_count:
+      type: integer
+      description: Number of API requests in the current billing period
+      example: 42
+    sms_count:
+      type: integer
+      description: Number of SMS messages sent in the current billing period
+      example: 0
+    request_limit:
+      type: integer
+      nullable: true
+      description: Monthly request limit for the current plan (null = unlimited)
+      example: 1000
+    over_limit:
+      type: boolean
+      description: Whether current usage exceeds the plan's request limit
+      example: false
+
+CheckoutResponse:
+  type: object
+  required:
+    - url
+  properties:
+    url:
+      type: string
+      format: uri
+      description: Stripe Checkout Session URL — redirect the user here to complete payment
+      example: https://checkout.stripe.com/c/pay/cs_test_...

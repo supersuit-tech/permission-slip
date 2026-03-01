@@ -363,6 +363,65 @@ func TestValidateConfig_VAPIDSubjectMustBeContactURI(t *testing.T) {
 	}
 }
 
+func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
+	setEnvForTest(t, map[string]string{
+		"MODE":                "",
+		"DATABASE_URL":        "postgres://localhost/test",
+		"SUPABASE_URL":        "http://localhost:54321",
+		"BILLING_ENABLED":     "true",
+		"STRIPE_SECRET_KEY":   "",
+		"STRIPE_WEBHOOK_SECRET": "",
+		"BASE_URL":            "",
+		"VAPID_PUBLIC_KEY":    "",
+		"VAPID_PRIVATE_KEY":   "",
+		"VAPID_SUBJECT":       "",
+	})
+
+	errs, _ := validateConfig()
+
+	wantErrors := map[string]bool{
+		"STRIPE_SECRET_KEY":    false,
+		"STRIPE_WEBHOOK_SECRET": false,
+		"BASE_URL":             false,
+	}
+	for _, e := range errs {
+		if _, ok := wantErrors[e.envVar]; ok {
+			wantErrors[e.envVar] = true
+		}
+	}
+	for v, found := range wantErrors {
+		if !found {
+			t.Errorf("expected error for missing %s when BILLING_ENABLED=true", v)
+		}
+	}
+}
+
+func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
+	setEnvForTest(t, map[string]string{
+		"MODE":                      "",
+		"DATABASE_URL":              "postgres://localhost/test",
+		"SUPABASE_URL":              "http://localhost:54321",
+		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
+		"BILLING_ENABLED":           "true",
+		"STRIPE_SECRET_KEY":         "sk_test_xxx",
+		"STRIPE_WEBHOOK_SECRET":     "whsec_xxx",
+		"STRIPE_PRICE_ID_REQUEST":   "price_xxx",
+		"BASE_URL":                  "https://example.com",
+		"INVITE_HMAC_KEY":           "test-key",
+		"VAPID_PUBLIC_KEY":          "",
+		"VAPID_PRIVATE_KEY":         "",
+		"VAPID_SUBJECT":             "",
+	})
+
+	errs, warnings := validateConfig()
+	if len(errs) != 0 {
+		t.Errorf("expected no errors, got %d: %v", len(errs), errs)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected no warnings, got %d: %v", len(warnings), warnings)
+	}
+}
+
 func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",

@@ -114,6 +114,26 @@ func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string)
 	return s, err
 }
 
+// UpgradeSubscriptionPlan atomically upgrades a subscription to a new plan,
+// but only if the user is currently on the expected old plan. This prevents
+// race conditions where two concurrent checkout webhooks could both upgrade
+// the same user. Returns nil (no error) if the user's current plan doesn't
+// match expectedOldPlanID (i.e., the upgrade was already applied).
+func UpgradeSubscriptionPlan(ctx context.Context, db DBTX, userID, expectedOldPlanID, newPlanID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		`UPDATE subscriptions
+		 SET plan_id = $3,
+		     downgraded_at = NULL,
+		     updated_at = now()
+		 WHERE user_id = $1 AND plan_id = $2
+		 RETURNING `+subscriptionColumns,
+		userID, expectedOldPlanID, newPlanID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // already upgraded or plan changed — idempotent no-op
+	}
+	return s, err
+}
+
 // UpdateSubscriptionStatus updates the status of a user's subscription.
 // Returns an error if the status is not one of the allowed values.
 func UpdateSubscriptionStatus(ctx context.Context, db DBTX, userID string, status SubscriptionStatus) (*Subscription, error) {
@@ -201,6 +221,28 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	}
 
 	return total, nil
+}
+
+// GetSubscriptionByStripeCustomerID returns the subscription with the given
+// Stripe Customer ID, or nil if not found. Used by webhook handlers.
+func GetSubscriptionByStripeCustomerID(ctx context.Context, db DBTX, stripeCustomerID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE stripe_customer_id = $1", stripeCustomerID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
+}
+
+// GetSubscriptionByStripeSubscriptionID returns the subscription with the given
+// Stripe Subscription ID, or nil if not found. Used by webhook handlers.
+func GetSubscriptionByStripeSubscriptionID(ctx context.Context, db DBTX, stripeSubscriptionID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE stripe_subscription_id = $1", stripeSubscriptionID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
 }
 
 // SubscriptionWithPlan combines a subscription with its associated plan details
