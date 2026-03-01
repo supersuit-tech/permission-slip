@@ -62,6 +62,7 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **[Architecture](docs/architecture.md)** — system diagrams and component overview
 - **[Agent Integration Guide](docs/agents.md)** — how to integrate an autonomous agent with Permission Slip
 - **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
+- **[Community Connectors](docs/community-connectors.md)** — directory of third-party connectors built by the community
 - **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
 - **[Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md)** — step-by-step guide to test the invite/registration flow
 - **[Self-Hosted Deployment](docs/deployment-self-hosted.md)** — complete guide for deploying on your own infrastructure (Docker, Fly.io, bare metal)

@@ -258,6 +258,10 @@ func main() {
 }
 ```
 
+## Community Connectors
+
+Looking for connectors built by the community? See the [Community Connectors](community-connectors.md) directory.
+
 ## Security Considerations
 
 External connectors run as subprocesses with the same privileges as the server process. Treat custom connectors with the same trust level as any code dependency:
