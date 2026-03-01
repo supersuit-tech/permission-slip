@@ -5,9 +5,6 @@ on:
       pr_url:
         description: "PR URL"
         required: true
-      title:
-        description: "PR Title"
-        required: true
 
 jobs:
   notify:
@@ -15,7 +12,6 @@ jobs:
     steps:
       - name: Call webhook
         env:
-          TITLE: ${{ inputs.title }}
           PR_URL: ${{ inputs.pr_url }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
@@ -29,8 +25,8 @@ jobs:
             exit 1
           fi
 
-          PAYLOAD=$(jq -n --arg pr_url "$PR_URL" --arg title "$TITLE" \
-            '{pr_url: $pr_url, title: $title}')
+          PAYLOAD=$(jq -n --arg pr_url "$PR_URL" \
+            '{pr_url: $pr_url}')
 
           RESPONSE=$(echo "$PAYLOAD" | curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \
