@@ -238,6 +238,7 @@ For deeper dives, see:
 | `make mobile-test` | Mobile tests (no database needed) |
 | `make mobile-install` | Install mobile app dependencies |
 | `make mobile-start` | Start Expo development server |
+| `make mobile-typecheck` | Type-check mobile app (`tsc --noEmit`) |
 | `make build` | Production binary with embedded frontend |
 | `make generate` | Bundle OpenAPI spec + generate TypeScript types |
 | `make typecheck` | Generate API client + run `tsc --noEmit` |
@@ -246,7 +247,7 @@ For deeper dives, see:
 | `make migrate-down` | Roll back the last migration |
 | `make migrate-create NAME=foo` | Create a new migration file |
 | `make seed` | Seed the dev database with test data |
-| `make audit` | Run npm audit + govulncheck |
+| `make audit` | Run npm audit (frontend + mobile) + govulncheck |
 
 ## Code Standards
 
