@@ -6,7 +6,7 @@
  * aalResponse) so individual test files don't duplicate boilerplate.
  */
 import { vi } from "vitest";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, User, Factor } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
 export const mockAuth = vi.mocked(supabase.auth);
@@ -26,6 +26,7 @@ export const mockUser: User = {
   created_at: "2024-01-01",
   app_metadata: {},
   user_metadata: {},
+  factors: [],
 };
 
 export const mockSession: Session = {
@@ -66,17 +67,40 @@ export function aalResponse(current: string, next: string) {
   };
 }
 
-export function setupAuthMocks({ authenticated = false } = {}) {
+/**
+ * Sets up auth mocks for a test.
+ *
+ * @param authenticated - Whether the user is authenticated
+ * @param factors - MFA factors to attach to the session user (default: []).
+ *   AuthContext reads user.factors directly from React state, so tests that
+ *   exercise listMfaFactors or verifyMfa should pass factors here instead of
+ *   mocking supabase.auth.mfa.listFactors().
+ *
+ * When no factors are provided, the original mockSession reference is used
+ * so that tests doing strict reference equality (toBe) still pass.
+ */
+export function setupAuthMocks({
+  authenticated = false,
+  factors = undefined as Factor[] | undefined,
+} = {}) {
   // restoreAllMocks (not clearAllMocks) so mock *implementations* from
   // previous tests are removed, not just call counts.
   vi.restoreAllMocks();
   // onAuthStateChange fires INITIAL_SESSION immediately on subscribe,
   // which drives the initial auth state (no separate getSession needed).
   mockAuth.onAuthStateChange.mockImplementation((callback) => {
-    callback(
-      "INITIAL_SESSION",
-      authenticated ? mockSession : null
-    );
+    let session = null;
+    if (authenticated) {
+      if (factors !== undefined) {
+        // Caller explicitly requested specific factors on the user.
+        const user = { ...mockUser, factors };
+        session = { ...mockSession, user };
+      } else {
+        // No factors override — use original mockSession for reference stability.
+        session = mockSession;
+      }
+    }
+    callback("INITIAL_SESSION", session);
     return {
       data: {
         subscription: { id: "test", callback: vi.fn(), unsubscribe: vi.fn() },

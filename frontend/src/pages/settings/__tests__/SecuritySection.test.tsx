@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Factor } from "@supabase/supabase-js";
 import {
   setupAuthMocks,
-  mockMfa,
   verifiedFactor,
 } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
@@ -13,8 +13,14 @@ import { SecuritySection } from "../SecuritySection";
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
-function mockApiFetch() {
-  setupAuthMocks({ authenticated: true });
+/**
+ * Sets up auth and API mocks for SecuritySection tests.
+ * Pass `factors` to control what MFA factors are on the user (default: []).
+ * AuthContext reads user.factors from React state, so factors must be set
+ * on the session user rather than mocking supabase.auth.mfa.listFactors().
+ */
+function mockApiFetch({ factors = [] as Factor[] } = {}) {
+  setupAuthMocks({ authenticated: true, factors });
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/profile") {
       return Promise.resolve({
@@ -41,10 +47,6 @@ describe("SecuritySection", () => {
 
   it("renders the security card with title", async () => {
     mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [], totp: [] },
-      error: null,
-    });
 
     render(<SecuritySection />, { wrapper });
 
@@ -58,10 +60,6 @@ describe("SecuritySection", () => {
 
   it("shows Two-Factor Authentication heading", async () => {
     mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [], totp: [] },
-      error: null,
-    });
 
     render(<SecuritySection />, { wrapper });
 
@@ -71,8 +69,11 @@ describe("SecuritySection", () => {
   });
 
   it("shows loading state initially", () => {
+    // SecuritySection starts in "loading" view before the first useEffect
+    // fires and loadFactors() resolves. Even though listMfaFactors() now
+    // resolves instantly from user state, the loading spinner is visible on
+    // the initial render (before any effects run).
     mockApiFetch();
-    mockMfa.listFactors.mockReturnValue(new Promise(() => {}));
 
     render(<SecuritySection />, { wrapper });
 
@@ -82,11 +83,8 @@ describe("SecuritySection", () => {
   });
 
   it("shows enrollment flow when no MFA factors exist", async () => {
-    mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [], totp: [] },
-      error: null,
-    });
+    // No factors on user → SecuritySection should show the enrollment button.
+    mockApiFetch({ factors: [] });
 
     render(<SecuritySection />, { wrapper });
 
@@ -98,11 +96,8 @@ describe("SecuritySection", () => {
   });
 
   it("shows enrolled factors with remove button", async () => {
-    mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [verifiedFactor], totp: [verifiedFactor] },
-      error: null,
-    });
+    // User has a verified TOTP factor → SecuritySection should show it.
+    mockApiFetch({ factors: [verifiedFactor] });
 
     render(<SecuritySection />, { wrapper });
 
@@ -113,29 +108,9 @@ describe("SecuritySection", () => {
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
   });
 
-  it("shows error state with retry button", async () => {
-    mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: null,
-      error: { message: "Network error" },
-    });
-
-    render(<SecuritySection />, { wrapper });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Failed to load security settings."),
-      ).toBeInTheDocument();
-    });
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
-  });
-
   it("shows confirmation before removing MFA factor", async () => {
-    mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [verifiedFactor], totp: [verifiedFactor] },
-      error: null,
-    });
+    mockApiFetch({ factors: [verifiedFactor] });
+    const { supabase } = await import("../../../lib/supabaseClient");
     const user = userEvent.setup();
 
     render(<SecuritySection />, { wrapper });
@@ -149,15 +124,11 @@ describe("SecuritySection", () => {
 
     expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    expect(mockMfa.unenroll).not.toHaveBeenCalled();
+    expect(vi.mocked(supabase.auth.mfa.unenroll)).not.toHaveBeenCalled();
   });
 
   it("cancels MFA removal when Cancel is clicked", async () => {
-    mockApiFetch();
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [verifiedFactor], totp: [verifiedFactor] },
-      error: null,
-    });
+    mockApiFetch({ factors: [verifiedFactor] });
     const user = userEvent.setup();
 
     render(<SecuritySection />, { wrapper });

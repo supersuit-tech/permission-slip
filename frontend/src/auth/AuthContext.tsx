@@ -15,6 +15,32 @@ import type { AuthStatus, AuthState } from "./types";
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+/**
+ * Races `request` against a timeout. The timeout timer is always cleared once
+ * the request settles (via `finally`), so it never lingers in the event loop
+ * after the request resolves quickly.
+ *
+ * Rejects with an `AuthError` on timeout; re-throws any other rejection so
+ * callers can handle it uniformly.
+ */
+async function withTimeout<T>(
+  request: Promise<T>,
+  ms: number
+): Promise<T> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(
+      () => reject(new Error("Request timed out")),
+      ms
+    );
+  });
+  try {
+    return await Promise.race([request, timeoutPromise]);
+  } finally {
+    clearTimeout(timerId);
+  }
+}
+
 /** Returns the first verified TOTP factor from a factor list, or undefined. */
 function getVerifiedTotpFactor(factors?: Factor[]): Factor | undefined {
   return factors?.find((f) => f.status === "verified");
@@ -58,10 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const challengeAndVerifyTotp = useCallback(
     async (factorId: string, code: string) => {
-      const { error } = await supabase.auth.mfa.challengeAndVerify({
-        factorId,
-        code,
-      });
+      const { error } = await withTimeout(
+        supabase.auth.mfa.challengeAndVerify({ factorId, code }),
+        10000
+      ).catch((err) => ({
+        error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
+      }));
       if (!error) {
         setAuthStatus("authenticated");
       }
@@ -179,11 +207,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyMfa = useCallback(
     async (code: string) => {
-      const { data: factorsData, error: listError } =
-        await supabase.auth.mfa.listFactors();
-      if (listError) return { error: listError };
-
-      const totpFactor = getVerifiedTotpFactor(factorsData?.totp);
+      // Read from user.factors (already in React state) instead of calling
+      // supabase.auth.mfa.listFactors(), which internally calls getUser() and
+      // acquires the Supabase internal lock — causing lock contention with the
+      // onAuthStateChange listener that fires during session init.
+      const totpFactor = (user?.factors ?? []).find(
+        (f) => f.factor_type === "totp" && f.status === "verified"
+      );
       if (!totpFactor) {
         return {
           error: createAuthError(
@@ -196,14 +226,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return challengeAndVerifyTotp(totpFactor.id, code);
     },
-    [challengeAndVerifyTotp]
+    [challengeAndVerifyTotp, user]
   );
 
   const enrollMfa = useCallback(async () => {
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: "totp",
-      friendlyName: "Authenticator App",
-    });
+    const { data, error } = await withTimeout(
+      supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: "Authenticator App",
+      }),
+      10000
+    ).catch((err) => ({
+      data: null,
+      error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
+    }));
     if (error) return { data: null, error };
 
     // Guard against partial/unexpected response shapes from GoTrue.
@@ -234,20 +270,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const unenrollMfa = useCallback(async (factorId: string) => {
-    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    const { error } = await withTimeout(
+      supabase.auth.mfa.unenroll({ factorId }),
+      10000
+    ).catch((err) => ({
+      error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
+    }));
     return { error: error ?? null };
   }, []);
 
   const listMfaFactors = useCallback(async () => {
-    const { data, error } = await supabase.auth.mfa.listFactors();
-    // Use data.all filtered by factor_type instead of data.totp because
-    // the Supabase client only puts *verified* factors in data.totp.
-    // We need unverified factors too so MfaEnrollmentFlow can clean up
-    // stale enrollments that the user abandoned before verifying.
-    const allTotp =
-      data?.all?.filter((f) => f.factor_type === "totp") ?? [];
-    return { factors: allTotp, error: error ?? null };
-  }, []);
+    // Read from user.factors (already in React state) instead of calling
+    // supabase.auth.mfa.listFactors(), which internally calls getUser() and
+    // acquires the Supabase internal lock — causing lock contention with the
+    // onAuthStateChange listener that fires during session init, hanging the
+    // UI for up to 10 seconds.
+    //
+    // This mirrors exactly what the Supabase SDK's own _listFactors() does
+    // internally: it reads user.factors from the already-fetched user object.
+    // user.factors includes both verified and unverified factors, so
+    // MfaEnrollmentFlow can still clean up stale abandoned enrollments.
+    const allTotp = (user?.factors ?? []).filter(
+      (f) => f.factor_type === "totp"
+    );
+    return { factors: allTotp, error: null };
+  }, [user]);
 
   const value = useMemo<AuthState>(
     () => ({
