@@ -325,6 +325,19 @@ Tracks per-user billable usage for each billing period. Half-open interval: [per
 
 **Constraints:** UNIQUE on `(user_id, period_start)` — one record per user per billing period
 
+### `stripe_webhook_events`
+
+Tracks processed Stripe webhook event IDs for idempotency. When a handler fails,
+the event is NOT recorded so Stripe's retry mechanism can reprocess it.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `event_id` | text | PK — Stripe event ID (e.g. "evt_1234...") |
+| `event_type` | text | NOT NULL — Stripe event type |
+| `processed_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Indexes:** `idx_stripe_webhook_events_processed_at` (for periodic purge of events older than 72 hours)
+
 ## Relationships
 
 Most foreign keys use ON DELETE CASCADE. Audit events use ON DELETE RESTRICT to preserve history.
