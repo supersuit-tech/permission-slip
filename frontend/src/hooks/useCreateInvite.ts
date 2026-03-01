@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
+import { getApiErrorMessage } from "@/api/errors";
 import type { components } from "@/api/schema";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
@@ -23,7 +24,11 @@ export function useCreateInvite() {
           body: {},
         },
       );
-      if (error) throw new Error("Failed to generate invite code");
+      if (error) {
+        throw new Error(
+          getApiErrorMessage(error, "Failed to generate invite code"),
+        );
+      }
       return data;
     },
     onSuccess: () => {

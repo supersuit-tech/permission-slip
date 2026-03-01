@@ -1,6 +1,8 @@
 import { Bell, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { useUpdateProfile } from "@/hooks/useUpdateProfile";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ const CHANNEL_LABELS: Record<string, { name: string; description: string }> = {
 
 export function NotificationSection() {
   const { profile } = useProfile();
+  const { updateProfile, isLoading: isUpdatingProfile } = useUpdateProfile();
   const { preferences, isLoading, error } = useNotificationPreferences();
   const { updatePreferences, isLoading: isUpdating } =
     useUpdateNotificationPreferences();
@@ -41,6 +44,20 @@ export function NotificationSection() {
   }
   if (!profile?.phone) {
     missingContact["sms"] = "Add a phone number above to receive SMS notifications.";
+  }
+
+  async function handleToggleProductUpdates() {
+    if (!profile) return;
+    const newValue = !profile.marketing_opt_in;
+    try {
+      await updateProfile({ marketing_opt_in: newValue });
+      trackEvent(PostHogEvents.MARKETING_OPT_IN_UPDATED, { enabled: newValue });
+      toast.success(
+        `Product updates ${newValue ? "enabled" : "disabled"}.`,
+      );
+    } catch {
+      toast.error("Failed to update product updates preference.");
+    }
   }
 
   async function handleToggle(channel: string, currentEnabled: boolean) {
@@ -116,6 +133,34 @@ export function NotificationSection() {
                 </div>
               );
             })}
+
+            <hr className="border-border" />
+
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Product updates</p>
+                  <p className="text-xs text-muted-foreground">
+                    Occasional emails about new features, platform improvements,
+                    and tips.
+                  </p>
+                </div>
+                <Button
+                  variant={profile?.marketing_opt_in ? "default" : "outline"}
+                  size="sm"
+                  disabled={isUpdatingProfile || !profile}
+                  onClick={handleToggleProductUpdates}
+                >
+                  {profile?.marketing_opt_in ? "Enabled" : "Disabled"}
+                </Button>
+              </div>
+              {!profile?.email && profile?.marketing_opt_in && (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>Add a contact email above to receive product update emails.</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

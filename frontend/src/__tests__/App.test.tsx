@@ -19,7 +19,7 @@ vi.mock("sonner");
 // When authenticated, simulate a profile existing (no onboarding needed).
 vi.mock("../hooks/useProfile", () => ({
   useProfile: () => ({
-    profile: { id: "user-123", username: "testuser", created_at: "2024-01-01" },
+    profile: { id: "user-123", username: "testuser", marketing_opt_in: false, created_at: "2024-01-01" },
     needsOnboarding: false,
     isLoading: false,
   }),

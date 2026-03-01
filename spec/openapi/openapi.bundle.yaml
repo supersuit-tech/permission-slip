@@ -371,6 +371,21 @@ paths:
                       message: Invite code is not valid
                       retryable: false
                       trace_id: trace_xyz789
+        '403':
+          description: Agent limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: agent_limit_reached
+                  message: Free tier allows up to 3 agents. Upgrade your plan to add more.
+                  retryable: false
+                  details:
+                    current_count: 3
+                    limit: 3
+                  trace_id: trace_xyz789
         '404':
           description: Invite not found
           content:
@@ -1495,6 +1510,22 @@ paths:
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Agent limit reached — user cannot register more agents on their current plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: agent_limit_reached
+                  message: Free plan allows up to 3 agents. Upgrade your plan to add more.
+                  retryable: false
+                  details:
+                    current_count: 3
+                    limit: 3
+                    plan_id: free
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '404':
           description: Profile not found for the authenticated user
           content:
@@ -3595,6 +3626,21 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Credential limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: credential_limit_reached
+                  message: Free tier allows up to 5 stored credentials. Upgrade your plan to add more.
+                  retryable: false
+                  details:
+                    current_count: 5
+                    limit: 5
+                  trace_id: trace_xyz789
         '409':
           description: Duplicate credentials for this service/label combination
           content:
@@ -4010,6 +4056,21 @@ paths:
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Standing approval limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: standing_approval_limit_reached
+                  message: Free tier allows up to 5 active standing approvals. Upgrade your plan to add more.
+                  retryable: false
+                  details:
+                    current_count: 5
+                    limit: 5
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '404':
           description: Agent not found or not owned by user
           content:
@@ -7884,6 +7945,11 @@ components:
           maxLength: 32
           pattern: ^[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}$
           example: alice
+        marketing_opt_in:
+          type: boolean
+          description: Whether the user opts in to product update emails. Defaults to false.
+          default: false
+          example: false
     OnboardingResponse:
       type: object
       description: The newly created (or existing) user profile.
@@ -7912,6 +7978,7 @@ components:
       required:
         - id
         - username
+        - marketing_opt_in
         - created_at
       properties:
         id:
@@ -7934,6 +8001,10 @@ components:
           nullable: true
           description: Contact phone number in E.164 format (user-provided, opt-in for SMS notifications)
           example: '+15551234567'
+        marketing_opt_in:
+          type: boolean
+          description: Whether the user has opted in to product update emails.
+          example: false
         created_at:
           type: string
           format: date-time
@@ -7941,7 +8012,7 @@ components:
           example: '2026-02-16T00:27:36Z'
     UpdateProfileRequest:
       type: object
-      description: Request body for updating profile contact fields.
+      description: Request body for updating profile fields.
       properties:
         email:
           type: string
@@ -7953,6 +8024,11 @@ components:
           nullable: true
           description: Contact phone number in E.164 format. Pass null or empty string to clear.
           example: '+15551234567'
+        marketing_opt_in:
+          type: boolean
+          description: |
+            Whether the user opts in to product update emails. Omit the field to leave the current value unchanged; unlike email/phone this field cannot be null.
+          example: true
     NotificationPreference:
       type: object
       description: A single notification channel preference.
@@ -8483,6 +8559,9 @@ components:
             - agent_connector_not_found
             - credentials_not_found
             - no_matching_standing_approval
+            - agent_limit_reached
+            - standing_approval_limit_reached
+            - credential_limit_reached
             - standing_approval_exhausted
             - constraint_violation
             - standing_approval_expired

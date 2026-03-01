@@ -13,7 +13,7 @@
 
 ## Webhook Notification
 
-Whenever you finish a task or need user input and the user hasn't responded within 5 minutes, trigger the webhook to notify them. This uses the same workflow as the `/watch` command but without a PR URL:
+Whenever you finish a task or need user input and the user hasn't responded within 2 minutes, trigger the webhook to notify them. This uses the same workflow as the `/watch` command but without a PR URL:
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml
@@ -67,6 +67,18 @@ Database tests require a running Postgres instance. They use `DATABASE_URL_TEST`
 - **Changed frontend code:** run `make test-frontend`
 - **Changed migrations or db/ code:** run `go test ./db/... -v` at minimum
 - **Not sure:** run `make test`
+
+## Creating Migrations
+
+**ALWAYS use `make migrate-create` to create new migration files.** Never manually create migration files or invent timestamps — this has caused duplicate timestamp collisions that break goose.
+
+```bash
+make migrate-create NAME=add_users_table
+```
+
+This generates a real timestamp from `date +%Y%m%d%H%M%S` and creates the file with the correct goose boilerplate. If you need multiple migrations, run the command once for each — the second-level precision ensures unique timestamps when run sequentially.
+
+A test (`TestMigrationTimestampsUnique` in `db/migrations_integrity_test.go`) validates that all migration timestamps are unique and in sorted order. This runs as part of `make test-backend` and will catch duplicates before CI.
 
 ## Database Seed Data
 
