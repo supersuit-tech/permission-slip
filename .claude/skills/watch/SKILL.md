@@ -19,9 +19,20 @@ Set these variables for the session:
 - `PR_NUMBER` — the extracted PR number
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh`
 
-## Pre-Poll: Fix Failing Checks
+## Pre-Poll: Merge from Main and Fix Failing Checks
 
-Before entering the polling loop, check whether the PR has any failing CI checks and fix them. This ensures the branch starts from a clean state before processing review comments.
+Before entering the polling loop, merge the latest main into the branch and check whether the PR has any failing CI checks. This ensures the branch starts from a clean, up-to-date state before processing review comments.
+
+### 0. Merge from Main
+
+Bring the branch up to date before doing anything else:
+
+```bash
+git fetch origin main
+git merge origin/main --no-edit
+```
+
+If the merge produces conflicts, follow the same conflict resolution procedure described in Polling Loop step 2. Run tests and build after resolving.
 
 ### 1. Fetch Check Status
 
@@ -77,23 +88,21 @@ Handle pagination if there are more than 100 results per endpoint.
 
 **PR reviews note:** Each review object has a `body` (which may be empty) and a `state` (`APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED`, `PENDING`). Only process reviews that have a non-empty `body` — empty-body reviews (e.g., a bare approval with no text) have no actionable instructions. Ignore reviews with state `PENDING` (these are drafts not yet submitted).
 
-### 2. Check for Merge Conflicts
+### 2. Merge from Main
 
-Before processing comments, check if the PR branch has merge conflicts with the base branch:
+Keep the branch up to date by merging from main on every poll cycle. This prevents the branch from drifting too far from the base branch and avoids large conflict resolutions later.
 
 ```bash
 # Fetch the latest base branch
 git fetch origin main
 
-# Attempt a trial merge to detect conflicts
-git merge --no-commit --no-ff origin/main
+# Merge main into the current branch
+git merge origin/main --no-edit
 ```
 
-**If the merge succeeds cleanly** (no conflicts), abort it — no action needed:
+**If the merge succeeds cleanly** (no conflicts and no new commits), continue to the next step — the branch is already up to date.
 
-```bash
-git merge --abort
-```
+**If the merge succeeds with new commits**, the branch has been updated. Continue to the next step — tests will be run before pushing.
 
 **If the merge produces conflicts**, resolve them thoughtfully:
 
@@ -202,7 +211,7 @@ After each cycle, wait 60 seconds and poll again.
 
 **Idle timeout:** Track the number of consecutive poll cycles with **no new comments, reviews, or merge conflicts**. If **3 consecutive cycles** pass with no new activity (i.e., 3 minutes of inactivity), **stop polling** and post a wrap-up comment on the PR before exiting (see step 9).
 
-If any cycle finds new comments, reviews, or merge conflicts that needed resolution, reset the idle counter to 0.
+If any cycle finds new comments, reviews, merge conflicts that needed resolution, or new commits merged in from main, reset the idle counter to 0.
 
 ### 9. Post Wrap-Up Comment on Idle Exit
 
