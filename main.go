@@ -165,6 +165,12 @@ func main() {
 		}
 	}
 
+	// Create a cancellable context for background goroutines (e.g. audit purge).
+	// Cancelled in the shutdown path so goroutines stop cleanly on SIGTERM.
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	defer bgCancel()
+	var auditPurgeDone <-chan struct{}
+
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -188,6 +194,9 @@ func main() {
 
 		log.Println("Connected to database")
 		deps.DB = pool
+
+		// Start background audit log purge.
+		auditPurgeDone = startAuditPurge(bgCtx, pool, logger)
 
 		// Ensure all existing users have subscriptions. When billing is disabled,
 		// this assigns the unlimited pay_as_you_go plan so enforcement sees no limits.
@@ -378,6 +387,17 @@ func main() {
 	case err := <-srvErr:
 		logger.Error("server failed, shutting down", "error", err)
 		serverFailed = true
+	}
+
+	// Stop background goroutines and wait for them to exit (up to 5s)
+	// before closing the DB pool or flushing Sentry.
+	bgCancel()
+	if auditPurgeDone != nil {
+		select {
+		case <-auditPurgeDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("audit purge goroutine did not exit in time")
+		}
 	}
 
 	// Allow up to 30 seconds for in-flight requests to complete.

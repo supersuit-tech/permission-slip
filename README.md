@@ -179,6 +179,7 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `VITE_POSTHOG_HOST` | Optional | PostHog API host (build-time, default: `https://us.i.posthog.com`) — use a custom host if self-hosting PostHog |
 | `POSTHOG_HOST` | Optional | PostHog API host added to CSP `connect-src` — must match `VITE_POSTHOG_HOST` (runtime) |
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
+| `AUDIT_PURGE_INTERVAL` | Optional | How often expired audit events are purged — Go duration format, minimum `1m` (default: `1h`) |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
 | `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
