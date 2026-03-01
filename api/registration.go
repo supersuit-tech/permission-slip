@@ -194,9 +194,13 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Check agent limit before creating the agent. The check runs inside
-		// the transaction so that if the limit is exceeded, the consumed invite
-		// is rolled back.
+		// Advisory lock + limit check inside the transaction prevents TOCTOU
+		// races where concurrent registrations could both pass the check.
+		if err := db.AcquireAgentLimitLock(r.Context(), tx, invite.UserID); err != nil {
+			log.Printf("[%s] RegisterAgent: advisory lock: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
+			return
+		}
 		if checkAgentLimit(r.Context(), w, r, tx, invite.UserID) {
 			return
 		}

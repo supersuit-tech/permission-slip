@@ -81,11 +81,6 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 
 		profile := Profile(r.Context())
 
-		// Check credential limit before processing the request.
-		if checkCredentialLimit(r.Context(), w, r, deps.DB, profile.ID) {
-			return
-		}
-
 		var req storeCredentialRequest
 		if !DecodeJSONOrReject(w, r, &req) {
 			return
@@ -122,7 +117,9 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Begin a transaction so vault insert + credential row insert are atomic.
+		// Begin a transaction so limit check + vault insert + credential row
+		// insert are atomic. The advisory lock prevents TOCTOU races where
+		// concurrent requests could both pass the limit check.
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: begin tx: %v", TraceID(r.Context()), err)
@@ -131,6 +128,15 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		}
 		if owned {
 			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
+		}
+
+		if err := db.AcquireCredentialLimitLock(r.Context(), tx, profile.ID); err != nil {
+			log.Printf("[%s] StoreCredential: advisory lock: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
+			return
+		}
+		if checkCredentialLimit(r.Context(), w, r, tx, profile.ID) {
+			return
 		}
 
 		// Encrypt credentials and store in vault.

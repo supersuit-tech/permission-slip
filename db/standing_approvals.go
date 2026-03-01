@@ -70,12 +70,16 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 }
 
 // CountActiveStandingApprovalsByUser returns the number of standing approvals
-// with status = 'active' for the given user.
+// that are currently active for the given user. An approval counts as active
+// if its status is 'active' and it hasn't expired (expires_at > now()).
+// This excludes approvals that have technically expired but whose status
+// hasn't yet been updated by the cleanup job, so users aren't penalized
+// by stale data.
 func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID string) (int, error) {
 	var count int
 	err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM standing_approvals
-		 WHERE user_id = $1 AND status = 'active'`,
+		 WHERE user_id = $1 AND status = 'active' AND expires_at > now()`,
 		userID,
 	).Scan(&count)
 	return count, err

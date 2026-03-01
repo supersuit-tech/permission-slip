@@ -440,11 +440,12 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = now() WHERE agent_id = $1`, agentID)
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	// 5 active + 3 revoked = only 5 count toward limit.
-	for i := 0; i < 5; i++ {
+	// 4 active + 5 revoked = only 4 count toward limit (under 5).
+	// If revoked counted, total would be 9 and creation would be blocked.
+	for i := 0; i < 4; i++ {
 		testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 	}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "revoked")
 	}
 
@@ -461,8 +462,8 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	// 5 active = at limit, should be blocked.
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	// 4 active (under limit of 5) — should succeed because revoked don't count.
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 (revoked don't count, 4 active under limit of 5), got %d: %s", w.Code, w.Body.String())
 	}
 }
