@@ -21,7 +21,7 @@ export function useDataRetention() {
       return data as DataRetention;
     },
     enabled: !!accessToken,
-    staleTime: 60_000,
+    // Retention config rarely changes — inherit the global 5min staleTime.
   });
 
   return { dataRetention: data ?? null, isLoading, error, refetch };

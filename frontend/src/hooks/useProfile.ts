@@ -41,10 +41,7 @@ export function useProfile() {
       return { profile: data as Profile | null, needsOnboarding: false };
     },
     enabled: !!accessToken,
-    // Profile data rarely changes. A 30s staleTime prevents unnecessary
-    // refetches during rapid auth-state transitions (e.g. MFA enrollment)
-    // while still picking up changes reasonably quickly.
-    staleTime: 30_000,
+    // Profile data rarely changes — inherit the global 5min staleTime.
   });
 
   return {
