@@ -1520,6 +1520,12 @@ paths:
         authenticated user, starting from the required `since` timestamp. Designed
         for compliance export and SIEM integration use cases.
 
+        Results are filtered by the user's plan retention window (7 days for free,
+        90 days for paid). If the `since` parameter is earlier than the retention
+        boundary, it is clamped and the response includes `effective_since` with
+        the actual start timestamp used. A 7-day grace period applies after
+        downgrading from paid to free.
+
         Supports cursor-based pagination via `limit` and `after` query parameters
         to iterate over large result sets.
       tags:
@@ -1669,6 +1675,11 @@ paths:
         - **One-off approvals**: approved, denied, or cancelled approval requests
         - **Standing approval executions**: auto-executed actions via standing approvals
         - **Agent lifecycle**: agent registration and deactivation events
+
+        Results are filtered by the user's plan retention window (7 days for free,
+        90 days for paid). The response includes a `retention` object with the
+        effective retention days and any active grace period. A 7-day grace period
+        applies after downgrading from paid to free.
 
         Supports cursor-based pagination via `limit` and `after` query parameters,
         and filtering by agent, event type, and outcome.
