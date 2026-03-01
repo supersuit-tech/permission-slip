@@ -13,7 +13,10 @@ ALTER TABLE subscriptions ADD COLUMN downgraded_at timestamptz;
 -- run as well; both are idempotent and safe to run concurrently.
 
 -- +goose StatementBegin
-CREATE OR REPLACE FUNCTION purge_expired_audit_events() RETURNS void LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION purge_expired_audit_events() RETURNS void
+    LANGUAGE plpgsql
+    SECURITY INVOKER  -- Must NOT be SECURITY DEFINER; runs via pg_cron as the cron role.
+AS $$
 DECLARE
     pass1_count bigint;
     pass2_count bigint;
