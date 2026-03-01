@@ -147,6 +147,9 @@ generate-vapid-keys:
 migrate-create:
 	@if [ -z "$(NAME)" ]; then echo "Usage: make migrate-create NAME=my_migration"; exit 1; fi
 	@TIMESTAMP=$$(date +%Y%m%d%H%M%S); \
+	while ls db/migrations/$${TIMESTAMP}_*.sql >/dev/null 2>&1; do \
+		TIMESTAMP=$$(( TIMESTAMP + 1 )); \
+	done; \
 	FILE="db/migrations/$${TIMESTAMP}_$(NAME).sql"; \
 	printf -- '-- +goose Up\n\n-- +goose Down\n' > $$FILE; \
 	echo "Created $$FILE"
