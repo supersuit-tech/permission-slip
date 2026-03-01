@@ -1508,6 +1508,22 @@ paths:
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Agent limit reached — user cannot register more agents on their current plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: agent_limit_reached
+                  message: Free plan allows up to 3 agents. Upgrade your plan to add more.
+                  retryable: false
+                  details:
+                    current_count: 3
+                    limit: 3
+                    plan_id: free
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '404':
           description: Profile not found for the authenticated user
           content:

@@ -45,6 +45,12 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := Profile(r.Context()).ID
 
+		// Check agent limit proactively so users learn about the limit
+		// before sharing an invite that would fail at registration time.
+		if checkAgentLimit(r.Context(), w, r, deps.DB, userID) {
+			return
+		}
+
 		// Rate-limit check runs before body decoding to reject abusive
 		// callers early, before spending resources on parsing or crypto.
 		// Skipped in development mode to avoid slowing down local testing.

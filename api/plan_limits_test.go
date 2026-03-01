@@ -288,6 +288,9 @@ func TestCheckAgentLimit_FreePlan_AtLimit_ReturnsForbidden(t *testing.T) {
 	if limit, ok := resp.Error.Details["limit"].(float64); !ok || int(limit) != 3 {
 		t.Errorf("expected limit=3, got %v", resp.Error.Details["limit"])
 	}
+	if planID, ok := resp.Error.Details["plan_id"].(string); !ok || planID != db.PlanFree {
+		t.Errorf("expected plan_id=%q, got %v", db.PlanFree, resp.Error.Details["plan_id"])
+	}
 }
 
 func TestCheckAgentLimit_FreePlan_UnderLimit_Allows(t *testing.T) {
@@ -366,6 +369,66 @@ func TestCheckAgentLimit_PendingAgentsCountTowardLimit(t *testing.T) {
 
 	if !blocked {
 		t.Fatal("expected pending agents to count toward limit, but was allowed")
+	}
+}
+
+// ── Invite Creation Limit Tests ──────────────────────────────────────────────
+// Invite creation (POST /registration-invites) proactively checks the agent
+// limit so users learn early, before sharing an invite that would fail.
+
+func TestCreateInvite_FreePlan_AtAgentLimit_Returns403(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Insert 3 registered agents (limit for free tier).
+	for i := 0; i < 3; i++ {
+		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/registration-invites", uid, `{}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if resp.Error.Code != ErrAgentLimitReached {
+		t.Errorf("expected error code %q, got %q", ErrAgentLimitReached, resp.Error.Code)
+	}
+}
+
+func TestCreateInvite_PaidPlan_Succeeds(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+
+	// 10 registered agents — paid plan has no limit.
+	for i := 0; i < 10; i++ {
+		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, InviteHMACKey: "testkey"}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/registration-invites", uid, `{}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 (paid plan), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
