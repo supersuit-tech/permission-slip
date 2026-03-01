@@ -43,11 +43,12 @@ type Subscription struct {
 	StripeSubscriptionID *string // nil for free-tier users
 	CurrentPeriodStart   time.Time
 	CurrentPeriodEnd     time.Time
+	DowngradedAt         *time.Time // set when plan changes from paid to free; nil otherwise
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
 
-const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, created_at, updated_at`
+const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, created_at, updated_at`
 
 func scanSubscription(row pgx.Row) (*Subscription, error) {
 	var s Subscription
@@ -60,6 +61,7 @@ func scanSubscription(row pgx.Row) (*Subscription, error) {
 		&s.StripeSubscriptionID,
 		&s.CurrentPeriodStart,
 		&s.CurrentPeriodEnd,
+		&s.DowngradedAt,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
@@ -90,10 +92,19 @@ func CreateSubscription(ctx context.Context, db DBTX, userID, planID string) (*S
 }
 
 // UpdateSubscriptionPlan changes the plan for a user's subscription.
+// When downgrading (moving to a plan with shorter retention), sets downgraded_at
+// to trigger a grace period before the shorter retention window takes effect.
+// When upgrading, clears downgraded_at since the longer retention applies immediately.
 func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
-		 SET plan_id = $2, updated_at = now()
+		 SET downgraded_at = CASE
+		         WHEN $2 = 'free' AND plan_id != 'free' THEN now()
+		         WHEN $2 != 'free' THEN NULL
+		         ELSE downgraded_at
+		     END,
+		     plan_id = $2,
+		     updated_at = now()
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, planID))
@@ -199,6 +210,37 @@ type SubscriptionWithPlan struct {
 	Plan Plan
 }
 
+// DowngradeGracePeriod is the duration after a downgrade during which the
+// previous (longer) retention window is still honoured. During this period
+// EffectiveRetentionDays continues to use PaidPlanRetentionDays so users
+// have time to export their data before it becomes inaccessible.
+const DowngradeGracePeriod = 7 * 24 * time.Hour // 7 days
+
+// PaidPlanRetentionDays is the retention window for the pay-as-you-go plan.
+// Used during the downgrade grace period when the plan's own retention is shorter.
+const PaidPlanRetentionDays = 90
+
+// EffectiveRetentionDays returns the audit log retention window to enforce
+// for this subscription. During the downgrade grace period the previous
+// (longer) retention is used so users have time to export data.
+func (sp *SubscriptionWithPlan) EffectiveRetentionDays() int {
+	if sp.DowngradedAt != nil && time.Since(*sp.DowngradedAt) < DowngradeGracePeriod {
+		return PaidPlanRetentionDays
+	}
+	return sp.Plan.AuditRetentionDays
+}
+
+// GracePeriodEndsAt returns the timestamp when the downgrade grace period
+// expires, or nil if no grace period is active. This helps the frontend
+// show users when their extended retention will end.
+func (sp *SubscriptionWithPlan) GracePeriodEndsAt() *time.Time {
+	if sp.DowngradedAt != nil && time.Since(*sp.DowngradedAt) < DowngradeGracePeriod {
+		t := sp.DowngradedAt.Add(DowngradeGracePeriod)
+		return &t
+	}
+	return nil
+}
+
 // GetSubscriptionWithPlan returns the user's subscription joined with plan
 // details, or nil if the user has no subscription.
 func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*SubscriptionWithPlan, error) {
@@ -207,7 +249,7 @@ func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*Subs
 		`SELECT s.id, s.user_id, s.plan_id, s.status,
 		        s.stripe_customer_id, s.stripe_subscription_id,
 		        s.current_period_start, s.current_period_end,
-		        s.created_at, s.updated_at,
+		        s.downgraded_at, s.created_at, s.updated_at,
 		        p.id, p.name, p.max_requests_per_month, p.max_agents,
 		        p.max_standing_approvals, p.max_credentials,
 		        p.audit_retention_days, p.price_per_request_millicents,
@@ -225,6 +267,7 @@ func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*Subs
 		&sp.StripeSubscriptionID,
 		&sp.CurrentPeriodStart,
 		&sp.CurrentPeriodEnd,
+		&sp.DowngradedAt,
 		&sp.CreatedAt,
 		&sp.UpdatedAt,
 		&sp.Plan.ID,

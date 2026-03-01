@@ -21,7 +21,7 @@ func TestListAuditEvents(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -42,7 +42,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestListAuditEvents(t *testing.T) {
 
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "agent.registered", "registered", fmt.Sprintf("ar:%d", agentID))
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -93,7 +93,7 @@ func TestListAuditEvents(t *testing.T) {
 
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "agent.deactivated", "deactivated", fmt.Sprintf("ad:%d", agentID))
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -125,7 +125,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertAuditEventWithAction(t, tx, uid, agentID, "standing_approval.executed", "auto_executed", testhelper.GenerateID(t, "sae_"), []byte(`{"name":"test"}`), actionTypeOnly)
 		testhelper.InsertAuditEventWithAction(t, tx, uid, agentID, "standing_approval.executed", "auto_executed", testhelper.GenerateID(t, "sae_"), []byte(`{"name":"test"}`), actionTypeOnly)
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -169,7 +169,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertAuditEvent(t, tx, uid, agent2, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 
 		filter := &db.AuditEventFilter{AgentID: &agent1}
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -196,7 +196,7 @@ func TestListAuditEvents(t *testing.T) {
 		filter := &db.AuditEventFilter{
 			EventTypes: []db.AuditEventType{db.AuditEventApprovalApproved},
 		}
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -221,7 +221,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 
 		filter := &db.AuditEventFilter{Outcome: "denied"}
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -249,7 +249,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "agent.registered", "registered", testhelper.GenerateID(t, "ar_"), nil)
 
 		filter := &db.AuditEventFilter{ConnectorID: &github}
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -275,7 +275,7 @@ func TestListAuditEvents(t *testing.T) {
 		}
 
 		// First page
-		page1, err := db.ListAuditEvents(ctx, tx, uid, 2, nil, nil)
+		page1, err := db.ListAuditEvents(ctx, tx, uid, 2, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("page 1: %v", err)
 		}
@@ -289,7 +289,7 @@ func TestListAuditEvents(t *testing.T) {
 		// Second page
 		last := page1.Events[len(page1.Events)-1]
 		cursor := &db.AuditEventCursor{Timestamp: last.Timestamp, ID: last.ID}
-		page2, err := db.ListAuditEvents(ctx, tx, uid, 2, cursor, nil)
+		page2, err := db.ListAuditEvents(ctx, tx, uid, 2, cursor, nil, 0)
 		if err != nil {
 			t.Fatalf("page 2: %v", err)
 		}
@@ -303,7 +303,7 @@ func TestListAuditEvents(t *testing.T) {
 		// Third page - 1 remaining
 		last2 := page2.Events[len(page2.Events)-1]
 		cursor2 := &db.AuditEventCursor{Timestamp: last2.Timestamp, ID: last2.ID}
-		page3, err := db.ListAuditEvents(ctx, tx, uid, 2, cursor2, nil)
+		page3, err := db.ListAuditEvents(ctx, tx, uid, 2, cursor2, nil, 0)
 		if err != nil {
 			t.Fatalf("page 3: %v", err)
 		}
@@ -322,7 +322,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		// limit=0 should default to 20
-		page, err := db.ListAuditEvents(ctx, tx, uid, 0, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 0, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -338,7 +338,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		// limit=200 should be clamped to 100
-		page, err := db.ListAuditEvents(ctx, tx, uid, 200, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 200, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -359,7 +359,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
 		// uid2 should see no events from uid1
-		page, err := db.ListAuditEvents(ctx, tx, uid2, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid2, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -380,7 +380,7 @@ func TestListAuditEvents(t *testing.T) {
 			testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
 		}
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -403,7 +403,7 @@ func TestListAuditEvents(t *testing.T) {
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "agent.registered", "registered", fmt.Sprintf("ar:%d", agentID))
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "standing_approval.executed", "auto_executed", testhelper.GenerateID(t, "sa_"))
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -439,7 +439,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -463,7 +463,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), recent)
 
 		since := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -488,7 +488,7 @@ func TestExportAuditLogs(t *testing.T) {
 		}
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -518,7 +518,7 @@ func TestExportAuditLogs(t *testing.T) {
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Page 1
-		page1, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, nil)
+		page1, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, nil, 0)
 		if err != nil {
 			t.Fatalf("page 1: %v", err)
 		}
@@ -532,7 +532,7 @@ func TestExportAuditLogs(t *testing.T) {
 		// Page 2
 		last := page1.Events[len(page1.Events)-1]
 		cursor := &db.AuditLogExportCursor{Timestamp: last.Timestamp, ID: last.ID}
-		page2, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor)
+		page2, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor, 0)
 		if err != nil {
 			t.Fatalf("page 2: %v", err)
 		}
@@ -554,7 +554,7 @@ func TestExportAuditLogs(t *testing.T) {
 		// Page 3
 		last2 := page2.Events[len(page2.Events)-1]
 		cursor2 := &db.AuditLogExportCursor{Timestamp: last2.Timestamp, ID: last2.ID}
-		page3, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor2)
+		page3, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 2, cursor2, 0)
 		if err != nil {
 			t.Fatalf("page 3: %v", err)
 		}
@@ -578,7 +578,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid2, since, nil, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid2, since, nil, nil, nil, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -594,7 +594,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 0, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 0, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -618,7 +618,7 @@ func TestExportAuditLogs(t *testing.T) {
 
 		since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		until := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, &until, nil, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, &until, nil, nil, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -639,7 +639,7 @@ func TestExportAuditLogs(t *testing.T) {
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		eventTypes := []db.AuditEventType{db.AuditEventApprovalApproved, db.AuditEventApprovalDenied}
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, nil, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, nil, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -666,7 +666,7 @@ func TestExportAuditLogs(t *testing.T) {
 		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID, "agent.registered", "registered", fmt.Sprintf("ar:%d", agentID), nil)
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, &slack, 100, nil)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, &slack, 100, nil, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -704,7 +704,7 @@ func TestInsertAuditEvent(t *testing.T) {
 		}
 
 		// Verify it shows up in list
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("list error: %v", err)
 		}
@@ -746,7 +746,7 @@ func TestInsertAuditEvent(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("list error: %v", err)
 		}
@@ -786,7 +786,7 @@ func TestInsertAuditEvent(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("list error: %v", err)
 		}
@@ -834,7 +834,7 @@ func TestInsertAuditEvent(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil)
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
 		if err != nil {
 			t.Fatalf("list error: %v", err)
 		}
@@ -847,6 +847,136 @@ func TestInsertAuditEvent(t *testing.T) {
 		}
 		if e.ExecutionError == nil || *e.ExecutionError != "API rate limit exceeded" {
 			t.Errorf("expected execution_error='API rate limit exceeded', got %v", e.ExecutionError)
+		}
+	})
+}
+
+func TestListAuditEvents_RetentionFiltering(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("ExcludesEventsOutsideRetentionWindow", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert an event dated 10 days ago — outside 7-day retention.
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"), time.Now().AddDate(0, 0, -10))
+
+		// Insert a recent event — inside 7-day retention.
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied",
+			testhelper.GenerateID(t, "appr_"))
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 7)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event within retention window, got %d", len(page.Events))
+		}
+		if page.Events[0].EventType != db.AuditEventApprovalDenied {
+			t.Errorf("expected recent event, got %s", page.Events[0].EventType)
+		}
+	})
+
+	t.Run("IncludesAllEventsWithinRetentionWindow", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert an event dated 30 days ago — inside 90-day retention.
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"), time.Now().AddDate(0, 0, -30))
+
+		// Insert a recent event.
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied",
+			testhelper.GenerateID(t, "appr_"))
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 90)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 2 {
+			t.Fatalf("expected 2 events within 90-day retention, got %d", len(page.Events))
+		}
+	})
+
+	t.Run("ZeroRetentionDaysDisablesFiltering", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert an event dated 200 days ago.
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"), time.Now().AddDate(0, 0, -200))
+
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied",
+			testhelper.GenerateID(t, "appr_"))
+
+		// retentionDays=0 means no filtering.
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 2 {
+			t.Fatalf("expected 2 events with no retention filter, got %d", len(page.Events))
+		}
+	})
+}
+
+func TestExportAuditLogs_RetentionFiltering(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("ClampsSinceToRetentionWindow", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert event 10 days ago — outside 7-day retention.
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"), time.Now().AddDate(0, 0, -10))
+
+		// Insert recent event — inside 7-day retention.
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied",
+			testhelper.GenerateID(t, "appr_"))
+
+		// Even though since=2020, the 7-day retention clamps the effective window.
+		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil, 7)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event within retention window, got %d", len(page.Events))
+		}
+	})
+
+	t.Run("ZeroRetentionDaysDisablesFiltering", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Insert event 200 days ago.
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"), time.Now().AddDate(0, 0, -200))
+
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied",
+			testhelper.GenerateID(t, "appr_"))
+
+		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, nil, nil, 100, nil, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 2 {
+			t.Fatalf("expected 2 events with no retention filter, got %d", len(page.Events))
 		}
 	})
 }
