@@ -7864,7 +7864,8 @@ components:
           example: '+15551234567'
         marketing_opt_in:
           type: boolean
-          description: Whether the user opts in to product update emails.
+          description: |
+            Whether the user opts in to product update emails. Omit the field to leave the current value unchanged; unlike email/phone this field cannot be null.
           example: true
     NotificationPreference:
       type: object

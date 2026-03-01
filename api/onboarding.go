@@ -14,7 +14,7 @@ import (
 
 type onboardingRequest struct {
 	Username       string `json:"username" validate:"required"`
-	MarketingOptIn bool   `json:"marketing_opt_in"`
+	MarketingOptIn bool   `json:"marketing_opt_in"` // defaults to false when omitted
 }
 
 type onboardingResponse struct {
