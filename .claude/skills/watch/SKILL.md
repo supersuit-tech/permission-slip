@@ -285,6 +285,18 @@ Fixed failing checks after watch session ended:
 - **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
 ```
 
+### 11. Trigger Webhook Notification
+
+After all polling, wrap-up, and check fixes are complete, trigger the webhook workflow to notify that the watch session has finished:
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml -f pr_url="$ARGUMENTS"
+```
+
+`$ARGUMENTS` is the original PR URL passed to the `/watch` command. This fires the `trigger-webhook.yml` workflow in the `supersuit-tech/permission-slip` repo, which sends a webhook notification with the PR URL.
+
+This step runs unconditionally — whether or not changes were made during the session.
+
 ## Important Rules
 
 - **Never ask for human input** — decide and implement autonomously.
