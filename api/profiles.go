@@ -14,19 +14,21 @@ import (
 
 // profileResponse is the JSON shape returned by GET /profile.
 type profileResponse struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	Email     *string   `json:"email,omitempty"`
-	Phone     *string   `json:"phone,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	Username       string    `json:"username"`
+	Email          *string   `json:"email,omitempty"`
+	Phone          *string   `json:"phone,omitempty"`
+	MarketingOptIn bool      `json:"marketing_opt_in"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // updateProfileRaw uses json.RawMessage to detect which fields were actually
 // provided in the request body, enabling true PATCH semantics (absent fields
 // are left unchanged, explicit null clears the field).
 type updateProfileRaw struct {
-	Email json.RawMessage `json:"email"`
-	Phone json.RawMessage `json:"phone"`
+	Email          json.RawMessage `json:"email"`
+	Phone          json.RawMessage `json:"phone"`
+	MarketingOptIn json.RawMessage `json:"marketing_opt_in"`
 }
 
 // RegisterProfileRoutes adds profile-related endpoints to the mux.
@@ -51,11 +53,12 @@ func handleGetProfile() http.HandlerFunc {
 		profile := Profile(r.Context())
 
 		RespondJSON(w, http.StatusOK, profileResponse{
-			ID:        profile.ID,
-			Username:  profile.Username,
-			Email:     profile.Email,
-			Phone:     profile.Phone,
-			CreatedAt: profile.CreatedAt,
+			ID:             profile.ID,
+			Username:       profile.Username,
+			Email:          profile.Email,
+			Phone:          profile.Phone,
+			MarketingOptIn: profile.MarketingOptIn,
+			CreatedAt:      profile.CreatedAt,
 		})
 	}
 }
@@ -89,6 +92,26 @@ func parseOptionalString(raw json.RawMessage) (*string, bool, error) {
 	return &s, true, nil
 }
 
+// parseOptionalBool parses a json.RawMessage that may be a bool or absent.
+// Returns (value, wasProvided, error):
+//   - absent field   → (nil, false, nil)
+//   - true/false     → (&b, true, nil)
+//   - null           → (nil, false, error) — boolean fields are non-nullable
+//   - wrong type     → (nil, false, error)
+func parseOptionalBool(raw json.RawMessage) (*bool, bool, error) {
+	if len(raw) == 0 {
+		return nil, false, nil // field not present in JSON
+	}
+	if isRawJSONNull(raw) {
+		return nil, false, fmt.Errorf("expected a boolean, got null")
+	}
+	var b bool
+	if err := json.Unmarshal(raw, &b); err != nil {
+		return nil, false, fmt.Errorf("expected a boolean, got %s", raw)
+	}
+	return &b, true, nil
+}
+
 func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
@@ -101,6 +124,7 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 		// Start from current values and only override provided fields.
 		email := profile.Email
 		phone := profile.Phone
+		var marketingOptIn *bool // nil means "not provided" → leave unchanged
 
 		if parsed, provided, err := parseOptionalString(req.Email); err != nil {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "email: "+err.Error()))
@@ -124,7 +148,14 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 			phone = parsed
 		}
 
-		if err := db.UpdateProfileContactFields(r.Context(), deps.DB, profile.ID, email, phone); err != nil {
+		if parsed, provided, err := parseOptionalBool(req.MarketingOptIn); err != nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "marketing_opt_in: "+err.Error()))
+			return
+		} else if provided {
+			marketingOptIn = parsed
+		}
+
+		if err := db.UpdateProfileFields(r.Context(), deps.DB, profile.ID, email, phone, marketingOptIn); err != nil {
 			log.Printf("[%s] handleUpdateProfile: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update profile"))
 			return
@@ -139,11 +170,12 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, profileResponse{
-			ID:        updated.ID,
-			Username:  updated.Username,
-			Email:     updated.Email,
-			Phone:     updated.Phone,
-			CreatedAt: updated.CreatedAt,
+			ID:             updated.ID,
+			Username:       updated.Username,
+			Email:          updated.Email,
+			Phone:          updated.Phone,
+			MarketingOptIn: updated.MarketingOptIn,
+			CreatedAt:      updated.CreatedAt,
 		})
 	}
 }

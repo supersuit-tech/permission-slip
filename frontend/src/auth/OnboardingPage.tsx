@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const queryClient = useQueryClient();
   const [username, setUsername] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,7 +28,7 @@ export default function OnboardingPage() {
     try {
       const { error: apiError } = await client.POST("/v1/onboarding", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
-        body: { username: username.trim() },
+        body: { username: username.trim(), marketing_opt_in: marketingOptIn },
       });
 
       if (apiError) {
@@ -101,6 +102,20 @@ export default function OnboardingPage() {
               </Link>
             </div>
           </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <Checkbox
+            id="marketing-opt-in"
+            checked={marketingOptIn}
+            onCheckedChange={(checked) => setMarketingOptIn(checked === true)}
+          />
+          <Label
+            htmlFor="marketing-opt-in"
+            className="text-sm font-normal leading-snug text-muted-foreground"
+          >
+            Keep me in the loop — Get occasional emails about new features,
+            platform updates, and tips to get more out of Permission Slip.
+          </Label>
         </div>
         <FormError error={error} prefix />
         <div className="flex gap-2">

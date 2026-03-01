@@ -42,7 +42,7 @@ describe("UserMenu", () => {
 
   it("shows username in the nav trigger when profile is loaded", async () => {
     mockUseProfile.mockReturnValue({
-      profile: { id: "user-123", username: "janedoe", created_at: "2024-01-01T00:00:00Z" },
+      profile: { id: "user-123", username: "janedoe", marketing_opt_in: false, created_at: "2024-01-01T00:00:00Z" },
       needsOnboarding: false,
       isLoading: false,
     });
@@ -55,7 +55,7 @@ describe("UserMenu", () => {
 
   it("shows username and email when profile is loaded", async () => {
     mockUseProfile.mockReturnValue({
-      profile: { id: "user-123", username: "janedoe", created_at: "2024-01-01T00:00:00Z" },
+      profile: { id: "user-123", username: "janedoe", marketing_opt_in: false, created_at: "2024-01-01T00:00:00Z" },
       needsOnboarding: false,
       isLoading: false,
     });

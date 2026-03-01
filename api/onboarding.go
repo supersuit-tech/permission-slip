@@ -13,7 +13,8 @@ import (
 )
 
 type onboardingRequest struct {
-	Username string `json:"username" validate:"required"`
+	Username       string `json:"username" validate:"required"`
+	MarketingOptIn bool   `json:"marketing_opt_in"`
 }
 
 type onboardingResponse struct {
@@ -68,7 +69,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		profile, err := db.CreateProfile(r.Context(), deps.DB, userID, username)
+		profile, err := db.CreateProfile(r.Context(), deps.DB, userID, username, req.MarketingOptIn)
 		if err != nil {
 			var onboardErr *db.OnboardingError
 			if errors.As(err, &onboardErr) {

@@ -27,9 +27,16 @@ describe("OnboardingPage", () => {
   it("renders the terms of service agreement checkbox", async () => {
     renderWithProviders(<OnboardingPage />);
     await waitFor(() => {
-      expect(screen.getByRole("checkbox")).toBeInTheDocument();
+      expect(screen.getAllByRole("checkbox")).toHaveLength(2);
     });
     expect(screen.getByText(/I agree to the/)).toBeInTheDocument();
+  });
+
+  it("renders the marketing opt-in checkbox", async () => {
+    renderWithProviders(<OnboardingPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/Keep me in the loop/)).toBeInTheDocument();
+    });
   });
 
   it("disables submit button until terms checkbox is checked", async () => {
@@ -41,7 +48,8 @@ describe("OnboardingPage", () => {
     const submitButton = screen.getByText("Create account");
     expect(submitButton).toBeDisabled();
 
-    await userEvent.click(screen.getByRole("checkbox"));
+    const tosCheckbox = screen.getByLabelText(/I agree to the/);
+    await userEvent.click(tosCheckbox);
     expect(submitButton).toBeEnabled();
   });
 
@@ -65,13 +73,13 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "alice");
-    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByLabelText(/I agree to the/));
     await userEvent.click(screen.getByText("Create account"));
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith(
         "/v1/onboarding",
-        expect.objectContaining({ body: { username: "alice" } })
+        expect.objectContaining({ body: { username: "alice", marketing_opt_in: false } })
       );
     });
   });
@@ -87,7 +95,7 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "taken");
-    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByLabelText(/I agree to the/));
     await userEvent.click(screen.getByText("Create account"));
 
     await waitFor(() => {

@@ -24,6 +24,7 @@ interface MockProfile {
   username: string;
   email?: string | null;
   phone?: string | null;
+  marketing_opt_in: boolean;
   created_at: string;
 }
 
@@ -32,12 +33,14 @@ const profileWithContact: MockProfile = {
   username: "alice",
   email: "alice@example.com",
   phone: "+15551234567",
+  marketing_opt_in: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 
 const profileNoContact: MockProfile = {
   id: "user-123",
   username: "alice",
+  marketing_opt_in: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 
@@ -119,8 +122,9 @@ describe("NotificationSection", () => {
       const disabledButtons = buttons.filter(
         (b) => b.textContent === "Disabled",
       );
+      // 2 channel enabled (email, sms) + 2 disabled (web-push, product updates)
       expect(enabledButtons).toHaveLength(2);
-      expect(disabledButtons).toHaveLength(1);
+      expect(disabledButtons).toHaveLength(2);
     });
   });
 
