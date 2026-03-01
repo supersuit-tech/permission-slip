@@ -268,8 +268,10 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 	fetchLimit := limit + 1
 
 	// Clamp `since` to the retention window when enforcement is active.
+	// Use UTC + fixed 24h days to match the SQL `make_interval(days => N)`
+	// semantics used in the list endpoint and purge jobs.
 	if retentionDays > 0 {
-		retentionFloor := time.Now().AddDate(0, 0, -retentionDays)
+		retentionFloor := time.Now().UTC().Add(-time.Duration(retentionDays) * 24 * time.Hour)
 		if since.Before(retentionFloor) {
 			since = retentionFloor
 		}

@@ -98,12 +98,12 @@ func CreateSubscription(ctx context.Context, db DBTX, userID, planID string) (*S
 func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
-		 SET plan_id = $2,
-		     downgraded_at = CASE
+		 SET downgraded_at = CASE
 		         WHEN $2 = 'free' AND plan_id != 'free' THEN now()
 		         WHEN $2 != 'free' THEN NULL
 		         ELSE downgraded_at
 		     END,
+		     plan_id = $2,
 		     updated_at = now()
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
@@ -210,11 +210,10 @@ type SubscriptionWithPlan struct {
 	Plan Plan
 }
 
-// GetSubscriptionWithPlan returns the user's subscription joined with plan
-// details, or nil if the user has no subscription.
 // DowngradeGracePeriod is the duration after a downgrade during which the
-// previous (longer) retention window is still honoured. This gives users
-// time to export their data before it becomes inaccessible.
+// previous (longer) retention window is still honoured. During this period
+// EffectiveRetentionDays continues to use PaidPlanRetentionDays so users
+// have time to export their data before it becomes inaccessible.
 const DowngradeGracePeriod = 7 * 24 * time.Hour // 7 days
 
 // PaidPlanRetentionDays is the retention window for the pay-as-you-go plan.

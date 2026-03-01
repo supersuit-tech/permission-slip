@@ -368,7 +368,7 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			}
 			// If the requested `since` was before the retention window,
 			// tell the client what effective start date was actually used.
-			retentionFloor := time.Now().AddDate(0, 0, -retentionDays)
+			retentionFloor := time.Now().UTC().Add(-time.Duration(retentionDays) * 24 * time.Hour)
 			if originalSince.Before(retentionFloor) {
 				resp.EffectiveSince = &retentionFloor
 			}
