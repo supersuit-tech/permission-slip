@@ -86,6 +86,21 @@ Permission Slip uses a single Supabase project for:
 - **Authentication > Email:** Configure email templates as needed
 - **Authentication > Rate Limits:** Review and adjust for production traffic
 
+**Fly.io setup:**
+
+```bash
+# Runtime secrets
+fly secrets set \
+  DATABASE_URL="postgres://postgres.[project-ref]:[password]@[host]:6543/postgres?sslmode=require" \
+  SUPABASE_URL="https://[project-ref].supabase.co" \
+  SUPABASE_SERVICE_ROLE_KEY="<service_role key from Supabase dashboard>"
+
+# Build-time args (inlined into frontend JS bundle)
+fly deploy \
+  --build-arg VITE_SUPABASE_URL="https://[project-ref].supabase.co" \
+  --build-arg VITE_SUPABASE_ANON_KEY="<anon key from Supabase dashboard>"
+```
+
 ### Sentry (Error Tracking)
 
 Two Sentry projects (or one with separate DSNs):
@@ -93,6 +108,22 @@ Two Sentry projects (or one with separate DSNs):
 - **Frontend:** Captures React errors, failed API calls, CSP violations
 
 Source maps are uploaded during Docker builds for readable stack traces.
+
+**Fly.io setup:**
+
+```bash
+# Runtime secrets
+fly secrets set \
+  SENTRY_DSN="https://[key]@[org].ingest.sentry.io/[project]" \
+  SENTRY_CSP_ENDPOINT="https://[org].ingest.sentry.io/api/[project]/security/?sentry_key=[key]"
+
+# Build-time args (frontend error tracking + source map upload)
+fly deploy \
+  --build-arg VITE_SENTRY_DSN="https://[key]@[org].ingest.sentry.io/[project]" \
+  --build-arg SENTRY_AUTH_TOKEN="sntrys_xxxx" \
+  --build-arg SENTRY_ORG="supersuit" \
+  --build-arg SENTRY_PROJECT="permission-slip"
+```
 
 ### Notification Services
 
@@ -107,6 +138,28 @@ Source maps are uploaded during Docker builds for readable stack traces.
 **Web Push — VAPID:**
 - Browser push notifications via FCM / Mozilla Push Service
 - VAPID key pair must be consistent across all instances
+
+**Fly.io setup:**
+
+```bash
+# Email (SendGrid)
+fly secrets set \
+  NOTIFICATION_EMAIL_PROVIDER="twilio-sendgrid" \
+  SENDGRID_API_KEY="SG.xxxx" \
+  NOTIFICATION_EMAIL_FROM="approvals@permissionslip.dev"
+
+# SMS (Twilio)
+fly secrets set \
+  TWILIO_ACCOUNT_SID="ACxxxx" \
+  TWILIO_AUTH_TOKEN="xxxx" \
+  TWILIO_FROM_NUMBER="+15551234567"
+
+# Web Push (VAPID) — generate keys first: go run ./cmd/generate-vapid-keys --format=fly
+fly secrets set \
+  VAPID_PUBLIC_KEY="<base64url public key>" \
+  VAPID_PRIVATE_KEY="<base64url private key>" \
+  VAPID_SUBJECT="mailto:admin@supersuit.tech"
+```
 
 ### PostHog (Product Analytics)
 
@@ -132,6 +185,24 @@ Product analytics for understanding user behavior, feature adoption, and funnel 
 |---|---|
 | `VITE_POSTHOG_KEY` | PostHog project API key |
 | `VITE_POSTHOG_HOST` | PostHog API host (default: `https://us.i.posthog.com`) |
+
+**Env vars (runtime):**
+
+| Variable | Description |
+|---|---|
+| `POSTHOG_HOST` | PostHog API host for backend CSP (must match `VITE_POSTHOG_HOST`) |
+
+**Fly.io setup:**
+
+```bash
+# Runtime secret (backend CSP — allows browser to send events to PostHog)
+fly secrets set POSTHOG_HOST="https://us.i.posthog.com"
+
+# Build-time args (inlined into frontend JS bundle)
+fly deploy \
+  --build-arg VITE_POSTHOG_KEY="phc_xxxx" \
+  --build-arg VITE_POSTHOG_HOST="https://us.i.posthog.com"
+```
 
 ### Better Stack / Logtail (Log Aggregation)
 
@@ -205,12 +276,27 @@ Payment processing for the paid tier: payment method collection, subscription ma
 |---|---|
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for frontend (build-time) |
 
+**Fly.io setup:**
+
+```bash
+# Runtime secrets
+fly secrets set \
+  BILLING_ENABLED="true" \
+  STRIPE_SECRET_KEY="sk_live_xxxx" \
+  STRIPE_PUBLISHABLE_KEY="pk_live_xxxx" \
+  STRIPE_WEBHOOK_SECRET="whsec_xxxx" \
+  STRIPE_PRICE_ID_REQUEST="price_xxxx"
+
+# Build-time arg (inlined into frontend JS bundle for Stripe Checkout)
+fly deploy --build-arg VITE_STRIPE_PUBLISHABLE_KEY="pk_live_xxxx"
+```
+
 **Setup steps:**
 1. Create Stripe account and get API keys
 2. Create a metered Price for per-request billing ($0.005/request after 1,000 free)
 3. Set up a webhook endpoint at `https://app.permissionslip.dev/api/v1/webhooks/stripe`
 4. Configure webhook to send: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
-5. Set all env vars via `fly secrets set`
+5. Set all env vars via `fly secrets set` (see commands above)
 
 **When `BILLING_ENABLED=false`:**
 - New users get `pay_as_you_go` plan (unlimited)
@@ -224,6 +310,8 @@ Payment processing for the paid tier: payment method collection, subscription ma
 
 Set via `fly secrets set`. These are encrypted at rest by Fly and injected as environment variables at runtime.
 
+> **Note:** The `MODE` variable controls dev vs. production behavior. When `MODE` is **not set** (the default), the server runs in production mode — config validation is strict, rate limiting is enabled, and Sentry reports its environment as `production`. **Do not** set `MODE=development` in production. There is no need to explicitly set `MODE` for production deploys.
+
 ```bash
 # ── Required ──────────────────────────────────────────────────────────────
 
@@ -233,6 +321,11 @@ fly secrets set \
   BASE_URL="https://app.permissionslip.dev" \
   ALLOWED_ORIGINS="https://app.permissionslip.dev" \
   INVITE_HMAC_KEY="<output of: openssl rand -hex 32>"
+
+# ── Recommended ───────────────────────────────────────────────────────────
+
+fly secrets set \
+  SUPABASE_SERVICE_ROLE_KEY="<service_role key from Supabase dashboard>"
 
 # ── Web Push (VAPID) ─────────────────────────────────────────────────────
 
@@ -261,6 +354,12 @@ fly secrets set \
 fly secrets set \
   SENTRY_DSN="https://[key]@[org].ingest.sentry.io/[project]" \
   SENTRY_CSP_ENDPOINT="https://[org].ingest.sentry.io/api/[project]/security/?sentry_key=[key]"
+
+# ── Product Analytics (PostHog) — when enabled ───────────────────────────
+# Not needed until PostHog is enabled. See #352.
+
+fly secrets set \
+  POSTHOG_HOST="https://us.i.posthog.com"
 
 # ── Billing (Stripe) — when BILLING_ENABLED=true ─────────────────────────
 # Not needed until billing is enabled. See #341, #364.
@@ -325,6 +424,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `TWILIO_FROM_NUMBER` | Runtime secret | **Set if SMS** | Twilio phone number |
 | `SENTRY_DSN` | Runtime secret | **Set** | Backend error tracking DSN |
 | `SENTRY_CSP_ENDPOINT` | Runtime secret | **Set** | CSP violation reporting |
+| `SUPABASE_SERVICE_ROLE_KEY` | Runtime secret | **Recommended** | Admin API operations (e.g. account deletion) |
 | `VITE_SUPABASE_URL` | Build arg | **Required** | Frontend auth URL |
 | `VITE_SUPABASE_ANON_KEY` | Build arg | **Required** | Frontend auth public key |
 | `VITE_SENTRY_DSN` | Build arg | **Set** | Frontend error tracking DSN |
@@ -333,6 +433,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `SENTRY_PROJECT` | Build arg | **Set** | `permission-slip` |
 | `VITE_POSTHOG_KEY` | Build arg | **Planned** ([#352]) | PostHog project API key |
 | `VITE_POSTHOG_HOST` | Build arg | **Planned** ([#352]) | PostHog API host (default: `us.i.posthog.com`) |
+| `POSTHOG_HOST` | Runtime secret | **Planned** ([#352]) | PostHog API host for backend CSP |
 | `BILLING_ENABLED` | Runtime secret | **Planned** ([#364]) | `true` to enable billing (default: `false`) |
 | `STRIPE_SECRET_KEY` | Runtime secret | **Planned** ([#341]) | Stripe API secret key |
 | `STRIPE_PUBLISHABLE_KEY` | Runtime secret | **Planned** ([#341]) | Stripe publishable key |
@@ -478,7 +579,7 @@ Use this for uptime monitoring (e.g., UptimeRobot, Fly's built-in checks).
 **Backend errors:**
 - All 5xx errors and panics are captured
 - Sensitive headers (`Authorization`, `Cookie`, `X-Api-Key`) are scrubbed before sending
-- Environment tag: `production`
+- Environment tag: derived from `MODE` (defaults to `production` when `MODE` is not set)
 - Release tag: git SHA (set via `-ldflags` at build time)
 
 **Frontend errors:**
