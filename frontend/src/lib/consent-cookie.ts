@@ -98,28 +98,55 @@ export function getStoredConsent(): ConsentStatus | null {
   return migrateFromLocalStorage();
 }
 
-/** Build shared cookie attributes. Secure is only set over HTTPS to avoid
- *  silent failures on http://localhost during development. */
-function cookieAttrs(): string {
-  const domain = getConsentCookieDomain();
-  const domainAttr = domain ? `; domain=${domain}` : "";
+/** Build base cookie attributes (path, SameSite, Secure). */
+function baseCookieAttrs(): string {
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  return `; path=/; SameSite=Lax${secure}${domainAttr}`;
+  return `; path=/; SameSite=Lax${secure}`;
 }
 
-/** Persist a consent choice as a cross-subdomain cookie. */
+/** Build cookie attributes with the cross-subdomain domain directive. */
+function domainCookieAttrs(): string {
+  const domain = getConsentCookieDomain();
+  const domainAttr = domain ? `; domain=${domain}` : "";
+  return `${baseCookieAttrs()}${domainAttr}`;
+}
+
+/**
+ * Persist a consent choice as a cookie.
+ *
+ * Tries to set a cross-subdomain cookie first (domain attribute). If the
+ * browser silently rejects it — e.g. because the derived domain is a public
+ * suffix like `ngrok-free.dev` — falls back to an origin-only cookie.
+ */
 export function persistConsent(status: ConsentStatus) {
   try {
-    document.cookie = `${CONSENT_COOKIE_NAME}=${encodeURIComponent(status)}${cookieAttrs()}; max-age=${CONSENT_MAX_AGE}`;
+    const value = encodeURIComponent(status);
+
+    // Attempt 1: cross-subdomain cookie (with domain attribute).
+    document.cookie = `${CONSENT_COOKIE_NAME}=${value}${domainCookieAttrs()}; max-age=${CONSENT_MAX_AGE}`;
+
+    // Verify the cookie was actually written. Browsers silently discard
+    // cookies whose domain is a public suffix (e.g. .ngrok-free.dev).
+    if (readRawCookie() === status) return;
+
+    // Attempt 2: origin-only cookie (no domain attribute).
+    document.cookie = `${CONSENT_COOKIE_NAME}=${value}${baseCookieAttrs()}; max-age=${CONSENT_MAX_AGE}`;
   } catch {
     // Cookie access may be unavailable; consent still works for the session.
   }
 }
 
-/** Remove the consent cookie (causes the banner to reappear). */
+/**
+ * Remove the consent cookie (causes the banner to reappear).
+ *
+ * Clears both the cross-subdomain (domain-scoped) and origin-only variants
+ * so we don't leave a stale cookie behind regardless of how it was originally
+ * written.
+ */
 export function clearConsent() {
   try {
-    document.cookie = `${CONSENT_COOKIE_NAME}=${cookieAttrs()}; max-age=0`;
+    document.cookie = `${CONSENT_COOKIE_NAME}=${domainCookieAttrs()}; max-age=0`;
+    document.cookie = `${CONSENT_COOKIE_NAME}=${baseCookieAttrs()}; max-age=0`;
   } catch {
     // Ignore cookie errors.
   }
