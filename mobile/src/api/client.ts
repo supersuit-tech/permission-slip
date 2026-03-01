@@ -13,7 +13,15 @@ import type { paths } from "./schema";
  */
 function resolveBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (!envUrl) return "https://app.permissionslip.dev/api";
+  if (!envUrl) {
+    if (__DEV__) {
+      console.warn(
+        "[api] EXPO_PUBLIC_API_BASE_URL is not set — falling back to production (https://app.permissionslip.dev/api). " +
+          "Set it in your .env or app.config to point at a local/staging server.",
+      );
+    }
+    return "https://app.permissionslip.dev/api";
+  }
   return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
 }
 
