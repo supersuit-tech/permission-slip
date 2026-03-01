@@ -68,6 +68,12 @@ Database tests require a running Postgres instance. They use `DATABASE_URL_TEST`
 - **Changed migrations or db/ code:** run `go test ./db/... -v` at minimum
 - **Not sure:** run `make test`
 
+## Creating Migrations
+
+**Always use `make migrate-create NAME=my_migration`** to create new migration files. Never create migration files by hand or by writing them directly — the Makefile target generates a proper timestamp and auto-increments if a collision exists.
+
+Duplicate migration versions cause goose to panic at startup. A CI test (`TestMigrationVersionsUnique` in `db/migrations_test.go`) guards against this, but using `make migrate-create` prevents the problem at the source.
+
 ## Database Seed Data
 
 Whenever you make changes to database schema, tables, or migrations, review the seed file and update it to reflect the new schema. Add seed data for any new tables or columns so the seed remains comprehensive and stable. The seed should always be runnable against the current schema without errors.

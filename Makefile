@@ -144,9 +144,13 @@ generate-vapid-keys:
 	go run ./cmd/generate-vapid-keys
 
 # Create a new migration file: make migrate-create NAME=add_users_table
+# Auto-increments the timestamp if a file with the same prefix already exists.
 migrate-create:
 	@if [ -z "$(NAME)" ]; then echo "Usage: make migrate-create NAME=my_migration"; exit 1; fi
-	@TIMESTAMP=$$(date +%Y%m%d%H%M%S); \
-	FILE="db/migrations/$${TIMESTAMP}_$(NAME).sql"; \
+	@TS=$$(date +%Y%m%d%H%M%S); \
+	while ls db/migrations/$${TS}_*.sql >/dev/null 2>&1; do \
+		TS=$$(echo $$TS | awk '{ printf "%014d", $$1 + 1 }'); \
+	done; \
+	FILE="db/migrations/$${TS}_$(NAME).sql"; \
 	printf -- '-- +goose Up\n\n-- +goose Down\n' > $$FILE; \
 	echo "Created $$FILE"
