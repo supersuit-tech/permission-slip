@@ -81,27 +81,49 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 		return
 	}
 
-	// Upgrade to paid plan.
-	if _, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanPayAsYouGo); err != nil {
+	// Atomically upgrade to paid plan — only succeeds if user is currently on
+	// the free plan. This prevents double-upgrade race conditions when two
+	// checkout webhooks arrive concurrently for the same user.
+	upgraded, err := db.UpgradeSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanFree, db.PlanPayAsYouGo)
+	if err != nil {
 		log.Printf("[%s] StripeWebhook: upgrade plan: %v", TraceID(r.Context()), err)
+		return
+	}
+	if upgraded == nil {
+		log.Printf("[%s] StripeWebhook: checkout complete (event %s), user %s already upgraded (idempotent no-op)", TraceID(r.Context()), event.ID, sub.UserID)
 		return
 	}
 
 	log.Printf("[%s] StripeWebhook: checkout complete (event %s), user %s upgraded to pay_as_you_go", TraceID(r.Context()), event.ID, sub.UserID)
 }
 
-// handleSubscriptionUpdated processes subscription status changes.
-// Maps Stripe statuses to local subscription statuses.
-func handleSubscriptionUpdated(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) {
-	stripeSub, err := pstripe.ParseSubscriptionUpdated(event)
+// lookupByStripeSubscription parses a subscription event and looks up the
+// local subscription by Stripe subscription ID. Returns nil for both values
+// (no error) if the subscription cannot be found — callers should return early.
+func lookupByStripeSubscription(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) (*db.Subscription, *pstripe.StripeSubscription) {
+	stripeSub, err := pstripe.ParseSubscriptionEvent(event)
 	if err != nil {
-		log.Printf("[%s] StripeWebhook: parse subscription.updated: %v", TraceID(r.Context()), err)
-		return
+		log.Printf("[%s] StripeWebhook: parse %s (event %s): %v", TraceID(r.Context()), event.Type, event.ID, err)
+		return nil, nil
 	}
 
 	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSub.ID)
-	if err != nil || sub == nil {
-		log.Printf("[%s] StripeWebhook: lookup subscription %s: %v", TraceID(r.Context()), stripeSub.ID, err)
+	if err != nil {
+		log.Printf("[%s] StripeWebhook: lookup subscription %s (event %s): %v", TraceID(r.Context()), stripeSub.ID, event.ID, err)
+		return nil, nil
+	}
+	if sub == nil {
+		log.Printf("[%s] StripeWebhook: no subscription found for %s (event %s)", TraceID(r.Context()), stripeSub.ID, event.ID)
+		return nil, nil
+	}
+	return sub, stripeSub
+}
+
+// handleSubscriptionUpdated processes subscription status changes.
+// Maps Stripe statuses to local subscription statuses.
+func handleSubscriptionUpdated(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) {
+	sub, stripeSub := lookupByStripeSubscription(r, deps, event)
+	if sub == nil {
 		return
 	}
 
@@ -124,24 +146,19 @@ func handleSubscriptionUpdated(r *http.Request, deps *Deps, event *pstripe.Webho
 // handleSubscriptionDeleted processes subscription cancellation.
 // Downgrades the user back to the free plan.
 func handleSubscriptionDeleted(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) {
-	stripeSub, err := pstripe.ParseSubscriptionUpdated(event)
-	if err != nil {
-		log.Printf("[%s] StripeWebhook: parse subscription.deleted: %v", TraceID(r.Context()), err)
-		return
-	}
-
-	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSub.ID)
-	if err != nil || sub == nil {
-		log.Printf("[%s] StripeWebhook: lookup subscription %s: %v", TraceID(r.Context()), stripeSub.ID, err)
+	sub, _ := lookupByStripeSubscription(r, deps, event)
+	if sub == nil {
 		return
 	}
 
 	// Downgrade to free plan and mark cancelled.
 	if _, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanFree); err != nil {
 		log.Printf("[%s] StripeWebhook: downgrade plan for %s: %v", TraceID(r.Context()), sub.UserID, err)
+		return
 	}
 	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, db.SubscriptionStatusCancelled); err != nil {
 		log.Printf("[%s] StripeWebhook: cancel status for %s: %v", TraceID(r.Context()), sub.UserID, err)
+		return
 	}
 
 	log.Printf("[%s] StripeWebhook: subscription deleted (event %s), user %s downgraded to free", TraceID(r.Context()), event.ID, sub.UserID)

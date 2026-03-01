@@ -302,6 +302,7 @@ Links each user to their current plan. One subscription per user (UNIQUE on `use
 | `stripe_subscription_id` | text | Nullable (NULL for free-tier) |
 | `current_period_start` | timestamptz | NOT NULL, DEFAULT date_trunc('month', now()) |
 | `current_period_end` | timestamptz | NOT NULL, DEFAULT date_trunc('month', now()) + interval '1 month' |
+| `downgraded_at` | timestamptz | Nullable — set when downgrading from paid to free; triggers 7-day grace period before shorter audit retention applies |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 | `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
 

@@ -61,9 +61,13 @@ func ParseCheckoutSessionCompleted(event *WebhookEvent) (customerID, subscriptio
 	return session.Customer.ID, session.Subscription.ID, nil
 }
 
-// ParseSubscriptionUpdated extracts subscription data from
+// StripeSubscription is the Stripe Subscription type, re-exported so callers
+// don't need to import the stripe-go SDK directly.
+type StripeSubscription = gostripe.Subscription
+
+// ParseSubscriptionEvent extracts subscription data from
 // customer.subscription.updated or customer.subscription.deleted events.
-func ParseSubscriptionUpdated(event *WebhookEvent) (*gostripe.Subscription, error) {
+func ParseSubscriptionEvent(event *WebhookEvent) (*StripeSubscription, error) {
 	var sub gostripe.Subscription
 	if err := json.Unmarshal(event.Raw.Data.Raw, &sub); err != nil {
 		return nil, fmt.Errorf("stripe webhook: parse subscription: %w", err)

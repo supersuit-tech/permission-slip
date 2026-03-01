@@ -114,6 +114,26 @@ func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string)
 	return s, err
 }
 
+// UpgradeSubscriptionPlan atomically upgrades a subscription to a new plan,
+// but only if the user is currently on the expected old plan. This prevents
+// race conditions where two concurrent checkout webhooks could both upgrade
+// the same user. Returns nil (no error) if the user's current plan doesn't
+// match expectedOldPlanID (i.e., the upgrade was already applied).
+func UpgradeSubscriptionPlan(ctx context.Context, db DBTX, userID, expectedOldPlanID, newPlanID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		`UPDATE subscriptions
+		 SET plan_id = $3,
+		     downgraded_at = NULL,
+		     updated_at = now()
+		 WHERE user_id = $1 AND plan_id = $2
+		 RETURNING `+subscriptionColumns,
+		userID, expectedOldPlanID, newPlanID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // already upgraded or plan changed — idempotent no-op
+	}
+	return s, err
+}
+
 // UpdateSubscriptionStatus updates the status of a user's subscription.
 // Returns an error if the status is not one of the allowed values.
 func UpdateSubscriptionStatus(ctx context.Context, db DBTX, userID string, status SubscriptionStatus) (*Subscription, error) {

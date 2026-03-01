@@ -25,6 +25,13 @@ subscription:
               current_period_start: '2026-03-01T00:00:00Z'
               current_period_end: '2026-04-01T00:00:00Z'
               has_payment_method: false
+              can_upgrade: true
+              plan_limits:
+                max_requests_per_month: 1000
+                max_agents: 5
+                max_standing_approvals: 10
+                max_credentials: 5
+                audit_retention_days: 7
               usage:
                 request_count: 42
                 sms_count: 0
@@ -84,13 +91,23 @@ webhook:
       webhook signature using `STRIPE_WEBHOOK_SECRET` and processes the following
       event types:
 
-      - `checkout.session.completed`: Activates paid subscription after checkout
-      - `customer.subscription.updated`: Syncs subscription status changes
-      - `customer.subscription.deleted`: Downgrades user to free plan
-      - `invoice.payment_failed`: Marks subscription as past_due
+      - `checkout.session.completed`: Stores the Stripe subscription ID and
+        atomically upgrades the user from free → pay_as_you_go (idempotent —
+        duplicate events are safely ignored).
+      - `customer.subscription.updated`: Maps the Stripe subscription status
+        (active/trialing → active, past_due/unpaid → past_due, other → cancelled)
+        to the local subscription status.
+      - `customer.subscription.deleted`: Downgrades user to free plan, marks
+        status as cancelled, and sets `downgraded_at` to trigger the 7-day
+        audit retention grace period.
+      - `invoice.payment_failed`: Marks subscription as past_due so the UI can
+        prompt the user to update their payment method.
+
+      Always returns 200 to prevent Stripe retries. Event processing failures
+      are logged server-side.
 
       **No authentication required** — security is provided by Stripe's webhook
-      signature verification.
+      signature verification (`STRIPE_WEBHOOK_SECRET` is required in production).
     operationId: stripeWebhook
     tags:
       - Billing
