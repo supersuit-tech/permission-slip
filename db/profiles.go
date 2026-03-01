@@ -10,11 +10,12 @@ import (
 
 // Profile represents a row from the profiles table.
 type Profile struct {
-	ID        string
-	Username  string
-	Email     *string // nullable — user opts in by setting an address
-	Phone     *string // nullable — E.164 format (e.g. "+15551234567")
-	CreatedAt time.Time
+	ID             string
+	Username       string
+	Email          *string // nullable — user opts in by setting an address
+	Phone          *string // nullable — E.164 format (e.g. "+15551234567")
+	MarketingOptIn bool    // opt-in for product update emails
+	CreatedAt      time.Time
 }
 
 // GetProfileByUserID returns the profile for the given user ID,
@@ -22,9 +23,9 @@ type Profile struct {
 func GetProfileByUserID(ctx context.Context, db DBTX, userID string) (*Profile, error) {
 	var p Profile
 	err := db.QueryRow(ctx,
-		"SELECT id, username, email, phone, created_at FROM profiles WHERE id = $1",
+		"SELECT id, username, email, phone, marketing_opt_in, created_at FROM profiles WHERE id = $1",
 		userID,
-	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.CreatedAt)
+	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -34,12 +35,13 @@ func GetProfileByUserID(ctx context.Context, db DBTX, userID string) (*Profile, 
 	return &p, nil
 }
 
-// UpdateProfileContactFields updates the email and phone columns for the
-// given user. Pass nil to clear a field.
-func UpdateProfileContactFields(ctx context.Context, db DBTX, userID string, email, phone *string) error {
+// UpdateProfileFields updates the mutable profile columns for the given user.
+// Pass nil for string fields to clear them; pass nil for marketingOptIn to
+// leave it unchanged.
+func UpdateProfileFields(ctx context.Context, db DBTX, userID string, email, phone *string, marketingOptIn *bool) error {
 	_, err := db.Exec(ctx,
-		"UPDATE profiles SET email = $2, phone = $3 WHERE id = $1",
-		userID, email, phone,
+		"UPDATE profiles SET email = $2, phone = $3, marketing_opt_in = COALESCE($4, marketing_opt_in) WHERE id = $1",
+		userID, email, phone, marketingOptIn,
 	)
 	return err
 }

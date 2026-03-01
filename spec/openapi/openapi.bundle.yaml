@@ -7844,6 +7844,11 @@ components:
           maxLength: 32
           pattern: ^[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}$
           example: alice
+        marketing_opt_in:
+          type: boolean
+          description: Whether the user opts in to product update emails. Defaults to false.
+          default: false
+          example: false
     OnboardingResponse:
       type: object
       description: The newly created (or existing) user profile.
@@ -7872,6 +7877,7 @@ components:
       required:
         - id
         - username
+        - marketing_opt_in
         - created_at
       properties:
         id:
@@ -7894,6 +7900,10 @@ components:
           nullable: true
           description: Contact phone number in E.164 format (user-provided, opt-in for SMS notifications)
           example: '+15551234567'
+        marketing_opt_in:
+          type: boolean
+          description: Whether the user has opted in to product update emails.
+          example: false
         created_at:
           type: string
           format: date-time
@@ -7901,7 +7911,7 @@ components:
           example: '2026-02-16T00:27:36Z'
     UpdateProfileRequest:
       type: object
-      description: Request body for updating profile contact fields.
+      description: Request body for updating profile fields.
       properties:
         email:
           type: string
@@ -7913,6 +7923,11 @@ components:
           nullable: true
           description: Contact phone number in E.164 format. Pass null or empty string to clear.
           example: '+15551234567'
+        marketing_opt_in:
+          type: boolean
+          description: |
+            Whether the user opts in to product update emails. Omit the field to leave the current value unchanged; unlike email/phone this field cannot be null.
+          example: true
     NotificationPreference:
       type: object
       description: A single notification channel preference.
