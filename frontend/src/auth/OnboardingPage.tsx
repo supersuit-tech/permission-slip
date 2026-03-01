@@ -77,27 +77,30 @@ export default function OnboardingPage() {
             onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
             required
           />
-          <Label
-            htmlFor="agree-tos"
-            className="text-sm font-normal leading-snug"
-          >
-            I agree to the{" "}
-            <Link
-              to="/policy/terms"
-              target="_blank"
-              className="text-primary underline underline-offset-2 hover:text-primary/80"
+          <div className="grid gap-1">
+            <Label
+              htmlFor="agree-tos"
+              className="text-sm font-normal leading-snug"
             >
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link
-              to="/policy/privacy"
-              target="_blank"
-              className="text-primary underline underline-offset-2 hover:text-primary/80"
-            >
-              Privacy Policy
-            </Link>
-          </Label>
+              I agree to the Terms of Service and Privacy Policy
+            </Label>
+            <div className="flex gap-3 text-sm">
+              <Link
+                to="/policy/terms"
+                target="_blank"
+                className="text-primary underline underline-offset-2 hover:text-primary/80"
+              >
+                Terms of Service
+              </Link>
+              <Link
+                to="/policy/privacy"
+                target="_blank"
+                className="text-primary underline underline-offset-2 hover:text-primary/80"
+              >
+                Privacy Policy
+              </Link>
+            </div>
+          </div>
         </div>
         <FormError error={error} prefix />
         <div className="flex gap-2">
