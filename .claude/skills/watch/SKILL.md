@@ -19,6 +19,41 @@ Set these variables for the session:
 - `PR_NUMBER` — the extracted PR number
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh`
 
+## Pre-Poll: Fix Failing Checks
+
+Before entering the polling loop, check whether the PR has any failing CI checks and fix them. This ensures the branch starts from a clean state before processing review comments.
+
+### 1. Fetch Check Status
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh pr checks $PR_NUMBER
+```
+
+If all checks pass or are still pending/in-progress, skip ahead to the polling loop.
+
+### 2. Get Failure Logs
+
+For each failing check, find the corresponding workflow run and fetch its logs:
+
+```bash
+# List recent runs on this branch to find the run ID
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run list --branch "$(git branch --show-current)" --limit 5
+
+# Fetch only the failed step logs
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run view <run-id> --log-failed
+```
+
+### 3. Fix the Failures
+
+1. **Read the failure logs** to understand what went wrong.
+2. **Reproduce locally** by running the relevant commands (`make test-backend`, `make test-frontend`, `make build`).
+3. **Fix the issue** — read surrounding code context, understand the root cause, implement the fix.
+4. **Run tests and build locally** to verify the fix.
+5. **Commit** with a clear message (e.g., `fix: resolve failing CI — <brief description>`).
+6. **Push** to trigger new check runs.
+
+If multiple checks are failing, fix them all before pushing (batch into one or more logical commits).
+
 ## Polling Loop
 
 Poll every **60 seconds**. On each poll cycle:
@@ -230,6 +265,25 @@ Format the comment in markdown. Example structure:
 ```
 
 If no changes were made during the session (e.g., all comments were already addressed before watching started, or no comments existed), still post the comment noting that no action was needed.
+
+### 10. Post-Poll: Fix Failing Checks
+
+After posting the wrap-up comment, run the same check repair procedure from the **Pre-Poll** section:
+
+1. Fetch the current check status with `gh pr checks $PR_NUMBER`.
+2. If any checks are failing, fetch the failure logs with `gh run view <run-id> --log-failed`.
+3. Reproduce locally, fix the issue, run tests and build, commit, and push.
+
+If all checks are passing (or only pending/in-progress), no action needed — exit cleanly.
+
+If fixes were pushed, append an addendum to the wrap-up comment (post a new comment) noting the additional fixes made:
+
+```markdown
+## 🔧 Post-Session Check Fixes
+
+Fixed failing checks after watch session ended:
+- **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
+```
 
 ## Important Rules
 

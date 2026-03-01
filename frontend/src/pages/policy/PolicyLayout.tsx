@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { Footer } from "../../components/Footer";
 
 interface PolicyLayoutProps {
   title: string;
@@ -45,19 +46,7 @@ export function PolicyLayout({ title, lastUpdated, children }: PolicyLayoutProps
           {children}
         </main>
 
-        <footer className="mt-12 border-t pt-6">
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <Link to="/policy/privacy" className="hover:text-foreground transition-colors">
-              Privacy Policy
-            </Link>
-            <Link to="/policy/terms" className="hover:text-foreground transition-colors">
-              Terms of Service
-            </Link>
-            <Link to="/policy/cookies" className="hover:text-foreground transition-colors">
-              Cookie Policy
-            </Link>
-          </div>
-        </footer>
+        <Footer className="mt-12 border-t pt-6" />
       </div>
     </div>
   );

@@ -94,6 +94,7 @@ curl https://your-app.fly.dev/api/health
 |---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `SUPABASE_URL` | Yes | Supabase project URL (JWT verification via JWKS + auth) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Recommended | Supabase service_role key — required for account deletion (removes auth user). Get from Supabase dashboard |
 | `BASE_URL` | Recommended | Public URL (e.g., `https://app.permissionslip.dev`) — required for invite link generation |
 | `ALLOWED_ORIGINS` | Recommended | CORS origins (e.g., `https://app.permissionslip.dev`). Defaults to same-origin only if unset |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |

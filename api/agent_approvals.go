@@ -443,17 +443,17 @@ func unprocessableEntity(code ErrorCode, message string) ErrorResponse {
 
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.
 // Only the action type is persisted — parameters are redacted.
+// Billable: approval requests count toward the user's monthly request quota.
 func emitApprovalRequestAuditEvent(ctx context.Context, d db.DBTX, userID string, appr *db.Approval, agentMeta []byte) {
-	if err := db.InsertAuditEvent(ctx, d, db.InsertAuditEventParams{
-		UserID:     userID,
-		AgentID:    appr.AgentID,
-		EventType:  db.AuditEventApprovalRequested,
-		Outcome:    "pending",
-		SourceID:   appr.ApprovalID,
-		SourceType: "approval",
-		AgentMeta:  agentMeta,
-		Action:     redactActionToType(appr.Action),
-	}); err != nil {
-		log.Printf("audit: failed to insert approval request audit event: %v", err)
-	}
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
+		UserID:      userID,
+		AgentID:     appr.AgentID,
+		EventType:   db.AuditEventApprovalRequested,
+		Outcome:     "pending",
+		SourceID:    appr.ApprovalID,
+		SourceType:  "approval",
+		AgentMeta:   agentMeta,
+		Action:      redactActionToType(appr.Action),
+		ConnectorID: connectorIDFromActionType(actionTypeFromJSON(appr.Action)),
+	}, true)
 }

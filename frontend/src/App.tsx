@@ -3,6 +3,7 @@ import { type ReactNode, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
+import { identifyUser, resetPostHogIdentity } from "./lib/posthog";
 import LoginPage from "./auth/LoginPage";
 import MfaChallengePage from "./auth/MfaChallengePage";
 import OnboardingPage from "./auth/OnboardingPage";
@@ -51,13 +52,16 @@ function App() {
   const { authStatus, user } = useAuth();
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
 
-  // Set Sentry user context so errors include the user's identity.
-  // Only the opaque Supabase user ID is sent — no email or PII.
+  // Set Sentry + PostHog user context so errors and analytics include
+  // the user's identity. Only the opaque Supabase user ID is sent — no
+  // email or PII.
   useEffect(() => {
     if (authStatus === "authenticated" && user) {
       Sentry.setUser({ id: user.id });
+      identifyUser(user.id);
     } else {
       Sentry.setUser(null);
+      resetPostHogIdentity();
     }
   }, [authStatus, user]);
 

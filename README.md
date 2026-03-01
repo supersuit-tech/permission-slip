@@ -58,7 +58,9 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
 - **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
 - **[Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md)** — step-by-step guide to test the invite/registration flow
-- **[Deploying to Fly.io](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
+- **[Self-Hosted Deployment](docs/deployment-self-hosted.md)** — complete guide for deploying on your own infrastructure (Docker, Fly.io, bare metal)
+- **[Production Deployment (internal)](docs/deployment-production.md)** — infrastructure, secrets, and operations for app.permissionslip.dev
+- **[Fly.io Deployment](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
 
 ## Tech Stack
 
@@ -164,6 +166,9 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `VITE_SENTRY_DSN` | Optional | Sentry DSN for frontend error tracking (build-time) — React errors, failed API calls, and performance data |
 | `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint — captures Content-Security-Policy violations as Sentry events |
 | `BILLING_ENABLED` | Optional | Set to `true` to enable billing (Stripe, metering, plan limits). Default: `false` (all users get unlimited access) |
+| `VITE_POSTHOG_KEY` | Optional | PostHog project API key for product analytics (build-time) — consent-gated, no data sent until user accepts cookies |
+| `VITE_POSTHOG_HOST` | Optional | PostHog API host (build-time, default: `https://us.i.posthog.com`) — use a custom host if self-hosting PostHog |
+| `POSTHOG_HOST` | Optional | PostHog API host added to CSP `connect-src` — must match `VITE_POSTHOG_HOST` (runtime) |
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
@@ -197,6 +202,21 @@ make test-frontend     # frontend tests (no database needed)
 ```
 
 Backend tests run against a real Postgres database. Frontend tests use a mocked Supabase client. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.
+
+## Observability
+
+### Error Tracking (Sentry)
+
+Sentry captures backend panics/5xx errors and frontend React errors. Set `SENTRY_DSN` (backend) and `VITE_SENTRY_DSN` (frontend) to enable.
+
+### Product Analytics (PostHog)
+
+PostHog provides privacy-focused product analytics. It is **fully consent-gated** — no data is collected until the user explicitly accepts cookies via the consent banner.
+
+- Set `VITE_POSTHOG_KEY` and optionally `VITE_POSTHOG_HOST` to enable (build-time).
+- Set `POSTHOG_HOST` to add the PostHog API host to the CSP `connect-src` directive (runtime).
+- If `VITE_POSTHOG_KEY` is not set, PostHog is completely disabled — no SDK code executes.
+- Events are defined in `frontend/src/lib/posthog-events.ts`. To add a new event, add a constant there and use `trackEvent()` from `@/lib/posthog`.
 
 ## Contributing
 

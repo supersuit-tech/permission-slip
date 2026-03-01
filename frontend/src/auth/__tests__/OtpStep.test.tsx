@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { AuthError } from "@supabase/supabase-js";
 import { MemoryRouter } from "react-router-dom";
+import { CookieConsentProvider } from "@/components/CookieConsentContext";
 import OtpStep from "../OtpStep";
 
 vi.mock("../dev", () => ({
@@ -18,7 +19,9 @@ const defaultProps = {
 function renderOtpStep(props = defaultProps) {
   return render(
     <MemoryRouter>
-      <OtpStep {...props} />
+      <CookieConsentProvider>
+        <OtpStep {...props} />
+      </CookieConsentProvider>
     </MemoryRouter>,
   );
 }

@@ -19,6 +19,8 @@ type Deps struct {
 	SupabaseJWTSecret string           // HMAC-SHA256 secret for HS256 JWTs (Supabase CLI v1 / test env)
 	SupabaseJWKSURL   string           // JWKS endpoint for ES256 JWTs (Supabase CLI v2+), e.g. "http://127.0.0.1:54321/auth/v1/.well-known/jwks.json"
 	JWKSCache         *JWKSCache       // JWKS key cache; initialized once at startup when SupabaseJWKSURL is set
+	SupabaseURL            string           // Supabase project URL (e.g. "http://127.0.0.1:54321"); used for Admin API calls
+	SupabaseServiceRoleKey string           // Supabase service_role key; required for Admin API calls (e.g. deleting auth users)
 	BaseURL           string           // Public base URL (e.g. "https://app.permissionslip.dev"); used to construct invite URLs
 	InviteHMACKey     string           // HMAC key for hashing short codes (invite codes, confirmation codes); if empty, falls back to plain SHA-256
 	Notifier              *notify.Dispatcher   // notification fan-out; nil means notifications are disabled

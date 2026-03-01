@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 export function useDenyApproval() {
   const { session } = useAuth();
@@ -22,6 +23,7 @@ export function useDenyApproval() {
       if (error) throw new Error("Failed to deny request");
     },
     onSuccess: () => {
+      trackEvent(PostHogEvents.APPROVAL_DENIED);
       queryClient.invalidateQueries({ queryKey: ["approvals"] });
     },
   });
