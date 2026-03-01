@@ -78,6 +78,7 @@ export function useAuditEvents(filters: AuditEventFilters = {}, limit = 20) {
     events: query.data?.data ?? [],
     hasMore: query.data?.has_more ?? false,
     nextCursor: query.data?.next_cursor,
+    retention: query.data?.retention ?? null,
     isLoading: query.isLoading,
     error: query.isError
       ? "Unable to load activity. Please try again later."

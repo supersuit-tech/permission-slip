@@ -52,7 +52,7 @@ export function DataRetentionSection() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Audit Log Retention</span>
                 <span className="text-sm text-muted-foreground">
-                  {dataRetention?.audit_retention_days ?? 7} days
+                  {dataRetention?.effective_retention_days ?? dataRetention?.audit_retention_days ?? 7} days
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -62,10 +62,18 @@ export function DataRetentionSection() {
                 </span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Audit log events older than your retention period are automatically
-              deleted. Upgrade to a paid plan for 90-day retention.
-            </p>
+            {dataRetention?.grace_period_ends_at ? (
+              <p className="text-amber-700 dark:text-amber-300 text-xs">
+                Your 90-day audit history is temporarily preserved.
+                After {new Date(dataRetention.grace_period_ends_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })},
+                retention will be reduced to {dataRetention.audit_retention_days} days.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Audit log events older than your retention period are automatically
+                deleted. Upgrade to a paid plan for 90-day retention.
+              </p>
+            )}
           </div>
         )}
       </CardContent>

@@ -231,6 +231,17 @@ func (sp *SubscriptionWithPlan) EffectiveRetentionDays() int {
 	return sp.Plan.AuditRetentionDays
 }
 
+// GracePeriodEndsAt returns the timestamp when the downgrade grace period
+// expires, or nil if no grace period is active. This helps the frontend
+// show users when their extended retention will end.
+func (sp *SubscriptionWithPlan) GracePeriodEndsAt() *time.Time {
+	if sp.DowngradedAt != nil && time.Since(*sp.DowngradedAt) < DowngradeGracePeriod {
+		t := sp.DowngradedAt.Add(DowngradeGracePeriod)
+		return &t
+	}
+	return nil
+}
+
 // GetSubscriptionWithPlan returns the user's subscription joined with plan
 // details, or nil if the user has no subscription.
 func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*SubscriptionWithPlan, error) {

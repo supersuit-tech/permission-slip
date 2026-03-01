@@ -456,4 +456,53 @@ func TestEffectiveRetentionDays(t *testing.T) {
 			t.Errorf("expected 7-day retention after grace period expired, got %d", got)
 		}
 	})
+
+	t.Run("GracePeriodEndsAtReturnedDuringGracePeriod", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+		_, err := db.CreateSubscription(ctx, tx, uid, db.PlanPayAsYouGo)
+		if err != nil {
+			t.Fatalf("CreateSubscription: %v", err)
+		}
+
+		// Downgrade to free → triggers grace period.
+		_, err = db.UpdateSubscriptionPlan(ctx, tx, uid, db.PlanFree)
+		if err != nil {
+			t.Fatalf("downgrade: %v", err)
+		}
+
+		sp, err := db.GetSubscriptionWithPlan(ctx, tx, uid)
+		if err != nil {
+			t.Fatalf("GetSubscriptionWithPlan: %v", err)
+		}
+
+		endsAt := sp.GracePeriodEndsAt()
+		if endsAt == nil {
+			t.Fatal("expected non-nil GracePeriodEndsAt during active grace period")
+		}
+	})
+
+	t.Run("GracePeriodEndsAtNilWhenNoDowngrade", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+		_, err := db.CreateSubscription(ctx, tx, uid, db.PlanFree)
+		if err != nil {
+			t.Fatalf("CreateSubscription: %v", err)
+		}
+
+		sp, err := db.GetSubscriptionWithPlan(ctx, tx, uid)
+		if err != nil {
+			t.Fatalf("GetSubscriptionWithPlan: %v", err)
+		}
+
+		if sp.GracePeriodEndsAt() != nil {
+			t.Error("expected nil GracePeriodEndsAt when no downgrade")
+		}
+	})
 }

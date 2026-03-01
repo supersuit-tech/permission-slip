@@ -62,6 +62,31 @@ describe("DataRetentionSection", () => {
     expect(screen.getByText("90 days")).toBeInTheDocument();
   });
 
+  it("shows grace period info when recently downgraded", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/profile/data-retention") {
+        return Promise.resolve({
+          data: {
+            plan_id: "free",
+            plan_name: "Free",
+            audit_retention_days: 7,
+            effective_retention_days: 90,
+            grace_period_ends_at: "2026-03-08T14:30:00Z",
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    render(<DataRetentionSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Free")).toBeInTheDocument();
+    });
+    expect(screen.getByText("90 days")).toBeInTheDocument();
+    expect(screen.getByText(/90-day audit history is temporarily preserved/)).toBeInTheDocument();
+  });
+
   it("shows loading state initially", () => {
     mockGet.mockReturnValue(new Promise(() => {})); // never resolves
 

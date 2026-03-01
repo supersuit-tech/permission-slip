@@ -47,8 +47,13 @@ export function useInfiniteAuditEvents(
   const events: AuditEvent[] =
     query.data?.pages.flatMap((page) => page?.data ?? []) ?? [];
 
+  // Retention metadata is the same across pages — use the first page's value.
+  const firstPage = query.data?.pages[0];
+  const retention = firstPage?.retention ?? null;
+
   return {
     events,
+    retention,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,

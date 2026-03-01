@@ -45,11 +45,20 @@ type auditLogExportEventResponse struct {
 	ExecutionError  *string   `json:"execution_error,omitempty"`
 }
 
+// retentionMeta is included in audit event responses so the frontend knows
+// the user's effective retention window and can display contextual UI (e.g.
+// "Showing events from the last 7 days" or an upgrade prompt).
+type retentionMeta struct {
+	Days              int        `json:"days"`
+	GracePeriodEndsAt *time.Time `json:"grace_period_ends_at,omitempty"`
+}
+
 // auditEventListResponse is the paginated JSON response for GET /audit-events.
 type auditEventListResponse struct {
 	Data       []auditEventResponse `json:"data"`
 	HasMore    bool                 `json:"has_more"`
 	NextCursor *string              `json:"next_cursor,omitempty"`
+	Retention  *retentionMeta       `json:"retention,omitempty"`
 }
 
 var validOutcomeValues = []string{
@@ -66,9 +75,11 @@ var validOutcomeFilters = func() map[string]bool {
 
 // auditLogExportResponse is the JSON response for GET /audit-logs.
 type auditLogExportResponse struct {
-	Data       []auditLogExportEventResponse `json:"data"`
-	HasMore    bool                          `json:"has_more"`
-	NextCursor *string                       `json:"next_cursor,omitempty"`
+	Data           []auditLogExportEventResponse `json:"data"`
+	HasMore        bool                          `json:"has_more"`
+	NextCursor     *string                       `json:"next_cursor,omitempty"`
+	Retention      *retentionMeta                `json:"retention,omitempty"`
+	EffectiveSince *time.Time                    `json:"effective_since,omitempty"`
 }
 
 // RegisterAuditEventRoutes adds audit event endpoints to the mux.
@@ -82,21 +93,30 @@ func RegisterAuditEventRoutes(mux *http.ServeMux, deps *Deps) {
 // subscription. Matches the free plan's audit_retention_days.
 const defaultFreeRetentionDays = 7
 
-// effectiveRetentionDays resolves the audit log retention window for the user.
-// Returns 0 (no filtering) when billing is disabled, and the plan-aware value
-// (with downgrade grace period) when billing is enabled.
-func effectiveRetentionDays(ctx context.Context, deps *Deps, userID string) (int, error) {
+// retentionInfo holds the resolved retention policy for a user, including
+// the effective retention window and any active grace period.
+type retentionInfo struct {
+	Days              int
+	GracePeriodEndsAt *time.Time
+}
+
+// effectiveRetention resolves the full audit log retention policy for the user.
+// Returns nil when billing is disabled (no retention filtering).
+func effectiveRetention(ctx context.Context, deps *Deps, userID string) (*retentionInfo, error) {
 	if !deps.BillingEnabled {
-		return 0, nil
+		return nil, nil
 	}
 	sp, err := db.GetSubscriptionWithPlan(ctx, deps.DB, userID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if sp == nil {
-		return defaultFreeRetentionDays, nil
+		return &retentionInfo{Days: defaultFreeRetentionDays}, nil
 	}
-	return sp.EffectiveRetentionDays(), nil
+	return &retentionInfo{
+		Days:              sp.EffectiveRetentionDays(),
+		GracePeriodEndsAt: sp.GracePeriodEndsAt(),
+	}, nil
 }
 
 // handleListAuditEvents returns a paginated activity feed for the authenticated
@@ -179,11 +199,16 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		retentionDays, err := effectiveRetentionDays(r.Context(), deps, userID)
+		retention, err := effectiveRetention(r.Context(), deps, userID)
 		if err != nil {
-			log.Printf("[%s] effectiveRetentionDays: %v", TraceID(r.Context()), err)
+			log.Printf("[%s] effectiveRetention: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list audit events"))
 			return
+		}
+
+		retentionDays := 0
+		if retention != nil {
+			retentionDays = retention.Days
 		}
 
 		page, err := db.ListAuditEvents(r.Context(), deps.DB, userID, limit, cursor, filter, retentionDays)
@@ -201,6 +226,12 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 		resp := auditEventListResponse{
 			Data:    data,
 			HasMore: page.HasMore,
+		}
+		if retention != nil {
+			resp.Retention = &retentionMeta{
+				Days:              retention.Days,
+				GracePeriodEndsAt: retention.GracePeriodEndsAt,
+			}
 		}
 		if page.HasMore && len(page.Events) > 0 {
 			last := page.Events[len(page.Events)-1]
@@ -300,13 +331,20 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 			cursor = &db.AuditLogExportCursor{Timestamp: ts, ID: id}
 		}
 
-		retentionDays, err := effectiveRetentionDays(r.Context(), deps, userID)
+		retention, err := effectiveRetention(r.Context(), deps, userID)
 		if err != nil {
-			log.Printf("[%s] effectiveRetentionDays: %v", TraceID(r.Context()), err)
+			log.Printf("[%s] effectiveRetention: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))
 			return
 		}
 
+		retentionDays := 0
+		if retention != nil {
+			retentionDays = retention.Days
+		}
+
+		// Track whether `since` gets clamped so we can tell the client.
+		originalSince := since
 		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, connectorID, limit, cursor, retentionDays)
 		if err != nil {
 			log.Printf("[%s] ExportAuditLogs: %v", TraceID(r.Context()), err)
@@ -322,6 +360,18 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 		resp := auditLogExportResponse{
 			Data:    data,
 			HasMore: page.HasMore,
+		}
+		if retention != nil {
+			resp.Retention = &retentionMeta{
+				Days:              retention.Days,
+				GracePeriodEndsAt: retention.GracePeriodEndsAt,
+			}
+			// If the requested `since` was before the retention window,
+			// tell the client what effective start date was actually used.
+			retentionFloor := time.Now().AddDate(0, 0, -retentionDays)
+			if originalSince.Before(retentionFloor) {
+				resp.EffectiveSince = &retentionFloor
+			}
 		}
 		if page.HasMore && len(page.Events) > 0 {
 			last := page.Events[len(page.Events)-1]
