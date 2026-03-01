@@ -1,0 +1,21 @@
+name: Trigger Webhook
+on:
+  workflow_dispatch:
+    inputs:
+      pr_url:
+        description: "PR URL"
+        required: true
+      title:
+        description: "PR Title"
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call webhook
+        run: |
+          curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"pr_url\": \"${{ inputs.pr_url }}\", \"title\": \"${{ inputs.title }}\"}"
