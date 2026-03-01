@@ -10,19 +10,15 @@ import { UserMenu } from "../UserMenu";
 vi.mock("../../lib/supabaseClient");
 vi.mock("sonner");
 vi.mock("../../hooks/useProfile");
-vi.mock("../../auth/mfaPendingEnrollment");
 
 import { useProfile } from "../../hooks/useProfile";
-import { hasPendingEnrollment } from "../../auth/mfaPendingEnrollment";
 const mockUseProfile = vi.mocked(useProfile);
-const mockHasPendingEnrollment = vi.mocked(hasPendingEnrollment);
 
 describe("UserMenu", () => {
   beforeEach(() => {
     setupAuthMocks({ authenticated: true });
     vi.mocked(toast.error).mockClear();
     mockUseProfile.mockReturnValue({ profile: null, needsOnboarding: false, isLoading: false });
-    mockHasPendingEnrollment.mockReturnValue(false);
     localStorage.removeItem("permission-slip-theme");
     document.documentElement.classList.remove("dark");
   });
@@ -74,25 +70,13 @@ describe("UserMenu", () => {
     expect(screen.getByText("test@example.com")).toBeInTheDocument();
   });
 
-  it("shows all menu items including Change Email", async () => {
+  it("shows all menu items", async () => {
     renderWithProviders(<UserMenu />);
     await userEvent.click(screen.getByLabelText("User menu"));
     expect(screen.getByText("Profile & Account")).toBeInTheDocument();
-    expect(screen.getByText("Notification Preferences")).toBeInTheDocument();
     expect(screen.getByText("Credential Vault")).toBeInTheDocument();
-    expect(screen.getByText("Security")).toBeInTheDocument();
-    expect(screen.getByText("Change Email")).toBeInTheDocument();
     expect(screen.getByText("Dark Mode")).toBeInTheDocument();
     expect(screen.getByText("Sign Out")).toBeInTheDocument();
-  });
-
-  it("opens email change dialog when Change Email is clicked", async () => {
-    renderWithProviders(<UserMenu />);
-    await userEvent.click(screen.getByLabelText("User menu"));
-    await userEvent.click(screen.getByText("Change Email"));
-    await waitFor(() => {
-      expect(screen.getByText("Change Email Address")).toBeInTheDocument();
-    });
   });
 
   it("toggles dark mode when clicked", async () => {
@@ -134,23 +118,4 @@ describe("UserMenu", () => {
     consoleSpy.mockRestore();
   });
 
-  it("auto-opens Security dialog when pending enrollment exists for current user", async () => {
-    mockHasPendingEnrollment.mockReturnValue(true);
-    renderWithProviders(<UserMenu />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Security Settings")).toBeInTheDocument();
-    });
-    expect(mockHasPendingEnrollment).toHaveBeenCalledWith("user-123");
-  });
-
-  it("does not auto-open Security dialog when no pending enrollment", async () => {
-    mockHasPendingEnrollment.mockReturnValue(false);
-    renderWithProviders(<UserMenu />);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("User menu")).toBeInTheDocument();
-    });
-    expect(screen.queryByText("Security Settings")).not.toBeInTheDocument();
-  });
 });

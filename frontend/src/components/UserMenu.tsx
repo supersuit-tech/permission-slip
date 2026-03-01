@@ -1,11 +1,7 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LogOut,
   User,
-  Mail,
-  Bell,
-  Shield,
   KeyRound,
   Moon,
   LifeBuoy,
@@ -15,7 +11,6 @@ import { useProfile } from "@/hooks/useProfile";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useTheme } from "@/components/ThemeContext";
 import { Avatar } from "@/components/ui/avatar";
-import { EmailChangeDialog } from "@/components/EmailChangeDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,8 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MfaSettingsDialog } from "@/pages/security/MfaSettingsDialog";
-import { hasPendingEnrollment } from "@/auth/mfaPendingEnrollment";
 
 export function UserMenu() {
   const { user } = useAuth();
@@ -35,24 +28,11 @@ export function UserMenu() {
   const { theme, toggleTheme } = useTheme();
   const handleSignOut = useSignOut();
   const navigate = useNavigate();
-  const [securityOpen, setSecurityOpen] = useState(false);
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-
-  // Auto-open the security dialog if there's a pending MFA enrollment
-  // for this user (e.g. user switched to authenticator app and the mobile
-  // tab refreshed). Scoped to user.id so a stale entry from a previous
-  // user is ignored.
-  useEffect(() => {
-    if (user?.id && hasPendingEnrollment(user.id)) {
-      setSecurityOpen(true);
-    }
-  }, [user?.id]);
 
   const email = user?.email ?? "unknown";
   const username = profile?.username;
 
   return (
-    <>
       <DropdownMenu>
         <DropdownMenuTrigger
           className="flex cursor-pointer select-none items-center gap-2 rounded-full border-none bg-transparent p-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -81,20 +61,8 @@ export function UserMenu() {
               <span>Profile & Account</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => navigate("/settings")}>
-              <Bell />
-              <span>Notification Preferences</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/settings")}>
               <KeyRound />
               <span>Credential Vault</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setSecurityOpen(true)}>
-              <Shield />
-              <span>Security</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setEmailDialogOpen(true)}>
-              <Mail />
-              <span>Change Email</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
@@ -119,12 +87,5 @@ export function UserMenu() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <MfaSettingsDialog open={securityOpen} onOpenChange={setSecurityOpen} />
-      <EmailChangeDialog
-        open={emailDialogOpen}
-        onOpenChange={setEmailDialogOpen}
-      />
-    </>
   );
 }
