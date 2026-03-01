@@ -75,12 +75,13 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 |---|---|
 | Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 |
+| Mobile | React Native (Expo), TypeScript |
 | UI Components | shadcn/ui (Radix UI + Tailwind + Lucide icons) |
 | API Client | openapi-fetch with generated TypeScript types |
 | Auth | Supabase Auth (JWT-based, MFA support) |
 | Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
 | State | React Query (TanStack Query) |
-| Testing | Go test + real Postgres, Vitest + React Testing Library |
+| Testing | Go test + real Postgres, Vitest + RTL, Jest (mobile) |
 
 ## Getting Started
 
@@ -150,6 +151,21 @@ Open **http://localhost:5173**. API requests to `/api/*` are automatically proxi
 
 > **Accessing via ngrok or an external URL?** Set `ALLOWED_ORIGINS` to your public URL (e.g. `ALLOWED_ORIGINS=https://your-subdomain.ngrok-free.app make dev-backend`) so the Go backend allows cross-origin requests. Without it, API calls from a non-localhost origin will be blocked with 403.
 
+### 7. Mobile app (optional)
+
+The mobile app lives in `mobile/` and uses React Native (Expo). It shares the same Supabase project and OpenAPI spec as the web frontend.
+
+```bash
+cd mobile
+npm install
+cp .env.example .env   # set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY
+npm start              # Expo dev server — scan QR with Expo Go app
+```
+
+**Auth tokens** are stored in the device's secure keychain (iOS Keychain / Android EncryptedSharedPreferences) via `expo-secure-store`, not in plain-text storage.
+
+See [`mobile/`](mobile/) for the full directory structure. Run `npm test` from the `mobile/` directory to run mobile unit tests.
+
 ## Production Build
 
 Build a single Go binary with the React frontend embedded:
@@ -209,6 +225,7 @@ go run ./cmd/generate-vapid-keys --format=heroku
 make test              # all tests (backend + frontend)
 make test-backend      # Go tests (requires Postgres)
 make test-frontend     # frontend tests (no database needed)
+cd mobile && npm test  # mobile tests
 ```
 
 Backend tests run against a real Postgres database. Frontend tests use a mocked Supabase client. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.

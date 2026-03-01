@@ -32,6 +32,15 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Provides Supabase auth state to the component tree. Mirrors the web
+ * frontend's AuthProvider pattern — session, user, and authStatus are
+ * resolved from `onAuthStateChange`, and AAL is determined from the JWT
+ * payload (with a Supabase API fallback) to detect MFA requirements.
+ *
+ * Auth tokens are persisted in the platform's secure keychain via
+ * `expo-secure-store` (configured in `supabaseClient.ts`).
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
