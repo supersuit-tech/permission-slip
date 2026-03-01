@@ -28,6 +28,9 @@ export const PostHogEvents = {
 
   // Notification settings
   NOTIFICATION_PREFERENCES_UPDATED: "notification_preferences_updated",
+
+  // Marketing preferences
+  MARKETING_OPT_IN_UPDATED: "marketing_opt_in_updated",
 } as const;
 
 export type PostHogEventName =

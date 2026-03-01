@@ -13,6 +13,7 @@ const mockUpdatedProfile = {
   username: "alice",
   email: "new@example.com",
   phone: "+15551234567",
+  marketing_opt_in: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 

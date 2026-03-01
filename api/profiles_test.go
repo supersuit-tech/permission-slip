@@ -179,7 +179,7 @@ func TestUpdateProfile_PartialUpdate_OnlyEmail(t *testing.T) {
 
 	// Set initial phone
 	phone := "+15559999999"
-	if err := db.UpdateProfileContactFields(context.Background(), tx, uid, nil, &phone); err != nil {
+	if err := db.UpdateProfileFields(context.Background(), tx, uid, nil, &phone, nil); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 
@@ -216,7 +216,7 @@ func TestUpdateProfile_ClearField_WithNull(t *testing.T) {
 
 	// Set initial email
 	email := "old@example.com"
-	if err := db.UpdateProfileContactFields(context.Background(), tx, uid, &email, nil); err != nil {
+	if err := db.UpdateProfileFields(context.Background(), tx, uid, &email, nil, nil); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 
@@ -426,5 +426,80 @@ func TestUpdateNotificationPreferences_DuplicateChannel(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- Marketing opt-in tests ---
+
+func TestUpdateProfile_SetMarketingOptIn(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
+		`{"marketing_opt_in":true}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp profileResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if !resp.MarketingOptIn {
+		t.Error("expected marketing_opt_in to be true")
+	}
+}
+
+func TestUpdateProfile_MarketingOptIn_NullRejected(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
+		`{"marketing_opt_in":null}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for null marketing_opt_in, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetProfile_IncludesMarketingOptIn(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/profile", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp profileResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	// Default should be false.
+	if resp.MarketingOptIn {
+		t.Error("expected marketing_opt_in to default to false")
 	}
 }
