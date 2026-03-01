@@ -471,14 +471,5 @@ func TestMetering_ConcurrentApprovalsAccurateCount(t *testing.T) {
 	}
 
 	// All 10 concurrent approval requests should result in exactly 10 metered events.
-	usage, err := db.GetCurrentPeriodUsage(context.Background(), pu.Pool, pu.UserID)
-	if err != nil {
-		t.Fatalf("GetCurrentPeriodUsage: %v", err)
-	}
-	if usage == nil {
-		t.Fatal("expected usage row, got nil")
-	}
-	if usage.RequestCount != goroutines {
-		t.Errorf("expected request_count=%d after concurrent requests, got %d", goroutines, usage.RequestCount)
-	}
+	testhelper.RequireUsageCount(t, pu.Pool, pu.UserID, goroutines)
 }
