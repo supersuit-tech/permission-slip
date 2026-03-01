@@ -18,7 +18,7 @@ jobs:
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "${{ secrets.WEBHOOK_URL }}" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"pr_url\": \"${{ inputs.pr_url }}\", \"title\": \"${{ inputs.title }}\"}")
+            -d "{\"message\": \"${{ inputs.title }}\n${{ inputs.pr_url }}\"}")
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
           echo "Status: $HTTP_STATUS"
