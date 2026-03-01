@@ -165,6 +165,11 @@ func main() {
 		}
 	}
 
+	// Create a cancellable context for background goroutines (e.g. audit purge).
+	// Cancelled in the shutdown path so goroutines stop cleanly on SIGTERM.
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	defer bgCancel()
+
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -188,6 +193,9 @@ func main() {
 
 		log.Println("Connected to database")
 		deps.DB = pool
+
+		// Start background audit log purge.
+		startAuditPurge(bgCtx, pool, logger)
 
 		// Ensure all existing users have subscriptions. When billing is disabled,
 		// this assigns the unlimited pay_as_you_go plan so enforcement sees no limits.
@@ -380,6 +388,9 @@ func main() {
 		serverFailed = true
 	}
 
+	// Stop background goroutines (audit purge, etc.) before shutting down.
+	bgCancel()
+
 	// Allow up to 30 seconds for in-flight requests to complete.
 	shutdownTimeout := 30 * time.Second
 	if v := os.Getenv("SHUTDOWN_TIMEOUT"); v != "" {
@@ -410,6 +421,59 @@ func main() {
 	if serverFailed {
 		os.Exit(1)
 	}
+}
+
+// startAuditPurge runs db.PurgeExpiredAuditEvents on a recurring ticker,
+// logging results each run. It returns immediately after launching the
+// background goroutine. Cancel ctx to stop the goroutine cleanly.
+func startAuditPurge(ctx context.Context, pool db.DBTX, logger *slog.Logger) {
+	interval := auditPurgeInterval()
+	logger.Info("audit purge: scheduled", "interval", interval.String())
+
+	go func() {
+		// Run once immediately on startup to catch up after downtime.
+		runAuditPurge(ctx, pool, logger)
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("audit purge: stopped")
+				return
+			case <-ticker.C:
+				runAuditPurge(ctx, pool, logger)
+			}
+		}
+	}()
+}
+
+// runAuditPurge executes a single purge pass with a 60-second timeout.
+func runAuditPurge(ctx context.Context, pool db.DBTX, logger *slog.Logger) {
+	purgeCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	deleted, err := db.PurgeExpiredAuditEvents(purgeCtx, pool)
+	if err != nil {
+		logger.Error("audit purge: failed", "error", err)
+		sentry.CaptureException(err)
+	} else {
+		logger.Info("audit purge: completed", "rows_deleted", deleted)
+	}
+}
+
+// auditPurgeInterval returns the purge ticker interval from the
+// AUDIT_PURGE_INTERVAL env var, defaulting to 1 hour.
+func auditPurgeInterval() time.Duration {
+	if v := os.Getenv("AUDIT_PURGE_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil && d > 0 {
+			return d
+		}
+		slog.Warn("invalid AUDIT_PURGE_INTERVAL, using default 1h", "value", v)
+	}
+	return time.Hour
 }
 
 // loadExternalConnectors scans the default connectors directory for
