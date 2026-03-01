@@ -103,6 +103,8 @@ tags:
     description: User profile management (session-authenticated)
   - name: Push Subscriptions
     description: Web Push subscription management (session-authenticated)
+  - name: Config
+    description: Server configuration and feature flags (session-authenticated)
 
 paths:
   /v1/connectors:
@@ -221,6 +223,9 @@ paths:
 
   /v1/push-subscriptions/{subscription_id}:
     $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptionById'
+
+  /v1/config:
+    $ref: './components/paths/config.yaml#/config'
 
   /v1/config/vapid-key:
     $ref: './components/paths/push_subscriptions.yaml#/vapidKey'
@@ -415,6 +420,10 @@ components:
       $ref: './components/schemas/push_subscriptions.yaml#/DeletePushSubscriptionResponse'
     VAPIDPublicKeyResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/VAPIDPublicKeyResponse'
+
+    # Config
+    ConfigResponse:
+      $ref: './components/schemas/config.yaml#/ConfigResponse'
 
     # Shared
     Action:

@@ -1,0 +1,16 @@
+ConfigResponse:
+  type: object
+  description: |
+    Server-level configuration and feature flags. The frontend should
+    fetch this once at startup to determine which UI features to show.
+  required:
+    - billing_enabled
+  properties:
+    billing_enabled:
+      type: boolean
+      description: |
+        Whether billing features (Stripe integration, request metering, plan
+        limits) are active. When `false` (the default), all users have the
+        unlimited `pay_as_you_go` plan and billing UI should be hidden.
+        Controlled by the `BILLING_ENABLED` server environment variable.
+      example: false

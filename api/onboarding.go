@@ -93,6 +93,15 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Create a subscription for the new user. Plan selection is
+		// centralized in db.DefaultPlanID to avoid duplicating the
+		// billing-enabled logic.
+		if _, err := db.CreateSubscription(r.Context(), deps.DB, profile.ID, db.DefaultPlanID(deps.BillingEnabled)); err != nil {
+			log.Printf("[%s] Onboarding: create subscription: %v", TraceID(r.Context()), err)
+			// Non-fatal: the profile was created successfully. Log the error
+			// but still return the profile so the user isn't blocked.
+		}
+
 		RespondJSON(w, http.StatusCreated, toOnboardingResponse(profile))
 	}
 }

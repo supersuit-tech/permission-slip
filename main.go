@@ -124,6 +124,12 @@ func main() {
 	} else {
 		log.Printf("Warning: neither SUPABASE_JWKS_URL/SUPABASE_URL nor SUPABASE_JWT_SECRET is set; authentication will fail")
 	}
+	deps.BillingEnabled = os.Getenv("BILLING_ENABLED") == "true"
+	if deps.BillingEnabled {
+		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
+	} else {
+		log.Println("Billing: disabled (all users get unlimited plan, Stripe/metering skipped)")
+	}
 	deps.DevMode = os.Getenv("MODE") == "development"
 	if !deps.DevMode {
 		deps.RateLimiter = api.NewRateLimiter(api.DefaultRateLimiterConfig())
@@ -182,6 +188,18 @@ func main() {
 
 		log.Println("Connected to database")
 		deps.DB = pool
+
+		// Ensure all existing users have subscriptions. When billing is disabled,
+		// this assigns the unlimited pay_as_you_go plan so enforcement sees no limits.
+		// When billing is enabled, unsubscribed users get the free plan.
+		subCtx, subCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		backfilled, err := db.EnsureAllUsersSubscribed(subCtx, pool, deps.BillingEnabled)
+		subCancel()
+		if err != nil {
+			log.Printf("Warning: failed to backfill subscriptions: %v", err)
+		} else if backfilled > 0 {
+			log.Printf("Subscriptions: backfilled %d user(s) without subscriptions", backfilled)
+		}
 
 		// Initialize credential vault.
 		// In production/dev with Supabase, use the real vault extension.

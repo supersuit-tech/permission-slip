@@ -99,6 +99,8 @@ tags:
     description: User profile management (session-authenticated)
   - name: Push Subscriptions
     description: Web Push subscription management (session-authenticated)
+  - name: Config
+    description: Server configuration and feature flags (session-authenticated)
 paths:
   /v1/connectors:
     get:
@@ -4601,6 +4603,35 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/config:
+    get:
+      summary: Get server configuration
+      description: |
+        Returns server-level feature flags that the frontend uses to adapt its UI.
+
+        **`billing_enabled`**: When `false` (the default for self-hosted deployments),
+        all users are auto-assigned the unlimited `pay_as_you_go` plan and billing-related
+        UI (plan selection, upgrade prompts, usage meters) should be hidden. When `true`,
+        the server enforces plan limits and integrates with Stripe for subscription management.
+
+        This endpoint requires authentication but does not require a profile, so it can
+        be called during the onboarding flow to determine what UI to show.
+      operationId: getConfig
+      tags:
+        - Config
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Server configuration returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+              example:
+                billing_enabled: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /v1/config/vapid-key:
     get:
       summary: Get VAPID public key
@@ -7991,6 +8022,22 @@ components:
           type: string
           description: Base64url-encoded VAPID public key
           example: BNx...
+    ConfigResponse:
+      type: object
+      description: |
+        Server-level configuration and feature flags. The frontend should
+        fetch this once at startup to determine which UI features to show.
+      required:
+        - billing_enabled
+      properties:
+        billing_enabled:
+          type: boolean
+          description: |
+            Whether billing features (Stripe integration, request metering, plan
+            limits) are active. When `false` (the default), all users have the
+            unlimited `pay_as_you_go` plan and billing UI should be hidden.
+            Controlled by the `BILLING_ENABLED` server environment variable.
+          example: false
     Action:
       type: object
       required:

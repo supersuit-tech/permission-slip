@@ -15,6 +15,17 @@ const (
 	PlanPayAsYouGo = "pay_as_you_go" // unlimited, 90-day audit, per-request billing
 )
 
+// DefaultPlanID returns the plan to assign new or unsubscribed users.
+// When billing is enabled, users start on the free plan. When disabled
+// (self-hosted), users get the unlimited pay_as_you_go plan so that
+// enforcement code sees no limits without needing billing-specific guards.
+func DefaultPlanID(billingEnabled bool) string {
+	if billingEnabled {
+		return PlanFree
+	}
+	return PlanPayAsYouGo
+}
+
 // Plan represents a row from the plans table. Plans define resource limits
 // and pricing tiers. Limit fields are nil when the plan allows unlimited usage.
 type Plan struct {

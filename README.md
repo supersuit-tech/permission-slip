@@ -165,6 +165,7 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking — panics and 5xx errors are captured automatically |
 | `VITE_SENTRY_DSN` | Optional | Sentry DSN for frontend error tracking (build-time) — React errors, failed API calls, and performance data |
 | `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint — captures Content-Security-Policy violations as Sentry events |
+| `BILLING_ENABLED` | Optional | Set to `true` to enable billing (Stripe, metering, plan limits). Default: `false` (all users get unlimited access) |
 | `VITE_POSTHOG_KEY` | Optional | PostHog project API key for product analytics (build-time) — consent-gated, no data sent until user accepts cookies |
 | `VITE_POSTHOG_HOST` | Optional | PostHog API host (build-time, default: `https://us.i.posthog.com`) — use a custom host if self-hosting PostHog |
 | `POSTHOG_HOST` | Optional | PostHog API host added to CSP `connect-src` — must match `VITE_POSTHOG_HOST` (runtime) |
@@ -172,6 +173,8 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
 | `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
+
+**Billing (`BILLING_ENABLED`):** Controls whether billing features are active. When unset or `false` (the default), all users are automatically assigned the unlimited `pay_as_you_go` plan — no Stripe keys, metering, or plan restrictions needed. Set to `true` for managed deployments that require plan-based limits and Stripe integration. The server logs the billing mode at startup. The frontend can query `GET /v1/config` to adapt its UI based on whether billing is enabled.
 
 **VAPID keys (Web Push):** Set all three to enable Web Push notifications. If none are set, Web Push is disabled. If partially configured, the server will refuse to start. In development mode (`MODE=development`), keys are auto-generated and stored in the database for convenience.
 
