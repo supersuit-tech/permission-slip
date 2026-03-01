@@ -5,7 +5,7 @@ type ApiError = components["schemas"]["Error"];
 /**
  * Extracts the human-readable error message from an openapi-fetch error response.
  *
- * All API error responses follow the ErrorResponse schema: `{ error: { code, message, ... } }`.
+ * All our API error responses follow the ErrorResponse schema: `{ error: { code, message, ... } }`.
  * This function safely navigates that shape and returns the server-provided message,
  * falling back to the provided default when the shape doesn't match.
  */
