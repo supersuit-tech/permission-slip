@@ -185,6 +185,31 @@ AuditLogEvent:
         Details about why the execution failed. Only present when
         execution_status is "failure".
 
+RetentionMeta:
+  type: object
+  description: |
+    Retention policy metadata for audit events. Included in responses when
+    billing is enabled to help clients display contextual information about
+    the user's data retention window.
+  required:
+    - days
+  properties:
+    days:
+      type: integer
+      description: |
+        The effective number of days audit events are retained. During a
+        downgrade grace period, this reflects the previous (longer) retention.
+      example: 7
+    grace_period_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When the downgrade grace period expires. Only present if the user
+        recently downgraded from a paid plan. After this time, the shorter
+        retention window takes effect.
+      example: "2026-03-08T14:30:00Z"
+
 AuditLogExportResponse:
   type: object
   description: Paginated export of audit log events in chronological order.
@@ -206,6 +231,17 @@ AuditLogExportResponse:
         Opaque cursor to pass as the `after` query parameter to fetch the
         next page. Only present when `has_more` is true.
       example: "2026-02-20T14:25:00.123456789Z,42"
+    retention:
+      $ref: '#/RetentionMeta'
+    effective_since:
+      type: string
+      format: date-time
+      description: |
+        The actual start timestamp used for the query. Only present when the
+        requested `since` was earlier than the retention window allows, indicating
+        the query was clamped to the retention boundary. Helps SIEM integrations
+        detect when their requested time range exceeds the user's plan limits.
+      example: "2026-02-22T00:00:00Z"
 
 AuditEventListResponse:
   type: object
@@ -229,3 +265,5 @@ AuditEventListResponse:
         next page. Only present when `has_more` is true. Do not construct
         or parse cursor values — they may change format without notice.
       example: "2026-02-20T14:25:00.123456789Z,42"
+    retention:
+      $ref: '#/RetentionMeta'

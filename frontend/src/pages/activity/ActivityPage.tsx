@@ -19,6 +19,7 @@ import { useInfiniteAuditEvents } from "@/hooks/useInfiniteAuditEvents";
 import type { AuditEventFilters } from "@/hooks/useAuditEvents";
 import { useAgents } from "@/hooks/useAgents";
 import { ActivityFilters } from "./ActivityFilters";
+import { RetentionBanner } from "./RetentionBanner";
 
 /** Set of valid outcome values for URL param validation. */
 const VALID_OUTCOMES = new Set(
@@ -75,6 +76,7 @@ export function ActivityPage() {
 
   const {
     events,
+    retention,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
@@ -98,6 +100,9 @@ export function ActivityPage() {
         </Link>
         <h1 className="text-2xl font-bold tracking-tight">Activity Log</h1>
       </div>
+
+      {/* Retention info */}
+      {retention && <RetentionBanner retention={retention} />}
 
       {/* Filters */}
       <ActivityFilters

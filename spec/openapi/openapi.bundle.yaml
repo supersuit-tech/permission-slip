@@ -1553,6 +1553,12 @@ paths:
         authenticated user, starting from the required `since` timestamp. Designed
         for compliance export and SIEM integration use cases.
 
+        Results are filtered by the user's plan retention window (7 days for free,
+        90 days for paid). If the `since` parameter is earlier than the retention
+        boundary, it is clamped and the response includes `effective_since` with
+        the actual start timestamp used. A 7-day grace period applies after
+        downgrading from paid to free.
+
         Supports cursor-based pagination via `limit` and `after` query parameters
         to iterate over large result sets.
       tags:
@@ -1702,6 +1708,11 @@ paths:
         - **One-off approvals**: approved, denied, or cancelled approval requests
         - **Standing approval executions**: auto-executed actions via standing approvals
         - **Agent lifecycle**: agent registration and deactivation events
+
+        Results are filtered by the user's plan retention window (7 days for free,
+        90 days for paid). The response includes a `retention` object with the
+        effective retention days and any active grace period. A 7-day grace period
+        applies after downgrading from paid to free.
 
         Supports cursor-based pagination via `limit` and `after` query parameters,
         and filtering by agent, event type, and outcome.
@@ -7044,6 +7055,8 @@ components:
             next page. Only present when `has_more` is true. Do not construct
             or parse cursor values — they may change format without notice.
           example: 2026-02-20T14:25:00.123456789Z,42
+        retention:
+          $ref: '#/components/schemas/RetentionMeta'
     AuditLogEvent:
       type: object
       description: |
@@ -7163,6 +7176,17 @@ components:
             Opaque cursor to pass as the `after` query parameter to fetch the
             next page. Only present when `has_more` is true.
           example: 2026-02-20T14:25:00.123456789Z,42
+        retention:
+          $ref: '#/components/schemas/RetentionMeta'
+        effective_since:
+          type: string
+          format: date-time
+          description: |
+            The actual start timestamp used for the query. Only present when the
+            requested `since` was earlier than the retention window allows, indicating
+            the query was clamped to the retention boundary. Helps SIEM integrations
+            detect when their requested time range exceeds the user's plan limits.
+          example: '2026-02-22T00:00:00Z'
     AgentSummary:
       type: object
       description: Summary of an agent owned by the authenticated user.
@@ -8105,6 +8129,7 @@ components:
         - plan_id
         - plan_name
         - audit_retention_days
+        - effective_retention_days
       properties:
         plan_id:
           type: string
@@ -8116,8 +8141,26 @@ components:
           example: Free
         audit_retention_days:
           type: integer
-          description: Number of days audit log events are retained before automatic deletion.
+          description: |
+            The plan's base retention period in days. This is the plan's configured
+            value, without considering any active grace period.
           example: 7
+        effective_retention_days:
+          type: integer
+          description: |
+            The currently enforced retention period in days, accounting for any
+            active downgrade grace period. During the 7-day grace period after a
+            downgrade, this will be 90 (the previous paid plan's retention) even
+            though audit_retention_days shows the new plan's shorter value.
+          example: 7
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the downgrade grace period expires. Only present if the user
+            recently downgraded from a paid plan. After this timestamp,
+            effective_retention_days will match audit_retention_days.
     CreatePushSubscriptionRequest:
       type: object
       description: Register a Web Push subscription from the browser.
@@ -8655,6 +8698,30 @@ components:
             next page. Only present when `has_more` is true. Do not construct
             or parse cursor values — they may change format without notice.
           example: 2026-02-11T13:15:00.123456Z,42
+    RetentionMeta:
+      type: object
+      description: |
+        Retention policy metadata for audit events. Included in responses when
+        billing is enabled to help clients display contextual information about
+        the user's data retention window.
+      required:
+        - days
+      properties:
+        days:
+          type: integer
+          description: |
+            The effective number of days audit events are retained. During a
+            downgrade grace period, this reflects the previous (longer) retention.
+          example: 7
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the downgrade grace period expires. Only present if the user
+            recently downgraded from a paid plan. After this time, the shorter
+            retention window takes effect.
+          example: '2026-03-08T14:30:00Z'
   parameters:
     ActionConfigId:
       name: config_id

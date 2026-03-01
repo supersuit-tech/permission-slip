@@ -140,6 +140,7 @@ DataRetentionResponse:
     - plan_id
     - plan_name
     - audit_retention_days
+    - effective_retention_days
   properties:
     plan_id:
       type: string
@@ -151,5 +152,23 @@ DataRetentionResponse:
       example: "Free"
     audit_retention_days:
       type: integer
-      description: Number of days audit log events are retained before automatic deletion.
+      description: |
+        The plan's base retention period in days. This is the plan's configured
+        value, without considering any active grace period.
       example: 7
+    effective_retention_days:
+      type: integer
+      description: |
+        The currently enforced retention period in days, accounting for any
+        active downgrade grace period. During the 7-day grace period after a
+        downgrade, this will be 90 (the previous paid plan's retention) even
+        though audit_retention_days shows the new plan's shorter value.
+      example: 7
+    grace_period_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When the downgrade grace period expires. Only present if the user
+        recently downgraded from a paid plan. After this timestamp,
+        effective_retention_days will match audit_retention_days.
