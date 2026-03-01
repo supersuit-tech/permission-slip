@@ -1,13 +1,15 @@
 .PHONY: dev dev-backend dev-frontend build run install setup \
        test test-backend test-frontend test-integration typecheck \
+       mobile-install mobile-start mobile-test mobile-typecheck \
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
-       audit audit-backend audit-frontend \
+       audit audit-backend audit-frontend audit-mobile \
        docker-build deploy
 
-# Install all dependencies
+# Install all dependencies (frontend + backend + mobile)
 install:
 	cd frontend && npm install
+	cd mobile && npm install
 	go mod download
 
 # Full setup: install deps + generate API client
@@ -75,7 +77,7 @@ deploy:
 
 # ---------- Testing ----------
 
-test: test-backend test-frontend
+test: test-backend test-frontend mobile-test
 
 test-backend:
 	go test ./...
@@ -99,10 +101,28 @@ test-integration:
 	DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
 	go test -tags integration -v ./...
 
+# ---------- Mobile (Expo) ----------
+
+# Install mobile app dependencies
+mobile-install:
+	cd mobile && npm install
+
+# Start Expo development server
+mobile-start:
+	cd mobile && npm start
+
+# Run mobile tests (--ci for deterministic output in CI)
+mobile-test:
+	cd mobile && npm test -- --ci
+
+# Type-check mobile app (no emit, just validate)
+mobile-typecheck:
+	cd mobile && npx tsc --noEmit
+
 # ---------- Dependency Audit ----------
 
 # Run all dependency audits
-audit: audit-backend audit-frontend
+audit: audit-backend audit-frontend audit-mobile
 
 # Audit Go modules for known vulnerabilities (requires govulncheck)
 audit-backend:
@@ -112,6 +132,10 @@ audit-backend:
 # Audit npm packages for known vulnerabilities
 audit-frontend:
 	cd frontend && npm audit
+
+# Audit mobile npm packages for known vulnerabilities
+audit-mobile:
+	cd mobile && npm audit
 
 # ---------- Database ----------
 
