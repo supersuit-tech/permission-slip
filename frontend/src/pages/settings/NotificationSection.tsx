@@ -2,6 +2,7 @@ import { Bell, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
+import { trackEvent, PostHogEvents } from "@/lib/posthog";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
 import { Button } from "@/components/ui/button";
@@ -46,10 +47,12 @@ export function NotificationSection() {
   }
 
   async function handleToggleProductUpdates() {
+    const newValue = !profile?.marketing_opt_in;
     try {
-      await updateProfile({ marketing_opt_in: !profile?.marketing_opt_in });
+      await updateProfile({ marketing_opt_in: newValue });
+      trackEvent(PostHogEvents.MARKETING_OPT_IN_UPDATED, { enabled: newValue });
       toast.success(
-        `Product updates ${!profile?.marketing_opt_in ? "enabled" : "disabled"}.`,
+        `Product updates ${newValue ? "enabled" : "disabled"}.`,
       );
     } catch {
       toast.error("Failed to update product updates preference.");
@@ -150,6 +153,12 @@ export function NotificationSection() {
                   {profile?.marketing_opt_in ? "Enabled" : "Disabled"}
                 </Button>
               </div>
+              {!profile?.email && profile?.marketing_opt_in && (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>Add a contact email above to receive product update emails.</span>
+                </div>
+              )}
             </div>
           </div>
         )}

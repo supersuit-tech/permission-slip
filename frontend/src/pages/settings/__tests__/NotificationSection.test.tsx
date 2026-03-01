@@ -5,6 +5,7 @@ import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import {
   mockGet,
+  mockPatch,
   mockPut,
   resetClientMocks,
 } from "../../../api/__mocks__/client";
@@ -227,6 +228,64 @@ describe("NotificationSection", () => {
           },
         }),
       );
+    });
+  });
+
+  it("renders the product updates section", async () => {
+    mockApiFetch();
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Product updates")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Occasional emails about new features/),
+    ).toBeInTheDocument();
+  });
+
+  it("calls updateProfile when product updates toggle is clicked", async () => {
+    mockApiFetch();
+    mockPatch.mockResolvedValue({
+      data: { ...profileWithContact, marketing_opt_in: true },
+    });
+    const user = userEvent.setup();
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Product updates")).toBeInTheDocument();
+    });
+
+    // The product updates button is the last "Disabled" button
+    const disabledButtons = screen.getAllByRole("button").filter(
+      (b) => b.textContent === "Disabled",
+    );
+    const productUpdatesBtn = disabledButtons[disabledButtons.length - 1]!;
+    await user.click(productUpdatesBtn);
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith(
+        "/v1/profile",
+        expect.objectContaining({
+          body: { marketing_opt_in: true },
+        }),
+      );
+    });
+  });
+
+  it("shows warning when product updates enabled but email is missing", async () => {
+    const profileOptedIn = { ...profileNoContact, marketing_opt_in: true };
+    mockApiFetch(profileOptedIn, allEnabled);
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Add a contact email above to receive product update emails.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 });

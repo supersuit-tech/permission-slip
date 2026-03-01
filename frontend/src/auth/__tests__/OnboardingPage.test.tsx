@@ -84,6 +84,26 @@ describe("OnboardingPage", () => {
     });
   });
 
+  it("sends marketing_opt_in=true when checkbox is checked", async () => {
+    mockPost.mockResolvedValue({ data: { id: "1", username: "bob", created_at: "2024-01-01" }, error: undefined });
+    renderWithProviders(<OnboardingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    });
+    await userEvent.type(screen.getByLabelText("Username"), "bob");
+    await userEvent.click(screen.getByLabelText(/I agree to the/));
+    await userEvent.click(screen.getByLabelText(/Keep me in the loop/));
+    await userEvent.click(screen.getByText("Create account"));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(
+        "/v1/onboarding",
+        expect.objectContaining({ body: { username: "bob", marketing_opt_in: true } })
+      );
+    });
+  });
+
   it("shows error when API returns an error", async () => {
     mockPost.mockResolvedValue({
       data: undefined,
