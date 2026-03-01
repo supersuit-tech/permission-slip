@@ -41,10 +41,12 @@ describe("MfaChallengePage", () => {
   });
 
   it("submits the TOTP code via verifyMfa", async () => {
-    mockMfa.listFactors.mockResolvedValue({
-      data: { all: [verifiedFactor], totp: [verifiedFactor] },
-      error: null,
-    });
+    // verifyMfa reads from user.factors in React state; set up the factor
+    // on the user via setupAuthMocks instead of mocking listFactors.
+    setupAuthMocks({ authenticated: true, factors: [verifiedFactor] });
+    mockMfa.getAuthenticatorAssuranceLevel.mockResolvedValue(
+      aalResponse("aal1", "aal2")
+    );
     mockMfa.challengeAndVerify.mockResolvedValue({
       data: mockSession,
       error: null,

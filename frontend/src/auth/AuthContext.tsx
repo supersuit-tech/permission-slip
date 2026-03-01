@@ -182,19 +182,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyMfa = useCallback(
     async (code: string) => {
-      const listTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Request timed out")), 10000)
+      // Read from user.factors (already in React state) instead of calling
+      // supabase.auth.mfa.listFactors(), which internally calls getUser() and
+      // acquires the Supabase internal lock — causing lock contention with the
+      // onAuthStateChange listener that fires during session init.
+      const totpFactor = (user?.factors ?? []).find(
+        (f) => f.factor_type === "totp" && f.status === "verified"
       );
-      const { data: factorsData, error: listError } = await Promise.race([
-        supabase.auth.mfa.listFactors(),
-        listTimeout,
-      ]).catch((err) => ({
-        data: null,
-        error: err instanceof Error ? err : new Error(String(err)),
-      }));
-      if (listError) return { error: listError };
-
-      const totpFactor = getVerifiedTotpFactor(factorsData?.totp);
       if (!totpFactor) {
         return {
           error: createAuthError(
@@ -207,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return challengeAndVerifyTotp(totpFactor.id, code);
     },
-    [challengeAndVerifyTotp]
+    [challengeAndVerifyTotp, user]
   );
 
   const enrollMfa = useCallback(async () => {
@@ -267,26 +261,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const listMfaFactors = useCallback(async () => {
-    // Wrap with a 10-second timeout so a hanging Supabase MFA endpoint
-    // resolves to an error instead of leaving the UI in an infinite spinner.
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out")), 10000)
+    // Read from user.factors (already in React state) instead of calling
+    // supabase.auth.mfa.listFactors(), which internally calls getUser() and
+    // acquires the Supabase internal lock — causing lock contention with the
+    // onAuthStateChange listener that fires during session init, hanging the
+    // UI for up to 10 seconds.
+    //
+    // This mirrors exactly what the Supabase SDK's own _listFactors() does
+    // internally: it reads user.factors from the already-fetched user object.
+    // user.factors includes both verified and unverified factors, so
+    // MfaEnrollmentFlow can still clean up stale abandoned enrollments.
+    const allTotp = (user?.factors ?? []).filter(
+      (f) => f.factor_type === "totp"
     );
-    const request = supabase.auth.mfa.listFactors();
-    const { data, error } = await Promise.race([request, timeout]).catch(
-      (err) => ({
-        data: null,
-        error: err instanceof Error ? err : new Error(String(err)),
-      })
-    );
-    // Use data.all filtered by factor_type instead of data.totp because
-    // the Supabase client only puts *verified* factors in data.totp.
-    // We need unverified factors too so MfaEnrollmentFlow can clean up
-    // stale enrollments that the user abandoned before verifying.
-    const allTotp =
-      data?.all?.filter((f) => f.factor_type === "totp") ?? [];
-    return { factors: allTotp, error: error ?? null };
-  }, []);
+    return { factors: allTotp, error: null };
+  }, [user]);
 
   const value = useMemo<AuthState>(
     () => ({

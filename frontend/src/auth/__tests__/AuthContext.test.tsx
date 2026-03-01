@@ -220,11 +220,8 @@ describe("AuthContext", () => {
 
   describe("verifyMfa", () => {
     it("calls challengeAndVerify with the verified TOTP factor", async () => {
-      setupAuthMocks({ authenticated: true });
-      mockMfa.listFactors.mockResolvedValue({
-        data: { all: [verifiedFactor], totp: [verifiedFactor] },
-        error: null,
-      });
+      // verifyMfa reads from user.factors in React state (no listFactors call).
+      setupAuthMocks({ authenticated: true, factors: [verifiedFactor] });
       // challengeAndVerify response shape only matters for the error field;
       // AuthContext doesn't inspect the data payload.
       mockMfa.challengeAndVerify.mockResolvedValue({
@@ -248,11 +245,8 @@ describe("AuthContext", () => {
     });
 
     it("returns error when no verified TOTP factor exists", async () => {
-      setupAuthMocks({ authenticated: true });
-      mockMfa.listFactors.mockResolvedValue({
-        data: { all: [], totp: [] },
-        error: null,
-      });
+      // No factors on user — verifyMfa should return mfa_factor_not_found.
+      setupAuthMocks({ authenticated: true, factors: [] });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -368,13 +362,9 @@ describe("AuthContext", () => {
   });
 
   describe("listMfaFactors", () => {
-    it("returns TOTP factors from supabase", async () => {
-      setupAuthMocks({ authenticated: true });
-      const factors = [verifiedFactor];
-      mockMfa.listFactors.mockResolvedValue({
-        data: { all: factors, totp: factors },
-        error: null,
-      });
+    it("returns TOTP factors from user state", async () => {
+      // listMfaFactors reads user.factors from React state — no Supabase call.
+      setupAuthMocks({ authenticated: true, factors: [verifiedFactor] });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -384,16 +374,12 @@ describe("AuthContext", () => {
 
       const response = await result.current.listMfaFactors();
 
-      expect(response.factors).toEqual(factors);
+      expect(response.factors).toEqual([verifiedFactor]);
       expect(response.error).toBeNull();
     });
 
     it("returns empty array when no factors exist", async () => {
-      setupAuthMocks({ authenticated: true });
-      mockMfa.listFactors.mockResolvedValue({
-        data: { all: [], totp: [] },
-        error: null,
-      });
+      setupAuthMocks({ authenticated: true, factors: [] });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -408,14 +394,10 @@ describe("AuthContext", () => {
     });
 
     it("includes unverified TOTP factors (for stale enrollment cleanup)", async () => {
-      setupAuthMocks({ authenticated: true });
-      // Supabase only puts verified factors in data.totp; unverified are
-      // only in data.all. Our wrapper must pull from data.all so the
-      // enrollment flow can find and clean up stale unverified factors.
-      mockMfa.listFactors.mockResolvedValue({
-        data: { all: [unverifiedFactor], totp: [] },
-        error: null,
-      });
+      // Supabase's onAuthStateChange provides user.factors which includes both
+      // verified and unverified factors, so MfaEnrollmentFlow can find and
+      // clean up stale abandoned enrollments.
+      setupAuthMocks({ authenticated: true, factors: [unverifiedFactor] });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -430,7 +412,6 @@ describe("AuthContext", () => {
     });
 
     it("excludes non-TOTP factors from results", async () => {
-      setupAuthMocks({ authenticated: true });
       const phoneFactor = {
         id: "factor-phone",
         status: "verified" as const,
@@ -438,13 +419,11 @@ describe("AuthContext", () => {
         created_at: "2024-01-01",
         updated_at: "2024-01-01",
       };
-      mockMfa.listFactors.mockResolvedValue({
-        data: {
-          all: [verifiedFactor, phoneFactor],
-          totp: [verifiedFactor],
-          phone: [phoneFactor],
-        },
-        error: null,
+      // user.factors contains both TOTP and phone factors; listMfaFactors
+      // must only return TOTP ones.
+      setupAuthMocks({
+        authenticated: true,
+        factors: [verifiedFactor, phoneFactor],
       });
 
       const { result } = renderHook(() => useAuth(), {
