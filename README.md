@@ -75,6 +75,7 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 |---|---|
 | Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 |
+| Mobile | React Native (Expo 55), TypeScript |
 | UI Components | shadcn/ui (Radix UI + Tailwind + Lucide icons) |
 | API Client | openapi-fetch with generated TypeScript types |
 | Auth | Supabase Auth (JWT-based, MFA support) |
@@ -131,7 +132,7 @@ The app starts without a database if `DATABASE_URL` is not set, so you can work 
 
 ### 5. Generate the typed API client
 
-TypeScript types are generated from the OpenAPI spec. This happens automatically after `npm install` via a postinstall hook, but you can also run it manually:
+TypeScript types are generated from the OpenAPI spec for both `frontend/` and `mobile/`. This happens automatically after `npm install` via a postinstall hook, but you can also run it manually:
 
 ```bash
 make generate
@@ -148,6 +149,18 @@ make dev-frontend
 ```
 
 Open **http://localhost:5173**. API requests to `/api/*` are automatically proxied to the Go server.
+
+### Mobile App (Expo)
+
+The mobile app lives in `mobile/` and shares the same OpenAPI spec for typed API access.
+
+```bash
+cd mobile
+npm install                # also runs `generate:api` via postinstall
+npm start                  # launches Expo dev server
+```
+
+Set `EXPO_PUBLIC_API_BASE_URL` in your `.env` (or Expo config) to point at your local backend (e.g. `http://<your-ip>:8080/api`). Without it, the app falls back to production and logs a warning in dev mode.
 
 > **Accessing via ngrok or an external URL?** Set `ALLOWED_ORIGINS` to your public URL (e.g. `ALLOWED_ORIGINS=https://your-subdomain.ngrok-free.app make dev-backend`) so the Go backend allows cross-origin requests. Without it, API calls from a non-localhost origin will be blocked with 403.
 

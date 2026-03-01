@@ -7,6 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "generate:api": "openapi-typescript ../spec/openapi/openapi.bundle.yaml -o src/api/schema.d.ts",
+    "postinstall": "npm run generate:api",
     "test": "jest"
   },
   "jest": {
@@ -15,6 +17,7 @@
   "dependencies": {
     "expo": "~55.0.4",
     "expo-status-bar": "~55.0.4",
+    "openapi-fetch": "^0.17.0",
     "react": "19.2.0",
     "react-native": "0.83.2"
   },
@@ -23,6 +26,7 @@
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "^19.1.0",
     "jest-expo": "^55.0.9",
+    "openapi-typescript": "^7.13.0",
     "react-test-renderer": "^19.2.0",
     "typescript": "~5.9.2"
   },
