@@ -1,5 +1,10 @@
 package testhelper
 
+// assertions_usage.go — reusable test assertions for billing usage counters.
+//
+// These helpers verify that the usage_periods table reflects the expected
+// request_count and JSONB breakdown after billable API operations.
+
 import (
 	"context"
 	"testing"

@@ -1,7 +1,18 @@
 package api
 
+// metering_test.go — API-level integration tests for billing metering.
+//
+// These tests verify that billable API operations (approval requests, standing
+// approval executions) correctly increment the usage_periods counters, and that
+// non-billable operations (approve/deny, token-based execution) do NOT.
+//
+// Tests use either SetupTestDB (transaction-isolated) or SetupPoolUser
+// (real pool) depending on whether the test exercises code paths that
+// require real transaction boundaries (e.g., dedup via unique violations).
+
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,10 +26,22 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
 
-// ── Approval request metering ───────────────────────────────────────────────
+// meteringTestCtx holds common test dependencies for metering tests that use
+// a transaction-isolated database (SetupTestDB). For pool-based tests, use
+// testhelper.SetupPoolUser directly.
+type meteringTestCtx struct {
+	DB      db.DBTX
+	UserID  string
+	AgentID int64
+	PrivKey ed25519.PrivateKey
+	Router  http.Handler
+}
 
-func TestMetering_ApprovalRequestIncrementsUsage(t *testing.T) {
-	t.Parallel()
+// setupMeteringTest creates a test transaction, user, registered agent with a
+// real Ed25519 key, and a standard router. Use this to reduce boilerplate in
+// metering tests that don't need custom Deps or real transaction boundaries.
+func setupMeteringTest(t *testing.T) meteringTestCtx {
+	t.Helper()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -30,24 +53,37 @@ func TestMetering_ApprovalRequestIncrementsUsage(t *testing.T) {
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
-	router := NewRouter(deps)
+	return meteringTestCtx{
+		DB:      tx,
+		UserID:  uid,
+		AgentID: agentID,
+		PrivKey: privKey,
+		Router:  NewRouter(deps),
+	}
+}
+
+// ── Approval request metering ───────────────────────────────────────────────
+
+func TestMetering_ApprovalRequestIncrementsUsage(t *testing.T) {
+	t.Parallel()
+	m := setupMeteringTest(t)
 
 	// No usage before any requests.
-	testhelper.RequireUsageCount(t, tx, uid, 0)
+	testhelper.RequireUsageCount(t, m.DB, m.UserID, 0)
 
 	// Submit first approval request.
 	reqBody := `{"request_id":"meter_req_001","action":{"type":"email.send","parameters":{"to":"alice@example.com"}},"context":{"description":"test"}}`
-	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, m.PrivKey, m.AgentID)
 	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
+	m.Router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
 	// Usage should now be 1 with correct breakdown.
-	usage := testhelper.RequireUsageCount(t, tx, uid, 1)
-	agentKey := strconv.FormatInt(agentID, 10)
+	usage := testhelper.RequireUsageCount(t, m.DB, m.UserID, 1)
+	agentKey := strconv.FormatInt(m.AgentID, 10)
 	testhelper.RequireUsageBreakdown(t, usage,
 		map[string]int{agentKey: 1},     // by_agent
 		nil,                             // by_connector (not checked)
@@ -56,16 +92,16 @@ func TestMetering_ApprovalRequestIncrementsUsage(t *testing.T) {
 
 	// Submit second approval request with different action type.
 	reqBody2 := `{"request_id":"meter_req_002","action":{"type":"slack.send_message","parameters":{"channel":"#general"}},"context":{"description":"test2"}}`
-	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody2, privKey, agentID)
+	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody2, m.PrivKey, m.AgentID)
 	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, r2)
+	m.Router.ServeHTTP(w2, r2)
 
 	if w2.Code != http.StatusOK {
 		t.Fatalf("second request: expected 200, got %d: %s", w2.Code, w2.Body.String())
 	}
 
 	// Usage should now be 2.
-	testhelper.RequireUsageCount(t, tx, uid, 2)
+	testhelper.RequireUsageCount(t, m.DB, m.UserID, 2)
 }
 
 // ── Standing approval execution metering (dashboard) ────────────────────────
@@ -179,42 +215,31 @@ func userIDFromApproval(t *testing.T, d db.DBTX, approvalID string) string {
 
 func TestMetering_DuplicateApprovalRequestDoesNotDoubleCount(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
-
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
-	router := NewRouter(deps)
+	m := setupMeteringTest(t)
 
 	reqBody := `{"request_id":"dedup_001","action":{"type":"email.send","parameters":{"to":"alice@example.com"}},"context":{"description":"test"}}`
 
 	// First request succeeds.
-	r1 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	r1 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, m.PrivKey, m.AgentID)
 	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, r1)
+	m.Router.ServeHTTP(w1, r1)
 
 	if w1.Code != http.StatusOK {
 		t.Fatalf("first request: expected 200, got %d: %s", w1.Code, w1.Body.String())
 	}
-	testhelper.RequireUsageCount(t, tx, uid, 1)
+	testhelper.RequireUsageCount(t, m.DB, m.UserID, 1)
 
 	// Second request with same request_id returns 409 Conflict.
-	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, m.PrivKey, m.AgentID)
 	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, r2)
+	m.Router.ServeHTTP(w2, r2)
 
 	if w2.Code != http.StatusConflict {
 		t.Fatalf("duplicate request: expected 409, got %d: %s", w2.Code, w2.Body.String())
 	}
 
 	// Usage should still be 1 — the duplicate was rejected before metering.
-	testhelper.RequireUsageCount(t, tx, uid, 1)
+	testhelper.RequireUsageCount(t, m.DB, m.UserID, 1)
 }
 
 func TestMetering_DuplicateStandingExecutionDoesNotDoubleCount(t *testing.T) {
@@ -263,6 +288,7 @@ func TestMetering_DuplicateStandingExecutionDoesNotDoubleCount(t *testing.T) {
 
 func TestMetering_ApproveDoesNotIncrementUsage(t *testing.T) {
 	t.Parallel()
+	// Uses custom deps (InviteHMACKey) so can't use setupMeteringTest directly.
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -309,6 +335,7 @@ func TestMetering_ApproveDoesNotIncrementUsage(t *testing.T) {
 
 func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 	t.Parallel()
+	// Uses testDepsWithSigningKey for action token support (standing execution).
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -319,7 +346,6 @@ func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	// Also create a standing approval for the agent.
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "email.read")
 
@@ -439,8 +465,9 @@ func TestMetering_ConcurrentApprovalsAccurateCount(t *testing.T) {
 	wg.Wait()
 	close(errs)
 
+	// Use t.Error (not t.Fatal) to report all goroutine failures, not just the first.
 	for err := range errs {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	// All 10 concurrent approval requests should result in exactly 10 metered events.
