@@ -435,6 +435,21 @@ func GetAgentByIDUnscoped(ctx context.Context, db DBTX, agentID int64) (*Agent, 
 	return a, nil
 }
 
+// CountRegisteredAgentsByUser returns the number of agents in 'registered' or
+// 'pending' (not yet expired) status for the given user. Both count toward the
+// plan limit because pending agents will become registered on verification.
+func CountRegisteredAgentsByUser(ctx context.Context, db DBTX, userID string) (int, error) {
+	var count int
+	err := db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM agents
+		 WHERE approver_id = $1
+		   AND (status = 'registered'
+		        OR (status = 'pending' AND (expires_at IS NULL OR expires_at > now())))`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
 // TouchAgentLastActive updates the agent's last_active_at timestamp to now().
 // This is a best-effort operation — callers should not fail the request if it errors.
 func TouchAgentLastActive(ctx context.Context, db DBTX, agentID int64) error {

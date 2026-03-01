@@ -205,7 +205,30 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			constraintsBytes = req.Constraints
 		}
 
-		sa, err := db.CreateStandingApproval(r.Context(), deps.DB, db.CreateStandingApprovalParams{
+		// Wrap limit check + insert in a transaction with an advisory lock
+		// to prevent TOCTOU races where concurrent requests could both pass
+		// the limit check and exceed the plan cap.
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] CreateStandingApproval: begin tx: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx)
+		}
+
+		if err := db.AcquireStandingApprovalLimitLock(r.Context(), tx, profile.ID); err != nil {
+			log.Printf("[%s] CreateStandingApproval: advisory lock: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+			return
+		}
+
+		if checkStandingApprovalLimit(r.Context(), w, r, tx, profile.ID) {
+			return
+		}
+
+		sa, err := db.CreateStandingApproval(r.Context(), tx, db.CreateStandingApprovalParams{
 			StandingApprovalID: saID,
 			AgentID:            req.AgentID,
 			UserID:             profile.ID,
@@ -225,6 +248,14 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			log.Printf("[%s] CreateStandingApproval: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
 			return
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] CreateStandingApproval: commit: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+				return
+			}
 		}
 
 		RespondJSON(w, http.StatusCreated, toStandingApprovalResponse(*sa))

@@ -126,6 +126,22 @@ register:
                     retryable: false
                     trace_id: "trace_xyz789"
 
+      '403':
+        description: Agent limit reached
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "agent_limit_reached"
+                message: "Free tier allows up to 3 agents. Upgrade your plan to add more."
+                retryable: false
+                details:
+                  current_count: 3
+                  limit: 3
+                trace_id: "trace_xyz789"
+
       '404':
         description: Invite not found
         content:

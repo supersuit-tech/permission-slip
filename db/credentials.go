@@ -45,6 +45,16 @@ const (
 	CredentialErrDuplicate                   // unique (user_id, service, label) violation
 )
 
+// CountCredentialsByUser returns the number of credentials for the given user.
+func CountCredentialsByUser(ctx context.Context, db DBTX, userID string) (int, error) {
+	var count int
+	err := db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM credentials WHERE user_id = $1`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
 // ListCredentialsByUser returns all credential metadata for the given user,
 // ordered by created_at descending (newest first).
 func ListCredentialsByUser(ctx context.Context, db DBTX, userID string) ([]Credential, error) {

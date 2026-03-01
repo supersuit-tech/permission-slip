@@ -46,4 +46,7 @@ const (
 	ErrConfigActionTypeMismatch ErrorCode = "configuration_action_type_mismatch"
 	ErrInvalidReference         ErrorCode = "invalid_reference"
 	ErrServiceUnavailable       ErrorCode = "service_unavailable"
+	ErrAgentLimitReached        ErrorCode = "agent_limit_reached"
+	ErrStandingApprovalLimitReached ErrorCode = "standing_approval_limit_reached"
+	ErrCredentialLimitReached   ErrorCode = "credential_limit_reached"
 )
