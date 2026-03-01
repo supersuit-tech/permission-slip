@@ -16,10 +16,12 @@ export function getApiErrorMessage(
   if (typeof error !== "object" || error === null) return fallback;
   if (!("error" in error)) return fallback;
 
+  // Safe: `in` check above guarantees "error" exists on the object.
   const inner = (error as { error: unknown }).error;
   if (typeof inner !== "object" || inner === null) return fallback;
   if (!("message" in inner)) return fallback;
 
+  // Safe: `in` check above guarantees "message" exists on the inner object.
   const msg = (inner as { message: unknown }).message;
   return typeof msg === "string" ? msg : fallback;
 }
@@ -32,10 +34,12 @@ export function getApiErrorCode(error: unknown): ApiError["code"] | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   if (!("error" in error)) return undefined;
 
+  // Safe: `in` check above guarantees "error" exists on the object.
   const inner = (error as { error: unknown }).error;
   if (typeof inner !== "object" || inner === null) return undefined;
   if (!("code" in inner)) return undefined;
 
+  // Safe: `in` check + narrowing above guarantee "code" exists; cast matches the Error schema.
   return (inner as { code: unknown }).code as ApiError["code"];
 }
 
