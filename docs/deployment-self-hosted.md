@@ -82,7 +82,7 @@ If you're using a Supabase-hosted database, vault is already available. If using
 | Variable | Description | Example |
 |---|---|---|
 | `BASE_URL` | Public URL of your deployment (used for invite links) | `https://permissions.mycompany.com` |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins | `https://permissions.mycompany.com` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins (exact match, no trailing slash). Defaults to same-origin only when unset — which works out of the box since the SPA is embedded in the binary. Set this if you serve the app behind a reverse proxy or CDN that changes the origin. | `https://permissions.mycompany.com` |
 | `INVITE_HMAC_KEY` | HMAC key for invite code signing | Generate: `openssl rand -hex 32` |
 
 ### Build-Time Variables (Frontend)
@@ -389,6 +389,9 @@ Check logs. Common causes: missing `DATABASE_URL`, incorrect Supabase credential
 **Connection refused to database:**
 If using Supabase, ensure the connection string uses the pooler endpoint (port 6543) with `?sslmode=require`. Direct connections (port 5432) may be blocked.
 
+**CORS errors in browser (403 on API calls):**
+Ensure `ALLOWED_ORIGINS` includes your deployment's exact origin (e.g., `https://permissions.mycompany.com`) — no trailing slash. If you're behind a reverse proxy or CDN, the origin seen by the browser may differ from `BASE_URL`. When `ALLOWED_ORIGINS` is unset, the server runs in same-origin only mode, which works for the standard embedded-SPA deployment but will reject requests from a different origin.
+
 **VAPID error on startup:**
 If any VAPID variable is set, all three (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) must be set. Either set all three or remove them all.
 
@@ -404,7 +407,7 @@ Migrations run automatically on startup. If they fail, check database connectivi
 | `VITE_SUPABASE_URL` | Yes | Build | Supabase URL for frontend auth |
 | `VITE_SUPABASE_ANON_KEY` | Yes | Build | Supabase public anon key |
 | `BASE_URL` | Recommended | Runtime | Public deployment URL |
-| `ALLOWED_ORIGINS` | Recommended | Runtime | CORS allowed origins (comma-separated) |
+| `ALLOWED_ORIGINS` | Recommended | Runtime | CORS allowed origins (comma-separated, exact match, no trailing slash). Same-origin only when unset. |
 | `INVITE_HMAC_KEY` | Recommended | Runtime | HMAC key for invite codes |
 | `PORT` | No | Runtime | Listen port (default: `8080`) |
 | `MODE` | No | Runtime | `development` to relax validation |

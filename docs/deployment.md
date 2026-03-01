@@ -96,7 +96,7 @@ curl https://your-app.fly.dev/api/health
 | `SUPABASE_URL` | Yes | Supabase project URL (JWT verification via JWKS + auth) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Recommended | Supabase service_role key — required for account deletion (removes auth user). Get from Supabase dashboard |
 | `BASE_URL` | Recommended | Public URL (e.g., `https://app.permissionslip.dev`) — required for invite link generation |
-| `ALLOWED_ORIGINS` | Recommended | CORS origins (e.g., `https://app.permissionslip.dev`). Defaults to same-origin only if unset |
+| `ALLOWED_ORIGINS` | Recommended | CORS origins — comma-separated, exact match, no trailing slash (e.g., `https://app.permissionslip.dev`). Defaults to same-origin only if unset |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
 | `SUPABASE_JWT_SECRET` | Legacy only | JWT secret for HS256 verification. Not needed when using ES256/JWKS (derived automatically from `SUPABASE_URL`) |
 | `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking |
@@ -243,6 +243,9 @@ Check logs with `fly logs`. Common causes: missing `DATABASE_URL`, incorrect Sup
 
 **Frontend shows "Missing VITE_SUPABASE_URL" error:**
 The Supabase build args were not passed during `fly deploy`. Re-deploy with `--build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_ANON_KEY=...` or add `[build.args]` to `fly.toml`. See [Configure frontend build args](#3-configure-frontend-build-args).
+
+**CORS errors in browser (403 on API calls):**
+Ensure `ALLOWED_ORIGINS` includes your app's exact origin (e.g., `https://your-app.fly.dev`) — no trailing slash. When unset, the server defaults to same-origin only mode, which works for the standard deployment but will reject requests if a custom domain or CDN changes the browser's origin.
 
 **Connection refused to database:**
 If using Supabase, ensure the connection string uses the pooler endpoint (port 6543) with `?sslmode=require`. Direct connections (port 5432) may be blocked by firewall rules.
