@@ -1,5 +1,6 @@
 .PHONY: dev dev-backend dev-frontend build run install setup \
        test test-backend test-frontend test-integration typecheck \
+       mobile-install mobile-start mobile-test \
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
        audit audit-backend audit-frontend \
@@ -98,6 +99,20 @@ test-integration:
 		(echo "Error: Supabase is not running. Run 'supabase start' first." && exit 1)
 	DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
 	go test -tags integration -v ./...
+
+# ---------- Mobile (Expo) ----------
+
+# Install mobile app dependencies
+mobile-install:
+	cd mobile && npm install
+
+# Start Expo development server
+mobile-start:
+	cd mobile && npm start
+
+# Run mobile tests
+mobile-test:
+	cd mobile && npm test
 
 # ---------- Dependency Audit ----------
 
