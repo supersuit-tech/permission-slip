@@ -200,7 +200,7 @@ git push -u origin <current-branch>
 
 After each cycle, wait 60 seconds and poll again.
 
-**Idle timeout:** Track the number of consecutive poll cycles with **no new comments, reviews, or merge conflicts**. If **5 consecutive cycles** pass with no new activity (i.e., 5 minutes of inactivity), **stop polling** and post a wrap-up comment on the PR before exiting (see step 9).
+**Idle timeout:** Track the number of consecutive poll cycles with **no new comments, reviews, or merge conflicts**. If **3 consecutive cycles** pass with no new activity (i.e., 3 minutes of inactivity), **stop polling** and post a wrap-up comment on the PR before exiting (see step 9).
 
 If any cycle finds new comments, reviews, or merge conflicts that needed resolution, reset the idle counter to 0.
 
@@ -261,7 +261,7 @@ Format the comment in markdown. Example structure:
 - ...
 
 ---
-*Watch session ended after 5 minutes of inactivity. Processed N comments across M poll cycles.*
+*Watch session ended after 3 minutes of inactivity. Processed N comments across M poll cycles.*
 ```
 
 If no changes were made during the session (e.g., all comments were already addressed before watching started, or no comments existed), still post the comment noting that no action was needed.
