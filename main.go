@@ -27,6 +27,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
+	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
@@ -127,6 +128,18 @@ func main() {
 	deps.BillingEnabled = os.Getenv("BILLING_ENABLED") == "true"
 	if deps.BillingEnabled {
 		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
+
+		// Initialize Stripe client when billing is enabled and keys are configured.
+		if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
+			deps.Stripe = pstripe.New(pstripe.Config{
+				SecretKey:      stripeKey,
+				WebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
+				PriceIDRequest: os.Getenv("STRIPE_PRICE_ID_REQUEST"),
+			})
+			log.Println("Stripe: client initialized")
+		} else {
+			log.Println("Stripe: STRIPE_SECRET_KEY not set, Stripe API calls will be unavailable")
+		}
 	} else {
 		log.Println("Billing: disabled (all users get unlimited plan, Stripe/metering skipped)")
 	}

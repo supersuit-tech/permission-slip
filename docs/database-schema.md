@@ -270,6 +270,60 @@ Immutable log of significant actions: approval decisions, agent lifecycle events
 
 **Note:** Audit events use ON DELETE RESTRICT (not CASCADE) to prevent accidental deletion of audit history when cleaning up users or agents. The `agent_meta` column captures a snapshot of the agent's metadata at event time so the audit trail remains meaningful even if the agent is later modified or deactivated.
 
+### `plans`
+
+Defines pricing tiers and resource limits. Seeded with two built-in plans.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | text | PK |
+| `name` | text | NOT NULL |
+| `max_requests_per_month` | integer | Nullable (NULL = unlimited) |
+| `max_agents` | integer | Nullable (NULL = unlimited) |
+| `max_standing_approvals` | integer | Nullable (NULL = unlimited) |
+| `max_credentials` | integer | Nullable (NULL = unlimited) |
+| `audit_retention_days` | integer | NOT NULL |
+| `price_per_request_millicents` | integer | NOT NULL, DEFAULT 0 |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Seed data:** `free` (1000 req/mo, 7-day audit, $0/req), `pay_as_you_go` (unlimited, 90-day audit, $0.005/req)
+
+### `subscriptions`
+
+Links each user to their current plan. One subscription per user (UNIQUE on `user_id`).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | uuid | PK, DEFAULT gen_random_uuid() |
+| `user_id` | uuid | NOT NULL, UNIQUE, FK → profiles(id) ON DELETE CASCADE |
+| `plan_id` | text | NOT NULL, FK → plans(id) |
+| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'past_due', 'cancelled') |
+| `stripe_customer_id` | text | Nullable (NULL for free-tier) |
+| `stripe_subscription_id` | text | Nullable (NULL for free-tier) |
+| `current_period_start` | timestamptz | NOT NULL, DEFAULT date_trunc('month', now()) |
+| `current_period_end` | timestamptz | NOT NULL, DEFAULT date_trunc('month', now()) + interval '1 month' |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Indexes:** `idx_subscriptions_plan_id`, `idx_subscriptions_stripe_customer_id` (UNIQUE partial), `idx_subscriptions_stripe_subscription_id` (UNIQUE partial)
+
+### `usage_periods`
+
+Tracks per-user billable usage for each billing period. Half-open interval: [period_start, period_end).
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | bigserial | PK |
+| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
+| `period_start` | timestamptz | NOT NULL |
+| `period_end` | timestamptz | NOT NULL, CHECK (period_end > period_start) |
+| `request_count` | integer | NOT NULL, DEFAULT 0 |
+| `sms_count` | integer | NOT NULL, DEFAULT 0 |
+| `breakdown` | jsonb | DEFAULT '{}' — per-agent/connector/action-type counters |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Constraints:** UNIQUE on `(user_id, period_start)` — one record per user per billing period
+
 ## Relationships
 
 Most foreign keys use ON DELETE CASCADE. Audit events use ON DELETE RESTRICT to preserve history.
@@ -278,6 +332,8 @@ Most foreign keys use ON DELETE CASCADE. Audit events use ON DELETE RESTRICT to 
 auth.users
   └── profiles
         ├── registration_invites (user_id → profiles, CASCADE)
+        ├── subscriptions (user_id → profiles, CASCADE)
+        ├── usage_periods (user_id → profiles, CASCADE)
         ├── agents (approver_id → profiles, CASCADE)
         ├── approvals (approver_id → profiles, CASCADE)
         ├── credentials (user_id → profiles, CASCADE)
@@ -450,3 +506,8 @@ Tests are split by domain. Each domain file owns its own schema assertions, CASC
 - `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, 90-day max, execution_count, max_executions), indexes, standing_approval_executions table
 - `action_configurations_test.go` — schema, cascades, CHECK constraints (status, parameters size), credential SET NULL behavior, CRUD function tests (create, get, list, update, delete), user scoping
 - `audit_events_test.go` — ListAuditEvents query: all event types, filters (agent_id, event_type, outcome), pagination, user isolation, ordering
+- `subscriptions_test.go` — schema, CRUD, UNIQUE constraints
+- `subscriptions_billing_test.go` — EnsureAllUsersSubscribed with billing enabled/disabled
+- `subscriptions_stripe_test.go` — Stripe ID lookups (GetSubscriptionByStripeCustomerID, GetSubscriptionByStripeSubscriptionID)
+- `usage_periods_test.go` — schema, atomic increments, JSONB breakdown, cascade delete
+- `plans_test.go` — plan lookup, seed data verification

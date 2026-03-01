@@ -192,6 +192,28 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	return total, nil
 }
 
+// GetSubscriptionByStripeCustomerID returns the subscription with the given
+// Stripe Customer ID, or nil if not found. Used by webhook handlers.
+func GetSubscriptionByStripeCustomerID(ctx context.Context, db DBTX, stripeCustomerID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE stripe_customer_id = $1", stripeCustomerID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
+}
+
+// GetSubscriptionByStripeSubscriptionID returns the subscription with the given
+// Stripe Subscription ID, or nil if not found. Used by webhook handlers.
+func GetSubscriptionByStripeSubscriptionID(ctx context.Context, db DBTX, stripeSubscriptionID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE stripe_subscription_id = $1", stripeSubscriptionID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
+}
+
 // SubscriptionWithPlan combines a subscription with its associated plan details
 // in a single query. This avoids the N+1 pattern of fetching subscription then plan.
 type SubscriptionWithPlan struct {

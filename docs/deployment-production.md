@@ -294,8 +294,8 @@ fly deploy --build-arg VITE_STRIPE_PUBLISHABLE_KEY="pk_live_xxxx"
 **Setup steps:**
 1. Create Stripe account and get API keys
 2. Create a metered Price for per-request billing ($0.005/request after 1,000 free)
-3. Set up a webhook endpoint at `https://app.permissionslip.dev/api/v1/webhooks/stripe`
-4. Configure webhook to send: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
+3. Set up a webhook endpoint at `https://app.permissionslip.dev/api/billing/webhook`
+4. Configure webhook to send: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 5. Set all env vars via `fly secrets set` (see commands above)
 
 **When `BILLING_ENABLED=false`:**
