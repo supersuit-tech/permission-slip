@@ -13,7 +13,7 @@
 
 ## Webhook Notification
 
-Whenever you finish a task or need user input and the user hasn't responded within 5 minutes, trigger the webhook to notify them. This uses the same workflow as the `/watch` command but without a PR URL:
+Whenever you finish a task or need user input and the user hasn't responded within 2 minutes, trigger the webhook to notify them. This uses the same workflow as the `/watch` command but without a PR URL:
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml
