@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./AuthContext";
 import AuthLayout from "./AuthLayout";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormError } from "@/components/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +15,7 @@ export default function OnboardingPage() {
   const { session, signOut } = useAuth();
   const queryClient = useQueryClient();
   const [username, setUsername] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -67,9 +70,42 @@ export default function OnboardingPage() {
             3–32 characters. Letters, digits, underscores, and hyphens only.
           </p>
         </div>
+        <div className="flex items-start gap-2">
+          <Checkbox
+            id="agree-tos"
+            checked={agreedToTerms}
+            onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+            required
+          />
+          <Label
+            htmlFor="agree-tos"
+            className="text-sm font-normal leading-snug"
+          >
+            I agree to the{" "}
+            <Link
+              to="/policy/terms"
+              target="_blank"
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              to="/policy/privacy"
+              target="_blank"
+              className="text-primary underline underline-offset-2 hover:text-primary/80"
+            >
+              Privacy Policy
+            </Link>
+          </Label>
+        </div>
         <FormError error={error} prefix />
         <div className="flex gap-2">
-          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={isSubmitting || !agreedToTerms}
+          >
             {isSubmitting ? "Creating account…" : "Create account"}
           </Button>
           <Button

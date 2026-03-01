@@ -24,6 +24,27 @@ describe("OnboardingPage", () => {
     expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
 
+  it("renders the terms of service agreement checkbox", async () => {
+    renderWithProviders(<OnboardingPage />);
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/I agree to the/)).toBeInTheDocument();
+  });
+
+  it("disables submit button until terms checkbox is checked", async () => {
+    renderWithProviders(<OnboardingPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    });
+
+    const submitButton = screen.getByText("Create account");
+    expect(submitButton).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("checkbox"));
+    expect(submitButton).toBeEnabled();
+  });
+
   it("calls signOut when Cancel is clicked", async () => {
     mockAuth.signOut.mockResolvedValue({ error: null });
     renderWithProviders(<OnboardingPage />);
@@ -44,6 +65,7 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "alice");
+    await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByText("Create account"));
 
     await waitFor(() => {
@@ -65,6 +87,7 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "taken");
+    await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByText("Create account"));
 
     await waitFor(() => {

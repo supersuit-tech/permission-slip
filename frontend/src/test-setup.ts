@@ -1,5 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 
+// jsdom doesn't implement ResizeObserver — stub it for Radix UI primitives
+// (e.g. Checkbox) that rely on it.
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // jsdom doesn't implement matchMedia — stub it for ThemeProvider and any
 // component that checks prefers-color-scheme.
 Object.defineProperty(window, "matchMedia", {
