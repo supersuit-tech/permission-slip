@@ -75,15 +75,6 @@ export function aalResponse(current: string, next: string) {
  *   AuthContext reads user.factors directly from React state, so tests that
  *   exercise listMfaFactors or verifyMfa should pass factors here instead of
  *   mocking supabase.auth.mfa.listFactors().
- */
-/**
- * Sets up auth mocks for a test.
- *
- * @param authenticated - Whether the user is authenticated
- * @param factors - MFA factors to attach to the session user (default: []).
- *   AuthContext reads user.factors directly from React state, so tests that
- *   exercise listMfaFactors or verifyMfa should pass factors here instead of
- *   mocking supabase.auth.mfa.listFactors().
  *
  * When no factors are provided, the original mockSession reference is used
  * so that tests doing strict reference equality (toBe) still pass.

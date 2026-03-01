@@ -15,6 +15,32 @@ import type { AuthStatus, AuthState } from "./types";
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+/**
+ * Races `request` against a timeout. The timeout timer is always cleared once
+ * the request settles (via `finally`), so it never lingers in the event loop
+ * after the request resolves quickly.
+ *
+ * Rejects with an `AuthError` on timeout; re-throws any other rejection so
+ * callers can handle it uniformly.
+ */
+async function withTimeout<T>(
+  request: Promise<T>,
+  ms: number
+): Promise<T> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(
+      () => reject(new Error("Request timed out")),
+      ms
+    );
+  });
+  try {
+    return await Promise.race([request, timeoutPromise]);
+  } finally {
+    clearTimeout(timerId);
+  }
+}
+
 /** Returns the first verified TOTP factor from a factor list, or undefined. */
 function getVerifiedTotpFactor(factors?: Factor[]): Factor | undefined {
   return factors?.find((f) => f.status === "verified");
@@ -58,11 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const challengeAndVerifyTotp = useCallback(
     async (factorId: string, code: string) => {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Request timed out")), 10000)
-      );
-      const request = supabase.auth.mfa.challengeAndVerify({ factorId, code });
-      const { error } = await Promise.race([request, timeout]).catch((err) => ({
+      const { error } = await withTimeout(
+        supabase.auth.mfa.challengeAndVerify({ factorId, code }),
+        10000
+      ).catch((err) => ({
         error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
       }));
       if (!error) {
@@ -205,16 +230,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const enrollMfa = useCallback(async () => {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out")), 10000)
-    );
-    const { data, error } = await Promise.race([
+    const { data, error } = await withTimeout(
       supabase.auth.mfa.enroll({
         factorType: "totp",
         friendlyName: "Authenticator App",
       }),
-      timeout,
-    ]).catch((err) => ({
+      10000
+    ).catch((err) => ({
       data: null,
       error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
     }));
@@ -248,13 +270,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const unenrollMfa = useCallback(async (factorId: string) => {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Request timed out")), 10000)
-    );
-    const { error } = await Promise.race([
+    const { error } = await withTimeout(
       supabase.auth.mfa.unenroll({ factorId }),
-      timeout,
-    ]).catch((err) => ({
+      10000
+    ).catch((err) => ({
       error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
     }));
     return { error: error ?? null };
