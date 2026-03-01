@@ -157,6 +157,9 @@ permission-slip/
 │   ├── pages/           # Page components organized by feature
 │   ├── hooks/           # Custom React hooks
 │   └── lib/             # Utility functions
+├── mobile/              # React Native (Expo) mobile approval app
+│   ├── __tests__/       # Jest tests
+│   └── assets/          # App icons and splash screen
 ├── spec/openapi/        # OpenAPI specification (source of truth for API types)
 ├── docs/                # Architecture docs, ADRs, guides
 │   └── adr/             # Architecture Decision Records
@@ -207,6 +210,7 @@ For deeper dives, see:
    # Or run just what you changed:
    make test-backend        # Go changes
    make test-frontend       # frontend changes
+   make mobile-test         # mobile changes
    ```
 
 5. **Run the build** to catch TypeScript compilation errors tests may miss:
@@ -228,9 +232,12 @@ For deeper dives, see:
 | `make dev` | Run backend + frontend servers together |
 | `make dev-backend` | Go server on port 8080 |
 | `make dev-frontend` | Vite on port 5173 with HMR |
-| `make test` | All tests (backend + frontend) |
+| `make test` | All tests (backend + frontend + mobile) |
 | `make test-backend` | Go tests (requires Postgres) |
 | `make test-frontend` | Frontend tests (no database needed) |
+| `make mobile-test` | Mobile tests (no database needed) |
+| `make mobile-install` | Install mobile app dependencies |
+| `make mobile-start` | Start Expo development server |
 | `make build` | Production binary with embedded frontend |
 | `make generate` | Bundle OpenAPI spec + generate TypeScript types |
 | `make typecheck` | Generate API client + run `tsc --noEmit` |
@@ -348,9 +355,10 @@ Every migration must include both `Up` and `Down` sections. For the full schema 
 ## Testing
 
 ```bash
-make test              # all tests (backend + frontend)
+make test              # all tests (backend + frontend + mobile)
 make test-backend      # Go tests (requires Postgres)
 make test-frontend     # frontend tests (no database needed)
+make mobile-test       # mobile tests (no database needed)
 cd frontend && npm run test:watch   # watch mode for frontend
 ```
 
@@ -368,6 +376,7 @@ No Docker required for unit tests — just a local Postgres install.
 
 - **Changed Go code** — run `make test-backend`
 - **Changed frontend code** — run `make test-frontend`
+- **Changed mobile code** — run `make mobile-test`
 - **Changed migrations or `db/` code** — run `go test ./db/... -v` at minimum
 - **Changed non-code files (docs, markdown)** — no tests needed
 - **Not sure** — run `make test`
