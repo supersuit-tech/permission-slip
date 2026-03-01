@@ -13,7 +13,7 @@ func TestCreateProfile_Success(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	profile, err := db.CreateProfile(context.Background(), tx, uid, "newuser")
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "newuser", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestCreateProfile_UsernameTaken(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid1, "taken")
 
-	_, err := db.CreateProfile(context.Background(), tx, uid2, "taken")
+	_, err := db.CreateProfile(context.Background(), tx, uid2, "taken", false)
 	if err == nil {
 		t.Fatal("expected error for duplicate username, got nil")
 	}
@@ -60,12 +60,35 @@ func TestCreateProfile_Idempotent_AuthUsers(t *testing.T) {
 	// Pre-insert the auth.users row (as Supabase would have done)
 	testhelper.MustExec(t, tx, `INSERT INTO auth.users (id) VALUES ($1)`, uid)
 
-	profile, err := db.CreateProfile(context.Background(), tx, uid, "preseeded")
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "preseeded", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if profile == nil || profile.Username != "preseeded" {
 		t.Errorf("expected profile with username 'preseeded', got %+v", profile)
+	}
+}
+
+func TestCreateProfile_MarketingOptIn(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "marketer", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !profile.MarketingOptIn {
+		t.Error("expected marketing_opt_in to be true")
+	}
+
+	// Re-fetch to confirm persistence.
+	fetched, err := db.GetProfileByUserID(context.Background(), tx, uid)
+	if err != nil {
+		t.Fatalf("re-fetch: %v", err)
+	}
+	if !fetched.MarketingOptIn {
+		t.Error("expected marketing_opt_in to be true after re-fetch")
 	}
 }
 

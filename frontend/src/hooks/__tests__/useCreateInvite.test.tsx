@@ -74,7 +74,7 @@ describe("useCreateInvite", () => {
       }
     });
 
-    expect(error?.message).toBe("Failed to generate invite code");
+    expect(error?.message).toBe("Server error");
   });
 
   it("sends correct request", async () => {

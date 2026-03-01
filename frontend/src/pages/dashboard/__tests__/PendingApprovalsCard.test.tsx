@@ -132,10 +132,24 @@ describe("PendingApprovalsCard", () => {
 
     render(<PendingApprovalsCard />, { wrapper });
 
+    // shouldAdvanceTime lets real wall-clock time leak into Date.now(),
+    // so the countdown may have ticked 1-2 seconds beyond the expected
+    // value. Use flexible matchers instead of exact text.
     await waitFor(() => {
-      expect(screen.getByText("3:00")).toBeInTheDocument();
+      const timerEls = screen
+        .getAllByText(/^\d+:\d{2}$/)
+        .map((el) => el.textContent ?? "");
+      // First approval: ~3 min remaining (could be 3:00 or 2:5x)
+      expect(
+        timerEls.some((t) => t === "3:00" || t.startsWith("2:5")),
+      ).toBe(true);
+      // Second approval: ~30 sec remaining (could be 0:30 or 0:2x)
+      expect(
+        timerEls.some(
+          (t) => t === "0:30" || (t.startsWith("0:2") && t !== "0:2"),
+        ),
+      ).toBe(true);
     });
-    expect(screen.getByText("0:30")).toBeInTheDocument();
   });
 
   it("countdown decrements over time", async () => {
@@ -143,18 +157,23 @@ describe("PendingApprovalsCard", () => {
 
     render(<PendingApprovalsCard />, { wrapper });
 
+    // shouldAdvanceTime lets real wall-clock time leak into Date.now(),
+    // so use a flexible matcher for the initial value too.
     await waitFor(() => {
-      expect(screen.getByText("3:00")).toBeInTheDocument();
+      const timerEls = screen
+        .getAllByText(/^\d+:\d{2}$/)
+        .map((el) => el.textContent ?? "");
+      expect(
+        timerEls.some((t) => t === "3:00" || t.startsWith("2:5")),
+      ).toBe(true);
     });
 
     act(() => {
       vi.advanceTimersByTime(5_000);
     });
 
-    // shouldAdvanceTime lets real wall-clock time leak into Date.now(),
-    // so the countdown may have ticked 1-2 extra seconds beyond the 5s
-    // we advanced. Assert the timer decremented rather than checking an
-    // exact value.
+    // After advancing 5s, the ~3:00 timer should now be ~2:55 or lower.
+    // Assert the timer decremented rather than checking an exact value.
     await waitFor(() => {
       const timerEls = screen
         .getAllByText(/^\d+:\d{2}$/)

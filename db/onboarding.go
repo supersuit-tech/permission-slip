@@ -29,7 +29,7 @@ const (
 // Returns the created Profile, or an *OnboardingError if the username is
 // already taken (OnboardingErrUsernameTaken) or if a profile already exists
 // for this user due to a concurrent request (OnboardingErrProfileExists).
-func CreateProfile(ctx context.Context, db DBTX, userID, username string) (*Profile, error) {
+func CreateProfile(ctx context.Context, db DBTX, userID, username string, marketingOptIn bool) (*Profile, error) {
 	// Upsert auth.users so the FK from profiles is satisfied.
 	// In production (Supabase), auth.users is managed by Supabase and this
 	// row already exists by the time the user reaches onboarding.
@@ -44,10 +44,10 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username string) (*Prof
 
 	var p Profile
 	err = db.QueryRow(ctx,
-		`INSERT INTO profiles (id, username) VALUES ($1, $2)
-		 RETURNING id, username, created_at`,
-		userID, username,
-	).Scan(&p.ID, &p.Username, &p.CreatedAt)
+		`INSERT INTO profiles (id, username, marketing_opt_in) VALUES ($1, $2, $3)
+		 RETURNING id, username, marketing_opt_in, created_at`,
+		userID, username, marketingOptIn,
+	).Scan(&p.ID, &p.Username, &p.MarketingOptIn, &p.CreatedAt)
 
 	if err != nil {
 		var pgErr *pgconn.PgError

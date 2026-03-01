@@ -194,6 +194,17 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Advisory lock + limit check inside the transaction prevents TOCTOU
+		// races where concurrent registrations could both pass the check.
+		if err := db.AcquireAgentLimitLock(r.Context(), tx, invite.UserID); err != nil {
+			log.Printf("[%s] RegisterAgent: advisory lock: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
+			return
+		}
+		if checkAgentLimit(r.Context(), w, r, tx, invite.UserID) {
+			return
+		}
+
 		// Insert the pending agent.
 		agent, err := db.InsertPendingAgent(
 			r.Context(), tx,
