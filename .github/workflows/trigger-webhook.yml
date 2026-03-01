@@ -3,8 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       pr_url:
-        description: "PR URL"
-        required: true
+        description: "PR URL (optional — omitted for non-PR notifications)"
+        required: false
+        default: ""
 
 jobs:
   notify:
@@ -25,8 +26,11 @@ jobs:
             exit 1
           fi
 
-          PAYLOAD=$(jq -n --arg pr_url "$PR_URL" \
-            '{pr_url: $pr_url}')
+          if [ -n "$PR_URL" ]; then
+            PAYLOAD=$(jq -n --arg pr_url "$PR_URL" '{pr_url: $pr_url}')
+          else
+            PAYLOAD='{}'
+          fi
 
           RESPONSE=$(echo "$PAYLOAD" | curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_TOKEN" \

@@ -11,6 +11,16 @@
 - If a file is getting large enough that splitting it would improve maintainability, just go ahead and split it — don't ask first.
 - When you need to ask questions, just ask them in regular chat text. Do NOT use the AskUserQuestion tool — it doesn't work reliably.
 
+## Webhook Notification
+
+Whenever you finish a task or need user input and the user hasn't responded within 5 minutes, trigger the webhook to notify them. This uses the same workflow as the `/watch` command but without a PR URL:
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml
+```
+
+Do not include `-f pr_url=...` — this is a general "attention needed" ping, not a PR-specific notification.
+
 ## Post-Task Review (before marking complete)
 
 Before presenting work as done, always perform these review passes:
