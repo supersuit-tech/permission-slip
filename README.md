@@ -141,6 +141,8 @@ make dev-frontend
 
 Open **http://localhost:5173**. API requests to `/api/*` are automatically proxied to the Go server.
 
+> **Accessing via ngrok or an external URL?** Set `ALLOWED_ORIGINS` to your public URL (e.g. `ALLOWED_ORIGINS=https://your-subdomain.ngrok-free.app make dev-backend`) so the Go backend allows cross-origin requests. Without it, API calls from a non-localhost origin will be blocked with 403.
+
 ## Production Build
 
 Build a single Go binary with the React frontend embedded:
