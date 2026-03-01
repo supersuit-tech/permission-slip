@@ -44,24 +44,31 @@ export function TermsOfServicePage() {
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      <h2>4. Beta Disclaimer</h2>
+      <h2>4. Service Disclaimer</h2>
       <p>
-        The Service is currently in <strong>beta</strong>. During the beta
-        period:
+        The Service is provided <strong>&quot;as is&quot;</strong> and{" "}
+        <strong>&quot;as available&quot;</strong> without warranties of any kind,
+        whether express, implied, or statutory, including but not limited to
+        implied warranties of merchantability, fitness for a particular purpose,
+        and non-infringement. This disclaimer applies at all times, regardless
+        of whether the Service is labeled as &quot;beta,&quot;
+        &quot;preview,&quot; or generally available.
       </p>
       <ul>
-        <li>
-          The Service is provided <strong>&quot;as is&quot;</strong> and{" "}
-          <strong>&quot;as available&quot;</strong> without warranties of any kind
-        </li>
         <li>Features may change, be modified, or be removed without notice</li>
         <li>
           We make no guarantees regarding uptime, availability, or reliability
         </li>
         <li>
-          The beta period will be clearly communicated when it ends
+          You use the Service entirely at your own risk
         </li>
       </ul>
+      <p>
+        The Service is currently in <strong>beta</strong>. The beta period will
+        be clearly communicated when it ends. The disclaimers in this section
+        are not limited to the beta period and survive in full force after
+        any beta period concludes.
+      </p>
 
       {/* ------------------------------------------------------------------ */}
       <h2>5. Pricing and Payment</h2>
@@ -309,8 +316,9 @@ export function TermsOfServicePage() {
       <ul>
         <li>
           The Service is provided <strong>&quot;AS IS&quot;</strong> and{" "}
-          <strong>&quot;AS AVAILABLE&quot;</strong> during beta, without warranty
-          of any kind, whether express, implied, or statutory
+          <strong>&quot;AS AVAILABLE&quot;</strong> without warranty of any kind,
+          whether express, implied, or statutory, at all times and regardless of
+          any beta, preview, or general availability designation
         </li>
         <li>
           We make no warranty of uptime, availability, or fitness for a
@@ -522,7 +530,19 @@ export function TermsOfServicePage() {
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      <h2>20. Contact Us</h2>
+      <h2>20. No Legal Advice</h2>
+      <p>
+        Nothing in these Terms, the Service, or any documentation or
+        communications from us constitutes legal, financial, or professional
+        advice. The Service is a software tool &mdash; not a legal service. You
+        should consult your own qualified legal counsel before relying on the
+        Service for any use case involving regulatory compliance, data
+        governance, or liability exposure. We make no representation that the
+        Service satisfies any particular legal or regulatory requirement.
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      <h2>21. Contact Us</h2>
       <p>
         If you have questions about these Terms, contact us at:
       </p>
