@@ -122,7 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut({ scope: "global" });
+    // Use "local" scope so signing out on mobile doesn't invalidate
+    // the user's web session. The web app uses "global" scope.
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     return { error: error ?? null };
   }, []);
 
