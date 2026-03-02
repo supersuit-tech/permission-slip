@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -92,6 +94,18 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			seen[p.Channel] = true
 		}
 
+		// Gate SMS behind paid tier: reject enabling SMS on the free plan.
+		if seen["sms"] {
+			for _, p := range req.Preferences {
+				if p.Channel == "sms" && p.Enabled {
+					if aborted := checkSMSPlanAccess(r.Context(), w, r, deps.DB, profile.ID); aborted {
+						return
+					}
+					break
+				}
+			}
+		}
+
 		for _, p := range req.Preferences {
 			if err := db.UpsertNotificationPreference(r.Context(), deps.DB, profile.ID, p.Channel, p.Enabled); err != nil {
 				log.Printf("[%s] handleUpdateNotificationPreferences: upsert %q: %v", TraceID(r.Context()), p.Channel, err)
@@ -112,6 +126,23 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			Preferences: buildPreferencesResponse(prefs),
 		})
 	}
+}
+
+// checkSMSPlanAccess verifies that the user's plan allows SMS notifications.
+// Returns true if the request should be aborted (free tier or error).
+func checkSMSPlanAccess(ctx context.Context, w http.ResponseWriter, r *http.Request, d db.DBTX, userID string) bool {
+	sub, err := db.GetSubscriptionByUserID(ctx, d, userID)
+	if err != nil {
+		log.Printf("[%s] checkSMSPlanAccess: get subscription: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), fmt.Errorf("check SMS plan access: %w", err))
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to check plan"))
+		return true
+	}
+	if sub == nil || sub.PlanID == db.PlanFree {
+		RespondError(w, r, http.StatusForbidden, Forbidden(ErrSMSRequiresPaidPlan, "SMS notifications require a paid plan"))
+		return true
+	}
+	return false
 }
 
 // buildPreferencesResponse converts DB preferences into the API response,

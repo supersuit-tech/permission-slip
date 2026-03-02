@@ -52,4 +52,5 @@ const (
 	ErrSubscriptionNotFound     ErrorCode = "subscription_not_found"
 	ErrAlreadySubscribed        ErrorCode = "already_subscribed"
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
+	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
 )
