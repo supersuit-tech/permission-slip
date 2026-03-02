@@ -11,9 +11,12 @@ import (
 )
 
 // notificationPreferenceResponse is a single channel preference.
+// The Available field indicates whether the user's plan supports this channel;
+// when false, the frontend should show an upgrade prompt instead of a toggle.
 type notificationPreferenceResponse struct {
-	Channel string `json:"channel"`
-	Enabled bool   `json:"enabled"`
+	Channel   string `json:"channel"`
+	Enabled   bool   `json:"enabled"`
+	Available bool   `json:"available"`
 }
 
 // notificationPreferencesResponse wraps the list.
@@ -60,8 +63,10 @@ func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		smsAvailable := isUserOnPaidPlan(r.Context(), deps.DB, profile.ID)
+
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs),
+			Preferences: buildPreferencesResponse(prefs, smsAvailable),
 		})
 	}
 }
@@ -122,8 +127,10 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		smsAvailable := isUserOnPaidPlan(r.Context(), deps.DB, profile.ID)
+
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs),
+			Preferences: buildPreferencesResponse(prefs, smsAvailable),
 		})
 	}
 }
@@ -139,15 +146,36 @@ func checkSMSPlanAccess(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return true
 	}
 	if sub == nil || sub.PlanID == db.PlanFree {
-		RespondError(w, r, http.StatusForbidden, Forbidden(ErrSMSRequiresPaidPlan, "SMS notifications require a paid plan"))
+		resp := Forbidden(ErrSMSRequiresPaidPlan, "SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS.")
+		resp.Error.Details = map[string]any{
+			"current_plan": db.PlanFree,
+			"required_plan": db.PlanPayAsYouGo,
+		}
+		RespondError(w, r, http.StatusForbidden, resp)
 		return true
 	}
 	return false
 }
 
+// isUserOnPaidPlan returns true if the user has an active subscription on a
+// non-free plan. Used to determine channel availability in preference responses.
+func isUserOnPaidPlan(ctx context.Context, d db.DBTX, userID string) bool {
+	sub, err := db.GetSubscriptionByUserID(ctx, d, userID)
+	if err != nil || sub == nil {
+		return false
+	}
+	return sub.PlanID != db.PlanFree
+}
+
+// paidOnlyChannels lists channels that require a paid plan.
+var paidOnlyChannels = map[string]bool{
+	"sms": true,
+}
+
 // buildPreferencesResponse converts DB preferences into the API response,
-// defaulting missing channels to enabled.
-func buildPreferencesResponse(prefs []db.NotificationPreference) []notificationPreferenceResponse {
+// defaulting missing channels to enabled. The smsAvailable flag controls
+// whether plan-gated channels (SMS) are marked as available.
+func buildPreferencesResponse(prefs []db.NotificationPreference, smsAvailable bool) []notificationPreferenceResponse {
 	channelMap := make(map[string]bool)
 	for _, p := range prefs {
 		channelMap[p.Channel] = p.Enabled
@@ -159,9 +187,14 @@ func buildPreferencesResponse(prefs []db.NotificationPreference) []notificationP
 		if !exists {
 			enabled = true // missing rows default to enabled
 		}
+		available := true
+		if paidOnlyChannels[ch] {
+			available = smsAvailable
+		}
 		result = append(result, notificationPreferenceResponse{
-			Channel: ch,
-			Enabled: enabled,
+			Channel:   ch,
+			Enabled:   enabled,
+			Available: available,
 		})
 	}
 	return result
