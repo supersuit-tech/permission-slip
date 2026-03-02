@@ -232,7 +232,9 @@ paths:
   /v1/billing/checkout:
     $ref: './components/paths/billing.yaml#/checkout'
 
-  /v1/billing/webhook:
+  # NOTE: The Stripe webhook endpoint lives outside /api/v1/ so it bypasses
+  # auth and rate-limiting middleware. Documented here for completeness.
+  /api/webhooks/stripe:
     $ref: './components/paths/billing.yaml#/webhook'
 
   /v1/config:

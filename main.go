@@ -319,6 +319,11 @@ func main() {
 	mux.HandleFunc("GET /api/health", handleHealth(deps.DB))
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api.NewRouter(&deps)))
 
+	// Stripe webhook endpoint lives outside /api/v1/ — it must bypass auth
+	// and rate-limiting middleware. Stripe verifies requests via signature
+	// (Stripe-Signature header), not Bearer tokens.
+	api.RegisterBillingWebhookRoutes(mux, &deps)
+
 	// Invite endpoint lives outside /api/v1/ — it's a user-facing onboarding
 	// URL (e.g., https://app.permissionslip.dev/invite/PS-XXXX-XXXX), not a
 	// versioned API resource.

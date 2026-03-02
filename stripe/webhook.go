@@ -75,6 +75,15 @@ func ParseSubscriptionEvent(event *WebhookEvent) (*StripeSubscription, error) {
 	return &sub, nil
 }
 
+// ParseInvoicePaid extracts invoice data from invoice.paid events.
+func ParseInvoicePaid(event *WebhookEvent) (*gostripe.Invoice, error) {
+	var inv gostripe.Invoice
+	if err := json.Unmarshal(event.Raw.Data.Raw, &inv); err != nil {
+		return nil, fmt.Errorf("stripe webhook: parse invoice (paid): %w", err)
+	}
+	return &inv, nil
+}
+
 // ParseInvoicePaymentFailed extracts invoice data from invoice.payment_failed events.
 func ParseInvoicePaymentFailed(event *WebhookEvent) (*gostripe.Invoice, error) {
 	var inv gostripe.Invoice
