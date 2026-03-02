@@ -3,6 +3,7 @@ import {
   formatCountdown,
   humanizeActionType,
   buildActionSummary,
+  formatRelativeTime,
 } from "../approvalUtils";
 
 describe("secondsUntil", () => {
@@ -94,5 +95,34 @@ describe("buildActionSummary", () => {
 
   it("returns humanized label for empty parameters", () => {
     expect(buildActionSummary("email.send", {})).toBe("Send");
+  });
+});
+
+describe("formatRelativeTime", () => {
+  it("shows 'Just now' for very recent times", () => {
+    const now = new Date(Date.now() - 5_000).toISOString();
+    expect(formatRelativeTime(now)).toBe("Just now");
+  });
+
+  it("shows minutes for times < 1 hour ago", () => {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    expect(formatRelativeTime(fiveMinAgo)).toBe("5m ago");
+  });
+
+  it("shows hours for times < 24 hours ago", () => {
+    const threeHrAgo = new Date(Date.now() - 3 * 3600_000).toISOString();
+    expect(formatRelativeTime(threeHrAgo)).toBe("3h ago");
+  });
+
+  it("shows days for times < 7 days ago", () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
+    expect(formatRelativeTime(twoDaysAgo)).toBe("2d ago");
+  });
+
+  it("shows date for older times", () => {
+    const oldDate = new Date(Date.now() - 30 * 86400_000).toISOString();
+    const result = formatRelativeTime(oldDate);
+    // Should contain a month abbreviation, not "ago"
+    expect(result).not.toContain("ago");
   });
 });

@@ -11,15 +11,43 @@ function urgencyColor(seconds: number): string {
   return colors.gray500;
 }
 
-/** Live countdown hook: recalculates every second. */
+/**
+ * Shared 1-second ticker so all countdown consumers share a single interval
+ * instead of each component creating its own setInterval.
+ */
+const tickerSubscribers = new Set<() => void>();
+let tickerTimerId: ReturnType<typeof setInterval> | null = null;
+
+function startTicker() {
+  if (tickerTimerId != null) return;
+  tickerTimerId = setInterval(() => {
+    tickerSubscribers.forEach((cb) => cb());
+  }, 1_000);
+}
+
+function stopTickerIfIdle() {
+  if (tickerSubscribers.size === 0 && tickerTimerId != null) {
+    clearInterval(tickerTimerId);
+    tickerTimerId = null;
+  }
+}
+
+/**
+ * Returns seconds remaining until `expiresAt`, re-evaluated every second via
+ * a single shared interval (no per-component timers).
+ */
 export function useCountdown(expiresAt: string): number {
   const [remaining, setRemaining] = useState(() => secondsUntil(expiresAt));
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setRemaining(secondsUntil(expiresAt));
-    }, 1_000);
-    return () => clearInterval(timer);
+    const cb = () => setRemaining(secondsUntil(expiresAt));
+    tickerSubscribers.add(cb);
+    startTicker();
+
+    return () => {
+      tickerSubscribers.delete(cb);
+      stopTickerIfIdle();
+    };
   }, [expiresAt]);
 
   return remaining;

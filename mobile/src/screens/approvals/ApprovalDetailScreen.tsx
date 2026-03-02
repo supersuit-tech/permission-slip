@@ -55,13 +55,19 @@ export default function ApprovalDetailScreen({ route }: Props) {
     >
       {/* Status banner for resolved approvals */}
       {approval.status === "approved" && (
-        <View style={styles.statusBannerApproved}>
-          <Text style={styles.statusBannerText}>Approved</Text>
+        <View
+          style={styles.statusBannerApproved}
+          accessibilityRole="alert"
+        >
+          <Text style={styles.statusBannerTextApproved}>Approved</Text>
         </View>
       )}
       {approval.status === "denied" && (
-        <View style={styles.statusBannerDenied}>
-          <Text style={styles.statusBannerText}>Denied</Text>
+        <View
+          style={styles.statusBannerDenied}
+          accessibilityRole="alert"
+        >
+          <Text style={styles.statusBannerTextDenied}>Denied</Text>
         </View>
       )}
       {approval.status === "cancelled" && (
@@ -114,39 +120,39 @@ export default function ApprovalDetailScreen({ route }: Props) {
           {summary !== humanizeActionType(approval.action.type) && (
             <Text style={styles.actionSummary}>{summary}</Text>
           )}
-        </View>
-      </View>
 
-      {/* Context description */}
-      {approval.context.description && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Context</Text>
-          <View style={styles.card}>
-            <Text style={styles.contextDescription}>
-              {approval.context.description}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Risk Level detail */}
-      {approval.context.risk_level && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Risk Level</Text>
-          <View style={styles.card}>
-            <View style={styles.riskRow}>
-              <RiskBadge level={approval.context.risk_level} />
-              <Text style={styles.riskDescription}>
-                {RISK_DESCRIPTIONS[approval.context.risk_level]}
+          {/* Context description — inline with the action for quick scanning */}
+          {approval.context.description && (
+            <View style={styles.contextInline}>
+              <Text style={styles.contextDescription}>
+                {approval.context.description}
               </Text>
             </View>
-            {approval.context.risk_level === "high" && (
-              <View style={styles.highRiskWarning}>
-                <Text style={styles.highRiskWarningText}>
-                  This is a high-risk action. Review the details carefully.
+          )}
+
+          {/* Risk explanation — inline for high/medium risk */}
+          {approval.context.risk_level &&
+            approval.context.risk_level !== "low" && (
+              <View style={styles.riskRow}>
+                <Text style={styles.riskDescription}>
+                  {RISK_DESCRIPTIONS[approval.context.risk_level]}
                 </Text>
               </View>
             )}
+        </View>
+      </View>
+
+      {/* High risk warning — prominent, outside the card */}
+      {approval.context.risk_level === "high" && (
+        <View style={styles.section}>
+          <View
+            style={styles.highRiskWarning}
+            accessibilityRole="alert"
+          >
+            <Text style={styles.highRiskWarningText}>
+              This is a high-risk action. Review the details carefully before
+              approving.
+            </Text>
           </View>
         </View>
       )}
@@ -171,14 +177,30 @@ export default function ApprovalDetailScreen({ route }: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Parameters</Text>
           <View style={styles.card}>
-            {paramEntries.map(([key, value]) => (
-              <View key={key} style={styles.paramRow}>
-                <Text style={styles.paramKey}>{key}</Text>
-                <Text style={styles.paramValue} selectable>
-                  {formatParamValue(value)}
-                </Text>
-              </View>
-            ))}
+            {paramEntries.map(([key, value], index) => {
+              const formatted = formatParamValue(value);
+              const isLong = formatted.length > 40 || formatted.includes("\n");
+              const isLast = index === paramEntries.length - 1;
+              return (
+                <View
+                  key={key}
+                  style={[
+                    isLong ? styles.paramRowVertical : styles.paramRow,
+                    isLast && styles.paramRowLast,
+                  ]}
+                >
+                  <Text style={styles.paramKey}>{key}</Text>
+                  <Text
+                    style={
+                      isLong ? styles.paramValueFull : styles.paramValue
+                    }
+                    selectable
+                  >
+                    {formatted}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
       )}
@@ -188,14 +210,30 @@ export default function ApprovalDetailScreen({ route }: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Additional Context</Text>
           <View style={styles.card}>
-            {contextDetailEntries.map(([key, value]) => (
-              <View key={key} style={styles.paramRow}>
-                <Text style={styles.paramKey}>{key}</Text>
-                <Text style={styles.paramValue} selectable>
-                  {formatParamValue(value)}
-                </Text>
-              </View>
-            ))}
+            {contextDetailEntries.map(([key, value], index) => {
+              const formatted = formatParamValue(value);
+              const isLong = formatted.length > 40 || formatted.includes("\n");
+              const isLast = index === contextDetailEntries.length - 1;
+              return (
+                <View
+                  key={key}
+                  style={[
+                    isLong ? styles.paramRowVertical : styles.paramRow,
+                    isLast && styles.paramRowLast,
+                  ]}
+                >
+                  <Text style={styles.paramKey}>{key}</Text>
+                  <Text
+                    style={
+                      isLong ? styles.paramValueFull : styles.paramValue
+                    }
+                    selectable
+                  >
+                    {formatted}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
       )}
@@ -305,6 +343,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.gray700,
   },
+  statusBannerTextApproved: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.success,
+  },
+  statusBannerTextDenied: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.error,
+  },
   section: {
     paddingHorizontal: 20,
     marginTop: 20,
@@ -386,26 +434,31 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 20,
   },
+  contextInline: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray100,
+  },
   contextDescription: {
     fontSize: 15,
     color: colors.gray700,
     lineHeight: 22,
   },
   riskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    marginTop: 8,
   },
   riskDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.gray500,
-    flex: 1,
+    fontStyle: "italic",
   },
   highRiskWarning: {
-    marginTop: 12,
     backgroundColor: colors.riskHighBg,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#FECACA",
   },
   highRiskWarningText: {
     fontSize: 13,
@@ -428,6 +481,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
   },
+  paramRowVertical: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  paramRowLast: {
+    borderBottomWidth: 0,
+  },
   paramKey: {
     fontSize: 13,
     fontWeight: "500",
@@ -440,6 +501,12 @@ const styles = StyleSheet.create({
     color: colors.gray900,
     flex: 1,
     textAlign: "right",
+  },
+  paramValueFull: {
+    fontSize: 13,
+    color: colors.gray900,
+    marginTop: 4,
+    lineHeight: 19,
   },
   footerLabel: {
     fontSize: 11,

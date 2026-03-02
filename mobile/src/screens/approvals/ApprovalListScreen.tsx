@@ -14,7 +14,7 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { colors } from "../../theme/colors";
-import { buildActionSummary, humanizeActionType, secondsUntil, formatCountdown } from "./approvalUtils";
+import { buildActionSummary, humanizeActionType, secondsUntil, formatRelativeTime } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
 import { useAuth } from "../../auth/AuthContext";
@@ -98,25 +98,39 @@ export default function ApprovalListScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.tabBar}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            testID={`tab-${tab.key}`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === tab.key }}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === tab.key && styles.tabTextActive,
-              ]}
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const count =
+            isActive && approvals.length > 0 ? approvals.length : null;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              testID={`tab-${tab.key}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={
+                count
+                  ? `${tab.label}, ${count} item${count !== 1 ? "s" : ""}`
+                  : tab.label
+              }
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <View style={styles.tabContent}>
+                <Text
+                  style={[styles.tabText, isActive && styles.tabTextActive]}
+                >
+                  {tab.label}
+                </Text>
+                {count != null && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{count}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {isLoading && !isRefetching ? (
@@ -203,11 +217,21 @@ function ApprovalRow({
             </>
           )}
           {approval.status === "approved" && (
-            <Text style={styles.statusApproved}>Approved</Text>
+            <>
+              <Text style={styles.dot}>{"\u00B7"}</Text>
+              <Text style={styles.statusApproved}>Approved</Text>
+            </>
           )}
           {approval.status === "denied" && (
-            <Text style={styles.statusDenied}>Denied</Text>
+            <>
+              <Text style={styles.dot}>{"\u00B7"}</Text>
+              <Text style={styles.statusDenied}>Denied</Text>
+            </>
           )}
+          <Text style={styles.dot}>{"\u00B7"}</Text>
+          <Text style={styles.relativeTime}>
+            {formatRelativeTime(approval.created_at)}
+          </Text>
         </View>
       </View>
       <Text style={styles.chevron}>{"\u203A"}</Text>
@@ -289,6 +313,25 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.gray900,
+  },
+  tabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  tabBadge: {
+    backgroundColor: colors.gray900,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  tabBadgeText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: "700",
   },
   center: {
     flex: 1,
@@ -376,6 +419,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     color: colors.error,
+  },
+  relativeTime: {
+    fontSize: 12,
+    color: colors.gray400,
   },
   chevron: {
     fontSize: 22,
