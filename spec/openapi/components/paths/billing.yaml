@@ -119,6 +119,7 @@ webhook:
     operationId: stripeWebhook
     tags:
       - Billing
+    security: []  # No auth — Stripe signature verification via Stripe-Signature header
     parameters:
       - name: Stripe-Signature
         in: header
@@ -158,8 +159,6 @@ webhook:
         description: Invalid signature or malformed event
       '500':
         description: Processing failed — Stripe will retry the event
-
-# ── New endpoints for issue #22 ──────────────────────────────────────────────
 
 plan:
   get:

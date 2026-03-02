@@ -115,8 +115,6 @@ CheckoutResponse:
       description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
       example: https://checkout.stripe.com/c/pay/cs_test_...
 
-# ── New schemas for issue #22 ────────────────────────────────────────────────
-
 Plan:
   description: |
     A billing plan with its resource limits. Composes `PlanLimits` with

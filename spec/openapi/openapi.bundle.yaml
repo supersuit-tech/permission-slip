@@ -4796,6 +4796,7 @@ paths:
       operationId: stripeWebhook
       tags:
         - Billing
+      security: []
       parameters:
         - name: Stripe-Signature
           in: header
