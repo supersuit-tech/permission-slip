@@ -1,9 +1,15 @@
 import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../../auth/AuthContext";
 import { useApprovals, type ApprovalSummary } from "../useApprovals";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import {
+  mockSession,
+  mockApproval,
+  createQueryClient,
+  waitFor,
+} from "../../__test-utils__";
 
 // --- Mocks ---
 
@@ -47,43 +53,6 @@ jest.mock("../../lib/supabaseClient", () => ({
 
 // --- Helpers ---
 
-function mockSession(): Session {
-  const payload = btoa(JSON.stringify({ aal: "aal1" }));
-  return {
-    access_token: `header.${payload}.signature`,
-    refresh_token: "mock-refresh",
-    expires_in: 3600,
-    expires_at: Date.now() / 1000 + 3600,
-    token_type: "bearer",
-    user: {
-      id: "user-1",
-      email: "test@example.com",
-      app_metadata: {},
-      user_metadata: {},
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-      factors: [],
-    },
-  } as Session;
-}
-
-const mockApproval: ApprovalSummary = {
-  approval_id: "appr_abc123",
-  agent_id: 42,
-  action: {
-    type: "email.send",
-    version: "1",
-    parameters: { to: ["user@example.com"], subject: "Hello" },
-  },
-  context: {
-    description: "Send welcome email to new user",
-    risk_level: "low",
-  },
-  status: "pending",
-  expires_at: "2026-03-02T13:25:00Z",
-  created_at: "2026-03-02T13:20:00Z",
-};
-
 interface HookCapture {
   approvals: ApprovalSummary[];
   isLoading: boolean;
@@ -104,12 +73,6 @@ function createHookCapture(status: "pending" | "approved" | "denied" = "pending"
   return { capture, Consumer };
 }
 
-function createQueryClient() {
-  return new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-}
-
 function renderWithProviders(Consumer: React.ComponentType) {
   const queryClient = createQueryClient();
   return create(
@@ -119,25 +82,6 @@ function renderWithProviders(Consumer: React.ComponentType) {
       createElement(AuthProvider, null, createElement(Consumer)),
     ),
   );
-}
-
-/**
- * Wait for condition to become true, flushing React updates each iteration.
- * Avoids infinite timer loops by using real timers with small real delays.
- */
-async function waitFor(
-  predicate: () => boolean,
-  { timeout = 3000, interval = 10 } = {},
-) {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeout) {
-      throw new Error("waitFor timed out");
-    }
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, interval));
-    });
-  }
 }
 
 // --- Tests ---

@@ -1,9 +1,18 @@
 import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../../../auth/AuthContext";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import ApprovalListScreen from "../ApprovalListScreen";
+import {
+  mockSession,
+  mockApproval,
+  createQueryClient,
+  waitFor,
+  hasTestId,
+  hasText,
+  findFirstByTestId,
+} from "../../../__test-utils__";
 
 // --- Mocks ---
 
@@ -51,49 +60,6 @@ jest.mock("../../../lib/supabaseClient", () => ({
 
 // --- Helpers ---
 
-function mockSession(): Session {
-  const payload = btoa(JSON.stringify({ aal: "aal1" }));
-  return {
-    access_token: `header.${payload}.signature`,
-    refresh_token: "mock-refresh",
-    expires_in: 3600,
-    expires_at: Date.now() / 1000 + 3600,
-    token_type: "bearer",
-    user: {
-      id: "user-1",
-      email: "test@example.com",
-      app_metadata: {},
-      user_metadata: {},
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-      factors: [],
-    },
-  } as Session;
-}
-
-const mockApproval = {
-  approval_id: "appr_abc123",
-  agent_id: 42,
-  action: {
-    type: "email.send",
-    version: "1",
-    parameters: { to: ["user@example.com"], subject: "Hello" },
-  },
-  context: {
-    description: "Send welcome email to new user",
-    risk_level: "low" as const,
-  },
-  status: "pending" as const,
-  expires_at: "2026-03-02T13:25:00Z",
-  created_at: "2026-03-02T13:20:00Z",
-};
-
-function createQueryClient() {
-  return new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-}
-
 function renderScreen() {
   const queryClient = createQueryClient();
   return create(
@@ -105,39 +71,6 @@ function renderScreen() {
   );
 }
 
-function hasTestId(renderer: ReactTestRenderer, testID: string): boolean {
-  return renderer.root.findAll((node) => node.props.testID === testID).length > 0;
-}
-
-function hasText(renderer: ReactTestRenderer, text: string): boolean {
-  return (
-    renderer.root.findAll(
-      (node) =>
-        typeof node.children?.[0] === "string" && node.children[0] === text,
-    ).length > 0
-  );
-}
-
-function findFirstByTestId(renderer: ReactTestRenderer, testID: string) {
-  const matches = renderer.root.findAll((node) => node.props.testID === testID);
-  return matches[0];
-}
-
-async function waitFor(
-  predicate: () => boolean,
-  { timeout = 3000, interval = 10 } = {},
-) {
-  const start = Date.now();
-  while (!predicate()) {
-    if (Date.now() - start > timeout) {
-      throw new Error("waitFor timed out");
-    }
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, interval));
-    });
-  }
-}
-
 async function authenticateAndRender(apiResponse: unknown) {
   mockGet.mockResolvedValue(apiResponse);
 
@@ -147,7 +80,10 @@ async function authenticateAndRender(apiResponse: unknown) {
   });
 
   // Wait for initial auth to settle
-  await waitFor(() => hasTestId(renderer!, "sign-out") || hasTestId(renderer!, "tab-pending"), { timeout: 1000 }).catch(() => {
+  await waitFor(
+    () => hasTestId(renderer!, "sign-out") || hasTestId(renderer!, "tab-pending"),
+    { timeout: 1000 },
+  ).catch(() => {
     // Screen might be in loading state still
   });
 
