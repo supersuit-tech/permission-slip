@@ -102,6 +102,26 @@ NotificationPreferencesResponse:
         $ref: '#/NotificationPreference'
       description: List of notification channel preferences
 
+NotificationPreferenceUpdate:
+  type: object
+  description: A channel preference update (request-only, no `available` field).
+  required:
+    - channel
+    - enabled
+  properties:
+    channel:
+      type: string
+      description: Notification channel identifier
+      enum:
+        - email
+        - web-push
+        - sms
+      example: "email"
+    enabled:
+      type: boolean
+      description: Whether notifications should be enabled for this channel
+      example: true
+
 UpdateNotificationPreferencesRequest:
   type: object
   description: Request body for updating notification preferences.
@@ -111,7 +131,7 @@ UpdateNotificationPreferencesRequest:
     preferences:
       type: array
       items:
-        $ref: '#/NotificationPreference'
+        $ref: '#/NotificationPreferenceUpdate'
       description: Channel preferences to update. Channels not included are unchanged.
       minItems: 1
 
