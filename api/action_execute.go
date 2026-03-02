@@ -243,7 +243,9 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 
 	// ── Check monthly request quota ─────────────────────────────
 
-	if checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID) {
+	var blocked bool
+	r, blocked = checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID)
+	if blocked {
 		return
 	}
 

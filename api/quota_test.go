@@ -33,10 +33,15 @@ func TestCheckRequestQuota_FreePlan_UnderLimit_Allows(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+	r, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	if blocked {
 		t.Fatalf("expected under-limit request to be allowed, got blocked: %s", w.Body.String())
+	}
+
+	// Context should be marked as quota-reserved after successful check.
+	if !IsQuotaReserved(r.Context()) {
+		t.Error("expected context to be marked as quota-reserved after successful check")
 	}
 
 	// Verify informational quota headers are set on allowed requests.
@@ -63,7 +68,7 @@ func TestCheckRequestQuota_FreePlan_AtLimit_Returns429(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+	_, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	if !blocked {
 		t.Fatal("expected at-limit request to be blocked")
@@ -118,7 +123,7 @@ func TestCheckRequestQuota_FreePlan_OverLimit_Returns429(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+	_, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	if !blocked {
 		t.Fatal("expected over-limit request to be blocked")
@@ -138,7 +143,7 @@ func TestCheckRequestQuota_FreePlan_ZeroUsage_Allows(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+	_, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	if blocked {
 		t.Fatalf("expected zero-usage request to be allowed, got blocked: %s", w.Body.String())
@@ -157,7 +162,7 @@ func TestCheckRequestQuota_PaidPlan_Bypass(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+	_, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	if blocked {
 		t.Fatalf("expected paid plan to bypass quota, but got blocked: %s", w.Body.String())
@@ -173,7 +178,7 @@ func TestCheckRequestQuota_NoSubscription_Allows(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+	_, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	if blocked {
 		t.Fatalf("expected no subscription to bypass quota, but got blocked: %s", w.Body.String())
@@ -190,7 +195,7 @@ func TestCheckRequestQuota_RetryAfterHeader(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
-	checkRequestQuota(r.Context(), w, r, tx, uid)
+	_, _ = checkRequestQuota(r.Context(), w, r, tx, uid)
 
 	retryAfter := w.Header().Get("Retry-After")
 	if retryAfter == "" {

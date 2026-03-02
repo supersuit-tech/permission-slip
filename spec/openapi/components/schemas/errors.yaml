@@ -61,6 +61,7 @@ Error:
         - approval_expired
         # 429 Too Many Requests
         - rate_limited
+        - monthly_quota_exceeded
         # 500 Internal Server Error
         - internal_error
         # 502 Bad Gateway
@@ -110,8 +111,8 @@ Error:
       type: integer
       minimum: 1
       description: |
-        Present only for `rate_limited` errors. Number of seconds the client should wait 
-        before retrying the request.
+        Present for `rate_limited` and `monthly_quota_exceeded` errors. Number of seconds
+        the client should wait before retrying the request.
       example: 60
 
 ErrorResponse:

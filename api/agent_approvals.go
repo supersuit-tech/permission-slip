@@ -154,7 +154,9 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		// Check monthly request quota before creating the approval.
-		if checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID) {
+		var blocked bool
+		r, blocked = checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID)
+		if blocked {
 			return
 		}
 

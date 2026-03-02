@@ -8641,6 +8641,7 @@ components:
             - verification_locked
             - approval_expired
             - rate_limited
+            - monthly_quota_exceeded
             - internal_error
             - upstream_error
             - service_unavailable
@@ -8682,8 +8683,8 @@ components:
           type: integer
           minimum: 1
           description: |
-            Present only for `rate_limited` errors. Number of seconds the client should wait 
-            before retrying the request.
+            Present for `rate_limited` and `monthly_quota_exceeded` errors. Number of seconds
+            the client should wait before retrying the request.
           example: 60
     ErrorResponse:
       type: object

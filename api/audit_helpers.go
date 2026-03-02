@@ -43,12 +43,22 @@ func emitAuditEventWithUsage(ctx context.Context, d db.DBTX, p db.InsertAuditEve
 		actionType = actionTypeFromJSON(p.Action)
 	}
 
-	if _, err := db.IncrementRequestCountWithBreakdown(ctx, d, p.UserID, periodStart, periodEnd, db.UsageBreakdownKeys{
+	keys := db.UsageBreakdownKeys{
 		AgentID:     p.AgentID,
 		ConnectorID: connectorID,
 		ActionType:  actionType,
-	}); err != nil {
-		log.Printf("audit: failed to increment usage for %s event: %v", p.EventType, err)
+	}
+
+	if IsQuotaReserved(ctx) {
+		// Count was already atomically incremented by checkRequestQuota.
+		// Only update the breakdown without re-incrementing.
+		if err := db.UpdateUsageBreakdownOnly(ctx, d, p.UserID, periodStart, keys); err != nil {
+			log.Printf("audit: failed to update usage breakdown for %s event: %v", p.EventType, err)
+		}
+	} else {
+		if _, err := db.IncrementRequestCountWithBreakdown(ctx, d, p.UserID, periodStart, periodEnd, keys); err != nil {
+			log.Printf("audit: failed to increment usage for %s event: %v", p.EventType, err)
+		}
 	}
 }
 

@@ -342,7 +342,9 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		// Check monthly request quota before executing.
-		if checkRequestQuota(r.Context(), w, r, deps.DB, profile.ID) {
+		var blocked bool
+		r, blocked = checkRequestQuota(r.Context(), w, r, deps.DB, profile.ID)
+		if blocked {
 			return
 		}
 
