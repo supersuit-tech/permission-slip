@@ -14,4 +14,18 @@ export const colors = {
   // Semantic
   error: "#DC2626",
   success: "#059669",
+  warning: "#D97706",
+
+  // Risk levels
+  riskLow: "#059669",
+  riskMedium: "#D97706",
+  riskHigh: "#DC2626",
+
+  // Status badges
+  pendingBg: "#FEF3C7",
+  pendingText: "#92400E",
+  approvedBg: "#D1FAE5",
+  approvedText: "#065F46",
+  deniedBg: "#FEE2E2",
+  deniedText: "#991B1B",
 } as const;
