@@ -56,6 +56,14 @@ func (s *SMSSender) Send(ctx context.Context, approval Approval, recipient Recip
 // formatSMSBody constructs a concise SMS message. We aim for ≤160 characters
 // (single SMS segment) but allow overflow when the content requires it.
 func formatSMSBody(a Approval) string {
+	if a.Type == NotificationTypePaymentFailed {
+		msg := "[Permission Slip] Payment failed — update your payment method to keep your subscription"
+		if a.ApprovalURL != "" {
+			return fmt.Sprintf("%s: %s", msg, a.ApprovalURL)
+		}
+		return msg
+	}
+
 	agentName := AgentDisplayName(a.AgentName, a.AgentID)
 	actionSummary := SummarizeAction(a.Action)
 

@@ -16,6 +16,7 @@ import (
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip-web/notify"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 )
 
@@ -574,5 +575,125 @@ func TestWebhook_FullCancellationFlow(t *testing.T) {
 	}
 	if sub.Status != db.SubscriptionStatusCancelled {
 		t.Errorf("after cancellation: expected status=cancelled, got %s", sub.Status)
+	}
+}
+
+// ── Notification dispatch ───────────────────────────────────────────────────
+
+// mockSender records calls to Send for test assertions.
+type mockSender struct {
+	name  string
+	calls []notify.Approval
+}
+
+func (m *mockSender) Name() string { return m.name }
+func (m *mockSender) Send(_ context.Context, approval notify.Approval, _ notify.Recipient) error {
+	m.calls = append(m.calls, approval)
+	return nil
+}
+
+func TestWebhook_InvoicePaymentFailed_DispatchesNotification(t *testing.T) {
+	t.Parallel()
+	tx, deps, _, uid := setupWebhookTest(t)
+	ctx := context.Background()
+
+	// Set up a profile with email so the notification can be dispatched.
+	email := "test@example.com"
+	testhelper.MustExec(t, tx, `UPDATE profiles SET email = $1 WHERE id = $2`, email, uid)
+
+	// Wire up a mock sender so we can verify the notification was dispatched.
+	mock := &mockSender{name: "test"}
+	deps.Notifier = notify.NewDispatcher([]notify.Sender{mock}, nil)
+	deps.BaseURL = "https://app.example.com"
+
+	// Re-register routes with updated deps.
+	mux := http.NewServeMux()
+	RegisterBillingWebhookRoutes(mux, deps)
+
+	subID := "sub_" + uid[:8]
+	payload := stripeEventPayload(t, "evt_notif_1", "invoice.payment_failed", map[string]interface{}{
+		"id": "in_notif_fail",
+		"parent": map[string]interface{}{
+			"subscription_details": map[string]interface{}{
+				"subscription": map[string]interface{}{"id": subID},
+			},
+		},
+	})
+
+	r := signedWebhookRequest(t, payload)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify the DB status was updated.
+	sub, err := db.GetSubscriptionByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("GetSubscriptionByUserID: %v", err)
+	}
+	if sub.Status != db.SubscriptionStatusPastDue {
+		t.Errorf("expected status=past_due, got %s", sub.Status)
+	}
+
+	// The notification is dispatched asynchronously via Dispatch (fire-and-forget
+	// goroutine). Use DispatchSync in production tests would be better, but
+	// since the mock is instant, give the goroutine a moment to complete.
+	// For a more robust approach, we'd use DispatchSync, but the handler
+	// intentionally uses async Dispatch to not block the webhook response.
+	//
+	// Wait briefly for the async goroutine to complete.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && len(mock.calls) == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if len(mock.calls) == 0 {
+		t.Fatal("expected notification to be dispatched, got 0 calls")
+	}
+
+	notif := mock.calls[0]
+	if notif.Type != notify.NotificationTypePaymentFailed {
+		t.Errorf("expected notification type=%s, got %s", notify.NotificationTypePaymentFailed, notif.Type)
+	}
+	if notif.ApprovalURL != "https://app.example.com/settings?tab=billing" {
+		t.Errorf("expected billing URL, got %s", notif.ApprovalURL)
+	}
+}
+
+func TestWebhook_InvoicePaymentFailed_NoNotifierConfigured_StillSucceeds(t *testing.T) {
+	t.Parallel()
+	tx, deps, _, uid := setupWebhookTest(t)
+	ctx := context.Background()
+
+	// Explicitly nil notifier.
+	deps.Notifier = nil
+	mux := http.NewServeMux()
+	RegisterBillingWebhookRoutes(mux, deps)
+
+	subID := "sub_" + uid[:8]
+	payload := stripeEventPayload(t, "evt_no_notifier", "invoice.payment_failed", map[string]interface{}{
+		"id": "in_no_notifier",
+		"parent": map[string]interface{}{
+			"subscription_details": map[string]interface{}{
+				"subscription": map[string]interface{}{"id": subID},
+			},
+		},
+	})
+
+	r := signedWebhookRequest(t, payload)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+
+	// Webhook should still return 200 — notification is best-effort.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// DB state should still be updated.
+	sub, _ := db.GetSubscriptionByUserID(ctx, tx, uid)
+	if sub.Status != db.SubscriptionStatusPastDue {
+		t.Errorf("expected status=past_due, got %s", sub.Status)
 	}
 }

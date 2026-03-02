@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	gostripe "github.com/stripe/stripe-go/v82"
+
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
@@ -131,6 +133,30 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	return nil
 }
 
+// lookupSubscriptionFromInvoice extracts the subscription ID from a Stripe
+// invoice's parent object and looks up the local subscription. Returns an
+// error for DB failures (retryable). Returns (nil, nil) when the invoice
+// has no parent subscription or the subscription is unknown (not retryable).
+//
+// This is shared by handleInvoicePaid and handleInvoicePaymentFailed.
+func lookupSubscriptionFromInvoice(r *http.Request, deps *Deps, event *pstripe.WebhookEvent, inv *gostripe.Invoice) (*db.Subscription, error) {
+	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
+		log.Printf("[%s] StripeWebhook: %s (event %s): invoice has no parent subscription, skipping", TraceID(r.Context()), event.Type, event.ID)
+		return nil, nil
+	}
+	stripeSubID := inv.Parent.SubscriptionDetails.Subscription.ID
+
+	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSubID)
+	if err != nil {
+		return nil, fmt.Errorf("lookup subscription %s: %w", stripeSubID, err)
+	}
+	if sub == nil {
+		log.Printf("[%s] StripeWebhook: %s (event %s): no subscription found for %s", TraceID(r.Context()), event.Type, event.ID, stripeSubID)
+		return nil, nil
+	}
+	return sub, nil
+}
+
 // handleInvoicePaid processes a successful invoice payment. It updates the
 // subscription status to active (clearing any past_due state from previous
 // failed payments) and syncs the billing period dates from Stripe.
@@ -141,20 +167,12 @@ func handleInvoicePaid(r *http.Request, deps *Deps, event *pstripe.WebhookEvent)
 		return nil // malformed event, don't retry
 	}
 
-	// Extract subscription ID from the parent object (v82+ API structure).
-	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
-		log.Printf("[%s] StripeWebhook: invoice.paid (event %s): invoice has no parent subscription, skipping", TraceID(r.Context()), event.ID)
-		return nil // not subscription-related (e.g. one-off invoice), don't retry
-	}
-	stripeSubID := inv.Parent.SubscriptionDetails.Subscription.ID
-
-	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSubID)
+	sub, err := lookupSubscriptionFromInvoice(r, deps, event, inv)
 	if err != nil {
-		return fmt.Errorf("lookup subscription %s: %w", stripeSubID, err)
+		return err
 	}
 	if sub == nil {
-		log.Printf("[%s] StripeWebhook: invoice.paid (event %s): no subscription found for %s", TraceID(r.Context()), event.ID, stripeSubID)
-		return nil // unknown subscription, don't retry
+		return nil
 	}
 
 	// Update status to active (this clears past_due after a successful retry).
@@ -258,20 +276,12 @@ func handleInvoicePaymentFailed(r *http.Request, deps *Deps, event *pstripe.Webh
 		return nil // malformed event, don't retry
 	}
 
-	// Extract subscription ID from the parent object (v82+ API structure).
-	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
-		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): invoice has no parent subscription, skipping", TraceID(r.Context()), event.ID)
-		return nil // not subscription-related, don't retry
-	}
-	stripeSubID := inv.Parent.SubscriptionDetails.Subscription.ID
-
-	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSubID)
+	sub, err := lookupSubscriptionFromInvoice(r, deps, event, inv)
 	if err != nil {
-		return fmt.Errorf("lookup subscription %s: %w", stripeSubID, err)
+		return err
 	}
 	if sub == nil {
-		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): no subscription found for %s", TraceID(r.Context()), event.ID, stripeSubID)
-		return nil // unknown subscription, don't retry
+		return nil
 	}
 
 	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, db.SubscriptionStatusPastDue); err != nil {
@@ -293,6 +303,7 @@ func handleInvoicePaymentFailed(r *http.Request, deps *Deps, event *pstripe.Webh
 // is not blocked by delivery latency or notification failures.
 func notifyPaymentFailure(r *http.Request, deps *Deps, userID string, event *pstripe.WebhookEvent) {
 	if deps.Notifier == nil {
+		log.Printf("[%s] StripeWebhook: notifier not configured, skipping payment failure notification for user %s", TraceID(r.Context()), userID)
 		return
 	}
 
@@ -308,14 +319,12 @@ func notifyPaymentFailure(r *http.Request, deps *Deps, userID string, event *pst
 		billingURL = deps.BaseURL + "/settings?tab=billing"
 	}
 
-	// Reuse the Approval struct for the notification payload. The notification
-	// senders use AgentName for the subject and ApprovalURL for the action link.
 	notif := notify.Approval{
 		ApprovalID:  "payment_failed_" + event.ID,
-		AgentName:   "Payment Failed",
 		ApprovalURL: billingURL,
 		CreatedAt:   time.Now(),
 		ExpiresAt:   time.Now().Add(72 * time.Hour), // Stripe retries for 72h
+		Type:        notify.NotificationTypePaymentFailed,
 	}
 
 	recipient := notify.Recipient{

@@ -137,6 +137,9 @@ func main() {
 				PriceIDRequest: os.Getenv("STRIPE_PRICE_ID_REQUEST"),
 			})
 			log.Println("Stripe: client initialized")
+			if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
+				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
+			}
 		} else {
 			log.Println("Stripe: STRIPE_SECRET_KEY not set, Stripe API calls will be unavailable")
 		}
