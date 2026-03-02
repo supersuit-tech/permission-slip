@@ -109,3 +109,367 @@ CheckoutResponse:
       format: uri
       description: Stripe Checkout Session URL — redirect the user here to complete payment
       example: https://checkout.stripe.com/c/pay/cs_test_...
+
+# ── New schemas for issue #22 ────────────────────────────────────────────────
+
+Plan:
+  type: object
+  required:
+    - id
+    - name
+    - max_requests_per_month
+    - max_agents
+    - max_standing_approvals
+    - max_credentials
+    - audit_retention_days
+  properties:
+    id:
+      type: string
+      description: Unique plan identifier
+      example: free
+    name:
+      type: string
+      description: Human-readable plan name
+      example: Free
+    max_requests_per_month:
+      type: integer
+      nullable: true
+      description: Monthly request limit (null = unlimited)
+      example: 1000
+    max_agents:
+      type: integer
+      nullable: true
+      description: Maximum number of agents (null = unlimited)
+      example: 3
+    max_standing_approvals:
+      type: integer
+      nullable: true
+      description: Maximum active standing approvals (null = unlimited)
+      example: 5
+    max_credentials:
+      type: integer
+      nullable: true
+      description: Maximum stored credentials (null = unlimited)
+      example: 5
+    audit_retention_days:
+      type: integer
+      description: Number of days audit logs are retained
+      example: 7
+
+Subscription:
+  type: object
+  required:
+    - status
+    - current_period_start
+    - current_period_end
+  properties:
+    status:
+      type: string
+      enum: [active, past_due, cancelled]
+      description: Current subscription status
+      example: active
+    current_period_start:
+      type: string
+      format: date-time
+      description: Start of the current billing period (inclusive)
+      example: '2026-03-01T00:00:00Z'
+    current_period_end:
+      type: string
+      format: date-time
+      description: End of the current billing period (exclusive)
+      example: '2026-04-01T00:00:00Z'
+
+UsageSummary:
+  type: object
+  required:
+    - requests
+    - agents
+    - standing_approvals
+    - credentials
+  properties:
+    requests:
+      type: integer
+      description: Number of API requests in the current billing period
+      example: 42
+    agents:
+      type: integer
+      description: Current number of registered agents
+      example: 2
+    standing_approvals:
+      type: integer
+      description: Current number of active standing approvals
+      example: 3
+    credentials:
+      type: integer
+      description: Current number of stored credentials
+      example: 1
+
+BillingPlanResponse:
+  type: object
+  required:
+    - plan
+    - subscription
+    - usage
+  properties:
+    plan:
+      $ref: '#/Plan'
+    subscription:
+      $ref: '#/Subscription'
+    usage:
+      $ref: '#/UsageSummary'
+
+UsageDetail:
+  type: object
+  required:
+    - period_start
+    - period_end
+    - requests
+    - sms
+  properties:
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the usage period (inclusive)
+      example: '2026-03-01T00:00:00Z'
+    period_end:
+      type: string
+      format: date-time
+      description: End of the usage period (exclusive)
+      example: '2026-04-01T00:00:00Z'
+    requests:
+      $ref: '#/RequestUsageDetail'
+    sms:
+      $ref: '#/SMSUsageDetail'
+    breakdown:
+      $ref: '#/UsageBreakdown'
+
+RequestUsageDetail:
+  type: object
+  required:
+    - total
+    - included
+    - overage
+    - cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total requests this period
+      example: 1542
+    included:
+      type: integer
+      description: Requests included in the plan at no extra cost
+      example: 1000
+    overage:
+      type: integer
+      description: Billable requests beyond the included allowance
+      example: 542
+    cost_cents:
+      type: integer
+      description: Cost of overage requests in cents
+      example: 271
+
+SMSUsageDetail:
+  type: object
+  required:
+    - total
+    - cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total SMS messages sent this period
+      example: 5
+    cost_cents:
+      type: integer
+      description: Total SMS cost in cents
+      example: 5
+
+UsageBreakdown:
+  type: object
+  properties:
+    by_agent:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Request counts keyed by agent ID
+      example:
+        '1': 500
+        '2': 1042
+    by_connector:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Request counts keyed by connector ID
+      example:
+        gmail: 300
+        stripe: 1242
+    by_action_type:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Request counts keyed by action type
+      example:
+        email.send: 300
+        payment.create: 1242
+
+UpgradeResponse:
+  type: object
+  required:
+    - checkout_url
+  properties:
+    checkout_url:
+      type: string
+      format: uri
+      description: Stripe Checkout Session URL — redirect the user here to complete payment
+      example: https://checkout.stripe.com/c/pay/cs_test_...
+
+DowngradeResponse:
+  type: object
+  required:
+    - status
+    - plan_id
+    - downgraded_at
+  properties:
+    status:
+      type: string
+      enum: [active, past_due, cancelled]
+      description: Updated subscription status
+      example: cancelled
+    plan_id:
+      type: string
+      description: The plan the user was downgraded to
+      example: free
+    downgraded_at:
+      type: string
+      format: date-time
+      description: Timestamp when the downgrade was processed
+
+Invoice:
+  type: object
+  required:
+    - id
+    - date
+    - amount_cents
+    - status
+  properties:
+    id:
+      type: string
+      description: Invoice identifier
+      example: inv_1234567890
+    date:
+      type: string
+      format: date-time
+      description: Invoice date
+      example: '2026-02-01T00:00:00Z'
+    amount_cents:
+      type: integer
+      description: Total invoice amount in cents
+      example: 271
+    status:
+      type: string
+      enum: [draft, open, paid, void, uncollectible]
+      description: Invoice payment status
+      example: paid
+    stripe_invoice_url:
+      type: string
+      format: uri
+      description: URL to view the invoice on Stripe's hosted page
+      example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
+
+InvoiceListResponse:
+  type: object
+  required:
+    - invoices
+  properties:
+    invoices:
+      type: array
+      items:
+        $ref: '#/Invoice'
+
+QuotaExceededError:
+  type: object
+  required:
+    - error
+  properties:
+    error:
+      type: object
+      required:
+        - code
+        - message
+        - retryable
+      properties:
+        code:
+          type: string
+          enum: [quota_exceeded]
+          description: Machine-readable error code
+          example: quota_exceeded
+        message:
+          type: string
+          description: Human-readable error message
+          example: Monthly request quota exceeded. Upgrade your plan for continued access.
+        retryable:
+          type: boolean
+          description: Whether the client should retry
+          example: false
+        details:
+          type: object
+          properties:
+            limit:
+              type: integer
+              description: The plan's request limit
+              example: 1000
+            current_count:
+              type: integer
+              description: Current usage count
+              example: 1001
+            plan_id:
+              type: string
+              description: The user's current plan
+              example: free
+            reset_at:
+              type: string
+              format: date-time
+              description: When the usage counter resets (next billing period start)
+
+ResourceLimitError:
+  type: object
+  required:
+    - error
+  properties:
+    error:
+      type: object
+      required:
+        - code
+        - message
+        - retryable
+      properties:
+        code:
+          type: string
+          enum:
+            - agent_limit_reached
+            - standing_approval_limit_reached
+            - credential_limit_reached
+          description: Machine-readable error code indicating which resource limit was hit
+          example: agent_limit_reached
+        message:
+          type: string
+          description: Human-readable error message with plan details
+          example: Free plan allows up to 3 agents. Upgrade your plan to add more.
+        retryable:
+          type: boolean
+          description: Whether the client should retry (always false for limit errors)
+          example: false
+        details:
+          type: object
+          properties:
+            current_count:
+              type: integer
+              description: Current number of the resource
+              example: 3
+            limit:
+              type: integer
+              description: Maximum allowed by the plan
+              example: 3
+            plan_id:
+              type: string
+              description: The user's current plan
+              example: free

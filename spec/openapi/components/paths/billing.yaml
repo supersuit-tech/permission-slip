@@ -116,3 +116,235 @@ webhook:
         description: Webhook processed successfully
       '400':
         description: Invalid signature or malformed event
+
+# ── New endpoints for issue #22 ──────────────────────────────────────────────
+
+plan:
+  get:
+    summary: Get billing plan details
+    description: |
+      Returns the authenticated user's current plan details, subscription status,
+      and a summary of current resource usage (request counts, agent count, etc.).
+
+      This is the primary billing endpoint for the frontend — it provides everything
+      needed to render the billing section of the settings page in a single request.
+
+      Only available when `billing_enabled` is `true` in the server config.
+    operationId: getBillingPlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Billing plan details returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/BillingPlanResponse'
+            example:
+              plan:
+                id: free
+                name: Free
+                max_requests_per_month: 1000
+                max_agents: 3
+                max_standing_approvals: 5
+                max_credentials: 5
+                audit_retention_days: 7
+              subscription:
+                status: active
+                current_period_start: '2026-03-01T00:00:00Z'
+                current_period_end: '2026-04-01T00:00:00Z'
+              usage:
+                requests: 42
+                agents: 2
+                standing_approvals: 3
+                credentials: 1
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: No subscription found for this user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+usage:
+  get:
+    summary: Get detailed usage breakdown
+    description: |
+      Returns detailed usage metrics for the current billing period, including
+      request totals, overage calculations, SMS counts, costs, and an optional
+      breakdown by agent, connector, and action type.
+
+      Only available when `billing_enabled` is `true` in the server config.
+    operationId: getBillingUsage
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Usage details returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/UsageDetail'
+            example:
+              period_start: '2026-03-01T00:00:00Z'
+              period_end: '2026-04-01T00:00:00Z'
+              requests:
+                total: 1542
+                included: 1000
+                overage: 542
+                cost_cents: 271
+              sms:
+                total: 5
+                cost_cents: 5
+              breakdown:
+                by_agent:
+                  '1': 500
+                  '2': 1042
+                by_connector:
+                  gmail: 300
+                  stripe: 1242
+                by_action_type:
+                  email.send: 300
+                  payment.create: 1242
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: No usage data found for this period
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+upgrade:
+  post:
+    summary: Initiate plan upgrade
+    description: |
+      Initiates an upgrade from the free plan to pay-as-you-go by creating a
+      Stripe Checkout Session. Returns a URL to redirect the user to Stripe's
+      hosted checkout page to complete the upgrade.
+
+      If the user doesn't have a Stripe Customer yet, one is created automatically.
+      If the user is already on a paid plan, returns 409 Conflict.
+
+      Only available when `billing_enabled` is `true` and Stripe is configured.
+    operationId: upgradePlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Checkout session created for upgrade
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/UpgradeResponse'
+            example:
+              checkout_url: https://checkout.stripe.com/c/pay/cs_test_...
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '409':
+        description: Already subscribed to a paid plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+downgrade:
+  post:
+    summary: Downgrade to free plan
+    description: |
+      Downgrades the user from the pay-as-you-go plan to the free plan.
+      Cancels the Stripe subscription and sets a 7-day grace period during
+      which the user retains the longer audit retention window to export data.
+
+      If the user is already on the free plan, returns 409 Conflict.
+
+      Only available when `billing_enabled` is `true`.
+    operationId: downgradePlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Successfully downgraded to free plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/DowngradeResponse'
+            example:
+              status: cancelled
+              plan_id: free
+              downgraded_at: '2026-03-02T12:00:00Z'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '409':
+        description: Already on the free plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error (failed to cancel subscription)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+invoices:
+  get:
+    summary: List invoices
+    description: |
+      Returns a list of the authenticated user's past invoices from Stripe,
+      including the amount, status, and a link to view the invoice.
+
+      Only available when `billing_enabled` is `true` and the user has a
+      Stripe customer ID (i.e., has previously been on a paid plan).
+    operationId: listInvoices
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Invoices returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/InvoiceListResponse'
+            example:
+              invoices:
+                - id: inv_1234567890
+                  date: '2026-02-01T00:00:00Z'
+                  amount_cents: 271
+                  status: paid
+                  stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_1234567890
+                - id: inv_0987654321
+                  date: '2026-01-01T00:00:00Z'
+                  amount_cents: 0
+                  status: paid
+                  stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_0987654321
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

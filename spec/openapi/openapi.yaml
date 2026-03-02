@@ -235,6 +235,21 @@ paths:
   /v1/billing/webhook:
     $ref: './components/paths/billing.yaml#/webhook'
 
+  /v1/billing/plan:
+    $ref: './components/paths/billing.yaml#/plan'
+
+  /v1/billing/usage:
+    $ref: './components/paths/billing.yaml#/usage'
+
+  /v1/billing/upgrade:
+    $ref: './components/paths/billing.yaml#/upgrade'
+
+  /v1/billing/downgrade:
+    $ref: './components/paths/billing.yaml#/downgrade'
+
+  /v1/billing/invoices:
+    $ref: './components/paths/billing.yaml#/invoices'
+
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
 
@@ -439,6 +454,34 @@ components:
       $ref: './components/schemas/billing.yaml#/UsageInfo'
     CheckoutResponse:
       $ref: './components/schemas/billing.yaml#/CheckoutResponse'
+    Plan:
+      $ref: './components/schemas/billing.yaml#/Plan'
+    Subscription:
+      $ref: './components/schemas/billing.yaml#/Subscription'
+    UsageSummary:
+      $ref: './components/schemas/billing.yaml#/UsageSummary'
+    BillingPlanResponse:
+      $ref: './components/schemas/billing.yaml#/BillingPlanResponse'
+    UsageDetail:
+      $ref: './components/schemas/billing.yaml#/UsageDetail'
+    RequestUsageDetail:
+      $ref: './components/schemas/billing.yaml#/RequestUsageDetail'
+    SMSUsageDetail:
+      $ref: './components/schemas/billing.yaml#/SMSUsageDetail'
+    UsageBreakdown:
+      $ref: './components/schemas/billing.yaml#/UsageBreakdown'
+    UpgradeResponse:
+      $ref: './components/schemas/billing.yaml#/UpgradeResponse'
+    DowngradeResponse:
+      $ref: './components/schemas/billing.yaml#/DowngradeResponse'
+    Invoice:
+      $ref: './components/schemas/billing.yaml#/Invoice'
+    InvoiceListResponse:
+      $ref: './components/schemas/billing.yaml#/InvoiceListResponse'
+    QuotaExceededError:
+      $ref: './components/schemas/billing.yaml#/QuotaExceededError'
+    ResourceLimitError:
+      $ref: './components/schemas/billing.yaml#/ResourceLimitError'
 
     # Config
     ConfigResponse:
