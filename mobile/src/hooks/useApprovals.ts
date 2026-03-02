@@ -1,0 +1,48 @@
+import { useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../auth/AuthContext";
+import client from "../api/client";
+import type { components } from "../api/schema";
+
+export type ApprovalSummary = components["schemas"]["ApprovalSummary"];
+export type ApprovalStatus = ApprovalSummary["status"];
+
+export function useApprovals(status: "pending" | "approved" | "denied" | "cancelled" | "all" = "pending") {
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
+  const userId = session?.user?.id;
+
+  // Keep the latest token in a ref so the query key stays stable across
+  // token refreshes (e.g. Supabase re-issues tokens on AAL promotion).
+  const tokenRef = useRef(accessToken);
+  if (accessToken) {
+    tokenRef.current = accessToken;
+  }
+
+  const query = useQuery({
+    queryKey: ["approvals", userId ?? "", status],
+    queryFn: async () => {
+      const token = tokenRef.current;
+      if (!token) throw new Error("Missing access token");
+      const { data, error } = await client.GET("/v1/approvals", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { query: { status } },
+      });
+      if (error) throw new Error("Failed to load approvals");
+      return data;
+    },
+    enabled: !!accessToken,
+    refetchInterval: 30_000,
+  });
+
+  return {
+    approvals: query.data?.data ?? [],
+    hasMore: query.data?.has_more ?? false,
+    isLoading: query.isLoading,
+    isRefetching: query.isRefetching,
+    error: query.isError
+      ? "Unable to load approvals. Please try again later."
+      : null,
+    refetch: query.refetch,
+  };
+}
