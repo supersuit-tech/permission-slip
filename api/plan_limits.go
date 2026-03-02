@@ -98,27 +98,41 @@ func checkRequestQuota(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		currentCount = usage.RequestCount
 	}
 
+	_, periodEnd := db.BillingPeriodBounds(now)
+	resetAt := periodEnd.UTC().Format(time.RFC3339)
+
 	if currentCount >= *limit {
-		_, periodEnd := db.BillingPeriodBounds(now)
 		retryAfter := int(math.Ceil(time.Until(periodEnd).Seconds()))
 		if retryAfter < 1 {
 			retryAfter = 1
 		}
 
-		resp := ErrorResponse{Error: Error{
-			Code:       ErrMonthlyQuotaExceeded,
-			Message:    fmt.Sprintf("Free tier limit of %d requests/month reached. Upgrade to continue.", *limit),
-			Retryable:  true,
-			RetryAfter: retryAfter,
-			Details: map[string]any{
-				"current_usage": currentCount,
-				"limit":         *limit,
-			},
-		}}
+		resp := QuotaExceeded(
+			fmt.Sprintf("Free tier limit of %d requests/month reached. Upgrade to continue.", *limit),
+			retryAfter,
+		)
+		resp.Error.Details = map[string]any{
+			"current_usage": currentCount,
+			"limit":         *limit,
+			"plan_id":       sp.Plan.ID,
+			"reset_at":      resetAt,
+		}
 		w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 		RespondError(w, r, http.StatusTooManyRequests, resp)
 		return true
 	}
+
+	// Set informational quota headers on allowed requests so SDK authors
+	// can proactively warn users approaching their limit (follows the
+	// pattern of GitHub, Stripe, and OpenAI APIs).
+	remaining := *limit - currentCount - 1 // -1 because this request will consume one
+	if remaining < 0 {
+		remaining = 0
+	}
+	w.Header().Set("X-Quota-Limit", strconv.Itoa(*limit))
+	w.Header().Set("X-Quota-Remaining", strconv.Itoa(remaining))
+	w.Header().Set("X-Quota-Reset", resetAt)
+
 	return false
 }
 

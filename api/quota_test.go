@@ -38,6 +38,17 @@ func TestCheckRequestQuota_FreePlan_UnderLimit_Allows(t *testing.T) {
 	if blocked {
 		t.Fatalf("expected under-limit request to be allowed, got blocked: %s", w.Body.String())
 	}
+
+	// Verify informational quota headers are set on allowed requests.
+	if w.Header().Get("X-Quota-Limit") != "1000" {
+		t.Errorf("expected X-Quota-Limit=1000, got %q", w.Header().Get("X-Quota-Limit"))
+	}
+	if w.Header().Get("X-Quota-Remaining") != "0" {
+		t.Errorf("expected X-Quota-Remaining=0 (999 used, -1 for this request), got %q", w.Header().Get("X-Quota-Remaining"))
+	}
+	if w.Header().Get("X-Quota-Reset") == "" {
+		t.Error("expected X-Quota-Reset header to be set")
+	}
 }
 
 func TestCheckRequestQuota_FreePlan_AtLimit_Returns429(t *testing.T) {
@@ -82,6 +93,16 @@ func TestCheckRequestQuota_FreePlan_AtLimit_Returns429(t *testing.T) {
 	}
 	if limit, ok := resp.Error.Details["limit"].(float64); !ok || int(limit) != 1000 {
 		t.Errorf("expected limit=1000, got %v", resp.Error.Details["limit"])
+	}
+	if planID, ok := resp.Error.Details["plan_id"].(string); !ok || planID != db.PlanFree {
+		t.Errorf("expected plan_id=%q, got %v", db.PlanFree, resp.Error.Details["plan_id"])
+	}
+	if resetAt, ok := resp.Error.Details["reset_at"].(string); !ok || resetAt == "" {
+		t.Errorf("expected non-empty reset_at timestamp, got %v", resp.Error.Details["reset_at"])
+	} else {
+		if _, err := time.Parse(time.RFC3339, resetAt); err != nil {
+			t.Errorf("reset_at is not valid RFC3339: %q", resetAt)
+		}
 	}
 }
 
@@ -356,4 +377,39 @@ func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testin
 
 	// Usage should have incremented.
 	testhelper.RequireUsageCount(t, tx, uid, 1000)
+}
+
+// ── Token-based execution is NOT blocked by quota ───────────────────────────
+// Token execution is not billable (the approval request was already counted),
+// so it must succeed even when the user is at their monthly quota limit.
+
+func TestQuota_TokenExecution_AtLimit_StillSucceeds(t *testing.T) {
+	t.Parallel()
+	tx, deps, router, agentID, privKey, apprID, jti := setupExecuteTest(t)
+
+	userID := userIDFromApproval(t, tx, apprID)
+	testhelper.InsertSubscription(t, tx, userID, db.PlanFree)
+	testhelper.SetUsageCount(t, tx, userID, 1000)
+
+	params := json.RawMessage(`{"to":"alice@example.com"}`)
+	hash, err := HashParameters(params)
+	if err != nil {
+		t.Fatalf("HashParameters: %v", err)
+	}
+
+	token := mintTestActionToken(t, deps.ActionTokenSigningKey, deps.ActionTokenKeyID,
+		agentID, apprID, "email.send", "1", hash, jti, time.Now().Add(5*time.Minute))
+
+	reqBody := fmt.Sprintf(`{"token":%q,"action_id":"email.send","parameters":{"to":"alice@example.com"}}`, token)
+	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	// Token-based execution should succeed even at quota limit — it's not billable.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (token execution is not billable), got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Usage should remain at 1000 — token execution is not metered.
+	testhelper.RequireUsageCount(t, tx, userID, 1000)
 }

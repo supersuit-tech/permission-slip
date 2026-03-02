@@ -295,6 +295,8 @@ TooManyRequests:
               details:
                 current_usage: 1000
                 limit: 1000
+                plan_id: "free"
+                reset_at: "2026-04-01T00:00:00Z"
               trace_id: "trace_xyz789"
 
 InternalServerError:
