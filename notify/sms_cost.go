@@ -1,8 +1,17 @@
 package notify
 
+// sms_cost.go — Destination-based SMS billing region lookup.
+// Region constants here align with stripe.SMSRates keys.
+//
+// NOTE: This lookup is not yet wired into the billing flow. The billing
+// endpoint (api/billing.go) currently charges all SMS at the "us_ca" rate.
+// A future iteration should pass SMSRegionForPhone(recipient.Phone) to
+// CreateSMSInvoiceItem instead of the hardcoded "us_ca" region.
+
 import "strings"
 
 // SMSRegion identifies a destination region for SMS pricing.
+// Values match the keys in stripe.SMSRates.
 type SMSRegion string
 
 const (
