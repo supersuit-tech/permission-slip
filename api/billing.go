@@ -123,10 +123,12 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			},
 		}
 
-		// Attach current period usage if available.
+		// Attach current period usage if available (non-fatal — subscription
+		// data is still returned without usage on error).
 		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] GetSubscription: usage lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 		if usage != nil {
 			ui := &usageInfo{
@@ -193,9 +195,11 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 			}
 			stripeCustomerID = cust.ID
 
-			// Persist Stripe customer ID.
+			// Persist Stripe customer ID so subsequent checkout attempts reuse
+			// the same customer instead of creating duplicates.
 			if _, err := db.UpdateSubscriptionStripe(r.Context(), deps.DB, profile.ID, &stripeCustomerID, nil); err != nil {
 				log.Printf("[%s] CreateCheckout: save customer ID: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 			}
 		}
 
@@ -464,7 +468,11 @@ func ReportPeriodUsage(ctx context.Context, deps *Deps, userID string, usage *db
 	}
 
 	sub, err := db.GetSubscriptionByUserID(ctx, deps.DB, userID)
-	if err != nil || sub == nil || sub.StripeCustomerID == nil {
+	if err != nil {
+		log.Printf("billing: ReportPeriodUsage: subscription lookup for %s: %v", userID, err)
+		return
+	}
+	if sub == nil || sub.StripeCustomerID == nil {
 		return
 	}
 
