@@ -1,6 +1,7 @@
 import React, { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import type { ApprovalSummary } from "../../../hooks/useApprovals";
+import { makeApproval, MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtures";
 
 // --- Mocks ---
 
@@ -18,31 +19,13 @@ jest.mock("../../../lib/supabaseClient", () => ({
   },
 }));
 
-const mockAgents = [
-  {
-    agent_id: 42,
-    status: "registered" as const,
-    metadata: { name: "Deploy Bot" },
-    created_at: "2026-01-01T00:00:00Z",
-  },
-];
-
 jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
-    agents: mockAgents,
+    agents: MOCK_AGENTS,
     isLoading: false,
     error: null,
   }),
-  getAgentDisplayName: (agent: { agent_id: number; metadata?: unknown }) => {
-    if (
-      agent.metadata &&
-      typeof agent.metadata === "object" &&
-      "name" in agent.metadata
-    ) {
-      return (agent.metadata as { name: string }).name;
-    }
-    return `Agent ${agent.agent_id}`;
-  },
+  getAgentDisplayName: mockGetAgentDisplayName,
 }));
 
 jest.mock("react-native-safe-area-context", () => ({
@@ -53,30 +36,6 @@ jest.mock("react-native-safe-area-context", () => ({
 import ApprovalDetailScreen from "../ApprovalDetailScreen";
 
 // --- Helpers ---
-
-function makeApproval(overrides?: Partial<ApprovalSummary>): ApprovalSummary {
-  return {
-    approval_id: "appr_test123",
-    agent_id: 42,
-    action: {
-      type: "email.send",
-      version: "1",
-      parameters: {
-        to: ["alice@example.com"],
-        subject: "Welcome",
-        body: "Hello!",
-      },
-    },
-    context: {
-      description: "Send welcome email to new user",
-      risk_level: "low",
-    },
-    status: "pending",
-    expires_at: new Date(Date.now() + 300_000).toISOString(),
-    created_at: new Date(Date.now() - 60_000).toISOString(),
-    ...overrides,
-  };
-}
 
 function renderDetail(approval: ApprovalSummary) {
   const route = {
@@ -99,10 +58,15 @@ function renderDetail(approval: ApprovalSummary) {
 describe("ApprovalDetailScreen", () => {
   let renderer: ReactTestRenderer;
 
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
   afterEach(async () => {
     await act(async () => {
       renderer?.unmount();
     });
+    jest.useRealTimers();
   });
 
   it("renders without crashing", async () => {

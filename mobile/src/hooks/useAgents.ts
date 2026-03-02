@@ -31,9 +31,10 @@ export function getAgentDisplayName(agent: {
 export function useAgents() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
+  const userId = session?.user?.id;
 
   const query = useQuery({
-    queryKey: ["agents"],
+    queryKey: ["agents", userId ?? ""],
     queryFn: async () => {
       if (!accessToken) throw new Error("Missing access token");
       const { data, error } = await client.GET("/v1/agents", {

@@ -14,10 +14,9 @@ export function useApprovals(status: "pending" | "approved" | "denied" | "cancel
 
   // Keep the latest token in a ref so the query key stays stable across
   // token refreshes (e.g. Supabase re-issues tokens on AAL promotion).
+  // Clear the ref when the token is gone (sign-out) to avoid stale tokens.
   const tokenRef = useRef(accessToken);
-  if (accessToken) {
-    tokenRef.current = accessToken;
-  }
+  tokenRef.current = accessToken;
 
   const query = useQuery({
     queryKey: ["approvals", userId ?? "", status],

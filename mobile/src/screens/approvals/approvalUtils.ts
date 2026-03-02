@@ -1,3 +1,40 @@
+/** Safely coerce action parameters to a plain object. */
+export function safeParams(raw: unknown): Record<string, unknown> {
+  if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  return {};
+}
+
+/** Returns true when a pending approval has passed its expiry. */
+export function isExpired(status: string, expiresAt: string): boolean {
+  return status === "pending" && secondsUntil(expiresAt) <= 0;
+}
+
+/** Formats a param/context value for display. */
+export function formatParamValue(value: unknown): string {
+  if (value == null) return "null";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  if (Array.isArray(value)) {
+    return value.map((v) => formatParamValue(v)).join(", ");
+  }
+  return JSON.stringify(value, null, 2);
+}
+
+/** Formats an ISO timestamp for display (e.g. "Jan 5, 3:04 PM"). */
+export function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** Returns seconds remaining until `expiresAt`, clamped to 0. */
 export function secondsUntil(expiresAt: string): number {
   const diff = new Date(expiresAt).getTime() - Date.now();

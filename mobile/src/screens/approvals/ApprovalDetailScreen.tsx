@@ -14,6 +14,10 @@ import {
   humanizeActionType,
   buildActionSummary,
   secondsUntil,
+  safeParams,
+  isExpired as checkExpired,
+  formatParamValue,
+  formatTimestamp,
 } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
@@ -33,18 +37,14 @@ export default function ApprovalDetailScreen({ route }: Props) {
     ? getAgentDisplayName(agent)
     : `Agent ${approval.agent_id}`;
 
-  const parameters = approval.action.parameters as Record<string, unknown>;
+  const parameters = safeParams(approval.action.parameters);
   const paramEntries = Object.entries(parameters);
-  const contextDetails = approval.context.details as
-    | Record<string, unknown>
-    | undefined;
-  const contextDetailEntries = contextDetails
-    ? Object.entries(contextDetails)
-    : [];
+  const contextDetails = safeParams(approval.context.details);
+  const contextDetailEntries = Object.entries(contextDetails);
 
   const remaining = secondsUntil(approval.expires_at);
   const isPending = approval.status === "pending";
-  const isExpired = isPending && remaining <= 0;
+  const expired = checkExpired(approval.status, approval.expires_at);
 
   const summary = buildActionSummary(approval.action.type, parameters);
 
@@ -75,7 +75,7 @@ export default function ApprovalDetailScreen({ route }: Props) {
           <Text style={styles.statusBannerText}>Cancelled</Text>
         </View>
       )}
-      {isExpired && (
+      {expired && (
         <View style={styles.statusBannerCancelled}>
           <Text style={styles.statusBannerText}>Expired</Text>
         </View>
@@ -165,7 +165,7 @@ export default function ApprovalDetailScreen({ route }: Props) {
             <View style={styles.expiryRow}>
               <CountdownBadge expiresAt={approval.expires_at} />
               <Text style={styles.expiryLabel}>
-                {isExpired ? "This request has expired" : "remaining"}
+                {expired ? "This request has expired" : "remaining"}
               </Text>
             </View>
           </View>
@@ -297,26 +297,6 @@ const RISK_DESCRIPTIONS: Record<string, string> = {
   high: "Significant impact, hard to reverse",
 };
 
-function formatParamValue(value: unknown): string {
-  if (value == null) return "null";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
-  if (Array.isArray(value)) {
-    return value.map((v) => formatParamValue(v)).join(", ");
-  }
-  return JSON.stringify(value, null, 2);
-}
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso);
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 const styles = StyleSheet.create({
   container: {

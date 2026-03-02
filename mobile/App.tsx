@@ -11,6 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { colors } from "./src/theme/colors";
 
 const queryClient = new QueryClient({
@@ -64,7 +65,11 @@ function AppContent() {
     );
   }
 
-  return <RootNavigator />;
+  return (
+    <ErrorBoundary>
+      <RootNavigator />
+    </ErrorBoundary>
+  );
 }
 
 export default function App() {

@@ -2,6 +2,7 @@ import React, { createElement } from "react";
 import { Text } from "react-native";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import type { ApprovalSummary } from "../../../hooks/useApprovals";
+import { MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtures";
 
 // --- Mocks ---
 
@@ -56,27 +57,11 @@ jest.mock("../../../hooks/useApprovals", () => ({
 
 jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
-    agents: [
-      {
-        agent_id: 42,
-        status: "registered",
-        metadata: { name: "Test Agent" },
-        created_at: "2026-01-01T00:00:00Z",
-      },
-    ],
+    agents: MOCK_AGENTS.map((a) => ({ ...a, status: "registered" })),
     isLoading: false,
     error: null,
   }),
-  getAgentDisplayName: (agent: { agent_id: number; metadata?: unknown }) => {
-    if (
-      agent.metadata &&
-      typeof agent.metadata === "object" &&
-      "name" in agent.metadata
-    ) {
-      return (agent.metadata as { name: string }).name;
-    }
-    return `Agent ${agent.agent_id}`;
-  },
+  getAgentDisplayName: mockGetAgentDisplayName,
 }));
 
 jest.mock("../../../auth/AuthContext", () => ({
@@ -122,6 +107,7 @@ describe("ApprovalListScreen", () => {
   let renderer: ReactTestRenderer;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     mockUseApprovalsReturn = {
       approvals: mockApprovals,
       hasMore: false,
@@ -136,6 +122,7 @@ describe("ApprovalListScreen", () => {
     await act(async () => {
       renderer?.unmount();
     });
+    jest.useRealTimers();
   });
 
   it("renders without crashing", async () => {

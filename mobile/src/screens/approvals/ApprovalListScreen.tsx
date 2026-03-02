@@ -14,7 +14,7 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { colors } from "../../theme/colors";
-import { buildActionSummary, humanizeActionType, secondsUntil, formatRelativeTime } from "./approvalUtils";
+import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
 import { useAuth } from "../../auth/AuthContext";
@@ -184,16 +184,15 @@ function ApprovalRow({
 }) {
   const summary = buildActionSummary(
     approval.action.type,
-    approval.action.parameters as Record<string, unknown>,
+    safeParams(approval.action.parameters),
   );
-  const remaining = secondsUntil(approval.expires_at);
-  const isExpired = approval.status === "pending" && remaining <= 0;
+  const expired = checkExpired(approval.status, approval.expires_at);
 
   return (
     <TouchableOpacity
       testID={`approval-row-${approval.approval_id}`}
       accessibilityLabel={`${humanizeActionType(approval.action.type)} from ${agentName}`}
-      style={[styles.row, isExpired && styles.rowExpired]}
+      style={[styles.row, expired && styles.rowExpired]}
       onPress={onPress}
     >
       <View style={styles.rowContent}>
