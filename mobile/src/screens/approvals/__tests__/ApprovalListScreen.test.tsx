@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../../../auth/AuthContext";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import ApprovalListScreen from "../ApprovalListScreen";
@@ -60,12 +60,11 @@ jest.mock("../../../lib/supabaseClient", () => ({
 
 // --- Helpers ---
 
-function renderScreen() {
-  const queryClient = createQueryClient();
+function renderScreen(qc: QueryClient) {
   return create(
     createElement(
       QueryClientProvider,
-      { client: queryClient },
+      { client: qc },
       createElement(AuthProvider, null, createElement(ApprovalListScreen)),
     ),
   );
@@ -73,18 +72,17 @@ function renderScreen() {
 
 async function authenticateAndRender(apiResponse: unknown) {
   mockGet.mockResolvedValue(apiResponse);
+  currentQueryClient = createQueryClient();
 
   let renderer: ReactTestRenderer;
   await act(async () => {
-    renderer = renderScreen();
+    renderer = renderScreen(currentQueryClient!);
   });
 
-  // Wait for initial auth to settle
-  await waitFor(
-    () => hasTestId(renderer!, "sign-out") || hasTestId(renderer!, "tab-pending"),
-    { timeout: 1000 },
-  ).catch(() => {
-    // Screen might be in loading state still
+  // The initial auth event fires as a microtask. Wait briefly for it to
+  // settle — the screen may still be on the loading/login state at this point.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 20));
   });
 
   const session = mockSession();
@@ -110,6 +108,7 @@ async function authenticateAndRender(apiResponse: unknown) {
 // --- Tests ---
 
 let currentRenderer: ReactTestRenderer | null = null;
+let currentQueryClient: QueryClient | null = null;
 
 describe("ApprovalListScreen", () => {
   beforeEach(() => {
@@ -117,7 +116,13 @@ describe("ApprovalListScreen", () => {
   });
 
   afterEach(async () => {
-    // Unmount to prevent React Query timers from firing after teardown.
+    // Cancel in-flight queries and clear the cache to stop React Query's
+    // refetchInterval timers before unmounting the component tree.
+    if (currentQueryClient) {
+      currentQueryClient.cancelQueries();
+      currentQueryClient.clear();
+      currentQueryClient = null;
+    }
     if (currentRenderer) {
       await act(async () => {
         currentRenderer!.unmount();

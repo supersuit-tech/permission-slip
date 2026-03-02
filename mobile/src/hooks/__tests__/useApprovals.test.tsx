@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../../auth/AuthContext";
 import { useApprovals, type ApprovalSummary } from "../useApprovals";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
@@ -73,12 +73,11 @@ function createHookCapture(status: "pending" | "approved" | "denied" = "pending"
   return { capture, Consumer };
 }
 
-function renderWithProviders(Consumer: React.ComponentType) {
-  const queryClient = createQueryClient();
+function renderWithProviders(Consumer: React.ComponentType, qc: QueryClient) {
   return create(
     createElement(
       QueryClientProvider,
-      { client: queryClient },
+      { client: qc },
       createElement(AuthProvider, null, createElement(Consumer)),
     ),
   );
@@ -87,6 +86,7 @@ function renderWithProviders(Consumer: React.ComponentType) {
 // --- Tests ---
 
 let currentRenderer: ReactTestRenderer | null = null;
+let currentQueryClient: QueryClient | null = null;
 
 describe("useApprovals", () => {
   beforeEach(() => {
@@ -94,6 +94,13 @@ describe("useApprovals", () => {
   });
 
   afterEach(async () => {
+    // Cancel in-flight queries and clear the cache to stop React Query's
+    // refetchInterval timers before unmounting the component tree.
+    if (currentQueryClient) {
+      currentQueryClient.cancelQueries();
+      currentQueryClient.clear();
+      currentQueryClient = null;
+    }
     if (currentRenderer) {
       await act(async () => {
         currentRenderer!.unmount();
@@ -104,9 +111,10 @@ describe("useApprovals", () => {
 
   it("returns empty list and loading false when not authenticated", async () => {
     const { capture, Consumer } = createHookCapture();
+    currentQueryClient = createQueryClient();
 
     await act(async () => {
-      currentRenderer = renderWithProviders(Consumer);
+      currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
     });
 
     await waitFor(() => capture.isLoading === false);
@@ -123,9 +131,10 @@ describe("useApprovals", () => {
     });
 
     const { capture, Consumer } = createHookCapture("pending");
+    currentQueryClient = createQueryClient();
 
     await act(async () => {
-      currentRenderer = renderWithProviders(Consumer);
+      currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
     });
 
     await waitFor(() => capture.isLoading === false);
@@ -154,9 +163,10 @@ describe("useApprovals", () => {
     });
 
     const { capture, Consumer } = createHookCapture("pending");
+    currentQueryClient = createQueryClient();
 
     await act(async () => {
-      currentRenderer = renderWithProviders(Consumer);
+      currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
     });
 
     await waitFor(() => capture.isLoading === false);
@@ -179,9 +189,10 @@ describe("useApprovals", () => {
     });
 
     const { Consumer } = createHookCapture("denied");
+    currentQueryClient = createQueryClient();
 
     await act(async () => {
-      currentRenderer = renderWithProviders(Consumer);
+      currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
     });
 
     await waitFor(() => mockGet.mock.calls.length === 0);
