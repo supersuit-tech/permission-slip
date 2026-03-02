@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -52,6 +51,11 @@ var allChannels = func() []string {
 	return channels
 }()
 
+// paidOnlyChannels lists channels that require a paid plan.
+var paidOnlyChannels = map[string]bool{
+	"sms": true,
+}
+
 func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
@@ -63,10 +67,10 @@ func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		smsAvailable := isUserOnPaidPlan(r.Context(), deps.DB, profile.ID)
+		planID := userPlanID(r.Context(), deps.DB, profile.ID)
 
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs, smsAvailable),
+			Preferences: buildPreferencesResponse(prefs, planID),
 		})
 	}
 }
@@ -100,10 +104,18 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 		}
 
 		// Gate SMS behind paid tier: reject enabling SMS on the free plan.
+		// Look up the plan once — reused for both the gate check and the response.
+		planID := userPlanID(r.Context(), deps.DB, profile.ID)
 		if seen["sms"] {
 			for _, p := range req.Preferences {
 				if p.Channel == "sms" && p.Enabled {
-					if aborted := checkSMSPlanAccess(r.Context(), w, r, deps.DB, profile.ID); aborted {
+					if !isPaidPlan(planID) {
+						resp := Forbidden(ErrSMSRequiresPaidPlan, "SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS.")
+						resp.Error.Details = map[string]any{
+							"current_plan":  planID,
+							"required_plan": db.PlanPayAsYouGo,
+						}
+						RespondError(w, r, http.StatusForbidden, resp)
 						return
 					}
 					break
@@ -127,60 +139,42 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		smsAvailable := isUserOnPaidPlan(r.Context(), deps.DB, profile.ID)
-
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs, smsAvailable),
+			Preferences: buildPreferencesResponse(prefs, planID),
 		})
 	}
 }
 
-// checkSMSPlanAccess verifies that the user's plan allows SMS notifications.
-// Returns true if the request should be aborted (free tier or error).
-func checkSMSPlanAccess(ctx context.Context, w http.ResponseWriter, r *http.Request, d db.DBTX, userID string) bool {
+// userPlanID returns the user's current plan ID, defaulting to "free" if the
+// subscription is missing or the lookup fails. Errors are logged but not
+// surfaced — this is a read-only helper for response enrichment.
+func userPlanID(ctx context.Context, d db.DBTX, userID string) string {
 	sub, err := db.GetSubscriptionByUserID(ctx, d, userID)
 	if err != nil {
-		log.Printf("[%s] checkSMSPlanAccess: get subscription: %v", TraceID(r.Context()), err)
-		CaptureError(r.Context(), fmt.Errorf("check SMS plan access: %w", err))
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to check plan"))
-		return true
+		log.Printf("userPlanID: get subscription for %s: %v", userID, err)
+		return db.PlanFree
 	}
-	if sub == nil || sub.PlanID == db.PlanFree {
-		resp := Forbidden(ErrSMSRequiresPaidPlan, "SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS.")
-		resp.Error.Details = map[string]any{
-			"current_plan": db.PlanFree,
-			"required_plan": db.PlanPayAsYouGo,
-		}
-		RespondError(w, r, http.StatusForbidden, resp)
-		return true
+	if sub == nil {
+		return db.PlanFree
 	}
-	return false
+	return sub.PlanID
 }
 
-// isUserOnPaidPlan returns true if the user has an active subscription on a
-// non-free plan. Used to determine channel availability in preference responses.
-func isUserOnPaidPlan(ctx context.Context, d db.DBTX, userID string) bool {
-	sub, err := db.GetSubscriptionByUserID(ctx, d, userID)
-	if err != nil || sub == nil {
-		return false
-	}
-	return sub.PlanID != db.PlanFree
-}
-
-// paidOnlyChannels lists channels that require a paid plan.
-var paidOnlyChannels = map[string]bool{
-	"sms": true,
+// isPaidPlan returns true if the plan ID represents a paid (non-free) plan.
+func isPaidPlan(planID string) bool {
+	return planID != db.PlanFree
 }
 
 // buildPreferencesResponse converts DB preferences into the API response,
-// defaulting missing channels to enabled. The smsAvailable flag controls
-// whether plan-gated channels (SMS) are marked as available.
-func buildPreferencesResponse(prefs []db.NotificationPreference, smsAvailable bool) []notificationPreferenceResponse {
+// defaulting missing channels to enabled. The planID controls whether
+// plan-gated channels (SMS) are marked as available.
+func buildPreferencesResponse(prefs []db.NotificationPreference, planID string) []notificationPreferenceResponse {
 	channelMap := make(map[string]bool)
 	for _, p := range prefs {
 		channelMap[p.Channel] = p.Enabled
 	}
 
+	paid := isPaidPlan(planID)
 	result := make([]notificationPreferenceResponse, 0, len(allChannels))
 	for _, ch := range allChannels {
 		enabled, exists := channelMap[ch]
@@ -189,7 +183,7 @@ func buildPreferencesResponse(prefs []db.NotificationPreference, smsAvailable bo
 		}
 		available := true
 		if paidOnlyChannels[ch] {
-			available = smsAvailable
+			available = paid
 		}
 		result = append(result, notificationPreferenceResponse{
 			Channel:   ch,

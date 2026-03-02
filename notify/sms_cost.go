@@ -11,6 +11,31 @@ const (
 	SMSRegionInternational SMSRegion = "international"
 )
 
+// euPrefixes lists E.164 dialing codes for EU/EEA countries that map to the
+// UK/EU billing region. Package-level to avoid per-call allocation. Longer
+// prefixes (3+ digits) are listed first so prefix matching is unambiguous.
+var euPrefixes = []string{
+	"+420", // Czech Republic
+	"+358", // Finland
+	"+353", // Ireland
+	"+351", // Portugal
+	"+33",  // France
+	"+49",  // Germany
+	"+39",  // Italy
+	"+34",  // Spain
+	"+31",  // Netherlands
+	"+32",  // Belgium
+	"+43",  // Austria
+	"+41",  // Switzerland
+	"+46",  // Sweden
+	"+47",  // Norway
+	"+45",  // Denmark
+	"+48",  // Poland
+	"+36",  // Hungary
+	"+40",  // Romania
+	"+30",  // Greece
+}
+
 // SMSRegionForPhone returns the billing region for a phone number based on
 // its international dialing prefix. Numbers should be in E.164 format
 // (e.g. "+15551234567"). This is a best-effort mapping; unrecognised prefixes
@@ -28,29 +53,6 @@ func SMSRegionForPhone(phone string) SMSRegion {
 	// UK: +44
 	if strings.HasPrefix(phone, "+44") {
 		return SMSRegionUKEU
-	}
-
-	// EU country codes (common ones)
-	euPrefixes := []string{
-		"+33", // France
-		"+49", // Germany
-		"+39", // Italy
-		"+34", // Spain
-		"+31", // Netherlands
-		"+32", // Belgium
-		"+43", // Austria
-		"+41", // Switzerland
-		"+46", // Sweden
-		"+47", // Norway
-		"+45", // Denmark
-		"+358", // Finland
-		"+353", // Ireland
-		"+351", // Portugal
-		"+48", // Poland
-		"+420", // Czech Republic
-		"+36", // Hungary
-		"+40", // Romania
-		"+30", // Greece
 	}
 
 	for _, prefix := range euPrefixes {
