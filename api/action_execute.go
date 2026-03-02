@@ -241,6 +241,12 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		return
 	}
 
+	// ── Check monthly request quota ─────────────────────────────
+
+	if checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID) {
+		return
+	}
+
 	// ── Find matching standing approval ──────────────────────────
 
 	sa, err := db.FindActiveStandingApprovalForAgent(r.Context(), deps.DB, agent.AgentID, req.Action.Type)

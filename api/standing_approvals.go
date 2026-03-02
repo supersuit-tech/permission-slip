@@ -341,6 +341,11 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Check monthly request quota before executing.
+		if checkRequestQuota(r.Context(), w, r, deps.DB, profile.ID) {
+			return
+		}
+
 		exec, err := db.RecordStandingApprovalExecution(r.Context(), deps.DB, saID, profile.ID, req.Parameters)
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {

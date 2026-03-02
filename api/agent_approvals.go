@@ -153,6 +153,11 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Check monthly request quota before creating the approval.
+		if checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID) {
+			return
+		}
+
 		// Compute expiration.
 		expiresAt := time.Now().UTC().Add(db.DefaultApprovalTTL)
 		if req.ExpiresIn != nil {

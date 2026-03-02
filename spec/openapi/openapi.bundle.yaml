@@ -9134,22 +9134,42 @@ components:
                     max_attempts: 5
                   trace_id: trace_xyz789
     TooManyRequests:
-      description: Too Many Requests - Rate limit exceeded
+      description: Too Many Requests - Rate limit or monthly quota exceeded
+      headers:
+        Retry-After:
+          description: Seconds until the rate limit resets or the billing period ends
+          schema:
+            type: integer
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: rate_limited
-              message: Too many requests. Please retry after 60 seconds.
-              retryable: true
-              retry_after: 60
-              details:
-                limit: 100
-                window: 1 minute
-                reset_at: '2026-02-11T13:26:00Z'
-              trace_id: trace_xyz789
+          examples:
+            rate_limited:
+              summary: Per-IP or per-agent rate limit exceeded
+              value:
+                error:
+                  code: rate_limited
+                  message: Too many requests. Please retry after 60 seconds.
+                  retryable: true
+                  retry_after: 60
+                  details:
+                    limit: 100
+                    window: 1 minute
+                    reset_at: '2026-02-11T13:26:00Z'
+                  trace_id: trace_xyz789
+            monthly_quota_exceeded:
+              summary: Free tier monthly request quota exhausted
+              value:
+                error:
+                  code: monthly_quota_exceeded
+                  message: Free tier limit of 1,000 requests/month reached. Upgrade to continue.
+                  retryable: true
+                  retry_after: 86400
+                  details:
+                    current_usage: 1000
+                    limit: 1000
+                  trace_id: trace_xyz789
     InternalServerError:
       description: Internal Server Error - Unexpected server error
       content:
