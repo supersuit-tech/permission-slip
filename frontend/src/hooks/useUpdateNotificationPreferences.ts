@@ -4,7 +4,7 @@ import client from "@/api/client";
 import type { components } from "@/api/schema";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
-type NotificationPreference = components["schemas"]["NotificationPreference"];
+type NotificationPreferenceUpdate = components["schemas"]["NotificationPreferenceUpdate"];
 
 /**
  * Hook for toggling notification channel preferences. Accepts an array
@@ -16,7 +16,7 @@ export function useUpdateNotificationPreferences() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (preferences: NotificationPreference[]) => {
+    mutationFn: async (preferences: NotificationPreferenceUpdate[]) => {
       if (!session?.access_token) {
         throw new Error("Not authenticated");
       }
