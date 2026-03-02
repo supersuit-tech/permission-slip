@@ -32,23 +32,6 @@ Before presenting work as done, always perform these review passes:
 5. **Documentation:** update comments, README, docs as needed
 
 Do NOT mark a task complete until all passes are done. If any pass surfaces issues, fix them before presenting.
-
-## Risk Assessment
-
-After completing any code change, provide a risk score from 0 (low) to 10 (high) across three dimensions:
-
-- **Maintainability:** How much does this change affect long-term code health? (complexity added, readability impact, coupling, DRY violations)
-- **Security:** Does this change introduce or touch attack surface? (auth, input handling, data exposure, dependencies)
-- **Functionality:** How likely is this change to break existing behavior? (scope of change, test coverage, edge cases, integration points)
-
-Present the scores in this format:
-
-```
-Risk: Maintainability 2 | Security 1 | Functionality 3
-```
-
-Include a one-line explanation if any score is 5 or above.
-
 ## Testing
 
 Always run relevant tests after making changes, before committing. Before pushing, run `make build` to catch TypeScript compilation errors that tests alone may miss (e.g. unused variables, missing interface fields).
