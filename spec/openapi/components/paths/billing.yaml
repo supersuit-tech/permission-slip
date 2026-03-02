@@ -83,6 +83,159 @@ checkout:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
+usage:
+  get:
+    summary: Get current usage
+    description: |
+      Returns a detailed usage breakdown for the current billing period,
+      including request counts, overage calculations, and SMS costs.
+
+      Only available when `billing_enabled` is `true` in the server config.
+    operationId: getUsage
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Usage details returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/UsageResponse'
+            example:
+              period_start: '2026-03-01T00:00:00Z'
+              period_end: '2026-04-01T00:00:00Z'
+              requests:
+                total: 450
+                included: 1000
+                overage: 0
+                overage_cost_cents: 0
+              sms:
+                total: 12
+                cost_cents: 12
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+
+upgrade:
+  post:
+    summary: Upgrade to paid plan
+    description: |
+      Initiates an upgrade to the paid plan by creating a Stripe Checkout Session.
+      Returns a URL to redirect the user to Stripe's hosted checkout page.
+
+      This is an alias for `POST /v1/billing/checkout`.
+
+      If the user doesn't have a Stripe Customer yet, one is created automatically.
+      If the user is already on a paid plan, returns 409 Conflict.
+
+      Only available when `billing_enabled` is `true` and Stripe is configured.
+    operationId: upgradePlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Checkout session created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/CheckoutResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '409':
+        description: Already subscribed to a paid plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+downgrade:
+  post:
+    summary: Downgrade to free plan
+    description: |
+      Downgrades the user from a paid plan to the free tier. Validates that
+      current resource counts (agents, standing approvals, credentials) are
+      within free plan limits before proceeding.
+
+      If the user has a Stripe subscription, it is cancelled immediately.
+      Returns 409 if the user is already on the free plan or if resource
+      counts exceed free plan limits.
+
+      Only available when `billing_enabled` is `true` in the server config.
+    operationId: downgradePlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Successfully downgraded
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/DowngradeResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '409':
+        description: Already on free plan or resource limits exceeded
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+invoices:
+  get:
+    summary: List invoices
+    description: |
+      Returns the user's past invoices from Stripe. Up to 24 paid invoices
+      are returned, sorted by creation date (most recent first).
+
+      Returns an empty list if the user has no Stripe customer or no invoices.
+
+      Only available when `billing_enabled` is `true` and Stripe is configured.
+    operationId: listInvoices
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Invoice list returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/InvoiceListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
 webhook:
   post:
     summary: Stripe webhook

@@ -229,8 +229,20 @@ paths:
   /v1/billing/subscription:
     $ref: './components/paths/billing.yaml#/subscription'
 
+  /v1/billing/usage:
+    $ref: './components/paths/billing.yaml#/usage'
+
   /v1/billing/checkout:
     $ref: './components/paths/billing.yaml#/checkout'
+
+  /v1/billing/upgrade:
+    $ref: './components/paths/billing.yaml#/upgrade'
+
+  /v1/billing/downgrade:
+    $ref: './components/paths/billing.yaml#/downgrade'
+
+  /v1/billing/invoices:
+    $ref: './components/paths/billing.yaml#/invoices'
 
   /v1/billing/webhook:
     $ref: './components/paths/billing.yaml#/webhook'
@@ -437,6 +449,18 @@ components:
       $ref: './components/schemas/billing.yaml#/SubscriptionResponse'
     UsageInfo:
       $ref: './components/schemas/billing.yaml#/UsageInfo'
+    UsageResponse:
+      $ref: './components/schemas/billing.yaml#/UsageResponse'
+    RequestsUsage:
+      $ref: './components/schemas/billing.yaml#/RequestsUsage'
+    SMSUsage:
+      $ref: './components/schemas/billing.yaml#/SMSUsage'
+    DowngradeResponse:
+      $ref: './components/schemas/billing.yaml#/DowngradeResponse'
+    InvoiceListResponse:
+      $ref: './components/schemas/billing.yaml#/InvoiceListResponse'
+    InvoiceSummary:
+      $ref: './components/schemas/billing.yaml#/InvoiceSummary'
     CheckoutResponse:
       $ref: './components/schemas/billing.yaml#/CheckoutResponse'
 
