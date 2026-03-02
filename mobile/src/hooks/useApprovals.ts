@@ -48,11 +48,15 @@ export function useApprovals(status: ApprovalStatus) {
     },
     enabled: !!accessToken,
     refetchInterval: 30_000,
+    // Cache stays fresh for 10 s — avoids redundant refetches when the user
+    // switches tabs back and forth quickly.
+    staleTime: 10_000,
   });
 
   return {
     approvals: query.data?.data ?? [],
     isLoading: query.isLoading,
+    isRefetching: query.isRefetching,
     error: query.isError ? (query.error?.message ?? "Unable to load approvals.") : null,
     refetch: query.refetch,
   };

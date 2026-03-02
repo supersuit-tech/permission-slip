@@ -1,7 +1,9 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,10 +20,13 @@ export default function ApprovalListScreen() {
   const { signOut, user } = useAuth();
   const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<ApprovalStatus>("pending");
-  const { approvals, isLoading, error, refetch } = useApprovals(status);
+  const { approvals, isLoading, isRefetching, error, refetch } = useApprovals(status);
 
-  const handleSignOut = useCallback(async () => {
-    await signOut();
+  const handleSignOut = useCallback(() => {
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: () => signOut() },
+    ]);
   }, [signOut]);
 
   const renderItem = useCallback(
@@ -84,6 +89,13 @@ export default function ApprovalListScreen() {
           data={approvals}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.gray500}
+            />
+          }
           contentContainerStyle={
             approvals.length === 0 ? styles.emptyContainer : styles.listContent
           }

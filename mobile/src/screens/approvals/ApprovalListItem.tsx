@@ -51,16 +51,39 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+/** Returns a human-readable time-remaining string, or null if already expired. */
+function timeRemaining(dateStr: string): { text: string; urgent: boolean } | null {
+  const now = Date.now();
+  const expires = new Date(dateStr).getTime();
+  const diffMs = expires - now;
+
+  if (diffMs <= 0) return { text: "Expired", urgent: true };
+
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return { text: "< 1m left", urgent: true };
+  if (minutes < 60) return { text: `${minutes}m left`, urgent: minutes <= 5 };
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return { text: `${hours}h left`, urgent: false };
+
+  const days = Math.floor(hours / 24);
+  return { text: `${days}d left`, urgent: false };
+}
+
 export default function ApprovalListItem({ approval, onPress }: ApprovalListItemProps) {
   const risk = approval.context.risk_level ?? "low";
   const riskColor = riskColors[risk] ?? colors.gray500;
   const badge = statusStyles[approval.status] ?? statusStyles.pending;
+  const expiry = approval.status === "pending"
+    ? timeRemaining(approval.expires_at)
+    : null;
 
   return (
     <TouchableOpacity
       testID={`approval-item-${approval.approval_id}`}
       accessibilityRole="button"
       accessibilityLabel={`${approval.context.description}, ${approval.status}`}
+      activeOpacity={0.7}
       style={styles.container}
       onPress={() => onPress(approval.approval_id)}
     >
@@ -84,7 +107,16 @@ export default function ApprovalListItem({ approval, onPress }: ApprovalListItem
           <View style={[styles.riskDot, { backgroundColor: riskColor }]} />
           <Text style={styles.riskLabel}>{capitalize(risk)} risk</Text>
         </View>
-        <Text style={styles.time}>{timeAgo(approval.created_at)}</Text>
+        <View style={styles.footerRight}>
+          {expiry && (
+            <Text
+              style={[styles.expiry, expiry.urgent && styles.expiryUrgent]}
+            >
+              {expiry.text}
+            </Text>
+          )}
+          <Text style={styles.time}>{timeAgo(approval.created_at)}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -146,6 +178,19 @@ const styles = StyleSheet.create({
   riskLabel: {
     fontSize: 12,
     color: colors.gray500,
+  },
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  expiry: {
+    fontSize: 12,
+    color: colors.gray500,
+  },
+  expiryUrgent: {
+    color: colors.warning,
+    fontWeight: "600",
   },
   time: {
     fontSize: 12,
