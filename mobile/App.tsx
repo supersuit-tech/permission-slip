@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
 
 const LOADING_TIMEOUT_MS = 10_000;
 
-function AppContent() {
+function AppContent({ onRetry }: { onRetry: () => void }) {
   const { authStatus } = useAuth();
   const [timedOut, setTimedOut] = useState(false);
 
@@ -53,7 +53,7 @@ function AppContent() {
               accessibilityLabel="Retry connection"
               accessibilityRole="button"
               style={styles.retryButton}
-              onPress={() => setTimedOut(false)}
+              onPress={onRetry}
             >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
@@ -73,11 +73,16 @@ function AppContent() {
 }
 
 export default function App() {
+  // Incrementing the key re-mounts AuthProvider, which re-triggers
+  // Supabase's onAuthStateChange and retries the initial session check.
+  const [authKey, setAuthKey] = useState(0);
+  const handleRetry = useCallback(() => setAuthKey((k) => k + 1), []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <AppContent />
+        <AuthProvider key={authKey}>
+          <AppContent onRetry={handleRetry} />
           <StatusBar style="auto" />
         </AuthProvider>
       </SafeAreaProvider>

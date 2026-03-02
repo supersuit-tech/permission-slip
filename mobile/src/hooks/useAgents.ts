@@ -1,3 +1,7 @@
+/**
+ * React Query hook for fetching the user's registered agents, plus a
+ * utility to derive a human-readable display name from agent metadata.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
@@ -10,6 +14,7 @@ interface AgentMetadata {
   [key: string]: unknown;
 }
 
+/** Safely narrows unknown agent metadata to an object with an optional `name` field. */
 function parseAgentMetadata(raw: unknown): AgentMetadata | null {
   if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
     return raw as AgentMetadata;
@@ -17,6 +22,10 @@ function parseAgentMetadata(raw: unknown): AgentMetadata | null {
   return null;
 }
 
+/**
+ * Returns a human-friendly name for an agent. Prefers `metadata.name`
+ * if present; falls back to "Agent {id}".
+ */
 export function getAgentDisplayName(agent: {
   agent_id: number;
   metadata?: unknown;
@@ -28,6 +37,10 @@ export function getAgentDisplayName(agent: {
   return `Agent ${agent.agent_id}`;
 }
 
+/**
+ * Fetches all agents belonging to the current user. Data is cached by
+ * userId and does not auto-refetch (agents change infrequently).
+ */
 export function useAgents() {
   const { session } = useAuth();
   const accessToken = session?.access_token;

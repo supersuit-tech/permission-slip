@@ -1,3 +1,8 @@
+/**
+ * Pure utility functions for the approval screens — formatting, date math,
+ * and action summary generation. No React dependencies; fully unit-testable.
+ */
+
 /** Safely coerce action parameters to a plain object. */
 export function safeParams(raw: unknown): Record<string, unknown> {
   if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
@@ -76,16 +81,19 @@ export function buildActionSummary(
 
 type ActionFormatter = (params: Record<string, unknown>) => string | null;
 
+/** Extracts a non-empty string from an unknown value, or returns null. */
 function strVal(v: unknown): string | null {
   if (typeof v === "string" && v.length > 0) return v;
   return null;
 }
 
+/** Truncates a string to `maxLen` characters, appending an ellipsis if needed. */
 function truncate(s: string, maxLen: number): string {
   if (s.length <= maxLen) return s;
   return s.slice(0, maxLen - 1) + "\u2026";
 }
 
+/** Formats a recipient list (string or string[]) for display in email summaries. */
 function formatRecipients(v: unknown): string | null {
   if (typeof v === "string") return v;
   if (Array.isArray(v)) {
@@ -97,6 +105,10 @@ function formatRecipients(v: unknown): string | null {
   return null;
 }
 
+/**
+ * Action-specific formatters keyed by action type. Each returns a
+ * human-readable summary string, or null to fall back to the generic formatter.
+ */
 const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
   "github.create_issue": (params) => {
     const owner = strVal(params.owner);
@@ -139,6 +151,10 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
   },
 };
 
+/**
+ * Fallback summary builder when no action-specific formatter matches.
+ * Constructs a label from the action type plus up to 3 parameter highlights.
+ */
 function buildGenericSummary(
   actionType: string,
   parameters: Record<string, unknown>,
@@ -159,6 +175,7 @@ function buildGenericSummary(
   return `${label}: ${highlights.join(", ")}`;
 }
 
+/** Formats an unknown value as a short display string for generic summaries. */
 function formatValue(value: unknown): string | null {
   if (typeof value === "string") return truncate(value, 40);
   if (typeof value === "number" || typeof value === "boolean")

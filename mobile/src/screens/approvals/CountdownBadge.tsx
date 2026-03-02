@@ -1,3 +1,8 @@
+/**
+ * Countdown badge and shared timer infrastructure for approval expiry.
+ * Uses a single shared setInterval so multiple CountdownBadge instances
+ * (e.g. in a list) don't each create their own timer.
+ */
 import { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { colors } from "../../theme/colors";
@@ -57,6 +62,10 @@ interface CountdownBadgeProps {
   expiresAt: string;
 }
 
+/**
+ * Displays a live-updating countdown (e.g. "4:32") that changes color
+ * based on urgency: gray (expired), red (<=60s), amber (<=120s).
+ */
 export function CountdownBadge({ expiresAt }: CountdownBadgeProps) {
   const remaining = useCountdown(expiresAt);
   const isExpired = remaining <= 0;

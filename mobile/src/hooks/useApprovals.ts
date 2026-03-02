@@ -1,3 +1,7 @@
+/**
+ * React Query hook for fetching the authenticated user's approval requests.
+ * Polls every 30 seconds and supports filtering by status.
+ */
 import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
@@ -7,6 +11,12 @@ import type { components } from "../api/schema";
 export type ApprovalSummary = components["schemas"]["ApprovalSummary"];
 export type ApprovalStatus = ApprovalSummary["status"];
 
+/**
+ * Fetches approval requests for the current user, filtered by status.
+ * Uses a stable query key (keyed by userId + status) and auto-refetches
+ * every 30 seconds. The access token is stored in a ref to avoid
+ * unnecessary query invalidation on token refresh.
+ */
 export function useApprovals(status: "pending" | "approved" | "denied" | "cancelled" | "all" = "pending") {
   const { session } = useAuth();
   const accessToken = session?.access_token;

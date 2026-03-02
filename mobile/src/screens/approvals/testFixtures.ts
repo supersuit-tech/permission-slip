@@ -1,5 +1,11 @@
+/**
+ * Shared test fixtures for approval screen tests. Provides mock agents,
+ * a display name resolver, and a factory for creating ApprovalSummary
+ * objects with sensible defaults.
+ */
 import type { ApprovalSummary } from "../../hooks/useApprovals";
 
+/** Pre-configured mock agents used across approval screen tests. */
 export const MOCK_AGENTS = [
   {
     agent_id: 42,
@@ -9,6 +15,10 @@ export const MOCK_AGENTS = [
   },
 ];
 
+/**
+ * Test-only version of getAgentDisplayName that avoids importing the
+ * hook module (which would pull in React Query providers).
+ */
 export function mockGetAgentDisplayName(agent: {
   agent_id: number;
   metadata?: unknown;

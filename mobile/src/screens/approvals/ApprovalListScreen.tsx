@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+/**
+ * Approval list screen — the primary screen after login. Displays a
+ * tabbed list of approval requests (Pending / Approved / Denied) with
+ * pull-to-refresh, loading/error/empty states, and navigation to the
+ * detail screen.
+ */
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -173,7 +179,8 @@ export default function ApprovalListScreen({ navigation }: Props) {
   );
 }
 
-function ApprovalRow({
+/** A single row in the approval list showing action type, agent, risk, and countdown. */
+const ApprovalRow = memo(function ApprovalRow({
   approval,
   agentName,
   onPress,
@@ -236,8 +243,9 @@ function ApprovalRow({
       <Text style={styles.chevron}>{"\u203A"}</Text>
     </TouchableOpacity>
   );
-}
+});
 
+/** Tab-specific empty state shown when there are no approvals for the selected status. */
 function EmptyState({ tab }: { tab: StatusTab }) {
   const messages: Record<StatusTab, { title: string; body: string }> = {
     pending: {

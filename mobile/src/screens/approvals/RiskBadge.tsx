@@ -1,3 +1,7 @@
+/**
+ * Risk level badge component — renders a colored pill (Low / Medium / High)
+ * based on the approval's risk_level. Returns null when no level is provided.
+ */
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme/colors";
 

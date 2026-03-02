@@ -1,3 +1,8 @@
+/**
+ * Approval detail screen — displays the full details of a single approval
+ * request including agent info, action parameters, risk level, expiry
+ * countdown, context, and timeline.
+ */
 import { useMemo } from "react";
 import {
   ScrollView,
@@ -291,6 +296,7 @@ export default function ApprovalDetailScreen({ route }: Props) {
   );
 }
 
+/** Human-readable explanations shown inline for each risk level. */
 const RISK_DESCRIPTIONS: Record<string, string> = {
   low: "Minimal impact, easily reversible",
   medium: "Moderate impact, some consequences",
