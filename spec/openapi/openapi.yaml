@@ -480,8 +480,12 @@ components:
       $ref: './components/schemas/billing.yaml#/InvoiceListResponse'
     QuotaExceededError:
       $ref: './components/schemas/billing.yaml#/QuotaExceededError'
+    QuotaExceededDetails:
+      $ref: './components/schemas/billing.yaml#/QuotaExceededDetails'
     ResourceLimitError:
       $ref: './components/schemas/billing.yaml#/ResourceLimitError'
+    ResourceLimitDetails:
+      $ref: './components/schemas/billing.yaml#/ResourceLimitDetails'
 
     # Config
     ConfigResponse:

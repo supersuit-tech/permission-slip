@@ -119,11 +119,45 @@ webhook:
     operationId: stripeWebhook
     tags:
       - Billing
+    parameters:
+      - name: Stripe-Signature
+        in: header
+        required: true
+        description: |
+          Stripe webhook signature header. Contains the timestamp and signature(s)
+          used to verify that the request originated from Stripe. The server verifies
+          this against `STRIPE_WEBHOOK_SECRET` before processing any event.
+        schema:
+          type: string
+        example: 't=1614556236,v1=abc123...'
+    requestBody:
+      required: true
+      description: |
+        Raw Stripe webhook event payload. **Must be passed as raw bytes** (not parsed JSON)
+        to the signature verification step — parsing before verification would invalidate
+        the signature check.
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Stripe Event object (structure varies by event type)
+            properties:
+              id:
+                type: string
+                description: Unique event identifier (used for idempotency)
+              type:
+                type: string
+                description: Event type (e.g., checkout.session.completed)
+            required:
+              - id
+              - type
     responses:
       '200':
-        description: Webhook processed successfully
+        description: Webhook processed successfully (always returned to prevent Stripe retries)
       '400':
         description: Invalid signature or malformed event
+      '500':
+        description: Processing failed — Stripe will retry the event
 
 # ── New endpoints for issue #22 ──────────────────────────────────────────────
 

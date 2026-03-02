@@ -4796,11 +4796,45 @@ paths:
       operationId: stripeWebhook
       tags:
         - Billing
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          description: |
+            Stripe webhook signature header. Contains the timestamp and signature(s)
+            used to verify that the request originated from Stripe. The server verifies
+            this against `STRIPE_WEBHOOK_SECRET` before processing any event.
+          schema:
+            type: string
+          example: t=1614556236,v1=abc123...
+      requestBody:
+        required: true
+        description: |
+          Raw Stripe webhook event payload. **Must be passed as raw bytes** (not parsed JSON)
+          to the signature verification step — parsing before verification would invalidate
+          the signature check.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe Event object (structure varies by event type)
+              properties:
+                id:
+                  type: string
+                  description: Unique event identifier (used for idempotency)
+                type:
+                  type: string
+                  description: Event type (e.g., checkout.session.completed)
+              required:
+                - id
+                - type
       responses:
         '200':
-          description: Webhook processed successfully
+          description: Webhook processed successfully (always returned to prevent Stripe retries)
         '400':
           description: Invalid signature or malformed event
+        '500':
+          description: Processing failed — Stripe will retry the event
   /v1/billing/plan:
     get:
       summary: Get billing plan details
@@ -8619,51 +8653,28 @@ components:
         url:
           type: string
           format: uri
-          description: Stripe Checkout Session URL — redirect the user here to complete payment
+          pattern: ^https://
+          description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
           example: https://checkout.stripe.com/c/pay/cs_test_...
     Plan:
-      type: object
-      required:
-        - id
-        - name
-        - max_requests_per_month
-        - max_agents
-        - max_standing_approvals
-        - max_credentials
-        - audit_retention_days
-      properties:
-        id:
-          type: string
-          description: Unique plan identifier
-          example: free
-        name:
-          type: string
-          description: Human-readable plan name
-          example: Free
-        max_requests_per_month:
-          type: integer
-          nullable: true
-          description: Monthly request limit (null = unlimited)
-          example: 1000
-        max_agents:
-          type: integer
-          nullable: true
-          description: Maximum number of agents (null = unlimited)
-          example: 3
-        max_standing_approvals:
-          type: integer
-          nullable: true
-          description: Maximum active standing approvals (null = unlimited)
-          example: 5
-        max_credentials:
-          type: integer
-          nullable: true
-          description: Maximum stored credentials (null = unlimited)
-          example: 5
-        audit_retention_days:
-          type: integer
-          description: Number of days audit logs are retained
-          example: 7
+      description: |
+        A billing plan with its resource limits. Composes `PlanLimits` with
+        plan identity fields to avoid duplicating the limit definitions.
+      allOf:
+        - type: object
+          required:
+            - id
+            - name
+          properties:
+            id:
+              type: string
+              description: Unique plan identifier
+              example: free
+            name:
+              type: string
+              description: Human-readable plan name
+              example: Free
+        - $ref: '#/components/schemas/PlanLimits'
     Subscription:
       type: object
       required:
@@ -8851,7 +8862,8 @@ components:
         checkout_url:
           type: string
           format: uri
-          description: Stripe Checkout Session URL — redirect the user here to complete payment
+          pattern: ^https://
+          description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
           example: https://checkout.stripe.com/c/pay/cs_test_...
     DowngradeResponse:
       type: object
@@ -8934,7 +8946,8 @@ components:
         stripe_invoice_url:
           type: string
           format: uri
-          description: URL to view the full invoice details on Stripe's hosted page
+          pattern: ^https://
+          description: URL to view the full invoice details on Stripe's hosted page. Always HTTPS.
           example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
     InvoiceListResponse:
       type: object
@@ -8951,93 +8964,77 @@ components:
           description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
           example: false
     QuotaExceededError:
-      type: object
-      required:
-        - error
-      properties:
+      description: |
+        Returned when the user exceeds their plan's monthly request quota (HTTP 429).
+        Uses the standard ErrorResponse structure. The `details` object contains
+        quota-specific fields to help the frontend render an upgrade prompt.
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+      example:
         error:
-          type: object
-          required:
-            - code
-            - message
-            - retryable
-          properties:
-            code:
-              type: string
-              enum:
-                - quota_exceeded
-              description: Machine-readable error code
-              example: quota_exceeded
-            message:
-              type: string
-              description: Human-readable error message
-              example: Monthly request quota exceeded. Upgrade your plan for continued access.
-            retryable:
-              type: boolean
-              description: Whether the client should retry
-              example: false
-            details:
-              type: object
-              properties:
-                limit:
-                  type: integer
-                  description: The plan's request limit
-                  example: 1000
-                current_count:
-                  type: integer
-                  description: Current usage count
-                  example: 1001
-                plan_id:
-                  type: string
-                  description: The user's current plan
-                  example: free
-                reset_at:
-                  type: string
-                  format: date-time
-                  description: When the usage counter resets (next billing period start)
+          code: quota_exceeded
+          message: Monthly request quota exceeded. Upgrade your plan for continued access.
+          retryable: false
+          details:
+            limit: 1000
+            current_count: 1001
+            plan_id: free
+            reset_at: '2026-04-01T00:00:00Z'
+    QuotaExceededDetails:
+      type: object
+      description: Shape of `error.details` for quota_exceeded errors.
+      properties:
+        limit:
+          type: integer
+          description: The plan's request limit
+          example: 1000
+        current_count:
+          type: integer
+          description: Current usage count
+          example: 1001
+        plan_id:
+          type: string
+          description: The user's current plan
+          example: free
+        reset_at:
+          type: string
+          format: date-time
+          description: When the usage counter resets (next billing period start)
     ResourceLimitError:
-      type: object
-      required:
-        - error
-      properties:
+      description: |
+        Returned when the user hits a plan-based resource limit (HTTP 403).
+        Uses the standard ErrorResponse structure. The `details` object contains
+        limit-specific fields to help the frontend render an upgrade prompt.
+
+        Possible error codes: `agent_limit_reached`, `standing_approval_limit_reached`,
+        `credential_limit_reached`.
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+      example:
         error:
-          type: object
-          required:
-            - code
-            - message
-            - retryable
-          properties:
-            code:
-              type: string
-              enum:
-                - agent_limit_reached
-                - standing_approval_limit_reached
-                - credential_limit_reached
-              description: Machine-readable error code indicating which resource limit was hit
-              example: agent_limit_reached
-            message:
-              type: string
-              description: Human-readable error message with plan details
-              example: Free plan allows up to 3 agents. Upgrade your plan to add more.
-            retryable:
-              type: boolean
-              description: Whether the client should retry (always false for limit errors)
-              example: false
-            details:
-              type: object
-              properties:
-                current_count:
-                  type: integer
-                  description: Current number of the resource
-                  example: 3
-                limit:
-                  type: integer
-                  description: Maximum allowed by the plan
-                  example: 3
-                plan_id:
-                  type: string
-                  description: The user's current plan
-                  example: free
+          code: agent_limit_reached
+          message: Free plan allows up to 3 agents. Upgrade your plan to add more.
+          retryable: false
+          details:
+            current_count: 3
+            limit: 3
+            plan_id: free
+    ResourceLimitDetails:
+      type: object
+      description: Shape of `error.details` for resource limit errors.
+      properties:
+        current_count:
+          type: integer
+          description: Current number of the resource
+          example: 3
+        limit:
+          type: integer
+          description: Maximum allowed by the plan
+          example: 3
+        plan_id:
+          type: string
+          description: The user's current plan
+          example: free
     ConfigResponse:
       type: object
       description: |
@@ -9451,6 +9448,10 @@ components:
     PlanLimits:
       type: object
       required:
+        - max_requests_per_month
+        - max_agents
+        - max_standing_approvals
+        - max_credentials
         - audit_retention_days
       properties:
         max_requests_per_month:
