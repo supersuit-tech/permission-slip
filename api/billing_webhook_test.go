@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -581,15 +582,28 @@ func TestWebhook_FullCancellationFlow(t *testing.T) {
 // ── Notification dispatch ───────────────────────────────────────────────────
 
 // mockSender records calls to Send for test assertions.
+// It is safe for concurrent use — Dispatch fires goroutines that call Send,
+// so the mutex protects the calls slice from data races.
 type mockSender struct {
+	mu    sync.Mutex
 	name  string
 	calls []notify.Approval
 }
 
 func (m *mockSender) Name() string { return m.name }
 func (m *mockSender) Send(_ context.Context, approval notify.Approval, _ notify.Recipient) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.calls = append(m.calls, approval)
 	return nil
+}
+
+func (m *mockSender) getCalls() []notify.Approval {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]notify.Approval, len(m.calls))
+	copy(out, m.calls)
+	return out
 }
 
 func TestWebhook_InvoicePaymentFailed_DispatchesNotification(t *testing.T) {
@@ -638,22 +652,19 @@ func TestWebhook_InvoicePaymentFailed_DispatchesNotification(t *testing.T) {
 	}
 
 	// The notification is dispatched asynchronously via Dispatch (fire-and-forget
-	// goroutine). Use DispatchSync in production tests would be better, but
-	// since the mock is instant, give the goroutine a moment to complete.
-	// For a more robust approach, we'd use DispatchSync, but the handler
-	// intentionally uses async Dispatch to not block the webhook response.
-	//
-	// Wait briefly for the async goroutine to complete.
+	// goroutine). Wait for the goroutine to complete using the thread-safe
+	// getCalls() accessor to avoid data races under -race.
 	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && len(mock.calls) == 0 {
+	for time.Now().Before(deadline) && len(mock.getCalls()) == 0 {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if len(mock.calls) == 0 {
+	calls := mock.getCalls()
+	if len(calls) == 0 {
 		t.Fatal("expected notification to be dispatched, got 0 calls")
 	}
 
-	notif := mock.calls[0]
+	notif := calls[0]
 	if notif.Type != notify.NotificationTypePaymentFailed {
 		t.Errorf("expected notification type=%s, got %s", notify.NotificationTypePaymentFailed, notif.Type)
 	}

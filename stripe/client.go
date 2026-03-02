@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	gostripe "github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
@@ -23,10 +24,16 @@ type Client struct {
 	cfg Config
 }
 
+// keyMu protects writes to gostripe.Key so parallel tests don't race.
+// In production New() is called once, but the mutex is cheap insurance.
+var keyMu sync.Mutex
+
 // New creates a new Stripe Client and sets the global API key.
 // The Stripe Go SDK uses a global key by default; we set it once at init.
 func New(cfg Config) *Client {
+	keyMu.Lock()
 	gostripe.Key = cfg.SecretKey
+	keyMu.Unlock()
 	return &Client{cfg: cfg}
 }
 

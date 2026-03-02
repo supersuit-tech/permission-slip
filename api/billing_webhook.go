@@ -239,6 +239,8 @@ func handleSubscriptionUpdated(r *http.Request, deps *Deps, event *pstripe.Webho
 	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, status); err != nil {
 		return fmt.Errorf("update status for %s: %w", sub.UserID, err)
 	}
+
+	log.Printf("[%s] StripeWebhook: subscription.updated (event %s), user %s status=%s (stripe=%s)", TraceID(r.Context()), event.ID, sub.UserID, status, stripeSub.Status)
 	return nil
 }
 
