@@ -4680,9 +4680,13 @@ paths:
   /v1/billing/subscription:
     get:
       summary: Get current subscription
+      deprecated: true
       description: |
         Returns the authenticated user's subscription details including plan info,
         billing period, and current usage metrics.
+
+        **Deprecated:** Use `GET /v1/billing/plan` instead, which returns structured
+        plan, subscription, and usage data in a single response.
 
         Only available when `billing_enabled` is `true` in the server config.
       operationId: getSubscription
@@ -4723,10 +4727,14 @@ paths:
   /v1/billing/checkout:
     post:
       summary: Create checkout session
+      deprecated: true
       description: |
         Creates a Stripe Checkout Session for upgrading from the free plan to
         pay-as-you-go. Returns a URL to redirect the user to Stripe's hosted
         checkout page.
+
+        **Deprecated:** Use `POST /v1/billing/upgrade` instead, which has the
+        same behavior but a clearer name and response schema.
 
         If the user doesn't have a Stripe Customer yet, one is created automatically.
         If the user is already on a paid plan, returns 409 Conflict.
@@ -4829,6 +4837,10 @@ paths:
                   status: active
                   current_period_start: '2026-03-01T00:00:00Z'
                   current_period_end: '2026-04-01T00:00:00Z'
+                  has_payment_method: false
+                  can_upgrade: true
+                  can_downgrade: false
+                  grace_period_ends_at: null
                 usage:
                   requests: 42
                   agents: 2
@@ -4848,9 +4860,12 @@ paths:
     get:
       summary: Get detailed usage breakdown
       description: |
-        Returns detailed usage metrics for the current billing period, including
-        request totals, overage calculations, SMS counts, costs, and an optional
-        breakdown by agent, connector, and action type.
+        Returns detailed usage metrics for a billing period, including request
+        totals, overage calculations, SMS counts, costs, and an optional breakdown
+        by agent, connector, and action type.
+
+        Defaults to the current billing period. Pass `period_start` to view a
+        historical period (e.g., last month's usage).
 
         Only available when `billing_enabled` is `true` in the server config.
       operationId: getBillingUsage
@@ -4858,6 +4873,18 @@ paths:
         - Billing
       security:
         - SupabaseSession: []
+      parameters:
+        - name: period_start
+          in: query
+          required: false
+          description: |
+            Start of the billing period to query, as an ISO 8601 date-time.
+            Must be the first day of a month in UTC (e.g., `2026-02-01T00:00:00Z`).
+            Defaults to the current billing period if omitted.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-02-01T00:00:00Z'
       responses:
         '200':
           description: Usage details returned
@@ -4965,6 +4992,7 @@ paths:
                 status: cancelled
                 plan_id: free
                 downgraded_at: '2026-03-02T12:00:00Z'
+                grace_period_ends_at: '2026-03-09T12:00:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
@@ -4985,8 +5013,11 @@ paths:
     get:
       summary: List invoices
       description: |
-        Returns a list of the authenticated user's past invoices from Stripe,
-        including the amount, status, and a link to view the invoice.
+        Returns a paginated list of the authenticated user's past invoices from
+        Stripe, including the amount, status, and a link to view the invoice.
+
+        Results are ordered by date descending (most recent first). Use
+        `starting_after` for cursor-based pagination.
 
         Only available when `billing_enabled` is `true` and the user has a
         Stripe customer ID (i.e., has previously been on a paid plan).
@@ -4995,6 +5026,25 @@ paths:
         - Billing
       security:
         - SupabaseSession: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of invoices to return (1–100). Defaults to 10.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: starting_after
+          in: query
+          required: false
+          description: |
+            Cursor for pagination. Pass the `id` of the last invoice from the
+            previous page to fetch the next page of results.
+          schema:
+            type: string
+          example: inv_1234567890
       responses:
         '200':
           description: Invoices returned
@@ -5006,14 +5056,19 @@ paths:
                 invoices:
                   - id: inv_1234567890
                     date: '2026-02-01T00:00:00Z'
+                    period_start: '2026-02-01T00:00:00Z'
+                    period_end: '2026-03-01T00:00:00Z'
                     amount_cents: 271
                     status: paid
                     stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_1234567890
                   - id: inv_0987654321
                     date: '2026-01-01T00:00:00Z'
+                    period_start: '2026-01-01T00:00:00Z'
+                    period_end: '2026-02-01T00:00:00Z'
                     amount_cents: 0
                     status: paid
                     stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_0987654321
+                has_more: false
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -8615,6 +8670,9 @@ components:
         - status
         - current_period_start
         - current_period_end
+        - has_payment_method
+        - can_upgrade
+        - can_downgrade
       properties:
         status:
           type: string
@@ -8622,7 +8680,11 @@ components:
             - active
             - past_due
             - cancelled
-          description: Current subscription status
+          description: |
+            Current subscription status.
+            - `active`: Subscription is in good standing.
+            - `past_due`: Payment failed — prompt the user to update their payment method.
+            - `cancelled`: Subscription was cancelled (user was downgraded to free).
           example: active
         current_period_start:
           type: string
@@ -8634,6 +8696,27 @@ components:
           format: date-time
           description: End of the current billing period (exclusive)
           example: '2026-04-01T00:00:00Z'
+        has_payment_method:
+          type: boolean
+          description: Whether the user has a Stripe payment method on file. Use this to decide whether to show "Add payment method" prompts.
+          example: false
+        can_upgrade:
+          type: boolean
+          description: Whether the user can upgrade (true when on the free plan). Use this to show/hide the upgrade button.
+          example: true
+        can_downgrade:
+          type: boolean
+          description: Whether the user can downgrade (true when on a paid plan). Use this to show/hide the downgrade button.
+          example: false
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the downgrade grace period expires, or null if no grace period is active.
+            During the grace period (7 days after downgrade), the user retains the longer
+            audit retention window (90 days) to export their data. After this timestamp,
+            retention drops to the free plan's window (7 days).
     UsageSummary:
       type: object
       required:
@@ -8776,6 +8859,7 @@ components:
         - status
         - plan_id
         - downgraded_at
+        - grace_period_ends_at
       properties:
         status:
           type: string
@@ -8783,7 +8867,7 @@ components:
             - active
             - past_due
             - cancelled
-          description: Updated subscription status
+          description: Updated subscription status (will be `cancelled` after downgrade)
           example: cancelled
         plan_id:
           type: string
@@ -8793,6 +8877,13 @@ components:
           type: string
           format: date-time
           description: Timestamp when the downgrade was processed
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          description: |
+            When the 7-day grace period expires. Until this time, the user retains
+            the 90-day audit retention window from their paid plan. Show this to the
+            user so they know how long they have to export their data.
     Invoice:
       type: object
       required:
@@ -8808,11 +8899,21 @@ components:
         date:
           type: string
           format: date-time
-          description: Invoice date
+          description: Invoice creation date
           example: '2026-02-01T00:00:00Z'
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the billing period this invoice covers
+          example: '2026-02-01T00:00:00Z'
+        period_end:
+          type: string
+          format: date-time
+          description: End of the billing period this invoice covers
+          example: '2026-03-01T00:00:00Z'
         amount_cents:
           type: integer
-          description: Total invoice amount in cents
+          description: Total invoice amount in cents (0 for periods within the free allowance)
           example: 271
         status:
           type: string
@@ -8822,22 +8923,33 @@ components:
             - paid
             - void
             - uncollectible
-          description: Invoice payment status
+          description: |
+            Invoice payment status.
+            - `draft`: Invoice is being prepared (not yet finalized).
+            - `open`: Invoice is finalized and awaiting payment.
+            - `paid`: Payment was collected successfully.
+            - `void`: Invoice was voided (no payment required).
+            - `uncollectible`: Payment could not be collected after all retries.
           example: paid
         stripe_invoice_url:
           type: string
           format: uri
-          description: URL to view the invoice on Stripe's hosted page
+          description: URL to view the full invoice details on Stripe's hosted page
           example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
     InvoiceListResponse:
       type: object
       required:
         - invoices
+        - has_more
       properties:
         invoices:
           type: array
           items:
             $ref: '#/components/schemas/Invoice'
+        has_more:
+          type: boolean
+          description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
+          example: false
     QuotaExceededError:
       type: object
       required:

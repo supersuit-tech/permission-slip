@@ -162,11 +162,18 @@ Subscription:
     - status
     - current_period_start
     - current_period_end
+    - has_payment_method
+    - can_upgrade
+    - can_downgrade
   properties:
     status:
       type: string
       enum: [active, past_due, cancelled]
-      description: Current subscription status
+      description: |
+        Current subscription status.
+        - `active`: Subscription is in good standing.
+        - `past_due`: Payment failed — prompt the user to update their payment method.
+        - `cancelled`: Subscription was cancelled (user was downgraded to free).
       example: active
     current_period_start:
       type: string
@@ -178,6 +185,27 @@ Subscription:
       format: date-time
       description: End of the current billing period (exclusive)
       example: '2026-04-01T00:00:00Z'
+    has_payment_method:
+      type: boolean
+      description: Whether the user has a Stripe payment method on file. Use this to decide whether to show "Add payment method" prompts.
+      example: false
+    can_upgrade:
+      type: boolean
+      description: Whether the user can upgrade (true when on the free plan). Use this to show/hide the upgrade button.
+      example: true
+    can_downgrade:
+      type: boolean
+      description: Whether the user can downgrade (true when on a paid plan). Use this to show/hide the downgrade button.
+      example: false
+    grace_period_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When the downgrade grace period expires, or null if no grace period is active.
+        During the grace period (7 days after downgrade), the user retains the longer
+        audit retention window (90 days) to export their data. After this timestamp,
+        retention drops to the free plan's window (7 days).
 
 UsageSummary:
   type: object
@@ -328,11 +356,12 @@ DowngradeResponse:
     - status
     - plan_id
     - downgraded_at
+    - grace_period_ends_at
   properties:
     status:
       type: string
       enum: [active, past_due, cancelled]
-      description: Updated subscription status
+      description: Updated subscription status (will be `cancelled` after downgrade)
       example: cancelled
     plan_id:
       type: string
@@ -342,6 +371,13 @@ DowngradeResponse:
       type: string
       format: date-time
       description: Timestamp when the downgrade was processed
+    grace_period_ends_at:
+      type: string
+      format: date-time
+      description: |
+        When the 7-day grace period expires. Until this time, the user retains
+        the 90-day audit retention window from their paid plan. Show this to the
+        user so they know how long they have to export their data.
 
 Invoice:
   type: object
@@ -358,32 +394,53 @@ Invoice:
     date:
       type: string
       format: date-time
-      description: Invoice date
+      description: Invoice creation date
       example: '2026-02-01T00:00:00Z'
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the billing period this invoice covers
+      example: '2026-02-01T00:00:00Z'
+    period_end:
+      type: string
+      format: date-time
+      description: End of the billing period this invoice covers
+      example: '2026-03-01T00:00:00Z'
     amount_cents:
       type: integer
-      description: Total invoice amount in cents
+      description: Total invoice amount in cents (0 for periods within the free allowance)
       example: 271
     status:
       type: string
       enum: [draft, open, paid, void, uncollectible]
-      description: Invoice payment status
+      description: |
+        Invoice payment status.
+        - `draft`: Invoice is being prepared (not yet finalized).
+        - `open`: Invoice is finalized and awaiting payment.
+        - `paid`: Payment was collected successfully.
+        - `void`: Invoice was voided (no payment required).
+        - `uncollectible`: Payment could not be collected after all retries.
       example: paid
     stripe_invoice_url:
       type: string
       format: uri
-      description: URL to view the invoice on Stripe's hosted page
+      description: URL to view the full invoice details on Stripe's hosted page
       example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
 
 InvoiceListResponse:
   type: object
   required:
     - invoices
+    - has_more
   properties:
     invoices:
       type: array
       items:
         $ref: '#/Invoice'
+    has_more:
+      type: boolean
+      description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
+      example: false
 
 QuotaExceededError:
   type: object
