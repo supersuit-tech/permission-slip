@@ -84,6 +84,17 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, stripeCustomerID, su
 // billing period before per-request charges apply.
 const FreeRequestAllowance = 1000
 
+// OverageCostCents calculates the cost in cents for overage requests at
+// $0.005/request (0.5 cents). Uses ceiling division to avoid under-billing
+// for odd counts: ceil(overage * 0.5) = (overage*5 + 9) / 10.
+// Returns 0 if overage is zero or negative.
+func OverageCostCents(overage int) int {
+	if overage <= 0 {
+		return 0
+	}
+	return int((int64(overage)*5 + 9) / 10)
+}
+
 // CreateUsageInvoiceItem creates a Stripe Invoice Item for billable request
 // usage. It calculates the overage beyond the free allowance and charges
 // $0.005 per request. Returns nil (no error) if usage is within the free tier.
@@ -93,9 +104,7 @@ func (c *Client) CreateUsageInvoiceItem(ctx context.Context, stripeCustomerID st
 		return nil, nil // within free tier
 	}
 
-	// $0.005/request = 0.5 cents/request. Stripe amounts are in cents (int64),
-	// so we round up to avoid under-billing for odd counts.
-	amountCents := (billable*5 + 9) / 10 // equivalent to ceil(billable * 0.5)
+	amountCents := int64(OverageCostCents(int(billable)))
 
 	params := &gostripe.InvoiceItemParams{
 		Customer:    gostripe.String(stripeCustomerID),
@@ -179,13 +188,15 @@ func (c *Client) ListInvoices(ctx context.Context, stripeCustomerID string, limi
 	for iter.Next() {
 		inv := iter.Invoice()
 		summary := InvoiceSummary{
-			ID:        inv.ID,
-			Number:    inv.Number,
-			Status:    string(inv.Status),
-			Currency:  string(inv.Currency),
-			AmountDue: inv.AmountDue,
-			AmountPaid: inv.AmountPaid,
-			Created:   inv.Created,
+			ID:          inv.ID,
+			Number:      inv.Number,
+			Status:      string(inv.Status),
+			Currency:    string(inv.Currency),
+			AmountDue:   inv.AmountDue,
+			AmountPaid:  inv.AmountPaid,
+			PeriodStart: inv.PeriodStart,
+			PeriodEnd:   inv.PeriodEnd,
+			Created:     inv.Created,
 		}
 		if inv.HostedInvoiceURL != "" {
 			summary.HostedURL = inv.HostedInvoiceURL

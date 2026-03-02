@@ -134,7 +134,7 @@ RequestsUsage:
       example: 450
     included:
       type: integer
-      description: Number of requests included in the plan (0 = unlimited)
+      description: Number of requests included in the plan for free (0 = unlimited on paid plans)
       example: 1000
     overage:
       type: integer
@@ -142,7 +142,9 @@ RequestsUsage:
       example: 0
     overage_cost_cents:
       type: integer
-      description: Estimated overage cost in cents
+      description: |
+        Estimated overage cost in cents, calculated at $0.005 per request
+        (0.5 cents), rounded up to the nearest cent
       example: 0
 
 SMSUsage:
@@ -157,7 +159,9 @@ SMSUsage:
       example: 12
     cost_cents:
       type: integer
-      description: Estimated SMS cost in cents
+      description: |
+        Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
+        International rates may apply for non-US/CA destinations.
       example: 12
 
 DowngradeResponse:

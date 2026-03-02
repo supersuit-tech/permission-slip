@@ -171,7 +171,8 @@ downgrade:
 
       If the user has a Stripe subscription, it is cancelled immediately.
       Returns 409 if the user is already on the free plan or if resource
-      counts exceed free plan limits.
+      counts exceed free plan limits (with details about which resource and
+      the current/allowed counts in the error response).
 
       Only available when `billing_enabled` is `true` in the server config.
     operationId: downgradePlan
@@ -192,6 +193,12 @@ downgrade:
         $ref: '../responses/errors.yaml#/NotFound'
       '409':
         description: Already on free plan or resource limits exceeded
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '500':
+        description: Unable to verify resource counts for limit validation
         content:
           application/json:
             schema:

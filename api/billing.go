@@ -256,12 +256,10 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			resp.Requests.Total = usage.RequestCount
 			resp.SMS.Total = usage.SMSCount
 
-			// Calculate overage.
+			// Calculate overage using the shared pricing function.
 			if included > 0 && usage.RequestCount > included {
-				overage := usage.RequestCount - included
-				resp.Requests.Overage = overage
-				// $0.005/request = 0.5 cents. Round up using same formula as stripe client.
-				resp.Requests.OverageCostCents = int((int64(overage)*5 + 9) / 10)
+				resp.Requests.Overage = usage.RequestCount - included
+				resp.Requests.OverageCostCents = pstripe.OverageCostCents(resp.Requests.Overage)
 			}
 
 			// SMS cost: $0.01/message (us_ca rate).
@@ -310,8 +308,12 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if err := validateDowngradeLimits(r.Context(), deps, profile.ID, freePlan); err != nil {
-			RespondError(w, r, http.StatusConflict, *err)
+		if limitErr := validateDowngradeLimits(r.Context(), deps, profile.ID, freePlan); limitErr != nil {
+			status := http.StatusConflict
+			if limitErr.Error.Code == ErrInternalError {
+				status = http.StatusInternalServerError
+			}
+			RespondError(w, r, status, *limitErr)
 			return
 		}
 

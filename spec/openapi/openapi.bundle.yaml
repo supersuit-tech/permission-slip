@@ -4846,7 +4846,8 @@ paths:
 
         If the user has a Stripe subscription, it is cancelled immediately.
         Returns 409 if the user is already on the free plan or if resource
-        counts exceed free plan limits.
+        counts exceed free plan limits (with details about which resource and
+        the current/allowed counts in the error response).
 
         Only available when `billing_enabled` is `true` in the server config.
       operationId: downgradePlan
@@ -4867,6 +4868,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           description: Already on free plan or resource limits exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unable to verify resource counts for limit validation
           content:
             application/json:
               schema:
@@ -8514,7 +8521,7 @@ components:
           example: 450
         included:
           type: integer
-          description: Number of requests included in the plan (0 = unlimited)
+          description: Number of requests included in the plan for free (0 = unlimited on paid plans)
           example: 1000
         overage:
           type: integer
@@ -8522,7 +8529,9 @@ components:
           example: 0
         overage_cost_cents:
           type: integer
-          description: Estimated overage cost in cents
+          description: |
+            Estimated overage cost in cents, calculated at $0.005 per request
+            (0.5 cents), rounded up to the nearest cent
           example: 0
     SMSUsage:
       type: object
@@ -8536,7 +8545,9 @@ components:
           example: 12
         cost_cents:
           type: integer
-          description: Estimated SMS cost in cents
+          description: |
+            Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
+            International rates may apply for non-US/CA destinations.
           example: 12
     DowngradeResponse:
       type: object
