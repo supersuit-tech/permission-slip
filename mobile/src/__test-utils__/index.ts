@@ -3,6 +3,11 @@
  *
  * Centralises mock factories, query-client setup, and renderer helpers
  * so each test file stays focused on its own assertions.
+ *
+ * NOTE: Supabase auth mocks (`jest.mock("../../lib/supabaseClient")`) and the
+ * `authMocks` callback tracker must remain in each test file because Jest
+ * hoists `jest.mock` calls above imports — the factory function cannot
+ * reference values from this module.
  */
 import { act, type ReactTestRenderer } from "react-test-renderer";
 import { QueryClient } from "@tanstack/react-query";

@@ -16,6 +16,10 @@ import { colors } from "../../theme/colors";
 import ApprovalListItem from "./ApprovalListItem";
 import StatusFilterTabs from "./StatusFilterTabs";
 
+/**
+ * Main screen showing the user's approval requests with status filter tabs.
+ * Supports pull-to-refresh and automatic polling via the useApprovals hook.
+ */
 export default function ApprovalListScreen() {
   const { signOut, user } = useAuth();
   const insets = useSafeAreaInsets();

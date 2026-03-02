@@ -13,6 +13,7 @@ const TABS: { key: ApprovalStatus; label: string }[] = [
   { key: "denied", label: "Denied" },
 ];
 
+/** Horizontal tab bar for switching between pending, approved, and denied approvals. */
 export default function StatusFilterTabs({ selected, onSelect }: StatusFilterTabsProps) {
   return (
     <View style={styles.container}>
