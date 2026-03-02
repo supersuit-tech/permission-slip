@@ -146,8 +146,8 @@ func TestCreateCheckout_AlreadyPaid(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Even with a Stripe client, already-paid users should get 409.
-	// We use nil Stripe since the check happens before any Stripe call.
+	// Business logic (already-paid) is checked before Stripe dependency,
+	// so even with nil Stripe the user gets the correct 409 error.
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
@@ -155,12 +155,16 @@ func TestCreateCheckout_AlreadyPaid(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	// The nil Stripe check happens first, but the already-paid check is
-	// after the Stripe nil check, so we'll get 503 here. That's fine —
-	// the important logic (already-paid rejection) is tested when Stripe
-	// is available, which requires a real/mock Stripe client.
-	if w.Code != http.StatusServiceUnavailable {
-		t.Logf("got %d (expected 503 since Stripe is nil)", w.Code)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to parse error response: %v", err)
+	}
+	if errResp.Error.Code != ErrAlreadySubscribed {
+		t.Errorf("expected error code %s, got %s", ErrAlreadySubscribed, errResp.Error.Code)
 	}
 }
 

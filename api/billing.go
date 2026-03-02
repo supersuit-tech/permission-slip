@@ -71,6 +71,9 @@ type downgradeResponse struct {
 	PlanID string `json:"plan_id"`
 }
 
+// maxInvoiceResults is the maximum number of invoices returned by the list endpoint.
+const maxInvoiceResults = 24
+
 // ── Route registration ──────────────────────────────────────────────────────
 
 // RegisterBillingRoutes adds billing endpoints to the mux.
@@ -147,12 +150,9 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
 
-		if deps.Stripe == nil {
-			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
-			return
-		}
-
-		// Look up existing subscription to check for existing Stripe customer.
+		// Check business logic before infrastructure dependencies so users
+		// get accurate error messages (e.g. "already subscribed" not "billing
+		// not configured").
 		sub, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] CreateCheckout: subscription lookup: %v", TraceID(r.Context()), err)
@@ -164,6 +164,11 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 		// If already on paid plan, reject.
 		if sub != nil && sub.PlanID == db.PlanPayAsYouGo {
 			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadySubscribed, "Already subscribed to a paid plan"))
+			return
+		}
+
+		if deps.Stripe == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
 			return
 		}
 
@@ -243,6 +248,9 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] GetUsage: usage lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch usage data"))
+			return
 		}
 		if usage != nil {
 			resp.Requests.Total = usage.RequestCount
@@ -339,17 +347,21 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 
 // validateDowngradeLimits checks that the user's current resource counts are
 // within the free plan's limits. Returns an ErrorResponse if any limit is
-// exceeded, nil otherwise.
+// exceeded or if a count cannot be verified (fail-closed), nil otherwise.
 func validateDowngradeLimits(ctx context.Context, deps *Deps, userID string, freePlan *db.Plan) *ErrorResponse {
 	if freePlan.MaxAgents != nil {
 		count, err := db.CountRegisteredAgentsByUser(ctx, deps.DB, userID)
 		if err != nil {
 			log.Printf("[%s] Downgrade: count agents: %v", TraceID(ctx), err)
-		} else if count > *freePlan.MaxAgents {
+			CaptureError(ctx, err)
+			resp := InternalError("Unable to verify agent count")
+			return &resp
+		}
+		if count > *freePlan.MaxAgents {
 			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active agents for the free plan")
 			resp.Error.Details = map[string]any{
-				"resource":  "agents",
-				"current":   count,
+				"resource":    "agents",
+				"current":     count,
 				"max_allowed": *freePlan.MaxAgents,
 			}
 			return &resp
@@ -360,11 +372,15 @@ func validateDowngradeLimits(ctx context.Context, deps *Deps, userID string, fre
 		count, err := db.CountActiveStandingApprovalsByUser(ctx, deps.DB, userID)
 		if err != nil {
 			log.Printf("[%s] Downgrade: count standing approvals: %v", TraceID(ctx), err)
-		} else if count > *freePlan.MaxStandingApprovals {
+			CaptureError(ctx, err)
+			resp := InternalError("Unable to verify standing approval count")
+			return &resp
+		}
+		if count > *freePlan.MaxStandingApprovals {
 			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active standing approvals for the free plan")
 			resp.Error.Details = map[string]any{
-				"resource":  "standing_approvals",
-				"current":   count,
+				"resource":    "standing_approvals",
+				"current":     count,
 				"max_allowed": *freePlan.MaxStandingApprovals,
 			}
 			return &resp
@@ -375,11 +391,15 @@ func validateDowngradeLimits(ctx context.Context, deps *Deps, userID string, fre
 		count, err := db.CountCredentialsByUser(ctx, deps.DB, userID)
 		if err != nil {
 			log.Printf("[%s] Downgrade: count credentials: %v", TraceID(ctx), err)
-		} else if count > *freePlan.MaxCredentials {
+			CaptureError(ctx, err)
+			resp := InternalError("Unable to verify credential count")
+			return &resp
+		}
+		if count > *freePlan.MaxCredentials {
 			resp := Conflict(ErrDowngradeLimitExceeded, "Too many stored credentials for the free plan")
 			resp.Error.Details = map[string]any{
-				"resource":  "credentials",
-				"current":   count,
+				"resource":    "credentials",
+				"current":     count,
 				"max_allowed": *freePlan.MaxCredentials,
 			}
 			return &resp
@@ -413,7 +433,7 @@ func handleListInvoices(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		invoices, err := deps.Stripe.ListInvoices(r.Context(), *sub.StripeCustomerID, 24)
+		invoices, err := deps.Stripe.ListInvoices(r.Context(), *sub.StripeCustomerID, maxInvoiceResults)
 		if err != nil {
 			log.Printf("[%s] ListInvoices: Stripe list: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
