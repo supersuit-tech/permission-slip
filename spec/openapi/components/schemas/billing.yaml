@@ -99,6 +99,152 @@ UsageInfo:
       description: Whether current usage exceeds the plan's request limit
       example: false
 
+UsageResponse:
+  type: object
+  required:
+    - period_start
+    - period_end
+    - requests
+    - sms
+  properties:
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the current billing period (inclusive)
+    period_end:
+      type: string
+      format: date-time
+      description: End of the current billing period (exclusive)
+    requests:
+      $ref: '#/RequestsUsage'
+    sms:
+      $ref: '#/SMSUsage'
+
+RequestsUsage:
+  type: object
+  required:
+    - total
+    - included
+    - overage
+    - overage_cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total API requests in the current billing period
+      example: 450
+    included:
+      type: integer
+      description: Number of requests included in the plan for free (0 = unlimited on paid plans)
+      example: 1000
+    overage:
+      type: integer
+      description: Number of requests exceeding the included allowance
+      example: 0
+    overage_cost_cents:
+      type: integer
+      description: |
+        Estimated overage cost in cents, calculated at $0.005 per request
+        (0.5 cents), rounded up to the nearest cent
+      example: 0
+
+SMSUsage:
+  type: object
+  required:
+    - total
+    - cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total SMS messages sent in the current billing period
+      example: 12
+    cost_cents:
+      type: integer
+      description: |
+        Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
+        International rates may apply for non-US/CA destinations.
+      example: 12
+
+DowngradeResponse:
+  type: object
+  required:
+    - status
+    - plan_id
+  properties:
+    status:
+      type: string
+      enum: [active, past_due, cancelled]
+      description: Subscription status after downgrade
+      example: active
+    plan_id:
+      type: string
+      description: Plan ID after downgrade (always "free")
+      example: free
+
+InvoiceListResponse:
+  type: object
+  required:
+    - invoices
+  properties:
+    invoices:
+      type: array
+      items:
+        $ref: '#/InvoiceSummary'
+
+InvoiceSummary:
+  type: object
+  required:
+    - id
+    - status
+    - currency
+    - amount_due
+    - amount_paid
+    - created
+  properties:
+    id:
+      type: string
+      description: Stripe Invoice ID
+      example: in_1234567890
+    number:
+      type: string
+      description: Invoice number
+      example: INV-0001
+    status:
+      type: string
+      description: Invoice status
+      example: paid
+    currency:
+      type: string
+      description: Three-letter ISO currency code
+      example: usd
+    amount_due:
+      type: integer
+      description: Amount due in cents
+      example: 500
+    amount_paid:
+      type: integer
+      description: Amount paid in cents
+      example: 500
+    period_start:
+      type: integer
+      description: Billing period start (Unix timestamp)
+      example: 1709251200
+    period_end:
+      type: integer
+      description: Billing period end (Unix timestamp)
+      example: 1711929600
+    created:
+      type: integer
+      description: Invoice creation time (Unix timestamp)
+      example: 1711929600
+    hosted_invoice_url:
+      type: string
+      format: uri
+      description: URL to view the invoice on Stripe's hosted page
+    invoice_pdf:
+      type: string
+      format: uri
+      description: URL to download the invoice PDF
+
 CheckoutResponse:
   type: object
   required:

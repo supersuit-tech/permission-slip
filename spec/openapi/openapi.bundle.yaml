@@ -4720,6 +4720,41 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/billing/usage:
+    get:
+      summary: Get current usage
+      description: |
+        Returns a detailed usage breakdown for the current billing period,
+        including request counts, overage calculations, and SMS costs.
+
+        Only available when `billing_enabled` is `true` in the server config.
+      operationId: getUsage
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Usage details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageResponse'
+              example:
+                period_start: '2026-03-01T00:00:00Z'
+                period_end: '2026-04-01T00:00:00Z'
+                requests:
+                  total: 450
+                  included: 1000
+                  overage: 0
+                  overage_cost_cents: 0
+                sms:
+                  total: 12
+                  cost_cents: 12
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/billing/checkout:
     post:
       summary: Create checkout session
@@ -4752,6 +4787,127 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/upgrade:
+    post:
+      summary: Upgrade to paid plan
+      description: |
+        Initiates an upgrade to the paid plan by creating a Stripe Checkout Session.
+        Returns a URL to redirect the user to Stripe's hosted checkout page.
+
+        This is an alias for `POST /v1/billing/checkout`.
+
+        If the user doesn't have a Stripe Customer yet, one is created automatically.
+        If the user is already on a paid plan, returns 409 Conflict.
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: upgradePlan
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Already subscribed to a paid plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/downgrade:
+    post:
+      summary: Downgrade to free plan
+      description: |
+        Downgrades the user from a paid plan to the free tier. Validates that
+        current resource counts (agents, standing approvals, credentials) are
+        within free plan limits before proceeding.
+
+        If the user has a Stripe subscription, it is cancelled immediately.
+        Returns 409 if the user is already on the free plan or if resource
+        counts exceed free plan limits (with details about which resource and
+        the current/allowed counts in the error response).
+
+        Only available when `billing_enabled` is `true` in the server config.
+      operationId: downgradePlan
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Successfully downgraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DowngradeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already on free plan or resource limits exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unable to verify resource counts for limit validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/billing/invoices:
+    get:
+      summary: List invoices
+      description: |
+        Returns the user's past invoices from Stripe. Up to 24 paid invoices
+        are returned, sorted by creation date (most recent first).
+
+        Returns an empty list if the user has no Stripe customer or no invoices.
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: listInvoices
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Invoice list returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '502':
           description: Stripe API error
           content:
@@ -8331,6 +8487,149 @@ components:
           type: boolean
           description: Whether current usage exceeds the plan's request limit
           example: false
+    UsageResponse:
+      type: object
+      required:
+        - period_start
+        - period_end
+        - requests
+        - sms
+      properties:
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the current billing period (inclusive)
+        period_end:
+          type: string
+          format: date-time
+          description: End of the current billing period (exclusive)
+        requests:
+          $ref: '#/components/schemas/RequestsUsage'
+        sms:
+          $ref: '#/components/schemas/SMSUsage'
+    RequestsUsage:
+      type: object
+      required:
+        - total
+        - included
+        - overage
+        - overage_cost_cents
+      properties:
+        total:
+          type: integer
+          description: Total API requests in the current billing period
+          example: 450
+        included:
+          type: integer
+          description: Number of requests included in the plan for free (0 = unlimited on paid plans)
+          example: 1000
+        overage:
+          type: integer
+          description: Number of requests exceeding the included allowance
+          example: 0
+        overage_cost_cents:
+          type: integer
+          description: |
+            Estimated overage cost in cents, calculated at $0.005 per request
+            (0.5 cents), rounded up to the nearest cent
+          example: 0
+    SMSUsage:
+      type: object
+      required:
+        - total
+        - cost_cents
+      properties:
+        total:
+          type: integer
+          description: Total SMS messages sent in the current billing period
+          example: 12
+        cost_cents:
+          type: integer
+          description: |
+            Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
+            International rates may apply for non-US/CA destinations.
+          example: 12
+    DowngradeResponse:
+      type: object
+      required:
+        - status
+        - plan_id
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - past_due
+            - cancelled
+          description: Subscription status after downgrade
+          example: active
+        plan_id:
+          type: string
+          description: Plan ID after downgrade (always "free")
+          example: free
+    InvoiceListResponse:
+      type: object
+      required:
+        - invoices
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceSummary'
+    InvoiceSummary:
+      type: object
+      required:
+        - id
+        - status
+        - currency
+        - amount_due
+        - amount_paid
+        - created
+      properties:
+        id:
+          type: string
+          description: Stripe Invoice ID
+          example: in_1234567890
+        number:
+          type: string
+          description: Invoice number
+          example: INV-0001
+        status:
+          type: string
+          description: Invoice status
+          example: paid
+        currency:
+          type: string
+          description: Three-letter ISO currency code
+          example: usd
+        amount_due:
+          type: integer
+          description: Amount due in cents
+          example: 500
+        amount_paid:
+          type: integer
+          description: Amount paid in cents
+          example: 500
+        period_start:
+          type: integer
+          description: Billing period start (Unix timestamp)
+          example: 1709251200
+        period_end:
+          type: integer
+          description: Billing period end (Unix timestamp)
+          example: 1711929600
+        created:
+          type: integer
+          description: Invoice creation time (Unix timestamp)
+          example: 1711929600
+        hosted_invoice_url:
+          type: string
+          format: uri
+          description: URL to view the invoice on Stripe's hosted page
+        invoice_pdf:
+          type: string
+          format: uri
+          description: URL to download the invoice PDF
     CheckoutResponse:
       type: object
       required:
