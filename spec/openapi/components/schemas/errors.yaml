@@ -50,23 +50,28 @@ Error:
         - constraint_violation
         # 410 Gone (standing approval)
         - standing_approval_expired
+        # 404 Not Found (billing)
+        - subscription_not_found
         # 409 Conflict
         - agent_already_registered
         - duplicate_request_id
         - approval_already_resolved
         - duplicate_credential
+        - already_subscribed
         # 410 Gone
         - registration_expired
         - verification_locked
         - approval_expired
         # 429 Too Many Requests
         - rate_limited
+        - quota_exceeded
         # 500 Internal Server Error
         - internal_error
         # 502 Bad Gateway
         - upstream_error
         # 503 Service Unavailable
         - service_unavailable
+        - billing_not_enabled
       example: "invalid_signature"
     
     message:

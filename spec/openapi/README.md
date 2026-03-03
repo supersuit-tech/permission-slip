@@ -21,38 +21,66 @@ spec/openapi/
     │   ├── registration.yaml    # Agent registration schemas
     │   ├── approvals.yaml       # Approval request/response schemas
     │   ├── actions.yaml         # Action execution schemas
-    │   ├── credentials.yaml     # Credential vault schemas
-    │   ├── connectors.yaml      # Connector/integration schemas
+    │   ├── action_config_templates.yaml # Action config template schemas
+    │   ├── action_configurations.yaml   # Action configuration schemas
+    │   ├── agents.yaml          # Agent management schemas
+    │   ├── agent_connectors.yaml # Agent-connector relationship schemas
+    │   ├── audit_events.yaml    # Audit event and log schemas
+    │   ├── billing.yaml         # Billing, plan, subscription, usage, invoice schemas
     │   ├── capabilities.yaml    # Agent capability discovery schemas
+    │   ├── config.yaml          # Server configuration schemas
+    │   ├── connectors.yaml      # Connector/integration schemas
+    │   ├── credentials.yaml     # Credential vault schemas
+    │   ├── onboarding.yaml      # Onboarding workflow schemas
+    │   ├── profiles.yaml        # User profile schemas
+    │   ├── push_subscriptions.yaml # Web Push subscription schemas
+    │   ├── registration_invites.yaml # Registration invite schemas
+    │   ├── standing_approvals.yaml   # Standing approval schemas
     │   ├── shared.yaml          # Shared schemas (Action, Token, etc.)
     │   └── errors.yaml          # Error response schemas
     ├── paths/                   # API endpoints
-    │   ├── connectors.yaml      # GET /v1/connectors, GET /v1/connectors/{id}
-    │   ├── registration.yaml    # Agent registration endpoints
-    │   ├── approvals.yaml       # Approval lifecycle endpoints
     │   ├── actions.yaml         # POST /v1/actions/execute
-    │   ├── credentials.yaml     # Credential vault endpoints
+    │   ├── action_config_templates.yaml # Action config template discovery
+    │   ├── action_configurations.yaml   # Action configuration CRUD
+    │   ├── agents.yaml          # Agent management endpoints
+    │   ├── agent_connectors.yaml # Agent-connector management
+    │   ├── approvals.yaml       # Approval lifecycle endpoints
+    │   ├── audit_events.yaml    # Audit event listing and export
+    │   ├── billing.yaml         # Billing plan, usage, upgrade, downgrade, invoices
     │   ├── capabilities.yaml    # GET /v1/agents/{id}/capabilities
-    │   └── standing_approvals.yaml # Standing approval discovery
+    │   ├── config.yaml          # Server configuration
+    │   ├── connectors.yaml      # GET /v1/connectors, GET /v1/connectors/{id}
+    │   ├── credentials.yaml     # Credential vault endpoints
+    │   ├── onboarding.yaml      # Onboarding workflow
+    │   ├── profiles.yaml        # User profile management
+    │   ├── push_subscriptions.yaml # Web Push subscription management
+    │   ├── registration.yaml    # Agent registration endpoints
+    │   ├── registration_invites.yaml # Registration invite creation
+    │   └── standing_approvals.yaml   # Standing approval management
     ├── parameters/              # Reusable parameters
     │   └── common.yaml          # Path parameters (agent_id, approval_id, etc.)
     ├── responses/               # Reusable responses
     │   └── errors.yaml          # Standard error responses
     └── securitySchemes/         # Authentication schemes
-        └── security.yaml        # Signature-based and JWT auth
+        └── security.yaml        # Supabase session JWT and agent signature auth
 ```
 
 ## API Endpoint Groups
 
-| Group | Endpoints | Description |
-|---|---|---|
-| **Connectors** | `GET /v1/connectors`, `GET /v1/connectors/{id}` | Discover available integrations and actions |
-| **Registration** | `POST /invite/{invite_code}`, `POST /v1/agents/{id}/verify` | Agent identity setup via invite URL |
-| **Approvals** | `POST /v1/approvals/request`, `POST .../verify`, `POST .../cancel` | Approval lifecycle |
-| **Actions** | `POST /v1/actions/execute` | Execute approved actions |
-| **Credentials** | `POST /v1/credentials`, `GET /v1/credentials`, `DELETE /v1/credentials/{id}` | Manage stored API credentials |
-| **Capabilities** | `GET /v1/agents/{id}/capabilities` | Agent capability discovery (connectors, actions, schemas, authorization) |
-| **Standing Approvals** | `GET /v1/agents/{id}/standing-approvals` | Discover active standing approvals |
+| Group | Endpoints | Auth | Description |
+|---|---|---|---|
+| **Connectors** | `GET /v1/connectors`, `GET /v1/connectors/{id}` | Public | Discover available integrations and actions |
+| **Registration** | `POST /invite/{code}`, `POST /v1/agents/{id}/verify` | Signature | Agent identity setup via invite URL |
+| **Agents** | `GET/PUT/DELETE /v1/agents/{id}`, `POST .../deactivate` | Session | Agent management |
+| **Approvals** | `POST /v1/approvals/request`, `POST .../verify`, `POST .../cancel` | Signature/Session | Approval lifecycle |
+| **Actions** | `POST /v1/actions/execute` | Signature/Token | Execute approved actions |
+| **Credentials** | `POST/GET /v1/credentials`, `DELETE .../credentials/{id}` | Session | Manage stored API credentials |
+| **Capabilities** | `GET /v1/agents/{id}/capabilities` | Signature | Agent capability discovery |
+| **Standing Approvals** | `GET/POST /v1/standing-approvals`, `POST .../revoke`, `POST .../execute` | Session/Signature | Pre-authorized agent actions |
+| **Audit Events** | `GET /v1/audit-events`, `GET /v1/audit-logs` | Session | Activity feed and audit trail |
+| **Billing** | `GET /v1/billing/plan`, `GET .../usage`, `POST .../upgrade`, `POST .../downgrade`, `GET .../invoices` | Session | Subscription, usage, and invoices |
+| **Profiles** | `GET/PUT /v1/profile`, `GET/PUT .../notification-preferences` | Session | User profile management |
+| **Config** | `GET /v1/config` | Session | Server configuration and feature flags |
 
 ## Usage
 
