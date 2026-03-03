@@ -47,6 +47,10 @@ SubscriptionResponse:
 PlanLimits:
   type: object
   required:
+    - max_requests_per_month
+    - max_agents
+    - max_standing_approvals
+    - max_credentials
     - audit_retention_days
   properties:
     max_requests_per_month:
@@ -99,6 +103,126 @@ UsageInfo:
       description: Whether current usage exceeds the plan's request limit
       example: false
 
+UsageResponse:
+  type: object
+  required:
+    - period_start
+    - period_end
+    - requests
+    - sms
+  properties:
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the current billing period (inclusive)
+    period_end:
+      type: string
+      format: date-time
+      description: End of the current billing period (exclusive)
+    requests:
+      $ref: '#/RequestsUsage'
+    sms:
+      $ref: '#/SMSUsage'
+
+RequestsUsage:
+  type: object
+  required:
+    - total
+    - included
+    - overage
+    - overage_cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total API requests in the current billing period
+      example: 450
+    included:
+      type: integer
+      description: Number of requests included in the plan for free (0 = unlimited on paid plans)
+      example: 1000
+    overage:
+      type: integer
+      description: Number of requests exceeding the included allowance
+      example: 0
+    overage_cost_cents:
+      type: integer
+      description: |
+        Estimated overage cost in cents, calculated at $0.005 per request
+        (0.5 cents), rounded up to the nearest cent
+      example: 0
+
+SMSUsage:
+  type: object
+  required:
+    - total
+    - cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total SMS messages sent in the current billing period
+      example: 12
+    cost_cents:
+      type: integer
+      description: |
+        Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
+        International rates may apply for non-US/CA destinations.
+      example: 12
+
+InvoiceSummary:
+  type: object
+  required:
+    - id
+    - status
+    - currency
+    - amount_due
+    - amount_paid
+    - created
+  properties:
+    id:
+      type: string
+      description: Stripe Invoice ID
+      example: in_1234567890
+    number:
+      type: string
+      description: Invoice number
+      example: INV-0001
+    status:
+      type: string
+      description: Invoice status
+      example: paid
+    currency:
+      type: string
+      description: Three-letter ISO currency code
+      example: usd
+    amount_due:
+      type: integer
+      description: Amount due in cents
+      example: 500
+    amount_paid:
+      type: integer
+      description: Amount paid in cents
+      example: 500
+    period_start:
+      type: integer
+      description: Billing period start (Unix timestamp)
+      example: 1709251200
+    period_end:
+      type: integer
+      description: Billing period end (Unix timestamp)
+      example: 1711929600
+    created:
+      type: integer
+      description: Invoice creation time (Unix timestamp)
+      example: 1711929600
+    hosted_invoice_url:
+      type: string
+      format: uri
+      description: URL to view the invoice on Stripe's hosted page
+    invoice_pdf:
+      type: string
+      format: uri
+      description: URL to download the invoice PDF
+
 CheckoutResponse:
   type: object
   required:
@@ -107,5 +231,390 @@ CheckoutResponse:
     url:
       type: string
       format: uri
-      description: Stripe Checkout Session URL — redirect the user here to complete payment
+      pattern: '^https://'
+      description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
       example: https://checkout.stripe.com/c/pay/cs_test_...
+
+Plan:
+  description: |
+    A billing plan with its resource limits. Composes `PlanLimits` with
+    plan identity fields to avoid duplicating the limit definitions.
+  allOf:
+    - type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Unique plan identifier
+          example: free
+        name:
+          type: string
+          description: Human-readable plan name
+          example: Free
+    - $ref: '#/PlanLimits'
+
+Subscription:
+  type: object
+  required:
+    - status
+    - current_period_start
+    - current_period_end
+    - has_payment_method
+    - can_upgrade
+    - can_downgrade
+  properties:
+    status:
+      type: string
+      enum: [active, past_due, cancelled]
+      description: |
+        Current subscription status.
+        - `active`: Subscription is in good standing.
+        - `past_due`: Payment failed — prompt the user to update their payment method.
+        - `cancelled`: Subscription was cancelled (user was downgraded to free).
+      example: active
+    current_period_start:
+      type: string
+      format: date-time
+      description: Start of the current billing period (inclusive)
+      example: '2026-03-01T00:00:00Z'
+    current_period_end:
+      type: string
+      format: date-time
+      description: End of the current billing period (exclusive)
+      example: '2026-04-01T00:00:00Z'
+    has_payment_method:
+      type: boolean
+      description: Whether the user has a Stripe payment method on file. Use this to decide whether to show "Add payment method" prompts.
+      example: false
+    can_upgrade:
+      type: boolean
+      description: Whether the user can upgrade (true when on the free plan). Use this to show/hide the upgrade button.
+      example: true
+    can_downgrade:
+      type: boolean
+      description: Whether the user can downgrade (true when on a paid plan). Use this to show/hide the downgrade button.
+      example: false
+    grace_period_ends_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When the downgrade grace period expires, or null if no grace period is active.
+        During the grace period (7 days after downgrade), the user retains the longer
+        audit retention window (90 days) to export their data. After this timestamp,
+        retention drops to the free plan's window (7 days).
+
+UsageSummary:
+  type: object
+  required:
+    - requests
+    - agents
+    - standing_approvals
+    - credentials
+  properties:
+    requests:
+      type: integer
+      description: Number of API requests in the current billing period
+      example: 42
+    agents:
+      type: integer
+      description: Current number of registered agents
+      example: 2
+    standing_approvals:
+      type: integer
+      description: Current number of active standing approvals
+      example: 3
+    credentials:
+      type: integer
+      description: Current number of stored credentials
+      example: 1
+
+BillingPlanResponse:
+  type: object
+  required:
+    - plan
+    - subscription
+    - usage
+  properties:
+    plan:
+      $ref: '#/Plan'
+    subscription:
+      $ref: '#/Subscription'
+    usage:
+      $ref: '#/UsageSummary'
+
+UsageDetail:
+  type: object
+  required:
+    - period_start
+    - period_end
+    - requests
+    - sms
+  properties:
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the usage period (inclusive)
+      example: '2026-03-01T00:00:00Z'
+    period_end:
+      type: string
+      format: date-time
+      description: End of the usage period (exclusive)
+      example: '2026-04-01T00:00:00Z'
+    requests:
+      $ref: '#/RequestUsageDetail'
+    sms:
+      $ref: '#/SMSUsageDetail'
+    breakdown:
+      $ref: '#/UsageBreakdown'
+
+RequestUsageDetail:
+  type: object
+  required:
+    - total
+    - included
+    - overage
+    - cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total requests this period
+      example: 1542
+    included:
+      type: integer
+      description: Requests included in the plan at no extra cost
+      example: 1000
+    overage:
+      type: integer
+      description: Billable requests beyond the included allowance
+      example: 542
+    cost_cents:
+      type: integer
+      description: Cost of overage requests in cents
+      example: 271
+
+SMSUsageDetail:
+  type: object
+  required:
+    - total
+    - cost_cents
+  properties:
+    total:
+      type: integer
+      description: Total SMS messages sent this period
+      example: 5
+    cost_cents:
+      type: integer
+      description: Total SMS cost in cents
+      example: 5
+
+UsageBreakdown:
+  type: object
+  properties:
+    by_agent:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Request counts keyed by agent ID
+      example:
+        '1': 500
+        '2': 1042
+    by_connector:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Request counts keyed by connector ID
+      example:
+        gmail: 300
+        stripe: 1242
+    by_action_type:
+      type: object
+      additionalProperties:
+        type: integer
+      description: Request counts keyed by action type
+      example:
+        email.send: 300
+        payment.create: 1242
+
+UpgradeResponse:
+  type: object
+  required:
+    - checkout_url
+  properties:
+    checkout_url:
+      type: string
+      format: uri
+      pattern: '^https://'
+      description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
+      example: https://checkout.stripe.com/c/pay/cs_test_...
+
+DowngradeResponse:
+  type: object
+  required:
+    - status
+    - plan_id
+    - downgraded_at
+    - grace_period_ends_at
+  properties:
+    status:
+      type: string
+      enum: [active, past_due, cancelled]
+      description: Updated subscription status (will be `cancelled` after downgrade)
+      example: cancelled
+    plan_id:
+      type: string
+      description: The plan the user was downgraded to
+      example: free
+    downgraded_at:
+      type: string
+      format: date-time
+      description: Timestamp when the downgrade was processed
+    grace_period_ends_at:
+      type: string
+      format: date-time
+      description: |
+        When the 7-day grace period expires. Until this time, the user retains
+        the 90-day audit retention window from their paid plan. Show this to the
+        user so they know how long they have to export their data.
+
+Invoice:
+  type: object
+  required:
+    - id
+    - date
+    - amount_cents
+    - status
+  properties:
+    id:
+      type: string
+      description: Invoice identifier
+      example: inv_1234567890
+    date:
+      type: string
+      format: date-time
+      description: Invoice creation date
+      example: '2026-02-01T00:00:00Z'
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the billing period this invoice covers
+      example: '2026-02-01T00:00:00Z'
+    period_end:
+      type: string
+      format: date-time
+      description: End of the billing period this invoice covers
+      example: '2026-03-01T00:00:00Z'
+    amount_cents:
+      type: integer
+      description: Total invoice amount in cents (0 for periods within the free allowance)
+      example: 271
+    status:
+      type: string
+      enum: [draft, open, paid, void, uncollectible]
+      description: |
+        Invoice payment status.
+        - `draft`: Invoice is being prepared (not yet finalized).
+        - `open`: Invoice is finalized and awaiting payment.
+        - `paid`: Payment was collected successfully.
+        - `void`: Invoice was voided (no payment required).
+        - `uncollectible`: Payment could not be collected after all retries.
+      example: paid
+    stripe_invoice_url:
+      type: string
+      format: uri
+      pattern: '^https://'
+      description: URL to view the full invoice details on Stripe's hosted page. Always HTTPS.
+      example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
+
+InvoiceListResponse:
+  type: object
+  required:
+    - invoices
+    - has_more
+  properties:
+    invoices:
+      type: array
+      items:
+        $ref: '#/Invoice'
+    has_more:
+      type: boolean
+      description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
+      example: false
+
+QuotaExceededError:
+  description: |
+    Returned when the user exceeds their plan's monthly request quota (HTTP 429).
+    Uses the standard ErrorResponse structure. The `details` object contains
+    quota-specific fields to help the frontend render an upgrade prompt.
+  allOf:
+    - $ref: '../schemas/errors.yaml#/ErrorResponse'
+  example:
+    error:
+      code: quota_exceeded
+      message: Monthly request quota exceeded. Upgrade your plan for continued access.
+      retryable: false
+      details:
+        limit: 1000
+        current_count: 1001
+        plan_id: free
+        reset_at: '2026-04-01T00:00:00Z'
+
+QuotaExceededDetails:
+  type: object
+  description: Shape of `error.details` for quota_exceeded errors.
+  properties:
+    limit:
+      type: integer
+      description: The plan's request limit
+      example: 1000
+    current_count:
+      type: integer
+      description: Current usage count
+      example: 1001
+    plan_id:
+      type: string
+      description: The user's current plan
+      example: free
+    reset_at:
+      type: string
+      format: date-time
+      description: When the usage counter resets (next billing period start)
+
+ResourceLimitError:
+  description: |
+    Returned when the user hits a plan-based resource limit (HTTP 403).
+    Uses the standard ErrorResponse structure. The `details` object contains
+    limit-specific fields to help the frontend render an upgrade prompt.
+
+    Possible error codes: `agent_limit_reached`, `standing_approval_limit_reached`,
+    `credential_limit_reached`.
+  allOf:
+    - $ref: '../schemas/errors.yaml#/ErrorResponse'
+  example:
+    error:
+      code: agent_limit_reached
+      message: Free plan allows up to 3 agents. Upgrade your plan to add more.
+      retryable: false
+      details:
+        current_count: 3
+        limit: 3
+        plan_id: free
+
+ResourceLimitDetails:
+  type: object
+  description: Shape of `error.details` for resource limit errors.
+  properties:
+    current_count:
+      type: integer
+      description: Current number of the resource
+      example: 3
+    limit:
+      type: integer
+      description: Maximum allowed by the plan
+      example: 3
+    plan_id:
+      type: string
+      description: The user's current plan
+      example: free

@@ -229,13 +229,28 @@ paths:
   /v1/billing/subscription:
     $ref: './components/paths/billing.yaml#/subscription'
 
+  /v1/billing/usage:
+    $ref: './components/paths/billing.yaml#/usage'
+
   /v1/billing/checkout:
     $ref: './components/paths/billing.yaml#/checkout'
+
+  /v1/billing/upgrade:
+    $ref: './components/paths/billing.yaml#/upgrade'
+
+  /v1/billing/downgrade:
+    $ref: './components/paths/billing.yaml#/downgrade'
+
+  /v1/billing/invoices:
+    $ref: './components/paths/billing.yaml#/invoices'
 
   # NOTE: The Stripe webhook endpoint lives outside /api/v1/ so it bypasses
   # auth and rate-limiting middleware. Documented here for completeness.
   /api/webhooks/stripe:
     $ref: './components/paths/billing.yaml#/webhook'
+
+  /v1/billing/plan:
+    $ref: './components/paths/billing.yaml#/plan'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -439,8 +454,48 @@ components:
       $ref: './components/schemas/billing.yaml#/SubscriptionResponse'
     UsageInfo:
       $ref: './components/schemas/billing.yaml#/UsageInfo'
+    UsageResponse:
+      $ref: './components/schemas/billing.yaml#/UsageResponse'
+    RequestsUsage:
+      $ref: './components/schemas/billing.yaml#/RequestsUsage'
+    SMSUsage:
+      $ref: './components/schemas/billing.yaml#/SMSUsage'
+    InvoiceSummary:
+      $ref: './components/schemas/billing.yaml#/InvoiceSummary'
     CheckoutResponse:
       $ref: './components/schemas/billing.yaml#/CheckoutResponse'
+    Plan:
+      $ref: './components/schemas/billing.yaml#/Plan'
+    Subscription:
+      $ref: './components/schemas/billing.yaml#/Subscription'
+    UsageSummary:
+      $ref: './components/schemas/billing.yaml#/UsageSummary'
+    BillingPlanResponse:
+      $ref: './components/schemas/billing.yaml#/BillingPlanResponse'
+    UsageDetail:
+      $ref: './components/schemas/billing.yaml#/UsageDetail'
+    RequestUsageDetail:
+      $ref: './components/schemas/billing.yaml#/RequestUsageDetail'
+    SMSUsageDetail:
+      $ref: './components/schemas/billing.yaml#/SMSUsageDetail'
+    UsageBreakdown:
+      $ref: './components/schemas/billing.yaml#/UsageBreakdown'
+    UpgradeResponse:
+      $ref: './components/schemas/billing.yaml#/UpgradeResponse'
+    DowngradeResponse:
+      $ref: './components/schemas/billing.yaml#/DowngradeResponse'
+    Invoice:
+      $ref: './components/schemas/billing.yaml#/Invoice'
+    InvoiceListResponse:
+      $ref: './components/schemas/billing.yaml#/InvoiceListResponse'
+    QuotaExceededError:
+      $ref: './components/schemas/billing.yaml#/QuotaExceededError'
+    QuotaExceededDetails:
+      $ref: './components/schemas/billing.yaml#/QuotaExceededDetails'
+    ResourceLimitError:
+      $ref: './components/schemas/billing.yaml#/ResourceLimitError'
+    ResourceLimitDetails:
+      $ref: './components/schemas/billing.yaml#/ResourceLimitDetails'
 
     # Config
     ConfigResponse:

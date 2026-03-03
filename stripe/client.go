@@ -8,7 +8,9 @@ import (
 	gostripe "github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/customer"
+	"github.com/stripe/stripe-go/v82/invoice"
 	"github.com/stripe/stripe-go/v82/invoiceitem"
+	"github.com/stripe/stripe-go/v82/subscription"
 )
 
 // Config holds Stripe configuration from environment variables.
@@ -89,6 +91,17 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, stripeCustomerID, su
 // billing period before per-request charges apply.
 const FreeRequestAllowance = 1000
 
+// OverageCostCents calculates the cost in cents for overage requests at
+// $0.005/request (0.5 cents). Uses ceiling division to avoid under-billing
+// for odd counts: ceil(overage * 0.5) = (overage*5 + 9) / 10.
+// Returns 0 if overage is zero or negative.
+func OverageCostCents(overage int) int {
+	if overage <= 0 {
+		return 0
+	}
+	return int((int64(overage)*5 + 9) / 10)
+}
+
 // CreateUsageInvoiceItem creates a Stripe Invoice Item for billable request
 // usage. It calculates the overage beyond the free allowance and charges
 // $0.005 per request. Returns nil (no error) if usage is within the free tier.
@@ -98,9 +111,7 @@ func (c *Client) CreateUsageInvoiceItem(ctx context.Context, stripeCustomerID st
 		return nil, nil // within free tier
 	}
 
-	// $0.005/request = 0.5 cents/request. Stripe amounts are in cents (int64),
-	// so we round up to avoid under-billing for odd counts.
-	amountCents := (billable*5 + 9) / 10 // equivalent to ceil(billable * 0.5)
+	amountCents := int64(OverageCostCents(int(billable)))
 
 	params := &gostripe.InvoiceItemParams{
 		Customer:    gostripe.String(stripeCustomerID),
@@ -151,4 +162,71 @@ func (c *Client) CreateSMSInvoiceItem(ctx context.Context, stripeCustomerID, reg
 		return nil, fmt.Errorf("stripe: create SMS invoice item: %w", err)
 	}
 	return item, nil
+}
+
+// InvoiceSummary is a simplified invoice representation for the API response.
+type InvoiceSummary struct {
+	ID          string `json:"id"`
+	Number      string `json:"number,omitempty"`
+	Status      string `json:"status"`
+	Currency    string `json:"currency"`
+	AmountDue   int64  `json:"amount_due"`
+	AmountPaid  int64  `json:"amount_paid"`
+	PeriodStart int64  `json:"period_start"`
+	PeriodEnd   int64  `json:"period_end"`
+	Created     int64  `json:"created"`
+	HostedURL   string `json:"hosted_invoice_url,omitempty"`
+	PDFURL      string `json:"invoice_pdf,omitempty"`
+}
+
+// ListInvoices returns up to `limit` invoices for the given Stripe customer,
+// filtered to only paid invoices. Returns an empty slice if the customer has
+// no invoices.
+func (c *Client) ListInvoices(ctx context.Context, stripeCustomerID string, limit int) ([]InvoiceSummary, error) {
+	params := &gostripe.InvoiceListParams{
+		Customer: gostripe.String(stripeCustomerID),
+		Status:   gostripe.String("paid"),
+	}
+	params.Limit = gostripe.Int64(int64(limit))
+	params.Context = ctx
+
+	var invoices []InvoiceSummary
+	iter := invoice.List(params)
+	for iter.Next() {
+		inv := iter.Invoice()
+		summary := InvoiceSummary{
+			ID:          inv.ID,
+			Number:      inv.Number,
+			Status:      string(inv.Status),
+			Currency:    string(inv.Currency),
+			AmountDue:   inv.AmountDue,
+			AmountPaid:  inv.AmountPaid,
+			PeriodStart: inv.PeriodStart,
+			PeriodEnd:   inv.PeriodEnd,
+			Created:     inv.Created,
+		}
+		if inv.HostedInvoiceURL != "" {
+			summary.HostedURL = inv.HostedInvoiceURL
+		}
+		if inv.InvoicePDF != "" {
+			summary.PDFURL = inv.InvoicePDF
+		}
+		invoices = append(invoices, summary)
+	}
+	if err := iter.Err(); err != nil {
+		return nil, fmt.Errorf("stripe: list invoices: %w", err)
+	}
+	return invoices, nil
+}
+
+// CancelSubscription cancels a Stripe subscription immediately.
+func (c *Client) CancelSubscription(ctx context.Context, stripeSubscriptionID string) (*gostripe.Subscription, error) {
+	params := &gostripe.SubscriptionCancelParams{}
+	params.Context = ctx
+
+	sub, err := subscription.Cancel(stripeSubscriptionID, params)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: cancel subscription: %w", err)
+	}
+	return sub, nil
 }
