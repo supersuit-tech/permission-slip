@@ -33,16 +33,17 @@ func TraceID(ctx context.Context) string {
 }
 
 // SecurityHeadersMiddleware sets standard security headers on every response.
-// extraConnectSrc allows additional origins for the CSP connect-src directive
-// (e.g., the Supabase project URL in production). Each entry is validated as
-// an http(s) origin (scheme://host); invalid entries are logged and skipped
-// to prevent CSP directive injection.
+// extraConnectSrc and extraScriptSrc allow additional origins for the CSP
+// connect-src and script-src directives respectively (e.g., the Supabase
+// project URL for connect-src, or Cloudflare Insights for script-src). Each
+// entry is validated as an http(s) origin (scheme://host); invalid entries
+// are logged and skipped to prevent CSP directive injection.
 //
 // sentryCSPEndpoint, when non-empty, adds a report-uri directive pointing to
 // Sentry's CSP reporting endpoint so that CSP violations are captured as
 // Sentry events. Obtain the URL from your Sentry project under
 // Settings → Security Headers → report-uri.
-func SecurityHeadersMiddleware(sentryCSPEndpoint string, extraConnectSrc ...string) func(http.Handler) http.Handler {
+func SecurityHeadersMiddleware(sentryCSPEndpoint string, extraConnectSrc, extraScriptSrc []string) func(http.Handler) http.Handler {
 	connectSrc := "'self' https://*.ingest.sentry.io"
 	for _, src := range extraConnectSrc {
 		origin := sanitizeCSPOrigin(src)
@@ -51,9 +52,17 @@ func SecurityHeadersMiddleware(sentryCSPEndpoint string, extraConnectSrc ...stri
 		}
 	}
 
+	scriptSrc := "'self'"
+	for _, src := range extraScriptSrc {
+		origin := sanitizeCSPOrigin(src)
+		if origin != "" {
+			scriptSrc += " " + origin
+		}
+	}
+
 	directives := []string{
 		"default-src 'self'",
-		"script-src 'self'",
+		"script-src " + scriptSrc,
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"font-src 'self' https://fonts.gstatic.com",
 		"img-src 'self' data:",

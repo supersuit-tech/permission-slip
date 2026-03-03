@@ -13,7 +13,7 @@ func TestSecurityHeadersMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware("")(inner)
+	handler := SecurityHeadersMiddleware("", nil, nil)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -60,7 +60,10 @@ func TestSecurityHeadersMiddleware_ExtraConnectSrc(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware("", "https://abc.supabase.co", "https://other.example.com")(inner)
+	handler := SecurityHeadersMiddleware("",
+		[]string{"https://abc.supabase.co", "https://other.example.com"},
+		nil,
+	)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -68,6 +71,54 @@ func TestSecurityHeadersMiddleware_ExtraConnectSrc(t *testing.T) {
 	csp := rec.Header().Get("Content-Security-Policy")
 	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://abc.supabase.co https://other.example.com") {
 		t.Errorf("CSP connect-src missing extra origins; full CSP: %s", csp)
+	}
+}
+
+func TestSecurityHeadersMiddleware_ExtraScriptSrc(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := SecurityHeadersMiddleware("",
+		nil,
+		[]string{"https://static.cloudflareinsights.com"},
+	)(inner)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self' https://static.cloudflareinsights.com") {
+		t.Errorf("CSP script-src missing extra origin; full CSP: %s", csp)
+	}
+	// Default script-src 'self' should still be present (as prefix).
+	if !strings.Contains(csp, "script-src 'self'") {
+		t.Errorf("CSP script-src missing 'self'; full CSP: %s", csp)
+	}
+}
+
+func TestSecurityHeadersMiddleware_CloudflareInsights(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Simulate the Cloudflare Insights configuration from main.go.
+	handler := SecurityHeadersMiddleware("",
+		[]string{"https://cloudflareinsights.com"},
+		[]string{"https://static.cloudflareinsights.com"},
+	)(inner)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self' https://static.cloudflareinsights.com") {
+		t.Errorf("CSP script-src missing Cloudflare Insights; full CSP: %s", csp)
+	}
+	if !strings.Contains(csp, "https://cloudflareinsights.com") {
+		t.Errorf("CSP connect-src missing Cloudflare Insights; full CSP: %s", csp)
 	}
 }
 
@@ -87,7 +138,7 @@ func TestSecurityHeadersMiddleware_InvalidExtraConnectSrc(t *testing.T) {
 		`javascript:alert(1)`,                  // javascript scheme
 	}
 
-	handler := SecurityHeadersMiddleware("", malicious...)(inner)
+	handler := SecurityHeadersMiddleware("", malicious, nil)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -108,6 +159,35 @@ func TestSecurityHeadersMiddleware_InvalidExtraConnectSrc(t *testing.T) {
 	}
 }
 
+func TestSecurityHeadersMiddleware_InvalidExtraScriptSrc(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	malicious := []string{
+		`https://evil.com; default-src *`,      // semicolon injection
+		"https://evil.com\ndefault-src: *",     // newline injection
+		`javascript:alert(1)`,                  // javascript scheme
+	}
+
+	handler := SecurityHeadersMiddleware("", nil, malicious)(inner)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	// script-src should only contain 'self' — all malicious entries rejected.
+	if !strings.Contains(csp, "script-src 'self'; ") {
+		t.Errorf("CSP script-src should be only 'self'; full CSP: %s", csp)
+	}
+	for _, m := range malicious {
+		if strings.Contains(csp, m) {
+			t.Errorf("CSP should not contain rejected value %q; full CSP: %s", m, csp)
+		}
+	}
+}
+
 func TestSecurityHeadersMiddleware_MixedValidAndInvalid(t *testing.T) {
 	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -115,9 +195,12 @@ func TestSecurityHeadersMiddleware_MixedValidAndInvalid(t *testing.T) {
 	})
 
 	handler := SecurityHeadersMiddleware("",
-		"https://good.supabase.co",
-		`https://evil.com; script-src *`,
-		"http://also-good.example.com",
+		[]string{
+			"https://good.supabase.co",
+			`https://evil.com; script-src *`,
+			"http://also-good.example.com",
+		},
+		nil,
 	)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -142,7 +225,7 @@ func TestSecurityHeadersMiddleware_EmptyExtraConnectSrc(t *testing.T) {
 	})
 
 	// Empty strings and whitespace-only strings should be ignored.
-	handler := SecurityHeadersMiddleware("", "", "  ")(inner)
+	handler := SecurityHeadersMiddleware("", []string{"", "  "}, nil)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -164,7 +247,7 @@ func TestSecurityHeadersMiddleware_SentryCSPReportURI(t *testing.T) {
 	})
 
 	endpoint := "https://o0.ingest.sentry.io/api/0/security/?sentry_key=abc"
-	handler := SecurityHeadersMiddleware(endpoint)(inner)
+	handler := SecurityHeadersMiddleware(endpoint, nil, nil)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -190,7 +273,7 @@ func TestSecurityHeadersMiddleware_SentryCSPReportURIInjection(t *testing.T) {
 	}
 
 	for _, endpoint := range malicious {
-		handler := SecurityHeadersMiddleware(endpoint)(inner)
+		handler := SecurityHeadersMiddleware(endpoint, nil, nil)(inner)
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
@@ -208,7 +291,7 @@ func TestSecurityHeadersMiddleware_NoReportURIWhenEmpty(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware("")(inner)
+	handler := SecurityHeadersMiddleware("", nil, nil)(inner)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -225,7 +308,7 @@ func TestSecurityHeadersMiddleware_HeadersPresentOnAllMethods(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := SecurityHeadersMiddleware("")(inner)
+	handler := SecurityHeadersMiddleware("", nil, nil)(inner)
 
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions} {
 		req := httptest.NewRequest(method, "/test", nil)
