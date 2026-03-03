@@ -44,6 +44,29 @@ func TestSMSRates_PricingCorrect(t *testing.T) {
 	}
 }
 
+func TestOverageCostCents(t *testing.T) {
+	tests := []struct {
+		overage  int
+		expected int
+	}{
+		{0, 0},
+		{-1, 0},
+		{1, 1},   // ceil(0.5) = 1 cent
+		{2, 1},   // ceil(1.0) = 1 cent
+		{10, 5},  // ceil(5.0) = 5 cents
+		{50, 25}, // ceil(25.0) = 25 cents
+		{99, 50}, // ceil(49.5) = 50 cents
+		{100, 50},
+		{1000, 500},
+	}
+	for _, tt := range tests {
+		got := OverageCostCents(tt.overage)
+		if got != tt.expected {
+			t.Errorf("OverageCostCents(%d) = %d, want %d", tt.overage, got, tt.expected)
+		}
+	}
+}
+
 func TestNew_SetsAPIKey(t *testing.T) {
 	// Ensure New doesn't panic with empty config.
 	client := New(Config{})

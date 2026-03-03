@@ -4528,6 +4528,10 @@ paths:
       description: |
         Returns the authenticated user's notification preferences for all
         channels. Channels without an explicit preference default to enabled.
+
+        The `available` field on each preference indicates whether the user's
+        plan supports the channel. SMS requires a paid plan — free-tier users
+        see `available: false` for the SMS channel.
       tags:
         - Profiles
       security:
@@ -4543,10 +4547,13 @@ paths:
                 preferences:
                   - channel: email
                     enabled: true
+                    available: true
                   - channel: sms
                     enabled: false
+                    available: false
                   - channel: web-push
                     enabled: true
+                    available: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -4562,6 +4569,10 @@ paths:
         Updates the authenticated user's notification preferences. Accepts an
         array of channel/enabled pairs. Channels not included in the request
         are left unchanged.
+
+        Enabling the SMS channel requires a paid plan. Free-tier users receive
+        a 403 (sms_requires_paid_plan) with `details.current_plan` and
+        `details.required_plan` indicating which plan is needed.
       tags:
         - Profiles
       security:
@@ -4589,6 +4600,23 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            SMS notifications require a paid plan. Returned when attempting to
+            enable the SMS channel on the free tier. The error details include
+            `current_plan` and `required_plan` fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: sms_requires_paid_plan
+                  message: SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS.
+                  retryable: false
+                  details:
+                    current_plan: free
+                    required_plan: pay_as_you_go
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -4680,9 +4708,13 @@ paths:
   /v1/billing/subscription:
     get:
       summary: Get current subscription
+      deprecated: true
       description: |
         Returns the authenticated user's subscription details including plan info,
         billing period, and current usage metrics.
+
+        **Deprecated:** Use `GET /v1/billing/plan` instead, which returns structured
+        plan, subscription, and usage data in a single response.
 
         Only available when `billing_enabled` is `true` in the server config.
       operationId: getSubscription
@@ -4720,13 +4752,84 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/billing/usage:
+    get:
+      summary: Get detailed usage breakdown
+      description: |
+        Returns detailed usage metrics for a billing period, including request
+        totals, overage calculations, SMS counts, costs, and an optional breakdown
+        by agent, connector, and action type.
+
+        Defaults to the current billing period. Pass `period_start` to view a
+        historical period (e.g., last month's usage).
+
+        Only available when `billing_enabled` is `true` in the server config.
+      operationId: getBillingUsage
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: period_start
+          in: query
+          required: false
+          description: |
+            Start of the billing period to query, as an ISO 8601 date-time.
+            Must be the first day of a month in UTC (e.g., `2026-02-01T00:00:00Z`).
+            Defaults to the current billing period if omitted.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-02-01T00:00:00Z'
+      responses:
+        '200':
+          description: Usage details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageDetail'
+              example:
+                period_start: '2026-03-01T00:00:00Z'
+                period_end: '2026-04-01T00:00:00Z'
+                requests:
+                  total: 1542
+                  included: 1000
+                  overage: 542
+                  cost_cents: 271
+                sms:
+                  total: 5
+                  cost_cents: 5
+                breakdown:
+                  by_agent:
+                    '1': 500
+                    '2': 1042
+                  by_connector:
+                    gmail: 300
+                    stripe: 1242
+                  by_action_type:
+                    email.send: 300
+                    payment.create: 1242
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No usage data found for this period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/billing/checkout:
     post:
       summary: Create checkout session
+      deprecated: true
       description: |
         Creates a Stripe Checkout Session for upgrading from the free plan to
         pay-as-you-go. Returns a URL to redirect the user to Stripe's hosted
         checkout page.
+
+        **Deprecated:** Use `POST /v1/billing/upgrade` instead, which has the
+        same behavior but a clearer name and response schema.
 
         If the user doesn't have a Stripe Customer yet, one is created automatically.
         If the user is already on a paid plan, returns 409 Conflict.
@@ -4760,6 +4863,156 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/upgrade:
+    post:
+      summary: Initiate plan upgrade
+      description: |
+        Initiates an upgrade from the free plan to pay-as-you-go by creating a
+        Stripe Checkout Session. Returns a URL to redirect the user to Stripe's
+        hosted checkout page to complete the upgrade.
+
+        If the user doesn't have a Stripe Customer yet, one is created automatically.
+        If the user is already on a paid plan, returns 409 Conflict.
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: upgradePlan
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Checkout session created for upgrade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeResponse'
+              example:
+                checkout_url: https://checkout.stripe.com/c/pay/cs_test_...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Already subscribed to a paid plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/downgrade:
+    post:
+      summary: Downgrade to free plan
+      description: |
+        Downgrades the user from the pay-as-you-go plan to the free plan.
+        Cancels the Stripe subscription and sets a 7-day grace period during
+        which the user retains the longer audit retention window to export data.
+
+        If the user is already on the free plan, returns 409 Conflict.
+
+        Only available when `billing_enabled` is `true`.
+      operationId: downgradePlan
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Successfully downgraded to free plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DowngradeResponse'
+              example:
+                status: cancelled
+                plan_id: free
+                downgraded_at: '2026-03-02T12:00:00Z'
+                grace_period_ends_at: '2026-03-09T12:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Already on the free plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error (failed to cancel subscription)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/invoices:
+    get:
+      summary: List invoices
+      description: |
+        Returns a paginated list of the authenticated user's past invoices from
+        Stripe, including the amount, status, and a link to view the invoice.
+
+        Results are ordered by date descending (most recent first). Use
+        `starting_after` for cursor-based pagination.
+
+        Only available when `billing_enabled` is `true` and the user has a
+        Stripe customer ID (i.e., has previously been on a paid plan).
+      operationId: listInvoices
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of invoices to return (1–100). Defaults to 10.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: starting_after
+          in: query
+          required: false
+          description: |
+            Cursor for pagination. Pass the `id` of the last invoice from the
+            previous page to fetch the next page of results.
+          schema:
+            type: string
+          example: inv_1234567890
+      responses:
+        '200':
+          description: Invoices returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceListResponse'
+              example:
+                invoices:
+                  - id: inv_1234567890
+                    date: '2026-02-01T00:00:00Z'
+                    period_start: '2026-02-01T00:00:00Z'
+                    period_end: '2026-03-01T00:00:00Z'
+                    amount_cents: 271
+                    status: paid
+                    stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_1234567890
+                  - id: inv_0987654321
+                    date: '2026-01-01T00:00:00Z'
+                    period_start: '2026-01-01T00:00:00Z'
+                    period_end: '2026-02-01T00:00:00Z'
+                    amount_cents: 0
+                    status: paid
+                    stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_0987654321
+                has_more: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/billing/webhook:
     post:
       summary: Stripe webhook
@@ -4788,11 +5041,101 @@ paths:
       operationId: stripeWebhook
       tags:
         - Billing
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          description: |
+            Stripe webhook signature header. Contains the timestamp and signature(s)
+            used to verify that the request originated from Stripe. The server verifies
+            this against `STRIPE_WEBHOOK_SECRET` before processing any event.
+          schema:
+            type: string
+          example: t=1614556236,v1=abc123...
+      requestBody:
+        required: true
+        description: |
+          Raw Stripe webhook event payload. **Must be passed as raw bytes** (not parsed JSON)
+          to the signature verification step — parsing before verification would invalidate
+          the signature check.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe Event object (structure varies by event type)
+              properties:
+                id:
+                  type: string
+                  description: Unique event identifier (used for idempotency)
+                type:
+                  type: string
+                  description: Event type (e.g., checkout.session.completed)
+              required:
+                - id
+                - type
       responses:
         '200':
-          description: Webhook processed successfully
+          description: Webhook processed successfully (always returned to prevent Stripe retries)
         '400':
           description: Invalid signature or malformed event
+        '500':
+          description: Processing failed — Stripe will retry the event
+  /v1/billing/plan:
+    get:
+      summary: Get billing plan details
+      description: |
+        Returns the authenticated user's current plan details, subscription status,
+        and a summary of current resource usage (request counts, agent count, etc.).
+
+        This is the primary billing endpoint for the frontend — it provides everything
+        needed to render the billing section of the settings page in a single request.
+
+        Only available when `billing_enabled` is `true` in the server config.
+      operationId: getBillingPlan
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Billing plan details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPlanResponse'
+              example:
+                plan:
+                  id: free
+                  name: Free
+                  max_requests_per_month: 1000
+                  max_agents: 3
+                  max_standing_approvals: 5
+                  max_credentials: 5
+                  audit_retention_days: 7
+                subscription:
+                  status: active
+                  current_period_start: '2026-03-01T00:00:00Z'
+                  current_period_end: '2026-04-01T00:00:00Z'
+                  has_payment_method: false
+                  can_upgrade: true
+                  can_downgrade: false
+                  grace_period_ends_at: null
+                usage:
+                  requests: 42
+                  agents: 2
+                  standing_approvals: 3
+                  credentials: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No subscription found for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/config:
     get:
       summary: Get server configuration
@@ -8072,10 +8415,14 @@ components:
           example: true
     NotificationPreference:
       type: object
-      description: A single notification channel preference.
+      description: |
+        A single notification channel preference. The `available` field indicates
+        whether the user's plan supports this channel. Channels that require a
+        paid plan (e.g. SMS) return `available: false` for free-tier users.
       required:
         - channel
         - enabled
+        - available
       properties:
         channel:
           type: string
@@ -8088,6 +8435,13 @@ components:
         enabled:
           type: boolean
           description: Whether notifications are enabled for this channel
+          example: true
+        available:
+          type: boolean
+          description: |
+            Whether this channel is available on the user's current plan.
+            When false, the channel is plan-gated and cannot be enabled.
+            SMS requires a paid plan (pay_as_you_go or higher).
           example: true
     NotificationPreferencesResponse:
       type: object
@@ -8109,7 +8463,7 @@ components:
         preferences:
           type: array
           items:
-            $ref: '#/components/schemas/NotificationPreference'
+            $ref: '#/components/schemas/NotificationPreferenceUpdate'
           description: Channel preferences to update. Channels not included are unchanged.
           minItems: 1
     DeleteAccountRequest:
@@ -8331,6 +8685,167 @@ components:
           type: boolean
           description: Whether current usage exceeds the plan's request limit
           example: false
+    UsageResponse:
+      type: object
+      required:
+        - period_start
+        - period_end
+        - requests
+        - sms
+      properties:
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the current billing period (inclusive)
+        period_end:
+          type: string
+          format: date-time
+          description: End of the current billing period (exclusive)
+        requests:
+          $ref: '#/components/schemas/RequestsUsage'
+        sms:
+          $ref: '#/components/schemas/SMSUsage'
+    RequestsUsage:
+      type: object
+      required:
+        - total
+        - included
+        - overage
+        - overage_cost_cents
+      properties:
+        total:
+          type: integer
+          description: Total API requests in the current billing period
+          example: 450
+        included:
+          type: integer
+          description: Number of requests included in the plan for free (0 = unlimited on paid plans)
+          example: 1000
+        overage:
+          type: integer
+          description: Number of requests exceeding the included allowance
+          example: 0
+        overage_cost_cents:
+          type: integer
+          description: |
+            Estimated overage cost in cents, calculated at $0.005 per request
+            (0.5 cents), rounded up to the nearest cent
+          example: 0
+    SMSUsage:
+      type: object
+      required:
+        - total
+        - cost_cents
+      properties:
+        total:
+          type: integer
+          description: Total SMS messages sent in the current billing period
+          example: 12
+        cost_cents:
+          type: integer
+          description: |
+            Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
+            International rates may apply for non-US/CA destinations.
+          example: 12
+    DowngradeResponse:
+      type: object
+      required:
+        - status
+        - plan_id
+        - downgraded_at
+        - grace_period_ends_at
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - past_due
+            - cancelled
+          description: Updated subscription status (will be `cancelled` after downgrade)
+          example: cancelled
+        plan_id:
+          type: string
+          description: The plan the user was downgraded to
+          example: free
+        downgraded_at:
+          type: string
+          format: date-time
+          description: Timestamp when the downgrade was processed
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          description: |
+            When the 7-day grace period expires. Until this time, the user retains
+            the 90-day audit retention window from their paid plan. Show this to the
+            user so they know how long they have to export their data.
+    InvoiceListResponse:
+      type: object
+      required:
+        - invoices
+        - has_more
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        has_more:
+          type: boolean
+          description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
+          example: false
+    InvoiceSummary:
+      type: object
+      required:
+        - id
+        - status
+        - currency
+        - amount_due
+        - amount_paid
+        - created
+      properties:
+        id:
+          type: string
+          description: Stripe Invoice ID
+          example: in_1234567890
+        number:
+          type: string
+          description: Invoice number
+          example: INV-0001
+        status:
+          type: string
+          description: Invoice status
+          example: paid
+        currency:
+          type: string
+          description: Three-letter ISO currency code
+          example: usd
+        amount_due:
+          type: integer
+          description: Amount due in cents
+          example: 500
+        amount_paid:
+          type: integer
+          description: Amount paid in cents
+          example: 500
+        period_start:
+          type: integer
+          description: Billing period start (Unix timestamp)
+          example: 1709251200
+        period_end:
+          type: integer
+          description: Billing period end (Unix timestamp)
+          example: 1711929600
+        created:
+          type: integer
+          description: Invoice creation time (Unix timestamp)
+          example: 1711929600
+        hosted_invoice_url:
+          type: string
+          format: uri
+          description: URL to view the invoice on Stripe's hosted page
+        invoice_pdf:
+          type: string
+          format: uri
+          description: URL to download the invoice PDF
     CheckoutResponse:
       type: object
       required:
@@ -8339,8 +8854,344 @@ components:
         url:
           type: string
           format: uri
-          description: Stripe Checkout Session URL — redirect the user here to complete payment
+          pattern: ^https://
+          description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
           example: https://checkout.stripe.com/c/pay/cs_test_...
+    Plan:
+      description: |
+        A billing plan with its resource limits. Composes `PlanLimits` with
+        plan identity fields to avoid duplicating the limit definitions.
+      allOf:
+        - type: object
+          required:
+            - id
+            - name
+          properties:
+            id:
+              type: string
+              description: Unique plan identifier
+              example: free
+            name:
+              type: string
+              description: Human-readable plan name
+              example: Free
+        - $ref: '#/components/schemas/PlanLimits'
+    Subscription:
+      type: object
+      required:
+        - status
+        - current_period_start
+        - current_period_end
+        - has_payment_method
+        - can_upgrade
+        - can_downgrade
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - past_due
+            - cancelled
+          description: |
+            Current subscription status.
+            - `active`: Subscription is in good standing.
+            - `past_due`: Payment failed — prompt the user to update their payment method.
+            - `cancelled`: Subscription was cancelled (user was downgraded to free).
+          example: active
+        current_period_start:
+          type: string
+          format: date-time
+          description: Start of the current billing period (inclusive)
+          example: '2026-03-01T00:00:00Z'
+        current_period_end:
+          type: string
+          format: date-time
+          description: End of the current billing period (exclusive)
+          example: '2026-04-01T00:00:00Z'
+        has_payment_method:
+          type: boolean
+          description: Whether the user has a Stripe payment method on file. Use this to decide whether to show "Add payment method" prompts.
+          example: false
+        can_upgrade:
+          type: boolean
+          description: Whether the user can upgrade (true when on the free plan). Use this to show/hide the upgrade button.
+          example: true
+        can_downgrade:
+          type: boolean
+          description: Whether the user can downgrade (true when on a paid plan). Use this to show/hide the downgrade button.
+          example: false
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the downgrade grace period expires, or null if no grace period is active.
+            During the grace period (7 days after downgrade), the user retains the longer
+            audit retention window (90 days) to export their data. After this timestamp,
+            retention drops to the free plan's window (7 days).
+    UsageSummary:
+      type: object
+      required:
+        - requests
+        - agents
+        - standing_approvals
+        - credentials
+      properties:
+        requests:
+          type: integer
+          description: Number of API requests in the current billing period
+          example: 42
+        agents:
+          type: integer
+          description: Current number of registered agents
+          example: 2
+        standing_approvals:
+          type: integer
+          description: Current number of active standing approvals
+          example: 3
+        credentials:
+          type: integer
+          description: Current number of stored credentials
+          example: 1
+    BillingPlanResponse:
+      type: object
+      required:
+        - plan
+        - subscription
+        - usage
+      properties:
+        plan:
+          $ref: '#/components/schemas/Plan'
+        subscription:
+          $ref: '#/components/schemas/Subscription'
+        usage:
+          $ref: '#/components/schemas/UsageSummary'
+    UsageDetail:
+      type: object
+      required:
+        - period_start
+        - period_end
+        - requests
+        - sms
+      properties:
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the usage period (inclusive)
+          example: '2026-03-01T00:00:00Z'
+        period_end:
+          type: string
+          format: date-time
+          description: End of the usage period (exclusive)
+          example: '2026-04-01T00:00:00Z'
+        requests:
+          $ref: '#/components/schemas/RequestUsageDetail'
+        sms:
+          $ref: '#/components/schemas/SMSUsageDetail'
+        breakdown:
+          $ref: '#/components/schemas/UsageBreakdown'
+    RequestUsageDetail:
+      type: object
+      required:
+        - total
+        - included
+        - overage
+        - cost_cents
+      properties:
+        total:
+          type: integer
+          description: Total requests this period
+          example: 1542
+        included:
+          type: integer
+          description: Requests included in the plan at no extra cost
+          example: 1000
+        overage:
+          type: integer
+          description: Billable requests beyond the included allowance
+          example: 542
+        cost_cents:
+          type: integer
+          description: Cost of overage requests in cents
+          example: 271
+    SMSUsageDetail:
+      type: object
+      required:
+        - total
+        - cost_cents
+      properties:
+        total:
+          type: integer
+          description: Total SMS messages sent this period
+          example: 5
+        cost_cents:
+          type: integer
+          description: Total SMS cost in cents
+          example: 5
+    UsageBreakdown:
+      type: object
+      properties:
+        by_agent:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Request counts keyed by agent ID
+          example:
+            '1': 500
+            '2': 1042
+        by_connector:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Request counts keyed by connector ID
+          example:
+            gmail: 300
+            stripe: 1242
+        by_action_type:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Request counts keyed by action type
+          example:
+            email.send: 300
+            payment.create: 1242
+    UpgradeResponse:
+      type: object
+      required:
+        - checkout_url
+      properties:
+        checkout_url:
+          type: string
+          format: uri
+          pattern: ^https://
+          description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
+          example: https://checkout.stripe.com/c/pay/cs_test_...
+    Invoice:
+      type: object
+      required:
+        - id
+        - date
+        - amount_cents
+        - status
+      properties:
+        id:
+          type: string
+          description: Invoice identifier
+          example: inv_1234567890
+        date:
+          type: string
+          format: date-time
+          description: Invoice creation date
+          example: '2026-02-01T00:00:00Z'
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the billing period this invoice covers
+          example: '2026-02-01T00:00:00Z'
+        period_end:
+          type: string
+          format: date-time
+          description: End of the billing period this invoice covers
+          example: '2026-03-01T00:00:00Z'
+        amount_cents:
+          type: integer
+          description: Total invoice amount in cents (0 for periods within the free allowance)
+          example: 271
+        status:
+          type: string
+          enum:
+            - draft
+            - open
+            - paid
+            - void
+            - uncollectible
+          description: |
+            Invoice payment status.
+            - `draft`: Invoice is being prepared (not yet finalized).
+            - `open`: Invoice is finalized and awaiting payment.
+            - `paid`: Payment was collected successfully.
+            - `void`: Invoice was voided (no payment required).
+            - `uncollectible`: Payment could not be collected after all retries.
+          example: paid
+        stripe_invoice_url:
+          type: string
+          format: uri
+          pattern: ^https://
+          description: URL to view the full invoice details on Stripe's hosted page. Always HTTPS.
+          example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
+    QuotaExceededError:
+      description: |
+        Returned when the user exceeds their plan's monthly request quota (HTTP 429).
+        Uses the standard ErrorResponse structure. The `details` object contains
+        quota-specific fields to help the frontend render an upgrade prompt.
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+      example:
+        error:
+          code: monthly_quota_exceeded
+          message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
+          retryable: true
+          retry_after: 2419200
+          details:
+            limit: 1000
+            current_usage: 1000
+            plan_id: free
+            reset_at: '2026-04-01T00:00:00Z'
+    QuotaExceededDetails:
+      type: object
+      description: Shape of `error.details` for monthly_quota_exceeded errors.
+      properties:
+        limit:
+          type: integer
+          description: The plan's request limit
+          example: 1000
+        current_count:
+          type: integer
+          description: Current usage count
+          example: 1001
+        plan_id:
+          type: string
+          description: The user's current plan
+          example: free
+        reset_at:
+          type: string
+          format: date-time
+          description: When the usage counter resets (next billing period start)
+    ResourceLimitError:
+      description: |
+        Returned when the user hits a plan-based resource limit (HTTP 403).
+        Uses the standard ErrorResponse structure. The `details` object contains
+        limit-specific fields to help the frontend render an upgrade prompt.
+
+        Possible error codes: `agent_limit_reached`, `standing_approval_limit_reached`,
+        `credential_limit_reached`.
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+      example:
+        error:
+          code: agent_limit_reached
+          message: Free plan allows up to 3 agents. Upgrade your plan to add more.
+          retryable: false
+          details:
+            current_count: 3
+            limit: 3
+            plan_id: free
+    ResourceLimitDetails:
+      type: object
+      description: Shape of `error.details` for resource limit errors.
+      properties:
+        current_count:
+          type: integer
+          description: Current number of the resource
+          example: 3
+        limit:
+          type: integer
+          description: Maximum allowed by the plan
+          example: 3
+        plan_id:
+          type: string
+          description: The user's current plan
+          example: free
     ConfigResponse:
       type: object
       description: |
@@ -8633,10 +9484,12 @@ components:
             - standing_approval_exhausted
             - constraint_violation
             - standing_approval_expired
+            - subscription_not_found
             - agent_already_registered
             - duplicate_request_id
             - approval_already_resolved
             - duplicate_credential
+            - already_subscribed
             - registration_expired
             - verification_locked
             - approval_expired
@@ -8645,6 +9498,7 @@ components:
             - internal_error
             - upstream_error
             - service_unavailable
+            - billing_not_enabled
           example: invalid_signature
         message:
           type: string
@@ -8748,9 +9602,32 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    NotificationPreferenceUpdate:
+      type: object
+      description: A channel preference update (request-only, no `available` field).
+      required:
+        - channel
+        - enabled
+      properties:
+        channel:
+          type: string
+          description: Notification channel identifier
+          enum:
+            - email
+            - web-push
+            - sms
+          example: email
+        enabled:
+          type: boolean
+          description: Whether notifications should be enabled for this channel
+          example: true
     PlanLimits:
       type: object
       required:
+        - max_requests_per_month
+        - max_agents
+        - max_standing_approvals
+        - max_credentials
         - audit_retention_days
       properties:
         max_requests_per_month:

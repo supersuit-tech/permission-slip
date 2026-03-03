@@ -223,6 +223,10 @@ notificationPreferences:
       Returns the authenticated user's notification preferences for all
       channels. Channels without an explicit preference default to enabled.
 
+      The `available` field on each preference indicates whether the user's
+      plan supports the channel. SMS requires a paid plan — free-tier users
+      see `available: false` for the SMS channel.
+
     tags:
       - Profiles
 
@@ -240,10 +244,13 @@ notificationPreferences:
               preferences:
                 - channel: "email"
                   enabled: true
+                  available: true
                 - channel: "sms"
                   enabled: false
+                  available: false
                 - channel: "web-push"
                   enabled: true
+                  available: true
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
@@ -264,6 +271,10 @@ notificationPreferences:
       Updates the authenticated user's notification preferences. Accepts an
       array of channel/enabled pairs. Channels not included in the request
       are left unchanged.
+
+      Enabling the SMS channel requires a paid plan. Free-tier users receive
+      a 403 (sms_requires_paid_plan) with `details.current_plan` and
+      `details.required_plan` indicating which plan is needed.
 
     tags:
       - Profiles
@@ -297,6 +308,24 @@ notificationPreferences:
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '403':
+        description: |
+          SMS notifications require a paid plan. Returned when attempting to
+          enable the SMS channel on the free tier. The error details include
+          `current_plan` and `required_plan` fields.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "sms_requires_paid_plan"
+                message: "SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS."
+                retryable: false
+                details:
+                  current_plan: "free"
+                  required_plan: "pay_as_you_go"
 
       '429':
         $ref: '../responses/errors.yaml#/TooManyRequests'

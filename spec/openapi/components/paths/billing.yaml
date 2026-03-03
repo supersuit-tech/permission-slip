@@ -1,9 +1,13 @@
 subscription:
   get:
     summary: Get current subscription
+    deprecated: true
     description: |
       Returns the authenticated user's subscription details including plan info,
       billing period, and current usage metrics.
+
+      **Deprecated:** Use `GET /v1/billing/plan` instead, which returns structured
+      plan, subscription, and usage data in a single response.
 
       Only available when `billing_enabled` is `true` in the server config.
     operationId: getSubscription
@@ -45,10 +49,14 @@ subscription:
 checkout:
   post:
     summary: Create checkout session
+    deprecated: true
     description: |
       Creates a Stripe Checkout Session for upgrading from the free plan to
       pay-as-you-go. Returns a URL to redirect the user to Stripe's hosted
       checkout page.
+
+      **Deprecated:** Use `POST /v1/billing/upgrade` instead, which has the
+      same behavior but a clearer name and response schema.
 
       If the user doesn't have a Stripe Customer yet, one is created automatically.
       If the user is already on a paid plan, returns 409 Conflict.
@@ -111,8 +119,320 @@ webhook:
     operationId: stripeWebhook
     tags:
       - Billing
+    security: []  # No auth — Stripe signature verification via Stripe-Signature header
+    parameters:
+      - name: Stripe-Signature
+        in: header
+        required: true
+        description: |
+          Stripe webhook signature header. Contains the timestamp and signature(s)
+          used to verify that the request originated from Stripe. The server verifies
+          this against `STRIPE_WEBHOOK_SECRET` before processing any event.
+        schema:
+          type: string
+        example: 't=1614556236,v1=abc123...'
+    requestBody:
+      required: true
+      description: |
+        Raw Stripe webhook event payload. **Must be passed as raw bytes** (not parsed JSON)
+        to the signature verification step — parsing before verification would invalidate
+        the signature check.
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Stripe Event object (structure varies by event type)
+            properties:
+              id:
+                type: string
+                description: Unique event identifier (used for idempotency)
+              type:
+                type: string
+                description: Event type (e.g., checkout.session.completed)
+            required:
+              - id
+              - type
     responses:
       '200':
-        description: Webhook processed successfully
+        description: Webhook processed successfully (always returned to prevent Stripe retries)
       '400':
         description: Invalid signature or malformed event
+      '500':
+        description: Processing failed — Stripe will retry the event
+
+plan:
+  get:
+    summary: Get billing plan details
+    description: |
+      Returns the authenticated user's current plan details, subscription status,
+      and a summary of current resource usage (request counts, agent count, etc.).
+
+      This is the primary billing endpoint for the frontend — it provides everything
+      needed to render the billing section of the settings page in a single request.
+
+      Only available when `billing_enabled` is `true` in the server config.
+    operationId: getBillingPlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Billing plan details returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/BillingPlanResponse'
+            example:
+              plan:
+                id: free
+                name: Free
+                max_requests_per_month: 1000
+                max_agents: 3
+                max_standing_approvals: 5
+                max_credentials: 5
+                audit_retention_days: 7
+              subscription:
+                status: active
+                current_period_start: '2026-03-01T00:00:00Z'
+                current_period_end: '2026-04-01T00:00:00Z'
+                has_payment_method: false
+                can_upgrade: true
+                can_downgrade: false
+                grace_period_ends_at: null
+              usage:
+                requests: 42
+                agents: 2
+                standing_approvals: 3
+                credentials: 1
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: No subscription found for this user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+usage:
+  get:
+    summary: Get detailed usage breakdown
+    description: |
+      Returns detailed usage metrics for a billing period, including request
+      totals, overage calculations, SMS counts, costs, and an optional breakdown
+      by agent, connector, and action type.
+
+      Defaults to the current billing period. Pass `period_start` to view a
+      historical period (e.g., last month's usage).
+
+      Only available when `billing_enabled` is `true` in the server config.
+    operationId: getBillingUsage
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: period_start
+        in: query
+        required: false
+        description: |
+          Start of the billing period to query, as an ISO 8601 date-time.
+          Must be the first day of a month in UTC (e.g., `2026-02-01T00:00:00Z`).
+          Defaults to the current billing period if omitted.
+        schema:
+          type: string
+          format: date-time
+        example: '2026-02-01T00:00:00Z'
+    responses:
+      '200':
+        description: Usage details returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/UsageDetail'
+            example:
+              period_start: '2026-03-01T00:00:00Z'
+              period_end: '2026-04-01T00:00:00Z'
+              requests:
+                total: 1542
+                included: 1000
+                overage: 542
+                cost_cents: 271
+              sms:
+                total: 5
+                cost_cents: 5
+              breakdown:
+                by_agent:
+                  '1': 500
+                  '2': 1042
+                by_connector:
+                  gmail: 300
+                  stripe: 1242
+                by_action_type:
+                  email.send: 300
+                  payment.create: 1242
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: No usage data found for this period
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+upgrade:
+  post:
+    summary: Initiate plan upgrade
+    description: |
+      Initiates an upgrade from the free plan to pay-as-you-go by creating a
+      Stripe Checkout Session. Returns a URL to redirect the user to Stripe's
+      hosted checkout page to complete the upgrade.
+
+      If the user doesn't have a Stripe Customer yet, one is created automatically.
+      If the user is already on a paid plan, returns 409 Conflict.
+
+      Only available when `billing_enabled` is `true` and Stripe is configured.
+    operationId: upgradePlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Checkout session created for upgrade
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/UpgradeResponse'
+            example:
+              checkout_url: https://checkout.stripe.com/c/pay/cs_test_...
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '409':
+        description: Already subscribed to a paid plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+downgrade:
+  post:
+    summary: Downgrade to free plan
+    description: |
+      Downgrades the user from the pay-as-you-go plan to the free plan.
+      Cancels the Stripe subscription and sets a 7-day grace period during
+      which the user retains the longer audit retention window to export data.
+
+      If the user is already on the free plan, returns 409 Conflict.
+
+      Only available when `billing_enabled` is `true`.
+    operationId: downgradePlan
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Successfully downgraded to free plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/DowngradeResponse'
+            example:
+              status: cancelled
+              plan_id: free
+              downgraded_at: '2026-03-02T12:00:00Z'
+              grace_period_ends_at: '2026-03-09T12:00:00Z'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '409':
+        description: Already on the free plan
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error (failed to cancel subscription)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+invoices:
+  get:
+    summary: List invoices
+    description: |
+      Returns a paginated list of the authenticated user's past invoices from
+      Stripe, including the amount, status, and a link to view the invoice.
+
+      Results are ordered by date descending (most recent first). Use
+      `starting_after` for cursor-based pagination.
+
+      Only available when `billing_enabled` is `true` and the user has a
+      Stripe customer ID (i.e., has previously been on a paid plan).
+    operationId: listInvoices
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Maximum number of invoices to return (1–100). Defaults to 10.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+      - name: starting_after
+        in: query
+        required: false
+        description: |
+          Cursor for pagination. Pass the `id` of the last invoice from the
+          previous page to fetch the next page of results.
+        schema:
+          type: string
+        example: inv_1234567890
+    responses:
+      '200':
+        description: Invoices returned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/InvoiceListResponse'
+            example:
+              invoices:
+                - id: inv_1234567890
+                  date: '2026-02-01T00:00:00Z'
+                  period_start: '2026-02-01T00:00:00Z'
+                  period_end: '2026-03-01T00:00:00Z'
+                  amount_cents: 271
+                  status: paid
+                  stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_1234567890
+                - id: inv_0987654321
+                  date: '2026-01-01T00:00:00Z'
+                  period_start: '2026-01-01T00:00:00Z'
+                  period_end: '2026-02-01T00:00:00Z'
+                  amount_cents: 0
+                  status: paid
+                  stripe_invoice_url: https://invoice.stripe.com/i/acct_1234/inv_0987654321
+              has_more: false
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

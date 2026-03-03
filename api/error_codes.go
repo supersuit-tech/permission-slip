@@ -51,7 +51,10 @@ const (
 	ErrCredentialLimitReached   ErrorCode = "credential_limit_reached"
 	ErrSubscriptionNotFound     ErrorCode = "subscription_not_found"
 	ErrAlreadySubscribed        ErrorCode = "already_subscribed"
+	ErrAlreadyDowngraded        ErrorCode = "already_downgraded"
+	ErrDowngradeLimitExceeded   ErrorCode = "downgrade_limit_exceeded"
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
+	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )
