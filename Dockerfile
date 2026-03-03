@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for Permission Slip.
 # Produces a minimal (~30MB) runtime image containing only the static binary.
 #
-# Build: docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_ANON_KEY=... -t permission-slip-web .
+# Build: docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=... -t permission-slip-web .
 # Run:   docker run -p 8080:8080 -e DATABASE_URL=... -e SUPABASE_URL=... permission-slip-web
 
 # ── Stage 1: Build frontend ──────────────────────────────────────────────────
@@ -20,7 +20,7 @@ RUN npm ci
 # Vite inlines VITE_* env vars into the JS bundle at build time.
 # Pass these as Docker build args (--build-arg) or via [build.args] in fly.toml.
 ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ARG VITE_SENTRY_DSN
 
 # Sentry source-map upload (optional — skip if not set).

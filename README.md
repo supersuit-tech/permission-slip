@@ -117,7 +117,7 @@ supabase start                        # start local Supabase stack (requires Doc
 supabase status                       # get local URLs and keys for .env
 ```
 
-Copy the `anon key` from `supabase status` into your `.env` as `VITE_SUPABASE_ANON_KEY`. The default `DATABASE_URL` in `.env.example` already points to Supabase's local Postgres (`127.0.0.1:54322`).
+Copy the `publishable key` from `supabase status` into your `.env` as `VITE_SUPABASE_PUBLISHABLE_KEY`. The default `DATABASE_URL` in `.env.example` already points to Supabase's local Postgres (`127.0.0.1:54322`).
 
 See the [Supabase docs](https://supabase.com/docs/guides/local-development) for more details.
 
@@ -170,7 +170,7 @@ The mobile app lives in `mobile/` and uses React Native (Expo). It shares the sa
 ```bash
 cd mobile
 npm install
-cp .env.example .env   # set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY
+cp .env.example .env   # set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 npm start              # Expo dev server — scan QR with Expo Go app
 ```
 

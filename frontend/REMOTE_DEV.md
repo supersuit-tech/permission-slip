@@ -25,14 +25,14 @@ supabase start
 
 ### 2. Update your `.env` file
 
-Get the anon key:
+Get the publishable key:
 ```bash
 supabase status -o env | grep ANON_KEY
 ```
 
 Then set in your `.env` file:
 ```bash
-VITE_SUPABASE_ANON_KEY=<your-anon-key>
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
 ```
 
 > **Note:** `VITE_SUPABASE_URL` is not needed for local dev. The app auto-resolves Supabase via `window.location.origin/supabase` in dev mode.

@@ -5,11 +5,9 @@ kill_timeout = '30s'
 
 [build]
   # Vite inlines these into the JS bundle at build time.
-  # Set via: fly deploy --build-arg VITE_SUPABASE_URL=https://xxx.supabase.co ...
-  # Or uncomment and hardcode below for convenience:
-  # [build.args]
-  #   VITE_SUPABASE_URL = "https://your-project.supabase.co"
-  #   VITE_SUPABASE_ANON_KEY = "your-anon-key"
+  [build.args]
+    VITE_SUPABASE_URL = "https://rixmzguicuihjvzumyxm.supabase.co"
+    VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4Db9aiXHjC7JG-K1w3V54g_qLLrDL4o"
 
 [env]
   PORT = '8080'

@@ -80,7 +80,7 @@ cp .env.example .env
 
 # 5. Start Supabase (requires Docker running)
 supabase start
-supabase status   # copy the anon key into .env as VITE_SUPABASE_ANON_KEY
+supabase status   # copy the publishable key into .env as VITE_SUPABASE_PUBLISHABLE_KEY
 
 # 6. Run database migrations
 make migrate-up
@@ -109,7 +109,7 @@ Run `cp .env.example .env` and fill in the values. The essential variables for l
 | `DATABASE_URL_TEST` | _(empty)_ | Postgres connection string for `go test` and CI |
 | `SUPABASE_URL` | _(empty)_ | Supabase project URL (e.g. `http://127.0.0.1:54321` locally) |
 | `VITE_SUPABASE_URL` | _(empty)_ | Supabase URL for the React frontend |
-| `VITE_SUPABASE_ANON_KEY` | _(empty)_ | Supabase anon key for the React frontend |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | _(empty)_ | Supabase publishable key for the React frontend |
 | `BASE_URL` | _(empty)_ | Public base URL — used for invite URLs |
 | `INVITE_HMAC_KEY` | _(empty)_ | HMAC key for invite codes — generate with `openssl rand -hex 32` |
 | `VAULT_SECRET_KEY` | _(empty)_ | Encryption key for Supabase Vault (AES-256-GCM) — generate with `openssl rand -hex 32` |
@@ -130,7 +130,7 @@ Copy the output into your `.env`:
 
 ```bash
 VITE_SUPABASE_URL=http://127.0.0.1:54321
-VITE_SUPABASE_ANON_KEY=<anon key from supabase status>
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key from supabase status>
 ```
 
 **Supabase Studio:** Open **http://127.0.0.1:54323** to manage your local database, tables, RLS policies, and auth.

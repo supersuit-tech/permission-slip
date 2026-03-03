@@ -563,11 +563,11 @@ func TestIntegration_UserLifecycle_SignupCreatesAuthUser(t *testing.T) {
 
 // --- Helpers for Supabase keys ---
 
-// supabaseAnonKey returns the Supabase anon key for the local instance.
-// The default local dev anon key is well-known and stable.
+// supabaseAnonKey returns the Supabase publishable key (formerly "anon key")
+// for the local instance. The default local dev key is well-known and stable.
 func supabaseAnonKey(t *testing.T) string {
 	t.Helper()
-	// Standard Supabase local dev anon key (public, safe to commit).
+	// Standard Supabase local dev publishable key (public, safe to commit).
 	return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
 }
 

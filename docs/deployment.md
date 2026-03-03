@@ -44,16 +44,16 @@ See [Secrets Reference](#secrets-reference) below for the full list.
 
 ### 3. Configure frontend build args
 
-The React frontend uses Vite, which inlines `VITE_*` environment variables into the JavaScript bundle at build time. You **must** pass your Supabase URL and anon key as build args — they cannot be set as runtime secrets.
+The React frontend uses Vite, which inlines `VITE_*` environment variables into the JavaScript bundle at build time. You **must** pass your Supabase URL and publishable key as build args — they cannot be set as runtime secrets.
 
-The anon key is safe to include in the build: it's a public key that's always visible in client-side JavaScript.
+The publishable key is safe to include in the build: it's a public key that's always visible in client-side JavaScript. (Supabase previously called this the "anon key" — it's the same value, just renamed in the dashboard.)
 
 **Option A** — Pass as `fly deploy` flags:
 
 ```bash
 fly deploy \
   --build-arg VITE_SUPABASE_URL=https://your-project.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 **Option B** — Hardcode in `fly.toml` (simpler for CI):
@@ -61,7 +61,7 @@ fly deploy \
 ```toml
 [build.args]
   VITE_SUPABASE_URL = "https://your-project.supabase.co"
-  VITE_SUPABASE_ANON_KEY = "your-anon-key"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "your-publishable-key"
 ```
 
 **Option C** — Use the Makefile shortcut (reads from your shell environment):
@@ -69,11 +69,11 @@ fly deploy \
 ```bash
 # Export the variables first, or inline them:
 export VITE_SUPABASE_URL=https://your-project.supabase.co
-export VITE_SUPABASE_ANON_KEY=your-anon-key
+export VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 make deploy
 
 # Or inline on the same command:
-VITE_SUPABASE_URL=https://your-project.supabase.co VITE_SUPABASE_ANON_KEY=your-anon-key make deploy
+VITE_SUPABASE_URL=https://your-project.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key make deploy
 ```
 
 ### 4. Deploy
@@ -223,7 +223,7 @@ make docker-build
 # Or directly:
 docker build \
   --build-arg VITE_SUPABASE_URL=https://your-project.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key \
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key \
   -t permission-slip-web .
 
 # Run
@@ -242,7 +242,7 @@ Ensure `spec/openapi/openapi.bundle.yaml` is committed — the `npm ci` postinst
 Check logs with `fly logs`. Common causes: missing `DATABASE_URL`, incorrect Supabase credentials, or the database being unreachable from Fly's network.
 
 **Frontend shows "Missing VITE_SUPABASE_URL" error:**
-The Supabase build args were not passed during `fly deploy`. Re-deploy with `--build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_ANON_KEY=...` or add `[build.args]` to `fly.toml`. See [Configure frontend build args](#3-configure-frontend-build-args).
+The Supabase build args were not passed during `fly deploy`. Re-deploy with `--build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=...` or add `[build.args]` to `fly.toml`. See [Configure frontend build args](#3-configure-frontend-build-args).
 
 **CORS errors in browser (403 on API calls):**
 Ensure `ALLOWED_ORIGINS` includes your app's exact origin (e.g., `https://your-app.fly.dev`) — no trailing slash. When unset, the server defaults to same-origin only mode, which works for the standard deployment but will reject requests if a custom domain or CDN changes the browser's origin.
