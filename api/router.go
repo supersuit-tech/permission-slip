@@ -79,7 +79,9 @@ func NewRouter(deps *Deps) http.Handler {
 	// Billing routes are always registered (handlers check deps.BillingEnabled
 	// and deps.Stripe internally) so the OpenAPI spec can document them.
 	RegisterBillingRoutes(mux, deps)
-	RegisterBillingWebhookRoutes(mux, deps)
+	// NOTE: Billing webhook routes are registered on the top-level mux in
+	// main.go, NOT here. They must bypass auth and rate-limiting middleware
+	// because Stripe verifies requests via signature, not Bearer tokens.
 
 	var handler http.Handler = mux
 	handler = RateLimitMiddleware(deps.RateLimiter, deps.DevMode, deps.TrustedProxyHeader)(handler)

@@ -168,32 +168,6 @@ SMSUsage:
         International rates may apply for non-US/CA destinations.
       example: 12
 
-DowngradeResponse:
-  type: object
-  required:
-    - status
-    - plan_id
-  properties:
-    status:
-      type: string
-      enum: [active, past_due, cancelled]
-      description: Subscription status after downgrade
-      example: active
-    plan_id:
-      type: string
-      description: Plan ID after downgrade (always "free")
-      example: free
-
-InvoiceListResponse:
-  type: object
-  required:
-    - invoices
-  properties:
-    invoices:
-      type: array
-      items:
-        $ref: '#/InvoiceSummary'
-
 InvoiceSummary:
   type: object
   required:

@@ -117,6 +117,15 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 
 // buildBody constructs the push notification payload from the approval data.
 func buildBody(approval notify.Approval) pushPayload {
+	if approval.Type == notify.NotificationTypePaymentFailed {
+		return pushPayload{
+			Title:      "Payment Failed",
+			Body:       "Your subscription payment could not be processed. Update your payment method to avoid losing access.",
+			URL:        approval.ApprovalURL,
+			ApprovalID: approval.ApprovalID,
+		}
+	}
+
 	title := "Approval Request"
 	if approval.AgentName != "" {
 		title = approval.AgentName

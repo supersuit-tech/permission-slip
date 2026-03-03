@@ -33,6 +33,18 @@ type Sender interface {
 	Name() string
 }
 
+// NotificationType distinguishes different kinds of notifications so
+// templates and formatters can adapt their content. The zero value
+// (empty string) means a standard approval notification.
+type NotificationType string
+
+const (
+	// NotificationTypeApproval is the default — an approval request from an agent.
+	NotificationTypeApproval NotificationType = ""
+	// NotificationTypePaymentFailed is sent when a subscription payment fails.
+	NotificationTypePaymentFailed NotificationType = "payment_failed"
+)
+
 // Approval holds the fields a notification channel needs to construct its
 // message. It is deliberately decoupled from the db.Approval type so the
 // notify package stays dependency-free of the database layer.
@@ -42,9 +54,10 @@ type Approval struct {
 	AgentName   string          // human-readable; may be empty
 	Action      json.RawMessage // raw JSONB from the approvals table
 	Context     json.RawMessage // raw JSONB from the approvals table
-	ApprovalURL string          // deep link to the approval UI
+	ApprovalURL string          // deep link to the approval UI (or billing settings for payment failures)
 	ExpiresAt   time.Time
 	CreatedAt   time.Time
+	Type        NotificationType // determines which email/SMS/push template to use; zero value = approval
 }
 
 // Recipient identifies who should receive the notification and provides
