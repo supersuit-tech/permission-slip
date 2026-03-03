@@ -101,6 +101,7 @@ curl https://your-app.fly.dev/api/health
 | `SUPABASE_JWT_SECRET` | Legacy only | JWT secret for HS256 verification. Not needed when using ES256/JWKS (derived automatically from `SUPABASE_URL`) |
 | `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking |
 | `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint for CSP violation tracking |
+| `CLOUDFLARE_INSIGHTS` | Optional | Set to `true` to allow Cloudflare Web Analytics beacon in CSP (required when using Cloudflare proxy) |
 | `VAPID_PUBLIC_KEY` | Optional | VAPID public key for Web Push (auto-generated if unset) |
 | `VAPID_PRIVATE_KEY` | Optional | VAPID private key for Web Push (auto-generated if unset) |
 | `VAPID_SUBJECT` | Optional | `mailto:` URL for VAPID (e.g., `mailto:admin@mycompany.com`) |
@@ -124,6 +125,23 @@ fly deploy \
   --build-arg SENTRY_ORG="your-org" \
   --build-arg SENTRY_PROJECT="your-project"
 ```
+
+### Cloudflare Web Analytics
+
+If your domain routes through Cloudflare (as a DNS proxy), Cloudflare Web Analytics auto-injects a `beacon.min.js` script from `static.cloudflareinsights.com`. This will be blocked by the Content Security Policy unless you enable the `CLOUDFLARE_INSIGHTS` env var:
+
+```bash
+fly secrets set CLOUDFLARE_INSIGHTS="true"
+```
+
+Or add it to `fly.toml`:
+
+```toml
+[env]
+  CLOUDFLARE_INSIGHTS = "true"
+```
+
+This adds `https://static.cloudflareinsights.com` to `script-src` and `https://cloudflareinsights.com` to `connect-src` in the CSP header.
 
 ### Optional notification secrets
 
@@ -242,7 +260,20 @@ Ensure `spec/openapi/openapi.bundle.yaml` is committed — the `npm ci` postinst
 Check logs with `fly logs`. Common causes: missing `DATABASE_URL`, incorrect Supabase credentials, or the database being unreachable from Fly's network.
 
 **Frontend shows "Missing VITE_SUPABASE_URL" error:**
-The Supabase build args were not passed during `fly deploy`. Re-deploy with `--build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=...` or add `[build.args]` to `fly.toml`. See [Configure frontend build args](#3-configure-frontend-build-args).
+The Supabase build args were not inlined into the JavaScript bundle during the Docker build. This can happen if:
+- The build args were not passed during `fly deploy`
+- Fly's remote builder used a stale cache from a previous build that lacked the args
+
+To fix, re-deploy with `--no-cache` to force a clean build:
+
+```bash
+fly deploy --no-cache
+```
+
+If that doesn't work, verify the args are set — either as `fly deploy --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=...` flags, or in `fly.toml` under `[build.args]`. See [Configure frontend build args](#3-configure-frontend-build-args).
+
+**CSP blocks Cloudflare Web Analytics (beacon.min.js):**
+If you use Cloudflare as a DNS proxy, its Web Analytics beacon is blocked by the default CSP. Set `CLOUDFLARE_INSIGHTS=true` as a Fly env var or in `fly.toml` `[env]`. See [Cloudflare Web Analytics](#cloudflare-web-analytics) above.
 
 **CORS errors in browser (403 on API calls):**
 Ensure `ALLOWED_ORIGINS` includes your app's exact origin (e.g., `https://your-app.fly.dev`) — no trailing slash. When unset, the server defaults to same-origin only mode, which works for the standard deployment but will reject requests if a custom domain or CDN changes the browser's origin.

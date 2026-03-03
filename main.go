@@ -383,7 +383,14 @@ func main() {
 			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
 		}
 	}
-	handler = api.SecurityHeadersMiddleware(sentryCSPEndpoint, extraConnectSrc...)(handler)
+	// Cloudflare Web Analytics — when CLOUDFLARE_INSIGHTS is "true", allow the
+	// auto-injected beacon.min.js script and its data reporting endpoint.
+	var extraScriptSrc []string
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("CLOUDFLARE_INSIGHTS")), "true") {
+		extraScriptSrc = append(extraScriptSrc, "https://static.cloudflareinsights.com")
+		extraConnectSrc = append(extraConnectSrc, "https://cloudflareinsights.com")
+	}
+	handler = api.SecurityHeadersMiddleware(sentryCSPEndpoint, extraConnectSrc, extraScriptSrc)(handler)
 
 	srv := &http.Server{
 		Addr:    ":" + port,

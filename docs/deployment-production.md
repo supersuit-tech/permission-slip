@@ -215,6 +215,30 @@ fly deploy \
   --build-arg VITE_POSTHOG_HOST="https://us.i.posthog.com"
 ```
 
+### Cloudflare (DNS / Proxy / Web Analytics)
+
+The production domain routes through Cloudflare as a DNS proxy. Cloudflare Web Analytics auto-injects a `beacon.min.js` script, which requires CSP exceptions.
+
+**Fly.io setup:**
+
+```bash
+# Set as a regular env var (not a secret — it's just a boolean toggle)
+# Already configured in fly.toml [env] section
+```
+
+In `fly.toml`:
+
+```toml
+[env]
+  CLOUDFLARE_INSIGHTS = "true"
+```
+
+This adds:
+- `https://static.cloudflareinsights.com` to CSP `script-src` (loads the beacon script)
+- `https://cloudflareinsights.com` to CSP `connect-src` (beacon sends analytics data)
+
+If Cloudflare Web Analytics is disabled in the Cloudflare dashboard, this setting is harmless — it just allows the domains in CSP without effect.
+
 ### Better Stack / Logtail (Log Aggregation)
 
 > **Status:** Planned — see [#331](https://github.com/supersuit-tech/permission-slip-web/issues/331)
@@ -435,6 +459,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `TWILIO_FROM_NUMBER` | Runtime secret | **Set if SMS** | Twilio phone number |
 | `SENTRY_DSN` | Runtime secret | **Set** | Backend error tracking DSN |
 | `SENTRY_CSP_ENDPOINT` | Runtime secret | **Set** | CSP violation reporting |
+| `CLOUDFLARE_INSIGHTS` | Runtime env | **Set** | `true` — allows Cloudflare Web Analytics beacon in CSP |
 | `SUPABASE_SERVICE_ROLE_KEY` | Runtime secret | **Recommended** | Admin API operations (e.g. account deletion) |
 | `VITE_SUPABASE_URL` | Build arg | **Required** | Frontend auth URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Build arg | **Required** | Frontend auth publishable key |
@@ -769,6 +794,7 @@ Quick reference for what's live vs. planned.
 | Service | Purpose | Status | Issue |
 |---|---|---|---|
 | **Fly.io** | Compute / hosting | Live | — |
+| **Cloudflare** | DNS proxy + Web Analytics | Live | — |
 | **Supabase** | Auth + Postgres + Vault | Live | — |
 | **Sentry** | Error tracking (backend + frontend) | Live | [#329](https://github.com/supersuit-tech/permission-slip-web/issues/329), [#330](https://github.com/supersuit-tech/permission-slip-web/issues/330) |
 | **SendGrid** | Email notifications | Live | — |
@@ -796,6 +822,13 @@ These are tracked under [#321](https://github.com/supersuit-tech/permission-slip
 - Dependency update automation (Dependabot or Renovate)
 
 ## Troubleshooting
+
+**Frontend shows "Missing VITE_SUPABASE_URL" error:**
+- The Vite build args were not inlined during the Docker build. Re-deploy with `fly deploy --no-cache` to bypass Fly's remote builder cache
+- Verify `[build.args]` in `fly.toml` contains `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+**CSP blocks Cloudflare Web Analytics (beacon.min.js):**
+- Ensure `CLOUDFLARE_INSIGHTS = "true"` is in `fly.toml` `[env]` section, then redeploy
 
 **Deploy fails on frontend build stage:**
 - Ensure `spec/openapi/openapi.bundle.yaml` is committed — the `npm ci` postinstall hook needs it
