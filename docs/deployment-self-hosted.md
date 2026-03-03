@@ -43,7 +43,7 @@ Permission Slip uses [Supabase Auth](https://supabase.com/auth) for user authent
 1. Create a project at [supabase.com](https://supabase.com)
 2. From your project dashboard, note these values:
    - **Project URL** (e.g., `https://abcdefgh.supabase.co`) — used as `SUPABASE_URL`
-   - **Anon key** (public) — used as `VITE_SUPABASE_ANON_KEY` at build time
+   - **Publishable key** (public) — used as `VITE_SUPABASE_PUBLISHABLE_KEY` at build time
 3. Under **Authentication > URL Configuration**, add your deployment URL to the redirect allow list
 
 > **Note:** You can use Supabase's hosted database as your `DATABASE_URL` too, or use a separate PostgreSQL instance. Either works.
@@ -92,10 +92,10 @@ These are inlined into the JavaScript bundle by Vite at build time. They must be
 | Variable | Description | Example |
 |---|---|---|
 | `VITE_SUPABASE_URL` | Supabase project URL (frontend auth) | `https://abcdefgh.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon (public) key | From Supabase dashboard |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key | From Supabase dashboard |
 | `VITE_SENTRY_DSN` | Frontend error tracking (optional) | `https://key@o0.ingest.sentry.io/0` |
 
-> The anon key is safe to include in the build — it's a public key visible in client-side JavaScript by design.
+> The publishable key is safe to include in the build — it's a public key visible in client-side JavaScript by design. (Supabase previously called this the "anon key.")
 
 ### Web Push Notifications (VAPID)
 
@@ -218,7 +218,7 @@ The included multi-stage Dockerfile produces a minimal (~30MB) Alpine image.
 ```bash
 docker build \
   --build-arg VITE_SUPABASE_URL=https://abcdefgh.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key \
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key \
   -t permission-slip .
 ```
 
@@ -244,7 +244,7 @@ services:
       context: .
       args:
         VITE_SUPABASE_URL: https://abcdefgh.supabase.co
-        VITE_SUPABASE_ANON_KEY: your-anon-key
+        VITE_SUPABASE_PUBLISHABLE_KEY: your-publishable-key
     ports:
       - "8080:8080"
     environment:
@@ -277,7 +277,7 @@ fly secrets set \
   INVITE_HMAC_KEY="$(openssl rand -hex 32)"
 fly deploy \
   --build-arg VITE_SUPABASE_URL=https://abcdefgh.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 ### Option C: Build from Source
@@ -294,7 +294,7 @@ make install
 
 # Set build-time vars for the frontend
 export VITE_SUPABASE_URL=https://abcdefgh.supabase.co
-export VITE_SUPABASE_ANON_KEY=your-anon-key
+export VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 make build
 
 # Run
@@ -314,7 +314,7 @@ Permission Slip works on any platform that supports Docker or Go builds:
 
 1. Connect your repo (or push the Docker image)
 2. Set the required environment variables in the platform's dashboard
-3. For Docker-based platforms, configure build args for `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+3. For Docker-based platforms, configure build args for `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
 4. Ensure the health check is configured for `GET /api/health` on port 8080
 
 ## TLS / Reverse Proxy
@@ -405,7 +405,7 @@ Migrations run automatically on startup. If they fail, check database connectivi
 | `DATABASE_URL` | Yes | Runtime | PostgreSQL connection string |
 | `SUPABASE_URL` | Yes | Runtime | Supabase project URL (JWT + auth) |
 | `VITE_SUPABASE_URL` | Yes | Build | Supabase URL for frontend auth |
-| `VITE_SUPABASE_ANON_KEY` | Yes | Build | Supabase public anon key |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Build | Supabase publishable key |
 | `BASE_URL` | Recommended | Runtime | Public deployment URL |
 | `ALLOWED_ORIGINS` | Recommended | Runtime | CORS allowed origins (comma-separated, exact match, no trailing slash). Same-origin only when unset. |
 | `INVITE_HMAC_KEY` | Recommended | Runtime | HMAC key for invite codes |

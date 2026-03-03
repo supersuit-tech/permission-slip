@@ -74,7 +74,7 @@ Permission Slip uses a single Supabase project for:
 | Value | Where to find | Used as |
 |---|---|---|
 | Project URL | Settings > API | `SUPABASE_URL` (runtime) + `VITE_SUPABASE_URL` (build) |
-| Anon key (public) | Settings > API | `VITE_SUPABASE_ANON_KEY` (build) |
+| Publishable key (public) | Settings > API | `VITE_SUPABASE_PUBLISHABLE_KEY` (build) |
 | Database connection string | Settings > Database > Connection string | `DATABASE_URL` (runtime) |
 
 **Database connection notes:**
@@ -98,7 +98,7 @@ fly secrets set \
 # Build-time args (inlined into frontend JS bundle)
 fly deploy \
   --build-arg VITE_SUPABASE_URL="https://[project-ref].supabase.co" \
-  --build-arg VITE_SUPABASE_ANON_KEY="<anon key from Supabase dashboard>"
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY="<publishable key from Supabase dashboard>"
 ```
 
 ### Sentry (Error Tracking)
@@ -385,7 +385,7 @@ These are inlined into the JavaScript bundle by Vite. Pass via `fly deploy --bui
 ```bash
 fly deploy \
   --build-arg VITE_SUPABASE_URL="https://[project-ref].supabase.co" \
-  --build-arg VITE_SUPABASE_ANON_KEY="<anon key from Supabase dashboard>" \
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY="<publishable key from Supabase dashboard>" \
   --build-arg VITE_SENTRY_DSN="https://[key]@[org].ingest.sentry.io/[project]" \
   --build-arg SENTRY_AUTH_TOKEN="sntrys_xxxx" \
   --build-arg SENTRY_ORG="supersuit" \
@@ -399,7 +399,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 ```toml
 [build.args]
   VITE_SUPABASE_URL = "https://[project-ref].supabase.co"
-  VITE_SUPABASE_ANON_KEY = "<anon key>"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "<publishable key>"
   VITE_POSTHOG_KEY = "phc_xxxx"
   # VITE_SENTRY_DSN, SENTRY_AUTH_TOKEN, etc. can go here too
 ```
@@ -426,7 +426,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `SENTRY_CSP_ENDPOINT` | Runtime secret | **Set** | CSP violation reporting |
 | `SUPABASE_SERVICE_ROLE_KEY` | Runtime secret | **Recommended** | Admin API operations (e.g. account deletion) |
 | `VITE_SUPABASE_URL` | Build arg | **Required** | Frontend auth URL |
-| `VITE_SUPABASE_ANON_KEY` | Build arg | **Required** | Frontend auth public key |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Build arg | **Required** | Frontend auth publishable key |
 | `VITE_SENTRY_DSN` | Build arg | **Set** | Frontend error tracking DSN |
 | `SENTRY_AUTH_TOKEN` | Build arg | **Set** | Source map upload token |
 | `SENTRY_ORG` | Build arg | **Set** | `supersuit` |
@@ -453,14 +453,14 @@ Or hardcode in `fly.toml` for simpler deploys:
 # From the repo root — reads VITE_* from environment or fly.toml [build.args]
 fly deploy \
   --build-arg VITE_SUPABASE_URL=https://[ref].supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=<key>
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=<key>
 ```
 
 Or use the Makefile shortcut:
 
 ```bash
 VITE_SUPABASE_URL=https://[ref].supabase.co \
-VITE_SUPABASE_ANON_KEY=<key> \
+VITE_SUPABASE_PUBLISHABLE_KEY=<key> \
 make deploy
 ```
 
@@ -788,7 +788,7 @@ These are tracked under [#321](https://github.com/supersuit-tech/permission-slip
 
 **Deploy fails on frontend build stage:**
 - Ensure `spec/openapi/openapi.bundle.yaml` is committed — the `npm ci` postinstall hook needs it
-- Check that build args (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) are being passed
+- Check that build args (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`) are being passed
 
 **Health check fails after deploy:**
 - Check `fly logs` for startup errors

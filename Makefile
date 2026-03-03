@@ -58,22 +58,22 @@ run:
 # ---------- Deployment ----------
 
 # Build Docker image locally for testing before deploying.
-# Requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the environment
+# Requires VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in the environment
 # (Vite inlines these into the JS bundle at build time).
-# Usage: VITE_SUPABASE_URL=https://xxx.supabase.co VITE_SUPABASE_ANON_KEY=yyy make docker-build
+# Usage: VITE_SUPABASE_URL=https://xxx.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=yyy make docker-build
 docker-build:
 	docker build \
 		--build-arg VITE_SUPABASE_URL=$${VITE_SUPABASE_URL} \
-		--build-arg VITE_SUPABASE_ANON_KEY=$${VITE_SUPABASE_ANON_KEY} \
+		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY} \
 		-t permission-slip-web .
 
 # Deploy to Fly.io. Reads Supabase build args from the environment.
 # Alternatively, configure [build.args] in fly.toml and just run: fly deploy
-# Usage: VITE_SUPABASE_URL=https://xxx.supabase.co VITE_SUPABASE_ANON_KEY=yyy make deploy
+# Usage: VITE_SUPABASE_URL=https://xxx.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=yyy make deploy
 deploy:
 	fly deploy \
 		--build-arg VITE_SUPABASE_URL=$${VITE_SUPABASE_URL} \
-		--build-arg VITE_SUPABASE_ANON_KEY=$${VITE_SUPABASE_ANON_KEY}
+		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY}
 
 # ---------- Testing ----------
 
