@@ -482,12 +482,8 @@ components:
       $ref: './components/schemas/billing.yaml#/UsageBreakdown'
     UpgradeResponse:
       $ref: './components/schemas/billing.yaml#/UpgradeResponse'
-    DowngradeResponse:
-      $ref: './components/schemas/billing.yaml#/DowngradeResponse'
     Invoice:
       $ref: './components/schemas/billing.yaml#/Invoice'
-    InvoiceListResponse:
-      $ref: './components/schemas/billing.yaml#/InvoiceListResponse'
     QuotaExceededError:
       $ref: './components/schemas/billing.yaml#/QuotaExceededError'
     QuotaExceededDetails:

@@ -64,6 +64,13 @@ func TooManyRequests(message string, retryAfter int) ErrorResponse {
 	return resp
 }
 
+// QuotaExceeded returns a 429 ErrorResponse for monthly quota exhaustion.
+func QuotaExceeded(message string, retryAfter int) ErrorResponse {
+	resp := newErrorResponse(ErrMonthlyQuotaExceeded, message, true)
+	resp.Error.RetryAfter = retryAfter
+	return resp
+}
+
 // InternalError returns a 500 ErrorResponse.
 func InternalError(message string) ErrorResponse { return newErrorResponse(ErrInternalError, message, true) }
 

@@ -9036,37 +9036,6 @@ components:
           pattern: ^https://
           description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
           example: https://checkout.stripe.com/c/pay/cs_test_...
-    DowngradeResponse:
-      type: object
-      required:
-        - status
-        - plan_id
-        - downgraded_at
-        - grace_period_ends_at
-      properties:
-        status:
-          type: string
-          enum:
-            - active
-            - past_due
-            - cancelled
-          description: Updated subscription status (will be `cancelled` after downgrade)
-          example: cancelled
-        plan_id:
-          type: string
-          description: The plan the user was downgraded to
-          example: free
-        downgraded_at:
-          type: string
-          format: date-time
-          description: Timestamp when the downgrade was processed
-        grace_period_ends_at:
-          type: string
-          format: date-time
-          description: |
-            When the 7-day grace period expires. Until this time, the user retains
-            the 90-day audit retention window from their paid plan. Show this to the
-            user so they know how long they have to export their data.
     Invoice:
       type: object
       required:
@@ -9120,20 +9089,6 @@ components:
           pattern: ^https://
           description: URL to view the full invoice details on Stripe's hosted page. Always HTTPS.
           example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
-    InvoiceListResponse:
-      type: object
-      required:
-        - invoices
-        - has_more
-      properties:
-        invoices:
-          type: array
-          items:
-            $ref: '#/components/schemas/Invoice'
-        has_more:
-          type: boolean
-          description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
-          example: false
     QuotaExceededError:
       description: |
         Returned when the user exceeds their plan's monthly request quota (HTTP 429).
@@ -9143,17 +9098,18 @@ components:
         - $ref: '#/components/schemas/ErrorResponse'
       example:
         error:
-          code: quota_exceeded
-          message: Monthly request quota exceeded. Upgrade your plan for continued access.
-          retryable: false
+          code: monthly_quota_exceeded
+          message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
+          retryable: true
+          retry_after: 2419200
           details:
             limit: 1000
-            current_count: 1001
+            current_usage: 1000
             plan_id: free
             reset_at: '2026-04-01T00:00:00Z'
     QuotaExceededDetails:
       type: object
-      description: Shape of `error.details` for quota_exceeded errors.
+      description: Shape of `error.details` for monthly_quota_exceeded errors.
       properties:
         limit:
           type: integer
@@ -9508,7 +9464,7 @@ components:
             - verification_locked
             - approval_expired
             - rate_limited
-            - quota_exceeded
+            - monthly_quota_exceeded
             - internal_error
             - upstream_error
             - service_unavailable
@@ -9551,8 +9507,8 @@ components:
           type: integer
           minimum: 1
           description: |
-            Present only for `rate_limited` errors. Number of seconds the client should wait 
-            before retrying the request.
+            Present for `rate_limited` and `monthly_quota_exceeded` errors. Number of seconds
+            the client should wait before retrying the request.
           example: 60
     ErrorResponse:
       type: object
@@ -9668,6 +9624,51 @@ components:
           type: integer
           description: Number of days audit logs are retained
           example: 7
+    DowngradeResponse:
+      type: object
+      required:
+        - status
+        - plan_id
+        - downgraded_at
+        - grace_period_ends_at
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - past_due
+            - cancelled
+          description: Updated subscription status (will be `cancelled` after downgrade)
+          example: cancelled
+        plan_id:
+          type: string
+          description: The plan the user was downgraded to
+          example: free
+        downgraded_at:
+          type: string
+          format: date-time
+          description: Timestamp when the downgrade was processed
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          description: |
+            When the 7-day grace period expires. Until this time, the user retains
+            the 90-day audit retention window from their paid plan. Show this to the
+            user so they know how long they have to export their data.
+    InvoiceListResponse:
+      type: object
+      required:
+        - invoices
+        - has_more
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        has_more:
+          type: boolean
+          description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
+          example: false
   parameters:
     ActionConfigId:
       name: config_id
@@ -10026,22 +10027,44 @@ components:
                     max_attempts: 5
                   trace_id: trace_xyz789
     TooManyRequests:
-      description: Too Many Requests - Rate limit exceeded
+      description: Too Many Requests - Rate limit or monthly quota exceeded
+      headers:
+        Retry-After:
+          description: Seconds until the rate limit resets or the billing period ends
+          schema:
+            type: integer
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: rate_limited
-              message: Too many requests. Please retry after 60 seconds.
-              retryable: true
-              retry_after: 60
-              details:
-                limit: 100
-                window: 1 minute
-                reset_at: '2026-02-11T13:26:00Z'
-              trace_id: trace_xyz789
+          examples:
+            rate_limited:
+              summary: Per-IP or per-agent rate limit exceeded
+              value:
+                error:
+                  code: rate_limited
+                  message: Too many requests. Please retry after 60 seconds.
+                  retryable: true
+                  retry_after: 60
+                  details:
+                    limit: 100
+                    window: 1 minute
+                    reset_at: '2026-02-11T13:26:00Z'
+                  trace_id: trace_xyz789
+            monthly_quota_exceeded:
+              summary: Free tier monthly request quota exhausted
+              value:
+                error:
+                  code: monthly_quota_exceeded
+                  message: Free tier limit of 1,000 requests/month reached. Upgrade to continue.
+                  retryable: true
+                  retry_after: 86400
+                  details:
+                    current_usage: 1000
+                    limit: 1000
+                    plan_id: free
+                    reset_at: '2026-04-01T00:00:00Z'
+                  trace_id: trace_xyz789
     InternalServerError:
       description: Internal Server Error - Unexpected server error
       content:

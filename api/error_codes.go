@@ -55,4 +55,6 @@ const (
 	ErrDowngradeLimitExceeded   ErrorCode = "downgrade_limit_exceeded"
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
 	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
+	// 429 Too Many Requests (quota)
+	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )
