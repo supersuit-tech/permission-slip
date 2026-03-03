@@ -80,6 +80,12 @@ Permission Slip uses [Supabase Vault](https://supabase.com/docs/guides/database/
 
 If you're using a Supabase-hosted database, vault is already available. If using a non-Supabase database, you'll need to install the `pgsodium` and `supabase_vault` extensions manually, or implement an alternative vault backend.
 
+### Row-Level Security (RLS)
+
+RLS is enabled on all application tables via a migration that runs automatically on startup. If you're using a Supabase-hosted database, this locks down the PostgREST data API so the `anon` and `authenticated` roles cannot access tables directly — all access goes through the Go backend. If you're using a non-Supabase PostgreSQL instance, RLS is still enabled but has no practical effect since there's no PostgREST layer exposing the database.
+
+The Go backend connects as a superuser and bypasses RLS entirely — no configuration is needed.
+
 ## Step 3: Configure Environment Variables
 
 ### Required Variables
