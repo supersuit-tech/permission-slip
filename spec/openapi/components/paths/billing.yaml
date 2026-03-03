@@ -95,24 +95,39 @@ webhook:
   post:
     summary: Stripe webhook
     description: |
-      Receives and processes Stripe webhook events. This endpoint verifies the
-      webhook signature using `STRIPE_WEBHOOK_SECRET` and processes the following
-      event types:
+      Receives and processes Stripe webhook events. This endpoint lives outside
+      `/api/v1/` to bypass auth and rate-limiting middleware. Security is provided
+      by Stripe's webhook signature verification using `STRIPE_WEBHOOK_SECRET`.
+
+      **Handled event types:**
 
       - `checkout.session.completed`: Stores the Stripe subscription ID and
         atomically upgrades the user from free → pay_as_you_go (idempotent —
         duplicate events are safely ignored).
+      - `invoice.paid`: Updates subscription status to active (clearing any
+        past_due state from previous failed payments) and syncs billing period
+        dates from the invoice.
+      - `invoice.payment_failed`: Marks subscription as past_due and sends a
+        notification to the user so they can update their payment method.
+        Stripe will continue to retry per its Smart Retries schedule.
       - `customer.subscription.updated`: Maps the Stripe subscription status
         (active/trialing → active, past_due/unpaid → past_due, other → cancelled)
         to the local subscription status.
       - `customer.subscription.deleted`: Downgrades user to free plan, marks
         status as cancelled, and sets `downgraded_at` to trigger the 7-day
         audit retention grace period.
-      - `invoice.payment_failed`: Marks subscription as past_due so the UI can
-        prompt the user to update their payment method.
 
-      Always returns 200 to prevent Stripe retries. Event processing failures
-      are logged server-side.
+      **Payment failure flow:**
+      1. `invoice.payment_failed` → status set to `past_due`, user notified
+      2. Stripe retries payment per Smart Retries schedule
+      3. If retry succeeds → `invoice.paid` → status set back to `active`
+      4. If all retries fail → `customer.subscription.deleted` → downgrade to free
+
+      **Idempotency:** Each event ID is recorded after successful processing.
+      Duplicate events (from Stripe retries) are safely skipped.
+
+      Returns 200 on success. Returns 500 on retryable errors (DB failures) so
+      Stripe will retry the event. Returns 400 on invalid signature.
 
       **No authentication required** — security is provided by Stripe's webhook
       signature verification (`STRIPE_WEBHOOK_SECRET` is required in production).

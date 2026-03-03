@@ -244,7 +244,9 @@ paths:
   /v1/billing/invoices:
     $ref: './components/paths/billing.yaml#/invoices'
 
-  /v1/billing/webhook:
+  # NOTE: The Stripe webhook endpoint lives outside /api/v1/ so it bypasses
+  # auth and rate-limiting middleware. Documented here for completeness.
+  /api/webhooks/stripe:
     $ref: './components/paths/billing.yaml#/webhook'
 
   /v1/billing/plan:
@@ -458,10 +460,6 @@ components:
       $ref: './components/schemas/billing.yaml#/RequestsUsage'
     SMSUsage:
       $ref: './components/schemas/billing.yaml#/SMSUsage'
-    DowngradeResponse:
-      $ref: './components/schemas/billing.yaml#/DowngradeResponse'
-    InvoiceListResponse:
-      $ref: './components/schemas/billing.yaml#/InvoiceListResponse'
     InvoiceSummary:
       $ref: './components/schemas/billing.yaml#/InvoiceSummary'
     CheckoutResponse:

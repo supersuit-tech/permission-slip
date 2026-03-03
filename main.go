@@ -137,6 +137,9 @@ func main() {
 				PriceIDRequest: os.Getenv("STRIPE_PRICE_ID_REQUEST"),
 			})
 			log.Println("Stripe: client initialized")
+			if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
+				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
+			}
 		} else {
 			log.Println("Stripe: STRIPE_SECRET_KEY not set, Stripe API calls will be unavailable")
 		}
@@ -330,6 +333,11 @@ func main() {
 	// API routes
 	mux.HandleFunc("GET /api/health", handleHealth(deps.DB))
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api.NewRouter(&deps)))
+
+	// Stripe webhook endpoint lives outside /api/v1/ — it must bypass auth
+	// and rate-limiting middleware. Stripe verifies requests via signature
+	// (Stripe-Signature header), not Bearer tokens.
+	api.RegisterBillingWebhookRoutes(mux, &deps)
 
 	// Invite endpoint lives outside /api/v1/ — it's a user-facing onboarding
 	// URL (e.g., https://app.permissionslip.dev/invite/PS-XXXX-XXXX), not a

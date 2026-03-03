@@ -9,8 +9,11 @@ import (
 	"time"
 )
 
-// buildEmailSubject returns the email subject line for an approval notification.
+// buildEmailSubject returns the email subject line for a notification.
 func buildEmailSubject(approval Approval) string {
+	if approval.Type == NotificationTypePaymentFailed {
+		return "Action required: Your payment failed"
+	}
 	actionType := extractActionType(approval.Action)
 	if actionType != "" {
 		return fmt.Sprintf("Approval needed: %s", actionType)
@@ -18,8 +21,12 @@ func buildEmailSubject(approval Approval) string {
 	return "Approval needed"
 }
 
-// buildEmailPlainBody returns the plain-text email body for an approval notification.
+// buildEmailPlainBody returns the plain-text email body for a notification.
 func buildEmailPlainBody(approval Approval) string {
+	if approval.Type == NotificationTypePaymentFailed {
+		return buildPaymentFailedPlainBody(approval)
+	}
+
 	var b strings.Builder
 
 	agentName := approval.AgentName
@@ -54,9 +61,27 @@ func buildEmailPlainBody(approval Approval) string {
 	return b.String()
 }
 
-// buildEmailHTMLBody returns the HTML email body for an approval notification.
+// buildPaymentFailedPlainBody returns the plain-text email body for a payment failure.
+func buildPaymentFailedPlainBody(approval Approval) string {
+	var b strings.Builder
+	b.WriteString("Your subscription payment could not be processed.\n\n")
+	b.WriteString("Please update your payment method to avoid losing access to paid features. ")
+	b.WriteString("Stripe will automatically retry the payment over the next few days. ")
+	b.WriteString("If all retries fail, your subscription will be cancelled and you'll be downgraded to the free plan.\n")
+	if approval.ApprovalURL != "" {
+		b.WriteString(fmt.Sprintf("\nUpdate payment method:\n%s\n", approval.ApprovalURL))
+	}
+	b.WriteString("\n---\nThis is an automated notification from Permission Slip.\n")
+	return b.String()
+}
+
+// buildEmailHTMLBody returns the HTML email body for a notification.
 // Uses inline styles only — no external CSS, no images.
 func buildEmailHTMLBody(approval Approval) string {
+	if approval.Type == NotificationTypePaymentFailed {
+		return buildPaymentFailedHTMLBody(approval)
+	}
+
 	agentName := approval.AgentName
 	if agentName == "" {
 		agentName = fmt.Sprintf("Agent %d", approval.AgentID)
@@ -104,6 +129,46 @@ func buildEmailHTMLBody(approval Approval) string {
 	b.WriteString(`<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:20px;font-size:12px;color:#9ca3af;">`)
 	b.WriteString(`<p style="margin:0;">This is an automated notification from Permission Slip. Do not reply to this email.</p>`)
 	b.WriteString(`<p style="margin:4px 0 0 0;">View full details in the dashboard — sensitive parameters are not included in this email.</p>`)
+	b.WriteString(`</div>`)
+
+	b.WriteString(`</body></html>`)
+	return b.String()
+}
+
+// buildPaymentFailedHTMLBody returns the HTML email body for a payment failure.
+func buildPaymentFailedHTMLBody(approval Approval) string {
+	var b bytes.Buffer
+	b.WriteString(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head>`)
+	b.WriteString(`<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1a1a1a;">`)
+
+	// Header — red accent to indicate urgency
+	b.WriteString(`<div style="border-bottom:2px solid #dc2626;padding-bottom:16px;margin-bottom:20px;">`)
+	b.WriteString(`<h2 style="margin:0 0 4px 0;font-size:20px;color:#dc2626;">Payment Failed</h2>`)
+	b.WriteString(`<p style="margin:0;color:#6b7280;font-size:14px;">Your subscription payment could not be processed</p>`)
+	b.WriteString(`</div>`)
+
+	// Body
+	b.WriteString(`<p style="margin:0 0 16px 0;line-height:1.6;">`)
+	b.WriteString(`Please update your payment method to avoid losing access to paid features. `)
+	b.WriteString(`Stripe will automatically retry the payment over the next few days.`)
+	b.WriteString(`</p>`)
+	b.WriteString(`<p style="margin:0 0 16px 0;line-height:1.6;color:#6b7280;">`)
+	b.WriteString(`If all retries fail, your subscription will be cancelled and you&#39;ll be downgraded to the free plan.`)
+	b.WriteString(`</p>`)
+
+	// CTA button — red to match urgency
+	if approval.ApprovalURL != "" {
+		b.WriteString(fmt.Sprintf(
+			`<div style="text-align:center;margin:24px 0;">
+		<a href="%s" style="display:inline-block;background-color:#dc2626;color:#ffffff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;">Update Payment Method</a>
+		</div>`,
+			html.EscapeString(approval.ApprovalURL),
+		))
+	}
+
+	// Footer
+	b.WriteString(`<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:20px;font-size:12px;color:#9ca3af;">`)
+	b.WriteString(`<p style="margin:0;">This is an automated notification from Permission Slip.</p>`)
 	b.WriteString(`</div>`)
 
 	b.WriteString(`</body></html>`)

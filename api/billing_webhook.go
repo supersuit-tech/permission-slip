@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
+
+	gostripe "github.com/stripe/stripe-go/v82"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip-web/notify"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 )
 
@@ -14,10 +18,11 @@ import (
 const maxWebhookBodyBytes = 65536
 
 // RegisterBillingWebhookRoutes adds the Stripe webhook endpoint to the mux.
-// This endpoint does NOT require authentication — Stripe signs the request
-// with a shared secret, which we verify via the Stripe-Signature header.
+// This should be called on the top-level mux (NOT inside the v1 router) so the
+// endpoint bypasses auth and rate-limiting middleware. Stripe authenticates
+// requests via the Stripe-Signature header, verified against STRIPE_WEBHOOK_SECRET.
 func RegisterBillingWebhookRoutes(mux *http.ServeMux, deps *Deps) {
-	mux.Handle("POST /billing/webhook", handleStripeWebhook(deps))
+	mux.Handle("POST /api/webhooks/stripe", handleStripeWebhook(deps))
 }
 
 func handleStripeWebhook(deps *Deps) http.HandlerFunc {
@@ -58,12 +63,14 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 		switch event.Type {
 		case "checkout.session.completed":
 			handlerErr = handleCheckoutCompleted(r, deps, event)
+		case "invoice.paid":
+			handlerErr = handleInvoicePaid(r, deps, event)
+		case "invoice.payment_failed":
+			handlerErr = handleInvoicePaymentFailed(r, deps, event)
 		case "customer.subscription.updated":
 			handlerErr = handleSubscriptionUpdated(r, deps, event)
 		case "customer.subscription.deleted":
 			handlerErr = handleSubscriptionDeleted(r, deps, event)
-		case "invoice.payment_failed":
-			handlerErr = handleInvoicePaymentFailed(r, deps, event)
 		default:
 			log.Printf("[%s] StripeWebhook: unhandled event type: %s (event %s)", TraceID(r.Context()), event.Type, event.ID)
 		}
@@ -126,6 +133,66 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	return nil
 }
 
+// lookupSubscriptionFromInvoice extracts the subscription ID from a Stripe
+// invoice's parent object and looks up the local subscription. Returns an
+// error for DB failures (retryable). Returns (nil, nil) when the invoice
+// has no parent subscription or the subscription is unknown (not retryable).
+//
+// This is shared by handleInvoicePaid and handleInvoicePaymentFailed.
+func lookupSubscriptionFromInvoice(r *http.Request, deps *Deps, event *pstripe.WebhookEvent, inv *gostripe.Invoice) (*db.Subscription, error) {
+	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
+		log.Printf("[%s] StripeWebhook: %s (event %s): invoice has no parent subscription, skipping", TraceID(r.Context()), event.Type, event.ID)
+		return nil, nil
+	}
+	stripeSubID := inv.Parent.SubscriptionDetails.Subscription.ID
+
+	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSubID)
+	if err != nil {
+		return nil, fmt.Errorf("lookup subscription %s: %w", stripeSubID, err)
+	}
+	if sub == nil {
+		log.Printf("[%s] StripeWebhook: %s (event %s): no subscription found for %s", TraceID(r.Context()), event.Type, event.ID, stripeSubID)
+		return nil, nil
+	}
+	return sub, nil
+}
+
+// handleInvoicePaid processes a successful invoice payment. It updates the
+// subscription status to active (clearing any past_due state from previous
+// failed payments) and syncs the billing period dates from Stripe.
+func handleInvoicePaid(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) error {
+	inv, err := pstripe.ParseInvoicePaid(event)
+	if err != nil {
+		log.Printf("[%s] StripeWebhook: parse invoice.paid: %v", TraceID(r.Context()), err)
+		return nil // malformed event, don't retry
+	}
+
+	sub, err := lookupSubscriptionFromInvoice(r, deps, event, inv)
+	if err != nil {
+		return err
+	}
+	if sub == nil {
+		return nil
+	}
+
+	// Update status to active (this clears past_due after a successful retry).
+	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, db.SubscriptionStatusActive); err != nil {
+		return fmt.Errorf("set active for %s: %w", sub.UserID, err)
+	}
+
+	// Sync billing period dates from the invoice.
+	if inv.PeriodStart > 0 && inv.PeriodEnd > 0 {
+		start := time.Unix(inv.PeriodStart, 0)
+		end := time.Unix(inv.PeriodEnd, 0)
+		if _, err := db.UpdateSubscriptionPeriod(r.Context(), deps.DB, sub.UserID, start, end); err != nil {
+			return fmt.Errorf("update period for %s: %w", sub.UserID, err)
+		}
+	}
+
+	log.Printf("[%s] StripeWebhook: invoice.paid (event %s), user %s status=active", TraceID(r.Context()), event.ID, sub.UserID)
+	return nil
+}
+
 // lookupByStripeSubscription parses a subscription event and looks up the
 // local subscription by Stripe subscription ID. Returns an error for DB
 // failures (retryable). Returns nil subscription when not found (not retryable).
@@ -172,6 +239,8 @@ func handleSubscriptionUpdated(r *http.Request, deps *Deps, event *pstripe.Webho
 	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, status); err != nil {
 		return fmt.Errorf("update status for %s: %w", sub.UserID, err)
 	}
+
+	log.Printf("[%s] StripeWebhook: subscription.updated (event %s), user %s status=%s (stripe=%s)", TraceID(r.Context()), event.ID, sub.UserID, status, stripeSub.Status)
 	return nil
 }
 
@@ -199,7 +268,9 @@ func handleSubscriptionDeleted(r *http.Request, deps *Deps, event *pstripe.Webho
 }
 
 // handleInvoicePaymentFailed marks the subscription as past_due when Stripe
-// cannot collect payment.
+// cannot collect payment, and notifies the user so they can update their
+// payment method. Stripe will continue to retry per its Smart Retries schedule;
+// if all retries fail, a customer.subscription.deleted event will follow.
 func handleInvoicePaymentFailed(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) error {
 	inv, err := pstripe.ParseInvoicePaymentFailed(event)
 	if err != nil {
@@ -207,24 +278,64 @@ func handleInvoicePaymentFailed(r *http.Request, deps *Deps, event *pstripe.Webh
 		return nil // malformed event, don't retry
 	}
 
-	// Extract subscription ID from the parent object (v82+ API structure).
-	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
-		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): invoice has no parent subscription, skipping", TraceID(r.Context()), event.ID)
-		return nil // not subscription-related, don't retry
-	}
-	stripeSubID := inv.Parent.SubscriptionDetails.Subscription.ID
-
-	sub, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), deps.DB, stripeSubID)
+	sub, err := lookupSubscriptionFromInvoice(r, deps, event, inv)
 	if err != nil {
-		return fmt.Errorf("lookup subscription %s: %w", stripeSubID, err)
+		return err
 	}
 	if sub == nil {
-		log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s): no subscription found for %s", TraceID(r.Context()), event.ID, stripeSubID)
-		return nil // unknown subscription, don't retry
+		return nil
 	}
 
 	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, db.SubscriptionStatusPastDue); err != nil {
 		return fmt.Errorf("set past_due for %s: %w", sub.UserID, err)
 	}
+
+	log.Printf("[%s] StripeWebhook: invoice.payment_failed (event %s), user %s set to past_due", TraceID(r.Context()), event.ID, sub.UserID)
+
+	// Notify the user about the payment failure so they can update their
+	// payment method. This is fire-and-forget; notification failures don't
+	// affect the webhook response.
+	notifyPaymentFailure(r, deps, sub.UserID, event)
+
 	return nil
+}
+
+// notifyPaymentFailure sends a notification to the user about a failed payment.
+// It is fire-and-forget: errors are logged, not returned, so the webhook handler
+// is not blocked by delivery latency or notification failures.
+func notifyPaymentFailure(r *http.Request, deps *Deps, userID string, event *pstripe.WebhookEvent) {
+	if deps.Notifier == nil {
+		log.Printf("[%s] StripeWebhook: notifier not configured, skipping payment failure notification for user %s", TraceID(r.Context()), userID)
+		return
+	}
+
+	profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
+	if err != nil || profile == nil {
+		log.Printf("[%s] StripeWebhook: notify payment failure: failed to lookup profile for %s: %v", TraceID(r.Context()), userID, err)
+		return
+	}
+
+	// Build a billing settings URL so the user can update their payment method.
+	billingURL := ""
+	if deps.BaseURL != "" {
+		billingURL = deps.BaseURL + "/settings?tab=billing"
+	}
+
+	notif := notify.Approval{
+		ApprovalID:  "payment_failed_" + event.ID,
+		ApprovalURL: billingURL,
+		CreatedAt:   time.Now(),
+		ExpiresAt:   time.Now().Add(72 * time.Hour), // Stripe retries for 72h
+		Type:        notify.NotificationTypePaymentFailed,
+	}
+
+	recipient := notify.Recipient{
+		UserID:   profile.ID,
+		Username: profile.Username,
+		Email:    profile.Email,
+		Phone:    profile.Phone,
+	}
+
+	deps.Notifier.Dispatch(r.Context(), notif, recipient)
+	log.Printf("[%s] StripeWebhook: dispatched payment failure notification for user %s", TraceID(r.Context()), userID)
 }
