@@ -14,4 +14,17 @@ export const colors = {
   // Semantic
   error: "#DC2626",
   success: "#059669",
+  warning: "#D97706",
+
+  // Risk level backgrounds and text
+  riskLow: "#059669",
+  riskLowBg: "#ECFDF5",
+  riskMedium: "#D97706",
+  riskMediumBg: "#FFFBEB",
+  riskHigh: "#DC2626",
+  riskHighBg: "#FEF2F2",
+
+  // Primary / accent
+  primary: "#2563EB",
+  primaryBg: "#EFF6FF",
 } as const;

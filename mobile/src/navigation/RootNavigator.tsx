@@ -4,11 +4,17 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import LoginScreen from "../screens/LoginScreen";
-import HomeScreen from "../screens/HomeScreen";
+import ApprovalListScreen from "../screens/approvals/ApprovalListScreen";
+import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
+import type { ApprovalSummary } from "../hooks/useApprovals";
 
 export type RootStackParamList = {
   Login: undefined;
-  Home: undefined;
+  ApprovalList: undefined;
+  ApprovalDetail: {
+    approvalId: string;
+    approval: ApprovalSummary;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -33,7 +39,18 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {authStatus === "authenticated" ? (
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <>
+            <Stack.Screen name="ApprovalList" component={ApprovalListScreen} />
+            <Stack.Screen
+              name="ApprovalDetail"
+              component={ApprovalDetailScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Approval Details",
+                headerBackTitle: "Back",
+              }}
+            />
+          </>
         ) : (
           <Stack.Screen
             name="Login"
