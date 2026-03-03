@@ -247,5 +247,8 @@ The Supabase build args were not passed during `fly deploy`. Re-deploy with `--b
 **CORS errors in browser (403 on API calls):**
 Ensure `ALLOWED_ORIGINS` includes your app's exact origin (e.g., `https://your-app.fly.dev`) — no trailing slash. When unset, the server defaults to same-origin only mode, which works for the standard deployment but will reject requests if a custom domain or CDN changes the browser's origin.
 
+**Users can't log in / auth errors:**
+Verify `SUPABASE_URL` is correct and the project is active. In the Supabase dashboard, check that the **Site URL** (Authentication > URL Configuration) points to your deployment URL (not localhost), and that your deployment URL is in the **Redirect URLs** allow list. Check that email OTP and MFA (TOTP) are enabled if you use them. See the [production guide troubleshooting](deployment-production.md#troubleshooting) for more details.
+
 **Connection refused to database:**
 If using Supabase, ensure the connection string uses the pooler endpoint (port 6543) with `?sslmode=require`. Direct connections (port 5432) may be blocked by firewall rules.
