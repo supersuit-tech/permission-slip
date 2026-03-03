@@ -5,7 +5,8 @@
 - When asked a question, just answer it. Do not write or modify code unless explicitly asked.
 - Always ask for permission before writing any code.
 - Do not git push without confirming first
-- Never open a pull request without confirming with the user right before doing so to get their explicit approval.
+- After making the first commit on a branch, create a pull request by default (no need to ask first). For subsequent commits, push to the existing PR branch.
+- Always include the pull request URL at the end of every message where a PR exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
 - If a file is getting large enough that splitting it would improve maintainability, just go ahead and split it — don't ask first.
