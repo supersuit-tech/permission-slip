@@ -239,6 +239,18 @@ func main() {
 	notifyCfg := notify.LoadConfig()
 	senders := notifyCfg.BuildSenders()
 
+	// #17 — Gate SMS behind paid tier: wrap SMS senders with plan checking
+	// and usage tracking. When the DB is available, free-tier users are blocked
+	// and paid-tier SMS usage is recorded in usage_periods.
+	if deps.DB != nil {
+		smsGate := &notify.DBSMSGate{DB: deps.DB}
+		for i, s := range senders {
+			if s.Name() == "sms" {
+				senders[i] = notify.NewPlanGatedSender(s, smsGate)
+			}
+		}
+	}
+
 	// #276 — Web Push (VAPID): Initialize VAPID keys and register sender.
 	// VAPID keys require the database for auto-generation + persistence,
 	// so this is wired here rather than in BuildSenders().

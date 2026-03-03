@@ -16,10 +16,13 @@ export const colors = {
   success: "#059669",
   warning: "#D97706",
 
-  // Risk levels
+  // Risk level backgrounds and text
   riskLow: "#059669",
+  riskLowBg: "#ECFDF5",
   riskMedium: "#D97706",
+  riskMediumBg: "#FFFBEB",
   riskHigh: "#DC2626",
+  riskHighBg: "#FEF2F2",
 
   // Status badges
   pendingBg: "#FEF3C7",
@@ -28,4 +31,8 @@ export const colors = {
   approvedText: "#065F46",
   deniedBg: "#FEE2E2",
   deniedText: "#991B1B",
+
+  // Primary / accent
+  primary: "#2563EB",
+  primaryBg: "#EFF6FF",
 } as const;

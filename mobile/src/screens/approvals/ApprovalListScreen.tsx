@@ -1,4 +1,10 @@
-import { useCallback, useState } from "react";
+/**
+ * Approval list screen — the primary screen after login. Displays a
+ * tabbed list of approval requests (Pending / Approved / Denied) with
+ * pull-to-refresh, loading/error/empty states, and navigation to the
+ * detail screen.
+ */
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,21 +16,60 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "../../auth/AuthContext";
-import { useApprovals, type ApprovalStatus, type ApprovalSummary } from "../../hooks/useApprovals";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../../navigation/RootNavigator";
+import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
+import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { colors } from "../../theme/colors";
-import ApprovalListItem from "./ApprovalListItem";
-import StatusFilterTabs from "./StatusFilterTabs";
+import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime } from "./approvalUtils";
+import { RiskBadge } from "./RiskBadge";
+import { CountdownBadge } from "./CountdownBadge";
+import { useAuth } from "../../auth/AuthContext";
 
-/**
- * Main screen showing the user's approval requests with status filter tabs.
- * Supports pull-to-refresh and automatic polling via the useApprovals hook.
- */
-export default function ApprovalListScreen() {
-  const { signOut, user } = useAuth();
+type StatusTab = "pending" | "approved" | "denied";
+
+const TABS: { key: StatusTab; label: string }[] = [
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "denied", label: "Denied" },
+];
+
+type Props = NativeStackScreenProps<RootStackParamList, "ApprovalList">;
+
+export default function ApprovalListScreen({ navigation }: Props) {
+  const [activeTab, setActiveTab] = useState<StatusTab>("pending");
+  const { approvals, isLoading, isRefetching, error, refetch } =
+    useApprovals(activeTab);
+  const { agents } = useAgents();
+  const { signOut } = useAuth();
   const insets = useSafeAreaInsets();
-  const [status, setStatus] = useState<ApprovalStatus>("pending");
-  const { approvals, isLoading, isRefetching, error, refetch } = useApprovals(status);
+
+  const agentMap = useMemo(() => {
+    const map = new Map<number, { agent_id: number; metadata?: unknown }>();
+    for (const agent of agents) {
+      map.set(agent.agent_id, agent);
+    }
+    return map;
+  }, [agents]);
+
+  const resolveAgentName = useCallback(
+    (agentId: number) => {
+      const agent = agentMap.get(agentId);
+      if (agent) return getAgentDisplayName(agent);
+      return `Agent ${agentId}`;
+    },
+    [agentMap],
+  );
+
+  const handlePress = useCallback(
+    (approval: ApprovalSummary) => {
+      navigation.navigate("ApprovalDetail", {
+        approvalId: approval.approval_id,
+        approval,
+      });
+    },
+    [navigation],
+  );
 
   const handleSignOut = useCallback(() => {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
@@ -35,14 +80,13 @@ export default function ApprovalListScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: ApprovalSummary }) => (
-      <ApprovalListItem
+      <ApprovalRow
         approval={item}
-        onPress={() => {
-          // Detail screen navigation will be added in the next phase
-        }}
+        agentName={resolveAgentName(item.agent_id)}
+        onPress={() => handlePress(item)}
       />
     ),
-    [],
+    [resolveAgentName, handlePress],
   );
 
   const keyExtractor = useCallback(
@@ -53,34 +97,66 @@ export default function ApprovalListScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Approvals</Text>
-          <Text style={styles.subtitle}>{user?.email ?? ""}</Text>
-        </View>
+        <Text style={styles.title}>Approvals</Text>
         <TouchableOpacity
           testID="sign-out"
           accessibilityLabel="Sign out"
           accessibilityRole="button"
-          style={styles.signOutButton}
           onPress={handleSignOut}
+          style={styles.signOutButton}
         >
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
 
-      <StatusFilterTabs selected={status} onSelect={setStatus} />
+      <View style={styles.tabBar}>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const count =
+            isActive && approvals.length > 0 ? approvals.length : null;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              testID={`tab-${tab.key}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={
+                count
+                  ? `${tab.label}, ${count} item${count !== 1 ? "s" : ""}`
+                  : tab.label
+              }
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <View style={styles.tabContent}>
+                <Text
+                  style={[styles.tabText, isActive && styles.tabTextActive]}
+                >
+                  {tab.label}
+                </Text>
+                {count != null && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{count}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.gray900} />
+      {isLoading && !isRefetching ? (
+        <View style={styles.center}>
+          <ActivityIndicator
+            size="large"
+            color={colors.gray900}
+            testID="loading-indicator"
+          />
         </View>
       ) : error ? (
-        <View style={styles.centered}>
+        <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
-            testID="retry-button"
-            accessibilityLabel="Retry loading approvals"
-            accessibilityRole="button"
             style={styles.retryButton}
             onPress={() => refetch()}
           >
@@ -89,31 +165,19 @@ export default function ApprovalListScreen() {
         </View>
       ) : (
         <FlatList
-          testID="approval-list"
           data={approvals}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          contentContainerStyle={
+            approvals.length === 0 ? styles.emptyContainer : styles.list
+          }
+          ListEmptyComponent={<EmptyState tab={activeTab} />}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={refetch}
+              onRefresh={() => refetch()}
               tintColor={colors.gray500}
             />
-          }
-          contentContainerStyle={
-            approvals.length === 0 ? styles.emptyContainer : styles.listContent
-          }
-          ListEmptyComponent={
-            <View style={styles.centered}>
-              <Text style={styles.emptyTitle}>
-                {status === "pending" ? "All clear" : `No ${status} approvals`}
-              </Text>
-              <Text style={styles.emptyBody}>
-                {status === "pending"
-                  ? "You have no pending approval requests."
-                  : `There are no ${status} approvals to show.`}
-              </Text>
-            </View>
           }
         />
       )}
@@ -121,85 +185,279 @@ export default function ApprovalListScreen() {
   );
 }
 
+/** A single row in the approval list showing action type, agent, risk, and countdown. */
+const ApprovalRow = memo(function ApprovalRow({
+  approval,
+  agentName,
+  onPress,
+}: {
+  approval: ApprovalSummary;
+  agentName: string;
+  onPress: () => void;
+}) {
+  const summary = buildActionSummary(
+    approval.action.type,
+    safeParams(approval.action.parameters),
+  );
+  const expired = checkExpired(approval.status, approval.expires_at);
+
+  return (
+    <TouchableOpacity
+      testID={`approval-row-${approval.approval_id}`}
+      accessibilityLabel={`${humanizeActionType(approval.action.type)} from ${agentName}`}
+      style={[styles.row, expired && styles.rowExpired]}
+      onPress={onPress}
+    >
+      <View style={styles.rowContent}>
+        <View style={styles.rowTop}>
+          <Text style={styles.actionType} numberOfLines={1}>
+            {humanizeActionType(approval.action.type)}
+          </Text>
+          <RiskBadge level={approval.context.risk_level} />
+        </View>
+        <Text style={styles.summary} numberOfLines={1}>
+          {summary}
+        </Text>
+        <View style={styles.rowBottom}>
+          <Text style={styles.agentName} numberOfLines={1}>
+            {agentName}
+          </Text>
+          {approval.status === "pending" && (
+            <>
+              <Text style={styles.dot}>{"\u00B7"}</Text>
+              <CountdownBadge expiresAt={approval.expires_at} />
+            </>
+          )}
+          {approval.status === "approved" && (
+            <>
+              <Text style={styles.dot}>{"\u00B7"}</Text>
+              <Text style={styles.statusApproved}>Approved</Text>
+            </>
+          )}
+          {approval.status === "denied" && (
+            <>
+              <Text style={styles.dot}>{"\u00B7"}</Text>
+              <Text style={styles.statusDenied}>Denied</Text>
+            </>
+          )}
+          <Text style={styles.dot}>{"\u00B7"}</Text>
+          <Text style={styles.relativeTime}>
+            {formatRelativeTime(approval.created_at)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.chevron}>{"\u203A"}</Text>
+    </TouchableOpacity>
+  );
+});
+
+/** Tab-specific empty state shown when there are no approvals for the selected status. */
+function EmptyState({ tab }: { tab: StatusTab }) {
+  const messages: Record<StatusTab, { title: string; body: string }> = {
+    pending: {
+      title: "No pending requests",
+      body: "New approval requests from your agents will appear here.",
+    },
+    approved: {
+      title: "No approved requests",
+      body: "Approved requests will appear here.",
+    },
+    denied: {
+      title: "No denied requests",
+      body: "Denied requests will appear here.",
+    },
+  };
+  const msg = messages[tab];
+
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyTitle}>{msg.title}</Text>
+      <Text style={styles.emptyBody}>{msg.body}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: colors.white,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
-    backgroundColor: colors.white,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "700",
     color: colors.gray900,
   },
-  subtitle: {
-    fontSize: 13,
-    color: colors.gray400,
-    marginTop: 2,
-  },
   signOutButton: {
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   signOutText: {
-    color: colors.gray700,
-    fontSize: 13,
+    color: colors.gray500,
+    fontSize: 14,
     fontWeight: "500",
   },
-  listContent: {
-    paddingTop: 8,
-    paddingBottom: 24,
+  tabBar: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
   },
-  centered: {
+  tab: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginRight: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabActive: {
+    borderBottomColor: colors.gray900,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.gray400,
+  },
+  tabTextActive: {
+    color: colors.gray900,
+  },
+  tabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  tabBadge: {
+    backgroundColor: colors.gray900,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  tabBadgeText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,
   },
+  errorText: {
+    color: colors.error,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  retryText: {
+    color: colors.gray700,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  list: {
+    paddingVertical: 4,
+  },
   emptyContainer: {
     flexGrow: 1,
+    justifyContent: "center",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  rowExpired: {
+    opacity: 0.5,
+  },
+  rowContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
+  actionType: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.gray900,
+    flexShrink: 1,
+  },
+  summary: {
+    fontSize: 13,
+    color: colors.gray500,
+    marginBottom: 4,
+  },
+  rowBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  agentName: {
+    fontSize: 12,
+    color: colors.gray400,
+    flexShrink: 1,
+  },
+  dot: {
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  statusApproved: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.success,
+  },
+  statusDenied: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.error,
+  },
+  relativeTime: {
+    fontSize: 12,
+    color: colors.gray400,
+  },
+  chevron: {
+    fontSize: 22,
+    color: colors.gray400,
+  },
+  empty: {
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
+    paddingVertical: 60,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "600",
-    color: colors.gray700,
-    marginBottom: 6,
+    color: colors.gray500,
+    marginBottom: 8,
+    textAlign: "center",
   },
   emptyBody: {
     fontSize: 14,
     color: colors.gray400,
     textAlign: "center",
     lineHeight: 20,
-  },
-  errorText: {
-    fontSize: 15,
-    color: colors.error,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: colors.gray900,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-  },
-  retryText: {
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: "600",
   },
 });

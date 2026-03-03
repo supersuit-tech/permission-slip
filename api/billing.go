@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
+	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 )
 
 // ── Response types ──────────────────────────────────────────────────────────
@@ -42,6 +43,37 @@ type checkoutResponse struct {
 	URL string `json:"url"`
 }
 
+type usageResponse struct {
+	PeriodStart time.Time       `json:"period_start"`
+	PeriodEnd   time.Time       `json:"period_end"`
+	Requests    requestsUsage   `json:"requests"`
+	SMS         smsUsage        `json:"sms"`
+}
+
+type requestsUsage struct {
+	Total           int  `json:"total"`
+	Included        int  `json:"included"`
+	Overage         int  `json:"overage"`
+	OverageCostCents int `json:"overage_cost_cents"`
+}
+
+type smsUsage struct {
+	Total     int `json:"total"`
+	CostCents int `json:"cost_cents"`
+}
+
+type invoiceListResponse struct {
+	Invoices []pstripe.InvoiceSummary `json:"invoices"`
+}
+
+type downgradeResponse struct {
+	Status string `json:"status"`
+	PlanID string `json:"plan_id"`
+}
+
+// maxInvoiceResults is the maximum number of invoices returned by the list endpoint.
+const maxInvoiceResults = 24
+
 // ── Route registration ──────────────────────────────────────────────────────
 
 // RegisterBillingRoutes adds billing endpoints to the mux.
@@ -49,7 +81,11 @@ type checkoutResponse struct {
 func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /billing/subscription", requireProfile(handleGetSubscription(deps)))
+	mux.Handle("GET /billing/usage", requireProfile(handleGetUsage(deps)))
 	mux.Handle("POST /billing/checkout", requireProfile(handleCreateCheckout(deps)))
+	mux.Handle("POST /billing/upgrade", requireProfile(handleCreateCheckout(deps)))
+	mux.Handle("POST /billing/downgrade", requireProfile(handleDowngrade(deps)))
+	mux.Handle("GET /billing/invoices", requireProfile(handleListInvoices(deps)))
 }
 
 // ── GET /billing/subscription ───────────────────────────────────────────────
@@ -87,10 +123,12 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			},
 		}
 
-		// Attach current period usage if available.
+		// Attach current period usage if available (non-fatal — subscription
+		// data is still returned without usage on error).
 		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] GetSubscription: usage lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 		if usage != nil {
 			ui := &usageInfo{
@@ -114,12 +152,9 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
 
-		if deps.Stripe == nil {
-			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
-			return
-		}
-
-		// Look up existing subscription to check for existing Stripe customer.
+		// Check business logic before infrastructure dependencies so users
+		// get accurate error messages (e.g. "already subscribed" not "billing
+		// not configured").
 		sub, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] CreateCheckout: subscription lookup: %v", TraceID(r.Context()), err)
@@ -131,6 +166,11 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 		// If already on paid plan, reject.
 		if sub != nil && sub.PlanID == db.PlanPayAsYouGo {
 			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadySubscribed, "Already subscribed to a paid plan"))
+			return
+		}
+
+		if deps.Stripe == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
 			return
 		}
 
@@ -155,9 +195,11 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 			}
 			stripeCustomerID = cust.ID
 
-			// Persist Stripe customer ID.
+			// Persist Stripe customer ID so subsequent checkout attempts reuse
+			// the same customer instead of creating duplicates.
 			if _, err := db.UpdateSubscriptionStripe(r.Context(), deps.DB, profile.ID, &stripeCustomerID, nil); err != nil {
 				log.Printf("[%s] CreateCheckout: save customer ID: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 			}
 		}
 
@@ -177,6 +219,241 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// ── GET /billing/usage ─────────────────────────────────────────────────────
+
+func handleGetUsage(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		sub, err := db.GetSubscriptionWithPlan(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetUsage: subscription lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch subscription"))
+			return
+		}
+		if sub == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No subscription found"))
+			return
+		}
+
+		resp := usageResponse{
+			PeriodStart: sub.CurrentPeriodStart,
+			PeriodEnd:   sub.CurrentPeriodEnd,
+		}
+
+		// Determine included request allowance from the plan.
+		included := 0
+		if sub.Plan.MaxRequestsPerMonth != nil {
+			included = *sub.Plan.MaxRequestsPerMonth
+		}
+		resp.Requests.Included = included
+
+		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetUsage: usage lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch usage data"))
+			return
+		}
+		if usage != nil {
+			resp.Requests.Total = usage.RequestCount
+			resp.SMS.Total = usage.SMSCount
+
+			// Calculate overage using the shared pricing function.
+			if included > 0 && usage.RequestCount > included {
+				resp.Requests.Overage = usage.RequestCount - included
+				resp.Requests.OverageCostCents = pstripe.OverageCostCents(resp.Requests.Overage)
+			}
+
+			// SMS cost: $0.01/message (us_ca rate).
+			resp.SMS.CostCents = usage.SMSCount
+		}
+
+		RespondJSON(w, http.StatusOK, resp)
+	}
+}
+
+// ── POST /billing/downgrade ───────────────────────────────────────────────
+
+func handleDowngrade(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		sub, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] Downgrade: subscription lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch subscription"))
+			return
+		}
+		if sub == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No subscription found"))
+			return
+		}
+
+		// Can only downgrade from a paid plan.
+		if sub.PlanID == db.PlanFree {
+			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadyDowngraded, "Already on the free plan"))
+			return
+		}
+
+		// Check plan limits: count agents, standing approvals, credentials.
+		freePlan, err := db.GetPlanByID(r.Context(), deps.DB, db.PlanFree)
+		if err != nil {
+			log.Printf("[%s] Downgrade: free plan lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch free plan limits"))
+			return
+		}
+		if freePlan == nil {
+			log.Printf("[%s] Downgrade: free plan not found", TraceID(r.Context()))
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Free plan not configured"))
+			return
+		}
+
+		if limitErr := validateDowngradeLimits(r.Context(), deps, profile.ID, freePlan); limitErr != nil {
+			status := http.StatusConflict
+			if limitErr.Error.Code == ErrInternalError {
+				status = http.StatusInternalServerError
+			}
+			RespondError(w, r, status, *limitErr)
+			return
+		}
+
+		// Cancel Stripe subscription if one exists.
+		if deps.Stripe != nil && sub.StripeSubscriptionID != nil {
+			if _, err := deps.Stripe.CancelSubscription(r.Context(), *sub.StripeSubscriptionID); err != nil {
+				log.Printf("[%s] Downgrade: cancel Stripe subscription: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to cancel subscription with payment provider"))
+				return
+			}
+		}
+
+		// Downgrade plan locally.
+		updated, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, profile.ID, db.PlanFree)
+		if err != nil {
+			log.Printf("[%s] Downgrade: update plan: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to downgrade plan"))
+			return
+		}
+		if updated == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No subscription found"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, downgradeResponse{
+			Status: string(updated.Status),
+			PlanID: updated.PlanID,
+		})
+	}
+}
+
+// validateDowngradeLimits checks that the user's current resource counts are
+// within the free plan's limits. Returns an ErrorResponse if any limit is
+// exceeded or if a count cannot be verified (fail-closed), nil otherwise.
+func validateDowngradeLimits(ctx context.Context, deps *Deps, userID string, freePlan *db.Plan) *ErrorResponse {
+	if freePlan.MaxAgents != nil {
+		count, err := db.CountRegisteredAgentsByUser(ctx, deps.DB, userID)
+		if err != nil {
+			log.Printf("[%s] Downgrade: count agents: %v", TraceID(ctx), err)
+			CaptureError(ctx, err)
+			resp := InternalError("Unable to verify agent count")
+			return &resp
+		}
+		if count > *freePlan.MaxAgents {
+			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active agents for the free plan")
+			resp.Error.Details = map[string]any{
+				"resource":    "agents",
+				"current":     count,
+				"max_allowed": *freePlan.MaxAgents,
+			}
+			return &resp
+		}
+	}
+
+	if freePlan.MaxStandingApprovals != nil {
+		count, err := db.CountActiveStandingApprovalsByUser(ctx, deps.DB, userID)
+		if err != nil {
+			log.Printf("[%s] Downgrade: count standing approvals: %v", TraceID(ctx), err)
+			CaptureError(ctx, err)
+			resp := InternalError("Unable to verify standing approval count")
+			return &resp
+		}
+		if count > *freePlan.MaxStandingApprovals {
+			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active standing approvals for the free plan")
+			resp.Error.Details = map[string]any{
+				"resource":    "standing_approvals",
+				"current":     count,
+				"max_allowed": *freePlan.MaxStandingApprovals,
+			}
+			return &resp
+		}
+	}
+
+	if freePlan.MaxCredentials != nil {
+		count, err := db.CountCredentialsByUser(ctx, deps.DB, userID)
+		if err != nil {
+			log.Printf("[%s] Downgrade: count credentials: %v", TraceID(ctx), err)
+			CaptureError(ctx, err)
+			resp := InternalError("Unable to verify credential count")
+			return &resp
+		}
+		if count > *freePlan.MaxCredentials {
+			resp := Conflict(ErrDowngradeLimitExceeded, "Too many stored credentials for the free plan")
+			resp.Error.Details = map[string]any{
+				"resource":    "credentials",
+				"current":     count,
+				"max_allowed": *freePlan.MaxCredentials,
+			}
+			return &resp
+		}
+	}
+
+	return nil
+}
+
+// ── GET /billing/invoices ─────────────────────────────────────────────────
+
+func handleListInvoices(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		if deps.Stripe == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
+			return
+		}
+
+		sub, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] ListInvoices: subscription lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch subscription"))
+			return
+		}
+		if sub == nil || sub.StripeCustomerID == nil {
+			// No Stripe customer → no invoices.
+			RespondJSON(w, http.StatusOK, invoiceListResponse{Invoices: []pstripe.InvoiceSummary{}})
+			return
+		}
+
+		invoices, err := deps.Stripe.ListInvoices(r.Context(), *sub.StripeCustomerID, maxInvoiceResults)
+		if err != nil {
+			log.Printf("[%s] ListInvoices: Stripe list: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to fetch invoices"))
+			return
+		}
+		if invoices == nil {
+			invoices = []pstripe.InvoiceSummary{}
+		}
+
+		RespondJSON(w, http.StatusOK, invoiceListResponse{Invoices: invoices})
+	}
+}
+
 // upstreamError returns a 502 ErrorResponse for upstream Stripe failures.
 func upstreamError(message string) ErrorResponse {
 	return newErrorResponse(ErrUpstreamError, message, true)
@@ -191,7 +468,11 @@ func ReportPeriodUsage(ctx context.Context, deps *Deps, userID string, usage *db
 	}
 
 	sub, err := db.GetSubscriptionByUserID(ctx, deps.DB, userID)
-	if err != nil || sub == nil || sub.StripeCustomerID == nil {
+	if err != nil {
+		log.Printf("billing: ReportPeriodUsage: subscription lookup for %s: %v", userID, err)
+		return
+	}
+	if sub == nil || sub.StripeCustomerID == nil {
 		return
 	}
 

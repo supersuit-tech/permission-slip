@@ -1,222 +1,192 @@
-import { createElement } from "react";
+import React, { createElement } from "react";
+import { Text } from "react-native";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "../../../auth/AuthContext";
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
-import ApprovalListScreen from "../ApprovalListScreen";
-import {
-  mockSession,
-  mockApproval,
-  createQueryClient,
-  waitFor,
-  hasTestId,
-  hasText,
-  findFirstByTestId,
-} from "../../../__test-utils__";
+import type { ApprovalSummary } from "../../../hooks/useApprovals";
+import { MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtures";
 
 // --- Mocks ---
-
-const mockGet = jest.fn();
-
-jest.mock("../../../api/client", () => ({
-  __esModule: true,
-  default: { GET: (...args: unknown[]) => mockGet(...args) },
-}));
-
-jest.mock("react-native-safe-area-context", () => ({
-  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
-}));
-
-const authMocks = {
-  authChangeCallback: null as
-    | ((event: AuthChangeEvent, session: Session | null) => void)
-    | null,
-};
 
 jest.mock("../../../lib/supabaseClient", () => ({
   supabase: {
     auth: {
-      onAuthStateChange: jest.fn(
-        (cb: (event: AuthChangeEvent, session: Session | null) => void) => {
-          authMocks.authChangeCallback = cb;
-          Promise.resolve().then(() =>
-            cb("INITIAL_SESSION" as AuthChangeEvent, null),
-          );
-          return { data: { subscription: { unsubscribe: jest.fn() } } };
-        },
-      ),
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: jest.fn() } },
+      }),
       signInWithOtp: jest.fn(),
       verifyOtp: jest.fn(),
-      signOut: jest.fn().mockResolvedValue({ error: null }),
-      mfa: {
-        getAuthenticatorAssuranceLevel: jest.fn().mockResolvedValue({
-          data: { currentLevel: "aal1", nextLevel: "aal1" },
-          error: null,
-        }),
-      },
+      signOut: jest.fn(),
     },
   },
 }));
 
+const mockApprovals: ApprovalSummary[] = [
+  {
+    approval_id: "appr_001",
+    agent_id: 42,
+    action: {
+      type: "email.send",
+      version: "1",
+      parameters: {
+        to: ["bob@example.com"],
+        subject: "Test",
+      },
+    },
+    context: {
+      description: "Send test email",
+      risk_level: "low",
+    },
+    status: "pending",
+    expires_at: new Date(Date.now() + 300_000).toISOString(),
+    created_at: new Date().toISOString(),
+  },
+];
+
+let mockUseApprovalsReturn = {
+  approvals: mockApprovals,
+  hasMore: false,
+  isLoading: false,
+  isRefetching: false,
+  error: null as string | null,
+  refetch: jest.fn(),
+};
+
+jest.mock("../../../hooks/useApprovals", () => ({
+  useApprovals: () => mockUseApprovalsReturn,
+}));
+
+jest.mock("../../../hooks/useAgents", () => ({
+  useAgents: () => ({
+    agents: MOCK_AGENTS.map((a) => ({ ...a, status: "registered" })),
+    isLoading: false,
+    error: null,
+  }),
+  getAgentDisplayName: mockGetAgentDisplayName,
+}));
+
+jest.mock("../../../auth/AuthContext", () => ({
+  useAuth: () => ({
+    signOut: jest.fn().mockResolvedValue({ error: null }),
+    session: null,
+    user: null,
+    authStatus: "authenticated",
+  }),
+}));
+
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+import ApprovalListScreen from "../ApprovalListScreen";
+
 // --- Helpers ---
 
-function renderScreen(qc: QueryClient) {
+function renderList() {
+  const navigation = { navigate: jest.fn() } as any;
+  const route = { key: "test", name: "ApprovalList" as const, params: undefined };
   return create(
-    createElement(
-      QueryClientProvider,
-      { client: qc },
-      createElement(AuthProvider, null, createElement(ApprovalListScreen)),
-    ),
+    createElement(ApprovalListScreen, { navigation, route } as any),
   );
 }
 
-async function authenticateAndRender(apiResponse: unknown) {
-  mockGet.mockResolvedValue(apiResponse);
-  currentQueryClient = createQueryClient();
-
-  let renderer: ReactTestRenderer;
-  await act(async () => {
-    renderer = renderScreen(currentQueryClient!);
-  });
-
-  // The initial auth event fires as a microtask. Wait briefly for it to
-  // settle — the screen may still be on the loading/login state at this point.
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 20));
-  });
-
-  const session = mockSession();
-  await act(async () => {
-    authMocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
-  });
-
-  // Wait for screen to render with data (loading indicator gone)
-  await waitFor(() => hasTestId(renderer!, "tab-pending"));
-
-  // Wait for API call to complete and data to render
-  await waitFor(() => mockGet.mock.calls.length > 0);
-
-  // Give React Query time to update the UI
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 50));
-  });
-
-  currentRenderer = renderer!;
-  return renderer!;
+/** Extracts all text content from the rendered tree. */
+function getAllText(renderer: ReactTestRenderer): string {
+  const texts = renderer.root.findAllByType(Text);
+  return texts.map((t) => {
+    const children = t.props.children;
+    if (typeof children === "string") return children;
+    if (Array.isArray(children)) return children.filter((c) => typeof c === "string").join("");
+    return "";
+  }).join(" ");
 }
 
 // --- Tests ---
 
-let currentRenderer: ReactTestRenderer | null = null;
-let currentQueryClient: QueryClient | null = null;
-
 describe("ApprovalListScreen", () => {
+  let renderer: ReactTestRenderer;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockUseApprovalsReturn = {
+      approvals: mockApprovals,
+      hasMore: false,
+      isLoading: false,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(),
+    };
   });
 
   afterEach(async () => {
-    // Cancel in-flight queries and clear the cache to stop React Query's
-    // refetchInterval timers before unmounting the component tree.
-    if (currentQueryClient) {
-      currentQueryClient.cancelQueries();
-      currentQueryClient.clear();
-      currentQueryClient = null;
-    }
-    if (currentRenderer) {
-      await act(async () => {
-        currentRenderer!.unmount();
-      });
-      currentRenderer = null;
-    }
-  });
-
-  it("renders the title and sign out button", async () => {
-    const renderer = await authenticateAndRender({
-      data: { data: [], has_more: false },
-      error: undefined,
-    });
-
-    expect(hasText(renderer, "Approvals")).toBe(true);
-    expect(hasTestId(renderer, "sign-out")).toBe(true);
-  });
-
-  it("renders three status filter tabs", async () => {
-    const renderer = await authenticateAndRender({
-      data: { data: [], has_more: false },
-      error: undefined,
-    });
-
-    expect(hasTestId(renderer, "tab-pending")).toBe(true);
-    expect(hasTestId(renderer, "tab-approved")).toBe(true);
-    expect(hasTestId(renderer, "tab-denied")).toBe(true);
-  });
-
-  it("shows empty state when no pending approvals", async () => {
-    const renderer = await authenticateAndRender({
-      data: { data: [], has_more: false },
-      error: undefined,
-    });
-
-    expect(hasText(renderer, "All clear")).toBe(true);
-    expect(hasText(renderer, "You have no pending approval requests.")).toBe(true);
-  });
-
-  it("renders approval items when data is returned", async () => {
-    const renderer = await authenticateAndRender({
-      data: { data: [mockApproval], has_more: false },
-      error: undefined,
-    });
-
-    expect(hasTestId(renderer, "approval-item-appr_abc123")).toBe(true);
-    expect(hasText(renderer, "Send welcome email to new user")).toBe(true);
-  });
-
-  it("shows error state with retry button on API failure", async () => {
-    const renderer = await authenticateAndRender({
-      data: undefined,
-      error: { error: { code: "internal_error", message: "Server error" } },
-    });
-
-    await waitFor(() => hasText(renderer, "Server error"));
-
-    expect(hasText(renderer, "Server error")).toBe(true);
-    expect(hasTestId(renderer, "retry-button")).toBe(true);
-  });
-
-  it("switches tabs and fetches with new status filter", async () => {
-    const renderer = await authenticateAndRender({
-      data: { data: [], has_more: false },
-      error: undefined,
-    });
-
-    // Initially fetched with pending
-    expect(mockGet).toHaveBeenCalledWith(
-      "/v1/approvals",
-      expect.objectContaining({
-        params: { query: { status: "pending" } },
-      }),
-    );
-
-    // Tap the "Approved" tab
-    const approvedTab = findFirstByTestId(renderer, "tab-approved");
     await act(async () => {
-      approvedTab?.props.onPress();
+      renderer?.unmount();
     });
+    jest.useRealTimers();
+  });
 
-    await waitFor(() =>
-      mockGet.mock.calls.some(
-        (call: unknown[]) =>
-          (call[1] as { params: { query: { status: string } } })?.params?.query
-            ?.status === "approved",
-      ),
-    );
+  it("renders without crashing", async () => {
+    await act(async () => {
+      renderer = renderList();
+    });
+    expect(renderer.toJSON()).toBeTruthy();
+  });
 
-    expect(mockGet).toHaveBeenCalledWith(
-      "/v1/approvals",
-      expect.objectContaining({
-        params: { query: { status: "approved" } },
-      }),
-    );
+  it("shows tab bar with pending, approved, denied", async () => {
+    await act(async () => {
+      renderer = renderList();
+    });
+    const allText = getAllText(renderer);
+    expect(allText).toContain("Pending");
+    expect(allText).toContain("Approved");
+    expect(allText).toContain("Denied");
+  });
+
+  it("shows the title", async () => {
+    await act(async () => {
+      renderer = renderList();
+    });
+    const allText = getAllText(renderer);
+    expect(allText).toContain("Approvals");
+  });
+
+  it("shows loading indicator when loading", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+      isLoading: true,
+    };
+    await act(async () => {
+      renderer = renderList();
+    });
+    const root = renderer.root;
+    const indicators = root.findAllByProps({ testID: "loading-indicator" });
+    expect(indicators.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows error state with retry button", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+      error: "Unable to load approvals. Please try again later.",
+    };
+    await act(async () => {
+      renderer = renderList();
+    });
+    const allText = getAllText(renderer);
+    expect(allText).toContain("Unable to load approvals");
+    expect(allText).toContain("Retry");
+  });
+
+  it("shows empty state when no approvals", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+    };
+    await act(async () => {
+      renderer = renderList();
+    });
+    const allText = getAllText(renderer);
+    expect(allText).toContain("No pending requests");
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -11,21 +11,21 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { colors } from "./src/theme/colors";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Don't keep cached data from a previous session visible during
-      // loading of a new session (important after sign-out/sign-in).
-      gcTime: 5 * 60 * 1000,
+      retry: 2,
+      staleTime: 30_000,
     },
   },
 });
 
 const LOADING_TIMEOUT_MS = 10_000;
 
-function AppContent() {
+function AppContent({ onRetry }: { onRetry: () => void }) {
   const { authStatus } = useAuth();
   const qc = useQueryClient();
   const [timedOut, setTimedOut] = useState(false);
@@ -67,7 +67,7 @@ function AppContent() {
               accessibilityLabel="Retry connection"
               accessibilityRole="button"
               style={styles.retryButton}
-              onPress={() => setTimedOut(false)}
+              onPress={onRetry}
             >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
@@ -79,19 +79,28 @@ function AppContent() {
     );
   }
 
-  return <RootNavigator />;
+  return (
+    <ErrorBoundary>
+      <RootNavigator />
+    </ErrorBoundary>
+  );
 }
 
 export default function App() {
+  // Incrementing the key re-mounts AuthProvider, which re-triggers
+  // Supabase's onAuthStateChange and retries the initial session check.
+  const [authKey, setAuthKey] = useState(0);
+  const handleRetry = useCallback(() => setAuthKey((k) => k + 1), []);
+
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <AppContent />
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <AuthProvider key={authKey}>
+          <AppContent onRetry={handleRetry} />
           <StatusBar style="auto" />
         </AuthProvider>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
 

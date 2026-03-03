@@ -307,6 +307,7 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -326,10 +327,17 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if len(resp.Preferences) != 3 {
 		t.Fatalf("expected 3 preferences, got %d", len(resp.Preferences))
 	}
-	// All channels default to enabled when no preferences are set
+	// All channels default to enabled when no preferences are set.
+	// SMS should not be available on the free plan.
 	for _, p := range resp.Preferences {
 		if !p.Enabled {
 			t.Errorf("expected channel %q to default to enabled", p.Channel)
+		}
+		if p.Channel == "sms" && p.Available {
+			t.Error("expected SMS to be unavailable on free plan")
+		}
+		if p.Channel != "sms" && !p.Available {
+			t.Errorf("expected channel %q to be available", p.Channel)
 		}
 	}
 }
@@ -339,6 +347,7 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
