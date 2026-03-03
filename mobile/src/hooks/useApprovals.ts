@@ -6,6 +6,7 @@ import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
+import { getApiErrorMessage } from "../api/errors";
 import type { components } from "../api/schema";
 
 export type ApprovalSummary = components["schemas"]["ApprovalSummary"];
@@ -37,11 +38,18 @@ export function useApprovals(status: "pending" | "approved" | "denied" | "cancel
         headers: { Authorization: `Bearer ${token}` },
         params: { query: { status } },
       });
-      if (error) throw new Error("Failed to load approvals");
+      if (error) {
+        throw new Error(
+          getApiErrorMessage(error, "Unable to load approvals. Please try again later."),
+        );
+      }
       return data;
     },
     enabled: !!accessToken,
     refetchInterval: 30_000,
+    // Cache stays fresh for 10 s — avoids redundant refetches when the user
+    // switches tabs back and forth quickly.
+    staleTime: 10_000,
   });
 
   return {
@@ -50,7 +58,7 @@ export function useApprovals(status: "pending" | "approved" | "denied" | "cancel
     isLoading: query.isLoading,
     isRefetching: query.isRefetching,
     error: query.isError
-      ? "Unable to load approvals. Please try again later."
+      ? (query.error?.message ?? "Unable to load approvals. Please try again later.")
       : null,
     refetch: query.refetch,
   };

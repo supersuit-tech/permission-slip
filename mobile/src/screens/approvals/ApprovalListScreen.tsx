@@ -7,6 +7,7 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -70,6 +71,13 @@ export default function ApprovalListScreen({ navigation }: Props) {
     [navigation],
   );
 
+  const handleSignOut = useCallback(() => {
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: () => signOut() },
+    ]);
+  }, [signOut]);
+
   const renderItem = useCallback(
     ({ item }: { item: ApprovalSummary }) => (
       <ApprovalRow
@@ -94,9 +102,7 @@ export default function ApprovalListScreen({ navigation }: Props) {
           testID="sign-out"
           accessibilityLabel="Sign out"
           accessibilityRole="button"
-          onPress={async () => {
-            await signOut();
-          }}
+          onPress={handleSignOut}
           style={styles.signOutButton}
         >
           <Text style={styles.signOutText}>Sign Out</Text>

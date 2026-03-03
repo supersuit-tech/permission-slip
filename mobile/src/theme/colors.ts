@@ -24,6 +24,14 @@ export const colors = {
   riskHigh: "#DC2626",
   riskHighBg: "#FEF2F2",
 
+  // Status badges
+  pendingBg: "#FEF3C7",
+  pendingText: "#92400E",
+  approvedBg: "#D1FAE5",
+  approvedText: "#065F46",
+  deniedBg: "#FEE2E2",
+  deniedText: "#991B1B",
+
   // Primary / accent
   primary: "#2563EB",
   primaryBg: "#EFF6FF",

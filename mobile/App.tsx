@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
@@ -27,7 +27,21 @@ const LOADING_TIMEOUT_MS = 10_000;
 
 function AppContent({ onRetry }: { onRetry: () => void }) {
   const { authStatus } = useAuth();
+  const qc = useQueryClient();
   const [timedOut, setTimedOut] = useState(false);
+  const prevAuthStatus = useRef(authStatus);
+
+  // Clear the React Query cache when the user signs out so the next user
+  // on a shared device never sees stale approval data from a prior session.
+  useEffect(() => {
+    if (
+      prevAuthStatus.current === "authenticated" &&
+      authStatus === "unauthenticated"
+    ) {
+      qc.clear();
+    }
+    prevAuthStatus.current = authStatus;
+  }, [authStatus, qc]);
 
   // If loading takes longer than 10 seconds, show an error with a retry option.
   useEffect(() => {
