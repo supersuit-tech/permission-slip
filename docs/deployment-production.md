@@ -148,6 +148,7 @@ fly deploy \
 
 **Web Push — VAPID:**
 - Browser push notifications via FCM / Mozilla Push Service
+- No external account or signup needed — VAPID keys are a self-generated key pair
 - VAPID key pair must be consistent across all instances
 
 **Fly.io setup:**
@@ -184,11 +185,13 @@ Product analytics for understanding user behavior, feature adoption, and funnel 
 - **Privacy:** Respects Do Not Track / cookie consent; no PII in event properties
 
 **Setup steps:**
-1. Create a PostHog Cloud project
-2. Set `VITE_POSTHOG_KEY` (build arg) — PostHog project API key
-3. Optionally set `VITE_POSTHOG_HOST` (build arg) — defaults to `https://us.i.posthog.com`
-4. Add PostHog host to the CSP `connect-src` directive
-5. If key is not set, PostHog is a no-op (safe for dev/staging)
+1. Sign up at [posthog.com](https://posthog.com) and create a new project
+2. During project creation, choose **US Cloud** (`us.i.posthog.com`) or **EU Cloud** (`eu.i.posthog.com`) based on your data residency requirements
+3. Copy the **Project API Key** from **Project Settings > Project Variables** — this becomes `VITE_POSTHOG_KEY`
+4. Set `VITE_POSTHOG_KEY` as a build arg (see Fly.io setup below)
+5. If you chose EU Cloud, also set `VITE_POSTHOG_HOST` to `https://eu.i.posthog.com` (US Cloud is the default)
+6. The backend automatically adds the PostHog host to the CSP `connect-src` directive when `POSTHOG_HOST` is set
+7. If the key is not set, PostHog is a no-op (safe for dev/staging)
 
 **Env vars (build-time):**
 
@@ -250,18 +253,21 @@ Centralized log search and alerting. The app already outputs structured JSON log
 - **Integration:** Native Fly.io log shipping (no sidecar needed)
 
 **Setup steps:**
-1. Create a Better Stack account and log source
-2. Configure Fly.io log shipping:
+1. Sign up at [betterstack.com](https://betterstack.com) and create a workspace
+2. In the dashboard, go to **Telemetry > Sources > Connect source**
+3. Select **Fly.io** as the source type
+4. Copy the **Source Token** — this is the `<logtail-source-token>` used below
+5. Configure Fly.io log shipping:
    ```bash
    # Recommended: native Fly.io → Logtail integration
    fly logs ship --org <fly-org> --access-token <logtail-source-token>
    ```
-3. Verify logs appear with correct JSON field parsing (`msg`, `level`, `trace_id`, `method`, `path`, `status`)
-4. Create alerts:
+6. Verify logs appear with correct JSON field parsing (`msg`, `level`, `trace_id`, `method`, `path`, `status`)
+7. Create alerts:
    - 5xx error rate spike (>5 errors in 5 minutes)
    - Health check failure logs
    - Panic/crash logs
-5. Create saved views: all errors, slow requests, auth failures
+8. Create saved views: all errors, slow requests, auth failures
 
 **No app env vars needed** — log shipping is configured at the Fly.io platform level, not in the app.
 

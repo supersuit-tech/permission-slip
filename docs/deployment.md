@@ -143,9 +143,29 @@ Or add it to `fly.toml`:
 
 This adds `https://static.cloudflareinsights.com` to `script-src` and `https://cloudflareinsights.com` to `connect-src` in the CSP header.
 
+### Product analytics (PostHog)
+
+Optional. If you want product analytics (feature adoption, funnel analysis, session replays), pass the PostHog project API key as a build arg:
+
+```bash
+fly deploy \
+  --build-arg VITE_POSTHOG_KEY="phc_xxxx"
+```
+
+If using EU Cloud, also set `--build-arg VITE_POSTHOG_HOST="https://eu.i.posthog.com"` and the runtime secret `POSTHOG_HOST="https://eu.i.posthog.com"` (for CSP). US Cloud is the default.
+
+If the key is not set, PostHog is a no-op. See the [production guide PostHog section](deployment-production.md#posthog-product-analytics) for full setup details.
+
 ### Optional notification secrets
 
 ```bash
+# Web Push (VAPID) — no external account needed, just a self-generated key pair
+# Generate keys: go run ./cmd/generate-vapid-keys --format=fly
+fly secrets set \
+  VAPID_PUBLIC_KEY="<base64url public key>" \
+  VAPID_PRIVATE_KEY="<base64url private key>" \
+  VAPID_SUBJECT="mailto:admin@mycompany.com"
+
 # Email via SendGrid
 fly secrets set \
   NOTIFICATION_EMAIL_PROVIDER="twilio-sendgrid" \
