@@ -1,6 +1,4 @@
-# Replace with your Fly app name before deploying.
-# Run `fly launch` to set this automatically, or set it manually.
-app = 'your-app-name'
+app = 'permission-slip'
 primary_region = 'iad'
 kill_signal = 'SIGTERM'
 kill_timeout = '30s'

@@ -13,21 +13,13 @@ Permission Slip ships as a single Go binary with the React frontend embedded. Th
 
 ### 1. Launch the app
 
-First, set the `app` name in `fly.toml`. Open it and replace `your-app-name` with your actual Fly app name:
-
-```toml
-app = 'my-permission-slip-app'
-```
-
-Then launch:
+From the project root:
 
 ```bash
 fly launch
 ```
 
-This detects the `Dockerfile` and `fly.toml` automatically. Review the settings and confirm. `fly launch` will update the `app` field for you if it isn't already set.
-
-If you already have the app created on Fly.io, you can skip `fly launch` — just make sure the `app` field in `fly.toml` matches your existing app name, then go straight to setting secrets.
+This detects the `Dockerfile` and `fly.toml` automatically (the app name `permission-slip` is already configured). Review the settings and confirm. If the app is already created on Fly.io, skip this step and go straight to setting secrets.
 
 ### 2. Set secrets
 
