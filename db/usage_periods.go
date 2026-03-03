@@ -216,6 +216,75 @@ func GetCurrentPeriodUsage(ctx context.Context, db DBTX, userID string) (*UsageP
 	return GetUsageByPeriod(ctx, db, userID, periodStart)
 }
 
+// ReserveRequestQuota atomically increments request_count only if the current
+// count is below the given limit. Returns (true, nil) if the reservation
+// succeeded, (false, nil) if the quota is exhausted, or (false, err) on
+// database errors. This prevents TOCTOU races where concurrent requests could
+// each pass a read-then-check gate before any increment is recorded.
+func ReserveRequestQuota(ctx context.Context, d DBTX, userID string, periodStart, periodEnd time.Time, limit int) (bool, error) {
+	// Use an upsert with a WHERE clause on DO UPDATE that only increments
+	// if count < limit. If the row is inserted (new period), count starts
+	// at 1 which is always under any limit >= 1. If the row exists but
+	// count >= limit, the WHERE prevents the update and 0 rows are returned.
+	var id int64
+	err := d.QueryRow(ctx,
+		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count)
+		 VALUES ($1, $2, $3, 1)
+		 ON CONFLICT (user_id, period_start)
+		 DO UPDATE SET request_count = usage_periods.request_count + 1,
+		              period_end = EXCLUDED.period_end
+		 WHERE usage_periods.request_count < $4
+		 RETURNING id`,
+		userID, periodStart, periodEnd, limit).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil // quota exhausted
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// UpdateUsageBreakdownOnly updates only the JSONB breakdown for an existing
+// usage period row without incrementing request_count. Used when the count
+// was already reserved atomically by ReserveRequestQuota.
+func UpdateUsageBreakdownOnly(ctx context.Context, d DBTX, userID string, periodStart time.Time, keys UsageBreakdownKeys) error {
+	agentKey := strconv.FormatInt(keys.AgentID, 10)
+
+	_, err := d.Exec(ctx,
+		`UPDATE usage_periods
+		 SET breakdown = jsonb_set(
+			jsonb_set(
+				jsonb_set(
+					COALESCE(breakdown, '{}'),
+					'{by_agent}',
+					jsonb_set(
+						COALESCE(breakdown->'by_agent', '{}'),
+						ARRAY[$3::text],
+						to_jsonb(COALESCE((breakdown->'by_agent'->>$3::text)::int, 0) + 1)
+					)
+				),
+				'{by_connector}',
+				CASE WHEN $4::text = '' THEN COALESCE(breakdown->'by_connector', '{}')
+				ELSE jsonb_set(
+					COALESCE(breakdown->'by_connector', '{}'),
+					ARRAY[$4::text],
+					to_jsonb(COALESCE((breakdown->'by_connector'->>$4::text)::int, 0) + 1)
+				) END
+			),
+			'{by_action_type}',
+			CASE WHEN $5::text = '' THEN COALESCE(breakdown->'by_action_type', '{}')
+			ELSE jsonb_set(
+				COALESCE(breakdown->'by_action_type', '{}'),
+				ARRAY[$5::text],
+				to_jsonb(COALESCE((breakdown->'by_action_type'->>$5::text)::int, 0) + 1)
+			) END
+		 )
+		 WHERE user_id = $1 AND period_start = $2`,
+		userID, periodStart, agentKey, keys.ConnectorID, keys.ActionType)
+	return err
+}
+
 // BillingPeriodBounds returns the start (inclusive) and end (exclusive) of the
 // billing month containing the given time. All calculations use UTC.
 //

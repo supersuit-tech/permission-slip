@@ -4754,329 +4754,6 @@ paths:
           $ref: '#/components/responses/NotFound'
   /v1/billing/usage:
     get:
-      summary: Get current usage
-      description: |
-        Returns a detailed usage breakdown for the current billing period,
-        including request counts, overage calculations, and SMS costs.
-
-        Only available when `billing_enabled` is `true` in the server config.
-      operationId: getUsage
-      tags:
-        - Billing
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: Usage details returned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UsageResponse'
-              example:
-                period_start: '2026-03-01T00:00:00Z'
-                period_end: '2026-04-01T00:00:00Z'
-                requests:
-                  total: 450
-                  included: 1000
-                  overage: 0
-                  overage_cost_cents: 0
-                sms:
-                  total: 12
-                  cost_cents: 12
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /v1/billing/checkout:
-    post:
-      summary: Create checkout session
-      deprecated: true
-      description: |
-        Creates a Stripe Checkout Session for upgrading from the free plan to
-        pay-as-you-go. Returns a URL to redirect the user to Stripe's hosted
-        checkout page.
-
-        **Deprecated:** Use `POST /v1/billing/upgrade` instead, which has the
-        same behavior but a clearer name and response schema.
-
-        If the user doesn't have a Stripe Customer yet, one is created automatically.
-        If the user is already on a paid plan, returns 409 Conflict.
-
-        Only available when `billing_enabled` is `true` and Stripe is configured.
-      operationId: createCheckout
-      tags:
-        - Billing
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: Checkout session created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckoutResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Already subscribed to a paid plan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '502':
-          description: Stripe API error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/billing/upgrade:
-    post:
-      summary: Upgrade to paid plan
-      description: |
-        Initiates an upgrade to the paid plan by creating a Stripe Checkout Session.
-        Returns a URL to redirect the user to Stripe's hosted checkout page.
-
-        This is an alias for `POST /v1/billing/checkout`.
-
-        If the user doesn't have a Stripe Customer yet, one is created automatically.
-        If the user is already on a paid plan, returns 409 Conflict.
-
-        Only available when `billing_enabled` is `true` and Stripe is configured.
-      operationId: upgradePlan
-      tags:
-        - Billing
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: Checkout session created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckoutResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Already subscribed to a paid plan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '502':
-          description: Stripe API error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/billing/downgrade:
-    post:
-      summary: Downgrade to free plan
-      description: |
-        Downgrades the user from a paid plan to the free tier. Validates that
-        current resource counts (agents, standing approvals, credentials) are
-        within free plan limits before proceeding.
-
-        If the user has a Stripe subscription, it is cancelled immediately.
-        Returns 409 if the user is already on the free plan or if resource
-        counts exceed free plan limits (with details about which resource and
-        the current/allowed counts in the error response).
-
-        Only available when `billing_enabled` is `true` in the server config.
-      operationId: downgradePlan
-      tags:
-        - Billing
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: Successfully downgraded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DowngradeResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Already on free plan or resource limits exceeded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Unable to verify resource counts for limit validation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '502':
-          description: Stripe API error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /v1/billing/invoices:
-    get:
-      summary: List invoices
-      description: |
-        Returns the user's past invoices from Stripe. Up to 24 paid invoices
-        are returned, sorted by creation date (most recent first).
-
-        Returns an empty list if the user has no Stripe customer or no invoices.
-
-        Only available when `billing_enabled` is `true` and Stripe is configured.
-      operationId: listInvoices
-      tags:
-        - Billing
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: Invoice list returned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InvoiceListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '502':
-          description: Stripe API error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/billing/webhook:
-    post:
-      summary: Stripe webhook
-      description: |
-        Receives and processes Stripe webhook events. This endpoint verifies the
-        webhook signature using `STRIPE_WEBHOOK_SECRET` and processes the following
-        event types:
-
-        - `checkout.session.completed`: Stores the Stripe subscription ID and
-          atomically upgrades the user from free → pay_as_you_go (idempotent —
-          duplicate events are safely ignored).
-        - `customer.subscription.updated`: Maps the Stripe subscription status
-          (active/trialing → active, past_due/unpaid → past_due, other → cancelled)
-          to the local subscription status.
-        - `customer.subscription.deleted`: Downgrades user to free plan, marks
-          status as cancelled, and sets `downgraded_at` to trigger the 7-day
-          audit retention grace period.
-        - `invoice.payment_failed`: Marks subscription as past_due so the UI can
-          prompt the user to update their payment method.
-
-        Always returns 200 to prevent Stripe retries. Event processing failures
-        are logged server-side.
-
-        **No authentication required** — security is provided by Stripe's webhook
-        signature verification (`STRIPE_WEBHOOK_SECRET` is required in production).
-      operationId: stripeWebhook
-      tags:
-        - Billing
-      security: []
-      parameters:
-        - name: Stripe-Signature
-          in: header
-          required: true
-          description: |
-            Stripe webhook signature header. Contains the timestamp and signature(s)
-            used to verify that the request originated from Stripe. The server verifies
-            this against `STRIPE_WEBHOOK_SECRET` before processing any event.
-          schema:
-            type: string
-          example: t=1614556236,v1=abc123...
-      requestBody:
-        required: true
-        description: |
-          Raw Stripe webhook event payload. **Must be passed as raw bytes** (not parsed JSON)
-          to the signature verification step — parsing before verification would invalidate
-          the signature check.
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Stripe Event object (structure varies by event type)
-              properties:
-                id:
-                  type: string
-                  description: Unique event identifier (used for idempotency)
-                type:
-                  type: string
-                  description: Event type (e.g., checkout.session.completed)
-              required:
-                - id
-                - type
-      responses:
-        '200':
-          description: Webhook processed successfully (always returned to prevent Stripe retries)
-        '400':
-          description: Invalid signature or malformed event
-        '500':
-          description: Processing failed — Stripe will retry the event
-  /v1/billing/plan:
-    get:
-      summary: Get billing plan details
-      description: |
-        Returns the authenticated user's current plan details, subscription status,
-        and a summary of current resource usage (request counts, agent count, etc.).
-
-        This is the primary billing endpoint for the frontend — it provides everything
-        needed to render the billing section of the settings page in a single request.
-
-        Only available when `billing_enabled` is `true` in the server config.
-      operationId: getBillingPlan
-      tags:
-        - Billing
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: Billing plan details returned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BillingPlanResponse'
-              example:
-                plan:
-                  id: free
-                  name: Free
-                  max_requests_per_month: 1000
-                  max_agents: 3
-                  max_standing_approvals: 5
-                  max_credentials: 5
-                  audit_retention_days: 7
-                subscription:
-                  status: active
-                  current_period_start: '2026-03-01T00:00:00Z'
-                  current_period_end: '2026-04-01T00:00:00Z'
-                  has_payment_method: false
-                  can_upgrade: true
-                  can_downgrade: false
-                  grace_period_ends_at: null
-                usage:
-                  requests: 42
-                  agents: 2
-                  standing_approvals: 3
-                  credentials: 1
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: No subscription found for this user
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/billing/usage:
-    get:
       summary: Get detailed usage breakdown
       description: |
         Returns detailed usage metrics for a billing period, including request
@@ -5136,6 +4813,50 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: No usage data found for this period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/checkout:
+    post:
+      summary: Create checkout session
+      deprecated: true
+      description: |
+        Creates a Stripe Checkout Session for upgrading from the free plan to
+        pay-as-you-go. Returns a URL to redirect the user to Stripe's hosted
+        checkout page.
+
+        **Deprecated:** Use `POST /v1/billing/upgrade` instead, which has the
+        same behavior but a clearer name and response schema.
+
+        If the user doesn't have a Stripe Customer yet, one is created automatically.
+        If the user is already on a paid plan, returns 409 Conflict.
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: createCheckout
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Already subscribed to a paid plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
           content:
             application/json:
               schema:
@@ -5290,6 +5011,144 @@ paths:
                 has_more: false
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/webhooks/stripe:
+    post:
+      summary: Stripe webhook
+      description: |
+        Receives and processes Stripe webhook events. This endpoint lives outside
+        `/api/v1/` to bypass auth and rate-limiting middleware. Security is provided
+        by Stripe's webhook signature verification using `STRIPE_WEBHOOK_SECRET`.
+
+        **Handled event types:**
+
+        - `checkout.session.completed`: Stores the Stripe subscription ID and
+          atomically upgrades the user from free → pay_as_you_go (idempotent —
+          duplicate events are safely ignored).
+        - `invoice.paid`: Updates subscription status to active (clearing any
+          past_due state from previous failed payments) and syncs billing period
+          dates from the invoice.
+        - `invoice.payment_failed`: Marks subscription as past_due and sends a
+          notification to the user so they can update their payment method.
+          Stripe will continue to retry per its Smart Retries schedule.
+        - `customer.subscription.updated`: Maps the Stripe subscription status
+          (active/trialing → active, past_due/unpaid → past_due, other → cancelled)
+          to the local subscription status.
+        - `customer.subscription.deleted`: Downgrades user to free plan, marks
+          status as cancelled, and sets `downgraded_at` to trigger the 7-day
+          audit retention grace period.
+
+        **Payment failure flow:**
+        1. `invoice.payment_failed` → status set to `past_due`, user notified
+        2. Stripe retries payment per Smart Retries schedule
+        3. If retry succeeds → `invoice.paid` → status set back to `active`
+        4. If all retries fail → `customer.subscription.deleted` → downgrade to free
+
+        **Idempotency:** Each event ID is recorded after successful processing.
+        Duplicate events (from Stripe retries) are safely skipped.
+
+        Returns 200 on success. Returns 500 on retryable errors (DB failures) so
+        Stripe will retry the event. Returns 400 on invalid signature.
+
+        **No authentication required** — security is provided by Stripe's webhook
+        signature verification (`STRIPE_WEBHOOK_SECRET` is required in production).
+      operationId: stripeWebhook
+      tags:
+        - Billing
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          description: |
+            Stripe webhook signature header. Contains the timestamp and signature(s)
+            used to verify that the request originated from Stripe. The server verifies
+            this against `STRIPE_WEBHOOK_SECRET` before processing any event.
+          schema:
+            type: string
+          example: t=1614556236,v1=abc123...
+      requestBody:
+        required: true
+        description: |
+          Raw Stripe webhook event payload. **Must be passed as raw bytes** (not parsed JSON)
+          to the signature verification step — parsing before verification would invalidate
+          the signature check.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe Event object (structure varies by event type)
+              properties:
+                id:
+                  type: string
+                  description: Unique event identifier (used for idempotency)
+                type:
+                  type: string
+                  description: Event type (e.g., checkout.session.completed)
+              required:
+                - id
+                - type
+      responses:
+        '200':
+          description: Webhook processed successfully (always returned to prevent Stripe retries)
+        '400':
+          description: Invalid signature or malformed event
+        '500':
+          description: Processing failed — Stripe will retry the event
+  /v1/billing/plan:
+    get:
+      summary: Get billing plan details
+      description: |
+        Returns the authenticated user's current plan details, subscription status,
+        and a summary of current resource usage (request counts, agent count, etc.).
+
+        This is the primary billing endpoint for the frontend — it provides everything
+        needed to render the billing section of the settings page in a single request.
+
+        Only available when `billing_enabled` is `true` in the server config.
+      operationId: getBillingPlan
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Billing plan details returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPlanResponse'
+              example:
+                plan:
+                  id: free
+                  name: Free
+                  max_requests_per_month: 1000
+                  max_agents: 3
+                  max_standing_approvals: 5
+                  max_credentials: 5
+                  audit_retention_days: 7
+                subscription:
+                  status: active
+                  current_period_start: '2026-03-01T00:00:00Z'
+                  current_period_end: '2026-04-01T00:00:00Z'
+                  has_payment_method: false
+                  can_upgrade: true
+                  can_downgrade: false
+                  grace_period_ends_at: null
+                usage:
+                  requests: 42
+                  agents: 2
+                  standing_approvals: 3
+                  credentials: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No subscription found for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
   /v1/config:
@@ -8903,33 +8762,6 @@ components:
             Estimated SMS cost in cents at the US/CA rate ($0.01 per message).
             International rates may apply for non-US/CA destinations.
           example: 12
-    DowngradeResponse:
-      type: object
-      required:
-        - status
-        - plan_id
-      properties:
-        status:
-          type: string
-          enum:
-            - active
-            - past_due
-            - cancelled
-          description: Subscription status after downgrade
-          example: active
-        plan_id:
-          type: string
-          description: Plan ID after downgrade (always "free")
-          example: free
-    InvoiceListResponse:
-      type: object
-      required:
-        - invoices
-      properties:
-        invoices:
-          type: array
-          items:
-            $ref: '#/components/schemas/InvoiceSummary'
     InvoiceSummary:
       type: object
       required:
@@ -9204,37 +9036,6 @@ components:
           pattern: ^https://
           description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
           example: https://checkout.stripe.com/c/pay/cs_test_...
-    DowngradeResponse:
-      type: object
-      required:
-        - status
-        - plan_id
-        - downgraded_at
-        - grace_period_ends_at
-      properties:
-        status:
-          type: string
-          enum:
-            - active
-            - past_due
-            - cancelled
-          description: Updated subscription status (will be `cancelled` after downgrade)
-          example: cancelled
-        plan_id:
-          type: string
-          description: The plan the user was downgraded to
-          example: free
-        downgraded_at:
-          type: string
-          format: date-time
-          description: Timestamp when the downgrade was processed
-        grace_period_ends_at:
-          type: string
-          format: date-time
-          description: |
-            When the 7-day grace period expires. Until this time, the user retains
-            the 90-day audit retention window from their paid plan. Show this to the
-            user so they know how long they have to export their data.
     Invoice:
       type: object
       required:
@@ -9288,20 +9089,6 @@ components:
           pattern: ^https://
           description: URL to view the full invoice details on Stripe's hosted page. Always HTTPS.
           example: https://invoice.stripe.com/i/acct_1234/inv_1234567890
-    InvoiceListResponse:
-      type: object
-      required:
-        - invoices
-        - has_more
-      properties:
-        invoices:
-          type: array
-          items:
-            $ref: '#/components/schemas/Invoice'
-        has_more:
-          type: boolean
-          description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
-          example: false
     QuotaExceededError:
       description: |
         Returned when the user exceeds their plan's monthly request quota (HTTP 429).
@@ -9311,17 +9098,18 @@ components:
         - $ref: '#/components/schemas/ErrorResponse'
       example:
         error:
-          code: quota_exceeded
-          message: Monthly request quota exceeded. Upgrade your plan for continued access.
-          retryable: false
+          code: monthly_quota_exceeded
+          message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
+          retryable: true
+          retry_after: 2419200
           details:
             limit: 1000
-            current_count: 1001
+            current_usage: 1000
             plan_id: free
             reset_at: '2026-04-01T00:00:00Z'
     QuotaExceededDetails:
       type: object
-      description: Shape of `error.details` for quota_exceeded errors.
+      description: Shape of `error.details` for monthly_quota_exceeded errors.
       properties:
         limit:
           type: integer
@@ -9676,7 +9464,7 @@ components:
             - verification_locked
             - approval_expired
             - rate_limited
-            - quota_exceeded
+            - monthly_quota_exceeded
             - internal_error
             - upstream_error
             - service_unavailable
@@ -9719,8 +9507,8 @@ components:
           type: integer
           minimum: 1
           description: |
-            Present only for `rate_limited` errors. Number of seconds the client should wait 
-            before retrying the request.
+            Present for `rate_limited` and `monthly_quota_exceeded` errors. Number of seconds
+            the client should wait before retrying the request.
           example: 60
     ErrorResponse:
       type: object
@@ -9836,6 +9624,51 @@ components:
           type: integer
           description: Number of days audit logs are retained
           example: 7
+    DowngradeResponse:
+      type: object
+      required:
+        - status
+        - plan_id
+        - downgraded_at
+        - grace_period_ends_at
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - past_due
+            - cancelled
+          description: Updated subscription status (will be `cancelled` after downgrade)
+          example: cancelled
+        plan_id:
+          type: string
+          description: The plan the user was downgraded to
+          example: free
+        downgraded_at:
+          type: string
+          format: date-time
+          description: Timestamp when the downgrade was processed
+        grace_period_ends_at:
+          type: string
+          format: date-time
+          description: |
+            When the 7-day grace period expires. Until this time, the user retains
+            the 90-day audit retention window from their paid plan. Show this to the
+            user so they know how long they have to export their data.
+    InvoiceListResponse:
+      type: object
+      required:
+        - invoices
+        - has_more
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        has_more:
+          type: boolean
+          description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
+          example: false
   parameters:
     ActionConfigId:
       name: config_id
@@ -10194,22 +10027,44 @@ components:
                     max_attempts: 5
                   trace_id: trace_xyz789
     TooManyRequests:
-      description: Too Many Requests - Rate limit exceeded
+      description: Too Many Requests - Rate limit or monthly quota exceeded
+      headers:
+        Retry-After:
+          description: Seconds until the rate limit resets or the billing period ends
+          schema:
+            type: integer
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              code: rate_limited
-              message: Too many requests. Please retry after 60 seconds.
-              retryable: true
-              retry_after: 60
-              details:
-                limit: 100
-                window: 1 minute
-                reset_at: '2026-02-11T13:26:00Z'
-              trace_id: trace_xyz789
+          examples:
+            rate_limited:
+              summary: Per-IP or per-agent rate limit exceeded
+              value:
+                error:
+                  code: rate_limited
+                  message: Too many requests. Please retry after 60 seconds.
+                  retryable: true
+                  retry_after: 60
+                  details:
+                    limit: 100
+                    window: 1 minute
+                    reset_at: '2026-02-11T13:26:00Z'
+                  trace_id: trace_xyz789
+            monthly_quota_exceeded:
+              summary: Free tier monthly request quota exhausted
+              value:
+                error:
+                  code: monthly_quota_exceeded
+                  message: Free tier limit of 1,000 requests/month reached. Upgrade to continue.
+                  retryable: true
+                  retry_after: 86400
+                  details:
+                    current_usage: 1000
+                    limit: 1000
+                    plan_id: free
+                    reset_at: '2026-04-01T00:00:00Z'
+                  trace_id: trace_xyz789
     InternalServerError:
       description: Internal Server Error - Unexpected server error
       content:

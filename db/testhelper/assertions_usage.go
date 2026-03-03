@@ -8,6 +8,7 @@ package testhelper
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
@@ -35,6 +36,22 @@ func RequireUsageCount(t *testing.T, d db.DBTX, userID string, want int) *db.Usa
 		t.Errorf("RequireUsageCount: expected request_count=%d for user %s, got %d", want, userID, usage.RequestCount)
 	}
 	return usage
+}
+
+// SetUsageCount upserts a usage_periods row for the current billing month with
+// the given request_count. Use this to set up pre-existing usage for quota tests.
+func SetUsageCount(t *testing.T, d db.DBTX, userID string, count int) {
+	t.Helper()
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	_, err := d.Exec(context.Background(),
+		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (user_id, period_start)
+		 DO UPDATE SET request_count = $4`,
+		userID, periodStart, periodEnd, count)
+	if err != nil {
+		t.Fatalf("SetUsageCount: %v", err)
+	}
 }
 
 // RequireUsageBreakdown asserts specific values in the usage period's JSONB

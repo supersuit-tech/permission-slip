@@ -352,6 +352,187 @@ func TestIncrementRequestCountConcurrent(t *testing.T) {
 	}
 }
 
+// TestReserveRequestQuota verifies basic reservation behavior: succeeds when
+// under limit, fails when at limit.
+func TestReserveRequestQuota(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	// Use current billing period to match SetUsageCount (which uses time.Now()).
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+
+	// Reserve with no existing row — should succeed (creates row with count=1).
+	ok, err := db.ReserveRequestQuota(ctx, tx, uid, periodStart, periodEnd, 5)
+	if err != nil {
+		t.Fatalf("ReserveRequestQuota: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected reservation to succeed on first call")
+	}
+
+	// Verify count is 1.
+	usage, err := db.GetUsageByPeriod(ctx, tx, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage.RequestCount != 1 {
+		t.Errorf("expected request_count=1, got %d", usage.RequestCount)
+	}
+
+	// Set count to exactly the limit.
+	testhelper.SetUsageCount(t, tx, uid, 5)
+
+	// Reserve at limit — should fail.
+	ok, err = db.ReserveRequestQuota(ctx, tx, uid, periodStart, periodEnd, 5)
+	if err != nil {
+		t.Fatalf("ReserveRequestQuota: %v", err)
+	}
+	if ok {
+		t.Fatal("expected reservation to fail when at limit")
+	}
+
+	// Count should still be 5 (not incremented).
+	usage, err = db.GetUsageByPeriod(ctx, tx, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage.RequestCount != 5 {
+		t.Errorf("expected request_count=5 (unchanged), got %d", usage.RequestCount)
+	}
+}
+
+// TestReserveRequestQuotaConcurrent verifies that concurrent reservation
+// attempts at the boundary (limit-1) result in exactly one success. This
+// proves the atomic conditional increment prevents TOCTOU over-counting.
+func TestReserveRequestQuotaConcurrent(t *testing.T) {
+	t.Parallel()
+	pool := testhelper.SetupPool(t)
+	ctx := context.Background()
+
+	uid := testhelper.GenerateUID(t)
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO auth.users (id) VALUES ($1)`, uid); err != nil {
+		t.Fatalf("insert auth.users: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO profiles (id, username) VALUES ($1, $2)`, uid, "rq_"+uid[:8]); err != nil {
+		t.Fatalf("insert profiles: %v", err)
+	}
+	t.Cleanup(func() {
+		bg := context.Background()
+		pool.Exec(bg, `DELETE FROM usage_periods WHERE user_id = $1`, uid) //nolint:errcheck
+		pool.Exec(bg, `DELETE FROM profiles WHERE id = $1`, uid)           //nolint:errcheck
+		pool.Exec(bg, `DELETE FROM auth.users WHERE id = $1`, uid)         //nolint:errcheck
+	})
+
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	const limit = 5
+
+	// Set count to limit-1 so exactly one more reservation can succeed.
+	testhelper.SetUsageCount(t, pool, uid, limit-1)
+
+	const goroutines = 20
+	var wg sync.WaitGroup
+	results := make(chan bool, goroutines)
+	errs := make(chan error, goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ok, err := db.ReserveRequestQuota(ctx, pool, uid, periodStart, periodEnd, limit)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- ok
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	for err := range errs {
+		t.Fatalf("concurrent ReserveRequestQuota failed: %v", err)
+	}
+
+	successCount := 0
+	for ok := range results {
+		if ok {
+			successCount++
+		}
+	}
+
+	if successCount != 1 {
+		t.Errorf("expected exactly 1 successful reservation out of %d, got %d", goroutines, successCount)
+	}
+
+	// Final count should be exactly the limit.
+	usage, err := db.GetUsageByPeriod(ctx, pool, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage == nil {
+		t.Fatal("expected usage row, got nil")
+	}
+	if usage.RequestCount != limit {
+		t.Errorf("expected request_count=%d, got %d", limit, usage.RequestCount)
+	}
+}
+
+// TestUpdateUsageBreakdownOnly verifies that breakdown updates don't increment
+// request_count (used when quota was already atomically reserved).
+func TestUpdateUsageBreakdownOnly(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	// Create a usage row with count=5.
+	_, err := tx.Exec(ctx,
+		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count) VALUES ($1, $2, $3, $4)`,
+		uid, periodStart, periodEnd, 5)
+	if err != nil {
+		t.Fatalf("insert usage row: %v", err)
+	}
+
+	// Update breakdown without incrementing count.
+	err = db.UpdateUsageBreakdownOnly(ctx, tx, uid, periodStart, db.UsageBreakdownKeys{
+		AgentID:     42,
+		ConnectorID: "github",
+		ActionType:  "github.create_issue",
+	})
+	if err != nil {
+		t.Fatalf("UpdateUsageBreakdownOnly: %v", err)
+	}
+
+	// Count should still be 5.
+	usage, err := db.GetUsageByPeriod(ctx, tx, uid, periodStart)
+	if err != nil {
+		t.Fatalf("GetUsageByPeriod: %v", err)
+	}
+	if usage.RequestCount != 5 {
+		t.Errorf("expected request_count=5 (unchanged), got %d", usage.RequestCount)
+	}
+
+	// Breakdown should have the agent entry.
+	b := usage.ParseBreakdown()
+	if b.ByAgent["42"] != 1 {
+		t.Errorf("expected by_agent[42]=1, got %d", b.ByAgent["42"])
+	}
+	if b.ByConnector["github"] != 1 {
+		t.Errorf("expected by_connector[github]=1, got %d", b.ByConnector["github"])
+	}
+}
+
 func TestIncrementRequestCountWithBreakdown(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

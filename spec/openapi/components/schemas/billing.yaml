@@ -168,32 +168,6 @@ SMSUsage:
         International rates may apply for non-US/CA destinations.
       example: 12
 
-DowngradeResponse:
-  type: object
-  required:
-    - status
-    - plan_id
-  properties:
-    status:
-      type: string
-      enum: [active, past_due, cancelled]
-      description: Subscription status after downgrade
-      example: active
-    plan_id:
-      type: string
-      description: Plan ID after downgrade (always "free")
-      example: free
-
-InvoiceListResponse:
-  type: object
-  required:
-    - invoices
-  properties:
-    invoices:
-      type: array
-      items:
-        $ref: '#/InvoiceSummary'
-
 InvoiceSummary:
   type: object
   required:
@@ -578,18 +552,19 @@ QuotaExceededError:
     - $ref: '../schemas/errors.yaml#/ErrorResponse'
   example:
     error:
-      code: quota_exceeded
-      message: Monthly request quota exceeded. Upgrade your plan for continued access.
-      retryable: false
+      code: monthly_quota_exceeded
+      message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
+      retryable: true
+      retry_after: 2419200
       details:
         limit: 1000
-        current_count: 1001
+        current_usage: 1000
         plan_id: free
         reset_at: '2026-04-01T00:00:00Z'
 
 QuotaExceededDetails:
   type: object
-  description: Shape of `error.details` for quota_exceeded errors.
+  description: Shape of `error.details` for monthly_quota_exceeded errors.
   properties:
     limit:
       type: integer
