@@ -54,4 +54,5 @@ const (
 	ErrAlreadyDowngraded        ErrorCode = "already_downgraded"
 	ErrDowngradeLimitExceeded   ErrorCode = "downgrade_limit_exceeded"
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
+	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
 )

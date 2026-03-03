@@ -61,10 +61,14 @@ UpdateProfileRequest:
 
 NotificationPreference:
   type: object
-  description: A single notification channel preference.
+  description: |
+    A single notification channel preference. The `available` field indicates
+    whether the user's plan supports this channel. Channels that require a
+    paid plan (e.g. SMS) return `available: false` for free-tier users.
   required:
     - channel
     - enabled
+    - available
   properties:
     channel:
       type: string
@@ -77,6 +81,13 @@ NotificationPreference:
     enabled:
       type: boolean
       description: Whether notifications are enabled for this channel
+      example: true
+    available:
+      type: boolean
+      description: |
+        Whether this channel is available on the user's current plan.
+        When false, the channel is plan-gated and cannot be enabled.
+        SMS requires a paid plan (pay_as_you_go or higher).
       example: true
 
 NotificationPreferencesResponse:
@@ -91,6 +102,26 @@ NotificationPreferencesResponse:
         $ref: '#/NotificationPreference'
       description: List of notification channel preferences
 
+NotificationPreferenceUpdate:
+  type: object
+  description: A channel preference update (request-only, no `available` field).
+  required:
+    - channel
+    - enabled
+  properties:
+    channel:
+      type: string
+      description: Notification channel identifier
+      enum:
+        - email
+        - web-push
+        - sms
+      example: "email"
+    enabled:
+      type: boolean
+      description: Whether notifications should be enabled for this channel
+      example: true
+
 UpdateNotificationPreferencesRequest:
   type: object
   description: Request body for updating notification preferences.
@@ -100,7 +131,7 @@ UpdateNotificationPreferencesRequest:
     preferences:
       type: array
       items:
-        $ref: '#/NotificationPreference'
+        $ref: '#/NotificationPreferenceUpdate'
       description: Channel preferences to update. Channels not included are unchanged.
       minItems: 1
 

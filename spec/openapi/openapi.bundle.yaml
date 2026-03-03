@@ -4528,6 +4528,10 @@ paths:
       description: |
         Returns the authenticated user's notification preferences for all
         channels. Channels without an explicit preference default to enabled.
+
+        The `available` field on each preference indicates whether the user's
+        plan supports the channel. SMS requires a paid plan — free-tier users
+        see `available: false` for the SMS channel.
       tags:
         - Profiles
       security:
@@ -4543,10 +4547,13 @@ paths:
                 preferences:
                   - channel: email
                     enabled: true
+                    available: true
                   - channel: sms
                     enabled: false
+                    available: false
                   - channel: web-push
                     enabled: true
+                    available: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -4562,6 +4569,10 @@ paths:
         Updates the authenticated user's notification preferences. Accepts an
         array of channel/enabled pairs. Channels not included in the request
         are left unchanged.
+
+        Enabling the SMS channel requires a paid plan. Free-tier users receive
+        a 403 (sms_requires_paid_plan) with `details.current_plan` and
+        `details.required_plan` indicating which plan is needed.
       tags:
         - Profiles
       security:
@@ -4589,6 +4600,23 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            SMS notifications require a paid plan. Returned when attempting to
+            enable the SMS channel on the free tier. The error details include
+            `current_plan` and `required_plan` fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: sms_requires_paid_plan
+                  message: SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS.
+                  retryable: false
+                  details:
+                    current_plan: free
+                    required_plan: pay_as_you_go
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -8228,10 +8256,14 @@ components:
           example: true
     NotificationPreference:
       type: object
-      description: A single notification channel preference.
+      description: |
+        A single notification channel preference. The `available` field indicates
+        whether the user's plan supports this channel. Channels that require a
+        paid plan (e.g. SMS) return `available: false` for free-tier users.
       required:
         - channel
         - enabled
+        - available
       properties:
         channel:
           type: string
@@ -8244,6 +8276,13 @@ components:
         enabled:
           type: boolean
           description: Whether notifications are enabled for this channel
+          example: true
+        available:
+          type: boolean
+          description: |
+            Whether this channel is available on the user's current plan.
+            When false, the channel is plan-gated and cannot be enabled.
+            SMS requires a paid plan (pay_as_you_go or higher).
           example: true
     NotificationPreferencesResponse:
       type: object
@@ -8265,7 +8304,7 @@ components:
         preferences:
           type: array
           items:
-            $ref: '#/components/schemas/NotificationPreference'
+            $ref: '#/components/schemas/NotificationPreferenceUpdate'
           description: Channel preferences to update. Channels not included are unchanged.
           minItems: 1
     DeleteAccountRequest:
@@ -9046,6 +9085,25 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    NotificationPreferenceUpdate:
+      type: object
+      description: A channel preference update (request-only, no `available` field).
+      required:
+        - channel
+        - enabled
+      properties:
+        channel:
+          type: string
+          description: Notification channel identifier
+          enum:
+            - email
+            - web-push
+            - sms
+          example: email
+        enabled:
+          type: boolean
+          description: Whether notifications should be enabled for this channel
+          example: true
     PlanLimits:
       type: object
       required:
