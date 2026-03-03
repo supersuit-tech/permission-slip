@@ -1,5 +1,8 @@
 # Permission Slip
 
+[![CI](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml)
+[![Deploy](https://github.com/supersuit-tech/permission-slip/actions/workflows/deploy.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/deploy.yml)
+
 **The authorization layer between your AI and everything it touches.**
 
 Open-source API key vault where agents execute scoped, time-limited actions on behalf of their humans — every call approved, logged, and revocable.
