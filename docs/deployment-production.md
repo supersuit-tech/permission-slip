@@ -82,9 +82,20 @@ Permission Slip uses a single Supabase project for:
 - Connection string format: `postgres://postgres.[project-ref]:[password]@[host]:6543/postgres?sslmode=require`
 
 **Auth configuration** (in Supabase dashboard):
-- **Authentication > URL Configuration:** Add `https://app.permissionslip.dev` to the redirect allow list
-- **Authentication > Email:** Configure email templates as needed
-- **Authentication > Rate Limits:** Review and adjust for production traffic
+
+> Permission Slip uses passwordless email OTP login. The Supabase dashboard settings below must match your production environment — the local `supabase/config.toml` only applies to `supabase start` (local dev).
+
+- [ ] **Authentication > URL Configuration > Site URL:** Set to `https://app.permissionslip.dev`. This is the base URL Supabase uses in email templates (magic links, OTP emails, password reset). If this is wrong, email links will point to localhost or the wrong domain.
+- [ ] **Authentication > URL Configuration > Redirect URLs:** Add `https://app.permissionslip.dev` to the allow list. Without this, post-login OAuth/magic-link redirects will fail.
+- [ ] **Authentication > Email Templates:** Review all templates (Confirm signup, Magic Link, Change Email, Reset Password). Ensure they reference the production domain, not localhost. Customize branding as needed.
+- [ ] **Authentication > Email > Enable email OTP:** Ensure email sign-in is enabled (this is the primary auth method).
+- [ ] **Authentication > Rate Limits:** Review and tighten for production traffic. The local config sets all limits to 1000 for dev convenience — production should use Supabase's defaults or stricter values.
+- [ ] **Authentication > Multi-Factor Authentication:** Verify TOTP (App Authenticator) enroll and verify are both enabled. The app supports MFA enrollment and challenge flows.
+- [ ] **Authentication > Sessions:** Review session timeouts. The local config uses 24h timebox / 8h inactivity — adjust for your production security requirements.
+
+**Vault (credential encryption):**
+
+- `VAULT_SECRET_KEY` is **not** a Fly.io runtime secret. Hosted Supabase manages the pgsodium encryption key automatically at the infrastructure level. The Go app never reads this env var — it only exists in `supabase/config.toml` for local development (`supabase start`). For local dev, generate with `openssl rand -hex 32`.
 
 **Fly.io setup:**
 
@@ -798,9 +809,20 @@ These are tracked under [#321](https://github.com/supersuit-tech/permission-slip
 - All three VAPID vars must be set, or none. Check `fly secrets list`
 
 **Users can't log in:**
-- Verify `SUPABASE_URL` is correct and the project is active
-- Check that `https://app.permissionslip.dev` is in Supabase's redirect allow list
-- Check Supabase dashboard for auth errors
+- Verify `SUPABASE_URL` is correct and the Supabase project is active (free tier projects pause after inactivity)
+- Check that the **Site URL** in Supabase dashboard (Authentication > URL Configuration) is set to `https://app.permissionslip.dev` — if it points to localhost, email links will be broken
+- Check that `https://app.permissionslip.dev` is in Supabase's **Redirect URLs** allow list
+- Verify email OTP is enabled in Supabase dashboard (Authentication > Email)
+- Check the Supabase dashboard Auth logs for specific error messages
+
+**MFA not working:**
+- Verify TOTP enroll and verify are both enabled in Supabase dashboard (Authentication > Multi-Factor Authentication)
+- Check that the user's device clock is synced (TOTP codes are time-based and drift-sensitive)
+
+**OTP emails not arriving:**
+- Check Supabase dashboard Auth logs for send failures
+- Verify email rate limits haven't been hit (Authentication > Rate Limits)
+- Check spam/junk folders — Supabase's built-in email sender may trigger spam filters. Consider configuring a custom SMTP provider in the Supabase dashboard for production email deliverability
 
 **CORS errors in browser:**
 - Ensure `ALLOWED_ORIGINS` includes `https://app.permissionslip.dev` (exact match, no trailing slash)

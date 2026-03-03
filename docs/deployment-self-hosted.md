@@ -44,7 +44,17 @@ Permission Slip uses [Supabase Auth](https://supabase.com/auth) for user authent
 2. From your project dashboard, note these values:
    - **Project URL** (e.g., `https://abcdefgh.supabase.co`) — used as `SUPABASE_URL`
    - **Publishable key** (public) — used as `VITE_SUPABASE_PUBLISHABLE_KEY` at build time
-3. Under **Authentication > URL Configuration**, add your deployment URL to the redirect allow list
+3. Configure the following in the Supabase dashboard:
+
+| Setting | Where | What to set |
+|---|---|---|
+| **Site URL** | Authentication > URL Configuration | Your deployment URL (e.g., `https://permissions.mycompany.com`). Used as the base URL in all auth emails. |
+| **Redirect URLs** | Authentication > URL Configuration | Add your deployment URL to the allow list |
+| **Email OTP** | Authentication > Email | Ensure email sign-in is enabled (the primary auth method) |
+| **Email templates** | Authentication > Email Templates | Review templates reference your domain, not localhost |
+| **MFA (TOTP)** | Authentication > Multi-Factor Authentication | Enable TOTP enroll and verify (if you want MFA support) |
+| **Rate limits** | Authentication > Rate Limits | Review and adjust for your expected traffic |
+| **Session timeouts** | Authentication > Sessions | Set timebox and inactivity timeout per your security policy |
 
 > **Note:** You can use Supabase's hosted database as your `DATABASE_URL` too, or use a separate PostgreSQL instance. Either works.
 
@@ -64,7 +74,9 @@ The server runs migrations automatically on startup — no manual migration step
 Permission Slip uses [Supabase Vault](https://supabase.com/docs/guides/database/vault) for encrypting stored credentials (API keys, OAuth tokens) at rest using AES-256-GCM. This requires:
 
 - The `pgsodium` and `vault` PostgreSQL extensions (included in all Supabase projects)
-- A `VAULT_SECRET_KEY` configured on the **database side** (not as an app env var)
+- A vault encryption key managed at the **database level** (not as an app env var)
+
+> **Note:** `VAULT_SECRET_KEY` is **not** a runtime secret for the Go server. Hosted Supabase manages the pgsodium encryption key automatically. The `VAULT_SECRET_KEY` env var in `.env.example` and `supabase/config.toml` is only used by the local Supabase CLI (`supabase start`). For local dev, generate with `openssl rand -hex 32`.
 
 If you're using a Supabase-hosted database, vault is already available. If using a non-Supabase database, you'll need to install the `pgsodium` and `supabase_vault` extensions manually, or implement an alternative vault backend.
 
