@@ -19,7 +19,7 @@ From the project root:
 fly launch
 ```
 
-This detects the `Dockerfile` and `fly.toml` automatically. Review the settings and confirm. If you already have the app created, skip this step and go straight to deploying.
+This detects the `Dockerfile` and `fly.toml` automatically (the app name `permission-slip` is already configured). Review the settings and confirm. If the app is already created on Fly.io, skip this step and go straight to setting secrets.
 
 ### 2. Set secrets
 
