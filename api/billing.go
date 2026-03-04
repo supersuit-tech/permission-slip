@@ -255,6 +255,18 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Determine the target billing period. If period_start is provided,
+		// look up that specific period; otherwise default to the current one.
+		var periodStart time.Time
+		if ps := r.URL.Query().Get("period_start"); ps != "" {
+			parsed, parseErr := time.Parse(time.RFC3339, ps)
+			if parseErr != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "period_start must be a valid ISO 8601 date-time"))
+				return
+			}
+			periodStart = parsed
+		}
+
 		resp := usageResponse{
 			PeriodStart: sub.CurrentPeriodStart,
 			PeriodEnd:   sub.CurrentPeriodEnd,
@@ -267,7 +279,17 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 		}
 		resp.Requests.Included = included
 
-		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
+		var usage *db.UsagePeriod
+		if periodStart.IsZero() {
+			// Current billing period.
+			usage, err = db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
+		} else {
+			// Historical period — update response bounds to match the query.
+			_, periodEnd := db.BillingPeriodBounds(periodStart)
+			resp.PeriodStart = periodStart
+			resp.PeriodEnd = periodEnd
+			usage, err = db.GetUsageByPeriod(r.Context(), deps.DB, profile.ID, periodStart)
+		}
 		if err != nil {
 			log.Printf("[%s] GetUsage: usage lookup: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
