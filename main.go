@@ -372,19 +372,22 @@ func main() {
 			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
 		}
 	}
-	// PostHog product analytics — allow the frontend to send events to the
-	// PostHog API host. Only added when POSTHOG_HOST is set.
+	var extraScriptSrc []string
+	// PostHog product analytics — allow the frontend to send events and load
+	// SDK assets (config.js, toolbar, surveys) from the PostHog proxy host.
+	// Added to both connect-src (event ingestion) and script-src (asset loading).
 	if posthogHost := strings.TrimSpace(os.Getenv("POSTHOG_HOST")); posthogHost != "" {
 		parsed, err := url.Parse(posthogHost)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			log.Printf("Warning: POSTHOG_HOST %q is not a valid URL; skipping CSP connect-src entry", posthogHost)
+			log.Printf("Warning: POSTHOG_HOST %q is not a valid URL; skipping CSP entries", posthogHost)
 		} else {
-			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
+			origin := parsed.Scheme + "://" + parsed.Host
+			extraConnectSrc = append(extraConnectSrc, origin)
+			extraScriptSrc = append(extraScriptSrc, origin)
 		}
 	}
 	// Cloudflare Web Analytics — when CLOUDFLARE_INSIGHTS is "true", allow the
 	// auto-injected beacon.min.js script and its data reporting endpoint.
-	var extraScriptSrc []string
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("CLOUDFLARE_INSIGHTS")), "true") {
 		extraScriptSrc = append(extraScriptSrc, "https://static.cloudflareinsights.com")
 		extraConnectSrc = append(extraConnectSrc, "https://cloudflareinsights.com")
