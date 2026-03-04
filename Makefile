@@ -5,6 +5,7 @@
        mobile-build-dev-ios mobile-build-dev-android \
        mobile-build-preview-ios mobile-build-preview-android \
        mobile-submit mobile-update \
+       generate-frontend generate-mobile \
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
        audit audit-backend audit-frontend audit-mobile \
@@ -39,13 +40,17 @@ dev-frontend:
 bundle:
 	npx @redocly/cli@2.19.1 bundle spec/openapi/openapi.yaml -o spec/openapi/openapi.bundle.yaml
 
-# Generate typed API client from the bundled OpenAPI spec (frontend + mobile)
-generate: bundle
+# Generate typed API clients from the bundled OpenAPI spec
+generate: generate-frontend generate-mobile
+
+generate-frontend: bundle
 	cd frontend && npm run generate:api
+
+generate-mobile: bundle
 	cd mobile && npm run generate:api
 
 # Type-check frontend (generates API client first, then runs tsc --noEmit)
-typecheck: generate
+typecheck: generate-frontend
 	cd frontend && npx tsc --noEmit
 
 # Build for production (generates API client first, then compiles)

@@ -60,7 +60,7 @@ jobs:
         run: cd frontend && npm ci
 
       - name: Generate API client
-        run: make generate
+        run: make generate-frontend
 
       - name: Verify bundled OpenAPI spec is up-to-date
         run: |
