@@ -5,6 +5,7 @@ import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
+import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -68,7 +69,7 @@ export function NotificationSection() {
   async function handleToggle(channel: string, currentEnabled: boolean) {
     try {
       await updatePreferences([
-        { channel: channel as "email" | "web-push" | "sms" | "mobile-push", enabled: !currentEnabled },
+        { channel: channel as components["schemas"]["NotificationPreferenceUpdate"]["channel"], enabled: !currentEnabled },
       ]);
       toast.success(
         `${CHANNEL_LABELS[channel]?.name ?? channel} notifications ${!currentEnabled ? "enabled" : "disabled"}.`,
