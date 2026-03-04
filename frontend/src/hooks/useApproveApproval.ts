@@ -2,13 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
+import type { components } from "@/api/schema";
+
+export type ApproveResult = components["schemas"]["ApproveApprovalResponse"];
 
 export function useApproveApproval() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (approvalId: string) => {
+    mutationFn: async (approvalId: string): Promise<ApproveResult> => {
       if (!session?.access_token) {
         throw new Error("Not authenticated");
       }
@@ -36,5 +39,6 @@ export function useApproveApproval() {
   return {
     approveApproval: (approvalId: string) => mutation.mutateAsync(approvalId),
     isPending: mutation.isPending,
+    result: mutation.data,
   };
 }

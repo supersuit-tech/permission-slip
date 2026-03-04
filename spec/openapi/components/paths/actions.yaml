@@ -3,45 +3,26 @@ execute:
     operationId: executeAction
     summary: Execute Action
     description: |
-      Execute an action via Permission Slip. This endpoint supports two authorization modes:
+      Execute an action via Permission Slip using a standing approval. The agent provides
+      action details and Permission Slip matches an active standing approval to authorize
+      execution.
 
-      ## Mode 1: One-off Approval (Bearer Token)
+      ## Standing Approval Flow
 
-      The agent redeems a single-use approval token from the one-off approval flow.
-
-      1. **Agent submits token**: Provides the approval token, action ID, and parameters
-      2. **Permission Slip validates**: Verifies token signature, expiration, scope, and parameter hash
-      3. **Permission Slip executes**: Calls the external service API using the user's stored credentials
-      4. **Result returned**: External service response is returned to the agent
-      5. **Token consumed**: Token is invalidated (single-use)
-
-      ## Mode 2: Standing Approval (Agent Signature)
-
-      The agent executes under a pre-authorized standing approval — no token needed.
-
-      1. **Agent submits action**: Provides action type and parameters (no token)
-      2. **Permission Slip matches**: Finds an active standing approval for this agent + action + constraints
+      1. **Agent submits action**: Provides action type, parameters, and request_id (no token)
+      2. **Permission Slip matches**: Finds an active standing approval for this agent + action type + constraints
       3. **Permission Slip validates**: Verifies parameters fall within standing approval constraints
-      4. **Permission Slip executes**: Calls the external service API immediately
-      5. **Result returned**: Uses the `StandingApprovalExecuteResponse` schema (includes `standing_approval_id` and `executions_remaining`)
+      4. **Permission Slip executes**: Calls the external service API using stored credentials
+      5. **Result returned**: Returns `StandingApprovalExecuteResponse` with `standing_approval_id` and `executions_remaining`
 
-      Permission Slip determines the mode by the presence of the `token` field in the JSON
-      request body. If a non-empty `token` is provided, one-off token verification is used.
-      If `token` is absent, standing approval matching is attempted using the agent signature.
-      If no standing approval matches, the request falls through to the one-off approval flow —
-      Permission Slip returns `404 Not Found` with a hint to use `POST /v1/approvals/request`,
-      indicating the agent should initiate the standard approval flow for this action.
+      ## One-off Approvals
 
-      ## Token Validation (One-off mode)
+      One-off approval actions are executed automatically when the user approves. Agents
+      should poll `GET /v1/approvals/{approval_id}/status` for results instead of calling
+      this endpoint. If no standing approval matches, Permission Slip returns `404 Not Found`
+      with a hint to use `POST /v1/approvals/request` for one-off approval.
 
-      Permission Slip verifies:
-      - **JWT signature**: Token was issued by Permission Slip
-      - **Expiration**: `exp` claim has not passed
-      - **Scope**: `scope` claim matches the `action_id` in the request
-      - **Parameters hash**: SHA-256 of JCS-canonicalized `parameters` matches `params_hash` claim
-      - **Single-use**: Token `jti` has not been previously consumed
-
-      ## Standing Approval Validation (Standing approval mode)
+      ## Standing Approval Validation
 
       Permission Slip verifies:
       - **Agent signature**: Valid Ed25519/ECDSA signature
@@ -58,33 +39,29 @@ execute:
 
       ## Idempotency
 
-      Standing approval executions support idempotency via the `request_id` field. If the
-      same `request_id` is submitted again for the same standing approval, Permission Slip
-      returns `409 Conflict` with error code `duplicate_request_id`. One-off token mode does
-      not use `request_id` — tokens are inherently single-use.
+      Executions support idempotency via the `request_id` field. If the same `request_id`
+      is submitted again for the same standing approval, Permission Slip returns
+      `409 Conflict` with error code `duplicate_request_id`.
 
       ## Error Handling
 
       If the external service returns an error, Permission Slip returns a `502 Bad Gateway`
-      with details about the upstream failure. For one-off mode, the token is still consumed —
-      the agent must request a new approval to retry. For standing approval mode, the execution
-      count is still incremented to prevent unbounded retry loops; the agent should use a new
-      `request_id` for each retry attempt.
+      with details about the upstream failure. The execution count is still incremented to
+      prevent unbounded retry loops; the agent should use a new `request_id` for each
+      retry attempt.
 
       ## Security
 
       - Request MUST include valid `X-Permission-Slip-Signature` header
-      - One-off: Token is single-use — consumed even if the external service call fails
-      - Standing: Constraints are enforced on every execution
-      - Parameters must match what was approved (hash verification for one-off, constraint check for standing)
+      - Constraints are enforced on every execution
       - Agent never sees user credentials
-    
+
     tags:
       - Actions
-    
+
     security:
       - PermissionSlipSignature: []
-    
+
     requestBody:
       required: true
       content:
@@ -92,43 +69,8 @@ execute:
           schema:
             $ref: '../schemas/actions.yaml#/ExecuteActionRequest'
           examples:
-            email_send_oneoff:
-              summary: "One-off: Execute email send with approval token"
-              value:
-                token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImFwcHJvdmFsX2lkIjoiYXBwcl94eXo3ODkiLCJzY29wZSI6ImVtYWlsLnNlbmQifQ.signature"
-                action_id: "email.send"
-                parameters:
-                  from: "alice@example.com"
-                  to:
-                    - "bob@example.com"
-                  subject: "Meeting tomorrow"
-                  body: "Let's meet at 3pm."
-            
-            flight_book_oneoff:
-              summary: "One-off: Execute flight booking with approval token"
-              value:
-                token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
-                action_id: "flight.book"
-                parameters:
-                  from: "SFO"
-                  to: "NYC"
-                  date: "2026-03-15"
-                  passengers: 1
-                  class: "economy"
-            
-            payment_charge_oneoff:
-              summary: "One-off: Execute payment charge with approval token"
-              value:
-                token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
-                action_id: "payment.charge"
-                parameters:
-                  amount: 9900
-                  currency: "USD"
-                  customer_id: "cus_abc123"
-                  description: "Subscription renewal"
-            
             email_read_standing:
-              summary: "Standing approval: Read emails (no token)"
+              summary: "Standing approval: Read emails"
               value:
                 request_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
                 action:
@@ -137,7 +79,21 @@ execute:
                   parameters:
                     sender: "*@github.com"
                     max_results: 10
-    
+
+            email_send_standing:
+              summary: "Standing approval: Send email"
+              value:
+                request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+                action:
+                  type: "email.send"
+                  version: "1"
+                  parameters:
+                    from: "alice@example.com"
+                    to:
+                      - "bob@example.com"
+                    subject: "Meeting tomorrow"
+                    body: "Let's meet at 3pm."
+
     responses:
       '200':
         description: Action executed successfully
@@ -146,28 +102,6 @@ execute:
             schema:
               $ref: '../schemas/actions.yaml#/ExecuteActionResponse'
             examples:
-              email_sent_oneoff:
-                summary: "One-off: Email sent successfully"
-                value:
-                  status: "success"
-                  action_id: "email.send"
-                  executed_at: "2026-02-11T13:21:00Z"
-                  result:
-                    message_id: "msg_abc123"
-                    delivery_status: "queued"
-              
-              flight_booked_oneoff:
-                summary: "One-off: Flight booked successfully"
-                value:
-                  status: "success"
-                  action_id: "flight.book"
-                  executed_at: "2026-02-11T13:21:05Z"
-                  result:
-                    confirmation_number: "ABC123"
-                    airline: "United Airlines"
-                    total: "$347.00"
-                    departure: "2026-03-15T08:00:00-08:00"
-              
               email_read_standing:
                 summary: "Standing approval: Emails read successfully"
                 value:
@@ -178,7 +112,16 @@ execute:
                         sender: "noreply@github.com"
                   standing_approval_id: "sa_abc123"
                   executions_remaining: null
-      
+
+              email_sent_standing:
+                summary: "Standing approval: Email sent successfully"
+                value:
+                  result:
+                    message_id: "msg_abc123"
+                    delivery_status: "queued"
+                  standing_approval_id: "sa_def456"
+                  executions_remaining: 47
+
       '400':
         description: Invalid request
         content:
@@ -188,80 +131,32 @@ execute:
             example:
               error:
                 code: "invalid_request"
-                message: "Missing required field: token"
+                message: "Missing required field: action"
                 retryable: false
                 details:
-                  field: "token"
+                  field: "action"
                 trace_id: "trace_xyz789"
-      
+
       '401':
-        description: Invalid signature or token
+        description: Invalid signature
         content:
           application/json:
             schema:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
-            examples:
-              invalid_token:
-                summary: Token is invalid or expired
-                value:
-                  error:
-                    code: "invalid_token"
-                    message: "Token is invalid or has expired"
-                    retryable: false
-                    trace_id: "trace_xyz789"
-              
-              invalid_signature:
-                summary: Request signature verification failed
-                value:
-                  error:
-                    code: "invalid_signature"
-                    message: "Signature verification failed"
-                    retryable: false
-                    trace_id: "trace_xyz789"
-      
+            example:
+              error:
+                code: "invalid_signature"
+                message: "Signature verification failed"
+                retryable: false
+                trace_id: "trace_xyz789"
+
       '403':
-        description: Token scope mismatch, parameter mismatch, or token already used
+        description: Standing approval exhausted or constraint violation
         content:
           application/json:
             schema:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
             examples:
-              insufficient_scope:
-                summary: Token scope doesn't match action_id
-                value:
-                  error:
-                    code: "insufficient_scope"
-                    message: "Token does not have the required scope for this action"
-                    retryable: false
-                    details:
-                      token_scope: "email.send"
-                      requested_action: "payment.charge"
-                    trace_id: "trace_xyz789"
-              
-              invalid_parameters:
-                summary: Parameters don't match approved parameters
-                value:
-                  error:
-                    code: "invalid_parameters"
-                    message: "Request parameters do not match the approved parameters"
-                    retryable: false
-                    details:
-                      expected_hash: "ba0617b2334170cb..."
-                      computed_hash: "c7d8e9f0a1b2c3d4..."
-                    trace_id: "trace_xyz789"
-              
-              token_already_used:
-                summary: Token has already been consumed
-                value:
-                  error:
-                    code: "token_already_used"
-                    message: "Token has already been consumed"
-                    retryable: false
-                    details:
-                      jti: "tok_unique123"
-                      used_at: "2026-02-11T13:21:00Z"
-                    trace_id: "trace_xyz789"
-              
               standing_approval_exhausted:
                 summary: Standing approval execution count exceeded
                 value:
@@ -274,7 +169,7 @@ execute:
                       max_executions: 100
                       execution_count: 100
                     trace_id: "trace_xyz789"
-              
+
               constraint_violation:
                 summary: Parameters violate standing approval constraints
                 value:
@@ -288,9 +183,9 @@ execute:
                       expected: "*@github.com"
                       actual: "*@competitor.com"
                     trace_id: "trace_xyz789"
-      
+
       '409':
-        description: Duplicate request_id (standing approval mode only)
+        description: Duplicate request_id
         content:
           application/json:
             schema:
@@ -319,7 +214,7 @@ execute:
                     details:
                       required_service: "gmail"
                     trace_id: "trace_xyz789"
-              
+
               no_matching_standing_approval:
                 summary: No active standing approval matches this request
                 value:
@@ -331,7 +226,7 @@ execute:
                       action_type: "email.read"
                       hint: "Use POST /v1/approvals/request for one-off approval"
                     trace_id: "trace_xyz789"
-      
+
       '410':
         description: Standing approval has expired
         content:
@@ -347,13 +242,13 @@ execute:
                   standing_approval_id: "sa_abc123"
                   expired_at: "2026-02-14T00:00:00Z"
                 trace_id: "trace_xyz789"
-      
+
       '429':
         $ref: '../responses/errors.yaml#/TooManyRequests'
-      
+
       '500':
         $ref: '../responses/errors.yaml#/InternalServerError'
-      
+
       '502':
         description: External service error
         content:
@@ -370,6 +265,6 @@ execute:
                   upstream_status: 503
                   upstream_message: "Service temporarily unavailable"
                 trace_id: "trace_xyz789"
-      
+
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'

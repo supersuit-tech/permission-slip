@@ -36,7 +36,7 @@ spec/openapi/
     │   ├── push_subscriptions.yaml # Web Push subscription schemas
     │   ├── registration_invites.yaml # Registration invite schemas
     │   ├── standing_approvals.yaml   # Standing approval schemas
-    │   ├── shared.yaml          # Shared schemas (Action, Token, etc.)
+    │   ├── shared.yaml          # Shared schemas (Action, ExecutionStatus, etc.)
     │   └── errors.yaml          # Error response schemas
     ├── paths/                   # API endpoints
     │   ├── actions.yaml         # POST /v1/actions/execute
@@ -72,8 +72,8 @@ spec/openapi/
 | **Connectors** | `GET /v1/connectors`, `GET /v1/connectors/{id}` | Public | Discover available integrations and actions |
 | **Registration** | `POST /invite/{code}`, `POST /v1/agents/{id}/verify` | Signature | Agent identity setup via invite URL |
 | **Agents** | `GET/PUT/DELETE /v1/agents/{id}`, `POST .../deactivate` | Session | Agent management |
-| **Approvals** | `POST /v1/approvals/request`, `POST .../verify`, `POST .../cancel` | Signature/Session | Approval lifecycle |
-| **Actions** | `POST /v1/actions/execute` | Signature/Token | Execute approved actions |
+| **Approvals** | `POST /v1/approvals/request`, `GET .../status`, `POST .../cancel`, `POST .../approve`, `POST .../deny` | Signature/Session | Approval lifecycle |
+| **Actions** | `POST /v1/actions/execute` | Signature | Execute actions via standing approvals |
 | **Credentials** | `POST/GET /v1/credentials`, `DELETE .../credentials/{id}` | Session | Manage stored API credentials |
 | **Capabilities** | `GET /v1/agents/{id}/capabilities` | Signature | Agent capability discovery |
 | **Standing Approvals** | `GET/POST /v1/standing-approvals`, `POST .../revoke`, `POST .../execute` | Session/Signature | Pre-authorized agent actions |
@@ -181,8 +181,8 @@ Every endpoint includes multiple examples:
 
 Two authentication methods are defined:
 
-1. **PermissionSlipSignature**: Request signature using agent's private key (for all endpoints except connector discovery)
-2. **BearerToken**: JWT bearer token (issued after approval verification, used in action execution)
+1. **PermissionSlipSignature**: Request signature using agent's private key (for agent-facing endpoints)
+2. **SupabaseSession**: JWT bearer token from Supabase Auth (for user-facing dashboard endpoints)
 
 ### Error Handling
 
