@@ -76,15 +76,18 @@ export function usePushSetup() {
     if (authStatus !== "authenticated" || !expoPushToken) return;
     if (registeredTokenRef.current === expoPushToken) return; // already registered
 
+    // Capture in a local const so the async function doesn't need a non-null
+    // assertion — the effect guard above already checked expoPushToken != null.
+    const token = expoPushToken;
     let cancelled = false;
 
     async function attemptRegistration(attempt: number) {
       if (cancelled) return;
 
       try {
-        await registerToken(expoPushToken!);
+        await registerToken(token);
         if (cancelled) return;
-        registeredTokenRef.current = expoPushToken;
+        registeredTokenRef.current = token;
         setIsTokenRegistered(true);
         if (__DEV__) {
           console.log("[push] Token registered with backend");
