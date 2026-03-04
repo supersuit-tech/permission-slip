@@ -48,7 +48,8 @@ Then update the OTA update URL in `app.json` — replace `${EXPO_PROJECT_ID}` wi
   1. Go to Google Play Console → Setup → API access
   2. Create a service account with "Release manager" permissions
   3. Download the JSON key file
-  4. Set the path in `eas.json` under `submit.production.android.serviceAccountKeyPath`
+  4. Store it **outside the repo** (e.g., `~/.config/eas/`) — the `.gitignore` blocks `service-account*.json` as a safety net, but credentials should never be in the repo tree
+  5. Set the absolute path in `eas.json` under `submit.production.android.serviceAccountKeyPath`
 
 ### 3. Set up CI (optional)
 
@@ -115,6 +116,25 @@ make mobile-update
 ```
 
 The `runtimeVersion` policy is set to `appVersion`, meaning OTA updates are only delivered to builds with a matching app version. If you change native code (new native modules, SDK upgrade), you must publish a new build — OTA updates only work for JS/asset changes.
+
+### OTA Code Signing (recommended for production)
+
+Expo supports code signing for OTA updates to prevent tampering. Without it, a compromised Expo account could push malicious updates to production devices. To enable:
+
+1. Generate a key pair: `npx expo-updates codesigning:generate --key-output-directory keys --certificate-validity-duration-years 10`
+2. Configure in `eas.json` under `build.production`:
+   ```json
+   "updates": {
+     "codeSigningCertificate": "keys/certificate.pem",
+     "codeSigningMetadata": {
+       "keyid": "main",
+       "alg": "rsa-v1_5-sha256"
+     }
+   }
+   ```
+3. Publish signed updates: `npx eas-cli update --channel production --code-signing-certificate keys/certificate.pem --code-signing-private-key keys/private-key.pem`
+
+See [Expo code signing docs](https://docs.expo.dev/eas-update/code-signing/) for full details.
 
 ## Environment Variables
 

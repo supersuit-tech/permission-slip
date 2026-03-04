@@ -18,6 +18,13 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Google Play service account keys (used by EAS Submit)
+google-services.json
+service-account*.json
+
+# EAS Update code signing keys
+keys/
+
 # Metro
 .metro-health-check*
 
