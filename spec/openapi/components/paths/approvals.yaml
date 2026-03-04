@@ -143,7 +143,6 @@ request:
                   approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
                   status: "pending"
                   expires_at: "2026-02-11T13:25:00Z"
-                  verification_required: true
               
               with_alternative_urls:
                 summary: Response with cross-platform URLs
@@ -155,7 +154,6 @@ request:
                     web: "https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789"
                   status: "pending"
                   expires_at: "2026-02-11T13:25:00Z"
-                  verification_required: true
       
       '400':
         description: Invalid request or unsupported action type
@@ -679,7 +677,6 @@ approveApproval:
               approval_id: "appr_xyz789"
               status: "approved"
               approved_at: "2026-02-21T10:30:00Z"
-              confirmation_code: "RK3-P7M"
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
