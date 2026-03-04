@@ -54,12 +54,19 @@ type AgentUsage struct {
 // GetUsageByAgent extracts per-agent request counts from the JSONB breakdown
 // for a specific user and billing period. Returns agents ordered by request
 // count DESC, enriched with agent names from metadata.
+//
+// The JOIN to agents is scoped to agents owned by the same user
+// (approver_id = user_id) to prevent leaking agent names across users.
 func GetUsageByAgent(ctx context.Context, db DBTX, userID string, periodStart time.Time) ([]AgentUsage, error) {
 	rows, err := db.Query(ctx,
-		`SELECT b.key, COALESCE(a.metadata->>'agent_name', ''), b.value::int AS count
+		`SELECT b.key,
+		        COALESCE(a.metadata->>'agent_name', ''),
+		        b.value::int AS count
 		 FROM usage_periods u,
 		      jsonb_each_text(COALESCE(u.breakdown->'by_agent', '{}')) b
-		 LEFT JOIN agents a ON a.agent_id = b.key::bigint
+		 LEFT JOIN agents a
+		   ON a.agent_id = b.key::bigint
+		   AND a.approver_id = $1
 		 WHERE u.user_id = $1 AND u.period_start = $2
 		 ORDER BY count DESC`,
 		userID, periodStart)
