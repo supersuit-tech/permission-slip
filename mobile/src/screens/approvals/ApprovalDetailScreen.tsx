@@ -3,7 +3,7 @@
  * request including agent info, action parameters, risk level, expiry
  * countdown, context, and timeline. Pending approvals show a deny button.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,22 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const [denied, setDenied] = useState(false);
+  const autoNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-navigate back to the list 1.5s after a successful deny so the user
+  // briefly sees the confirmation then returns to their pending queue.
+  useEffect(() => {
+    if (denied) {
+      autoNavTimer.current = setTimeout(() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
+      }, 1500);
+    }
+    return () => {
+      if (autoNavTimer.current) clearTimeout(autoNavTimer.current);
+    };
+  }, [denied, navigation]);
 
   const agent = useMemo(
     () => agents.find((a) => a.agent_id === approval.agent_id),
@@ -98,12 +114,29 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           <Text style={styles.statusBannerTextApproved}>Approved</Text>
         </View>
       )}
-      {(approval.status === "denied" || denied) && (
+      {(approval.status === "denied" && !denied) && (
         <View
           style={styles.statusBannerDenied}
           accessibilityRole="alert"
         >
           <Text style={styles.statusBannerTextDenied}>Denied</Text>
+        </View>
+      )}
+      {denied && (
+        <View style={styles.deniedConfirmation} accessibilityRole="alert">
+          <Text style={styles.deniedConfirmationTitle}>Request Denied</Text>
+          <Text style={styles.deniedConfirmationSubtitle}>
+            Returning to list...
+          </Text>
+          <Pressable
+            testID="back-to-list-button"
+            style={styles.backToListButton}
+            onPress={() => navigation.canGoBack() && navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back to approval list"
+          >
+            <Text style={styles.backToListButtonText}>Back to List</Text>
+          </Pressable>
         </View>
       )}
       {approval.status === "cancelled" && (
@@ -222,10 +255,13 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             disabled={isDenying}
             accessibilityRole="button"
             accessibilityLabel="Deny request"
+            accessibilityHint="Double-tap to deny this approval request"
+            accessibilityState={{ disabled: isDenying, busy: isDenying }}
           >
             {isDenying ? (
               <ActivityIndicator
                 testID="deny-loading"
+                accessibilityLabel="Denying request"
                 color={colors.error}
                 size="small"
               />
@@ -518,6 +554,36 @@ const styles = StyleSheet.create({
   expiryLabel: {
     fontSize: 14,
     color: colors.gray500,
+  },
+  deniedConfirmation: {
+    backgroundColor: colors.riskHighBg,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    gap: 6,
+  },
+  deniedConfirmationTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.error,
+  },
+  deniedConfirmationSubtitle: {
+    fontSize: 14,
+    color: colors.gray500,
+    marginBottom: 8,
+  },
+  backToListButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  backToListButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.gray700,
   },
   denyButton: {
     backgroundColor: colors.white,

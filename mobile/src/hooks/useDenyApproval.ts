@@ -38,5 +38,6 @@ export function useDenyApproval() {
   return {
     denyApproval: (approvalId: string) => mutation.mutateAsync(approvalId),
     isPending: mutation.isPending,
+    error: mutation.error,
   };
 }
