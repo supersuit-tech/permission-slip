@@ -3,7 +3,7 @@ import { KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCredentials } from "@/hooks/useCredentials";
 import { useDeleteCredential } from "@/hooks/useDeleteCredential";
-import { useBillingPlan } from "@/hooks/useBillingPlan";
+import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import { LimitBadge } from "@/components/LimitBadge";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
@@ -21,12 +21,13 @@ import { AddCredentialDialog } from "./AddCredentialDialog";
 export function CredentialSection() {
   const { credentials, isLoading, error } = useCredentials();
   const { deleteCredential, isLoading: isDeleting } = useDeleteCredential();
-  const { billingPlan } = useBillingPlan();
+  const {
+    max: maxCredentials,
+    current: credentialCount,
+    atLimit,
+    hasData: hasBillingData,
+  } = useResourceLimit("max_credentials", credentials.length);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-
-  const maxCredentials = billingPlan?.plan?.max_credentials ?? null;
-  const credentialCount = billingPlan?.usage?.credentials ?? credentials.length;
-  const atLimit = maxCredentials != null && credentialCount >= maxCredentials;
 
   async function handleDelete(credentialId: string, service: string) {
     try {
@@ -47,7 +48,7 @@ export function CredentialSection() {
             <div className="flex items-center gap-2">
               <KeyRound className="text-muted-foreground size-5" />
               <CardTitle>Credential Vault</CardTitle>
-              {billingPlan?.plan ? (
+              {hasBillingData ? (
                 <LimitBadge
                   current={credentialCount}
                   max={maxCredentials}

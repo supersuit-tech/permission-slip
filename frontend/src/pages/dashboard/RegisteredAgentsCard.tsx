@@ -23,7 +23,7 @@ import {
 import { AgentStatusBadge } from "@/components/AgentStatusBadge";
 import { formatRelativeTime } from "@/lib/utils";
 import { useAgents, type Agent } from "@/hooks/useAgents";
-import { useBillingPlan } from "@/hooks/useBillingPlan";
+import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { getAgentDisplayName } from "@/lib/agents";
 import { InviteCodeDialog } from "./InviteCodeDialog";
 import { ReviewPendingAgentDialog } from "./ReviewPendingAgentDialog";
@@ -179,13 +179,10 @@ export function RegisteredAgentsCard() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const { agents, isLoading, error, refetch } = useAgents();
-  const { billingPlan } = useBillingPlan();
+  const { max: maxAgents, current: agentCount, atLimit, hasData: hasBillingData } =
+    useResourceLimit("max_agents", agents.length);
   const { newlyRegistered, clearNewlyRegistered } =
     useRegistrationSuccess(agents);
-
-  const maxAgents = billingPlan?.plan?.max_agents ?? null;
-  const agentCount = billingPlan?.usage?.agents ?? agents.length;
-  const atLimit = maxAgents != null && agentCount >= maxAgents;
 
   const filteredAgents = useMemo(() => {
     if (statusFilter === "all") return agents;
@@ -205,7 +202,7 @@ export function RegisteredAgentsCard() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <CardTitle>Registered Agents</CardTitle>
-            {billingPlan?.plan && (
+            {hasBillingData && (
               <LimitBadge
                 current={agentCount}
                 max={maxAgents}

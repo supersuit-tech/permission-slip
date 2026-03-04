@@ -24,7 +24,7 @@ import {
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
 import { useAgents } from "@/hooks/useAgents";
-import { useBillingPlan } from "@/hooks/useBillingPlan";
+import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { RevokeStandingApprovalDialog } from "./RevokeStandingApprovalDialog";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 
@@ -124,25 +124,23 @@ export function StandingApprovalsCard() {
   const { standingApprovals, isLoading, error, refetch } =
     useStandingApprovals();
   const { agents } = useAgents();
-  const { billingPlan } = useBillingPlan();
+  const {
+    max: maxStandingApprovals,
+    current: standingApprovalCount,
+    atLimit,
+    hasData: hasBillingData,
+  } = useResourceLimit("max_standing_approvals", standingApprovals.length);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<StandingApproval | null>(
     null,
   );
-
-  const maxStandingApprovals = billingPlan?.plan?.max_standing_approvals ?? null;
-  const standingApprovalCount =
-    billingPlan?.usage?.standing_approvals ?? standingApprovals.length;
-  const atLimit =
-    maxStandingApprovals != null &&
-    standingApprovalCount >= maxStandingApprovals;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <CardTitle>Standing Approvals</CardTitle>
-          {billingPlan?.plan && (
+          {hasBillingData && (
             <LimitBadge
               current={standingApprovalCount}
               max={maxStandingApprovals}
