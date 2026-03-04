@@ -19,13 +19,9 @@ Set these variables for the session:
 - `PR_NUMBER` — the extracted PR number
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh`
 
-## Pre-Poll: Merge from Main and Fix Failing Checks
+## Pre-Poll: Merge from Main
 
-Before entering the polling loop, merge the latest main into the branch and check whether the PR has any failing CI checks. This ensures the branch starts from a clean, up-to-date state before processing review comments.
-
-### 0. Merge from Main
-
-Bring the branch up to date before doing anything else:
+Before entering the polling loop, merge the latest main into the branch. This ensures the branch starts from a clean, up-to-date state before processing review comments.
 
 ```bash
 git fetch origin main
@@ -34,36 +30,7 @@ git merge origin/main --no-edit
 
 If the merge produces conflicts, follow the same conflict resolution procedure described in Polling Loop step 2. Run tests and build after resolving.
 
-### 1. Fetch Check Status
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh pr checks $PR_NUMBER
-```
-
-If all checks pass or are still pending/in-progress, skip ahead to the polling loop.
-
-### 2. Get Failure Logs
-
-For each failing check, find the corresponding workflow run and fetch its logs:
-
-```bash
-# List recent runs on this branch to find the run ID
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run list --branch "$(git branch --show-current)" --limit 5
-
-# Fetch only the failed step logs
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run view <run-id> --log-failed
-```
-
-### 3. Fix the Failures
-
-1. **Read the failure logs** to understand what went wrong.
-2. **Reproduce locally** by running the relevant commands (`make test-backend`, `make test-frontend`, `make build`).
-3. **Fix the issue** — read surrounding code context, understand the root cause, implement the fix.
-4. **Run tests and build locally** to verify the fix.
-5. **Commit** with a clear message (e.g., `fix: resolve failing CI — <brief description>`).
-6. **Push** to trigger new check runs.
-
-If multiple checks are failing, fix them all before pushing (batch into one or more logical commits).
+CI is manual-only (`workflow_dispatch`), so there are no check runs to inspect at this point. CI will be triggered once at the end of the watch session (see Post-Poll step 10).
 
 ## Polling Loop
 
@@ -275,15 +242,44 @@ Format the comment in markdown. Example structure:
 
 If no changes were made during the session (e.g., all comments were already addressed before watching started, or no comments existed), still post the comment noting that no action was needed.
 
-### 10. Post-Poll: Fix Failing Checks
+### 10. Post-Poll: Trigger CI and Fix Failing Checks
 
-After posting the wrap-up comment, run the same check repair procedure from the **Pre-Poll** section:
+CI is manual-only, so after posting the wrap-up comment, **trigger CI once** against the final state of the branch, wait for it to complete, and fix any failures.
 
-1. Fetch the current check status with `gh pr checks $PR_NUMBER`.
-2. If any checks are failing, fetch the failure logs with `gh run view <run-id> --log-failed`.
-3. Reproduce locally, fix the issue, run tests and build, commit, and push.
+#### a) Trigger the CI workflow
 
-If all checks are passing (or only pending/in-progress), no action needed — exit cleanly.
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh workflow run ci.yml --ref "$(git branch --show-current)"
+```
+
+#### b) Wait for the run to appear and complete
+
+Poll until the run triggered above finishes. First, wait ~5 seconds for the run to register, then poll:
+
+```bash
+# Find the most recent run on this branch
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run list --workflow=ci.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
+```
+
+Poll every 30 seconds until `status` is `completed`.
+
+#### c) Check results
+
+If `conclusion` is `success`, no action needed — exit cleanly.
+
+If `conclusion` is `failure`:
+
+1. Fetch the failed run's logs:
+   ```bash
+   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run view <run-id> --log-failed
+   ```
+2. **Read the failure logs** to understand what went wrong.
+3. **Reproduce locally** by running the relevant commands (`make test-backend`, `make test-frontend`, `make build`).
+4. **Fix the issue** — read surrounding code context, understand the root cause, implement the fix.
+5. **Run tests and build locally** to verify the fix.
+6. **Commit** with a clear message (e.g., `fix: resolve failing CI — <brief description>`).
+7. **Push** to the branch.
+8. **Trigger CI again** (repeat from step a) to verify the fix. If it fails again, repeat the fix cycle up to 3 times before posting a comment that CI cannot be fixed automatically.
 
 If fixes were pushed, append an addendum to the wrap-up comment (post a new comment) noting the additional fixes made:
 
