@@ -9,7 +9,12 @@
     "web": "expo start --web",
     "generate:api": "openapi-typescript ../spec/openapi/openapi.bundle.yaml -o src/api/schema.d.ts",
     "postinstall": "npm run generate:api",
-    "test": "jest"
+    "test": "jest",
+    "eas-build:dev": "eas-cli build --profile development --platform all",
+    "eas-build:preview": "eas-cli build --profile preview --platform all",
+    "eas-build:prod": "eas-cli build --profile production --platform all",
+    "eas-submit": "eas-cli submit --profile production --platform all",
+    "eas-update": "eas-cli update --channel production"
   },
   "jest": {
     "preset": "jest-expo",
@@ -41,6 +46,7 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "eas-cli": "^18.1.0",
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "^19.1.0",
     "jest-expo": "^55.0.9",

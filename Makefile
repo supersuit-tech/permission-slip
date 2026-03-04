@@ -2,6 +2,8 @@
        test test-backend test-frontend test-integration typecheck \
        mobile-install mobile-start mobile-test mobile-typecheck \
        mobile-build-dev mobile-build-preview mobile-build-prod \
+       mobile-build-dev-ios mobile-build-dev-android \
+       mobile-build-preview-ios mobile-build-preview-android \
        mobile-submit mobile-update \
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
@@ -37,9 +39,10 @@ dev-frontend:
 bundle:
 	npx @redocly/cli@2.19.1 bundle spec/openapi/openapi.yaml -o spec/openapi/openapi.bundle.yaml
 
-# Generate typed API client from the bundled OpenAPI spec
+# Generate typed API client from the bundled OpenAPI spec (frontend + mobile)
 generate: bundle
 	cd frontend && npm run generate:api
+	cd mobile && npm run generate:api
 
 # Type-check frontend (generates API client first, then runs tsc --noEmit)
 typecheck: generate
@@ -124,10 +127,18 @@ mobile-typecheck:
 # EAS Build: development (simulator/internal distribution)
 mobile-build-dev:
 	cd mobile && npx eas-cli build --profile development --platform all
+mobile-build-dev-ios:
+	cd mobile && npx eas-cli build --profile development --platform ios
+mobile-build-dev-android:
+	cd mobile && npx eas-cli build --profile development --platform android
 
 # EAS Build: preview (internal distribution for testers)
 mobile-build-preview:
 	cd mobile && npx eas-cli build --profile preview --platform all
+mobile-build-preview-ios:
+	cd mobile && npx eas-cli build --profile preview --platform ios
+mobile-build-preview-android:
+	cd mobile && npx eas-cli build --profile preview --platform android
 
 # EAS Build: production (App Store / Google Play)
 mobile-build-prod:
