@@ -2310,26 +2310,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalListResponse'
-              example:
-                data:
-                  - approval_id: appr_xyz789
-                    agent_id: 42
-                    action:
-                      type: email.send
-                      version: '1'
-                      parameters:
-                        from: alice@example.com
-                        to:
-                          - recipient@example.com
-                        subject: Hello World
-                        body: This is a test email.
-                    context:
-                      description: Send welcome email to new user
-                      risk_level: low
-                    status: pending
-                    expires_at: '2026-02-11T13:25:00Z'
-                    created_at: '2026-02-11T13:20:00Z'
-                has_more: false
+              examples:
+                pending_approvals:
+                  summary: List of pending approvals
+                  value:
+                    data:
+                      - approval_id: appr_xyz789
+                        agent_id: 42
+                        action:
+                          type: email.send
+                          version: '1'
+                          parameters:
+                            from: alice@example.com
+                            to:
+                              - recipient@example.com
+                            subject: Hello World
+                            body: This is a test email.
+                        context:
+                          description: Send welcome email to new user
+                          risk_level: low
+                        status: pending
+                        expires_at: '2026-02-11T13:25:00Z'
+                        created_at: '2026-02-11T13:20:00Z'
+                    has_more: false
+                approved_with_results:
+                  summary: Approved approval with execution result
+                  value:
+                    data:
+                      - approval_id: appr_abc456
+                        agent_id: 42
+                        action:
+                          type: email.send
+                          version: '1'
+                          parameters:
+                            from: alice@example.com
+                            to:
+                              - recipient@example.com
+                            subject: Hello World
+                            body: This is a test email.
+                        context:
+                          description: Send welcome email to new user
+                          risk_level: low
+                        status: approved
+                        expires_at: '2026-02-11T13:25:00Z'
+                        approved_at: '2026-02-11T13:21:00Z'
+                        created_at: '2026-02-11T13:20:00Z'
+                        execution_status: success
+                        execution_result:
+                          message_id: msg_abc123
+                          delivery_status: queued
+                        executed_at: '2026-02-11T13:21:01Z'
+                    has_more: false
         '400':
           description: Invalid query parameters
           content:
@@ -2385,14 +2416,17 @@ paths:
         |-------|-------------|
         | `connected` | Sent immediately on connection. Confirms the stream is live. |
         | `approval_created` | A new approval was requested by an agent. |
-        | `approval_resolved` | An approval was approved or denied. |
+        | `approval_resolved` | An approval was approved or denied. Includes `execution_status` when approved. |
         | `approval_cancelled` | An agent cancelled an approval. |
 
-        Each event carries a JSON `data` payload with `approval_id`:
+        Each event carries a JSON `data` payload with `approval_id` and relevant fields:
 
         ```
         event: approval_created
         data: {"approval_id":"appr_xyz789"}
+
+        event: approval_resolved
+        data: {"approval_id":"appr_xyz789","status":"approved","execution_status":"success"}
         ```
 
         A `: heartbeat` comment is sent every 30 seconds to keep the connection
@@ -2435,6 +2469,9 @@ paths:
 
                 event: approval_created
                 data: {"approval_id":"appr_xyz789"}
+
+                event: approval_resolved
+                data: {"approval_id":"appr_xyz789","status":"approved","execution_status":"success"}
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -5516,6 +5553,10 @@ components:
             recipient_count: 1
     ApprovalRequestResponse:
       type: object
+      description: |
+        Response after submitting an approval request. The agent should use the `approval_id`
+        to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
+        or listen for real-time updates via `GET /v1/approvals/events` (SSE).
       required:
         - approval_id
         - approval_url
@@ -5528,7 +5569,7 @@ components:
           maxLength: 70
           description: |
             Unique approval identifier assigned by Permission Slip. Used to reference this approval
-            in subsequent operations (cancel, poll status).
+            in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
           example: appr_xyz789
         approval_url:
           type: string
@@ -5665,6 +5706,30 @@ components:
           format: date-time
           description: When the approval request was created
           example: '2026-02-11T13:20:00Z'
+        execution_status:
+          type: string
+          enum:
+            - pending
+            - success
+            - partial
+            - error
+          nullable: true
+          description: |
+            Status of the action execution. Only present when status is `approved`.
+            Null for pending, denied, or cancelled approvals.
+          example: success
+        execution_result:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: |
+            Result data from executing the action. Only present when `execution_status`
+            is `success`, `partial`, or `error`. Structure varies by action type.
+        executed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the action was executed (null if not yet executed)
     ApprovalListResponse:
       type: object
       description: Paginated list of approval requests.

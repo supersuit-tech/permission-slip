@@ -93,6 +93,10 @@ ApprovalRequest:
 
 ApprovalRequestResponse:
   type: object
+  description: |
+    Response after submitting an approval request. The agent should use the `approval_id`
+    to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
+    or listen for real-time updates via `GET /v1/approvals/events` (SSE).
   required:
     - approval_id
     - approval_url
@@ -105,7 +109,7 @@ ApprovalRequestResponse:
       maxLength: 70
       description: |
         Unique approval identifier assigned by Permission Slip. Used to reference this approval
-        in subsequent operations (cancel, poll status).
+        in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
       example: "appr_xyz789"
 
     approval_url:
@@ -253,6 +257,30 @@ ApprovalSummary:
       format: date-time
       description: When the approval request was created
       example: "2026-02-11T13:20:00Z"
+    execution_status:
+      type: string
+      enum:
+        - pending
+        - success
+        - partial
+        - error
+      nullable: true
+      description: |
+        Status of the action execution. Only present when status is `approved`.
+        Null for pending, denied, or cancelled approvals.
+      example: "success"
+    execution_result:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: |
+        Result data from executing the action. Only present when `execution_status`
+        is `success`, `partial`, or `error`. Structure varies by action type.
+    executed_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the action was executed (null if not yet executed)
 
 ApprovalListResponse:
   type: object
