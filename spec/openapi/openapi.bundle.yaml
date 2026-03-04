@@ -8891,10 +8891,11 @@ components:
           $ref: '#/components/schemas/UsageSummary'
     UsageDetail:
       type: object
-      description: >
+      description: |
         Detailed usage metrics for a single billing period. Includes request
         and SMS totals, overage/cost calculations, and an optional breakdown
-        by agent, connector, and action type.
+        by agent, connector, and action type. Used by the billing dashboard
+        to render the usage overview and per-agent breakdown table.
       required:
         - period_start
         - period_end
@@ -8904,16 +8905,17 @@ components:
         period_start:
           type: string
           format: date-time
-          description: >
+          description: |
             Start of the billing period (inclusive, UTC). Always the first
-            instant of a calendar month.
+            instant of a calendar month, e.g. `2026-03-01T00:00:00Z`.
           example: '2026-03-01T00:00:00Z'
         period_end:
           type: string
           format: date-time
-          description: >
-            End of the billing period (exclusive, UTC). Uses half-open
-            interval: [period_start, period_end).
+          description: |
+            End of the billing period (exclusive, UTC). Always the first
+            instant of the following month. Uses half-open interval convention:
+            the period covers [period_start, period_end).
           example: '2026-04-01T00:00:00Z'
         requests:
           $ref: '#/components/schemas/RequestUsageDetail'
@@ -8923,9 +8925,11 @@ components:
           $ref: '#/components/schemas/UsageBreakdown'
     RequestUsageDetail:
       type: object
-      description: >
-        Request usage metrics. Overage and cost are only non-zero when
-        total exceeds the plan's included allowance.
+      description: |
+        Request usage metrics for a billing period. The `included` count
+        comes from the plan's `max_requests_per_month` (0 for unlimited
+        paid plans). Overage and cost are only non-zero when the total
+        exceeds the included allowance.
       required:
         - total
         - included
@@ -8938,24 +8942,29 @@ components:
           example: 1542
         included:
           type: integer
-          description: >
-            Requests included at no extra cost. 0 when the plan has no limit.
+          description: |
+            Number of requests included in the plan at no extra cost.
+            0 when the plan has no request limit (e.g. pay-as-you-go).
           example: 1000
         overage:
           type: integer
-          description: >
-            Requests exceeding the included allowance. 0 when total <= included.
+          description: |
+            Number of requests exceeding the included allowance.
+            Always 0 when total <= included or when there is no limit.
           example: 542
         cost_cents:
           type: integer
-          description: >
-            Estimated overage cost in cents at $0.005/request, rounded up.
-            Formula: ceil(overage * 0.5).
+          description: |
+            Estimated cost of overage requests in cents, calculated at
+            $0.005 per request (0.5 cents), rounded up to the nearest cent.
+            Formula: ceil(overage * 0.5). Always 0 when there is no overage.
           example: 271
     SMSUsageDetail:
       type: object
-      description: >
-        SMS usage metrics. Cost is at the US/CA rate ($0.01/message).
+      description: |
+        SMS usage metrics for a billing period. Cost is calculated at
+        the US/CA rate ($0.01 per message). International rates may
+        apply for non-US/CA destinations in the future.
       required:
         - total
         - cost_cents
@@ -8966,21 +8975,24 @@ components:
           example: 5
         cost_cents:
           type: integer
-          description: Estimated SMS cost in cents at $0.01/message.
+          description: |
+            Estimated SMS cost in cents at the US/CA rate ($0.01/message).
           example: 5
     UsageBreakdown:
       type: object
-      description: >
+      description: |
         Hierarchical breakdown of request counts by agent, connector, and
-        action type. Omitted when no breakdown data exists for the period.
+        action type. Each map uses string keys (IDs or type names) with
+        integer count values. Omitted from the response when no breakdown
+        data has been recorded for the period.
       properties:
         by_agent:
           type: object
           additionalProperties:
             type: integer
-          description: >
-            Request counts keyed by agent ID (string). Used by the
-            per-agent usage table on the billing dashboard.
+          description: |
+            Request counts keyed by agent ID (as a string). Sorted by
+            count descending on the frontend for the per-agent table.
           example:
             '1': 500
             '2': 1042
