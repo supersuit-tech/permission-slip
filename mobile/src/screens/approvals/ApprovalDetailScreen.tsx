@@ -2,7 +2,7 @@
  * Approval detail screen — displays the full details of a single approval
  * request including agent info, action parameters, risk level, expiry
  * countdown, context, and timeline. For pending approvals, shows
- * approve/deny buttons. After approval, displays the confirmation code.
+ * approve/deny buttons with haptic feedback.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -30,7 +30,6 @@ import {
 } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
-import { ConfirmationCodeCard } from "./ConfirmationCodeCard";
 import { ApprovalActions } from "./ApprovalActions";
 import { KeyValueList, type KeyValueEntry } from "./KeyValueList";
 
@@ -41,7 +40,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
 
-  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const [isDenied, setIsDenied] = useState(false);
   // Capture the exact timestamp when the user approves/denies so the timeline
   // doesn't flicker with a new Date() on every re-render.
@@ -74,7 +73,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     return Object.entries(details).map(([label, value]) => ({ label, value }));
   }, [approval.context.details]);
 
-  const isPending = approval.status === "pending" && !confirmationCode && !isDenied;
+  const isPending = approval.status === "pending" && !isApproved && !isDenied;
   const expired = checkExpired(approval.status, approval.expires_at);
   const canAct = isPending && !expired;
 
@@ -85,7 +84,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       { label: "Created", value: formatTimestamp(approval.created_at) },
       { label: "Expires", value: formatTimestamp(approval.expires_at) },
     ];
-    const approvedTime = approval.approved_at ?? (confirmationCode ? resolvedAt : null);
+    const approvedTime = approval.approved_at ?? (isApproved ? resolvedAt : null);
     if (approvedTime) {
       entries.push({ label: "Approved", value: formatTimestamp(approvedTime) });
     }
@@ -97,13 +96,13 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       entries.push({ label: "Cancelled", value: formatTimestamp(approval.cancelled_at) });
     }
     return entries;
-  }, [approval, confirmationCode, isDenied, resolvedAt]);
+  }, [approval, isApproved, isDenied, resolvedAt]);
 
   const handleApprove = useCallback(async () => {
     try {
-      const result = await approveApproval(approval.approval_id);
+      await approveApproval(approval.approval_id);
       setResolvedAt(new Date().toISOString());
-      setConfirmationCode(result.confirmation_code);
+      setIsApproved(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -150,14 +149,11 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
         style={styles.container}
         contentContainerStyle={{ paddingBottom: canAct ? 8 : insets.bottom + 24 }}
       >
-        {/* Confirmation code — shown after successful approval */}
-        {confirmationCode && (
+        {/* Success state — shown after successful approval */}
+        {isApproved && (
           <View style={styles.section}>
             <View style={styles.successBanner} accessibilityRole="alert">
               <Text style={styles.successBannerText}>Request Approved</Text>
-            </View>
-            <View style={styles.codeSection}>
-              <ConfirmationCodeCard code={confirmationCode} />
             </View>
             <TouchableOpacity
               style={styles.doneButton}
@@ -194,7 +190,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
         )}
 
         {/* Status banner for already-resolved approvals (loaded from list) */}
-        {!confirmationCode && !isDenied && (
+        {!isApproved && !isDenied && (
           <>
             {approval.status === "approved" && (
               <View
@@ -301,7 +297,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
         )}
 
         {/* Expiry Countdown */}
-        {approval.status === "pending" && !confirmationCode && !isDenied && (
+        {approval.status === "pending" && !isApproved && !isDenied && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Expiry</Text>
             <View style={styles.card}>
@@ -396,9 +392,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.success,
-  },
-  codeSection: {
-    marginTop: 0,
   },
   statusBannerApproved: {
     backgroundColor: colors.riskLowBg,

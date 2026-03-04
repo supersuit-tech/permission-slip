@@ -89,6 +89,9 @@ jobs:
       - name: Install dependencies
         run: cd mobile && npm ci
 
+      - name: Type-check
+        run: make mobile-typecheck
+
       - name: Run mobile tests
         run: make mobile-test
 
