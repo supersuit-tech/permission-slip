@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { Alert } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import LoginScreen from "../screens/LoginScreen";
@@ -16,6 +19,8 @@ export type RootStackParamList = {
     approval: ApprovalSummary;
   };
 };
+
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -36,7 +41,7 @@ export default function RootNavigator() {
   }, [authStatus, signOut]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {authStatus === "authenticated" ? (
           <>
