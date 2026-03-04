@@ -271,7 +271,7 @@ func TestDeleteExpoPushToken_InvalidID(t *testing.T) {
 	}
 }
 
-func TestCreateExpoPushToken_WhitespaceTrimed(t *testing.T) {
+func TestCreateExpoPushToken_WhitespaceTrimmed(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)

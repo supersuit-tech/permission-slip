@@ -108,8 +108,8 @@ type expoAPIResponse struct {
 // Send delivers a push notification to all of the recipient's registered
 // Expo push tokens. Messages are batched into a single API call (up to 100
 // per request). Invalid tokens (DeviceNotRegistered) are automatically
-// cleaned up. Partial failures are logged but do not cause the overall
-// Send to return an error — best-effort delivery across all devices.
+// cleaned up. If any batch fails, the last error is returned but remaining
+// batches are still attempted — best-effort delivery across all devices.
 func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient notify.Recipient) error {
 	tokens, err := s.store.ListTokens(ctx, recipient.UserID)
 	if err != nil {
@@ -171,7 +171,6 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	if s.accessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+s.accessToken)
 	}

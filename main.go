@@ -27,9 +27,9 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
+	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
