@@ -41,7 +41,7 @@ const queryClient = new QueryClient({
 const LOADING_TIMEOUT_MS = 10_000;
 
 function AppContent({ onRetry }: { onRetry: () => void }) {
-  const { authStatus } = useAuth();
+  const { authStatus, session } = useAuth();
   const qc = useQueryClient();
   const [timedOut, setTimedOut] = useState(false);
   const prevAuthStatus = useRef(authStatus);
@@ -49,8 +49,9 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
   // Register/unregister Expo push token as auth status changes
   usePushSetup();
 
-  // Biometric auth gate — locks the app on resume from background
-  const biometric = useBiometricAuth();
+  // Biometric auth gate — locks the app on resume from background.
+  // Pass userId so the preference is scoped per user on shared devices.
+  const biometric = useBiometricAuth({ userId: session?.user?.id });
   const appStateRef = useRef(AppState.currentState);
 
   useEffect(() => {

@@ -13,6 +13,13 @@ import { getApiErrorMessage } from "../api/errors";
 import type { ApprovalSummary } from "./useApprovals";
 
 /**
+ * Matches the approval_id format from the OpenAPI spec.
+ * Defense-in-depth: prevents API calls with obviously invalid IDs
+ * from crafted or malformed deep link URLs.
+ */
+const APPROVAL_ID_PATTERN = /^appr_[a-zA-Z0-9]{6,64}$/;
+
+/**
  * Searches the React Query cache for an approval with the given ID.
  * Checks all cached approval list queries (pending, approved, denied, etc.).
  */
@@ -40,6 +47,9 @@ export function useApproval(approvalId: string) {
   const tokenRef = useRef(accessToken);
   tokenRef.current = accessToken;
 
+  // Validate the approval ID format before making any API calls
+  const isValidId = APPROVAL_ID_PATTERN.test(approvalId);
+
   const query = useQuery({
     queryKey: ["approval", approvalId],
     queryFn: async () => {
@@ -66,13 +76,24 @@ export function useApproval(approvalId: string) {
       if (!match) throw new Error("Approval not found");
       return match;
     },
-    enabled: !!accessToken && !!approvalId,
+    // Only enable if we have auth and a valid-looking approval ID
+    enabled: !!accessToken && !!approvalId && isValidId,
     staleTime: 10_000,
     // Limit retries for deep links — the approval may be expired or deleted.
     // One retry handles transient network errors without hammering the API
     // for genuinely missing approvals.
     retry: 1,
   });
+
+  // Return an immediate error for invalid IDs without making any API calls
+  if (!isValidId && approvalId) {
+    return {
+      approval: null,
+      isLoading: false,
+      error: "Invalid approval ID format",
+      refetch: query.refetch,
+    };
+  }
 
   return {
     approval: query.data ?? null,

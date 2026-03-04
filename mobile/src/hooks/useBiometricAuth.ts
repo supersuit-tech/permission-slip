@@ -4,17 +4,27 @@
  * Provides:
  * - Hardware capability detection
  * - Enrolled biometrics check
- * - User preference toggle (persisted in secure storage)
+ * - User preference toggle (persisted in secure storage, scoped per user)
  * - Authentication prompt
  *
  * Biometric auth is an optional per-user setting — when enabled, it gates
- * access to the app on resume from background.
+ * access to the app on resume from background. The preference is stored
+ * with a user-specific key so multiple accounts on a shared device don't
+ * interfere with each other.
  */
 import { useCallback, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
-const BIOMETRIC_ENABLED_KEY = "biometric_auth_enabled";
+const BIOMETRIC_KEY_PREFIX = "biometric_auth_enabled";
+
+/** Returns the SecureStore key for the given user's biometric preference. */
+function biometricKey(userId: string | undefined): string {
+  // Include user ID to prevent cross-account preference leakage on shared
+  // devices. Falls back to a global key if user ID is unavailable (shouldn't
+  // happen in practice since the hook is only used when authenticated).
+  return userId ? `${BIOMETRIC_KEY_PREFIX}_${userId}` : BIOMETRIC_KEY_PREFIX;
+}
 
 export type BiometricStatus =
   | "checking"
@@ -22,12 +32,18 @@ export type BiometricStatus =
   | "available"
   | "enrolled";
 
-export function useBiometricAuth() {
+interface UseBiometricAuthOptions {
+  /** The current user's ID, used to scope biometric preferences per user. */
+  userId?: string;
+}
+
+export function useBiometricAuth(options: UseBiometricAuthOptions = {}) {
+  const { userId } = options;
   const [status, setStatus] = useState<BiometricStatus>("checking");
   const [isEnabled, setIsEnabled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check hardware and enrollment on mount
+  // Check hardware and enrollment on mount (and when userId changes)
   useEffect(() => {
     async function check() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -44,15 +60,18 @@ export function useBiometricAuth() {
 
       setStatus("enrolled");
 
-      // Load user preference
-      const stored = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
+      // Load user-specific preference
+      const key = biometricKey(userId);
+      const stored = await SecureStore.getItemAsync(key);
       if (stored === "true") {
         setIsEnabled(true);
+      } else {
+        setIsEnabled(false);
       }
     }
 
     check();
-  }, []);
+  }, [userId]);
 
   const toggleBiometric = useCallback(async (enabled: boolean) => {
     if (enabled) {
@@ -66,13 +85,14 @@ export function useBiometricAuth() {
       if (!result.success) return false;
     }
 
-    await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, String(enabled));
+    const key = biometricKey(userId);
+    await SecureStore.setItemAsync(key, String(enabled));
     setIsEnabled(enabled);
     if (!enabled) {
       setIsAuthenticated(true);
     }
     return true;
-  }, []);
+  }, [userId]);
 
   const authenticate = useCallback(async () => {
     if (!isEnabled) {

@@ -33,7 +33,7 @@ import { useBiometricAuth } from "../useBiometricAuth";
 let captured: ReturnType<typeof useBiometricAuth>;
 
 function TestHarness() {
-  captured = useBiometricAuth();
+  captured = useBiometricAuth({ userId: "test-user-123" });
   return createElement(
     Text,
     null,
@@ -119,7 +119,7 @@ describe("useBiometricAuth", () => {
     });
     expect(result).toBe(true);
     expect(captured.isEnabled).toBe(true);
-    expect(mockSetItem).toHaveBeenCalledWith("biometric_auth_enabled", "true");
+    expect(mockSetItem).toHaveBeenCalledWith("biometric_auth_enabled_test-user-123", "true");
   });
 
   it("toggleBiometric does not enable after failed verification", async () => {
