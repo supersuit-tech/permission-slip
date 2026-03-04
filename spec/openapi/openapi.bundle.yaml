@@ -19,7 +19,6 @@ info:
     - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
     - **Registration**: One-time setup where agent proves identity via public key
     - **Approval Request**: Async request for permission to execute a specific action
-    - **Token**: Single-use credential issued after one-off approval, used to execute the approved action
     - **Standing Approval**: Pre-authorized, constraint-scoped grant that lets an agent execute an action repeatedly without per-request approval
 
     ## Authentication
@@ -41,8 +40,8 @@ info:
     3. **Store Credentials** *(if needed)*: User connects external accounts and stores credentials in Permission Slip's vault using the credential management endpoints
     4. **Submit Action**: Agent submits a structured action (e.g., `email.send` with parameters)
     5. **User Approval**: Approver reviews the action in a human-readable format and approves/denies
-    6. **Verify & Get Token**: Agent submits confirmation code, receives single-use token
-    7. **Execute Action**: Agent calls `POST /v1/actions/execute` with the token — Permission Slip calls the external API using stored credentials
+    6. **Direct Execution**: On approval, Permission Slip immediately executes the action via the connector
+    7. **Poll for Result**: Agent calls `GET /v1/approvals/{approval_id}/status` to get the execution result
 
     ### Standing Approval (pre-authorized)
 
@@ -1877,10 +1876,8 @@ paths:
         3. **Permission Slip responds**: Returns approval URL with unique approval_id
         4. **Notification sent**: Permission Slip notifies approver (push notification)
         5. **Approver reviews**: Visits URL, sees full action details, approves/denies
-        6. **Confirmation shown**: If approved, Permission Slip shows 6-character confirmation code
-        7. **Agent verifies**: Collects code from user, submits to verify endpoint
-        8. **Token issued**: Permission Slip returns single-use JWT token
-        9. **Agent executes**: Uses token to call `POST /v1/actions/execute`
+        6. **Direct execution**: If approved, Permission Slip immediately executes the action via the connector
+        7. **Agent polls for result**: Agent calls `GET /v1/approvals/{approval_id}/status` to get execution result
 
         ## Action Types
 
@@ -1909,10 +1906,9 @@ paths:
 
         ## Parameters Hash
 
-        The `action.parameters` object is canonicalized using RFC 8785 (JCS) and hashed with 
-        SHA-256. This hash is embedded in the approval token as `params_hash` to prevent 
-        parameter tampering. Permission Slip verifies the hash matches request parameters before 
-        executing actions.
+        The `action.parameters` object is canonicalized using RFC 8785 (JCS) and hashed with
+        SHA-256. This hash is stored with the approval to prevent parameter tampering.
+        Permission Slip verifies the hash matches request parameters before executing actions.
       tags:
         - Approvals
       security:
@@ -2314,26 +2310,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalListResponse'
-              example:
-                data:
-                  - approval_id: appr_xyz789
-                    agent_id: 42
-                    action:
-                      type: email.send
-                      version: '1'
-                      parameters:
-                        from: alice@example.com
-                        to:
-                          - recipient@example.com
-                        subject: Hello World
-                        body: This is a test email.
-                    context:
-                      description: Send welcome email to new user
-                      risk_level: low
-                    status: pending
-                    expires_at: '2026-02-11T13:25:00Z'
-                    created_at: '2026-02-11T13:20:00Z'
-                has_more: false
+              examples:
+                pending_approvals:
+                  summary: List of pending approvals
+                  value:
+                    data:
+                      - approval_id: appr_xyz789
+                        agent_id: 42
+                        action:
+                          type: email.send
+                          version: '1'
+                          parameters:
+                            from: alice@example.com
+                            to:
+                              - recipient@example.com
+                            subject: Hello World
+                            body: This is a test email.
+                        context:
+                          description: Send welcome email to new user
+                          risk_level: low
+                        status: pending
+                        expires_at: '2026-02-11T13:25:00Z'
+                        created_at: '2026-02-11T13:20:00Z'
+                    has_more: false
+                approved_with_results:
+                  summary: Approved approval with execution result
+                  value:
+                    data:
+                      - approval_id: appr_abc456
+                        agent_id: 42
+                        action:
+                          type: email.send
+                          version: '1'
+                          parameters:
+                            from: alice@example.com
+                            to:
+                              - recipient@example.com
+                            subject: Hello World
+                            body: This is a test email.
+                        context:
+                          description: Send welcome email to new user
+                          risk_level: low
+                        status: approved
+                        expires_at: '2026-02-11T13:25:00Z'
+                        approved_at: '2026-02-11T13:21:00Z'
+                        created_at: '2026-02-11T13:20:00Z'
+                        execution_status: success
+                        execution_result:
+                          message_id: msg_abc123
+                          delivery_status: queued
+                        executed_at: '2026-02-11T13:21:01Z'
+                    has_more: false
         '400':
           description: Invalid query parameters
           content:
@@ -2389,14 +2416,17 @@ paths:
         |-------|-------------|
         | `connected` | Sent immediately on connection. Confirms the stream is live. |
         | `approval_created` | A new approval was requested by an agent. |
-        | `approval_resolved` | An approval was approved or denied. |
+        | `approval_resolved` | An approval was approved or denied. Includes `execution_status` when approved. |
         | `approval_cancelled` | An agent cancelled an approval. |
 
-        Each event carries a JSON `data` payload with `approval_id`:
+        Each event carries a JSON `data` payload with `approval_id` and relevant fields:
 
         ```
         event: approval_created
         data: {"approval_id":"appr_xyz789"}
+
+        event: approval_resolved
+        data: {"approval_id":"appr_xyz789","status":"approved","execution_status":"success"}
         ```
 
         A `: heartbeat` comment is sent every 30 seconds to keep the connection
@@ -2439,6 +2469,9 @@ paths:
 
                 event: approval_created
                 data: {"approval_id":"appr_xyz789"}
+
+                event: approval_resolved
+                data: {"approval_id":"appr_xyz789","status":"approved","execution_status":"success"}
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -2465,8 +2498,12 @@ paths:
         authenticated user (as approver) and must be in `pending` status and
         not expired.
 
-        This is a dashboard endpoint for human approvers — distinct from the
-        agent-facing verify endpoint which uses confirmation codes.
+        When approved, Permission Slip immediately executes the action via the
+        configured connector using the user's stored credentials. The execution
+        result is stored on the approval row and returned in the response.
+
+        This is a dashboard endpoint for human approvers. Agents can poll for
+        the result via `GET /v1/approvals/{approval_id}/status`.
       tags:
         - Approvals
       security:
@@ -2480,10 +2517,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApproveApprovalResponse'
-              example:
-                approval_id: appr_xyz789
-                status: approved
-                approved_at: '2026-02-21T10:30:00Z'
+              examples:
+                success:
+                  summary: Approved and executed successfully
+                  value:
+                    approval_id: appr_xyz789
+                    status: approved
+                    approved_at: '2026-02-21T10:30:00Z'
+                    execution_status: success
+                    execution_result:
+                      message_id: msg_abc123
+                      delivery_status: queued
+                execution_error:
+                  summary: Approved but execution failed
+                  value:
+                    approval_id: appr_xyz789
+                    status: approved
+                    approved_at: '2026-02-21T10:30:00Z'
+                    execution_status: error
+                    execution_result:
+                      error: upstream_error
+                      message: External service returned 503
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -2530,6 +2584,22 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '502':
+          description: External service error during action execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: upstream_error
+                  message: External service returned an error
+                  retryable: false
+                  details:
+                    service: gmail
+                    upstream_status: 503
+                    upstream_message: Service temporarily unavailable
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
   /v1/approvals/{approval_id}/deny:
@@ -2601,6 +2671,108 @@ paths:
                   details:
                     expired_at: '2026-02-21T10:25:00Z'
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/approvals/{approval_id}/status:
+    get:
+      operationId: getApprovalStatus
+      summary: Get Approval Status
+      description: |
+        Poll the status of an approval request and retrieve the execution result.
+        This is an agent-facing endpoint used to check whether an approval has been
+        resolved and, if approved, to get the result of the executed action.
+
+        ## Polling Flow
+
+        1. **Agent submits approval request**: `POST /v1/approvals/request`
+        2. **Agent polls status**: `GET /v1/approvals/{approval_id}/status`
+        3. **Permission Slip responds**: Returns current status and execution result (if available)
+
+        ## Status Transitions
+
+        - `pending` → `approved` (with execution result) or `denied` or `cancelled`
+        - Once resolved, the status is final and will not change
+
+        ## Recommended Polling Strategy
+
+        - Poll every 1–2 seconds for the first 30 seconds
+        - Then every 5 seconds until expiration
+        - Stop polling when status is no longer `pending` or when `expires_at` has passed
+        - Prefer SSE (`GET /v1/approvals/events`) for real-time notifications when possible
+
+        ## Security
+
+        - Request MUST include valid `X-Permission-Slip-Signature` header
+        - Only the agent that created the approval can poll its status
+      tags:
+        - Approvals
+      security:
+        - PermissionSlipSignature: []
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200':
+          description: Approval status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalStatusResponse'
+              examples:
+                pending:
+                  summary: Approval still pending
+                  value:
+                    approval_id: appr_xyz789
+                    status: pending
+                    expires_at: '2026-02-21T10:35:00Z'
+                approved_with_result:
+                  summary: Approved and executed successfully
+                  value:
+                    approval_id: appr_xyz789
+                    status: approved
+                    approved_at: '2026-02-21T10:30:00Z'
+                    expires_at: '2026-02-21T10:35:00Z'
+                    execution_status: success
+                    execution_result:
+                      message_id: msg_abc123
+                      delivery_status: queued
+                    executed_at: '2026-02-21T10:30:01Z'
+                approved_execution_pending:
+                  summary: Approved but execution still in progress
+                  value:
+                    approval_id: appr_xyz789
+                    status: approved
+                    approved_at: '2026-02-21T10:30:00Z'
+                    expires_at: '2026-02-21T10:35:00Z'
+                    execution_status: pending
+                denied:
+                  summary: Approval denied
+                  value:
+                    approval_id: appr_xyz789
+                    status: denied
+                    denied_at: '2026-02-21T10:30:00Z'
+                    expires_at: '2026-02-21T10:35:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: |
+            Approval not found or not owned by this agent. Returns the same error
+            for both cases to prevent approval ID enumeration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: approval_not_found
+                  message: Approval not found
+                  retryable: false
+                  details:
+                    approval_id: appr_xyz789
+                  trace_id: trace_xyz789
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -2995,45 +3167,26 @@ paths:
       operationId: executeAction
       summary: Execute Action
       description: |
-        Execute an action via Permission Slip. This endpoint supports two authorization modes:
+        Execute an action via Permission Slip using a standing approval. The agent provides
+        action details and Permission Slip matches an active standing approval to authorize
+        execution.
 
-        ## Mode 1: One-off Approval (Bearer Token)
+        ## Standing Approval Flow
 
-        The agent redeems a single-use approval token from the one-off approval flow.
-
-        1. **Agent submits token**: Provides the approval token, action ID, and parameters
-        2. **Permission Slip validates**: Verifies token signature, expiration, scope, and parameter hash
-        3. **Permission Slip executes**: Calls the external service API using the user's stored credentials
-        4. **Result returned**: External service response is returned to the agent
-        5. **Token consumed**: Token is invalidated (single-use)
-
-        ## Mode 2: Standing Approval (Agent Signature)
-
-        The agent executes under a pre-authorized standing approval — no token needed.
-
-        1. **Agent submits action**: Provides action type and parameters (no token)
-        2. **Permission Slip matches**: Finds an active standing approval for this agent + action + constraints
+        1. **Agent submits action**: Provides action type, parameters, and request_id (no token)
+        2. **Permission Slip matches**: Finds an active standing approval for this agent + action type + constraints
         3. **Permission Slip validates**: Verifies parameters fall within standing approval constraints
-        4. **Permission Slip executes**: Calls the external service API immediately
-        5. **Result returned**: Uses the `StandingApprovalExecuteResponse` schema (includes `standing_approval_id` and `executions_remaining`)
+        4. **Permission Slip executes**: Calls the external service API using stored credentials
+        5. **Result returned**: Returns `StandingApprovalExecuteResponse` with `standing_approval_id` and `executions_remaining`
 
-        Permission Slip determines the mode by the presence of the `token` field in the JSON
-        request body. If a non-empty `token` is provided, one-off token verification is used.
-        If `token` is absent, standing approval matching is attempted using the agent signature.
-        If no standing approval matches, the request falls through to the one-off approval flow —
-        Permission Slip returns `404 Not Found` with a hint to use `POST /v1/approvals/request`,
-        indicating the agent should initiate the standard approval flow for this action.
+        ## One-off Approvals
 
-        ## Token Validation (One-off mode)
+        One-off approval actions are executed automatically when the user approves. Agents
+        should poll `GET /v1/approvals/{approval_id}/status` for results instead of calling
+        this endpoint. If no standing approval matches, Permission Slip returns `404 Not Found`
+        with a hint to use `POST /v1/approvals/request` for one-off approval.
 
-        Permission Slip verifies:
-        - **JWT signature**: Token was issued by Permission Slip
-        - **Expiration**: `exp` claim has not passed
-        - **Scope**: `scope` claim matches the `action_id` in the request
-        - **Parameters hash**: SHA-256 of JCS-canonicalized `parameters` matches `params_hash` claim
-        - **Single-use**: Token `jti` has not been previously consumed
-
-        ## Standing Approval Validation (Standing approval mode)
+        ## Standing Approval Validation
 
         Permission Slip verifies:
         - **Agent signature**: Valid Ed25519/ECDSA signature
@@ -3050,25 +3203,21 @@ paths:
 
         ## Idempotency
 
-        Standing approval executions support idempotency via the `request_id` field. If the
-        same `request_id` is submitted again for the same standing approval, Permission Slip
-        returns `409 Conflict` with error code `duplicate_request_id`. One-off token mode does
-        not use `request_id` — tokens are inherently single-use.
+        Executions support idempotency via the `request_id` field. If the same `request_id`
+        is submitted again for the same standing approval, Permission Slip returns
+        `409 Conflict` with error code `duplicate_request_id`.
 
         ## Error Handling
 
         If the external service returns an error, Permission Slip returns a `502 Bad Gateway`
-        with details about the upstream failure. For one-off mode, the token is still consumed —
-        the agent must request a new approval to retry. For standing approval mode, the execution
-        count is still incremented to prevent unbounded retry loops; the agent should use a new
-        `request_id` for each retry attempt.
+        with details about the upstream failure. The execution count is still incremented to
+        prevent unbounded retry loops; the agent should use a new `request_id` for each
+        retry attempt.
 
         ## Security
 
         - Request MUST include valid `X-Permission-Slip-Signature` header
-        - One-off: Token is single-use — consumed even if the external service call fails
-        - Standing: Constraints are enforced on every execution
-        - Parameters must match what was approved (hash verification for one-off, constraint check for standing)
+        - Constraints are enforced on every execution
         - Agent never sees user credentials
       tags:
         - Actions
@@ -3081,40 +3230,8 @@ paths:
             schema:
               $ref: '#/components/schemas/ExecuteActionRequest'
             examples:
-              email_send_oneoff:
-                summary: 'One-off: Execute email send with approval token'
-                value:
-                  token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImFwcHJvdmFsX2lkIjoiYXBwcl94eXo3ODkiLCJzY29wZSI6ImVtYWlsLnNlbmQifQ.signature
-                  action_id: email.send
-                  parameters:
-                    from: alice@example.com
-                    to:
-                      - bob@example.com
-                    subject: Meeting tomorrow
-                    body: Let's meet at 3pm.
-              flight_book_oneoff:
-                summary: 'One-off: Execute flight booking with approval token'
-                value:
-                  token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
-                  action_id: flight.book
-                  parameters:
-                    from: SFO
-                    to: NYC
-                    date: '2026-03-15'
-                    passengers: 1
-                    class: economy
-              payment_charge_oneoff:
-                summary: 'One-off: Execute payment charge with approval token'
-                value:
-                  token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
-                  action_id: payment.charge
-                  parameters:
-                    amount: 9900
-                    currency: USD
-                    customer_id: cus_abc123
-                    description: Subscription renewal
               email_read_standing:
-                summary: 'Standing approval: Read emails (no token)'
+                summary: 'Standing approval: Read emails'
                 value:
                   request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
                   action:
@@ -3123,6 +3240,19 @@ paths:
                     parameters:
                       sender: '*@github.com'
                       max_results: 10
+              email_send_standing:
+                summary: 'Standing approval: Send email'
+                value:
+                  request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
+                  action:
+                    type: email.send
+                    version: '1'
+                    parameters:
+                      from: alice@example.com
+                      to:
+                        - bob@example.com
+                      subject: Meeting tomorrow
+                      body: Let's meet at 3pm.
       responses:
         '200':
           description: Action executed successfully
@@ -3131,26 +3261,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExecuteActionResponse'
               examples:
-                email_sent_oneoff:
-                  summary: 'One-off: Email sent successfully'
-                  value:
-                    status: success
-                    action_id: email.send
-                    executed_at: '2026-02-11T13:21:00Z'
-                    result:
-                      message_id: msg_abc123
-                      delivery_status: queued
-                flight_booked_oneoff:
-                  summary: 'One-off: Flight booked successfully'
-                  value:
-                    status: success
-                    action_id: flight.book
-                    executed_at: '2026-02-11T13:21:05Z'
-                    result:
-                      confirmation_number: ABC123
-                      airline: United Airlines
-                      total: $347.00
-                      departure: '2026-03-15T08:00:00-08:00'
                 email_read_standing:
                   summary: 'Standing approval: Emails read successfully'
                   value:
@@ -3161,6 +3271,14 @@ paths:
                           sender: noreply@github.com
                     standing_approval_id: sa_abc123
                     executions_remaining: null
+                email_sent_standing:
+                  summary: 'Standing approval: Email sent successfully'
+                  value:
+                    result:
+                      message_id: msg_abc123
+                      delivery_status: queued
+                    standing_approval_id: sa_def456
+                    executions_remaining: 47
         '400':
           description: Invalid request
           content:
@@ -3170,74 +3288,30 @@ paths:
               example:
                 error:
                   code: invalid_request
-                  message: 'Missing required field: token'
+                  message: 'Missing required field: action'
                   retryable: false
                   details:
-                    field: token
+                    field: action
                   trace_id: trace_xyz789
         '401':
-          description: Invalid signature or token
+          description: Invalid signature
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                invalid_token:
-                  summary: Token is invalid or expired
-                  value:
-                    error:
-                      code: invalid_token
-                      message: Token is invalid or has expired
-                      retryable: false
-                      trace_id: trace_xyz789
-                invalid_signature:
-                  summary: Request signature verification failed
-                  value:
-                    error:
-                      code: invalid_signature
-                      message: Signature verification failed
-                      retryable: false
-                      trace_id: trace_xyz789
+              example:
+                error:
+                  code: invalid_signature
+                  message: Signature verification failed
+                  retryable: false
+                  trace_id: trace_xyz789
         '403':
-          description: Token scope mismatch, parameter mismatch, or token already used
+          description: Standing approval exhausted or constraint violation
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                insufficient_scope:
-                  summary: Token scope doesn't match action_id
-                  value:
-                    error:
-                      code: insufficient_scope
-                      message: Token does not have the required scope for this action
-                      retryable: false
-                      details:
-                        token_scope: email.send
-                        requested_action: payment.charge
-                      trace_id: trace_xyz789
-                invalid_parameters:
-                  summary: Parameters don't match approved parameters
-                  value:
-                    error:
-                      code: invalid_parameters
-                      message: Request parameters do not match the approved parameters
-                      retryable: false
-                      details:
-                        expected_hash: ba0617b2334170cb...
-                        computed_hash: c7d8e9f0a1b2c3d4...
-                      trace_id: trace_xyz789
-                token_already_used:
-                  summary: Token has already been consumed
-                  value:
-                    error:
-                      code: token_already_used
-                      message: Token has already been consumed
-                      retryable: false
-                      details:
-                        jti: tok_unique123
-                        used_at: '2026-02-11T13:21:00Z'
-                      trace_id: trace_xyz789
                 standing_approval_exhausted:
                   summary: Standing approval execution count exceeded
                   value:
@@ -3292,7 +3366,7 @@ paths:
                         hint: Use POST /v1/approvals/request for one-off approval
                       trace_id: trace_xyz789
         '409':
-          description: Duplicate request_id (standing approval mode only)
+          description: Duplicate request_id
           content:
             application/json:
               schema:
@@ -5213,97 +5287,6 @@ components:
         - `exp` (integer): Token expiration (Unix timestamp)
         - `aud` (string): `authenticated`
         - `role` (string): `authenticated`
-    BearerToken:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: |
-        JWT Bearer token issued by Permission Slip after approval verification. Used in the `POST /v1/actions/execute` endpoint.
-
-        ## Token Structure
-
-        Single-use JWT token issued after approval. Contains:
-
-        ### Header
-
-        ```json
-        {
-          "alg": "ES256",
-          "typ": "JWT",
-          "kid": "key-2026-01"
-        }
-        ```
-
-        ### Payload Claims
-
-        - `sub` (string): Agent ID
-        - `aud` (string): `permissionslip.dev`
-        - `approver` (string): Username who approved
-        - `approval_id` (string): Approval request ID
-        - `scope` (string): Action type (e.g., `email.send`)
-        - `scope_version` (string): Action version (e.g., `"1"`)
-        - `params_hash` (string): SHA-256 hash of JCS-canonicalized action parameters
-        - `iat` (integer): Issued at (Unix timestamp)
-        - `exp` (integer): Expires at (Unix timestamp)
-        - `jti` (string): Unique token ID (for single-use enforcement)
-
-        ### Example Payload
-
-        ```json
-        {
-          "sub": "42",
-          "aud": "permissionslip.dev",
-          "approver": "alice",
-          "approval_id": "appr_xyz789",
-          "scope": "email.send",
-          "scope_version": "1",
-          "params_hash": "ba0617b2334170cb936916db202400300a1fdc1fe71e36b911d08b2519f3d68c",
-          "iat": 1770816045,
-          "exp": 1770816345,
-          "jti": "tok_unique123"
-        }
-        ```
-
-        ## Usage
-
-        Tokens are passed in the `token` field of `POST /v1/actions/execute`:
-
-        ```http
-        POST https://app.permissionslip.dev/v1/actions/execute
-        X-Permission-Slip-Signature: agent_id="...", algorithm="Ed25519", ...
-        Content-Type: application/json
-
-        {
-          "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...",
-          "action_id": "email.send",
-          "parameters": {
-            "from": "alice@example.com",
-            "to": ["bob@example.com"],
-            "subject": "Hello",
-            "body": "Message body"
-          }
-        }
-        ```
-
-        Permission Slip validates the token and executes the action using stored credentials.
-
-        ## Token Verification (Permission Slip)
-
-        Permission Slip verifies:
-
-        1. **JWT Signature**: Token was issued by Permission Slip
-        2. **Expiration**: `exp` claim not exceeded
-        3. **Audience**: `aud` is `permissionslip.dev`
-        4. **Scope**: Matches the `action_id` in the execute request
-        5. **Parameters Hash**: Request parameters match `params_hash` claim
-        6. **Single-Use**: `jti` not already consumed (atomic check-and-set)
-
-        ## Token Lifecycle
-
-        - **Expiration**: Typically 5 minutes
-        - **Single-Use**: Token invalidated after first successful use
-        - **No Refresh**: Protocol does not support token refresh
-        - **Retry Guidance**: Use token immediately; request new approval if expired
   schemas:
     RegisterAgentRequest:
       type: object
@@ -5493,7 +5476,7 @@ components:
           description: |
             Unique request identifier for replay protection and idempotency. UUID v4 recommended.
 
-            Permission Slip tracks this value within the timestamp window (300 seconds) and rejects 
+            Permission Slip tracks this value within the timestamp window (300 seconds) and rejects
             duplicate requests with `409 Conflict` error code `duplicate_request_id`.
           example: a925fbe0-db83-4969-9dc5-27f40385f12c
         approver:
@@ -5557,6 +5540,10 @@ components:
             recipient_count: 1
     ApprovalRequestResponse:
       type: object
+      description: |
+        Response after submitting an approval request. The agent should use the `approval_id`
+        to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
+        or listen for real-time updates via `GET /v1/approvals/events` (SSE).
       required:
         - approval_id
         - approval_url
@@ -5569,7 +5556,7 @@ components:
           maxLength: 70
           description: |
             Unique approval identifier assigned by Permission Slip. Used to reference this approval
-            in subsequent operations (cancel, poll status).
+            in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
           example: appr_xyz789
         approval_url:
           type: string
@@ -5706,6 +5693,17 @@ components:
           format: date-time
           description: When the approval request was created
           example: '2026-02-11T13:20:00Z'
+        execution_status:
+          allOf:
+            - $ref: '#/components/schemas/ExecutionStatus'
+            - nullable: true
+              description: |
+                Status of the action execution. Only present when status is `approved`.
+                Null for pending, denied, or cancelled approvals.
+        execution_result:
+          $ref: '#/components/schemas/ExecutionResult'
+        executed_at:
+          $ref: '#/components/schemas/ExecutedAt'
     ApprovalListResponse:
       type: object
       description: Paginated list of approval requests.
@@ -5734,6 +5732,7 @@ components:
         - approval_id
         - status
         - approved_at
+        - execution_status
       properties:
         approval_id:
           type: string
@@ -5750,6 +5749,10 @@ components:
           format: date-time
           description: When the approval was approved
           example: '2026-02-21T10:30:00Z'
+        execution_status:
+          $ref: '#/components/schemas/ExecutionStatus'
+        execution_result:
+          $ref: '#/components/schemas/ExecutionResult'
     DenyApprovalResponse:
       type: object
       required:
@@ -5772,6 +5775,61 @@ components:
           format: date-time
           description: When the approval was denied
           example: '2026-02-21T10:30:00Z'
+    ApprovalStatusResponse:
+      type: object
+      description: |
+        Response for agent polling of approval status and execution result.
+        Agents use this to check whether their approval has been resolved and,
+        if approved, to retrieve the execution result.
+      required:
+        - approval_id
+        - status
+      properties:
+        approval_id:
+          type: string
+          description: Unique approval identifier
+          example: appr_xyz789
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - denied
+            - cancelled
+          description: Current status of the approval request.
+          example: approved
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the approval was approved (null if not yet approved)
+          example: '2026-02-21T10:30:00Z'
+        denied_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the approval was denied (null if not denied)
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the approval was cancelled (null if not cancelled)
+        expires_at:
+          type: string
+          format: date-time
+          description: When the approval expires
+          example: '2026-02-21T10:35:00Z'
+        execution_status:
+          allOf:
+            - $ref: '#/components/schemas/ExecutionStatus'
+            - nullable: true
+              description: |
+                Status of the action execution. Only present when approval status is `approved`.
+                Null when the approval has not been approved yet.
+        execution_result:
+          $ref: '#/components/schemas/ExecutionResult'
+        executed_at:
+          $ref: '#/components/schemas/ExecutedAt'
     ActionConfigTemplate:
       type: object
       required:
@@ -6148,147 +6206,23 @@ components:
         id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         deleted_at: '2026-02-25T15:00:00Z'
     ExecuteActionRequest:
-      description: |
-        Execute an action via Permission Slip. Supports two authorization modes:
-
-        - **One-off (token-based):** Include the `token` field with a single-use JWT from the approval flow.
-        - **Standing approval (signature-based):** Omit the `token` field and include the `action` object.
-          Permission Slip matches an active standing approval for the agent + action type + constraints.
-
-        Permission Slip determines the mode by the presence of the `token` field. If `token` is present
-        and non-empty, one-off token verification is used. If `token` is absent, standing approval
-        matching is attempted using the agent signature.
-      oneOf:
-        - $ref: '#/components/schemas/ExecuteActionTokenRequest'
+      allOf:
         - $ref: '#/components/schemas/StandingApprovalExecuteRequest'
-      discriminator:
-        propertyName: token
-    ExecuteActionTokenRequest:
-      type: object
-      description: |
-        One-off approval execution request. The agent redeems a single-use token from the
-        approval flow to execute the approved action.
-      required:
-        - token
-        - action_id
-        - parameters
-      properties:
-        token:
-          type: string
-          maxLength: 4096
-          description: |
-            Single-use token issued after the user approved the action. This token authorizes
-            Permission Slip to execute the action on behalf of the user.
+        - description: |
+            Execute an action via Permission Slip using a standing approval.
 
-            **Lifecycle**:
-            - Single-use: consumed after successful execution
-            - Short-lived: typically expires 5 minutes after issuance
-            - Scoped: bound to the specific action type and parameters that were approved
-          example: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImFwcHJvdmFsX2lkIjoiYXBwcl94eXo3ODkiLCJzY29wZSI6ImVtYWlsLnNlbmQifQ.signature
-        action_id:
-          type: string
-          maxLength: 128
-          description: |
-            The action type to execute. Must match the action type that was approved.
+            The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
+            Permission Slip matches an active standing approval for the agent + action type + constraints
+            and executes the action using the user's stored credentials.
 
-            Permission Slip verifies this matches the `scope` claim in the approval token. 
-            If mismatch, returns `403 Forbidden` with error code `insufficient_scope`.
-
-            Examples: `email.send`, `flight.book`, `payment.charge`
-          example: email.send
-        parameters:
-          type: object
-          additionalProperties: true
-          description: |
-            Action-specific parameters. Must match the parameters that were approved — 
-            Permission Slip verifies the parameter hash matches the `params_hash` claim 
-            in the approval token.
-
-            The structure of parameters depends on the action type. See the connector 
-            documentation (`GET /v1/connectors/{id}`) for parameter schemas per action.
-
-            **Security**: Parameters are hashed (SHA-256 of JCS-canonicalized JSON) and compared 
-            against the token's `params_hash` claim. Any modification after approval is rejected.
-          example:
-            from: alice@example.com
-            to:
-              - bob@example.com
-            subject: Meeting tomorrow
-            body: Let's meet at 3pm.
-      example:
-        token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
-        action_id: email.send
-        parameters:
-          from: alice@example.com
-          to:
-            - bob@example.com
-          subject: Meeting tomorrow
-          body: Let's meet at 3pm.
+            One-off approvals are executed directly when the user approves — agents receive results
+            via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
     ExecuteActionResponse:
-      description: |
-        Response from executing an action. The shape depends on the authorization mode:
-
-        - **One-off (token-based):** Returns `ExecuteActionTokenResponse` with `status`, `action_id`,
-          `executed_at`, and `result`.
-        - **Standing approval:** Returns `StandingApprovalExecuteResponse` with `result`,
-          `standing_approval_id`, and `executions_remaining`.
-      oneOf:
-        - $ref: '#/components/schemas/ExecuteActionTokenResponse'
+      allOf:
         - $ref: '#/components/schemas/StandingApprovalExecuteResponse'
-    ExecuteActionTokenResponse:
-      type: object
-      description: |
-        Response from executing an action via the one-off (token-based) approval flow.
-      required:
-        - status
-        - action_id
-        - executed_at
-      properties:
-        status:
-          type: string
-          enum:
-            - success
-            - partial
-          description: |
-            Execution status.
-
-            - **success**: Action executed successfully via the external service API
-            - **partial**: Action partially completed (e.g., some recipients failed)
-          example: success
-        action_id:
-          type: string
-          maxLength: 128
-          description: |
-            The action type that was executed (echoed from request).
-          example: email.send
-        executed_at:
-          type: string
-          format: date-time
-          description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when the action was executed against 
-            the external service.
-          example: '2026-02-11T13:21:00Z'
-        result:
-          type: object
-          additionalProperties: true
-          description: |
-            Action-specific result data returned from the external service. The structure 
-            varies by action type.
-
-            Examples:
-            - `email.send`: `{ "message_id": "msg_abc123" }`
-            - `flight.book`: `{ "confirmation_number": "ABC123", "total": "$347.00" }`
-            - `payment.charge`: `{ "charge_id": "ch_xyz789", "receipt_url": "https://..." }`
-          example:
-            message_id: msg_abc123
-            delivery_status: queued
-      example:
-        status: success
-        action_id: email.send
-        executed_at: '2026-02-11T13:21:00Z'
-        result:
-          message_id: msg_abc123
-          delivery_status: queued
+        - description: |
+            Response from executing an action via a standing approval. Returns the action result,
+            the standing approval that authorized execution, and the remaining execution count.
     StoreCredentialRequest:
       type: object
       required:
@@ -9225,12 +9159,12 @@ components:
           description: |
             Action-specific parameters. Structure is defined by the action type and version.
 
-            Permission Slip validates parameters against the expected schema for the action type. 
-            The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and 
-            included in approval tokens as `params_hash` to prevent parameter tampering.
+            Permission Slip validates parameters against the expected schema for the action type.
+            The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and
+            stored with the approval to prevent parameter tampering.
 
-            **Security**: Permission Slip verifies that request parameters match the params_hash 
-            in the approval token before executing actions.
+            **Security**: Permission Slip verifies that request parameters match the stored
+            params_hash before executing actions.
           example:
             from: alice@example.com
             to:
@@ -9294,87 +9228,6 @@ components:
         details:
           recipient_count: 1
           estimated_time: 5 minutes
-    ApprovalToken:
-      type: object
-      required:
-        - access_token
-        - expires_at
-        - scope
-        - scope_version
-      properties:
-        access_token:
-          type: string
-          format: jwt
-          description: |
-            Single-use JWT bearer token for executing the approved action. The token is signed 
-            by Permission Slip using ES256 (ECDSA P-256).
-
-            ## Token Structure
-
-            ### Header
-            ```json
-            {
-              "alg": "ES256",
-              "typ": "JWT",
-              "kid": "key-2026-01"
-            }
-            ```
-
-            ### Payload
-            - `sub` (string): Agent ID
-            - `aud` (string): `permissionslip.dev`
-            - `approver` (string): Username who approved
-            - `approval_id` (string): Approval request ID
-            - `scope` (string): Action type (e.g., `email.send`)
-            - `scope_version` (string): Action version (e.g., `"1"`)
-            - `params_hash` (string): SHA-256 hash of JCS-canonicalized parameters
-            - `iat` (integer): Issued at (Unix timestamp)
-            - `exp` (integer): Expires at (Unix timestamp)
-            - `jti` (string): Unique token ID (for single-use enforcement)
-
-            ## Usage
-
-            Pass this token in the `token` field when calling `POST /v1/actions/execute`. 
-            Permission Slip validates the token and executes the approved action using the 
-            user's stored credentials.
-
-            ## Token Lifecycle
-
-            - **Single-use**: Consumed after first successful use (enforced via `jti` claim)
-            - **Expiration**: Typically 5 minutes (matches approval TTL)
-            - **No refresh**: Protocol does not support token refresh
-            - **Retry guidance**: Use immediately; request new approval if expired or already used
-          example: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImF1ZCI6InBlcm1pc3Npb25zbGlwLmRldiIsImFwcHJvdmVyIjoiYWxpY2UiLCJhcHByb3ZhbF9pZCI6ImFwcHJfeHl6Nzg5Iiwic2NvcGUiOiJlbWFpbC5zZW5kIiwic2NvcGVfdmVyc2lvbiI6IjEiLCJwYXJhbXNfaGFzaCI6ImJhMDYxN2IyMzM0MTcwY2I5MzY5MTZkYjIwMjQwMDMwMGExZmRjMWZlNzFlMzZiOTExZDA4YjI1MTlmM2Q2OGMiLCJpYXQiOjE3NzA4MTYwNDUsImV4cCI6MTc3MDgxNjM0NSwianRpIjoidG9rX3VuaXF1ZTEyMyJ9.signature
-        expires_at:
-          type: string
-          format: date-time
-          description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when the token expires. After this time, 
-            the token is invalid and services will reject it with `401 Unauthorized` error code 
-            `invalid_token`.
-
-            Typically matches the approval request expiration (5 minutes from approval time).
-          example: '2026-02-11T13:25:45Z'
-        scope:
-          type: string
-          maxLength: 128
-          description: |
-            Action type this token authorizes. Must match the `type` from the approval request.
-            Permission Slip verifies this matches the `action_id` in the execute request.
-          example: email.send
-        scope_version:
-          type: string
-          pattern: ^\d+$
-          maxLength: 10
-          description: |
-            Action type version this token authorizes. Must match the `version` from the approval 
-            request.
-          example: '1'
-      example:
-        access_token: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
-        expires_at: '2026-02-11T13:25:45Z'
-        scope: email.send
-        scope_version: '1'
     AlternativeUrls:
       type: object
       description: |
@@ -9401,6 +9254,40 @@ components:
       example:
         deeplink: permissionslip://permission-slip/approve?token=eyJ...
         web: https://accounts.permissionslip.dev/permission-slip/approve?token=eyJ...
+    ExecutionStatus:
+      type: string
+      enum:
+        - pending
+        - success
+        - partial
+        - error
+      description: |
+        Status of the action execution.
+
+        - **pending**: Execution is still in progress
+        - **success**: Action executed successfully via the external service
+        - **partial**: Action partially completed (e.g., some recipients failed)
+        - **error**: Action execution failed
+      example: success
+    ExecutionResult:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: |
+        Result data from executing the action. Structure varies by action type.
+        May be null if execution is still pending or if an error occurred.
+
+        On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
+        On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
+      example:
+        message_id: msg_abc123
+        delivery_status: queued
+    ExecutedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the action was executed (null if not yet executed)
+      example: '2026-02-21T10:30:01Z'
     Error:
       type: object
       required:

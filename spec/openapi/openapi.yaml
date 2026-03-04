@@ -19,7 +19,6 @@ info:
     - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
     - **Registration**: One-time setup where agent proves identity via public key
     - **Approval Request**: Async request for permission to execute a specific action
-    - **Token**: Single-use credential issued after one-off approval, used to execute the approved action
     - **Standing Approval**: Pre-authorized, constraint-scoped grant that lets an agent execute an action repeatedly without per-request approval
 
     ## Authentication
@@ -41,8 +40,8 @@ info:
     3. **Store Credentials** *(if needed)*: User connects external accounts and stores credentials in Permission Slip's vault using the credential management endpoints
     4. **Submit Action**: Agent submits a structured action (e.g., `email.send` with parameters)
     5. **User Approval**: Approver reviews the action in a human-readable format and approves/denies
-    6. **Verify & Get Token**: Agent submits confirmation code, receives single-use token
-    7. **Execute Action**: Agent calls `POST /v1/actions/execute` with the token — Permission Slip calls the external API using stored credentials
+    6. **Direct Execution**: On approval, Permission Slip immediately executes the action via the connector
+    7. **Poll for Result**: Agent calls `GET /v1/approvals/{approval_id}/status` to get the execution result
 
     ### Standing Approval (pre-authorized)
 
@@ -174,6 +173,9 @@ paths:
   /v1/approvals/{approval_id}/deny:
     $ref: './components/paths/approvals.yaml#/denyApproval'
 
+  /v1/approvals/{approval_id}/status:
+    $ref: './components/paths/approvals.yaml#/approvalStatus'
+
   /v1/action-config-templates:
     $ref: './components/paths/action_config_templates.yaml#/actionConfigTemplates'
 
@@ -298,6 +300,8 @@ components:
       $ref: './components/schemas/approvals.yaml#/ApproveApprovalResponse'
     DenyApprovalResponse:
       $ref: './components/schemas/approvals.yaml#/DenyApprovalResponse'
+    ApprovalStatusResponse:
+      $ref: './components/schemas/approvals.yaml#/ApprovalStatusResponse'
 
     # Action Configuration Templates
     ActionConfigTemplate:
@@ -320,12 +324,8 @@ components:
     # Actions
     ExecuteActionRequest:
       $ref: './components/schemas/actions.yaml#/ExecuteActionRequest'
-    ExecuteActionTokenRequest:
-      $ref: './components/schemas/actions.yaml#/ExecuteActionTokenRequest'
     ExecuteActionResponse:
       $ref: './components/schemas/actions.yaml#/ExecuteActionResponse'
-    ExecuteActionTokenResponse:
-      $ref: './components/schemas/actions.yaml#/ExecuteActionTokenResponse'
     
     # Credentials
     StoreCredentialRequest:
@@ -524,10 +524,14 @@ components:
       $ref: './components/schemas/shared.yaml#/Action'
     ActionContext:
       $ref: './components/schemas/shared.yaml#/ActionContext'
-    ApprovalToken:
-      $ref: './components/schemas/shared.yaml#/ApprovalToken'
     AlternativeUrls:
       $ref: './components/schemas/shared.yaml#/AlternativeUrls'
+    ExecutionStatus:
+      $ref: './components/schemas/shared.yaml#/ExecutionStatus'
+    ExecutionResult:
+      $ref: './components/schemas/shared.yaml#/ExecutionResult'
+    ExecutedAt:
+      $ref: './components/schemas/shared.yaml#/ExecutedAt'
     Error:
       $ref: './components/schemas/errors.yaml#/Error'
     ErrorResponse:
