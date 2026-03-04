@@ -10,9 +10,11 @@
  * Should be called once in the authenticated app shell (e.g. AppContent).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { NotificationResponse } from "expo-notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "./useNotifications";
 import { useRegisterPushToken, unregisterPushTokenDirect } from "./useRegisterPushToken";
+import { useNotificationNavigation } from "./useNotificationNavigation";
 import { useAuth } from "../auth/AuthContext";
 
 /** Maximum number of retry attempts for token registration. */
@@ -34,13 +36,26 @@ export function usePushSetup() {
     queryClient.invalidateQueries({ queryKey: ["approvals"] });
   }, [queryClient]);
 
+  // Navigate to the approval detail screen when the user taps a notification.
+  // Also invalidate the cache so the list is fresh when the user navigates back.
+  const { handleNotificationTap: navigateOnTap } = useNotificationNavigation();
+  const onNotificationTap = useCallback(
+    (response: NotificationResponse) => {
+      queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      navigateOnTap(response);
+    },
+    [queryClient, navigateOnTap],
+  );
+
   const {
     expoPushToken,
     permissionGranted,
     error: notificationError,
     registerForPushNotifications,
-    lastNotificationResponse,
-  } = useNotifications({ onNotificationReceived });
+  } = useNotifications({
+    onNotificationReceived,
+    onNotificationTap,
+  });
   const { registerToken } = useRegisterPushToken();
 
   // Track the token we last sent to the backend so we can unregister on logout
@@ -157,7 +172,6 @@ export function usePushSetup() {
   }, [authStatus]);
 
   return {
-    lastNotificationResponse,
     expoPushToken,
     permissionGranted,
     notificationError,
