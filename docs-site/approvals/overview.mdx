@@ -17,7 +17,7 @@ The default flow. An agent submits a request, you review it, and you decide. Eac
 1. Agent submits request → you get notified.
 2. You review the action type, parameters, and risk level.
 3. You approve or deny.
-4. If approved, the agent receives a confirmation code and can execute the action.
+4. If approved, Permission Slip executes the action immediately via the connector and the agent receives the result.
 
 ### Standing Approvals
 
@@ -35,7 +35,7 @@ Pre-authorizations for repeated actions. Instead of reviewing the same type of r
 | State | Description |
 |-------|-------------|
 | **Pending** | Awaiting your review. Has a countdown timer. |
-| **Approved** | You approved the request. Agent can verify and execute. |
+| **Approved** | You approved the request. Action is executed automatically. |
 | **Denied** | You denied the request. Agent is notified. |
 | **Cancelled** | Agent cancelled the request before you reviewed it. |
 
@@ -47,10 +47,6 @@ Every approval request includes a risk level set by the agent:
 - **Medium** — actions that modify data. Displayed with a yellow badge.
 - **High** — sensitive actions like financial transactions or data deletion. Displayed with a red badge and a prominent warning.
 
-## Confirmation Codes
+## Direct Execution
 
-After you approve a request, Permission Slip generates a 6-character confirmation code (format: `ABC-DEF`). This code is displayed on screen and can be copied. The agent uses this code to verify the approval and receive a single-use execution token.
-
-<Info>
-  Confirmation codes use an unambiguous character set — no `0/O` or `1/I` confusion. The agent has up to 5 attempts to submit the correct code.
-</Info>
+When you approve a request, Permission Slip immediately executes the action via the appropriate connector using your stored credentials. The execution result (success or failure) is recorded on the approval and visible in the dashboard. The agent can poll for the result or receive it via the real-time events stream.
