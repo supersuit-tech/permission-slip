@@ -9,17 +9,25 @@
  *
  * Should be called once in the authenticated app shell (e.g. AppContent).
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "./useNotifications";
-import { useRegisterPushToken } from "./useRegisterPushToken";
+import { useRegisterPushToken, unregisterPushTokenDirect } from "./useRegisterPushToken";
 import { useNotificationNavigation } from "./useNotificationNavigation";
 import { useAuth } from "../auth/AuthContext";
-import client from "../api/client";
+
+/** Maximum number of retry attempts for token registration. */
+const MAX_RETRIES = 3;
+
+/** Returns the delay in ms for the given retry attempt (exponential backoff). */
+function retryDelay(attempt: number): number {
+  return Math.min(1000 * Math.pow(2, attempt), 8000);
+}
 
 export function usePushSetup() {
   const { authStatus, session } = useAuth();
   const queryClient = useQueryClient();
+  const [isTokenRegistered, setIsTokenRegistered] = useState(false);
 
   // When a notification arrives in the foreground, invalidate the approvals
   // cache so the list updates immediately without waiting for the next poll.
@@ -45,6 +53,9 @@ export function usePushSetup() {
   // Track the token we last sent to the backend so we can unregister on logout
   const registeredTokenRef = useRef<string | null>(null);
 
+  // Track active retry timeout so we can cancel on unmount or auth change
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Capture the access token while authenticated so we can use it for
   // unregistration after sign-out. By the time authStatus transitions to
   // "unauthenticated", the session is already null — the mutation hook's
@@ -59,23 +70,72 @@ export function usePushSetup() {
   // When authenticated, request permissions and get the push token
   useEffect(() => {
     if (authStatus === "authenticated") {
+      if (__DEV__) {
+        console.log("[push] Authenticated — requesting push permissions");
+      }
       registerForPushNotifications();
     }
   }, [authStatus, registerForPushNotifications]);
 
-  // When we have a token and are authenticated, register it with the backend
+  // When we have a token and are authenticated, register it with the backend.
+  // Retries with exponential backoff on failure (up to MAX_RETRIES attempts).
   useEffect(() => {
     if (authStatus !== "authenticated" || !expoPushToken) return;
     if (registeredTokenRef.current === expoPushToken) return; // already registered
 
-    registerToken(expoPushToken)
-      .then(() => {
-        registeredTokenRef.current = expoPushToken;
-      })
-      .catch(() => {
-        // Registration is best-effort; the user can still use the app.
-        // The hook will retry on next mount or auth change.
-      });
+    // Capture in a local const so the async function doesn't need a non-null
+    // assertion — the effect guard above already checked expoPushToken != null.
+    const token = expoPushToken;
+    let cancelled = false;
+
+    async function attemptRegistration(attempt: number) {
+      if (cancelled) return;
+
+      try {
+        await registerToken(token);
+        if (cancelled) return;
+        registeredTokenRef.current = token;
+        setIsTokenRegistered(true);
+        if (__DEV__) {
+          console.log("[push] Token registered with backend");
+        }
+      } catch (err) {
+        if (cancelled) return;
+
+        if (__DEV__) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[push] Registration attempt ${attempt + 1}/${MAX_RETRIES + 1} failed: ${msg}`,
+          );
+        }
+
+        if (attempt < MAX_RETRIES) {
+          const delay = retryDelay(attempt);
+          if (__DEV__) {
+            console.log(`[push] Retrying in ${delay}ms...`);
+          }
+          retryTimerRef.current = setTimeout(
+            () => attemptRegistration(attempt + 1),
+            delay,
+          );
+        } else if (__DEV__) {
+          console.warn(
+            "[push] All registration attempts exhausted. " +
+              "Will retry on next app launch or auth change.",
+          );
+        }
+      }
+    }
+
+    attemptRegistration(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, [authStatus, expoPushToken, registerToken]);
 
   // On sign-out, unregister the token from the backend using the captured
@@ -86,16 +146,19 @@ export function usePushSetup() {
       const accessToken = lastAccessTokenRef.current;
       registeredTokenRef.current = null;
       lastAccessTokenRef.current = null;
+      setIsTokenRegistered(false);
+
+      // Cancel any in-flight retry
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
 
       if (accessToken) {
-        client
-          .POST("/v1/push-subscriptions/unregister", {
-            headers: { Authorization: `Bearer ${accessToken}` },
-            body: { expo_token: pushToken },
-          })
-          .catch(() => {
-            // Best-effort cleanup. The backend will eventually prune stale tokens.
-          });
+        if (__DEV__) {
+          console.log("[push] Signed out — unregistering token from backend");
+        }
+        unregisterPushTokenDirect(pushToken, accessToken);
       }
     }
   }, [authStatus]);
@@ -105,5 +168,7 @@ export function usePushSetup() {
     expoPushToken,
     permissionGranted,
     notificationError,
+    /** Whether the push token has been successfully registered with the backend. */
+    isTokenRegistered,
   };
 }

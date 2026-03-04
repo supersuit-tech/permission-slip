@@ -243,7 +243,7 @@ The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin cl
 
 **Current capabilities:** login, browse pending/approved/denied requests, view full request details (action parameters, risk level, agent info, expiry countdown), approve with confirmation code display (copyable `XXX-XXX` format), deny with confirmation, and push notifications for new approval requests.
 
-**Push notifications:** The app uses `expo-notifications` to request push permissions, retrieve the Expo push token, and register it with the backend on login. Notifications are delivered via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/). Push notifications require a physical device (not simulators). On Android, a dedicated "Approval Requests" notification channel is created for user-configurable notification preferences.
+**Push notifications:** The app uses `expo-notifications` to request push permissions, retrieve the Expo push token, and register it with the backend on login. Token registration retries automatically with exponential backoff (up to 3 retries) on transient failures. On logout, the token is unregistered from the backend for clean session separation. Notifications are delivered via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/). Push notifications require a physical device (not simulators). On Android, a dedicated "Approval Requests" notification channel is created for user-configurable notification preferences. Enable `__DEV__` logging (automatic in development builds) to trace the full push token lifecycle in the console.
 
 ```bash
 make mobile-install    # install mobile dependencies

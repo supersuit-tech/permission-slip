@@ -55,12 +55,12 @@ Action:
       description: |
         Action-specific parameters. Structure is defined by the action type and version.
         
-        Permission Slip validates parameters against the expected schema for the action type. 
-        The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and 
-        included in approval tokens as `params_hash` to prevent parameter tampering.
-        
-        **Security**: Permission Slip verifies that request parameters match the params_hash 
-        in the approval token before executing actions.
+        Permission Slip validates parameters against the expected schema for the action type.
+        The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and
+        stored with the approval to prevent parameter tampering.
+
+        **Security**: Permission Slip verifies that request parameters match the stored
+        params_hash before executing actions.
       example:
         from: "alice@example.com"
         to:
@@ -130,92 +130,6 @@ ActionContext:
       recipient_count: 1
       estimated_time: "5 minutes"
 
-ApprovalToken:
-  type: object
-  required:
-    - access_token
-    - expires_at
-    - scope
-    - scope_version
-  properties:
-    access_token:
-      type: string
-      format: jwt
-      description: |
-        Single-use JWT bearer token for executing the approved action. The token is signed 
-        by Permission Slip using ES256 (ECDSA P-256).
-        
-        ## Token Structure
-        
-        ### Header
-        ```json
-        {
-          "alg": "ES256",
-          "typ": "JWT",
-          "kid": "key-2026-01"
-        }
-        ```
-        
-        ### Payload
-        - `sub` (string): Agent ID
-        - `aud` (string): `permissionslip.dev`
-        - `approver` (string): Username who approved
-        - `approval_id` (string): Approval request ID
-        - `scope` (string): Action type (e.g., `email.send`)
-        - `scope_version` (string): Action version (e.g., `"1"`)
-        - `params_hash` (string): SHA-256 hash of JCS-canonicalized parameters
-        - `iat` (integer): Issued at (Unix timestamp)
-        - `exp` (integer): Expires at (Unix timestamp)
-        - `jti` (string): Unique token ID (for single-use enforcement)
-        
-        ## Usage
-        
-        Pass this token in the `token` field when calling `POST /v1/actions/execute`. 
-        Permission Slip validates the token and executes the approved action using the 
-        user's stored credentials.
-        
-        ## Token Lifecycle
-        
-        - **Single-use**: Consumed after first successful use (enforced via `jti` claim)
-        - **Expiration**: Typically 5 minutes (matches approval TTL)
-        - **No refresh**: Protocol does not support token refresh
-        - **Retry guidance**: Use immediately; request new approval if expired or already used
-      example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImF1ZCI6InBlcm1pc3Npb25zbGlwLmRldiIsImFwcHJvdmVyIjoiYWxpY2UiLCJhcHByb3ZhbF9pZCI6ImFwcHJfeHl6Nzg5Iiwic2NvcGUiOiJlbWFpbC5zZW5kIiwic2NvcGVfdmVyc2lvbiI6IjEiLCJwYXJhbXNfaGFzaCI6ImJhMDYxN2IyMzM0MTcwY2I5MzY5MTZkYjIwMjQwMDMwMGExZmRjMWZlNzFlMzZiOTExZDA4YjI1MTlmM2Q2OGMiLCJpYXQiOjE3NzA4MTYwNDUsImV4cCI6MTc3MDgxNjM0NSwianRpIjoidG9rX3VuaXF1ZTEyMyJ9.signature"
-    
-    expires_at:
-      type: string
-      format: date-time
-      description: |
-        ISO 8601 timestamp (RFC 3339 format, UTC) when the token expires. After this time, 
-        the token is invalid and services will reject it with `401 Unauthorized` error code 
-        `invalid_token`.
-        
-        Typically matches the approval request expiration (5 minutes from approval time).
-      example: "2026-02-11T13:25:45Z"
-    
-    scope:
-      type: string
-      maxLength: 128
-      description: |
-        Action type this token authorizes. Must match the `type` from the approval request.
-        Permission Slip verifies this matches the `action_id` in the execute request.
-      example: "email.send"
-    
-    scope_version:
-      type: string
-      pattern: '^\d+$'
-      maxLength: 10
-      description: |
-        Action type version this token authorizes. Must match the `version` from the approval 
-        request.
-      example: "1"
-  
-  example:
-    access_token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
-    expires_at: "2026-02-11T13:25:45Z"
-    scope: "email.send"
-    scope_version: "1"
-
 AlternativeUrls:
   type: object
   description: |
@@ -244,3 +158,42 @@ AlternativeUrls:
   example:
     deeplink: "permissionslip://permission-slip/approve?token=eyJ..."
     web: "https://accounts.permissionslip.dev/permission-slip/approve?token=eyJ..."
+
+# Shared execution result fields used by ApproveApprovalResponse,
+# ApprovalStatusResponse, and ApprovalSummary.
+ExecutionStatus:
+  type: string
+  enum:
+    - pending
+    - success
+    - partial
+    - error
+  description: |
+    Status of the action execution.
+
+    - **pending**: Execution is still in progress
+    - **success**: Action executed successfully via the external service
+    - **partial**: Action partially completed (e.g., some recipients failed)
+    - **error**: Action execution failed
+  example: "success"
+
+ExecutionResult:
+  type: object
+  additionalProperties: true
+  nullable: true
+  description: |
+    Result data from executing the action. Structure varies by action type.
+    May be null if execution is still pending or if an error occurred.
+
+    On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
+    On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
+  example:
+    message_id: "msg_abc123"
+    delivery_status: "queued"
+
+ExecutedAt:
+  type: string
+  format: date-time
+  nullable: true
+  description: When the action was executed (null if not yet executed)
+  example: "2026-02-21T10:30:01Z"
