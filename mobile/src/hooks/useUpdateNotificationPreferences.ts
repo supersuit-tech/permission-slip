@@ -3,6 +3,7 @@
  * Accepts an array of channel/enabled pairs — channels not included are
  * left unchanged. Invalidates the preferences cache on success.
  */
+import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
@@ -20,15 +21,21 @@ export function useUpdateNotificationPreferences() {
   const queryClient = useQueryClient();
   const userId = session?.user?.id;
 
+  // Use a ref so the mutation always reads the latest token, even if the
+  // session refreshed between render and mutation execution.
+  const tokenRef = useRef(session?.access_token);
+  tokenRef.current = session?.access_token;
+
   const mutation = useMutation({
     mutationFn: async (preferences: NotificationPreferenceUpdate[]) => {
-      if (!session?.access_token) {
+      const token = tokenRef.current;
+      if (!token) {
         throw new Error("Not authenticated");
       }
       const { data, error } = await client.PUT(
         "/v1/profile/notification-preferences",
         {
-          headers: { Authorization: `Bearer ${session.access_token}` },
+          headers: { Authorization: `Bearer ${token}` },
           body: { preferences },
         },
       );
