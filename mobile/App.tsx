@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  type AppStateStatus,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -8,11 +11,20 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { focusManager, QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { colors } from "./src/theme/colors";
+
+// Tell React Query when the app returns to the foreground so queries with
+// refetchOnWindowFocus automatically re-fetch (AppState is the RN equivalent
+// of the browser's visibilitychange event).
+function onAppStateChange(status: AppStateStatus) {
+  if (Platform.OS !== "web") {
+    focusManager.setFocused(status === "active");
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +99,12 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function App() {
+  // Subscribe to AppState changes so React Query knows when the app is focused.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", onAppStateChange);
+    return () => sub.remove();
+  }, []);
+
   // Incrementing the key re-mounts AuthProvider, which re-triggers
   // Supabase's onAuthStateChange and retries the initial session check.
   const [authKey, setAuthKey] = useState(0);

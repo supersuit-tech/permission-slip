@@ -49,6 +49,7 @@ let mockUseApprovalsReturn = {
   isRefetching: false,
   error: null as string | null,
   refetch: jest.fn(),
+  dataUpdatedAt: Date.now(),
 };
 
 jest.mock("../../../hooks/useApprovals", () => ({
@@ -115,6 +116,7 @@ describe("ApprovalListScreen", () => {
       isRefetching: false,
       error: null,
       refetch: jest.fn(),
+      dataUpdatedAt: Date.now(),
     };
   });
 
@@ -188,5 +190,47 @@ describe("ApprovalListScreen", () => {
     });
     const allText = getAllText(renderer);
     expect(allText).toContain("No pending requests");
+  });
+
+  it("shows 'Updated just now' indicator when data was recently fetched", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      dataUpdatedAt: Date.now(),
+    };
+    await act(async () => {
+      renderer = renderList();
+    });
+    const allText = getAllText(renderer);
+    expect(allText).toContain("Updated just now");
+  });
+
+  it("hides last-updated indicator while loading", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+      isLoading: true,
+      dataUpdatedAt: Date.now(),
+    };
+    await act(async () => {
+      renderer = renderList();
+    });
+    const lastUpdated = renderer.root.findAll(
+      (node) => node.props.testID === "last-updated",
+    );
+    expect(lastUpdated).toHaveLength(0);
+  });
+
+  it("hides last-updated indicator when data has never been fetched", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      dataUpdatedAt: 0,
+    };
+    await act(async () => {
+      renderer = renderList();
+    });
+    const lastUpdated = renderer.root.findAll(
+      (node) => node.props.testID === "last-updated",
+    );
+    expect(lastUpdated).toHaveLength(0);
   });
 });

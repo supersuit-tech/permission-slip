@@ -192,6 +192,20 @@ function formatValue(value: unknown): string | null {
 }
 
 /**
+ * Formats an epoch-ms timestamp as a human-friendly "last updated" string.
+ * Returns null when the timestamp is 0 (data never fetched).
+ */
+export function formatLastUpdated(epochMs: number): string | null {
+  if (epochMs === 0) return null;
+  const diffSec = Math.floor((Date.now() - epochMs) / 1_000);
+  if (diffSec < 10) return "Updated just now";
+  if (diffSec < 60) return `Updated ${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `Updated ${diffMin}m ago`;
+  return `Updated ${Math.floor(diffMin / 60)}h ago`;
+}
+
+/**
  * Formats an ISO timestamp as a relative time string for list rows.
  * Shows "Just now", "2m ago", "1h ago", or falls back to date for older items.
  */

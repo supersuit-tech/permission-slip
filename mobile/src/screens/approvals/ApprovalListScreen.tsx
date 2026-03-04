@@ -4,7 +4,7 @@
  * pull-to-refresh, loading/error/empty states, and navigation to the
  * detail screen.
  */
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +21,7 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { colors } from "../../theme/colors";
-import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime } from "./approvalUtils";
+import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
 import { useAuth } from "../../auth/AuthContext";
@@ -38,11 +38,19 @@ type Props = NativeStackScreenProps<RootStackParamList, "ApprovalList">;
 
 export default function ApprovalListScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<StatusTab>("pending");
-  const { approvals, isLoading, isRefetching, error, refetch } =
+  const { approvals, isLoading, isRefetching, error, refetch, dataUpdatedAt } =
     useApprovals(activeTab);
   const { agents } = useAgents();
   const { signOut } = useAuth();
   const insets = useSafeAreaInsets();
+
+  // Re-render the "Updated X ago" label every 15 seconds so it stays current.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
+  const lastUpdatedText = formatLastUpdated(dataUpdatedAt);
 
   const agentMap = useMemo(() => {
     const map = new Map<number, { agent_id: number; metadata?: unknown }>();
@@ -144,6 +152,14 @@ export default function ApprovalListScreen({ navigation }: Props) {
           );
         })}
       </View>
+
+      {lastUpdatedText != null && !isLoading && (
+        <View style={styles.lastUpdatedBar}>
+          <Text style={styles.lastUpdatedText} testID="last-updated">
+            {lastUpdatedText}
+          </Text>
+        </View>
+      )}
 
       {isLoading && !isRefetching ? (
         <View style={styles.center}>
@@ -345,6 +361,18 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: "700",
+  },
+  lastUpdatedBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    backgroundColor: colors.gray50,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  lastUpdatedText: {
+    fontSize: 11,
+    color: colors.gray400,
+    textAlign: "right",
   },
   center: {
     flex: 1,
