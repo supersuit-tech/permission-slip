@@ -2757,23 +2757,10 @@ paths:
                     expires_at: '2026-02-21T10:35:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Agent not authorized to view this approval
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: agent_not_authorized
-                  message: Agent is not authorized to view this approval
-                  retryable: false
-                  details:
-                    agent_id: 42
-                    approval_id: appr_xyz789
-                  trace_id: trace_xyz789
         '404':
-          description: Approval not found
+          description: |
+            Approval not found or not owned by this agent. Returns the same error
+            for both cases to prevent approval ID enumeration.
           content:
             application/json:
               schema:
