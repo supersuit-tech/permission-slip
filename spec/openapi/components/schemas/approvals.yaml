@@ -283,6 +283,7 @@ ApproveApprovalResponse:
     - approval_id
     - status
     - approved_at
+    - execution_status
   properties:
     approval_id:
       type: string
@@ -299,6 +300,113 @@ ApproveApprovalResponse:
       format: date-time
       description: When the approval was approved
       example: "2026-02-21T10:30:00Z"
+    execution_status:
+      type: string
+      enum:
+        - success
+        - partial
+        - error
+        - pending
+      description: |
+        Status of the action execution that was triggered by the approval.
+
+        - **success**: Action executed successfully via the external service
+        - **partial**: Action partially completed (e.g., some recipients failed)
+        - **error**: Action execution failed
+        - **pending**: Execution is still in progress (async)
+      example: "success"
+    execution_result:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: |
+        Result data from executing the action. Structure varies by action type.
+        May be null if execution is still pending or if an error occurred.
+
+        On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
+        On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
+      example:
+        message_id: "msg_abc123"
+        delivery_status: "queued"
+
+ApprovalStatusResponse:
+  type: object
+  description: |
+    Response for agent polling of approval status and execution result.
+    Agents use this to check whether their approval has been resolved and,
+    if approved, to retrieve the execution result.
+  required:
+    - approval_id
+    - status
+  properties:
+    approval_id:
+      type: string
+      description: Unique approval identifier
+      example: "appr_xyz789"
+    status:
+      type: string
+      enum:
+        - pending
+        - approved
+        - denied
+        - cancelled
+      description: Current status of the approval request.
+      example: "approved"
+    approved_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was approved (null if not yet approved)
+      example: "2026-02-21T10:30:00Z"
+    denied_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was denied (null if not denied)
+    cancelled_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was cancelled (null if not cancelled)
+    expires_at:
+      type: string
+      format: date-time
+      description: When the approval expires
+      example: "2026-02-21T10:35:00Z"
+    execution_status:
+      type: string
+      enum:
+        - pending
+        - success
+        - partial
+        - error
+      nullable: true
+      description: |
+        Status of the action execution. Only present when approval status is `approved`.
+
+        - **pending**: Execution is still in progress
+        - **success**: Action executed successfully
+        - **partial**: Action partially completed
+        - **error**: Action execution failed
+
+        Null when the approval has not been approved yet.
+      example: "success"
+    execution_result:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: |
+        Result data from executing the action. Only present when `execution_status`
+        is `success`, `partial`, or `error`. Structure varies by action type.
+      example:
+        message_id: "msg_abc123"
+        delivery_status: "queued"
+    executed_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the action was executed (null if not yet executed)
+      example: "2026-02-21T10:30:01Z"
 
 DenyApprovalResponse:
   type: object

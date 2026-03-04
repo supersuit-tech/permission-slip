@@ -1,152 +1,17 @@
 ExecuteActionRequest:
   description: |
-    Execute an action via Permission Slip. Supports two authorization modes:
+    Execute an action via Permission Slip using a standing approval.
 
-    - **One-off (token-based):** Include the `token` field with a single-use JWT from the approval flow.
-    - **Standing approval (signature-based):** Omit the `token` field and include the `action` object.
-      Permission Slip matches an active standing approval for the agent + action type + constraints.
+    The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
+    Permission Slip matches an active standing approval for the agent + action type + constraints
+    and executes the action using the user's stored credentials.
 
-    Permission Slip determines the mode by the presence of the `token` field. If `token` is present
-    and non-empty, one-off token verification is used. If `token` is absent, standing approval
-    matching is attempted using the agent signature.
-  oneOf:
-    - $ref: '#/ExecuteActionTokenRequest'
-    - $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteRequest'
-  discriminator:
-    propertyName: token
-
-ExecuteActionTokenRequest:
-  type: object
-  description: |
-    One-off approval execution request. The agent redeems a single-use token from the
-    approval flow to execute the approved action.
-  required:
-    - token
-    - action_id
-    - parameters
-  properties:
-    token:
-      type: string
-      maxLength: 4096
-      description: |
-        Single-use token issued after the user approved the action. This token authorizes
-        Permission Slip to execute the action on behalf of the user.
-
-        **Lifecycle**:
-        - Single-use: consumed after successful execution
-        - Short-lived: typically expires 5 minutes after issuance
-        - Scoped: bound to the specific action type and parameters that were approved
-      example: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZ2VudF94N0s5bVA0biIsImFwcHJvdmFsX2lkIjoiYXBwcl94eXo3ODkiLCJzY29wZSI6ImVtYWlsLnNlbmQifQ.signature"
-    
-    action_id:
-      type: string
-      maxLength: 128
-      description: |
-        The action type to execute. Must match the action type that was approved.
-        
-        Permission Slip verifies this matches the `scope` claim in the approval token. 
-        If mismatch, returns `403 Forbidden` with error code `insufficient_scope`.
-        
-        Examples: `email.send`, `flight.book`, `payment.charge`
-      example: "email.send"
-    
-    parameters:
-      type: object
-      additionalProperties: true
-      description: |
-        Action-specific parameters. Must match the parameters that were approved — 
-        Permission Slip verifies the parameter hash matches the `params_hash` claim 
-        in the approval token.
-        
-        The structure of parameters depends on the action type. See the connector 
-        documentation (`GET /v1/connectors/{id}`) for parameter schemas per action.
-        
-        **Security**: Parameters are hashed (SHA-256 of JCS-canonicalized JSON) and compared 
-        against the token's `params_hash` claim. Any modification after approval is rejected.
-      example:
-        from: "alice@example.com"
-        to:
-          - "bob@example.com"
-        subject: "Meeting tomorrow"
-        body: "Let's meet at 3pm."
-  
-  example:
-    token: "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..."
-    action_id: "email.send"
-    parameters:
-      from: "alice@example.com"
-      to:
-        - "bob@example.com"
-      subject: "Meeting tomorrow"
-      body: "Let's meet at 3pm."
+    One-off approvals are executed directly when the user approves — agents receive results
+    via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
+  $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteRequest'
 
 ExecuteActionResponse:
   description: |
-    Response from executing an action. The shape depends on the authorization mode:
-
-    - **One-off (token-based):** Returns `ExecuteActionTokenResponse` with `status`, `action_id`,
-      `executed_at`, and `result`.
-    - **Standing approval:** Returns `StandingApprovalExecuteResponse` with `result`,
-      `standing_approval_id`, and `executions_remaining`.
-  oneOf:
-    - $ref: '#/ExecuteActionTokenResponse'
-    - $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteResponse'
-
-ExecuteActionTokenResponse:
-  type: object
-  description: |
-    Response from executing an action via the one-off (token-based) approval flow.
-  required:
-    - status
-    - action_id
-    - executed_at
-  properties:
-    status:
-      type: string
-      enum:
-        - success
-        - partial
-      description: |
-        Execution status.
-        
-        - **success**: Action executed successfully via the external service API
-        - **partial**: Action partially completed (e.g., some recipients failed)
-      example: "success"
-    
-    action_id:
-      type: string
-      maxLength: 128
-      description: |
-        The action type that was executed (echoed from request).
-      example: "email.send"
-    
-    executed_at:
-      type: string
-      format: date-time
-      description: |
-        ISO 8601 timestamp (RFC 3339 format, UTC) when the action was executed against 
-        the external service.
-      example: "2026-02-11T13:21:00Z"
-    
-    result:
-      type: object
-      additionalProperties: true
-      description: |
-        Action-specific result data returned from the external service. The structure 
-        varies by action type.
-        
-        Examples:
-        - `email.send`: `{ "message_id": "msg_abc123" }`
-        - `flight.book`: `{ "confirmation_number": "ABC123", "total": "$347.00" }`
-        - `payment.charge`: `{ "charge_id": "ch_xyz789", "receipt_url": "https://..." }`
-      example:
-        message_id: "msg_abc123"
-        delivery_status: "queued"
-  
-  example:
-    status: "success"
-    action_id: "email.send"
-    executed_at: "2026-02-11T13:21:00Z"
-    result:
-      message_id: "msg_abc123"
-      delivery_status: "queued"
+    Response from executing an action via a standing approval. Returns the action result,
+    the standing approval that authorized execution, and the remaining execution count.
+  $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteResponse'
