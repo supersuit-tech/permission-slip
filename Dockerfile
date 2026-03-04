@@ -22,6 +22,8 @@ RUN npm ci
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ARG VITE_SENTRY_DSN
+ARG VITE_POSTHOG_KEY
+ARG VITE_POSTHOG_HOST
 
 # Sentry source-map upload (optional — skip if not set).
 # @sentry/vite-plugin reads these during the Vite build to upload maps.
