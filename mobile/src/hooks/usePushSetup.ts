@@ -14,9 +14,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "./useNotifications";
 import { useRegisterPushToken } from "./useRegisterPushToken";
 import { useAuth } from "../auth/AuthContext";
+import client from "../api/client";
 
 export function usePushSetup() {
-  const { authStatus } = useAuth();
+  const { authStatus, session } = useAuth();
   const queryClient = useQueryClient();
 
   // When a notification arrives in the foreground, invalidate the approvals
@@ -32,10 +33,21 @@ export function usePushSetup() {
     registerForPushNotifications,
     lastNotificationResponse,
   } = useNotifications({ onNotificationReceived });
-  const { registerToken, unregisterToken } = useRegisterPushToken();
+  const { registerToken } = useRegisterPushToken();
 
   // Track the token we last sent to the backend so we can unregister on logout
   const registeredTokenRef = useRef<string | null>(null);
+
+  // Capture the access token while authenticated so we can use it for
+  // unregistration after sign-out. By the time authStatus transitions to
+  // "unauthenticated", the session is already null — the mutation hook's
+  // session reference would be stale and fail with "Not authenticated".
+  const lastAccessTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (session?.access_token) {
+      lastAccessTokenRef.current = session.access_token;
+    }
+  }, [session?.access_token]);
 
   // When authenticated, request permissions and get the push token
   useEffect(() => {
@@ -59,16 +71,27 @@ export function usePushSetup() {
       });
   }, [authStatus, expoPushToken, registerToken]);
 
-  // On sign-out, unregister the token from the backend
+  // On sign-out, unregister the token from the backend using the captured
+  // access token (since session is already null at this point).
   useEffect(() => {
     if (authStatus === "unauthenticated" && registeredTokenRef.current) {
-      const token = registeredTokenRef.current;
+      const pushToken = registeredTokenRef.current;
+      const accessToken = lastAccessTokenRef.current;
       registeredTokenRef.current = null;
-      unregisterToken(token).catch(() => {
-        // Best-effort cleanup. The backend will eventually prune stale tokens.
-      });
+      lastAccessTokenRef.current = null;
+
+      if (accessToken) {
+        client
+          .POST("/v1/push-subscriptions/unregister", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: { expo_token: pushToken },
+          })
+          .catch(() => {
+            // Best-effort cleanup. The backend will eventually prune stale tokens.
+          });
+      }
     }
-  }, [authStatus, unregisterToken]);
+  }, [authStatus]);
 
   return {
     lastNotificationResponse,

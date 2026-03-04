@@ -5,11 +5,12 @@ import { create, act, type ReactTestRenderer } from "react-test-renderer";
 
 const mockRegisterForPushNotifications = jest.fn();
 const mockRegisterToken = jest.fn();
-const mockUnregisterToken = jest.fn();
 const mockInvalidateQueries = jest.fn();
+const mockClientPost = jest.fn();
 
 let mockAuthStatus = "unauthenticated";
 let mockExpoPushToken: string | null = null;
+let mockSession: { access_token: string } | null = null;
 let capturedOnNotificationReceived: ((n: unknown) => void) | undefined;
 
 jest.mock("@tanstack/react-query", () => ({
@@ -34,19 +35,21 @@ jest.mock("../useNotifications", () => ({
 jest.mock("../useRegisterPushToken", () => ({
   useRegisterPushToken: () => ({
     registerToken: mockRegisterToken,
-    unregisterToken: mockUnregisterToken,
     isRegistering: false,
-    isUnregistering: false,
     registerError: null,
-    unregisterError: null,
   }),
 }));
 
 jest.mock("../../auth/AuthContext", () => ({
   useAuth: () => ({
     authStatus: mockAuthStatus,
-    session: mockAuthStatus === "authenticated" ? { access_token: "tok" } : null,
+    session: mockSession,
   }),
+}));
+
+jest.mock("../../api/client", () => ({
+  __esModule: true,
+  default: { POST: (...args: unknown[]) => mockClientPost(...args) },
 }));
 
 import { usePushSetup } from "../usePushSetup";
@@ -68,10 +71,11 @@ describe("usePushSetup", () => {
     jest.clearAllMocks();
     mockAuthStatus = "unauthenticated";
     mockExpoPushToken = null;
+    mockSession = null;
     capturedOnNotificationReceived = undefined;
     mockRegisterForPushNotifications.mockResolvedValue(null);
     mockRegisterToken.mockResolvedValue({});
-    mockUnregisterToken.mockResolvedValue({});
+    mockClientPost.mockResolvedValue({ data: {}, error: undefined });
   });
 
   afterEach(async () => {
@@ -85,6 +89,7 @@ describe("usePushSetup", () => {
 
   it("calls registerForPushNotifications when authenticated", async () => {
     mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
     const { Consumer } = createHookCapture();
 
     await act(async () => {
@@ -107,6 +112,7 @@ describe("usePushSetup", () => {
 
   it("registers token with backend when token is available and authenticated", async () => {
     mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
     const { Consumer } = createHookCapture();
 
@@ -136,6 +142,7 @@ describe("usePushSetup", () => {
 
   it("does not crash when registerToken fails", async () => {
     mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
     mockRegisterToken.mockRejectedValue(new Error("Network error"));
     const { Consumer } = createHookCapture();
@@ -150,8 +157,9 @@ describe("usePushSetup", () => {
     });
   });
 
-  it("unregisters token on sign-out", async () => {
+  it("unregisters token on sign-out using captured access token", async () => {
     mockAuthStatus = "authenticated";
+    mockSession = { access_token: "captured-tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
     const { Consumer } = createHookCapture();
 
@@ -166,8 +174,9 @@ describe("usePushSetup", () => {
 
     expect(mockRegisterToken).toHaveBeenCalledWith("ExponentPushToken[abc]");
 
-    // Simulate sign-out by re-creating with new auth status
+    // Simulate sign-out — session is now null
     mockAuthStatus = "unauthenticated";
+    mockSession = null;
     await act(async () => {
       renderer!.update(createElement(Consumer));
     });
@@ -176,11 +185,19 @@ describe("usePushSetup", () => {
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    expect(mockUnregisterToken).toHaveBeenCalledWith("ExponentPushToken[abc]");
+    // Should use the captured token to call the API directly
+    expect(mockClientPost).toHaveBeenCalledWith(
+      "/v1/push-subscriptions/unregister",
+      {
+        headers: { Authorization: "Bearer captured-tok" },
+        body: { expo_token: "ExponentPushToken[abc]" },
+      },
+    );
   });
 
   it("invalidates approvals cache when a foreground notification is received", async () => {
     mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
     const { Consumer } = createHookCapture();
 
     await act(async () => {
@@ -195,10 +212,11 @@ describe("usePushSetup", () => {
     });
   });
 
-  it("does not crash when unregisterToken fails", async () => {
+  it("does not crash when unregister API call fails", async () => {
     mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
-    mockUnregisterToken.mockRejectedValue(new Error("Network error"));
+    mockClientPost.mockRejectedValue(new Error("Network error"));
     const { Consumer } = createHookCapture();
 
     await act(async () => {
@@ -210,6 +228,7 @@ describe("usePushSetup", () => {
     });
 
     mockAuthStatus = "unauthenticated";
+    mockSession = null;
     await act(async () => {
       renderer!.update(createElement(Consumer));
     });
