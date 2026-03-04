@@ -27,8 +27,12 @@ Permission Slip sits between your AI agents and the actions they want to take. H
   Click **Approve** to let the action proceed, or **Deny** to block it. High-risk actions are flagged with a warning so you can review them more carefully.
 </Step>
 
+<Step title="Action Executes">
+  If approved, Permission Slip immediately executes the action via the appropriate connector using your stored credentials. The result is recorded on the approval.
+</Step>
+
 <Step title="Agent Gets the Result">
-  If approved, the agent receives a confirmation code it can use to verify the approval. If denied, the agent is notified and can handle the rejection gracefully.
+  The agent polls for the approval status and receives the execution result — including the connector's response data. If denied, the agent is notified and can handle the rejection gracefully.
 </Step>
 
 </Steps>
