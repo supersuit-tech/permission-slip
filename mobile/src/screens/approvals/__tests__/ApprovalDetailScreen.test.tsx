@@ -63,6 +63,8 @@ import ApprovalDetailScreen from "../ApprovalDetailScreen";
 
 // --- Helpers ---
 
+const mockGoBack = jest.fn();
+
 function renderDetail(approval: ApprovalSummary) {
   const route = {
     params: {
@@ -72,7 +74,7 @@ function renderDetail(approval: ApprovalSummary) {
     key: "test",
     name: "ApprovalDetail" as const,
   };
-  const navigation = { goBack: jest.fn() } as any;
+  const navigation = { goBack: mockGoBack } as any;
 
   return create(
     createElement(ApprovalDetailScreen, { route, navigation } as any),
@@ -432,5 +434,58 @@ describe("ApprovalDetailScreen", () => {
     });
 
     expect(hasTestId(renderer, "done-button")).toBe(true);
+  });
+
+  it("Done button navigates back to list", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      confirmation_code: "AB3-CD5",
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    const doneButton = findFirstByTestId(renderer, "done-button");
+    await act(async () => {
+      doneButton?.props.onPress();
+    });
+
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it("copies confirmation code to clipboard", async () => {
+    const Clipboard = require("expo-clipboard");
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      confirmation_code: "XK7-M9P",
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    const copyButton = findFirstByTestId(renderer, "copy-code-button");
+    await act(async () => {
+      copyButton?.props.onPress();
+    });
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith("XK7-M9P");
   });
 });
