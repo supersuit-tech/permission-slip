@@ -8446,6 +8446,7 @@ components:
             - email
             - web-push
             - sms
+            - mobile-push
           example: email
         enabled:
           type: boolean
@@ -9586,6 +9587,7 @@ components:
             - email
             - web-push
             - sms
+            - mobile-push
           example: email
         enabled:
           type: boolean

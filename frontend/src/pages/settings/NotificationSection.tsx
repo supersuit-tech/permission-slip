@@ -28,6 +28,11 @@ const CHANNEL_LABELS: Record<string, { name: string; description: string }> = {
     name: "SMS",
     description: "Text message notifications for urgent approval requests.",
   },
+  "mobile-push": {
+    name: "Mobile Push",
+    description:
+      "Push notifications to your mobile device for real-time approval alerts.",
+  },
 };
 
 export function NotificationSection() {
@@ -63,7 +68,7 @@ export function NotificationSection() {
   async function handleToggle(channel: string, currentEnabled: boolean) {
     try {
       await updatePreferences([
-        { channel: channel as "email" | "web-push" | "sms", enabled: !currentEnabled },
+        { channel: channel as "email" | "web-push" | "sms" | "mobile-push", enabled: !currentEnabled },
       ]);
       toast.success(
         `${CHANNEL_LABELS[channel]?.name ?? channel} notifications ${!currentEnabled ? "enabled" : "disabled"}.`,
