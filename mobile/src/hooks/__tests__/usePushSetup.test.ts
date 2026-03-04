@@ -6,18 +6,29 @@ import { create, act, type ReactTestRenderer } from "react-test-renderer";
 const mockRegisterForPushNotifications = jest.fn();
 const mockRegisterToken = jest.fn();
 const mockUnregisterToken = jest.fn();
+const mockInvalidateQueries = jest.fn();
 
 let mockAuthStatus = "unauthenticated";
 let mockExpoPushToken: string | null = null;
+let capturedOnNotificationReceived: ((n: unknown) => void) | undefined;
+
+jest.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+  }),
+}));
 
 jest.mock("../useNotifications", () => ({
-  useNotifications: () => ({
-    expoPushToken: mockExpoPushToken,
-    permissionGranted: mockExpoPushToken !== null,
-    error: null,
-    registerForPushNotifications: mockRegisterForPushNotifications,
-    lastNotificationResponse: { current: null },
-  }),
+  useNotifications: (options?: { onNotificationReceived?: (n: unknown) => void }) => {
+    capturedOnNotificationReceived = options?.onNotificationReceived;
+    return {
+      expoPushToken: mockExpoPushToken,
+      permissionGranted: mockExpoPushToken !== null,
+      error: null,
+      registerForPushNotifications: mockRegisterForPushNotifications,
+      lastNotificationResponse: { current: null },
+    };
+  },
 }));
 
 jest.mock("../useRegisterPushToken", () => ({
@@ -57,6 +68,7 @@ describe("usePushSetup", () => {
     jest.clearAllMocks();
     mockAuthStatus = "unauthenticated";
     mockExpoPushToken = null;
+    capturedOnNotificationReceived = undefined;
     mockRegisterForPushNotifications.mockResolvedValue(null);
     mockRegisterToken.mockResolvedValue({});
     mockUnregisterToken.mockResolvedValue({});
@@ -165,6 +177,22 @@ describe("usePushSetup", () => {
     });
 
     expect(mockUnregisterToken).toHaveBeenCalledWith("ExponentPushToken[abc]");
+  });
+
+  it("invalidates approvals cache when a foreground notification is received", async () => {
+    mockAuthStatus = "authenticated";
+    const { Consumer } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    expect(capturedOnNotificationReceived).toBeDefined();
+    capturedOnNotificationReceived?.({ request: { content: { title: "Test" } } });
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["approvals"],
+    });
   });
 
   it("does not crash when unregisterToken fails", async () => {

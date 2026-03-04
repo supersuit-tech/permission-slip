@@ -39,7 +39,15 @@ export interface NotificationState {
  * @param projectId - The Expo project ID (from app.json extra or Constants).
  *   Optional — Expo infers it in managed workflow builds.
  */
-export function useNotifications(projectId?: string) {
+export interface UseNotificationsOptions {
+  /** Expo project ID. Optional — inferred in managed workflow builds. */
+  projectId?: string;
+  /** Callback invoked when a notification is received while the app is in the foreground. */
+  onNotificationReceived?: (notification: Notifications.Notification) => void;
+}
+
+export function useNotifications(options: UseNotificationsOptions = {}) {
+  const { projectId, onNotificationReceived } = options;
   const [state, setState] = useState<NotificationState>({
     expoPushToken: null,
     permissionGranted: false,
@@ -52,9 +60,19 @@ export function useNotifications(projectId?: string) {
   /** The last notification response (tap). Callers can read this for navigation. */
   const lastNotificationResponse = useRef<Notifications.NotificationResponse | null>(null);
 
+  // Keep the callback ref fresh without re-creating the effect subscription
+  const onNotificationReceivedRef = useRef(onNotificationReceived);
+  onNotificationReceivedRef.current = onNotificationReceived;
+
   const registerForPushNotifications = useCallback(async (): Promise<string | null> => {
     // Push notifications only work on physical devices
     if (!Device.isDevice) {
+      if (__DEV__) {
+        console.log(
+          "[notifications] Running on simulator — push notifications are unavailable. " +
+            "Use a physical device to test push notifications.",
+        );
+      }
       setState((s) => ({
         ...s,
         error: "Push notifications require a physical device",
@@ -81,10 +99,13 @@ export function useNotifications(projectId?: string) {
       return null;
     }
 
-    // Android requires a notification channel
+    // Android requires a notification channel. We create a dedicated channel
+    // for approval requests so users can configure notification preferences
+    // (sound, vibration, etc.) independently from other future channels.
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "Default",
+      await Notifications.setNotificationChannelAsync("approval-requests", {
+        name: "Approval Requests",
+        description: "Notifications for new approval requests that need your attention",
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#1A1A2E",
@@ -120,9 +141,8 @@ export function useNotifications(projectId?: string) {
   useEffect(() => {
     // Listen for incoming notifications while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(
-      (_notification) => {
-        // No-op: foreground notification display is handled by setNotificationHandler above.
-        // Callers can extend this if needed.
+      (notification) => {
+        onNotificationReceivedRef.current?.(notification);
       },
     );
 

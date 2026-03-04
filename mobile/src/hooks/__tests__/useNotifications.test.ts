@@ -21,7 +21,11 @@ jest.mock("expo-device", () => ({
   isDevice: true,
 }));
 
-import { useNotifications, type NotificationState } from "../useNotifications";
+import {
+  useNotifications,
+  type NotificationState,
+  type UseNotificationsOptions,
+} from "../useNotifications";
 
 const mockGetPermissions = Notifications.getPermissionsAsync as jest.Mock;
 const mockRequestPermissions = Notifications.requestPermissionsAsync as jest.Mock;
@@ -34,10 +38,10 @@ interface Capture extends NotificationState {
   registerForPushNotifications: () => Promise<string | null>;
 }
 
-function createHookCapture(projectId?: string) {
+function createHookCapture(options: UseNotificationsOptions = {}) {
   const capture = {} as Capture;
   function Consumer() {
-    const result = useNotifications(projectId);
+    const result = useNotifications(options);
     capture.expoPushToken = result.expoPushToken;
     capture.permissionGranted = result.permissionGranted;
     capture.error = result.error;
@@ -193,9 +197,9 @@ describe("useNotifications", () => {
     });
 
     expect(mockSetChannel).toHaveBeenCalledWith(
-      "default",
+      "approval-requests",
       expect.objectContaining({
-        name: "Default",
+        name: "Approval Requests",
         importance: Notifications.AndroidImportance.HIGH,
       }),
     );
@@ -244,8 +248,32 @@ describe("useNotifications", () => {
     expect(sub2.remove).toHaveBeenCalled();
   });
 
+  it("calls onNotificationReceived when a foreground notification arrives", async () => {
+    const onNotificationReceived = jest.fn();
+    let receivedCallback: ((n: unknown) => void) | null = null;
+
+    (Notifications.addNotificationReceivedListener as jest.Mock).mockImplementation(
+      (cb: (n: unknown) => void) => {
+        receivedCallback = cb;
+        return { remove: jest.fn() };
+      },
+    );
+
+    const { Consumer } = createHookCapture({ onNotificationReceived });
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    const fakeNotification = { request: { content: { title: "New approval" } } };
+    await act(async () => {
+      receivedCallback?.(fakeNotification);
+    });
+
+    expect(onNotificationReceived).toHaveBeenCalledWith(fakeNotification);
+  });
+
   it("passes projectId to getExpoPushTokenAsync when provided", async () => {
-    const { capture, Consumer } = createHookCapture("my-project-id");
+    const { capture, Consumer } = createHookCapture({ projectId: "my-project-id" });
     await act(async () => {
       renderer = create(createElement(Consumer));
     });

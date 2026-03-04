@@ -3,17 +3,35 @@
  * Expo push token, and registers/unregisters it with the backend as the
  * user's auth status changes.
  *
+ * Also refreshes the approvals cache when a push notification is received
+ * while the app is in the foreground, so the user immediately sees new
+ * approval requests without waiting for the next poll.
+ *
  * Should be called once in the authenticated app shell (e.g. AppContent).
  */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "./useNotifications";
 import { useRegisterPushToken } from "./useRegisterPushToken";
 import { useAuth } from "../auth/AuthContext";
 
 export function usePushSetup() {
   const { authStatus } = useAuth();
-  const { expoPushToken, registerForPushNotifications, lastNotificationResponse } =
-    useNotifications();
+  const queryClient = useQueryClient();
+
+  // When a notification arrives in the foreground, invalidate the approvals
+  // cache so the list updates immediately without waiting for the next poll.
+  const onNotificationReceived = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["approvals"] });
+  }, [queryClient]);
+
+  const {
+    expoPushToken,
+    permissionGranted,
+    error: notificationError,
+    registerForPushNotifications,
+    lastNotificationResponse,
+  } = useNotifications({ onNotificationReceived });
   const { registerToken, unregisterToken } = useRegisterPushToken();
 
   // Track the token we last sent to the backend so we can unregister on logout
@@ -52,5 +70,10 @@ export function usePushSetup() {
     }
   }, [authStatus, unregisterToken]);
 
-  return { lastNotificationResponse };
+  return {
+    lastNotificationResponse,
+    expoPushToken,
+    permissionGranted,
+    notificationError,
+  };
 }
