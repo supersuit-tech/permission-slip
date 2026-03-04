@@ -9,6 +9,7 @@ import { useAuth } from "../auth/AuthContext";
 import LoginScreen from "../screens/LoginScreen";
 import ApprovalListScreen from "../screens/approvals/ApprovalListScreen";
 import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
+import SettingsScreen from "../screens/settings/SettingsScreen";
 import type { ApprovalSummary } from "../hooks/useApprovals";
 
 export type RootStackParamList = {
@@ -18,6 +19,7 @@ export type RootStackParamList = {
     approvalId: string;
     approval: ApprovalSummary;
   };
+  Settings: undefined;
 };
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -52,6 +54,15 @@ export default function RootNavigator() {
               options={{
                 headerShown: true,
                 headerTitle: "Approval Details",
+                headerBackTitle: "Back",
+              }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Settings",
                 headerBackTitle: "Back",
               }}
             />

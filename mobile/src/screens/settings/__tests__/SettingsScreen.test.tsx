@@ -1,0 +1,214 @@
+import React, { createElement } from "react";
+import { create, act, type ReactTestRenderer } from "react-test-renderer";
+import type { NotificationPreference } from "../../../hooks/useNotificationPreferences";
+
+// --- Mocks ---
+
+jest.mock("../../../lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getSession: jest
+        .fn()
+        .mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: jest.fn() } },
+      }),
+      signInWithOtp: jest.fn(),
+      verifyOtp: jest.fn(),
+      signOut: jest.fn(),
+    },
+  },
+}));
+
+const mockSignOut = jest.fn();
+jest.mock("../../../auth/AuthContext", () => ({
+  useAuth: () => ({
+    signOut: mockSignOut,
+    session: null,
+    user: null,
+    authStatus: "authenticated",
+  }),
+}));
+
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+const mockPreferences: NotificationPreference[] = [
+  { channel: "email", enabled: true, available: true },
+  { channel: "web-push", enabled: true, available: true },
+  { channel: "mobile-push", enabled: true, available: true },
+];
+
+let mockPrefsReturn = {
+  preferences: mockPreferences,
+  isLoading: false,
+  error: null as string | null,
+  refetch: jest.fn(),
+};
+
+jest.mock("../../../hooks/useNotificationPreferences", () => ({
+  useNotificationPreferences: () => mockPrefsReturn,
+}));
+
+const mockUpdatePreferences = jest.fn().mockResolvedValue({});
+
+jest.mock("../../../hooks/useUpdateNotificationPreferences", () => ({
+  useUpdateNotificationPreferences: () => ({
+    updatePreferences: mockUpdatePreferences,
+    isUpdating: false,
+    error: null,
+  }),
+}));
+
+// Import after mocks
+import SettingsScreen from "../SettingsScreen";
+
+// --- Helpers ---
+
+function renderScreen() {
+  const navigation = { navigate: jest.fn(), goBack: jest.fn() } as never;
+  const route = {
+    key: "Settings",
+    name: "Settings" as const,
+    params: undefined,
+  };
+  return create(createElement(SettingsScreen, { navigation, route }));
+}
+
+/** Find the first node matching a testID (host components only). */
+function findByTestId(renderer: ReactTestRenderer, testID: string) {
+  const nodes = renderer.root.findAll(
+    (node) =>
+      typeof node.type === "string" && node.props.testID === testID,
+  );
+  return nodes;
+}
+
+function hasText(renderer: ReactTestRenderer, text: string): boolean {
+  const nodes = renderer.root.findAll(
+    (node) =>
+      typeof node.children?.[0] === "string" && node.children[0] === text,
+  );
+  return nodes.length > 0;
+}
+
+// --- Tests ---
+
+describe("SettingsScreen", () => {
+  let renderer: ReactTestRenderer;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPrefsReturn = {
+      preferences: mockPreferences,
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+    };
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      renderer?.unmount();
+    });
+  });
+
+  it("renders the push notifications toggle", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(hasText(renderer, "Push Notifications")).toBe(true);
+    expect(findByTestId(renderer, "mobile-push-toggle").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows toggle in enabled state when mobile-push is enabled", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const toggle = findByTestId(renderer, "mobile-push-toggle")[0];
+    expect(toggle?.props.value).toBe(true);
+  });
+
+  it("shows toggle in disabled state when mobile-push is disabled", async () => {
+    mockPrefsReturn = {
+      ...mockPrefsReturn,
+      preferences: [
+        { channel: "mobile-push", enabled: false, available: true },
+      ],
+    };
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const toggle = findByTestId(renderer, "mobile-push-toggle")[0];
+    expect(toggle?.props.value).toBe(false);
+  });
+
+  it("calls updatePreferences when toggle is pressed", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    // Find the Switch node that has the onValueChange handler
+    const toggleNodes = renderer.root.findAll(
+      (node) =>
+        node.props.testID === "mobile-push-toggle" &&
+        typeof node.props.onValueChange === "function",
+    );
+    const toggle = toggleNodes[0];
+
+    await act(async () => {
+      toggle?.props.onValueChange(false);
+    });
+
+    expect(mockUpdatePreferences).toHaveBeenCalledWith([
+      { channel: "mobile-push", enabled: false },
+    ]);
+  });
+
+  it("shows loading indicator when preferences are loading", async () => {
+    mockPrefsReturn = {
+      ...mockPrefsReturn,
+      isLoading: true,
+      preferences: [],
+    };
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "prefs-loading").length).toBeGreaterThanOrEqual(1);
+    expect(findByTestId(renderer, "mobile-push-toggle")).toHaveLength(0);
+  });
+
+  it("shows error state when preferences fail to load", async () => {
+    mockPrefsReturn = {
+      ...mockPrefsReturn,
+      error: "Failed to load",
+      preferences: [],
+    };
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(hasText(renderer, "Failed to load")).toBe(true);
+    expect(findByTestId(renderer, "mobile-push-toggle")).toHaveLength(0);
+  });
+
+  it("renders the sign out button", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "sign-out-button").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Sign Out")).toBe(true);
+  });
+
+  it("defaults to enabled when mobile-push preference is missing", async () => {
+    mockPrefsReturn = {
+      ...mockPrefsReturn,
+      preferences: [{ channel: "email", enabled: true, available: true }],
+    };
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const toggle = findByTestId(renderer, "mobile-push-toggle")[0];
+    expect(toggle?.props.value).toBe(true);
+  });
+});
