@@ -185,8 +185,13 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 		return fmt.Errorf("read expo push API response: %w", err)
 	}
 
-	if resp.StatusCode >= 500 {
-		return fmt.Errorf("expo push API returned %d: %s", resp.StatusCode, body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Truncate body in error message to avoid logging potentially sensitive data.
+		errBody := string(body)
+		if len(errBody) > 200 {
+			errBody = errBody[:200] + "..."
+		}
+		return fmt.Errorf("expo push API returned %d: %s", resp.StatusCode, errBody)
 	}
 
 	var apiResp expoAPIResponse
@@ -208,7 +213,7 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 		}
 
 		if i < len(tokens) && ticket.Details != nil && ticket.Details.Error == "DeviceNotRegistered" {
-			log.Printf("mobilepush: token %q is no longer registered, removing", tokens[i])
+			log.Printf("mobilepush: token ending %q is no longer registered, removing", truncateTokenForLog(tokens[i]))
 			if err := s.store.DeleteToken(ctx, tokens[i]); err != nil {
 				log.Printf("mobilepush: failed to delete invalid token: %v", err)
 			}
@@ -226,4 +231,13 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 // Delegates to notify.BuildPushContent for consistent messaging across channels.
 func buildMessage(approval notify.Approval) notify.PushContent {
 	return notify.BuildPushContent(approval)
+}
+
+// truncateTokenForLog returns the last 8 characters of a token for logging,
+// avoiding exposure of the full token string in log output.
+func truncateTokenForLog(token string) string {
+	if len(token) <= 8 {
+		return token
+	}
+	return "..." + token[len(token)-8:]
 }
