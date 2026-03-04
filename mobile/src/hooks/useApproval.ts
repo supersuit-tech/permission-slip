@@ -1,0 +1,80 @@
+/**
+ * Hook to fetch a single approval by ID. Used when navigating via deep link
+ * where only the approval_id is available (no pre-fetched ApprovalSummary).
+ *
+ * First checks the React Query cache for the approval (from a prior list
+ * fetch), then falls back to fetching all approvals and finding the match.
+ */
+import { useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../auth/AuthContext";
+import client from "../api/client";
+import { getApiErrorMessage } from "../api/errors";
+import type { ApprovalSummary } from "./useApprovals";
+
+/**
+ * Searches the React Query cache for an approval with the given ID.
+ * Checks all cached approval list queries (pending, approved, denied, etc.).
+ */
+function findInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  approvalId: string,
+): ApprovalSummary | undefined {
+  const queries = queryClient.getQueriesData<{ data?: ApprovalSummary[] }>({
+    queryKey: ["approvals"],
+  });
+  for (const [, queryData] of queries) {
+    const match = queryData?.data?.find(
+      (a) => a.approval_id === approvalId,
+    );
+    if (match) return match;
+  }
+  return undefined;
+}
+
+export function useApproval(approvalId: string) {
+  const { session } = useAuth();
+  const accessToken = session?.access_token;
+  const queryClient = useQueryClient();
+
+  const tokenRef = useRef(accessToken);
+  tokenRef.current = accessToken;
+
+  const query = useQuery({
+    queryKey: ["approval", approvalId],
+    queryFn: async () => {
+      // Check cache first
+      const cached = findInCache(queryClient, approvalId);
+      if (cached) return cached;
+
+      // Fetch all statuses and find the matching approval
+      const token = tokenRef.current;
+      if (!token) throw new Error("Missing access token");
+
+      const { data, error } = await client.GET("/v1/approvals", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { query: { status: "all" } },
+      });
+      if (error) {
+        throw new Error(
+          getApiErrorMessage(error, "Unable to load approval."),
+        );
+      }
+      const match = data?.data?.find(
+        (a: ApprovalSummary) => a.approval_id === approvalId,
+      );
+      if (!match) throw new Error("Approval not found");
+      return match;
+    },
+    enabled: !!accessToken && !!approvalId,
+    staleTime: 10_000,
+  });
+
+  return {
+    approval: query.data ?? null,
+    isLoading: query.isLoading,
+    error: query.isError
+      ? (query.error?.message ?? "Unable to load approval.")
+      : null,
+  };
+}

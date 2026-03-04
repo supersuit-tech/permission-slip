@@ -1,12 +1,16 @@
 import { useEffect } from "react";
-import { Alert } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import LoginScreen from "../screens/LoginScreen";
 import ApprovalListScreen from "../screens/approvals/ApprovalListScreen";
 import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
+import DeepLinkDetailScreen from "../screens/approvals/DeepLinkDetailScreen";
 import type { ApprovalSummary } from "../hooks/useApprovals";
+import { linking } from "./linking";
+import { navigationRef } from "./navigationRef";
+import { colors } from "../theme/colors";
 
 export type RootStackParamList = {
   Login: undefined;
@@ -14,6 +18,9 @@ export type RootStackParamList = {
   ApprovalDetail: {
     approvalId: string;
     approval: ApprovalSummary;
+  };
+  DeepLinkDetail: {
+    approvalId: string;
   };
 };
 
@@ -36,7 +43,16 @@ export default function RootNavigator() {
   }, [authStatus, signOut]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      fallback={
+        <View style={styles.fallback}>
+          <ActivityIndicator size="large" color={colors.gray900} />
+          <Text style={styles.fallbackText}>Loading...</Text>
+        </View>
+      }
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {authStatus === "authenticated" ? (
           <>
@@ -44,6 +60,15 @@ export default function RootNavigator() {
             <Stack.Screen
               name="ApprovalDetail"
               component={ApprovalDetailScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Approval Details",
+                headerBackTitle: "Back",
+              }}
+            />
+            <Stack.Screen
+              name="DeepLinkDetail"
+              component={DeepLinkDetailScreen}
               options={{
                 headerShown: true,
                 headerTitle: "Approval Details",
@@ -62,3 +87,17 @@ export default function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  fallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  fallbackText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.gray500,
+  },
+});

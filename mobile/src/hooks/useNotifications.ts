@@ -137,10 +137,22 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       },
     );
 
-    // Listen for notification taps (user interaction)
+    // Listen for notification taps (user interaction) and navigate to the
+    // relevant approval detail screen via deep link.
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         lastNotificationResponse.current = response;
+
+        // Extract approval_id from notification data and navigate
+        const data = response.notification.request.content.data;
+        if (data && typeof data === "object" && "approval_id" in data) {
+          const approvalId = data.approval_id;
+          if (typeof approvalId === "string") {
+            // Lazy import to avoid circular dependencies
+            const { navigateWhenReady } = require("../navigation/navigationRef");
+            navigateWhenReady("DeepLinkDetail", { approvalId });
+          }
+        }
       },
     );
 

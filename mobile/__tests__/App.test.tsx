@@ -13,6 +13,23 @@ jest.mock('../src/lib/supabaseClient', () => ({
   },
 }));
 
+jest.mock('expo-linking', () => ({
+  createURL: jest.fn(() => 'permissionslip://'),
+}));
+
+jest.mock('expo-local-authentication', () => ({
+  hasHardwareAsync: jest.fn().mockResolvedValue(false),
+  isEnrolledAsync: jest.fn().mockResolvedValue(false),
+  authenticateAsync: jest.fn().mockResolvedValue({ success: false }),
+}));
+
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn(),
+  notificationAsync: jest.fn(),
+  ImpactFeedbackStyle: { Heavy: 'heavy' },
+  NotificationFeedbackType: { Warning: 'warning' },
+}));
+
 import App from '../App';
 
 describe('App', () => {

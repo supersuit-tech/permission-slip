@@ -16,6 +16,8 @@ import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { usePushSetup } from "./src/hooks/usePushSetup";
+import { useBiometricAuth } from "./src/hooks/useBiometricAuth";
+import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { colors } from "./src/theme/colors";
 
 // Tell React Query when the app returns to the foreground so queries with
@@ -46,6 +48,26 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
 
   // Register/unregister Expo push token as auth status changes
   usePushSetup();
+
+  // Biometric auth gate — locks the app on resume from background
+  const biometric = useBiometricAuth();
+  const appStateRef = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      // Re-lock when app goes to background and comes back
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextState === "active" &&
+        biometric.isEnabled
+      ) {
+        biometric.setIsAuthenticated(false);
+        biometric.authenticate();
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [biometric.isEnabled, biometric.authenticate, biometric.setIsAuthenticated]);
 
   // Clear the React Query cache when the user signs out so the next user
   // on a shared device never sees stale approval data from a prior session.
@@ -93,6 +115,15 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
         )}
       </View>
     );
+  }
+
+  // Show biometric lock screen when authenticated but biometric hasn't passed
+  if (
+    authStatus === "authenticated" &&
+    biometric.isEnabled &&
+    !biometric.isAuthenticated
+  ) {
+    return <BiometricLockScreen onUnlock={biometric.authenticate} />;
   }
 
   return (
