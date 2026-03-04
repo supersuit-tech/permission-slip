@@ -11,7 +11,6 @@ jest.mock("../../../hooks/useDenyApproval", () => ({
   useDenyApproval: () => ({
     denyApproval: mockDenyApproval,
     isPending: false,
-    error: null,
   }),
 }));
 
@@ -33,7 +32,6 @@ jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
     agents: MOCK_AGENTS,
     isLoading: false,
-    error: null,
   }),
   getAgentDisplayName: mockGetAgentDisplayName,
 }));

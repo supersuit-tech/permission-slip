@@ -1,9 +1,17 @@
 /**
- * DenyAction — encapsulates the deny button, confirmation dialog, loading
- * state, and post-deny confirmation banner for a pending approval.
+ * DenyAction — self-contained deny interaction for a pending approval.
  *
- * Extracted from ApprovalDetailScreen to keep the detail screen focused on
- * display and this component focused on the deny interaction lifecycle.
+ * Renders one of two states:
+ * 1. **Button state** — a red outlined "Deny" button. Pressing it shows a
+ *    native `Alert.alert` confirmation dialog. Confirming fires the deny
+ *    API call via `useDenyApproval`.
+ * 2. **Confirmation state** — after a successful deny, shows a "Request
+ *    Denied" banner with a "Back to List" button. Auto-calls `onDenied`
+ *    after 1.5 s so the parent can navigate away.
+ *
+ * The parent (ApprovalDetailScreen) controls *when* DenyAction is rendered
+ * (only for pending, non-expired approvals) and provides the `onDenied`
+ * callback for navigation.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {

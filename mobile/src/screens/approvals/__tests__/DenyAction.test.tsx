@@ -11,7 +11,6 @@ jest.mock("../../../hooks/useDenyApproval", () => ({
   useDenyApproval: () => ({
     denyApproval: mockDenyApproval,
     isPending: mockIsDenying,
-    error: null,
   }),
 }));
 
@@ -79,6 +78,27 @@ describe("DenyAction", () => {
       );
     });
     expect(hasTestId(renderer, "deny-button")).toBe(true);
+  });
+
+  it("shows loading spinner and disables button when isDenying is true", async () => {
+    mockIsDenying = true;
+    await act(async () => {
+      renderer = create(
+        createElement(DenyAction, { approvalId: "appr_1", onDenied: mockOnDenied }),
+      );
+    });
+
+    // Should show the loading indicator
+    expect(hasTestId(renderer, "deny-loading")).toBe(true);
+
+    // The deny button should be disabled
+    const denyNodes = renderer.root.findAll(
+      (node) => node.props.testID === "deny-button",
+    );
+    const pressableNode = denyNodes.find(
+      (node) => node.props.disabled !== undefined,
+    );
+    expect(pressableNode?.props.disabled).toBe(true);
   });
 
   it("shows confirmation alert when deny button is pressed", async () => {

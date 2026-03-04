@@ -1,6 +1,15 @@
 /**
  * React Query mutation hook for denying a pending approval request.
- * Mirrors the web frontend's useDenyApproval pattern.
+ *
+ * Calls `POST /v1/approvals/{approval_id}/deny` with the current session
+ * token. On success, invalidates all `["approvals"]` queries so the list
+ * screen refreshes. Errors are thrown as plain `Error` instances with the
+ * server-provided message (or a generic fallback).
+ *
+ * Mirrors the web frontend's `useDenyApproval` pattern (`frontend/src/hooks/`).
+ *
+ * @returns `denyApproval(id)` — resolves on success, throws on failure.
+ * @returns `isPending` — true while the deny request is in flight.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
@@ -38,6 +47,5 @@ export function useDenyApproval() {
   return {
     denyApproval: (approvalId: string) => mutation.mutateAsync(approvalId),
     isPending: mutation.isPending,
-    error: mutation.error,
   };
 }
