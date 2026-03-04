@@ -26,7 +26,7 @@ export function useApproveApproval() {
       trackEvent(PostHogEvents.APPROVAL_APPROVED);
     },
     // No query invalidation — the approved row stays visible so the user
-    // can read/copy the confirmation code. The 5-second polling in useApprovals
+    // can see the success state. The 5-second polling in useApprovals
     // handles eventual removal from the pending list.
   });
 

@@ -17,16 +17,13 @@ func TestApprovalsSchema(t *testing.T) {
 	t.Run("approvals", func(t *testing.T) {
 		testhelper.RequireColumns(t, tx, "approvals", []string{
 			"approval_id", "agent_id", "approver_id", "action", "context",
-			"status", "confirmation_code_hash", "verification_attempts",
-			"token_jti", "expires_at", "approved_at", "denied_at",
+			"status", "execution_status", "execution_result", "executed_at",
+			"expires_at", "approved_at", "denied_at",
 			"cancelled_at", "created_at",
 		})
 	})
 	t.Run("request_ids", func(t *testing.T) {
 		testhelper.RequireColumns(t, tx, "request_ids", []string{"request_id", "agent_id", "approver_id", "created_at"})
-	})
-	t.Run("consumed_tokens", func(t *testing.T) {
-		testhelper.RequireColumns(t, tx, "consumed_tokens", []string{"jti", "consumed_at"})
 	})
 }
 
@@ -43,7 +40,6 @@ func TestApprovalIndexes(t *testing.T) {
 		{"approvals", "idx_approvals_expires_at"},
 		{"approvals", "idx_approvals_approver_created"},
 		{"request_ids", "idx_request_ids_created_at"},
-		{"consumed_tokens", "idx_consumed_tokens_consumed_at"},
 	}
 
 	for _, idx := range indexes {
@@ -103,31 +99,6 @@ func TestApprovalStatusCheckConstraint(t *testing.T) {
 		})
 }
 
-func TestApprovalTokenJTIUnique(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-
-	jti := testhelper.GenerateID(t, "jti_")
-	apprID1 := testhelper.GenerateID(t, "appr_")
-	apprID2 := testhelper.GenerateID(t, "appr_")
-
-	testhelper.RequireUniqueViolation(t, tx, "token_jti",
-		func() error {
-			testhelper.InsertApprovalWithJTI(t, tx, apprID1, agentID, uid, jti)
-			return nil
-		},
-		func() error {
-			_, err := tx.Exec(context.Background(),
-				`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, token_jti, expires_at)
-				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, now() + interval '1 hour')`,
-				apprID2, agentID, uid, jti)
-			return err
-		})
-}
-
 func TestRequestIdCascadeDeleteOnAgentDelete(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
@@ -141,24 +112,6 @@ func TestRequestIdCascadeDeleteOnAgentDelete(t *testing.T) {
 		[]string{"request_ids"},
 		fmt.Sprintf("agent_id = %d", agentID),
 	)
-}
-
-func TestConsumedTokensInsert(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-
-	tok := testhelper.GenerateID(t, "tok_")
-	testhelper.RequireUniqueViolation(t, tx, "consumed_tokens PK",
-		func() error {
-			_, err := tx.Exec(context.Background(),
-				`INSERT INTO consumed_tokens (jti) VALUES ($1)`, tok)
-			return err
-		},
-		func() error {
-			_, err := tx.Exec(context.Background(),
-				`INSERT INTO consumed_tokens (jti) VALUES ($1)`, tok)
-			return err
-		})
 }
 
 func TestListApprovalsByApproverPaginated(t *testing.T) {
@@ -328,33 +281,32 @@ func TestListApprovalsByApproverPaginated_StatusFilters(t *testing.T) {
 	}
 }
 
-func TestApprovalVerificationAttemptsCheckConstraint(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	apprID := testhelper.GenerateID(t, "appr_")
-
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
-
-	// Setting verification_attempts to a negative value should fail
-	err := testhelper.WithSavepoint(t, tx, func() error {
-		_, err := tx.Exec(context.Background(),
-			`UPDATE approvals SET verification_attempts = -1 WHERE approval_id = $1`, apprID)
-		return err
-	})
-	if err == nil {
-		t.Error("expected CHECK constraint violation for negative verification_attempts, but update succeeded")
-	}
-}
-
 func TestPgCronJobsScheduled(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	for _, jobName := range []string{"cleanup_request_ids", "cleanup_consumed_tokens"} {
+	for _, jobName := range []string{"cleanup_request_ids"} {
 		t.Run(jobName, func(t *testing.T) {
 			testhelper.RequirePgCronJob(t, tx, jobName)
 		})
 	}
+}
+
+func TestApprovalExecutionStatusCheckConstraint(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	base := testhelper.GenerateID(t, "appr_")
+	testhelper.RequireCheckValues(t, tx, "execution_status",
+		[]string{"pending", "success", "error"}, "invalid",
+		func(value string, i int) error {
+			_, err := tx.Exec(context.Background(),
+				`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, expires_at)
+				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, now() + interval '1 hour')`,
+				fmt.Sprintf("%s_%d", base, i), agentID, uid, value)
+			return err
+		})
 }

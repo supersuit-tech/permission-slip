@@ -222,14 +222,13 @@ describe("PendingApprovalsCard", () => {
     expect(screen.getAllByText("Hello World").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("approves via review dialog and shows confirmation code", async () => {
+  it("approves via review dialog and shows success message", async () => {
     mockApprovalsFetch();
     mockPost.mockResolvedValue({
       data: {
         approval_id: "appr_abc123",
         status: "approved",
         approved_at: "2026-02-21T10:00:05Z",
-        confirmation_code: "RK3-P7M",
       },
     });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -253,10 +252,9 @@ describe("PendingApprovalsCard", () => {
     await user.click(screen.getByRole("button", { name: "Approve" }));
 
     await waitFor(() => {
-      expect(screen.getByText("RK3-P7M")).toBeInTheDocument();
+      expect(screen.getByText("Request Approved")).toBeInTheDocument();
     });
-    expect(screen.getByText("Confirmation code")).toBeInTheDocument();
-    expect(screen.getByText("Request Approved")).toBeInTheDocument();
+    expect(screen.getByText(/The agent has been notified/)).toBeInTheDocument();
   });
 
   it("denies via review dialog", async () => {

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Loader2, Clock, Shield, Bot, AlertTriangle } from "lucide-react";
+import { Loader2, Clock, Bot, AlertTriangle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,6 @@ import {
   formatCountdown,
   urgencyColor,
   RiskBadge,
-  ConfirmationCodeBanner,
 } from "./approval-components";
 
 interface ReviewApprovalDialogProps {
@@ -36,7 +35,7 @@ export function ReviewApprovalDialog({
   open,
   onOpenChange,
 }: ReviewApprovalDialogProps) {
-  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const { approveApproval, isPending: isApproving } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName } = useActionSchema(approval.action.type);
@@ -46,8 +45,8 @@ export function ReviewApprovalDialog({
 
   const handleApprove = useCallback(async () => {
     try {
-      const result = await approveApproval(approval.approval_id);
-      setConfirmationCode(result.confirmation_code);
+      await approveApproval(approval.approval_id);
+      setIsApproved(true);
     } catch {
       toast.error("Failed to approve request. Please try again.");
     }
@@ -65,7 +64,7 @@ export function ReviewApprovalDialog({
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
-      setConfirmationCode(null);
+      setIsApproved(false);
     }
     onOpenChange(nextOpen);
   }
@@ -77,15 +76,17 @@ export function ReviewApprovalDialog({
           <DialogTitle>Review Approval Request</DialogTitle>
         </DialogHeader>
 
-        {confirmationCode ? (
+        {isApproved ? (
           <div className="space-y-6 py-4">
             <div className="flex flex-col items-center gap-4">
               <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
-                <Shield className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
+                <CheckCircle className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
               </div>
               <p className="text-lg font-semibold">Request Approved</p>
+              <p className="text-muted-foreground text-sm text-center">
+                The agent has been notified and can now proceed.
+              </p>
             </div>
-            <ConfirmationCodeBanner code={confirmationCode} copyable />
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-6">
@@ -175,7 +176,7 @@ export function ReviewApprovalDialog({
           </div>
         )}
 
-        {!confirmationCode && (
+        {!isApproved && (
           <DialogFooter>
             <Button
               variant="outline"

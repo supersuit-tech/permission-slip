@@ -11,27 +11,27 @@ import (
 
 // Approval represents a row from the approvals table.
 type Approval struct {
-	ApprovalID           string
-	AgentID              int64
-	ApproverID           string
-	Action               []byte // raw JSONB
-	Context              []byte // raw JSONB
-	Status               string
-	ConfirmationCodeHash *string
-	VerificationAttempts int
-	TokenJTI             *string
-	ExpiresAt            time.Time
-	ApprovedAt           *time.Time
-	DeniedAt             *time.Time
-	CancelledAt          *time.Time
-	CreatedAt            time.Time
+	ApprovalID      string
+	AgentID         int64
+	ApproverID      string
+	Action          []byte // raw JSONB
+	Context         []byte // raw JSONB
+	Status          string
+	ExecutionStatus *string
+	ExecutionResult []byte // raw JSONB
+	ExecutedAt      *time.Time
+	ExpiresAt       time.Time
+	ApprovedAt      *time.Time
+	DeniedAt        *time.Time
+	CancelledAt     *time.Time
+	CreatedAt       time.Time
 }
 
 // approvalColumns is the canonical column list for SELECT on the approvals table.
 // Keep in sync with scanApproval.
 const approvalColumns = `approval_id, agent_id, approver_id, action, context,
-	status, confirmation_code_hash, verification_attempts,
-	token_jti, expires_at, approved_at, denied_at, cancelled_at, created_at`
+	status, execution_status, execution_result, executed_at,
+	expires_at, approved_at, denied_at, cancelled_at, created_at`
 
 // ApprovalCursor identifies the position of the last item on a page,
 // using both created_at and approval_id as a compound key to avoid
@@ -52,8 +52,8 @@ func scanApproval(row pgx.Row) (*Approval, error) {
 	var a Approval
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
-		&a.Status, &a.ConfirmationCodeHash, &a.VerificationAttempts,
-		&a.TokenJTI, &a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
+		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt,
+		&a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -67,8 +67,8 @@ func scanApprovalWithMeta(row pgx.Row) (*Approval, []byte, error) {
 	var agentMeta []byte
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
-		&a.Status, &a.ConfirmationCodeHash, &a.VerificationAttempts,
-		&a.TokenJTI, &a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
+		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt,
+		&a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
 		&agentMeta,
 	)
 	if err != nil {
@@ -184,16 +184,16 @@ func GetApprovalByIDAndApprover(ctx context.Context, db DBTX, approvalID, approv
 	return a, nil
 }
 
-// ApproveApproval atomically sets the approval status to 'approved', records
-// the timestamp, and stores the confirmation code hash. The UPDATE enforces
-// status='pending' AND expires_at > now() to eliminate TOCTOU races. On
-// failure it reads the current row to produce a precise error.
+// ApproveApproval atomically sets the approval status to 'approved' and records
+// the timestamp. The UPDATE enforces status='pending' AND expires_at > now() to
+// eliminate TOCTOU races. On failure it reads the current row to produce a
+// precise error.
 // Returns the updated approval and the agent's current metadata snapshot.
-func ApproveApproval(ctx context.Context, db DBTX, approvalID, approverID, confirmationCodeHash string) (*Approval, []byte, error) {
+func ApproveApproval(ctx context.Context, db DBTX, approvalID, approverID string) (*Approval, []byte, error) {
 	row := db.QueryRow(ctx,
 		`WITH updated AS (
 			UPDATE approvals
-			SET status = 'approved', approved_at = now(), confirmation_code_hash = $3
+			SET status = 'approved', approved_at = now()
 			WHERE approval_id = $1 AND approver_id = $2
 			  AND status = 'pending' AND expires_at > now()
 			RETURNING `+approvalColumns+`
@@ -201,7 +201,7 @@ func ApproveApproval(ctx context.Context, db DBTX, approvalID, approverID, confi
 		SELECT updated.*, a.metadata
 		FROM updated
 		LEFT JOIN agents a ON a.agent_id = updated.agent_id`,
-		approvalID, approverID, confirmationCodeHash,
+		approvalID, approverID,
 	)
 	appr, agentMeta, err := scanApprovalWithMeta(row)
 	if err == nil {
