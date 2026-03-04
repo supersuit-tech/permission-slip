@@ -9,7 +9,9 @@ import {
   freePlanResponse,
   paidPlanResponse,
   usageDetailResponse,
+  freeUsageDetailResponse,
   invoicesResponse,
+  agentsResponse,
   overLimitPaidPlanResponse,
   atLimitPaidPlanResponse,
 } from "./fixtures";
@@ -17,17 +19,23 @@ import {
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
-function mockBillingApi(planResponse: typeof freePlanResponse | typeof paidPlanResponse) {
+function mockBillingApi(
+  planResponse: typeof freePlanResponse | typeof paidPlanResponse,
+  usageResponse: typeof usageDetailResponse | typeof freeUsageDetailResponse = usageDetailResponse,
+) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/billing/plan") {
       return Promise.resolve({ data: planResponse });
     }
     if (url === "/v1/billing/usage") {
-      return Promise.resolve({ data: usageDetailResponse });
+      return Promise.resolve({ data: usageResponse });
     }
     if (url === "/v1/billing/invoices") {
       return Promise.resolve({ data: invoicesResponse });
+    }
+    if (url === "/v1/agents") {
+      return Promise.resolve({ data: agentsResponse });
     }
     return Promise.resolve({ data: null });
   });
@@ -472,6 +480,94 @@ describe("BillingPage", () => {
       });
       const banner = screen.getByText("Welcome to Pay-as-you-go!").closest("[role='status']");
       expect(banner).toBeInTheDocument();
+    });
+  });
+
+  describe("Usage Dashboard", () => {
+    it("renders usage details card", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Usage Details")).toBeInTheDocument();
+      });
+    });
+
+    it("shows requests progress bar for free plan", async () => {
+      mockBillingApi(freePlanResponse, freeUsageDetailResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Requests this period")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Requests remaining")).toBeInTheDocument();
+    });
+
+    it("shows estimated cost for paid plan", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Estimated cost")).toBeInTheDocument();
+      });
+      // $2.71 requests + $0.05 SMS = $2.76 (shown in both UsageDashboard and PlanDetailsCard)
+      expect(screen.getAllByText("$2.76").length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("shows days remaining in billing period", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Days remaining")).toBeInTheDocument();
+      });
+    });
+
+    it("shows per-agent breakdown table with agent names and links", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Usage by Agent")).toBeInTheDocument();
+      });
+      // Agent names load from a separate query, so wait for them
+      await waitFor(() => {
+        expect(screen.getByText("Gmail Bot")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Stripe Bot")).toBeInTheDocument();
+      expect(screen.getByText("% of total")).toBeInTheDocument();
+      // Agent names link to detail pages
+      expect(screen.getByRole("link", { name: "Gmail Bot" })).toHaveAttribute("href", "/agents/1");
+      expect(screen.getByRole("link", { name: "Stripe Bot" })).toHaveAttribute("href", "/agents/2");
+      // Paid plan shows estimated cost per agent
+      expect(screen.getByText("Est. cost")).toBeInTheDocument();
+    });
+
+    it("shows SMS usage section for paid plan with SMS", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("SMS Usage")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Messages sent")).toBeInTheDocument();
+    });
+
+    it("does not show SMS section for free plan with no SMS", async () => {
+      mockBillingApi(freePlanResponse, freeUsageDetailResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Usage Details")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("SMS Usage")).not.toBeInTheDocument();
     });
   });
 });

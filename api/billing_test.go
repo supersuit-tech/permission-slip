@@ -260,8 +260,8 @@ func TestGetUsage_ReturnsUsage(t *testing.T) {
 	if resp.Requests.Overage != 0 {
 		t.Errorf("expected requests.overage=0, got %d", resp.Requests.Overage)
 	}
-	if resp.Requests.OverageCostCents != 0 {
-		t.Errorf("expected requests.overage_cost_cents=0, got %d", resp.Requests.OverageCostCents)
+	if resp.Requests.CostCents != 0 {
+		t.Errorf("expected requests.overage_cost_cents=0, got %d", resp.Requests.CostCents)
 	}
 	if resp.SMS.Total != 3 {
 		t.Errorf("expected sms.total=3, got %d", resp.SMS.Total)
@@ -358,8 +358,69 @@ func TestGetUsage_WithOverage(t *testing.T) {
 		t.Errorf("expected requests.overage=50, got %d", resp.Requests.Overage)
 	}
 	// 50 requests at $0.005 = 25 cents. Formula: ceil(50 * 0.5) = 25
-	if resp.Requests.OverageCostCents != 25 {
-		t.Errorf("expected requests.overage_cost_cents=25, got %d", resp.Requests.OverageCostCents)
+	if resp.Requests.CostCents != 25 {
+		t.Errorf("expected requests.overage_cost_cents=25, got %d", resp.Requests.CostCents)
+	}
+}
+
+func TestGetUsage_HistoricalPeriod(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Insert usage for a past period (February 2026).
+	testhelper.MustExec(t, tx,
+		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count, sms_count)
+		 VALUES ($1, '2026-02-01T00:00:00Z', '2026-03-01T00:00:00Z', 800, 2)`,
+		uid)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/usage?period_start=2026-02-01T00:00:00Z", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp usageResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Requests.Total != 800 {
+		t.Errorf("expected requests.total=800, got %d", resp.Requests.Total)
+	}
+	if resp.SMS.Total != 2 {
+		t.Errorf("expected sms.total=2, got %d", resp.SMS.Total)
+	}
+	// Period bounds should reflect the requested period, not current.
+	if resp.PeriodStart.Month() != 2 {
+		t.Errorf("expected period_start month=2, got %d", resp.PeriodStart.Month())
+	}
+}
+
+func TestGetUsage_InvalidPeriodStart(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/usage?period_start=not-a-date", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

@@ -86,6 +86,41 @@ export const usageDetailResponse = {
   period_end: "2026-04-01T00:00:00Z",
   requests: { total: 1542, included: 1000, overage: 542, cost_cents: 271 },
   sms: { total: 5, cost_cents: 5 },
+  breakdown: {
+    by_agent: { "1": 500, "2": 1042 },
+    by_connector: { gmail: 300, stripe: 1242 },
+    by_action_type: { "email.send": 300, "payment.create": 1242 },
+  },
+};
+
+export const freeUsageDetailResponse = {
+  period_start: "2026-03-01T00:00:00Z",
+  period_end: "2026-04-01T00:00:00Z",
+  requests: { total: 450, included: 1000, overage: 0, cost_cents: 0 },
+  sms: { total: 0, cost_cents: 0 },
+  breakdown: {
+    by_agent: { "1": 200, "2": 250 },
+    by_connector: {},
+    by_action_type: {},
+  },
+};
+
+export const agentsResponse = {
+  data: [
+    {
+      agent_id: 1,
+      status: "registered",
+      metadata: { name: "Gmail Bot" },
+      created_at: "2026-02-01T00:00:00Z",
+    },
+    {
+      agent_id: 2,
+      status: "registered",
+      metadata: { name: "Stripe Bot" },
+      created_at: "2026-02-01T00:00:00Z",
+    },
+  ],
+  has_more: false,
 };
 
 export const invoicesResponse = {
