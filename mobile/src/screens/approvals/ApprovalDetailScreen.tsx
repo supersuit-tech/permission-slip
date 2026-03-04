@@ -25,13 +25,13 @@ import {
   buildActionSummary,
   safeParams,
   isExpired as checkExpired,
-  formatParamValue,
   formatTimestamp,
 } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
 import { ConfirmationCodeCard } from "./ConfirmationCodeCard";
 import { ApprovalActions } from "./ApprovalActions";
+import { KeyValueList, type KeyValueEntry } from "./KeyValueList";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -42,6 +42,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
   const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
   const [isDenied, setIsDenied] = useState(false);
+  // Capture the exact timestamp when the user approves/denies so the timeline
+  // doesn't flicker with a new Date() on every re-render.
+  const [resolvedAt, setResolvedAt] = useState<string | null>(null);
 
   const {
     approveApproval,
@@ -61,9 +64,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     : `Agent ${approval.agent_id}`;
 
   const parameters = safeParams(approval.action.parameters);
-  const paramEntries = Object.entries(parameters);
-  const contextDetails = safeParams(approval.context.details);
-  const contextDetailEntries = Object.entries(contextDetails);
+  const paramEntries: KeyValueEntry[] = useMemo(
+    () => Object.entries(parameters).map(([label, value]) => ({ label, value })),
+    [parameters],
+  );
+  const contextDetailEntries: KeyValueEntry[] = useMemo(() => {
+    const details = safeParams(approval.context.details);
+    return Object.entries(details).map(([label, value]) => ({ label, value }));
+  }, [approval.context.details]);
 
   const isPending = approval.status === "pending" && !confirmationCode && !isDenied;
   const expired = checkExpired(approval.status, approval.expires_at);
@@ -71,9 +79,29 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
   const summary = buildActionSummary(approval.action.type, parameters);
 
+  const timelineEntries: KeyValueEntry[] = useMemo(() => {
+    const entries: KeyValueEntry[] = [
+      { label: "Created", value: formatTimestamp(approval.created_at) },
+      { label: "Expires", value: formatTimestamp(approval.expires_at) },
+    ];
+    const approvedTime = approval.approved_at ?? (confirmationCode ? resolvedAt : null);
+    if (approvedTime) {
+      entries.push({ label: "Approved", value: formatTimestamp(approvedTime) });
+    }
+    const deniedTime = approval.denied_at ?? (isDenied ? resolvedAt : null);
+    if (deniedTime) {
+      entries.push({ label: "Denied", value: formatTimestamp(deniedTime) });
+    }
+    if (approval.cancelled_at) {
+      entries.push({ label: "Cancelled", value: formatTimestamp(approval.cancelled_at) });
+    }
+    return entries;
+  }, [approval, confirmationCode, isDenied, resolvedAt]);
+
   const handleApprove = useCallback(async () => {
     try {
       const result = await approveApproval(approval.approval_id);
+      setResolvedAt(new Date().toISOString());
       setConfirmationCode(result.confirmation_code);
     } catch (err) {
       const message =
@@ -94,6 +122,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           onPress: async () => {
             try {
               await denyApproval(approval.approval_id);
+              setResolvedAt(new Date().toISOString());
               setIsDenied(true);
             } catch (err) {
               const message =
@@ -231,7 +260,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
               <Text style={styles.actionSummary}>{summary}</Text>
             )}
 
-            {/* Context description — inline with the action for quick scanning */}
             {approval.context.description && (
               <View style={styles.contextInline}>
                 <Text style={styles.contextDescription}>
@@ -240,7 +268,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
               </View>
             )}
 
-            {/* Risk explanation — inline for high/medium risk */}
             {approval.context.risk_level &&
               approval.context.risk_level !== "low" && (
                 <View style={styles.riskRow}>
@@ -252,7 +279,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* High risk warning — prominent, outside the card */}
+        {/* High risk warning */}
         {approval.context.risk_level === "high" && (
           <View style={styles.section}>
             <View
@@ -287,30 +314,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Parameters</Text>
             <View style={styles.card}>
-              {paramEntries.map(([key, value], index) => {
-                const formatted = formatParamValue(value);
-                const isLong = formatted.length > 40 || formatted.includes("\n");
-                const isLast = index === paramEntries.length - 1;
-                return (
-                  <View
-                    key={key}
-                    style={[
-                      isLong ? styles.paramRowVertical : styles.paramRow,
-                      isLast && styles.paramRowLast,
-                    ]}
-                  >
-                    <Text style={styles.paramKey}>{key}</Text>
-                    <Text
-                      style={
-                        isLong ? styles.paramValueFull : styles.paramValue
-                      }
-                      selectable
-                    >
-                      {formatted}
-                    </Text>
-                  </View>
-                );
-              })}
+              <KeyValueList entries={paramEntries} />
             </View>
           </View>
         )}
@@ -320,74 +324,16 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Additional Context</Text>
             <View style={styles.card}>
-              {contextDetailEntries.map(([key, value], index) => {
-                const formatted = formatParamValue(value);
-                const isLong = formatted.length > 40 || formatted.includes("\n");
-                const isLast = index === contextDetailEntries.length - 1;
-                return (
-                  <View
-                    key={key}
-                    style={[
-                      isLong ? styles.paramRowVertical : styles.paramRow,
-                      isLast && styles.paramRowLast,
-                    ]}
-                  >
-                    <Text style={styles.paramKey}>{key}</Text>
-                    <Text
-                      style={
-                        isLong ? styles.paramValueFull : styles.paramValue
-                      }
-                      selectable
-                    >
-                      {formatted}
-                    </Text>
-                  </View>
-                );
-              })}
+              <KeyValueList entries={contextDetailEntries} />
             </View>
           </View>
         )}
 
-        {/* Timestamps */}
+        {/* Timeline */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Timeline</Text>
           <View style={styles.card}>
-            <View style={styles.paramRow}>
-              <Text style={styles.paramKey}>Created</Text>
-              <Text style={styles.paramValue}>
-                {formatTimestamp(approval.created_at)}
-              </Text>
-            </View>
-            <View style={styles.paramRow}>
-              <Text style={styles.paramKey}>Expires</Text>
-              <Text style={styles.paramValue}>
-                {formatTimestamp(approval.expires_at)}
-              </Text>
-            </View>
-            {(approval.approved_at ?? (confirmationCode ? new Date().toISOString() : null)) && (
-              <View style={styles.paramRow}>
-                <Text style={styles.paramKey}>Approved</Text>
-                <Text style={styles.paramValue}>
-                  {formatTimestamp(approval.approved_at ?? new Date().toISOString())}
-                </Text>
-              </View>
-            )}
-            {(approval.denied_at ?? (isDenied ? new Date().toISOString() : null)) && (
-              <View style={styles.paramRow}>
-                <Text style={styles.paramKey}>Denied</Text>
-                <Text style={styles.paramValue}>
-                  {formatTimestamp(approval.denied_at ?? new Date().toISOString())}
-                </Text>
-              </View>
-            )}
-            {approval.cancelled_at && (
-              <View style={styles.paramRow}>
-                <Text style={styles.paramKey}>Cancelled</Text>
-                <Text style={styles.paramValue}>
-                  {formatTimestamp(approval.cancelled_at)}
-                </Text>
-              </View>
-            )}
+            <KeyValueList entries={timelineEntries} />
           </View>
         </View>
 
@@ -598,40 +544,6 @@ const styles = StyleSheet.create({
   expiryLabel: {
     fontSize: 14,
     color: colors.gray500,
-  },
-  paramRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  paramRowVertical: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  paramRowLast: {
-    borderBottomWidth: 0,
-  },
-  paramKey: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.gray500,
-    marginRight: 12,
-    flexShrink: 0,
-  },
-  paramValue: {
-    fontSize: 13,
-    color: colors.gray900,
-    flex: 1,
-    textAlign: "right",
-  },
-  paramValueFull: {
-    fontSize: 13,
-    color: colors.gray900,
-    marginTop: 4,
-    lineHeight: 19,
   },
   footerLabel: {
     fontSize: 11,
