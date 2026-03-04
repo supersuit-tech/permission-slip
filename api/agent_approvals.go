@@ -29,29 +29,11 @@ type agentApprovalConfigRef struct {
 }
 
 type agentRequestApprovalResponse struct {
-	ApprovalID           string    `json:"approval_id"`
-	ApprovalURL          string    `json:"approval_url"`
-	Status               string    `json:"status"`
-	ExpiresAt            time.Time `json:"expires_at"`
-	VerificationRequired bool      `json:"verification_required"`
-	CreatedAt            time.Time `json:"created_at"`
-}
-
-type agentVerifyApprovalRequest struct {
-	ConfirmationCode string `json:"confirmation_code" validate:"required"`
-}
-
-type agentVerifyApprovalResponse struct {
-	Status     string                  `json:"status"`
-	ApprovedAt time.Time               `json:"approved_at"`
-	Token      *agentApprovalTokenResp `json:"token"`
-}
-
-type agentApprovalTokenResp struct {
-	AccessToken  string    `json:"access_token"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	Scope        string    `json:"scope"`
-	ScopeVersion string    `json:"scope_version"`
+	ApprovalID  string    `json:"approval_id"`
+	ApprovalURL string    `json:"approval_url"`
+	Status      string    `json:"status"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type agentCancelApprovalResponse struct {
@@ -66,7 +48,6 @@ type agentCancelApprovalResponse struct {
 func RegisterAgentApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireAgent := RequireAgentSignature(deps)
 	mux.Handle("POST /approvals/request", requireAgent(handleAgentRequestApproval(deps)))
-	mux.Handle("POST /approvals/{approval_id}/verify", requireAgent(handleAgentVerifyApproval(deps)))
 	mux.Handle("POST /approvals/{approval_id}/cancel", requireAgent(handleAgentCancelApproval(deps)))
 }
 
@@ -222,153 +203,11 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		approvalURL := fmt.Sprintf("%s/approve/%s", deps.BaseURL, approval.ApprovalID)
 
 		RespondJSON(w, http.StatusOK, agentRequestApprovalResponse{
-			ApprovalID:           approval.ApprovalID,
-			ApprovalURL:          approvalURL,
-			Status:               approval.Status,
-			ExpiresAt:            approval.ExpiresAt,
-			VerificationRequired: true,
-			CreatedAt:            approval.CreatedAt,
-		})
-	}
-}
-
-// ── POST /approvals/{approval_id}/verify ───────────────────────────────────
-
-func handleAgentVerifyApproval(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		agent := AuthenticatedAgent(r.Context())
-		approvalID := r.PathValue("approval_id")
-
-		if strings.TrimSpace(approvalID) == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "approval_id is required"))
-			return
-		}
-
-		var req agentVerifyApprovalRequest
-		if !DecodeJSONOrReject(w, r, &req) {
-			return
-		}
-		if !ValidateRequest(w, r, &req) {
-			return
-		}
-
-		normalized := normalizeConfirmationCode(req.ConfirmationCode)
-		if len(normalized) != shared.ConfirmationCodeLength {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Invalid confirmation code format"))
-			return
-		}
-
-		codeHash := hashCodeHex(normalized, deps.InviteHMACKey)
-
-		// Wrap code verification + token minting in a transaction so that
-		// if token minting fails, the confirmation code is not consumed.
-		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
-		if err != nil {
-			log.Printf("[%s] AgentVerifyApproval: begin tx: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify approval"))
-			return
-		}
-		if owned {
-			defer func() { _ = db.RollbackTx(r.Context(), tx) }()
-		}
-
-		appr, err := db.VerifyApprovalConfirmationCode(r.Context(), tx, approvalID, agent.AgentID, codeHash)
-		if err != nil {
-			// On invalid code, commit the transaction to persist the attempt
-			// increment so the 5-attempt brute-force lockout stays effective.
-			// Other error paths (not found, expired, locked) didn't modify
-			// any rows, so the deferred rollback is harmless for those.
-			var apprErr *db.ApprovalError
-			if owned && errors.As(err, &apprErr) && apprErr.Code == db.ApprovalErrInvalidCode {
-				if commitErr := db.CommitTx(r.Context(), tx); commitErr != nil {
-					log.Printf("[%s] AgentVerifyApproval: commit attempt increment: %v", TraceID(r.Context()), commitErr)
-				}
-			}
-			if handleAgentApprovalError(w, r, err) {
-				return
-			}
-			log.Printf("[%s] AgentVerifyApproval: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify approval"))
-			return
-		}
-
-		// Check signing key after verification so that verification errors
-		// (not found, expired, wrong code) are returned with the correct
-		// status code instead of a generic 503.
-		if deps.ActionTokenSigningKey == nil {
-			log.Printf("[%s] AgentVerifyApproval: action token signing key not configured", TraceID(r.Context()))
-			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Action token signing not available"))
-			return
-		}
-
-		// Look up the approver's username for the JWT "approver" claim.
-		// approver_id is an FK, so a nil profile indicates data inconsistency.
-		approverProfile, err := db.GetProfileByUserID(r.Context(), tx, appr.ApproverID)
-		if err != nil {
-			log.Printf("[%s] AgentVerifyApproval: profile lookup: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to mint action token"))
-			return
-		}
-		if approverProfile == nil {
-			log.Printf("[%s] AgentVerifyApproval: no profile for approver_id=%s", TraceID(r.Context()), appr.ApproverID)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to mint action token"))
-			return
-		}
-		approverUsername := approverProfile.Username
-
-		// Generate a unique JTI for single-use enforcement.
-		jti, err := generatePrefixedID("tok_", 16)
-		if err != nil {
-			log.Printf("[%s] AgentVerifyApproval: generate JTI: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to mint action token"))
-			return
-		}
-
-		claims, err := buildActionTokenClaims(agent.AgentID, approverUsername, appr.ApprovalID, appr.Action, appr.ExpiresAt, jti)
-		if err != nil {
-			log.Printf("[%s] AgentVerifyApproval: build claims: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to mint action token"))
-			return
-		}
-
-		accessToken, err := MintActionToken(deps.ActionTokenSigningKey, deps.ActionTokenKeyID, claims)
-		if err != nil {
-			log.Printf("[%s] AgentVerifyApproval: sign token: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to mint action token"))
-			return
-		}
-
-		// Persist the JTI for single-use tracking. This is now within the
-		// transaction, so failure here rolls back the code consumption too.
-		if err := db.SetApprovalTokenJTI(r.Context(), tx, appr.ApprovalID, jti); err != nil {
-			log.Printf("[%s] AgentVerifyApproval: set token_jti: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to mint action token"))
-			return
-		}
-
-		// Everything succeeded — commit the transaction.
-		if owned {
-			if err := db.CommitTx(r.Context(), tx); err != nil {
-				log.Printf("[%s] AgentVerifyApproval: commit: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify approval"))
-				return
-			}
-		}
-
-		approvedAt := time.Now().UTC()
-		if appr.ApprovedAt != nil {
-			approvedAt = *appr.ApprovedAt
-		}
-
-		RespondJSON(w, http.StatusOK, agentVerifyApprovalResponse{
-			Status:     appr.Status,
-			ApprovedAt: approvedAt,
-			Token: &agentApprovalTokenResp{
-				AccessToken:  accessToken,
-				ExpiresAt:    claims.ExpiresAt.Time,
-				Scope:        claims.Scope,
-				ScopeVersion: claims.ScopeVersion,
-			},
+			ApprovalID:  approval.ApprovalID,
+			ApprovalURL: approvalURL,
+			Status:      approval.Status,
+			ExpiresAt:   approval.ExpiresAt,
+			CreatedAt:   approval.CreatedAt,
 		})
 	}
 }
@@ -411,42 +250,9 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 
 // ── Error handling ─────────────────────────────────────────────────────────
 
-// handleAgentApprovalError maps db.ApprovalError to the appropriate HTTP
-// response for agent-facing endpoints. Returns true if the error was handled.
-func handleAgentApprovalError(w http.ResponseWriter, r *http.Request, err error) bool {
-	var apprErr *db.ApprovalError
-	if !errors.As(err, &apprErr) {
-		return false
-	}
-	switch apprErr.Code {
-	case db.ApprovalErrNotFound:
-		RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
-	case db.ApprovalErrAlreadyResolved:
-		resp := Conflict(ErrApprovalAlreadyResolved, "Approval already resolved")
-		if apprErr.Status != "" {
-			resp.Error.Details = map[string]any{"status": apprErr.Status}
-		}
-		RespondError(w, r, http.StatusConflict, resp)
-	case db.ApprovalErrExpired:
-		RespondError(w, r, http.StatusGone, Gone(ErrApprovalExpired, "Approval has expired"))
-	case db.ApprovalErrInvalidCode:
-		RespondError(w, r, http.StatusUnprocessableEntity, unprocessableEntity(ErrInvalidCode, "Incorrect confirmation code"))
-	case db.ApprovalErrVerificationLocked:
-		RespondError(w, r, http.StatusForbidden, Forbidden(ErrVerificationLocked, "Too many failed verification attempts"))
-	case db.ApprovalErrNotYetApproved:
-		resp := Conflict(ErrApprovalAlreadyResolved, "Approval has not been approved yet")
-		resp.Error.Details = map[string]any{"status": "pending"}
-		RespondError(w, r, http.StatusConflict, resp)
-	default:
-		return false
-	}
-	return true
-}
-
-// unprocessableEntity returns a 422 ErrorResponse.
-func unprocessableEntity(code ErrorCode, message string) ErrorResponse {
-	return ErrorResponse{Error: Error{Code: code, Message: message, Retryable: false}}
-}
+// handleAgentApprovalError is an alias for the shared handleApprovalError
+// in approvals.go. Both dashboard and agent endpoints use the same mapping.
+var handleAgentApprovalError = handleApprovalError
 
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.
 // Only the action type is persisted — parameters are redacted.

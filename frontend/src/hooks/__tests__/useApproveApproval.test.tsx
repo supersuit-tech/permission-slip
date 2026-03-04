@@ -12,7 +12,6 @@ const mockApproveResponse = {
   approval_id: "approval-abc",
   status: "approved",
   approved_at: "2026-02-21T12:00:00Z",
-  confirmation_code: "XK7-M9P",
 };
 
 describe("useApproveApproval", () => {
@@ -46,7 +45,7 @@ describe("useApproveApproval", () => {
     expect(result.current.isPending).toBe(false);
   });
 
-  it("returns the confirmation code from the response", async () => {
+  it("returns the approval data from the response", async () => {
     setupAuthMocks({ authenticated: true });
     mockPost.mockResolvedValue({ data: mockApproveResponse });
 
@@ -59,7 +58,8 @@ describe("useApproveApproval", () => {
       response = await result.current.approveApproval("approval-abc");
     });
 
-    expect(response!.confirmation_code).toBe("XK7-M9P");
+    expect(response!.approval_id).toBe("approval-abc");
+    expect(response!.status).toBe("approved");
   });
 
   it("throws when not authenticated", async () => {

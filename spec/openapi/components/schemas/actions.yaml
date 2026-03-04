@@ -29,12 +29,9 @@ ExecuteActionTokenRequest:
       type: string
       maxLength: 4096
       description: |
-        Single-use token issued after the user approved the action. This token authorizes 
+        Single-use token issued after the user approved the action. This token authorizes
         Permission Slip to execute the action on behalf of the user.
-        
-        Tokens are returned from the `/v1/approvals/{approval_id}/verify` endpoint after 
-        the agent submits the correct confirmation code.
-        
+
         **Lifecycle**:
         - Single-use: consumed after successful execution
         - Short-lived: typically expires 5 minutes after issuance

@@ -158,10 +158,7 @@ paths:
 
   /v1/approvals/request:
     $ref: './components/paths/approvals.yaml#/request'
-  
-  /v1/approvals/{approval_id}/verify:
-    $ref: './components/paths/approvals.yaml#/verifyApproval'
-  
+
   /v1/approvals/{approval_id}/cancel:
     $ref: './components/paths/approvals.yaml#/cancel'
 
@@ -289,10 +286,6 @@ components:
       $ref: './components/schemas/approvals.yaml#/ApprovalRequest'
     ApprovalRequestResponse:
       $ref: './components/schemas/approvals.yaml#/ApprovalRequestResponse'
-    VerifyApprovalRequest:
-      $ref: './components/schemas/approvals.yaml#/VerifyApprovalRequest'
-    VerifyApprovalResponse:
-      $ref: './components/schemas/approvals.yaml#/VerifyApprovalResponse'
     CancelApprovalRequest:
       $ref: './components/schemas/approvals.yaml#/CancelApprovalRequest'
     CancelApprovalResponse:

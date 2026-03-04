@@ -98,7 +98,7 @@ export function RiskBadge({ level }: { level?: "low" | "medium" | "high" | null 
   );
 }
 
-
+/** Confirmation code display used during agent registration. */
 export function ConfirmationCodeBanner({
   code,
   copyable = false,
