@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
@@ -8,9 +9,20 @@ import { UsageSummaryCard } from "./UsageSummaryCard";
 import { UpgradeCTA } from "./UpgradeCTA";
 import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
+import { UpgradeSuccessBanner } from "./UpgradeSuccessBanner";
 
 export function BillingPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showSuccess, setShowSuccess] = useState(
+    searchParams.get("upgraded") === "true",
+  );
+
+  function dismissSuccess() {
+    setShowSuccess(false);
+    searchParams.delete("upgraded");
+    setSearchParams(searchParams, { replace: true });
+  }
 
   return (
     <div className="space-y-6">
@@ -24,6 +36,8 @@ export function BillingPage() {
         </Link>
         <h1 className="text-2xl font-bold tracking-tight">Billing</h1>
       </div>
+
+      {showSuccess && <UpgradeSuccessBanner onDismiss={dismissSuccess} />}
 
       {isLoading ? (
         <BillingPageSkeleton />

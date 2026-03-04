@@ -67,8 +67,20 @@ type invoiceListResponse struct {
 }
 
 type downgradeResponse struct {
-	Status string `json:"status"`
-	PlanID string `json:"plan_id"`
+	Status            string     `json:"status"`
+	PlanID            string     `json:"plan_id"`
+	DowngradedAt      *time.Time `json:"downgraded_at"`
+	GracePeriodEndsAt *time.Time `json:"grace_period_ends_at"`
+}
+
+// gracePeriodEnd returns the time when the 7-day grace period expires for a
+// given downgrade timestamp, or nil if no downgrade timestamp is set.
+func gracePeriodEnd(downgradedAt *time.Time) *time.Time {
+	if downgradedAt == nil {
+		return nil
+	}
+	t := downgradedAt.Add(db.DowngradeGracePeriod)
+	return &t
 }
 
 // maxInvoiceResults is the maximum number of invoices returned by the list endpoint.
@@ -204,8 +216,8 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 		}
 
 		// Build success/cancel URLs.
-		successURL := deps.BaseURL + "/settings?checkout=success"
-		cancelURL := deps.BaseURL + "/settings?checkout=cancel"
+		successURL := deps.BaseURL + "/billing?upgraded=true"
+		cancelURL := deps.BaseURL + "/billing"
 
 		sess, err := deps.Stripe.CreateCheckoutSession(r.Context(), stripeCustomerID, successURL, cancelURL)
 		if err != nil {
@@ -345,8 +357,10 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, downgradeResponse{
-			Status: string(updated.Status),
-			PlanID: updated.PlanID,
+			Status:            string(updated.Status),
+			PlanID:            updated.PlanID,
+			DowngradedAt:      updated.DowngradedAt,
+			GracePeriodEndsAt: gracePeriodEnd(updated.DowngradedAt),
 		})
 	}
 }
