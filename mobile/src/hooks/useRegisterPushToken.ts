@@ -75,3 +75,33 @@ export function useRegisterPushToken() {
     unregisterError: unregister.error?.message ?? null,
   };
 }
+
+/**
+ * Unregisters a push token using an explicit access token. This is needed
+ * during logout when the auth session is already cleared but we still need
+ * to clean up the backend subscription. Best-effort — failures are logged
+ * in dev but don't throw.
+ */
+export async function unregisterPushTokenDirect(
+  expoToken: string,
+  accessToken: string,
+): Promise<void> {
+  try {
+    const { error } = await client.POST("/v1/push-subscriptions/unregister", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: { expo_token: expoToken },
+    });
+    if (error) {
+      const msg = getApiErrorMessage(error, "Failed to unregister push token");
+      if (__DEV__) {
+        console.warn(`[push] Unregister failed: ${msg}`);
+      }
+    } else if (__DEV__) {
+      console.log("[push] Token unregistered from backend");
+    }
+  } catch {
+    if (__DEV__) {
+      console.warn("[push] Unregister request failed (network error)");
+    }
+  }
+}
