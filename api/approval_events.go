@@ -166,11 +166,12 @@ func sseTokenFromQuery(next http.Handler) http.Handler {
 
 func handleApprovalEvents(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Streaming not supported"))
-			return
-		}
+		// Use http.ResponseController to access Flush through middleware
+		// wrappers (e.g. statusRecorder) that implement Unwrap().
+		// A direct w.(http.Flusher) type assertion fails on wrapped writers
+		// because the wrapper type doesn't implement the interface, even
+		// though the underlying writer does.
+		rc := http.NewResponseController(w)
 
 		profile := Profile(r.Context())
 		userID := profile.ID
@@ -194,7 +195,9 @@ func handleApprovalEvents(deps *Deps) http.HandlerFunc {
 
 		// Send an initial connected event so the client knows the stream is live.
 		fmt.Fprintf(w, "event: connected\ndata: {}\n\n")
-		flusher.Flush()
+		if err := rc.Flush(); err != nil {
+			return
+		}
 
 		heartbeat := time.NewTicker(30 * time.Second)
 		defer heartbeat.Stop()
@@ -208,10 +211,10 @@ func handleApprovalEvents(deps *Deps) http.HandlerFunc {
 					return
 				}
 				fmt.Fprintf(w, "%s\n\n", event)
-				flusher.Flush()
+				rc.Flush()
 			case <-heartbeat.C:
 				fmt.Fprintf(w, ": heartbeat\n\n")
-				flusher.Flush()
+				rc.Flush()
 			}
 		}
 	}
