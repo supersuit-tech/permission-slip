@@ -333,6 +333,11 @@ UsageSummary:
 
 BillingPlanResponse:
   type: object
+  description: |
+    Complete billing information for the authenticated user. Combines plan
+    details (including resource limits), subscription status, and current
+    usage counts. Used by the frontend to render limit badges, upgrade
+    prompts, and gate features like SMS notifications.
   required:
     - plan
     - subscription

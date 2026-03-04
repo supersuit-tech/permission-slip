@@ -30,8 +30,8 @@ export function RetentionBanner({ retention }: RetentionBannerProps) {
           <span className="font-medium">
             {formatGracePeriodDate(grace_period_ends_at)}
           </span>
-          . After that, retention will be {days === 90 ? days : 7} days.{" "}
-          <Link to="/settings" className="font-medium underline">
+          . After that, retention will drop to 7 days.{" "}
+          <Link to="/billing" className="font-medium underline">
             Upgrade
           </Link>{" "}
           to keep 90-day history.
@@ -47,8 +47,8 @@ export function RetentionBanner({ retention }: RetentionBannerProps) {
     <div className="bg-muted/50 flex items-center gap-2 rounded-lg border px-4 py-3">
       <Clock className="text-muted-foreground size-4 shrink-0" />
       <p className="text-muted-foreground text-sm">
-        Showing events from the last {days} days.{" "}
-        <Link to="/settings" className="text-foreground font-medium underline">
+        Showing last {days} days (Free plan).{" "}
+        <Link to="/billing" className="text-foreground font-medium underline">
           Upgrade
         </Link>{" "}
         for 90-day history.

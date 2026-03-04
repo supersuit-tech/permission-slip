@@ -3,7 +3,10 @@ import { KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCredentials } from "@/hooks/useCredentials";
 import { useDeleteCredential } from "@/hooks/useDeleteCredential";
+import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { LimitBadge } from "@/components/LimitBadge";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +21,12 @@ import { AddCredentialDialog } from "./AddCredentialDialog";
 export function CredentialSection() {
   const { credentials, isLoading, error } = useCredentials();
   const { deleteCredential, isLoading: isDeleting } = useDeleteCredential();
+  const {
+    max: maxCredentials,
+    current: credentialCount,
+    atLimit,
+    hasData: hasBillingData,
+  } = useResourceLimit("max_credentials", credentials.length);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   async function handleDelete(credentialId: string, service: string) {
@@ -39,20 +48,28 @@ export function CredentialSection() {
             <div className="flex items-center gap-2">
               <KeyRound className="text-muted-foreground size-5" />
               <CardTitle>Credential Vault</CardTitle>
-              {credentials.length > 0 && (
+              {hasBillingData ? (
+                <LimitBadge
+                  current={credentialCount}
+                  max={maxCredentials}
+                  resource="credentials"
+                />
+              ) : credentials.length > 0 ? (
                 <Badge variant="outline" className="ml-1">
                   {credentials.length}
                 </Badge>
-              )}
+              ) : null}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-            >
-              <Plus className="size-4" />
-              Add Credential
-            </Button>
+            {!atLimit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <Plus className="size-4" />
+                Add Credential
+              </Button>
+            )}
           </div>
           <CardDescription>
             Service credentials stored in your encrypted vault. These are used by
@@ -107,6 +124,11 @@ export function CredentialSection() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {atLimit && (
+            <div className="mt-4">
+              <UpgradePrompt feature="Upgrade to store more credentials." />
             </div>
           )}
         </CardContent>
