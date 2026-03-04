@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -228,6 +229,27 @@ func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newSt
 
 	// UPDATE matched zero rows — determine why.
 	return nil, nil, diagnoseApprovalFailure(ctx, db, approvalID, approverID)
+}
+
+// UpdateApprovalExecution atomically sets execution_status, execution_result,
+// and executed_at on an approved approval row. Only updates if the approval is
+// in 'approved' status and has no prior execution result (executed_at IS NULL).
+func UpdateApprovalExecution(ctx context.Context, db DBTX, approvalID, executionStatus string, executionResult json.RawMessage) error {
+	tag, err := db.Exec(ctx,
+		`UPDATE approvals
+		 SET execution_status = $2, execution_result = $3, executed_at = now()
+		 WHERE approval_id = $1
+		   AND status = 'approved'
+		   AND executed_at IS NULL`,
+		approvalID, executionStatus, executionResult,
+	)
+	if err != nil {
+		return fmt.Errorf("update approval execution: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("approval %s not eligible for execution update", approvalID)
+	}
+	return nil
 }
 
 // diagnoseApprovalFailure reads the current approval row to determine why an

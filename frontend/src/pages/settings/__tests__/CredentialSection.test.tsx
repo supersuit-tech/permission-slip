@@ -13,7 +13,21 @@ import { CredentialSection } from "../CredentialSection";
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
-function mockApiFetch(credentials: unknown[] = []) {
+const freePlanResponse = {
+  plan: {
+    id: "free",
+    name: "Free",
+    max_requests_per_month: 1000,
+    max_agents: 3,
+    max_standing_approvals: 5,
+    max_credentials: 5,
+    audit_retention_days: 7,
+  },
+  subscription: { status: "active", can_upgrade: true, can_downgrade: false },
+  usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
+};
+
+function mockApiFetch(credentials: unknown[] = [], billingPlan = freePlanResponse) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/profile") {
@@ -29,6 +43,9 @@ function mockApiFetch(credentials: unknown[] = []) {
     }
     if (url === "/v1/credentials") {
       return Promise.resolve({ data: { credentials } });
+    }
+    if (url === "/v1/billing/plan") {
+      return Promise.resolve({ data: billingPlan });
     }
     return Promise.resolve({ data: null });
   });
@@ -283,26 +300,103 @@ describe("CredentialSection", () => {
     });
   });
 
-  it("shows credential count badge", async () => {
-    mockApiFetch([
-      {
-        id: "cred-1",
-        service: "GitHub",
-        label: "Token",
-        created_at: "2026-01-15T00:00:00Z",
-      },
-      {
-        id: "cred-2",
-        service: "Slack",
-        label: "Bot",
-        created_at: "2026-01-16T00:00:00Z",
-      },
-    ]);
+  it("shows credential count with limit badge", async () => {
+    const planWith2Creds = {
+      ...freePlanResponse,
+      usage: { ...freePlanResponse.usage, credentials: 2 },
+    };
+    mockApiFetch(
+      [
+        {
+          id: "cred-1",
+          service: "GitHub",
+          label: "Token",
+          created_at: "2026-01-15T00:00:00Z",
+        },
+        {
+          id: "cred-2",
+          service: "Slack",
+          label: "Bot",
+          created_at: "2026-01-16T00:00:00Z",
+        },
+      ],
+      planWith2Creds,
+    );
 
     render(<CredentialSection />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.getByText("2 / 5 credentials")).toBeInTheDocument();
     });
+  });
+
+  it("shows upgrade prompt when at credential limit", async () => {
+    const atLimitPlan = {
+      ...freePlanResponse,
+      usage: { ...freePlanResponse.usage, credentials: 5 },
+    };
+    mockApiFetch(
+      [
+        { id: "cred-1", service: "S1", created_at: "2026-01-15T00:00:00Z" },
+        { id: "cred-2", service: "S2", created_at: "2026-01-15T00:00:00Z" },
+        { id: "cred-3", service: "S3", created_at: "2026-01-15T00:00:00Z" },
+        { id: "cred-4", service: "S4", created_at: "2026-01-15T00:00:00Z" },
+        { id: "cred-5", service: "S5", created_at: "2026-01-15T00:00:00Z" },
+      ],
+      atLimitPlan,
+    );
+
+    render(<CredentialSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Upgrade to store more credentials/),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: "Add Credential" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("falls back to plain count badge when billing data is unavailable", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/profile") {
+        return Promise.resolve({
+          data: {
+            id: "user-123",
+            username: "alice",
+            marketing_opt_in: false,
+            created_at: "2026-01-01T00:00:00Z",
+          },
+          response: { status: 200 },
+        });
+      }
+      if (url === "/v1/credentials") {
+        return Promise.resolve({
+          data: {
+            credentials: [
+              { id: "cred-1", service: "GitHub", label: "Token", created_at: "2026-01-15T00:00:00Z" },
+            ],
+          },
+        });
+      }
+      if (url === "/v1/billing/plan") {
+        return Promise.reject(new Error("Billing unavailable"));
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    render(<CredentialSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("GitHub")).toBeInTheDocument();
+    });
+    // Should show plain count badge (fallback), not limit badge
+    expect(screen.getByText("1")).toBeInTheDocument();
+    // Should still show Add Credential button (not gated since billing unknown)
+    expect(
+      screen.getByRole("button", { name: "Add Credential" }),
+    ).toBeInTheDocument();
   });
 });

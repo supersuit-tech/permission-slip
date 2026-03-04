@@ -235,3 +235,21 @@ func notifyApprovalChange(deps *Deps, userID string, eventType string, approvalI
 		)
 	}
 }
+
+// notifyApprovalExecuted sends an SSE event with the execution status when an
+// approved action has been executed. This notifies the approver's connected
+// browser tabs so they can update the UI with the execution outcome.
+func notifyApprovalExecuted(deps *Deps, userID string, approvalID string, executionStatus string) {
+	if deps.ApprovalEvents == nil {
+		return
+	}
+	event := fmt.Sprintf("event: approval_executed\ndata: {\"approval_id\":%q,\"execution_status\":%q}", approvalID, executionStatus)
+	deps.ApprovalEvents.Notify(userID, event)
+	if deps.Logger != nil {
+		deps.Logger.Debug("SSE event sent",
+			slog.String("event_type", "approval_executed"),
+			slog.String("approval_id", approvalID),
+			slog.String("execution_status", executionStatus),
+		)
+	}
+}

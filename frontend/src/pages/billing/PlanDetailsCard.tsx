@@ -4,7 +4,6 @@ import {
   CreditCard,
   ExternalLink,
   Loader2,
-  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,11 +17,13 @@ import {
 import { useDowngradePlan } from "@/hooks/useDowngradePlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { useBillingInvoices } from "@/hooks/useBillingInvoices";
-import type { Subscription } from "@/hooks/useBillingPlan";
-import { formatCents, formatDate, isSafeUrl } from "./formatters";
+import type { Subscription, UsageSummary } from "@/hooks/useBillingPlan";
+import { formatCents, formatDate, isStripeUrl } from "./formatters";
+import { DowngradeConfirmDialog } from "./DowngradeConfirmDialog";
 
 interface PlanDetailsCardProps {
   subscription: Subscription;
+  usage: UsageSummary;
 }
 
 function CostEstimate() {
@@ -75,7 +76,7 @@ function InvoicesList() {
           </span>
           <div className="flex items-center gap-3">
             <span className="tabular-nums">{formatCents(invoice.amount_cents)}</span>
-            {invoice.stripe_invoice_url && isSafeUrl(invoice.stripe_invoice_url) && (
+            {invoice.stripe_invoice_url && isStripeUrl(invoice.stripe_invoice_url) && (
               <a
                 href={invoice.stripe_invoice_url}
                 target="_blank"
@@ -93,11 +94,17 @@ function InvoicesList() {
   );
 }
 
-function DowngradeSection() {
+interface DowngradeSectionProps {
+  usage: UsageSummary;
+}
+
+function DowngradeSection({ usage }: DowngradeSectionProps) {
   const { downgrade, isDowngrading } = useDowngradePlan();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [downgradeError, setDowngradeError] = useState<string | null>(null);
 
   async function handleDowngrade() {
+    setDowngradeError(null);
     try {
       const result = await downgrade();
       setShowConfirm(false);
@@ -106,61 +113,36 @@ function DowngradeSection() {
         : "";
       toast.success(`Your plan has been downgraded to Free.${graceMsg}`);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to downgrade. Please try again.",
-      );
+      const message = err instanceof Error ? err.message : "Failed to downgrade. Please try again.";
+      setDowngradeError(message);
     }
   }
 
-  if (!showConfirm) {
-    return (
+  return (
+    <>
       <Button
         variant="outline"
         size="sm"
-        onClick={() => setShowConfirm(true)}
+        onClick={() => {
+          setDowngradeError(null);
+          setShowConfirm(true);
+        }}
       >
         Downgrade to Free
       </Button>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
-      <div className="flex items-start gap-2">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
-        <div className="space-y-1">
-          <p className="text-sm font-medium">Are you sure?</p>
-          <p className="text-xs text-muted-foreground">
-            You&apos;ll lose access to unlimited resources. Your 90-day audit
-            retention will be preserved for a 7-day grace period so you can
-            export your data before it reverts to 7 days.
-          </p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleDowngrade}
-          disabled={isDowngrading}
-        >
-          {isDowngrading && <Loader2 className="animate-spin" />}
-          Confirm Downgrade
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowConfirm(false)}
-          disabled={isDowngrading}
-        >
-          Cancel
-        </Button>
-      </div>
-    </div>
+      <DowngradeConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirm={handleDowngrade}
+        isPending={isDowngrading}
+        error={downgradeError}
+        usage={usage}
+      />
+    </>
   );
 }
 
-export function PlanDetailsCard({ subscription }: PlanDetailsCardProps) {
+export function PlanDetailsCard({ subscription, usage }: PlanDetailsCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -201,7 +183,7 @@ export function PlanDetailsCard({ subscription }: PlanDetailsCardProps) {
 
           {subscription.can_downgrade && (
             <div className="border-t pt-4">
-              <DowngradeSection />
+              <DowngradeSection usage={usage} />
             </div>
           )}
         </div>

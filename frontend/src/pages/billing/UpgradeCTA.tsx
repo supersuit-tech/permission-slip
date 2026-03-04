@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpRight, Check, Loader2, Sparkles } from "lucide-react";
+import { ArrowUpRight, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,10 @@ import {
 } from "@/components/ui/card";
 import { useUpgradePlan } from "@/hooks/useUpgradePlan";
 import type { Plan } from "@/hooks/useBillingPlan";
-import { isSafeUrl } from "./formatters";
+import { isStripeUrl } from "./formatters";
+import { PAID_PLAN_FEATURES } from "./constants";
+import { FeatureList } from "./FeatureList";
+import { UpgradeConfirmDialog } from "./UpgradeConfirmDialog";
 
 interface UpgradeCTAProps {
   plan: Plan;
@@ -34,41 +37,28 @@ function buildCurrentFeatures(plan: Plan): string[] {
 
 const PAID_FEATURES = [
   "Unlimited requests (pay per use)",
-  "Unlimited agents",
-  "Unlimited standing approvals",
-  "Unlimited credentials",
-  "90-day audit retention",
+  ...PAID_PLAN_FEATURES,
 ];
-
-function FeatureList({ features, variant }: { features: string[]; variant: "free" | "paid" }) {
-  return (
-    <ul className="space-y-2">
-      {features.map((feature) => (
-        <li key={feature} className="flex items-start gap-2 text-sm">
-          <Check className={`mt-0.5 size-4 shrink-0 ${variant === "paid" ? "text-emerald-600" : "text-muted-foreground"}`} />
-          <span>{feature}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 export function UpgradeCTA({ plan }: UpgradeCTAProps) {
   const { upgrade, isUpgrading } = useUpgradePlan();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const currentFeatures = buildCurrentFeatures(plan);
 
   async function handleUpgrade() {
     try {
       const result = await upgrade();
-      if (result?.checkout_url) {
-        if (!isSafeUrl(result.checkout_url)) {
-          throw new Error("Invalid checkout URL received");
-        }
-        setIsRedirecting(true);
-        window.location.href = result.checkout_url;
+      if (!result?.checkout_url) {
+        throw new Error("No checkout URL returned. Please try again.");
       }
+      if (!isStripeUrl(result.checkout_url)) {
+        throw new Error("Invalid checkout URL received");
+      }
+      setIsRedirecting(true);
+      window.location.href = result.checkout_url;
     } catch (err) {
+      setShowConfirm(false);
       toast.error(
         err instanceof Error ? err.message : "Failed to initiate upgrade. Please try again.",
       );
@@ -78,40 +68,49 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
   const isPending = isUpgrading || isRedirecting;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Sparkles className="text-muted-foreground size-5" />
-          <CardTitle>Upgrade Your Plan</CardTitle>
-        </div>
-        <CardDescription>
-          Unlock unlimited resources with Pay-as-you-go.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="rounded-lg border p-4 space-y-3">
-            <h3 className="text-sm font-semibold">{plan.name}</h3>
-            <p className="text-xs text-muted-foreground">Your current plan</p>
-            <FeatureList features={currentFeatures} variant="free" />
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="text-muted-foreground size-5" aria-hidden="true" />
+            <CardTitle>Upgrade Your Plan</CardTitle>
           </div>
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
-            <h3 className="text-sm font-semibold">Pay-as-you-go</h3>
-            <p className="text-xs text-muted-foreground">$0.005/request after free tier</p>
-            <FeatureList features={PAID_FEATURES} variant="paid" />
+          <CardDescription>
+            Unlock unlimited resources with Pay-as-you-go.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="rounded-lg border p-4 space-y-3">
+              <h3 className="text-sm font-semibold">{plan.name}</h3>
+              <p className="text-xs text-muted-foreground">Your current plan</p>
+              <FeatureList features={currentFeatures} variant="muted" />
+            </div>
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <h3 className="text-sm font-semibold">Pay-as-you-go</h3>
+              <p className="text-xs text-muted-foreground">$0.005/request after free tier</p>
+              <FeatureList features={PAID_FEATURES} />
+            </div>
           </div>
-        </div>
-        <div className="mt-6 flex justify-end">
-          <Button onClick={handleUpgrade} disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <ArrowUpRight />
-            )}
-            {isRedirecting ? "Redirecting…" : "Upgrade to Pay-as-you-go"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="mt-6 flex justify-end">
+            <Button onClick={() => setShowConfirm(true)} disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <ArrowUpRight aria-hidden="true" />
+              )}
+              {isRedirecting ? "Redirecting…" : "Upgrade to Pay-as-you-go"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <UpgradeConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirm={handleUpgrade}
+        isPending={isPending}
+      />
+    </>
   );
 }

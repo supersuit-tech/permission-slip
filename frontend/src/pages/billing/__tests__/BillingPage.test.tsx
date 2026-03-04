@@ -12,6 +12,8 @@ import {
   freeUsageDetailResponse,
   invoicesResponse,
   agentsResponse,
+  overLimitPaidPlanResponse,
+  atLimitPaidPlanResponse,
 } from "./fixtures";
 
 vi.mock("../../../lib/supabaseClient");
@@ -145,7 +147,50 @@ describe("BillingPage", () => {
       expect(screen.queryByText("Plan Details")).not.toBeInTheDocument();
     });
 
-    it("redirects to Stripe on upgrade click", async () => {
+    it("opens upgrade confirmation dialog on upgrade click", async () => {
+      mockBillingApi(freePlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+
+      await waitFor(() => {
+        expect(screen.getByText("What you get")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Pricing")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Continue to Checkout/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+
+    it("dismisses upgrade dialog when cancel is clicked", async () => {
+      mockBillingApi(freePlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+
+      await waitFor(() => {
+        expect(screen.getByText("What you get")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("What you get")).not.toBeInTheDocument();
+      });
+    });
+
+    it("redirects to Stripe after confirming upgrade dialog", async () => {
       mockBillingApi(freePlanResponse);
       mockPost.mockResolvedValue({
         data: { checkout_url: "https://checkout.stripe.com/test" },
@@ -165,7 +210,15 @@ describe("BillingPage", () => {
           expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
         });
 
+        // Click upgrade button to open dialog
         await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+
+        await waitFor(() => {
+          expect(screen.getByRole("button", { name: /Continue to Checkout/ })).toBeInTheDocument();
+        });
+
+        // Click "Continue to Checkout" in the dialog
+        await user.click(screen.getByRole("button", { name: /Continue to Checkout/ }));
 
         await waitFor(() => {
           expect(window.location.href).toBe("https://checkout.stripe.com/test");
@@ -176,6 +229,32 @@ describe("BillingPage", () => {
           value: originalLocation,
         });
       }
+    });
+
+    it("shows error toast when upgrade API fails", async () => {
+      mockBillingApi(freePlanResponse);
+      mockPost.mockResolvedValue({
+        data: undefined,
+        error: { error: { code: "internal_error", message: "Stripe unavailable" } },
+      });
+
+      const user = userEvent.setup();
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Continue to Checkout/ })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: /Continue to Checkout/ }));
+
+      // Dialog should close on error (upgrade CTA button reappears without dialog)
+      await waitFor(() => {
+        expect(screen.queryByText("What you get")).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -236,7 +315,7 @@ describe("BillingPage", () => {
       });
     });
 
-    it("shows downgrade confirmation on click", async () => {
+    it("opens downgrade confirmation dialog on click", async () => {
       mockBillingApi(paidPlanResponse);
       const user = userEvent.setup();
 
@@ -248,9 +327,159 @@ describe("BillingPage", () => {
 
       await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
 
-      expect(screen.getByText("Are you sure?")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText("What changes")).toBeInTheDocument();
+      });
       expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+
+    it("shows limit warnings when over free plan limits", async () => {
+      mockBillingApi(overLimitPaidPlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/over free plan limits/)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/You have 10 agents/)).toBeInTheDocument();
+      expect(screen.getByText(/You have 25 standing approvals/)).toBeInTheDocument();
+      expect(screen.getByText(/You have 20 credentials/)).toBeInTheDocument();
+
+      // Confirm button should be disabled when over limits
+      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeDisabled();
+
+      // Should show "Manage" links for each over-limit resource
+      expect(screen.getByText("Manage agents")).toBeInTheDocument();
+      expect(screen.getByText("Manage standing approvals")).toBeInTheDocument();
+      expect(screen.getByText("Manage credentials")).toBeInTheDocument();
+    });
+
+    it("does not show limit warnings when at free plan limits", async () => {
+      mockBillingApi(atLimitPaidPlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("What changes")).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/over free plan limits/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeEnabled();
+    });
+
+    it("shows error in downgrade dialog when downgrade API fails", async () => {
+      mockBillingApi(atLimitPaidPlanResponse);
+      mockPost.mockResolvedValue({
+        data: undefined,
+        error: { error: { code: "downgrade_limit_exceeded", message: "Too many active agents" } },
+      });
+
+      const user = userEvent.setup();
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Confirm Downgrade" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Too many active agents")).toBeInTheDocument();
+      });
+    });
+
+    it("dismisses downgrade dialog when cancel is clicked", async () => {
+      mockBillingApi(paidPlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+      await waitFor(() => {
+        expect(screen.getByText("What changes")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("What changes")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Success banner", () => {
+    it("shows success banner when upgraded=true query param is present", async () => {
+      mockBillingApi(paidPlanResponse);
+      wrapper = createAuthWrapper(["/billing?upgraded=true"]);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Welcome to Pay-as-you-go!")).toBeInTheDocument();
+      });
+    });
+
+    it("dismisses success banner when close button is clicked", async () => {
+      mockBillingApi(paidPlanResponse);
+      wrapper = createAuthWrapper(["/billing?upgraded=true"]);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Welcome to Pay-as-you-go!")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Dismiss success message" }));
+
+      expect(screen.queryByText("Welcome to Pay-as-you-go!")).not.toBeInTheDocument();
+    });
+
+    it("does not show success banner without query param", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Current Plan")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Welcome to Pay-as-you-go!")).not.toBeInTheDocument();
+    });
+
+    it("success banner has accessible role", async () => {
+      mockBillingApi(paidPlanResponse);
+      wrapper = createAuthWrapper(["/billing?upgraded=true"]);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Welcome to Pay-as-you-go!")).toBeInTheDocument();
+      });
+      const banner = screen.getByText("Welcome to Pay-as-you-go!").closest("[role='status']");
+      expect(banner).toBeInTheDocument();
     });
   });
 

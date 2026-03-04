@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
@@ -9,9 +10,28 @@ import { UpgradeCTA } from "./UpgradeCTA";
 import { UsageDashboard } from "./UsageDashboard";
 import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
+import { UpgradeSuccessBanner } from "./UpgradeSuccessBanner";
 
 export function BillingPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showSuccess, setShowSuccess] = useState(
+    searchParams.get("upgraded") === "true",
+  );
+
+  // Refetch billing data when returning from Stripe with upgraded=true
+  // to ensure the plan card reflects the new subscription.
+  useEffect(() => {
+    if (showSuccess) {
+      void refetch();
+    }
+  }, [showSuccess, refetch]);
+
+  function dismissSuccess() {
+    setShowSuccess(false);
+    searchParams.delete("upgraded");
+    setSearchParams(searchParams, { replace: true });
+  }
 
   return (
     <div className="space-y-6">
@@ -25,6 +45,8 @@ export function BillingPage() {
         </Link>
         <h1 className="text-2xl font-bold tracking-tight">Billing</h1>
       </div>
+
+      {showSuccess && <UpgradeSuccessBanner onDismiss={dismissSuccess} />}
 
       {isLoading ? (
         <BillingPageSkeleton />
@@ -53,7 +75,10 @@ export function BillingPage() {
             <UpgradeCTA plan={billingPlan.plan} />
           )}
           {billingPlan.subscription.can_downgrade && (
-            <PlanDetailsCard subscription={billingPlan.subscription} />
+            <PlanDetailsCard
+              subscription={billingPlan.subscription}
+              usage={billingPlan.usage}
+            />
           )}
         </>
       ) : null}

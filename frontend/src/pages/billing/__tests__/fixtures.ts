@@ -59,6 +59,28 @@ export const paidPlanResponse = {
   },
 };
 
+/** Paid plan where usage exceeds all free plan limits. */
+export const overLimitPaidPlanResponse = {
+  ...paidPlanResponse,
+  usage: {
+    requests: 3000,
+    agents: 10,
+    standing_approvals: 25,
+    credentials: 20,
+  },
+};
+
+/** Paid plan where usage is exactly at free plan limits (no warnings expected). */
+export const atLimitPaidPlanResponse = {
+  ...paidPlanResponse,
+  usage: {
+    requests: 1000,
+    agents: 3,
+    standing_approvals: 5,
+    credentials: 5,
+  },
+};
+
 export const usageDetailResponse = {
   period_start: "2026-03-01T00:00:00Z",
   period_end: "2026-04-01T00:00:00Z",
