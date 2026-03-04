@@ -44,6 +44,20 @@ func DeleteExpoPushToken(ctx context.Context, db DBTX, userID string, tokenID in
 	return tag.RowsAffected() > 0, nil
 }
 
+// DeleteExpoPushTokenForUser removes an Expo push token by its token string,
+// scoped to a specific user. Used by the mobile app on logout/unregister.
+// Returns true if a row was deleted.
+func DeleteExpoPushTokenForUser(ctx context.Context, db DBTX, userID, token string) (bool, error) {
+	tag, err := db.Exec(ctx,
+		"DELETE FROM expo_push_tokens WHERE user_id = $1 AND token = $2",
+		userID, token,
+	)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // DeleteExpoPushTokenByToken removes an Expo push token by its token string.
 // Used when the Expo push service reports the token as invalid.
 func DeleteExpoPushTokenByToken(ctx context.Context, db DBTX, token string) error {

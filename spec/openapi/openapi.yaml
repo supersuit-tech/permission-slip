@@ -228,6 +228,9 @@ paths:
   /v1/push-subscriptions/{subscription_id}:
     $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptionById'
 
+  /v1/push-subscriptions/unregister:
+    $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptionUnregister'
+
   /v1/expo-push-tokens:
     $ref: './components/paths/expo_push_tokens.yaml#/expoPushTokens'
 
@@ -448,12 +451,20 @@ components:
     # Push Subscriptions
     CreatePushSubscriptionRequest:
       $ref: './components/schemas/push_subscriptions.yaml#/CreatePushSubscriptionRequest'
+    CreateWebPushSubscriptionRequest:
+      $ref: './components/schemas/push_subscriptions.yaml#/CreateWebPushSubscriptionRequest'
+    CreateExpoPushSubscriptionRequest:
+      $ref: './components/schemas/push_subscriptions.yaml#/CreateExpoPushSubscriptionRequest'
     PushSubscriptionResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/PushSubscriptionResponse'
     PushSubscriptionListResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/PushSubscriptionListResponse'
     DeletePushSubscriptionResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/DeletePushSubscriptionResponse'
+    UnregisterExpoPushTokenRequest:
+      $ref: './components/schemas/push_subscriptions.yaml#/UnregisterExpoPushTokenRequest'
+    UnregisterExpoPushTokenResponse:
+      $ref: './components/schemas/push_subscriptions.yaml#/UnregisterExpoPushTokenResponse'
     VAPIDPublicKeyResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/VAPIDPublicKeyResponse'
 

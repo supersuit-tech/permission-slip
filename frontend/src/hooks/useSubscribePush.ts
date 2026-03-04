@@ -61,7 +61,7 @@ export function useSubscribePush() {
       // Send subscription to server
       const { data, error } = await client.POST("/v1/push-subscriptions", {
         headers: { Authorization: `Bearer ${session.access_token}` },
-        body: { endpoint, p256dh, auth },
+        body: { type: "web-push", endpoint, p256dh, auth },
       });
       if (error) {
         throw new Error(

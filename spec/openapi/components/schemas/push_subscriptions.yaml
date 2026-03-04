@@ -1,11 +1,33 @@
 CreatePushSubscriptionRequest:
+  description: |
+    Register a push subscription. Use `type: "web-push"` (or omit type) for
+    browser Web Push subscriptions, or `type: "expo"` / `type: "mobile-push"`
+    for Expo push tokens from the mobile app.
+  oneOf:
+    - $ref: '#/CreateWebPushSubscriptionRequest'
+    - $ref: '#/CreateExpoPushSubscriptionRequest'
+  discriminator:
+    propertyName: type
+    mapping:
+      web-push: '#/CreateWebPushSubscriptionRequest'
+      expo: '#/CreateExpoPushSubscriptionRequest'
+      mobile-push: '#/CreateExpoPushSubscriptionRequest'
+
+CreateWebPushSubscriptionRequest:
   type: object
-  description: Register a Web Push subscription from the browser.
+  description: Register a Web Push subscription from a browser PushSubscription.
   required:
     - endpoint
     - p256dh
     - auth
   properties:
+    type:
+      type: string
+      description: Subscription type. Defaults to "web-push" when omitted.
+      enum:
+        - web-push
+      default: web-push
+      example: "web-push"
     endpoint:
       type: string
       format: uri
@@ -20,12 +42,33 @@ CreatePushSubscriptionRequest:
       description: Base64url-encoded auth secret from the browser PushSubscription keys
       example: "tBHItJI5svbpC7RB5gg6bQ"
 
+CreateExpoPushSubscriptionRequest:
+  type: object
+  description: Register an Expo push token from the mobile app.
+  required:
+    - type
+    - expo_token
+  properties:
+    type:
+      type: string
+      description: |
+        Subscription type. Use "expo" or "mobile-push" — both are accepted
+        and create a mobile-push channel subscription.
+      enum:
+        - expo
+        - mobile-push
+      example: "expo"
+    expo_token:
+      type: string
+      description: Expo push token from expo-notifications
+      example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+
 PushSubscriptionResponse:
   type: object
-  description: A registered Web Push subscription.
+  description: A registered push subscription (Web Push or Expo).
   required:
     - id
-    - endpoint
+    - channel
     - created_at
   properties:
     id:
@@ -33,11 +76,22 @@ PushSubscriptionResponse:
       format: int64
       description: Subscription ID
       example: 1
+    channel:
+      type: string
+      description: The push channel type
+      enum:
+        - web-push
+        - mobile-push
+      example: "web-push"
     endpoint:
       type: string
       format: uri
-      description: Push service endpoint URL
+      description: Push service endpoint URL (present for web-push subscriptions)
       example: "https://fcm.googleapis.com/fcm/send/abc123..."
+    expo_token:
+      type: string
+      description: Expo push token (present for mobile-push subscriptions)
+      example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
     created_at:
       type: string
       format: date-time
@@ -71,6 +125,29 @@ DeletePushSubscriptionResponse:
       type: string
       format: date-time
       description: Deletion timestamp
+      example: "2026-02-27T10:05:00Z"
+
+UnregisterExpoPushTokenRequest:
+  type: object
+  description: Request to unregister an Expo push token (e.g. on mobile logout).
+  required:
+    - expo_token
+  properties:
+    expo_token:
+      type: string
+      description: The Expo push token to unregister
+      example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+
+UnregisterExpoPushTokenResponse:
+  type: object
+  description: Confirmation that the Expo push token was unregistered.
+  required:
+    - unregistered_at
+  properties:
+    unregistered_at:
+      type: string
+      format: date-time
+      description: When the token was unregistered
       example: "2026-02-27T10:05:00Z"
 
 VAPIDPublicKeyResponse:
