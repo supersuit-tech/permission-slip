@@ -5,6 +5,15 @@ import { makeApproval, MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtu
 
 // --- Mocks ---
 
+const mockDenyApproval = jest.fn();
+
+jest.mock("../../../hooks/useDenyApproval", () => ({
+  useDenyApproval: () => ({
+    denyApproval: mockDenyApproval,
+    isPending: false,
+  }),
+}));
+
 jest.mock("../../../lib/supabaseClient", () => ({
   supabase: {
     auth: {
@@ -23,7 +32,6 @@ jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
     agents: MOCK_AGENTS,
     isLoading: false,
-    error: null,
   }),
   getAgentDisplayName: mockGetAgentDisplayName,
 }));
@@ -46,11 +54,19 @@ function renderDetail(approval: ApprovalSummary) {
     key: "test",
     name: "ApprovalDetail" as const,
   };
-  const navigation = {} as any;
+  const navigation = {
+    canGoBack: jest.fn().mockReturnValue(true),
+    goBack: jest.fn(),
+  } as any;
 
   return create(
     createElement(ApprovalDetailScreen, { route, navigation } as any),
   );
+}
+
+function hasDenyButton(renderer: ReactTestRenderer): boolean {
+  const json = JSON.stringify(renderer.toJSON());
+  return json.includes('"testID":"deny-button"');
 }
 
 // --- Tests ---
@@ -60,6 +76,7 @@ describe("ApprovalDetailScreen", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    mockDenyApproval.mockReset();
   });
 
   afterEach(async () => {
@@ -169,5 +186,48 @@ describe("ApprovalDetailScreen", () => {
     });
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain("Agent 999");
+  });
+
+  // --- Deny action visibility ---
+
+  it("shows deny button for pending approval", async () => {
+    const approval = makeApproval({ status: "pending" });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasDenyButton(renderer)).toBe(true);
+  });
+
+  it("does not show deny button for denied approval", async () => {
+    const approval = makeApproval({
+      status: "denied",
+      denied_at: new Date().toISOString(),
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasDenyButton(renderer)).toBe(false);
+  });
+
+  it("does not show deny button for approved approval", async () => {
+    const approval = makeApproval({
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasDenyButton(renderer)).toBe(false);
+  });
+
+  it("does not show deny button for expired approval", async () => {
+    const approval = makeApproval({
+      status: "pending",
+      expires_at: new Date(Date.now() - 60_000).toISOString(),
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasDenyButton(renderer)).toBe(false);
   });
 });

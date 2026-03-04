@@ -83,32 +83,58 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 
 		// Optional channel filter: ?channel=web-push or ?channel=mobile-push
 		channel := r.URL.Query().Get("channel")
-		var (
-			subs []db.PushSubscription
-			err  error
-		)
+
+		var data []pushSubscriptionResponse
+
 		switch channel {
 		case "":
-			subs, err = db.ListPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+			// Return both web-push and expo tokens.
+			subs, err := db.ListWebPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+			if err != nil {
+				log.Printf("[%s] ListPushSubscriptions (web-push): %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
+				return
+			}
+			for _, s := range subs {
+				data = append(data, toPushSubscriptionResponse(s))
+			}
+			tokens, err := db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
+			if err != nil {
+				log.Printf("[%s] ListPushSubscriptions (mobile-push): %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
+				return
+			}
+			for _, t := range tokens {
+				data = append(data, expoTokenToResponse(t))
+			}
 		case db.PushChannelWebPush:
-			subs, err = db.ListWebPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+			subs, err := db.ListWebPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+			if err != nil {
+				log.Printf("[%s] ListPushSubscriptions: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
+				return
+			}
+			for _, s := range subs {
+				data = append(data, toPushSubscriptionResponse(s))
+			}
 		case db.PushChannelMobilePush:
-			subs, err = db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
+			tokens, err := db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
+			if err != nil {
+				log.Printf("[%s] ListPushSubscriptions: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
+				return
+			}
+			for _, t := range tokens {
+				data = append(data, expoTokenToResponse(t))
+			}
 		default:
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "channel must be \"web-push\" or \"mobile-push\""))
 			return
 		}
-		if err != nil {
-			log.Printf("[%s] ListPushSubscriptions: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
-			return
-		}
 
-		data := make([]pushSubscriptionResponse, len(subs))
-		for i, s := range subs {
-			data[i] = toPushSubscriptionResponse(s)
+		if data == nil {
+			data = []pushSubscriptionResponse{}
 		}
-
 		RespondJSON(w, http.StatusOK, pushSubscriptionListResponse{Subscriptions: data})
 	}
 }
@@ -193,14 +219,14 @@ func handleCreateExpo(w http.ResponseWriter, r *http.Request, deps *Deps, userID
 		return
 	}
 
-	sub, err := db.UpsertExpoPushToken(r.Context(), deps.DB, userID, req.ExpoToken)
+	tok, err := db.UpsertExpoPushToken(r.Context(), deps.DB, userID, req.ExpoToken)
 	if err != nil {
 		log.Printf("[%s] CreateExpoPushToken: %v", TraceID(r.Context()), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create push subscription"))
 		return
 	}
 
-	RespondJSON(w, http.StatusCreated, toPushSubscriptionResponse(*sub))
+	RespondJSON(w, http.StatusCreated, expoTokenToResponse(*tok))
 }
 
 func handleDeletePushSubscription(deps *Deps) http.HandlerFunc {
@@ -293,7 +319,7 @@ func isValidExpoToken(token string) bool {
 	return false
 }
 
-// toPushSubscriptionResponse converts a DB PushSubscription to the API response.
+// toPushSubscriptionResponse converts a DB PushSubscription (web-push) to the API response.
 func toPushSubscriptionResponse(s db.PushSubscription) pushSubscriptionResponse {
 	return pushSubscriptionResponse{
 		ID:        s.ID,
@@ -301,5 +327,15 @@ func toPushSubscriptionResponse(s db.PushSubscription) pushSubscriptionResponse 
 		Endpoint:  s.Endpoint,
 		ExpoToken: s.ExpoToken,
 		CreatedAt: s.CreatedAt,
+	}
+}
+
+// expoTokenToResponse converts a DB ExpoPushToken to the unified API response.
+func expoTokenToResponse(t db.ExpoPushToken) pushSubscriptionResponse {
+	return pushSubscriptionResponse{
+		ID:        t.ID,
+		Channel:   db.PushChannelMobilePush,
+		ExpoToken: &t.Token,
+		CreatedAt: t.CreatedAt,
 	}
 }

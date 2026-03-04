@@ -13,6 +13,7 @@ import { AgentConfigPage } from "./pages/agents/AgentConfigPage";
 import { ConnectorConfigPage } from "./pages/agents/connectors/ConnectorConfigPage";
 import { ActivityPage } from "./pages/activity/ActivityPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
+import { BillingPage } from "./pages/billing/BillingPage";
 import { PrivacyPolicyPage } from "./pages/policy/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/policy/TermsOfServicePage";
 import { CookiePolicyPage } from "./pages/policy/CookiePolicyPage";
@@ -106,6 +107,7 @@ function App() {
           <Route path="/agents/:agentId/connectors/:connectorId" element={<RouteWithBoundary><ConnectorConfigPage /></RouteWithBoundary>} />
           <Route path="/activity" element={<RouteWithBoundary><ActivityPage /></RouteWithBoundary>} />
           <Route path="/settings" element={<RouteWithBoundary><SettingsPage /></RouteWithBoundary>} />
+          <Route path="/billing" element={<RouteWithBoundary><BillingPage /></RouteWithBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </SentryRoutes>
       </AppLayout>

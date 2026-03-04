@@ -45,24 +45,6 @@ func UpsertPushSubscription(ctx context.Context, db DBTX, userID, endpoint, p256
 	return &sub, nil
 }
 
-// UpsertExpoPushToken inserts an Expo push token subscription or updates it
-// if the (user_id, expo_token) pair already exists (device re-registered).
-func UpsertExpoPushToken(ctx context.Context, db DBTX, userID, expoToken string) (*PushSubscription, error) {
-	var sub PushSubscription
-	err := db.QueryRow(ctx,
-		`INSERT INTO push_subscriptions (user_id, channel, expo_token)
-		 VALUES ($1, 'mobile-push', $2)
-		 ON CONFLICT (user_id, expo_token) WHERE expo_token IS NOT NULL
-		 DO UPDATE SET expo_token = EXCLUDED.expo_token
-		 RETURNING id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at`,
-		userID, expoToken,
-	).Scan(&sub.ID, &sub.UserID, &sub.Channel, &sub.Endpoint, &sub.P256dh, &sub.Auth, &sub.ExpoToken, &sub.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &sub, nil
-}
-
 // DeletePushSubscription removes a push subscription by ID, scoped to the user.
 // Returns true if a row was deleted.
 func DeletePushSubscription(ctx context.Context, db DBTX, userID string, subID int64) (bool, error) {
@@ -86,29 +68,6 @@ func DeletePushSubscriptionByEndpoint(ctx context.Context, db DBTX, endpoint str
 	return err
 }
 
-// DeleteExpoPushToken removes a push subscription by Expo token.
-// Used when the Expo push service reports a token as invalid.
-func DeleteExpoPushToken(ctx context.Context, db DBTX, expoToken string) error {
-	_, err := db.Exec(ctx,
-		"DELETE FROM push_subscriptions WHERE expo_token = $1",
-		expoToken,
-	)
-	return err
-}
-
-// DeleteExpoPushTokenForUser removes an Expo push token scoped to a specific user.
-// Used by the mobile app on logout/unregister. Returns true if a row was deleted.
-func DeleteExpoPushTokenForUser(ctx context.Context, db DBTX, userID, expoToken string) (bool, error) {
-	tag, err := db.Exec(ctx,
-		"DELETE FROM push_subscriptions WHERE user_id = $1 AND expo_token = $2",
-		userID, expoToken,
-	)
-	if err != nil {
-		return false, err
-	}
-	return tag.RowsAffected() > 0, nil
-}
-
 // pushSubscriptionColumns is the SELECT column list shared across queries.
 const pushSubscriptionColumns = "id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at"
 
@@ -130,14 +89,6 @@ func scanPushSubscriptions(rows pgx.Rows, err error) ([]PushSubscription, error)
 	return subs, rows.Err()
 }
 
-// ListPushSubscriptionsByUserID returns all push subscriptions for a user.
-func ListPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
-	return scanPushSubscriptions(db.Query(ctx,
-		"SELECT "+pushSubscriptionColumns+" FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at",
-		userID,
-	))
-}
-
 // ListWebPushSubscriptionsByUserID returns only web-push subscriptions for a user.
 func ListWebPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
 	return scanPushSubscriptions(db.Query(ctx,
@@ -146,10 +97,3 @@ func ListWebPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID strin
 	))
 }
 
-// ListExpoPushTokensByUserID returns only mobile-push (Expo) subscriptions for a user.
-func ListExpoPushTokensByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
-	return scanPushSubscriptions(db.Query(ctx,
-		"SELECT "+pushSubscriptionColumns+" FROM push_subscriptions WHERE user_id = $1 AND channel = 'mobile-push' ORDER BY created_at",
-		userID,
-	))
-}
