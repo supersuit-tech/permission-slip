@@ -26,7 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
 
 export default function SettingsScreen(_props: Props) {
   const insets = useSafeAreaInsets();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { preferences, isLoading, error, refetch } =
     useNotificationPreferences();
   const { updatePreferences, isUpdating } =
@@ -79,6 +79,8 @@ export default function SettingsScreen(_props: Props) {
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity
               style={styles.retryButton}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading notification preferences"
               onPress={() => refetch()}
             >
               <Text style={styles.retryText}>Retry</Text>
@@ -102,6 +104,9 @@ export default function SettingsScreen(_props: Props) {
                   false: colors.gray300,
                   true: colors.primary,
                 }}
+                accessibilityLabel="Push Notifications"
+                accessibilityRole="switch"
+                accessibilityState={{ checked: mobilePushEnabled }}
               />
             </View>
           </View>
@@ -109,9 +114,26 @@ export default function SettingsScreen(_props: Props) {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        {user?.email ? (
+          <View style={styles.card}>
+            <View style={styles.accountRow}>
+              <Text style={styles.accountLabel}>Signed in as</Text>
+              <Text
+                style={styles.accountEmail}
+                numberOfLines={1}
+                ellipsizeMode="middle"
+              >
+                {user.email}
+              </Text>
+            </View>
+          </View>
+        ) : null}
         <TouchableOpacity
           testID="sign-out-button"
-          style={styles.signOutButton}
+          style={[styles.signOutButton, user?.email ? styles.signOutButtonSpaced : null]}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out of your account"
           onPress={handleSignOut}
         >
           <Text style={styles.signOutText}>Sign Out</Text>
@@ -197,6 +219,24 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     lineHeight: 18,
   },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  accountLabel: {
+    fontSize: 15,
+    color: colors.gray500,
+  },
+  accountEmail: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: colors.gray900,
+    flexShrink: 1,
+    marginLeft: 12,
+  },
   signOutButton: {
     backgroundColor: colors.white,
     borderRadius: 12,
@@ -204,6 +244,9 @@ const styles = StyleSheet.create({
     borderColor: colors.gray200,
     paddingVertical: 14,
     alignItems: "center",
+  },
+  signOutButtonSpaced: {
+    marginTop: 12,
   },
   signOutText: {
     color: colors.error,

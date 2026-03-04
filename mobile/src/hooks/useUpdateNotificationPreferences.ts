@@ -9,12 +9,16 @@ import client from "../api/client";
 import { getApiErrorMessage } from "../api/errors";
 import type { components } from "../api/schema";
 
+type NotificationPreference = components["schemas"]["NotificationPreference"];
 type NotificationPreferenceUpdate =
   components["schemas"]["NotificationPreferenceUpdate"];
+type PreferencesResponse =
+  components["schemas"]["NotificationPreferencesResponse"];
 
 export function useUpdateNotificationPreferences() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const userId = session?.user?.id;
 
   const mutation = useMutation({
     mutationFn: async (preferences: NotificationPreferenceUpdate[]) => {
@@ -35,7 +39,32 @@ export function useUpdateNotificationPreferences() {
       }
       return data;
     },
-    onSuccess: () => {
+    onMutate: async (updates) => {
+      const queryKey = ["notification-preferences", userId ?? ""];
+      await queryClient.cancelQueries({ queryKey });
+      const previous =
+        queryClient.getQueryData<PreferencesResponse>(queryKey);
+
+      queryClient.setQueryData<PreferencesResponse>(queryKey, (old) => {
+        if (!old) return old;
+        const updated = old.preferences.map(
+          (p: NotificationPreference): NotificationPreference => {
+            const match = updates.find((u) => u.channel === p.channel);
+            return match ? { ...p, enabled: match.enabled } : p;
+          },
+        );
+        return { ...old, preferences: updated };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        const queryKey = ["notification-preferences", userId ?? ""];
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: ["notification-preferences"],
       });
