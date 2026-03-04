@@ -241,7 +241,9 @@ go run ./cmd/generate-vapid-keys --format=heroku
 
 The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin client for approving and viewing requests from your phone — similar to the Microsoft Authenticator approval flow.
 
-**Current capabilities:** login, browse pending/approved/denied requests, view full request details (action parameters, risk level, agent info, expiry countdown), approve with confirmation code display (copyable `XXX-XXX` format), and deny with confirmation.
+**Current capabilities:** login, browse pending/approved/denied requests, view full request details (action parameters, risk level, agent info, expiry countdown), approve with confirmation code display (copyable `XXX-XXX` format), deny with confirmation, and push notifications for new approval requests.
+
+**Push notifications:** The app uses `expo-notifications` to request push permissions, retrieve the Expo push token, and register it with the backend on login. Notifications are delivered via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/). Push notifications require a physical device (not simulators). On Android, a dedicated "Approval Requests" notification channel is created for user-configurable notification preferences.
 
 ```bash
 make mobile-install    # install mobile dependencies
