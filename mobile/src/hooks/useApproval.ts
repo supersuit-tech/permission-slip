@@ -68,6 +68,10 @@ export function useApproval(approvalId: string) {
     },
     enabled: !!accessToken && !!approvalId,
     staleTime: 10_000,
+    // Limit retries for deep links — the approval may be expired or deleted.
+    // One retry handles transient network errors without hammering the API
+    // for genuinely missing approvals.
+    retry: 1,
   });
 
   return {
@@ -76,5 +80,6 @@ export function useApproval(approvalId: string) {
     error: query.isError
       ? (query.error?.message ?? "Unable to load approval.")
       : null,
+    refetch: query.refetch,
   };
 }

@@ -4,6 +4,9 @@
  * Deep links (permissionslip://permission-slip/approve/{approvalId}) only
  * provide the approval ID, not the full ApprovalSummary object. This screen
  * fetches the approval by ID then renders the standard ApprovalDetailScreen.
+ *
+ * Shows a loading spinner while fetching, and an error state with retry
+ * and fallback navigation if the approval can't be found.
  */
 import { useEffect } from "react";
 import {
@@ -22,7 +25,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "DeepLinkDetail">;
 
 export default function DeepLinkDetailScreen({ route, navigation }: Props) {
   const { approvalId } = route.params;
-  const { approval, isLoading, error } = useApproval(approvalId);
+  const { approval, isLoading, error, refetch } = useApproval(approvalId);
 
   // Once we have the approval, replace this screen with the real detail screen
   useEffect(() => {
@@ -48,14 +51,24 @@ export default function DeepLinkDetailScreen({ route, navigation }: Props) {
       <View style={styles.container}>
         <Text style={styles.errorTitle}>Approval not found</Text>
         <Text style={styles.errorBody}>{error}</Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => navigation.replace("ApprovalList")}
-          accessibilityLabel="Go to approval list"
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>Go to Approvals</Text>
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={refetch}
+            accessibilityLabel="Retry loading approval"
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.replace("ApprovalList")}
+            accessibilityLabel="Go to approval list"
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>Go to Approvals</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -88,11 +101,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 24,
   },
+  actions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: colors.gray900,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  retryButtonText: {
+    color: colors.gray900,
+    fontSize: 16,
+    fontWeight: "600",
+  },
   button: {
     backgroundColor: colors.gray900,
     borderRadius: 8,
     paddingVertical: 12,
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
   },
   buttonText: {
     color: colors.white,
