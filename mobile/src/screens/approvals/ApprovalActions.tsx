@@ -1,8 +1,13 @@
 /**
  * Approve/Deny action buttons shown at the bottom of the approval detail
  * screen for pending, non-expired approvals.
+ *
+ * Provides haptic feedback on press: heavy impact for approve, warning
+ * notification for deny.
  */
+import { useCallback } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
 
 interface ApprovalActionsProps {
@@ -22,11 +27,21 @@ export function ApprovalActions({
 }: ApprovalActionsProps) {
   const isBusy = isApproving || isDenying;
 
+  const handleApprove = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onApprove();
+  }, [onApprove]);
+
+  const handleDeny = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    onDeny();
+  }, [onDeny]);
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
         style={[styles.denyButton, (disabled || isBusy) && styles.buttonDisabled]}
-        onPress={onDeny}
+        onPress={handleDeny}
         disabled={disabled || isBusy}
         accessibilityLabel="Deny request"
         accessibilityRole="button"
@@ -43,7 +58,7 @@ export function ApprovalActions({
 
       <TouchableOpacity
         style={[styles.approveButton, (disabled || isBusy) && styles.approveButtonDisabled]}
-        onPress={onApprove}
+        onPress={handleApprove}
         disabled={disabled || isBusy}
         accessibilityLabel="Approve request"
         accessibilityRole="button"

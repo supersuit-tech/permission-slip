@@ -28,7 +28,7 @@ jest.mock("../../auth/AuthContext", () => ({
   }),
 }));
 
-jest.mock("../../navigation/RootNavigator", () => ({
+jest.mock("../../navigation/navigationRef", () => ({
   navigationRef: {
     isReady: () => mockIsReady(),
     navigate: (...args: unknown[]) => mockNavigate(...args),

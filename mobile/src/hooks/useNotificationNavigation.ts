@@ -16,15 +16,9 @@ import type { NotificationResponse } from "expo-notifications";
 import * as Notifications from "expo-notifications";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
-import { navigationRef } from "../navigation/RootNavigator";
+import { isValidApprovalId } from "../lib/approvalId";
+import { navigationRef } from "../navigation/navigationRef";
 import type { ApprovalSummary } from "./useApprovals";
-
-/**
- * Matches the approval_id format from the OpenAPI spec.
- * Defense-in-depth: prevents API calls with obviously invalid IDs
- * from crafted or malformed notification payloads.
- */
-const APPROVAL_ID_PATTERN = /^appr_[a-zA-Z0-9]{6,64}$/;
 
 /**
  * Extracts and validates the approval_id from a notification response's data
@@ -37,7 +31,7 @@ function extractApprovalId(response: NotificationResponse): string | null {
     | undefined;
   if (!data) return null;
   const id = data.approval_id;
-  if (typeof id !== "string" || !APPROVAL_ID_PATTERN.test(id)) {
+  if (typeof id !== "string" || !isValidApprovalId(id)) {
     return null;
   }
   return id;
