@@ -298,3 +298,117 @@ func BillingPeriodBounds(t time.Time) (start, end time.Time) {
 	end = start.AddDate(0, 1, 0)
 	return start, end
 }
+
+// ── Admin / analytics queries ───────────────────────────────────────────────
+
+// TopUserUsage represents a row from the top-users-by-usage query.
+type TopUserUsage struct {
+	UserID       string
+	RequestCount int
+	SMSCount     int
+	PeriodStart  time.Time
+	PeriodEnd    time.Time
+}
+
+// GetTopUsersByUsage returns users with the highest request counts for a given
+// billing period, ordered by request_count DESC. limit caps the number of rows
+// returned (clamped to 1–100).
+func GetTopUsersByUsage(ctx context.Context, db DBTX, periodStart time.Time, limit int) ([]TopUserUsage, error) {
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	rows, err := db.Query(ctx,
+		`SELECT user_id, request_count, sms_count, period_start, period_end
+		 FROM usage_periods
+		 WHERE period_start = $1
+		 ORDER BY request_count DESC
+		 LIMIT $2`,
+		periodStart, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []TopUserUsage
+	for rows.Next() {
+		var u TopUserUsage
+		if err := rows.Scan(&u.UserID, &u.RequestCount, &u.SMSCount, &u.PeriodStart, &u.PeriodEnd); err != nil {
+			return nil, err
+		}
+		result = append(result, u)
+	}
+	return result, rows.Err()
+}
+
+// ConnectorUsage represents aggregate request counts for a single connector
+// across all users in a billing period.
+type ConnectorUsage struct {
+	ConnectorID  string
+	RequestCount int
+}
+
+// GetUsageByConnector aggregates request counts from the JSONB breakdown
+// across all users for a given billing period. Returns connectors ordered
+// by request count DESC.
+func GetUsageByConnector(ctx context.Context, db DBTX, periodStart time.Time) ([]ConnectorUsage, error) {
+	rows, err := db.Query(ctx,
+		`SELECT key, SUM(value::int)::int AS total
+		 FROM usage_periods,
+		      jsonb_each_text(COALESCE(breakdown->'by_connector', '{}'))
+		 WHERE period_start = $1
+		 GROUP BY key
+		 ORDER BY total DESC`,
+		periodStart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []ConnectorUsage
+	for rows.Next() {
+		var c ConnectorUsage
+		if err := rows.Scan(&c.ConnectorID, &c.RequestCount); err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, rows.Err()
+}
+
+// AgentUsage represents request counts for a single agent within a user's
+// billing period, extracted from the JSONB breakdown.
+type AgentUsage struct {
+	AgentID      string
+	RequestCount int
+}
+
+// GetUsageByAgent extracts per-agent request counts from the JSONB breakdown
+// for a specific user and billing period. Returns agents ordered by request
+// count DESC.
+func GetUsageByAgent(ctx context.Context, db DBTX, userID string, periodStart time.Time) ([]AgentUsage, error) {
+	rows, err := db.Query(ctx,
+		`SELECT key, value::int AS count
+		 FROM usage_periods,
+		      jsonb_each_text(COALESCE(breakdown->'by_agent', '{}'))
+		 WHERE user_id = $1 AND period_start = $2
+		 ORDER BY count DESC`,
+		userID, periodStart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []AgentUsage
+	for rows.Next() {
+		var a AgentUsage
+		if err := rows.Scan(&a.AgentID, &a.RequestCount); err != nil {
+			return nil, err
+		}
+		result = append(result, a)
+	}
+	return result, rows.Err()
+}

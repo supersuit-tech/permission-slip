@@ -1,0 +1,132 @@
+AdminUsageResponse:
+  type: object
+  required:
+    - user_id
+    - period_start
+    - period_end
+    - request_count
+    - sms_count
+  properties:
+    user_id:
+      type: string
+      format: uuid
+      description: The user whose usage is reported
+    period_start:
+      type: string
+      format: date-time
+      description: Start of the billing period (inclusive, UTC)
+    period_end:
+      type: string
+      format: date-time
+      description: End of the billing period (exclusive, UTC)
+    request_count:
+      type: integer
+      description: Total billable requests in the period
+      example: 542
+    sms_count:
+      type: integer
+      description: Total SMS messages sent in the period
+      example: 3
+    breakdown:
+      $ref: '../schemas/billing.yaml#/UsageBreakdown'
+
+TopUsersResponse:
+  type: object
+  required:
+    - period_start
+    - period_end
+    - users
+  properties:
+    period_start:
+      type: string
+      format: date-time
+    period_end:
+      type: string
+      format: date-time
+    users:
+      type: array
+      items:
+        $ref: '#/TopUserEntry'
+
+TopUserEntry:
+  type: object
+  required:
+    - user_id
+    - request_count
+    - sms_count
+  properties:
+    user_id:
+      type: string
+      format: uuid
+    request_count:
+      type: integer
+      example: 5432
+    sms_count:
+      type: integer
+      example: 12
+
+ConnectorUsageResponse:
+  type: object
+  required:
+    - period_start
+    - period_end
+    - connectors
+  properties:
+    period_start:
+      type: string
+      format: date-time
+    period_end:
+      type: string
+      format: date-time
+    connectors:
+      type: array
+      items:
+        $ref: '#/ConnectorUsageEntry'
+
+ConnectorUsageEntry:
+  type: object
+  required:
+    - connector_id
+    - request_count
+  properties:
+    connector_id:
+      type: string
+      description: Connector identifier
+    request_count:
+      type: integer
+      example: 1542
+
+AgentUsageResponse:
+  type: object
+  required:
+    - user_id
+    - period_start
+    - period_end
+    - agents
+  properties:
+    user_id:
+      type: string
+      format: uuid
+    period_start:
+      type: string
+      format: date-time
+    period_end:
+      type: string
+      format: date-time
+    agents:
+      type: array
+      items:
+        $ref: '#/AgentUsageEntry'
+
+AgentUsageEntry:
+  type: object
+  required:
+    - agent_id
+    - request_count
+  properties:
+    agent_id:
+      type: string
+      description: Agent ID (as string)
+    request_count:
+      type: integer
+      example: 500
