@@ -10,6 +10,7 @@
  * Should be called once in the authenticated app shell (e.g. AppContent).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { NotificationResponse } from "expo-notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "./useNotifications";
 import { useRegisterPushToken, unregisterPushTokenDirect } from "./useRegisterPushToken";
@@ -36,7 +37,15 @@ export function usePushSetup() {
   }, [queryClient]);
 
   // Navigate to the approval detail screen when the user taps a notification.
-  const { handleNotificationTap } = useNotificationNavigation();
+  // Also invalidate the cache so the list is fresh when the user navigates back.
+  const { handleNotificationTap: navigateOnTap } = useNotificationNavigation();
+  const onNotificationTap = useCallback(
+    (response: NotificationResponse) => {
+      queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      navigateOnTap(response);
+    },
+    [queryClient, navigateOnTap],
+  );
 
   const {
     expoPushToken,
@@ -46,7 +55,7 @@ export function usePushSetup() {
     lastNotificationResponse,
   } = useNotifications({
     onNotificationReceived,
-    onNotificationTap: handleNotificationTap,
+    onNotificationTap,
   });
   const { registerToken } = useRegisterPushToken();
 

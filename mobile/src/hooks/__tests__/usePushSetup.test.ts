@@ -355,7 +355,7 @@ describe("usePushSetup", () => {
     });
   });
 
-  it("passes handleNotificationTap as onNotificationTap to useNotifications", async () => {
+  it("passes onNotificationTap callback to useNotifications", async () => {
     mockAuthStatus = "authenticated";
     mockSession = { access_token: "tok" };
     const { Consumer } = createHookCapture();
@@ -364,10 +364,11 @@ describe("usePushSetup", () => {
       renderer = create(createElement(Consumer));
     });
 
-    expect(capturedOnNotificationTap).toBe(mockHandleNotificationTap);
+    expect(capturedOnNotificationTap).toBeDefined();
+    expect(typeof capturedOnNotificationTap).toBe("function");
   });
 
-  it("forwards notification tap to handleNotificationTap", async () => {
+  it("forwards notification tap to handleNotificationTap and invalidates cache", async () => {
     mockAuthStatus = "authenticated";
     mockSession = { access_token: "tok" };
     const { Consumer } = createHookCapture();
@@ -383,6 +384,9 @@ describe("usePushSetup", () => {
     capturedOnNotificationTap?.(fakeResponse);
 
     expect(mockHandleNotificationTap).toHaveBeenCalledWith(fakeResponse);
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["approvals"],
+    });
   });
 
   it("cancels in-flight retry when user signs out", async () => {

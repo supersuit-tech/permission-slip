@@ -10,6 +10,11 @@ let mockSession: { access_token: string } | null = null;
 
 const mockNavigate = jest.fn();
 const mockIsReady = jest.fn(() => true);
+const mockSetBadgeCount = jest.fn().mockResolvedValue(true);
+
+jest.mock("expo-notifications", () => ({
+  setBadgeCountAsync: (...args: unknown[]) => mockSetBadgeCount(...args),
+}));
 
 jest.mock("../../api/client", () => ({
   __esModule: true,
@@ -82,6 +87,7 @@ describe("useNotificationNavigation", () => {
     mockAuthStatus = "authenticated";
     mockSession = { access_token: "test-token" };
     mockIsReady.mockReturnValue(true);
+    mockSetBadgeCount.mockResolvedValue(true);
     mockClientGet.mockResolvedValue({
       data: { data: [fakeApproval], has_more: false },
       error: undefined,
@@ -116,6 +122,20 @@ describe("useNotificationNavigation", () => {
       approvalId: "appr_abc123",
       approval: fakeApproval,
     });
+  });
+
+  it("clears the app badge count after navigating", async () => {
+    const { capture, Consumer } = createHookCapture();
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    const response = makeNotificationResponse("appr_abc123");
+    await act(async () => {
+      await capture.handleNotificationTap(response);
+    });
+
+    expect(mockSetBadgeCount).toHaveBeenCalledWith(0);
   });
 
   it("does not navigate when approval_id is missing from notification data", async () => {

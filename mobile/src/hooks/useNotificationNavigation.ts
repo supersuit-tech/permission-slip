@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import type { NotificationResponse } from "expo-notifications";
+import * as Notifications from "expo-notifications";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
 import { navigationRef } from "../navigation/RootNavigator";
@@ -48,6 +49,10 @@ export function useNotificationNavigation() {
       const token = accessTokenRef.current;
       if (!token) return;
 
+      if (__DEV__) {
+        console.log(`[push] Fetching approval ${approvalId} for deep link...`);
+      }
+
       // Fetch the approval from the list endpoint. We search "all" statuses
       // since the notification could arrive for any status transition.
       try {
@@ -56,24 +61,51 @@ export function useNotificationNavigation() {
           params: { query: { status: "all" } },
         });
 
-        if (error || !data?.data) return;
+        if (error || !data?.data) {
+          if (__DEV__) {
+            console.warn("[push] Failed to fetch approvals for deep link:", error);
+          }
+          return;
+        }
 
         const approval = data.data.find(
           (a: ApprovalSummary) => a.approval_id === approvalId,
         );
-        if (!approval) return;
-
-        // Wait for the navigation container to be ready (may not be mounted
-        // yet on cold start).
-        if (navigationRef.isReady()) {
-          navigationRef.navigate("ApprovalDetail", {
-            approvalId: approval.approval_id,
-            approval,
-          });
+        if (!approval) {
+          if (__DEV__) {
+            console.warn(`[push] Approval ${approvalId} not found in API response`);
+          }
+          return;
         }
+
+        // The navigation container should be ready by the time auth is
+        // available (it mounts as part of the initial render). If somehow
+        // it's not, skip gracefully — the user can navigate manually.
+        if (!navigationRef.isReady()) {
+          if (__DEV__) {
+            console.warn("[push] Navigation not ready — skipping deep link");
+          }
+          return;
+        }
+
+        if (__DEV__) {
+          console.log(`[push] Navigating to ApprovalDetail for ${approvalId}`);
+        }
+
+        // Clear the app badge count since the user is actively engaging
+        // with the notification content.
+        Notifications.setBadgeCountAsync(0).catch(() => {
+          // Best-effort — badge clearing is non-critical
+        });
+
+        navigationRef.navigate("ApprovalDetail", {
+          approvalId: approval.approval_id,
+          approval,
+        });
       } catch {
-        // Best-effort navigation — if the fetch fails, the user can still
-        // navigate manually from the approval list.
+        if (__DEV__) {
+          console.warn("[push] Deep link navigation failed — user can navigate manually");
+        }
       }
     },
     [],
@@ -82,7 +114,12 @@ export function useNotificationNavigation() {
   const handleNotificationTap = useCallback(
     async (response: NotificationResponse) => {
       const approvalId = extractApprovalId(response);
-      if (!approvalId) return;
+      if (!approvalId) {
+        if (__DEV__) {
+          console.log("[push] Notification tapped but no approval_id in data — ignoring");
+        }
+        return;
+      }
 
       // De-duplicate: don't navigate again for the same notification tap.
       const responseId =
@@ -90,8 +127,15 @@ export function useNotificationNavigation() {
       if (lastProcessedIdRef.current === responseId) return;
       lastProcessedIdRef.current = responseId;
 
+      if (__DEV__) {
+        console.log(`[push] Notification tapped for approval ${approvalId}`);
+      }
+
       const token = accessTokenRef.current;
       if (!token) {
+        if (__DEV__) {
+          console.log("[push] Auth not ready — queuing notification for later processing");
+        }
         // Auth isn't ready yet (common on cold start). Queue the response
         // so it can be processed once authentication completes.
         pendingResponseRef.current = response;
@@ -109,6 +153,10 @@ export function useNotificationNavigation() {
     const pending = pendingResponseRef.current;
     if (!pending) return;
     pendingResponseRef.current = null;
+
+    if (__DEV__) {
+      console.log("[push] Auth ready — processing queued notification tap");
+    }
 
     const approvalId = extractApprovalId(pending);
     if (approvalId) {
