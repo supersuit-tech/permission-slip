@@ -73,6 +73,7 @@ func NewRouter(deps *Deps) http.Handler {
 	RegisterRegistrationInviteRoutes(mux, deps)
 	RegisterRegistrationRoutes(mux, deps)
 	RegisterPushSubscriptionRoutes(mux, deps)
+	RegisterExpoPushTokenRoutes(mux, deps)
 	RegisterStandingApprovalRoutes(mux, deps)
 	RegisterApprovalEventRoutes(mux, deps)
 

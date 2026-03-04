@@ -1,0 +1,84 @@
+expoPushTokens:
+  get:
+    summary: List Expo push tokens
+    description: Returns all Expo push tokens registered by the authenticated user.
+    operationId: listExpoPushTokens
+    tags:
+      - Expo Push Tokens
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Expo push tokens retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/expo_push_tokens.yaml#/ExpoPushTokenListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  post:
+    summary: Register Expo push token
+    description: |
+      Register an Expo push token from the mobile app. If the same token
+      already exists for this user, the request is idempotent (no duplicate
+      is created).
+    operationId: createExpoPushToken
+    tags:
+      - Expo Push Tokens
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/expo_push_tokens.yaml#/CreateExpoPushTokenRequest'
+    responses:
+      '201':
+        description: Expo push token registered
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/expo_push_tokens.yaml#/ExpoPushTokenResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+expoPushTokenById:
+  delete:
+    summary: Delete Expo push token
+    description: Remove an Expo push token registration by ID.
+    operationId: deleteExpoPushToken
+    tags:
+      - Expo Push Tokens
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: token_id
+        in: path
+        required: true
+        description: Expo push token registration ID
+        schema:
+          type: integer
+          format: int64
+    responses:
+      '200':
+        description: Expo push token deleted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/expo_push_tokens.yaml#/DeleteExpoPushTokenResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'

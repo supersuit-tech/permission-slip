@@ -324,8 +324,8 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if len(resp.Preferences) != 3 {
-		t.Fatalf("expected 3 preferences, got %d", len(resp.Preferences))
+	if len(resp.Preferences) != len(allChannels) {
+		t.Fatalf("expected %d preferences, got %d", len(allChannels), len(resp.Preferences))
 	}
 	// All channels default to enabled when no preferences are set.
 	// SMS should not be available on the free plan.

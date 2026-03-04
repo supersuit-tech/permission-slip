@@ -28,6 +28,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
+	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
@@ -280,6 +281,13 @@ func main() {
 			}
 			senders = append(senders, webpush.New(vapidKeys, subject, deps.DB))
 		}
+	}
+
+	// Mobile Push (Expo): Register sender when the database is available.
+	// The Expo access token is optional — unauthenticated requests work
+	// but have lower rate limits.
+	if deps.DB != nil {
+		senders = append(senders, mobilepush.New(deps.DB, notifyCfg.ExpoAccessToken))
 	}
 
 	notify.LogChannelSummary(senders)

@@ -29,6 +29,12 @@ type Config struct {
 	// VAPIDSubject is a mailto: URL identifying the server operator, required
 	// by the Web Push spec. Example: "mailto:admin@mycompany.com"
 	VAPIDSubject string
+
+	// Mobile Push (Expo) — issue #9
+	// ExpoAccessToken is an optional Expo access token for authenticated
+	// requests to the Expo Push Service. When empty, unauthenticated
+	// requests are used (lower rate limits).
+	ExpoAccessToken string
 }
 
 // LoadConfig reads notification-related environment variables and returns a
@@ -47,6 +53,7 @@ func LoadConfig() Config {
 		TwilioAuthToken:  os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber: os.Getenv("TWILIO_FROM_NUMBER"),
 		VAPIDSubject:     EnvOrDefault("VAPID_SUBJECT", ""),
+		ExpoAccessToken:  os.Getenv("EXPO_ACCESS_TOKEN"),
 	}
 }
 
