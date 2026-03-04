@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Loader2 } from "lucide-react";
+import { ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PAID_PLAN_FEATURES, PAID_PLAN_PRICING } from "./constants";
+import { FeatureList } from "./FeatureList";
 
 interface UpgradeConfirmDialogProps {
   open: boolean;
@@ -37,14 +38,7 @@ export function UpgradeConfirmDialog({
         <div className="space-y-4">
           <div className="rounded-lg border bg-primary/5 p-4 space-y-3">
             <h3 className="text-sm font-semibold">What you get</h3>
-            <ul className="space-y-2">
-              {PAID_PLAN_FEATURES.map((benefit) => (
-                <li key={benefit} className="flex items-start gap-2 text-sm">
-                  <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                  <span>{benefit}</span>
-                </li>
-              ))}
-            </ul>
+            <FeatureList features={PAID_PLAN_FEATURES} />
           </div>
 
           <div className="rounded-lg border p-4 space-y-1">

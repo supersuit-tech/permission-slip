@@ -94,6 +94,7 @@ func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /billing/subscription", requireProfile(handleGetSubscription(deps)))
 	mux.Handle("GET /billing/usage", requireProfile(handleGetUsage(deps)))
+	// Deprecated: use POST /billing/upgrade instead. Kept for backward compatibility.
 	mux.Handle("POST /billing/checkout", requireProfile(handleCreateCheckout(deps)))
 	mux.Handle("POST /billing/upgrade", requireProfile(handleCreateCheckout(deps)))
 	mux.Handle("POST /billing/downgrade", requireProfile(handleDowngrade(deps)))
