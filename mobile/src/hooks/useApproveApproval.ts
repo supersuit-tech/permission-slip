@@ -1,13 +1,13 @@
 /**
- * React Query mutation hook for denying an approval request.
- * Invalidates the approvals query cache on success so the list updates.
+ * React Query mutation hook for approving an approval request.
+ * Returns the confirmation code on success (XXX-XXX format).
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
 import { getApiErrorMessage } from "../api/errors";
 
-export function useDenyApproval() {
+export function useApproveApproval() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
 
@@ -17,8 +17,8 @@ export function useDenyApproval() {
         throw new Error("Not authenticated");
       }
 
-      const { error } = await client.POST(
-        "/v1/approvals/{approval_id}/deny",
+      const { data, error } = await client.POST(
+        "/v1/approvals/{approval_id}/approve",
         {
           headers: { Authorization: `Bearer ${session.access_token}` },
           params: { path: { approval_id: approvalId } },
@@ -26,17 +26,20 @@ export function useDenyApproval() {
       );
       if (error) {
         throw new Error(
-          getApiErrorMessage(error, "Failed to deny request"),
+          getApiErrorMessage(error, "Failed to approve request"),
         );
       }
+      return data;
     },
     onSuccess: () => {
+      // Invalidate list cache so the approval moves from pending to approved
+      // when the user navigates back.
       queryClient.invalidateQueries({ queryKey: ["approvals"] });
     },
   });
 
   return {
-    denyApproval: (approvalId: string) => mutation.mutateAsync(approvalId),
+    approveApproval: (approvalId: string) => mutation.mutateAsync(approvalId),
     isPending: mutation.isPending,
     error: mutation.error,
     reset: mutation.reset,
