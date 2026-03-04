@@ -15,6 +15,7 @@ import { focusManager, QueryClient, QueryClientProvider, useQueryClient } from "
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
+import { usePushSetup } from "./src/hooks/usePushSetup";
 import { colors } from "./src/theme/colors";
 
 // Tell React Query when the app returns to the foreground so queries with
@@ -42,6 +43,9 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
   const qc = useQueryClient();
   const [timedOut, setTimedOut] = useState(false);
   const prevAuthStatus = useRef(authStatus);
+
+  // Register/unregister Expo push token as auth status changes
+  usePushSetup();
 
   // Clear the React Query cache when the user signs out so the next user
   // on a shared device never sees stale approval data from a prior session.
