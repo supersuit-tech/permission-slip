@@ -79,6 +79,10 @@ jest.mock("react-native-safe-area-context", () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+jest.mock("@react-navigation/native", () => ({
+  useIsFocused: () => true,
+}));
+
 import ApprovalListScreen from "../ApprovalListScreen";
 
 // --- Helpers ---

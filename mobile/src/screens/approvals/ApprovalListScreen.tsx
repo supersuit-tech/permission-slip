@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useIsFocused } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
@@ -45,11 +46,15 @@ export default function ApprovalListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
   // Re-render the "Updated X ago" label every 15 seconds so it stays current.
+  // Only tick when the screen is focused to avoid background re-renders when
+  // the user is on the detail screen.
+  const isFocused = useIsFocused();
   const [, setTick] = useState(0);
   useEffect(() => {
+    if (!isFocused || dataUpdatedAt === 0) return;
     const id = setInterval(() => setTick((t) => t + 1), 15_000);
     return () => clearInterval(id);
-  }, []);
+  }, [isFocused, dataUpdatedAt]);
   const lastUpdatedText = formatLastUpdated(dataUpdatedAt);
 
   const agentMap = useMemo(() => {

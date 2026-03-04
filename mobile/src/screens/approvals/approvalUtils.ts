@@ -197,7 +197,8 @@ function formatValue(value: unknown): string | null {
  */
 export function formatLastUpdated(epochMs: number): string | null {
   if (epochMs === 0) return null;
-  const diffSec = Math.floor((Date.now() - epochMs) / 1_000);
+  // Clamp to 0 so clock skew (epochMs in the future) still shows "just now".
+  const diffSec = Math.max(0, Math.floor((Date.now() - epochMs) / 1_000));
   if (diffSec < 10) return "Updated just now";
   if (diffSec < 60) return `Updated ${diffSec}s ago`;
   const diffMin = Math.floor(diffSec / 60);

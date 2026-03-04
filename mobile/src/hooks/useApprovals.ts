@@ -2,9 +2,10 @@
  * React Query hook for fetching the authenticated user's approval requests.
  *
  * Pending approvals poll every 10 seconds (time-sensitive — users need to act
- * quickly). Historical tabs (approved / denied) don't poll since they rarely
- * change. When the app returns to the foreground the focus manager (configured
- * in App.tsx) triggers an immediate refetch so data is always fresh.
+ * quickly). All other statuses (approved, denied, cancelled, all) don't poll
+ * since they represent historical data that rarely changes. When the app
+ * returns to the foreground the focus manager (configured in App.tsx) triggers
+ * an immediate refetch so data is always fresh.
  */
 import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
