@@ -10,15 +10,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useUpgradePlan } from "@/hooks/useUpgradePlan";
+import type { Plan } from "@/hooks/useBillingPlan";
 import { isSafeUrl } from "./formatters";
 
-const FREE_FEATURES = [
-  "1,000 requests/month",
-  "3 agents",
-  "5 standing approvals",
-  "5 credentials",
-  "7-day audit retention",
-];
+interface UpgradeCTAProps {
+  plan: Plan;
+}
+
+function formatLimit(value: number | null | undefined, unit: string): string {
+  if (value === null || value === undefined) return `Unlimited ${unit}`;
+  return `${value.toLocaleString()} ${unit}`;
+}
+
+function buildCurrentFeatures(plan: Plan): string[] {
+  return [
+    `${formatLimit(plan.max_requests_per_month, "requests/month")}`,
+    `${formatLimit(plan.max_agents, "agents")}`,
+    `${formatLimit(plan.max_standing_approvals, "standing approvals")}`,
+    `${formatLimit(plan.max_credentials, "credentials")}`,
+    `${plan.audit_retention_days}-day audit retention`,
+  ];
+}
 
 const PAID_FEATURES = [
   "Unlimited requests (pay per use)",
@@ -41,9 +53,10 @@ function FeatureList({ features, variant }: { features: string[]; variant: "free
   );
 }
 
-export function UpgradeCTA() {
+export function UpgradeCTA({ plan }: UpgradeCTAProps) {
   const { upgrade, isUpgrading } = useUpgradePlan();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const currentFeatures = buildCurrentFeatures(plan);
 
   async function handleUpgrade() {
     try {
@@ -78,9 +91,9 @@ export function UpgradeCTA() {
       <CardContent>
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="rounded-lg border p-4 space-y-3">
-            <h3 className="text-sm font-semibold">Free</h3>
+            <h3 className="text-sm font-semibold">{plan.name}</h3>
             <p className="text-xs text-muted-foreground">Your current plan</p>
-            <FeatureList features={FREE_FEATURES} variant="free" />
+            <FeatureList features={currentFeatures} variant="free" />
           </div>
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
             <h3 className="text-sm font-semibold">Pay-as-you-go</h3>

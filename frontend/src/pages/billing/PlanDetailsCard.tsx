@@ -41,12 +41,23 @@ function CostEstimate() {
 }
 
 function InvoicesList() {
-  const { invoices, isLoading } = useBillingInvoices(5);
+  const { invoices, isLoading, error, refetch } = useBillingInvoices(5);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-4">
         <Loader2 className="text-muted-foreground size-4 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-destructive">Failed to load invoices.</span>
+        <Button variant="ghost" size="sm" onClick={() => refetch()}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -120,8 +131,9 @@ function DowngradeSection() {
         <div className="space-y-1">
           <p className="text-sm font-medium">Are you sure?</p>
           <p className="text-xs text-muted-foreground">
-            You&apos;ll lose access to unlimited resources. Your data will be
-            preserved for 7 days before free plan limits apply.
+            You&apos;ll lose access to unlimited resources. Your 90-day audit
+            retention will be preserved for a 7-day grace period so you can
+            export your data before it reverts to 7 days.
           </p>
         </div>
       </div>
