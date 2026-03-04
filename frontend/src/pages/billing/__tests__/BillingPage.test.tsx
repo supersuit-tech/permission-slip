@@ -159,6 +159,29 @@ describe("BillingPage", () => {
       expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     });
 
+    it("dismisses upgrade dialog when cancel is clicked", async () => {
+      mockBillingApi(freePlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+
+      await waitFor(() => {
+        expect(screen.getByText("What you get")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("What you get")).not.toBeInTheDocument();
+      });
+    });
+
     it("redirects to Stripe after confirming upgrade dialog", async () => {
       mockBillingApi(freePlanResponse);
       mockPost.mockResolvedValue({
@@ -373,6 +396,28 @@ describe("BillingPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Too many active agents")).toBeInTheDocument();
+      });
+    });
+
+    it("dismisses downgrade dialog when cancel is clicked", async () => {
+      mockBillingApi(paidPlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+      await waitFor(() => {
+        expect(screen.getByText("What changes")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("What changes")).not.toBeInTheDocument();
       });
     });
   });

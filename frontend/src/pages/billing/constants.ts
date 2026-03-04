@@ -10,9 +10,12 @@ export const PAID_PLAN_FEATURES = [
 export const PAID_PLAN_PRICING =
   "First 1,000 requests/month are free. After that, $0.005 per request.";
 
-/** Free plan limits used for downgrade warnings. */
+/**
+ * Free plan limits used for downgrade warnings.
+ * managePath points to where users can deactivate or remove excess resources.
+ */
 export const FREE_PLAN_LIMITS = {
-  agents: { label: "agents", limit: 3, managePath: "/settings" },
-  standing_approvals: { label: "standing approvals", limit: 5, managePath: "/settings" },
+  agents: { label: "agents", limit: 3, managePath: "/" },
+  standing_approvals: { label: "standing approvals", limit: 5, managePath: "/" },
   credentials: { label: "credentials", limit: 5, managePath: "/settings" },
 } as const;

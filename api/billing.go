@@ -20,6 +20,8 @@ type subscriptionResponse struct {
 	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
 	HasPaymentMethod   bool       `json:"has_payment_method"`
 	CanUpgrade         bool       `json:"can_upgrade"`
+	CanDowngrade       bool       `json:"can_downgrade"`
+	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
 	PlanLimits         planLimits `json:"plan_limits"`
 	Usage              *usageInfo `json:"usage,omitempty"`
 }
@@ -127,6 +129,8 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			CurrentPeriodEnd:   sub.CurrentPeriodEnd,
 			HasPaymentMethod:   sub.StripeCustomerID != nil,
 			CanUpgrade:         sub.PlanID == db.PlanFree,
+			CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
+			GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
 			PlanLimits: planLimits{
 				MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
 				MaxAgents:            sub.Plan.MaxAgents,
