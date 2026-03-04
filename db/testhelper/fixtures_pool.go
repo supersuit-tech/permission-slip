@@ -52,6 +52,7 @@ func SetupPoolUser(t *testing.T, prefix string, publicKey string) PoolUser {
 		pool.Exec(bg, `DELETE FROM approvals WHERE agent_id = $1`, agentID)
 		pool.Exec(bg, `DELETE FROM audit_events WHERE user_id = $1`, uid)
 		pool.Exec(bg, `DELETE FROM usage_periods WHERE user_id = $1`, uid)
+		pool.Exec(bg, `DELETE FROM subscriptions WHERE user_id = $1`, uid)
 		pool.Exec(bg, `DELETE FROM agents WHERE agent_id = $1`, agentID)
 		pool.Exec(bg, `DELETE FROM profiles WHERE id = $1`, uid)
 		pool.Exec(bg, `DELETE FROM auth.users WHERE id = $1`, uid)
