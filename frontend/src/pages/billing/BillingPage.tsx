@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
 import { useBillingPlan } from "@/hooks/useBillingPlan";
@@ -7,6 +7,7 @@ import { PlanCard } from "./PlanCard";
 import { UsageSummaryCard } from "./UsageSummaryCard";
 import { UpgradeCTA } from "./UpgradeCTA";
 import { PlanDetailsCard } from "./PlanDetailsCard";
+import { BillingPageSkeleton } from "./BillingPageSkeleton";
 
 export function BillingPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
@@ -25,13 +26,7 @@ export function BillingPage() {
       </div>
 
       {isLoading ? (
-        <div
-          className="flex items-center justify-center py-16"
-          role="status"
-          aria-label="Loading billing information"
-        >
-          <Loader2 className="text-muted-foreground size-5 animate-spin" />
-        </div>
+        <BillingPageSkeleton />
       ) : error ? (
         <div className="space-y-3">
           <FormError error={error} />

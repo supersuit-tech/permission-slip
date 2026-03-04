@@ -34,7 +34,7 @@ function UsageRow({ label, current, limit }: UsageRowProps) {
         </span>
       </div>
       {!isUnlimited && (
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={current} aria-valuemin={0} aria-valuemax={limit}>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={current} aria-valuemin={0} aria-valuemax={limit} aria-label={`${label}: ${current.toLocaleString()} of ${limit.toLocaleString()} used`}>
           <div
             className={`h-full rounded-full transition-all ${
               isAtLimit

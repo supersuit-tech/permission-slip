@@ -19,21 +19,10 @@ import { useDowngradePlan } from "@/hooks/useDowngradePlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { useBillingInvoices } from "@/hooks/useBillingInvoices";
 import type { Subscription } from "@/hooks/useBillingPlan";
+import { formatCents, formatDate } from "./formatters";
 
 interface PlanDetailsCardProps {
   subscription: Subscription;
-}
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function CostEstimate() {
@@ -99,9 +88,12 @@ function DowngradeSection() {
 
   async function handleDowngrade() {
     try {
-      await downgrade();
+      const result = await downgrade();
       setShowConfirm(false);
-      toast.success("Your plan has been downgraded to Free.");
+      const graceMsg = result?.grace_period_ends_at
+        ? ` Your paid features remain active until ${formatDate(result.grace_period_ends_at)}.`
+        : "";
+      toast.success(`Your plan has been downgraded to Free.${graceMsg}`);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to downgrade. Please try again.",

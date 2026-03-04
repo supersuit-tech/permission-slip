@@ -8,18 +8,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { Plan, Subscription } from "@/hooks/useBillingPlan";
+import { formatDate } from "./formatters";
 
 interface PlanCardProps {
   plan: Plan;
   subscription: Subscription;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function StatusBadge({ status }: { status: Subscription["status"] }) {

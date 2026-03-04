@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Activity } from "lucide-react";
+import { LayoutDashboard, Activity, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
 import { Footer } from "./Footer";
@@ -114,6 +114,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Activity className="size-5" aria-hidden="true" />
             Activity
+          </Link>
+          <Link
+            to="/billing"
+            aria-current={isBilling ? "page" : undefined}
+            className={cn(
+              "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
+              isBilling ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <CreditCard className="size-5" aria-hidden="true" />
+            Billing
           </Link>
         </div>
       </nav>
