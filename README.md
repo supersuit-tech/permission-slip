@@ -259,6 +259,15 @@ make mobile-start      # start Expo development server
 make mobile-test       # run mobile tests
 ```
 
+**Build & distribution:** The app uses EAS (Expo Application Services) for building, code signing, OTA updates, and app store submission. Build profiles: `development` (simulator), `preview` (internal testers), `production` (app stores). OTA updates via `expo-updates` push JS bundle changes without app store review. See [docs/mobile-builds.md](docs/mobile-builds.md) for setup instructions, available commands, and code signing configuration.
+
+```bash
+make mobile-build-dev  # build for development (simulator)
+make mobile-build-prod # build for production (app stores)
+make mobile-update     # push OTA update to production
+make mobile-submit     # submit to App Store / Google Play
+```
+
 See [issue #9](https://github.com/supersuit-tech/permission-slip/issues/9) for the full mobile roadmap.
 
 ## Testing
