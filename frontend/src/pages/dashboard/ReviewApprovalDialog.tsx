@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, Clock, Bot, AlertTriangle, CheckCircle } from "lucide-react";
+import { Loader2, Clock, Bot, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApproveApproval } from "@/hooks/useApproveApproval";
+import type { ApproveResult } from "@/hooks/useApproveApproval";
 import { useDenyApproval } from "@/hooks/useDenyApproval";
 import { useActionSchema } from "@/hooks/useActionSchema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
@@ -32,13 +33,68 @@ interface ReviewApprovalDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function ExecutionStatusBanner({ result }: { result: ApproveResult }) {
+  const isSuccess = result.execution_status === "success";
+  const isError = result.execution_status === "error";
+  const isPending = result.execution_status === "pending";
+
+  if (isPending) {
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
+          <Loader2 className="size-8 animate-spin text-blue-600 dark:text-blue-400" aria-hidden="true" />
+        </div>
+        <p className="text-lg font-semibold">Request Approved</p>
+        <p className="text-muted-foreground text-sm text-center">
+          The action is being executed…
+        </p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    const errorDetail = result.execution_result
+      ? (result.execution_result as Record<string, unknown>)["execution_error"]
+      : undefined;
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
+          <XCircle className="size-8 text-red-600 dark:text-red-400" aria-hidden="true" />
+        </div>
+        <p className="text-lg font-semibold">Execution Failed</p>
+        <p className="text-muted-foreground text-sm text-center">
+          The action was approved but execution failed.
+          {typeof errorDetail === "string" && ` ${errorDetail}`}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
+        <CheckCircle className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
+      </div>
+      <p className="text-lg font-semibold">
+        {isSuccess ? "Action Executed Successfully" : "Request Approved"}
+      </p>
+      <p className="text-muted-foreground text-sm text-center">
+        {isSuccess
+          ? "The action has been executed. The agent has been notified."
+          : "The action was approved. The agent has been notified."}
+      </p>
+    </div>
+  );
+}
+
 export function ReviewApprovalDialog({
   approval,
   agentDisplayName,
   open,
   onOpenChange,
 }: ReviewApprovalDialogProps) {
-  const [isApproved, setIsApproved] = useState(false);
+  const [approveResult, setApproveResult] = useState<ApproveResult | null>(null);
+  const isApproved = approveResult !== null;
   const { approveApproval, isPending: isApproving } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName } = useActionSchema(approval.action.type);
@@ -55,8 +111,8 @@ export function ReviewApprovalDialog({
 
   const handleApprove = useCallback(async () => {
     try {
-      await approveApproval(approval.approval_id);
-      setIsApproved(true);
+      const result = await approveApproval(approval.approval_id);
+      setApproveResult(result);
     } catch {
       toast.error("Failed to approve request. Please try again.");
     }
@@ -74,7 +130,7 @@ export function ReviewApprovalDialog({
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
-      setIsApproved(false);
+      setApproveResult(null);
     }
     onOpenChange(nextOpen);
   }
@@ -88,15 +144,7 @@ export function ReviewApprovalDialog({
 
         {isApproved ? (
           <div className="space-y-6 py-4" role="status" aria-live="polite">
-            <div className="flex flex-col items-center gap-4">
-              <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
-                <CheckCircle className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
-              </div>
-              <p className="text-lg font-semibold">Request Approved</p>
-              <p className="text-muted-foreground text-sm text-center">
-                The agent has been notified and can now proceed.
-              </p>
-            </div>
+            <ExecutionStatusBanner result={approveResult} />
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-6">
