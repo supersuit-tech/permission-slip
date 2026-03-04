@@ -304,9 +304,58 @@ func TestApprovalExecutionStatusCheckConstraint(t *testing.T) {
 		[]string{"pending", "success", "error"}, "invalid",
 		func(value string, i int) error {
 			_, err := tx.Exec(context.Background(),
-				`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, expires_at)
-				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, now() + interval '1 hour')`,
+				`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, executed_at, expires_at)
+				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, now(), now() + interval '1 hour')`,
 				fmt.Sprintf("%s_%d", base, i), agentID, uid, value)
 			return err
 		})
+}
+
+func TestApprovalExecutionColumnsConsistencyConstraint(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	ctx := context.Background()
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	// Valid: all execution columns NULL (not yet executed)
+	id1 := testhelper.GenerateID(t, "appr_")
+	_, err := tx.Exec(ctx,
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at)
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', now() + interval '1 hour')`,
+		id1, agentID, uid)
+	if err != nil {
+		t.Fatalf("all-NULL insert should succeed: %v", err)
+	}
+
+	// Valid: execution_status and executed_at both set
+	id2 := testhelper.GenerateID(t, "appr_")
+	_, err = tx.Exec(ctx,
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, executed_at, expires_at)
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', 'success', now(), now() + interval '1 hour')`,
+		id2, agentID, uid)
+	if err != nil {
+		t.Fatalf("status+timestamp insert should succeed: %v", err)
+	}
+
+	// Invalid: execution_status set but executed_at NULL
+	id3 := testhelper.GenerateID(t, "appr_")
+	_, err = tx.Exec(ctx,
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, expires_at)
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', 'success', now() + interval '1 hour')`,
+		id3, agentID, uid)
+	if err == nil {
+		t.Error("execution_status without executed_at should violate constraint")
+	}
+
+	// Invalid: executed_at set but execution_status NULL
+	id4 := testhelper.GenerateID(t, "appr_")
+	_, err = tx.Exec(ctx,
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, executed_at, expires_at)
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', now(), now() + interval '1 hour')`,
+		id4, agentID, uid)
+	if err == nil {
+		t.Error("executed_at without execution_status should violate constraint")
+	}
 }
