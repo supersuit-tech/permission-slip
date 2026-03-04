@@ -1,4 +1,5 @@
 import React, { createElement } from "react";
+import { Alert } from "react-native";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import type { ApprovalSummary } from "../../../hooks/useApprovals";
 import { makeApproval, MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtures";
@@ -28,9 +29,34 @@ jest.mock("../../../hooks/useAgents", () => ({
   getAgentDisplayName: mockGetAgentDisplayName,
 }));
 
+const mockApproveApproval = jest.fn();
+const mockDenyApproval = jest.fn();
+
+jest.mock("../../../hooks/useApproveApproval", () => ({
+  useApproveApproval: () => ({
+    approveApproval: mockApproveApproval,
+    isPending: false,
+    error: null,
+    reset: jest.fn(),
+  }),
+}));
+
+jest.mock("../../../hooks/useDenyApproval", () => ({
+  useDenyApproval: () => ({
+    denyApproval: mockDenyApproval,
+    isPending: false,
+    error: null,
+    reset: jest.fn(),
+  }),
+}));
+
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock("expo-clipboard", () => ({
+  setStringAsync: jest.fn(),
 }));
 
 import ApprovalDetailScreen from "../ApprovalDetailScreen";
@@ -46,11 +72,20 @@ function renderDetail(approval: ApprovalSummary) {
     key: "test",
     name: "ApprovalDetail" as const,
   };
-  const navigation = {} as any;
+  const navigation = { goBack: jest.fn() } as any;
 
   return create(
     createElement(ApprovalDetailScreen, { route, navigation } as any),
   );
+}
+
+function hasTestId(renderer: ReactTestRenderer, testID: string) {
+  return renderer.root.findAll((node) => node.props.testID === testID).length > 0;
+}
+
+function findFirstByTestId(renderer: ReactTestRenderer, testID: string) {
+  const matches = renderer.root.findAll((node) => node.props.testID === testID);
+  return matches[0];
 }
 
 // --- Tests ---
@@ -60,6 +95,7 @@ describe("ApprovalDetailScreen", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    jest.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -169,5 +205,187 @@ describe("ApprovalDetailScreen", () => {
     });
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain("Agent 999");
+  });
+
+  // --- Approve/Deny flow tests ---
+
+  it("shows approve and deny buttons for pending approvals", async () => {
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasTestId(renderer, "approve-button")).toBe(true);
+    expect(hasTestId(renderer, "deny-button")).toBe(true);
+  });
+
+  it("does not show approve/deny buttons for approved approvals", async () => {
+    const approval = makeApproval({
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasTestId(renderer, "approve-button")).toBe(false);
+    expect(hasTestId(renderer, "deny-button")).toBe(false);
+  });
+
+  it("does not show approve/deny buttons for denied approvals", async () => {
+    const approval = makeApproval({
+      status: "denied",
+      denied_at: new Date().toISOString(),
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasTestId(renderer, "approve-button")).toBe(false);
+  });
+
+  it("does not show approve/deny buttons for expired approvals", async () => {
+    const approval = makeApproval({
+      expires_at: new Date(Date.now() - 60_000).toISOString(),
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasTestId(renderer, "approve-button")).toBe(false);
+  });
+
+  it("shows confirmation code after successful approval", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      confirmation_code: "RK3-P7M",
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    // Press approve button
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("RK3-P7M");
+    expect(json).toContain("Confirmation Code");
+    expect(json).toContain("Request Approved");
+
+    // Approve/deny buttons should be gone
+    expect(hasTestId(renderer, "approve-button")).toBe(false);
+  });
+
+  it("shows copy button for confirmation code", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      confirmation_code: "XK7-M9P",
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    expect(hasTestId(renderer, "copy-code-button")).toBe(true);
+  });
+
+  it("shows alert on approve failure", async () => {
+    mockApproveApproval.mockRejectedValueOnce(new Error("Approval has expired"));
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Approval Failed",
+      expect.stringContaining("Failed to approve"),
+    );
+  });
+
+  it("shows deny confirmation dialog and processes denial", async () => {
+    mockDenyApproval.mockResolvedValueOnce(undefined);
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const denyButton = findFirstByTestId(renderer, "deny-button");
+    await act(async () => {
+      denyButton?.props.onPress();
+    });
+
+    // Alert.alert should be called with deny confirmation
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Deny Request",
+      "Are you sure you want to deny this request?",
+      expect.arrayContaining([
+        expect.objectContaining({ text: "Cancel" }),
+        expect.objectContaining({ text: "Deny", style: "destructive" }),
+      ]),
+    );
+
+    // Simulate pressing "Deny" in the alert
+    const denyAction = alertSpy.mock.calls[0]?.[2]?.find(
+      (btn) => btn.text === "Deny",
+    );
+    await act(async () => {
+      await denyAction?.onPress?.();
+    });
+
+    expect(mockDenyApproval).toHaveBeenCalledWith("appr_test123");
+
+    // Should show denied banner
+    expect(hasTestId(renderer, "denied-banner")).toBe(true);
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("Request Denied");
+  });
+
+  it("shows alert on deny failure", async () => {
+    mockDenyApproval.mockRejectedValueOnce(new Error("Already resolved"));
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const denyButton = findFirstByTestId(renderer, "deny-button");
+    await act(async () => {
+      denyButton?.props.onPress();
+    });
+
+    // Simulate pressing "Deny" in the alert
+    const denyAction = alertSpy.mock.calls[0]?.[2]?.find(
+      (btn) => btn.text === "Deny",
+    );
+    await act(async () => {
+      await denyAction?.onPress?.();
+    });
+
+    // Second alert call should be the error alert
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Denial Failed",
+      expect.stringContaining("Failed to deny"),
+    );
   });
 });

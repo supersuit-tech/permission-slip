@@ -1,10 +1,12 @@
 /**
  * Approval detail screen — displays the full details of a single approval
  * request including agent info, action parameters, risk level, expiry
- * countdown, context, and timeline.
+ * countdown, context, and timeline. For pending approvals, shows
+ * approve/deny buttons. After approval, displays the confirmation code.
  */
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,11 +16,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
+import { useApproveApproval } from "../../hooks/useApproveApproval";
+import { useDenyApproval } from "../../hooks/useDenyApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
   buildActionSummary,
-  secondsUntil,
   safeParams,
   isExpired as checkExpired,
   formatParamValue,
@@ -26,13 +29,27 @@ import {
 } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
+import { ConfirmationCodeCard } from "./ConfirmationCodeCard";
+import { ApprovalActions } from "./ApprovalActions";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
-export default function ApprovalDetailScreen({ route }: Props) {
+export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { approval } = route.params;
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
+
+  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+  const [isDenied, setIsDenied] = useState(false);
+
+  const {
+    approveApproval,
+    isPending: isApproving,
+  } = useApproveApproval();
+  const {
+    denyApproval,
+    isPending: isDenying,
+  } = useDenyApproval();
 
   const agent = useMemo(
     () => agents.find((a) => a.agent_id === approval.agent_id),
@@ -47,252 +64,331 @@ export default function ApprovalDetailScreen({ route }: Props) {
   const contextDetails = safeParams(approval.context.details);
   const contextDetailEntries = Object.entries(contextDetails);
 
-  const remaining = secondsUntil(approval.expires_at);
-  const isPending = approval.status === "pending";
+  const isPending = approval.status === "pending" && !confirmationCode && !isDenied;
   const expired = checkExpired(approval.status, approval.expires_at);
+  const canAct = isPending && !expired;
 
   const summary = buildActionSummary(approval.action.type, parameters);
 
+  const handleApprove = useCallback(async () => {
+    try {
+      const result = await approveApproval(approval.approval_id);
+      setConfirmationCode(result.confirmation_code);
+    } catch {
+      Alert.alert(
+        "Approval Failed",
+        "Failed to approve request. The request may have expired or already been resolved.",
+      );
+    }
+  }, [approveApproval, approval.approval_id]);
+
+  const handleDeny = useCallback(() => {
+    Alert.alert(
+      "Deny Request",
+      "Are you sure you want to deny this request?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Deny",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await denyApproval(approval.approval_id);
+              setIsDenied(true);
+            } catch {
+              Alert.alert(
+                "Denial Failed",
+                "Failed to deny request. The request may have expired or already been resolved.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  }, [denyApproval, approval.approval_id]);
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-    >
-      {/* Status banner for resolved approvals */}
-      {approval.status === "approved" && (
-        <View
-          style={styles.statusBannerApproved}
-          accessibilityRole="alert"
-        >
-          <Text style={styles.statusBannerTextApproved}>Approved</Text>
-        </View>
-      )}
-      {approval.status === "denied" && (
-        <View
-          style={styles.statusBannerDenied}
-          accessibilityRole="alert"
-        >
-          <Text style={styles.statusBannerTextDenied}>Denied</Text>
-        </View>
-      )}
-      {approval.status === "cancelled" && (
-        <View style={styles.statusBannerCancelled}>
-          <Text style={styles.statusBannerText}>Cancelled</Text>
-        </View>
-      )}
-      {expired && (
-        <View style={styles.statusBannerCancelled}>
-          <Text style={styles.statusBannerText}>Expired</Text>
-        </View>
-      )}
-
-      {/* Agent Info */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Agent</Text>
-        <View style={styles.agentRow}>
-          <View style={styles.agentAvatar}>
-            <Text style={styles.agentAvatarText}>
-              {agentName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.agentInfo}>
-            <Text style={styles.agentName}>{agentName}</Text>
-            {agentName !== `Agent ${approval.agent_id}` && (
-              <Text style={styles.agentId}>ID: {approval.agent_id}</Text>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {/* Action & Risk */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Action</Text>
-        <View style={styles.card}>
-          <View style={styles.actionHeader}>
-            <View style={styles.actionTitleRow}>
-              <Text style={styles.actionName}>
-                {humanizeActionType(approval.action.type)}
-              </Text>
-              <RiskBadge level={approval.context.risk_level} />
+    <View style={styles.outerContainer}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: canAct ? 8 : insets.bottom + 24 }}
+      >
+        {/* Confirmation code — shown after successful approval */}
+        {confirmationCode && (
+          <View style={styles.section}>
+            <View style={styles.successBanner} accessibilityRole="alert">
+              <Text style={styles.successBannerText}>Request Approved</Text>
             </View>
-            <Text style={styles.actionType}>{approval.action.type}</Text>
-            {approval.action.version && (
-              <Text style={styles.actionVersion}>
-                v{approval.action.version}
-              </Text>
-            )}
+            <View style={styles.codeSection}>
+              <ConfirmationCodeCard code={confirmationCode} />
+            </View>
           </View>
-          {summary !== humanizeActionType(approval.action.type) && (
-            <Text style={styles.actionSummary}>{summary}</Text>
-          )}
+        )}
 
-          {/* Context description — inline with the action for quick scanning */}
-          {approval.context.description && (
-            <View style={styles.contextInline}>
-              <Text style={styles.contextDescription}>
-                {approval.context.description}
+        {/* Denied confirmation */}
+        {isDenied && (
+          <View
+            style={styles.statusBannerDenied}
+            accessibilityRole="alert"
+            testID="denied-banner"
+          >
+            <Text style={styles.statusBannerTextDenied}>Request Denied</Text>
+          </View>
+        )}
+
+        {/* Status banner for already-resolved approvals (loaded from list) */}
+        {!confirmationCode && !isDenied && (
+          <>
+            {approval.status === "approved" && (
+              <View
+                style={styles.statusBannerApproved}
+                accessibilityRole="alert"
+              >
+                <Text style={styles.statusBannerTextApproved}>Approved</Text>
+              </View>
+            )}
+            {approval.status === "denied" && (
+              <View
+                style={styles.statusBannerDenied}
+                accessibilityRole="alert"
+              >
+                <Text style={styles.statusBannerTextDenied}>Denied</Text>
+              </View>
+            )}
+            {approval.status === "cancelled" && (
+              <View style={styles.statusBannerCancelled}>
+                <Text style={styles.statusBannerText}>Cancelled</Text>
+              </View>
+            )}
+            {expired && (
+              <View style={styles.statusBannerCancelled}>
+                <Text style={styles.statusBannerText}>Expired</Text>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Agent Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Agent</Text>
+          <View style={styles.agentRow}>
+            <View style={styles.agentAvatar}>
+              <Text style={styles.agentAvatarText}>
+                {agentName.charAt(0).toUpperCase()}
               </Text>
             </View>
-          )}
+            <View style={styles.agentInfo}>
+              <Text style={styles.agentName}>{agentName}</Text>
+              {agentName !== `Agent ${approval.agent_id}` && (
+                <Text style={styles.agentId}>ID: {approval.agent_id}</Text>
+              )}
+            </View>
+          </View>
+        </View>
 
-          {/* Risk explanation — inline for high/medium risk */}
-          {approval.context.risk_level &&
-            approval.context.risk_level !== "low" && (
-              <View style={styles.riskRow}>
-                <Text style={styles.riskDescription}>
-                  {RISK_DESCRIPTIONS[approval.context.risk_level]}
+        {/* Action & Risk */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Action</Text>
+          <View style={styles.card}>
+            <View style={styles.actionHeader}>
+              <View style={styles.actionTitleRow}>
+                <Text style={styles.actionName}>
+                  {humanizeActionType(approval.action.type)}
+                </Text>
+                <RiskBadge level={approval.context.risk_level} />
+              </View>
+              <Text style={styles.actionType}>{approval.action.type}</Text>
+              {approval.action.version && (
+                <Text style={styles.actionVersion}>
+                  v{approval.action.version}
+                </Text>
+              )}
+            </View>
+            {summary !== humanizeActionType(approval.action.type) && (
+              <Text style={styles.actionSummary}>{summary}</Text>
+            )}
+
+            {/* Context description — inline with the action for quick scanning */}
+            {approval.context.description && (
+              <View style={styles.contextInline}>
+                <Text style={styles.contextDescription}>
+                  {approval.context.description}
                 </Text>
               </View>
             )}
-        </View>
-      </View>
 
-      {/* High risk warning — prominent, outside the card */}
-      {approval.context.risk_level === "high" && (
-        <View style={styles.section}>
-          <View
-            style={styles.highRiskWarning}
-            accessibilityRole="alert"
-          >
-            <Text style={styles.highRiskWarningText}>
-              This is a high-risk action. Review the details carefully before
-              approving.
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Expiry Countdown */}
-      {isPending && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Expiry</Text>
-          <View style={styles.card}>
-            <View style={styles.expiryRow}>
-              <CountdownBadge expiresAt={approval.expires_at} />
-              <Text style={styles.expiryLabel}>
-                {expired ? "This request has expired" : "remaining"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Parameters */}
-      {paramEntries.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Parameters</Text>
-          <View style={styles.card}>
-            {paramEntries.map(([key, value], index) => {
-              const formatted = formatParamValue(value);
-              const isLong = formatted.length > 40 || formatted.includes("\n");
-              const isLast = index === paramEntries.length - 1;
-              return (
-                <View
-                  key={key}
-                  style={[
-                    isLong ? styles.paramRowVertical : styles.paramRow,
-                    isLast && styles.paramRowLast,
-                  ]}
-                >
-                  <Text style={styles.paramKey}>{key}</Text>
-                  <Text
-                    style={
-                      isLong ? styles.paramValueFull : styles.paramValue
-                    }
-                    selectable
-                  >
-                    {formatted}
+            {/* Risk explanation — inline for high/medium risk */}
+            {approval.context.risk_level &&
+              approval.context.risk_level !== "low" && (
+                <View style={styles.riskRow}>
+                  <Text style={styles.riskDescription}>
+                    {RISK_DESCRIPTIONS[approval.context.risk_level]}
                   </Text>
                 </View>
-              );
-            })}
+              )}
           </View>
         </View>
-      )}
 
-      {/* Context Details */}
-      {contextDetailEntries.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Additional Context</Text>
-          <View style={styles.card}>
-            {contextDetailEntries.map(([key, value], index) => {
-              const formatted = formatParamValue(value);
-              const isLong = formatted.length > 40 || formatted.includes("\n");
-              const isLast = index === contextDetailEntries.length - 1;
-              return (
-                <View
-                  key={key}
-                  style={[
-                    isLong ? styles.paramRowVertical : styles.paramRow,
-                    isLast && styles.paramRowLast,
-                  ]}
-                >
-                  <Text style={styles.paramKey}>{key}</Text>
-                  <Text
-                    style={
-                      isLong ? styles.paramValueFull : styles.paramValue
-                    }
-                    selectable
+        {/* High risk warning — prominent, outside the card */}
+        {approval.context.risk_level === "high" && (
+          <View style={styles.section}>
+            <View
+              style={styles.highRiskWarning}
+              accessibilityRole="alert"
+            >
+              <Text style={styles.highRiskWarningText}>
+                This is a high-risk action. Review the details carefully before
+                approving.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Expiry Countdown */}
+        {approval.status === "pending" && !confirmationCode && !isDenied && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Expiry</Text>
+            <View style={styles.card}>
+              <View style={styles.expiryRow}>
+                <CountdownBadge expiresAt={approval.expires_at} />
+                <Text style={styles.expiryLabel}>
+                  {expired ? "This request has expired" : "remaining"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Parameters */}
+        {paramEntries.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Parameters</Text>
+            <View style={styles.card}>
+              {paramEntries.map(([key, value], index) => {
+                const formatted = formatParamValue(value);
+                const isLong = formatted.length > 40 || formatted.includes("\n");
+                const isLast = index === paramEntries.length - 1;
+                return (
+                  <View
+                    key={key}
+                    style={[
+                      isLong ? styles.paramRowVertical : styles.paramRow,
+                      isLast && styles.paramRowLast,
+                    ]}
                   >
-                    {formatted}
-                  </Text>
-                </View>
-              );
-            })}
+                    <Text style={styles.paramKey}>{key}</Text>
+                    <Text
+                      style={
+                        isLong ? styles.paramValueFull : styles.paramValue
+                      }
+                      selectable
+                    >
+                      {formatted}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
+        )}
+
+        {/* Context Details */}
+        {contextDetailEntries.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Additional Context</Text>
+            <View style={styles.card}>
+              {contextDetailEntries.map(([key, value], index) => {
+                const formatted = formatParamValue(value);
+                const isLong = formatted.length > 40 || formatted.includes("\n");
+                const isLast = index === contextDetailEntries.length - 1;
+                return (
+                  <View
+                    key={key}
+                    style={[
+                      isLong ? styles.paramRowVertical : styles.paramRow,
+                      isLast && styles.paramRowLast,
+                    ]}
+                  >
+                    <Text style={styles.paramKey}>{key}</Text>
+                    <Text
+                      style={
+                        isLong ? styles.paramValueFull : styles.paramValue
+                      }
+                      selectable
+                    >
+                      {formatted}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Timestamps */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Timeline</Text>
+          <View style={styles.card}>
+            <View style={styles.paramRow}>
+              <Text style={styles.paramKey}>Created</Text>
+              <Text style={styles.paramValue}>
+                {formatTimestamp(approval.created_at)}
+              </Text>
+            </View>
+            <View style={styles.paramRow}>
+              <Text style={styles.paramKey}>Expires</Text>
+              <Text style={styles.paramValue}>
+                {formatTimestamp(approval.expires_at)}
+              </Text>
+            </View>
+            {(approval.approved_at ?? (confirmationCode ? new Date().toISOString() : null)) && (
+              <View style={styles.paramRow}>
+                <Text style={styles.paramKey}>Approved</Text>
+                <Text style={styles.paramValue}>
+                  {formatTimestamp(approval.approved_at ?? new Date().toISOString())}
+                </Text>
+              </View>
+            )}
+            {(approval.denied_at ?? (isDenied ? new Date().toISOString() : null)) && (
+              <View style={styles.paramRow}>
+                <Text style={styles.paramKey}>Denied</Text>
+                <Text style={styles.paramValue}>
+                  {formatTimestamp(approval.denied_at ?? new Date().toISOString())}
+                </Text>
+              </View>
+            )}
+            {approval.cancelled_at && (
+              <View style={styles.paramRow}>
+                <Text style={styles.paramKey}>Cancelled</Text>
+                <Text style={styles.paramValue}>
+                  {formatTimestamp(approval.cancelled_at)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Approval ID */}
+        <View style={styles.section}>
+          <Text style={styles.footerLabel}>
+            ID: {approval.approval_id}
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* Action buttons — fixed at bottom for pending approvals */}
+      {canAct && (
+        <View style={[styles.actionBar, { paddingBottom: insets.bottom + 8 }]}>
+          <ApprovalActions
+            onApprove={handleApprove}
+            onDeny={handleDeny}
+            isApproving={isApproving}
+            isDenying={isDenying}
+            disabled={expired}
+          />
         </View>
       )}
-
-      {/* Timestamps */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Timeline</Text>
-        <View style={styles.card}>
-          <View style={styles.paramRow}>
-            <Text style={styles.paramKey}>Created</Text>
-            <Text style={styles.paramValue}>
-              {formatTimestamp(approval.created_at)}
-            </Text>
-          </View>
-          <View style={styles.paramRow}>
-            <Text style={styles.paramKey}>Expires</Text>
-            <Text style={styles.paramValue}>
-              {formatTimestamp(approval.expires_at)}
-            </Text>
-          </View>
-          {approval.approved_at && (
-            <View style={styles.paramRow}>
-              <Text style={styles.paramKey}>Approved</Text>
-              <Text style={styles.paramValue}>
-                {formatTimestamp(approval.approved_at)}
-              </Text>
-            </View>
-          )}
-          {approval.denied_at && (
-            <View style={styles.paramRow}>
-              <Text style={styles.paramKey}>Denied</Text>
-              <Text style={styles.paramValue}>
-                {formatTimestamp(approval.denied_at)}
-              </Text>
-            </View>
-          )}
-          {approval.cancelled_at && (
-            <View style={styles.paramRow}>
-              <Text style={styles.paramKey}>Cancelled</Text>
-              <Text style={styles.paramValue}>
-                {formatTimestamp(approval.cancelled_at)}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Approval ID */}
-      <View style={styles.section}>
-        <Text style={styles.footerLabel}>
-          ID: {approval.approval_id}
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -305,9 +401,29 @@ const RISK_DESCRIPTIONS: Record<string, string> = {
 
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
     flex: 1,
     backgroundColor: colors.gray50,
+  },
+  container: {
+    flex: 1,
+  },
+  successBanner: {
+    backgroundColor: colors.riskLowBg,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    marginBottom: 16,
+  },
+  successBannerText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.success,
+  },
+  codeSection: {
+    marginTop: 0,
   },
   statusBannerApproved: {
     backgroundColor: colors.riskLowBg,
@@ -499,5 +615,10 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     textAlign: "center",
     fontFamily: "monospace",
+  },
+  actionBar: {
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray200,
   },
 });
