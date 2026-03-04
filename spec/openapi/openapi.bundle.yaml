@@ -8602,38 +8602,66 @@ components:
             recently downgraded from a paid plan. After this timestamp,
             effective_retention_days will match audit_retention_days.
     CreatePushSubscriptionRequest:
-      type: object
       description: |
         Register a push subscription. Use `type: "web-push"` (or omit type) for
-        browser Web Push subscriptions, or `type: "expo"` for Expo push tokens
-        from the mobile app.
+        browser Web Push subscriptions, or `type: "expo"` / `type: "mobile-push"`
+        for Expo push tokens from the mobile app.
+      oneOf:
+        - $ref: '#/components/schemas/CreateWebPushSubscriptionRequest'
+        - $ref: '#/components/schemas/CreateExpoPushSubscriptionRequest'
+      discriminator:
+        propertyName: type
+        mapping:
+          web-push: '#/components/schemas/CreateWebPushSubscriptionRequest'
+          expo: '#/components/schemas/CreateExpoPushSubscriptionRequest'
+          mobile-push: '#/components/schemas/CreateExpoPushSubscriptionRequest'
+    CreateWebPushSubscriptionRequest:
+      type: object
+      description: Register a Web Push subscription from a browser PushSubscription.
+      required:
+        - endpoint
+        - p256dh
+        - auth
       properties:
         type:
           type: string
-          description: |
-            Subscription type. Defaults to "web-push" when omitted for backward
-            compatibility with existing browser clients.
+          description: Subscription type. Defaults to "web-push" when omitted.
           enum:
             - web-push
-            - expo
           default: web-push
           example: web-push
         endpoint:
           type: string
           format: uri
-          description: Push service endpoint URL from the browser PushSubscription (required for web-push)
+          description: Push service endpoint URL from the browser PushSubscription
           example: https://fcm.googleapis.com/fcm/send/abc123...
         p256dh:
           type: string
-          description: Base64url-encoded P-256 public key from the browser PushSubscription keys (required for web-push)
+          description: Base64url-encoded P-256 public key from the browser PushSubscription keys
           example: BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8p8REqnSw
         auth:
           type: string
-          description: Base64url-encoded auth secret from the browser PushSubscription keys (required for web-push)
+          description: Base64url-encoded auth secret from the browser PushSubscription keys
           example: tBHItJI5svbpC7RB5gg6bQ
+    CreateExpoPushSubscriptionRequest:
+      type: object
+      description: Register an Expo push token from the mobile app.
+      required:
+        - type
+        - expo_token
+      properties:
+        type:
+          type: string
+          description: |
+            Subscription type. Use "expo" or "mobile-push" — both are accepted
+            and create a mobile-push channel subscription.
+          enum:
+            - expo
+            - mobile-push
+          example: expo
         expo_token:
           type: string
-          description: Expo push token from expo-notifications (required for expo type)
+          description: Expo push token from expo-notifications
           example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
     PushSubscriptionResponse:
       type: object

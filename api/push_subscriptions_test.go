@@ -144,6 +144,33 @@ func TestCreatePushSubscription_Expo_ExpoPushTokenPrefix(t *testing.T) {
 	}
 }
 
+func TestCreatePushSubscription_MobilePushTypeAlias(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid,
+		`{"type":"mobile-push","expo_token":"ExponentPushToken[alias_test]"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp pushSubscriptionResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Channel != "mobile-push" {
+		t.Errorf("expected channel mobile-push, got %q", resp.Channel)
+	}
+}
+
 func TestCreatePushSubscription_Expo_MissingToken(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

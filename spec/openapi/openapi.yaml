@@ -443,6 +443,10 @@ components:
     # Push Subscriptions
     CreatePushSubscriptionRequest:
       $ref: './components/schemas/push_subscriptions.yaml#/CreatePushSubscriptionRequest'
+    CreateWebPushSubscriptionRequest:
+      $ref: './components/schemas/push_subscriptions.yaml#/CreateWebPushSubscriptionRequest'
+    CreateExpoPushSubscriptionRequest:
+      $ref: './components/schemas/push_subscriptions.yaml#/CreateExpoPushSubscriptionRequest'
     PushSubscriptionResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/PushSubscriptionResponse'
     PushSubscriptionListResponse:

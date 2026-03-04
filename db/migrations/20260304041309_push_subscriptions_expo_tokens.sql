@@ -45,6 +45,10 @@ ALTER TABLE push_subscriptions
     CHECK (channel != 'mobile-push' OR expo_token IS NOT NULL);
 
 -- +goose Down
+-- Remove mobile-push rows first — they have NULL endpoint/p256dh/auth which
+-- would violate the NOT NULL constraints we're about to restore.
+DELETE FROM push_subscriptions WHERE channel = 'mobile-push';
+
 ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_mobile_push_fields;
 ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_web_push_fields;
 DROP INDEX IF EXISTS idx_push_subscriptions_user_expo_token;

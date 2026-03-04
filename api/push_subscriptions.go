@@ -130,10 +130,10 @@ func handleCreatePushSubscription(deps *Deps) http.HandlerFunc {
 		switch req.Type {
 		case "web-push":
 			handleCreateWebPush(w, r, deps, profile.ID, req)
-		case "expo":
+		case "expo", "mobile-push":
 			handleCreateExpo(w, r, deps, profile.ID, req)
 		default:
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "type must be \"web-push\" or \"expo\""))
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "type must be \"web-push\", \"expo\", or \"mobile-push\""))
 		}
 	}
 }
