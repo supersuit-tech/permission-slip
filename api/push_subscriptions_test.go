@@ -252,6 +252,196 @@ func TestCreatePushSubscription_WebPush_MissingEndpoint(t *testing.T) {
 	}
 }
 
+func TestCreatePushSubscription_Expo_MissingClosingBracket(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid,
+		`{"type":"expo","expo_token":"ExponentPushToken[no_closing_bracket"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreatePushSubscription_Expo_EmptyBrackets(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid,
+		`{"type":"expo","expo_token":"ExponentPushToken[]"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for empty brackets, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestListPushSubscriptions_ChannelFilter(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	// Create one of each type
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid,
+		`{"endpoint":"https://push.example.com/filter","p256dh":"k","auth":"a"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create web-push: %d: %s", w.Code, w.Body.String())
+	}
+
+	r = authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid,
+		`{"type":"expo","expo_token":"ExponentPushToken[filter_test]"}`)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create expo: %d: %s", w.Code, w.Body.String())
+	}
+
+	// Filter by web-push
+	r = authenticatedRequest(t, http.MethodGet, "/push-subscriptions?channel=web-push", uid)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("filter web-push: %d: %s", w.Code, w.Body.String())
+	}
+	var listResp pushSubscriptionListResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(listResp.Subscriptions) != 1 || listResp.Subscriptions[0].Channel != "web-push" {
+		t.Errorf("expected 1 web-push, got %d", len(listResp.Subscriptions))
+	}
+
+	// Filter by mobile-push
+	r = authenticatedRequest(t, http.MethodGet, "/push-subscriptions?channel=mobile-push", uid)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("filter mobile-push: %d: %s", w.Code, w.Body.String())
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(listResp.Subscriptions) != 1 || listResp.Subscriptions[0].Channel != "mobile-push" {
+		t.Errorf("expected 1 mobile-push, got %d", len(listResp.Subscriptions))
+	}
+
+	// Invalid channel filter
+	r = authenticatedRequest(t, http.MethodGet, "/push-subscriptions?channel=invalid", uid)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid channel, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUnregisterExpoPushToken(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	// Register a token
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid,
+		`{"type":"expo","expo_token":"ExponentPushToken[unreg_test]"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("register: %d: %s", w.Code, w.Body.String())
+	}
+
+	// Unregister by token
+	r = authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions/unregister", uid,
+		`{"expo_token":"ExponentPushToken[unreg_test]"}`)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("unregister: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify it's gone
+	r = authenticatedRequest(t, http.MethodGet, "/push-subscriptions?channel=mobile-push", uid)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	var listResp pushSubscriptionListResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(listResp.Subscriptions) != 0 {
+		t.Errorf("expected 0 subscriptions after unregister, got %d", len(listResp.Subscriptions))
+	}
+}
+
+func TestUnregisterExpoPushToken_NotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions/unregister", uid,
+		`{"expo_token":"ExponentPushToken[nonexistent]"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUnregisterExpoPushToken_WrongUser(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid1 := testhelper.GenerateUID(t)
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
+	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	// user1 registers a token
+	r := authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions", uid1,
+		`{"type":"expo","expo_token":"ExponentPushToken[user1_token]"}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("register: %d: %s", w.Code, w.Body.String())
+	}
+
+	// user2 should not be able to unregister user1's token
+	r = authenticatedJSONRequest(t, http.MethodPost, "/push-subscriptions/unregister", uid2,
+		`{"expo_token":"ExponentPushToken[user1_token]"}`)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for wrong user, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestCreatePushSubscription_Expo_Upsert(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Push subscription channel values.
@@ -94,12 +96,24 @@ func DeleteExpoPushToken(ctx context.Context, db DBTX, expoToken string) error {
 	return err
 }
 
-// ListPushSubscriptionsByUserID returns all push subscriptions for a user.
-func ListPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
-	rows, err := db.Query(ctx,
-		"SELECT id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at",
-		userID,
+// DeleteExpoPushTokenForUser removes an Expo push token scoped to a specific user.
+// Used by the mobile app on logout/unregister. Returns true if a row was deleted.
+func DeleteExpoPushTokenForUser(ctx context.Context, db DBTX, userID, expoToken string) (bool, error) {
+	tag, err := db.Exec(ctx,
+		"DELETE FROM push_subscriptions WHERE user_id = $1 AND expo_token = $2",
+		userID, expoToken,
 	)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// pushSubscriptionColumns is the SELECT column list shared across queries.
+const pushSubscriptionColumns = "id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at"
+
+// scanPushSubscriptions reads rows into a slice of PushSubscription.
+func scanPushSubscriptions(rows pgx.Rows, err error) ([]PushSubscription, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -114,48 +128,28 @@ func ListPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID string) 
 		subs = append(subs, s)
 	}
 	return subs, rows.Err()
+}
+
+// ListPushSubscriptionsByUserID returns all push subscriptions for a user.
+func ListPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
+	return scanPushSubscriptions(db.Query(ctx,
+		"SELECT "+pushSubscriptionColumns+" FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at",
+		userID,
+	))
 }
 
 // ListWebPushSubscriptionsByUserID returns only web-push subscriptions for a user.
 func ListWebPushSubscriptionsByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
-	rows, err := db.Query(ctx,
-		"SELECT id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at FROM push_subscriptions WHERE user_id = $1 AND channel = 'web-push' ORDER BY created_at",
+	return scanPushSubscriptions(db.Query(ctx,
+		"SELECT "+pushSubscriptionColumns+" FROM push_subscriptions WHERE user_id = $1 AND channel = 'web-push' ORDER BY created_at",
 		userID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var subs []PushSubscription
-	for rows.Next() {
-		var s PushSubscription
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Channel, &s.Endpoint, &s.P256dh, &s.Auth, &s.ExpoToken, &s.CreatedAt); err != nil {
-			return nil, err
-		}
-		subs = append(subs, s)
-	}
-	return subs, rows.Err()
+	))
 }
 
 // ListExpoPushTokensByUserID returns only mobile-push (Expo) subscriptions for a user.
 func ListExpoPushTokensByUserID(ctx context.Context, db DBTX, userID string) ([]PushSubscription, error) {
-	rows, err := db.Query(ctx,
-		"SELECT id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at FROM push_subscriptions WHERE user_id = $1 AND channel = 'mobile-push' ORDER BY created_at",
+	return scanPushSubscriptions(db.Query(ctx,
+		"SELECT "+pushSubscriptionColumns+" FROM push_subscriptions WHERE user_id = $1 AND channel = 'mobile-push' ORDER BY created_at",
 		userID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var subs []PushSubscription
-	for rows.Next() {
-		var s PushSubscription
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Channel, &s.Endpoint, &s.P256dh, &s.Auth, &s.ExpoToken, &s.CreatedAt); err != nil {
-			return nil, err
-		}
-		subs = append(subs, s)
-	}
-	return subs, rows.Err()
+	))
 }

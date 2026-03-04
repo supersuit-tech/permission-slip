@@ -51,6 +51,14 @@ type deletePushSubscriptionResponse struct {
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
+type unregisterExpoPushTokenRequest struct {
+	ExpoToken string `json:"expo_token"`
+}
+
+type unregisterExpoPushTokenResponse struct {
+	UnregisteredAt time.Time `json:"unregistered_at"`
+}
+
 type vapidPublicKeyResponse struct {
 	PublicKey string `json:"public_key"`
 }
@@ -63,6 +71,7 @@ func RegisterPushSubscriptionRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("GET /push-subscriptions", requireProfile(handleListPushSubscriptions(deps)))
 	mux.Handle("POST /push-subscriptions", requireProfile(handleCreatePushSubscription(deps)))
 	mux.Handle("DELETE /push-subscriptions/{subscription_id}", requireProfile(handleDeletePushSubscription(deps)))
+	mux.Handle("POST /push-subscriptions/unregister", requireProfile(handleUnregisterExpoPushToken(deps)))
 	mux.Handle("GET /config/vapid-key", requireProfile(handleGetVAPIDKey(deps)))
 }
 
@@ -72,7 +81,23 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
 
-		subs, err := db.ListPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+		// Optional channel filter: ?channel=web-push or ?channel=mobile-push
+		channel := r.URL.Query().Get("channel")
+		var (
+			subs []db.PushSubscription
+			err  error
+		)
+		switch channel {
+		case "":
+			subs, err = db.ListPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+		case db.PushChannelWebPush:
+			subs, err = db.ListWebPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
+		case db.PushChannelMobilePush:
+			subs, err = db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
+		default:
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "channel must be \"web-push\" or \"mobile-push\""))
+			return
+		}
 		if err != nil {
 			log.Printf("[%s] ListPushSubscriptions: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
@@ -158,8 +183,9 @@ func handleCreateExpo(w http.ResponseWriter, r *http.Request, deps *Deps, userID
 		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expo_token is required"))
 		return
 	}
-	if !strings.HasPrefix(req.ExpoToken, "ExponentPushToken[") && !strings.HasPrefix(req.ExpoToken, "ExpoPushToken[") {
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expo_token must be a valid Expo push token"))
+	if !isValidExpoToken(req.ExpoToken) {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+			"expo_token must be a valid Expo push token (e.g. ExponentPushToken[...] or ExpoPushToken[...])"))
 		return
 	}
 	if len(req.ExpoToken) > maxExpoTokenLength {
@@ -207,6 +233,41 @@ func handleDeletePushSubscription(deps *Deps) http.HandlerFunc {
 	}
 }
 
+// handleUnregisterExpoPushToken removes an Expo push token by value.
+// This is more convenient for mobile clients than DELETE by ID, since the
+// device knows its own token but may not have cached the subscription ID.
+func handleUnregisterExpoPushToken(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		var req unregisterExpoPushTokenRequest
+		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+
+		if req.ExpoToken == "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expo_token is required"))
+			return
+		}
+
+		deleted, err := db.DeleteExpoPushTokenForUser(r.Context(), deps.DB, profile.ID, req.ExpoToken)
+		if err != nil {
+			log.Printf("[%s] UnregisterExpoPushToken: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to unregister push token"))
+			return
+		}
+
+		if !deleted {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrInvalidRequest, "Expo push token not found"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, unregisterExpoPushTokenResponse{
+			UnregisteredAt: time.Now().UTC(),
+		})
+	}
+}
+
 func handleGetVAPIDKey(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.VAPIDPublicKey == "" {
@@ -218,6 +279,18 @@ func handleGetVAPIDKey(deps *Deps) http.HandlerFunc {
 			PublicKey: deps.VAPIDPublicKey,
 		})
 	}
+}
+
+// isValidExpoToken checks whether a token matches the Expo push token format:
+// ExponentPushToken[...] or ExpoPushToken[...]
+func isValidExpoToken(token string) bool {
+	if strings.HasPrefix(token, "ExponentPushToken[") && strings.HasSuffix(token, "]") {
+		return len(token) > len("ExponentPushToken[]") // must have content inside brackets
+	}
+	if strings.HasPrefix(token, "ExpoPushToken[") && strings.HasSuffix(token, "]") {
+		return len(token) > len("ExpoPushToken[]")
+	}
+	return false
 }
 
 // toPushSubscriptionResponse converts a DB PushSubscription to the API response.

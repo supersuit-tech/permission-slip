@@ -4626,12 +4626,24 @@ paths:
   /v1/push-subscriptions:
     get:
       summary: List push subscriptions
-      description: Returns all push subscriptions (Web Push and Expo) registered by the authenticated user.
+      description: |
+        Returns push subscriptions registered by the authenticated user.
+        Optionally filter by channel type using the `channel` query parameter.
       operationId: listPushSubscriptions
       tags:
         - Push Subscriptions
       security:
         - SupabaseSession: []
+      parameters:
+        - name: channel
+          in: query
+          required: false
+          description: Filter by push channel type. Omit to list all subscriptions.
+          schema:
+            type: string
+            enum:
+              - web-push
+              - mobile-push
       responses:
         '200':
           description: Push subscriptions retrieved
@@ -4639,6 +4651,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PushSubscriptionListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -4682,7 +4696,7 @@ paths:
   /v1/push-subscriptions/{subscription_id}:
     delete:
       summary: Delete push subscription
-      description: Remove a Web Push subscription by ID.
+      description: Remove a push subscription by ID.
       operationId: deletePushSubscription
       tags:
         - Push Subscriptions
@@ -4703,6 +4717,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeletePushSubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/push-subscriptions/unregister:
+    post:
+      summary: Unregister Expo push token
+      description: |
+        Remove an Expo push token by value. This is more convenient for mobile
+        clients than DELETE by ID, since the device knows its own token but may
+        not have cached the subscription ID. Typically called on logout.
+      operationId: unregisterExpoPushToken
+      tags:
+        - Push Subscriptions
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnregisterExpoPushTokenRequest'
+      responses:
+        '200':
+          description: Expo push token unregistered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnregisterExpoPushTokenResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -8648,6 +8695,27 @@ components:
           type: string
           format: date-time
           description: Deletion timestamp
+          example: '2026-02-27T10:05:00Z'
+    UnregisterExpoPushTokenRequest:
+      type: object
+      description: Request to unregister an Expo push token (e.g. on mobile logout).
+      required:
+        - expo_token
+      properties:
+        expo_token:
+          type: string
+          description: The Expo push token to unregister
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+    UnregisterExpoPushTokenResponse:
+      type: object
+      description: Confirmation that the Expo push token was unregistered.
+      required:
+        - unregistered_at
+      properties:
+        unregistered_at:
+          type: string
+          format: date-time
+          description: When the token was unregistered
           example: '2026-02-27T10:05:00Z'
     VAPIDPublicKeyResponse:
       type: object

@@ -97,6 +97,29 @@ DeletePushSubscriptionResponse:
       description: Deletion timestamp
       example: "2026-02-27T10:05:00Z"
 
+UnregisterExpoPushTokenRequest:
+  type: object
+  description: Request to unregister an Expo push token (e.g. on mobile logout).
+  required:
+    - expo_token
+  properties:
+    expo_token:
+      type: string
+      description: The Expo push token to unregister
+      example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+
+UnregisterExpoPushTokenResponse:
+  type: object
+  description: Confirmation that the Expo push token was unregistered.
+  required:
+    - unregistered_at
+  properties:
+    unregistered_at:
+      type: string
+      format: date-time
+      description: When the token was unregistered
+      example: "2026-02-27T10:05:00Z"
+
 VAPIDPublicKeyResponse:
   type: object
   description: The server's VAPID public key for Web Push subscription.
