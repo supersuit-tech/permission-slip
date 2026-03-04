@@ -2,17 +2,12 @@ package db
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
-
-// maxApprovalVerificationAttempts is the maximum number of failed confirmation
-// code verification attempts before an approval is locked.
-const maxApprovalVerificationAttempts = 5
 
 // DefaultApprovalTTL is the default time-to-live for a new approval request.
 const DefaultApprovalTTL = 10 * time.Minute
@@ -116,64 +111,6 @@ func CancelApproval(ctx context.Context, db DBTX, approvalID string, agentID int
 	return nil, diagnoseAgentApprovalFailure(ctx, db, approvalID, agentID)
 }
 
-// VerifyApprovalConfirmationCode atomically increments verification_attempts
-// and checks the submitted code hash against the stored hash. The approval must
-// be in 'approved' status (user has already approved) and not expired.
-//
-// Returns the approval on success. On failure, returns the appropriate
-// ApprovalError (not_found, expired, already_resolved, verification_locked,
-// invalid_code).
-func VerifyApprovalConfirmationCode(ctx context.Context, db DBTX, approvalID string, agentID int64, submittedCodeHash string) (*Approval, error) {
-	// Atomically increment attempts for approved approvals under the limit.
-	row := db.QueryRow(ctx,
-		`UPDATE approvals
-		 SET verification_attempts = verification_attempts + 1
-		 WHERE approval_id = $1 AND agent_id = $2
-		   AND status = 'approved' AND expires_at > now()
-		   AND verification_attempts < $3
-		 RETURNING `+approvalColumns,
-		approvalID, agentID, maxApprovalVerificationAttempts,
-	)
-	appr, err := scanApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, diagnoseApprovalVerifyFailure(ctx, db, approvalID, agentID)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Constant-time comparison of hex-encoded hashes. Both strings are
-	// fixed-length SHA-256/HMAC-SHA256 hex digests. The 5-attempt lockout
-	// already makes timing attacks infeasible, but we use constant-time
-	// comparison for defense-in-depth (matching the pattern in
-	// VerifyAgentConfirmationCode).
-	storedHash := ""
-	if appr.ConfirmationCodeHash != nil {
-		storedHash = *appr.ConfirmationCodeHash
-	}
-	if subtle.ConstantTimeCompare([]byte(storedHash), []byte(submittedCodeHash)) != 1 {
-		return appr, &ApprovalError{Code: ApprovalErrInvalidCode}
-	}
-
-	// Success — invalidate the confirmation code so it cannot be reused, and
-	// undo the attempt increment (successful verifications should not count
-	// toward the lockout limit). Clearing the hash prevents repeated
-	// verifications against the same approval.
-	_, err = db.Exec(ctx,
-		`UPDATE approvals
-		 SET confirmation_code_hash = NULL,
-		     verification_attempts = GREATEST(verification_attempts - 1, 0)
-		 WHERE approval_id = $1`,
-		approvalID,
-	)
-	if err != nil {
-		// Log but don't fail — the verification itself succeeded.
-		return appr, nil
-	}
-
-	return appr, nil
-}
-
 // diagnoseAgentApprovalFailure reads the current approval row to determine why
 // an atomic UPDATE from the agent's perspective matched zero rows.
 func diagnoseAgentApprovalFailure(ctx context.Context, db DBTX, approvalID string, agentID int64) error {
@@ -190,56 +127,7 @@ func diagnoseAgentApprovalFailure(ctx context.Context, db DBTX, approvalID strin
 	return &ApprovalError{Code: ApprovalErrExpired}
 }
 
-// diagnoseApprovalVerifyFailure reads the current approval row to determine
-// why the atomic verification attempt increment matched zero rows.
-func diagnoseApprovalVerifyFailure(ctx context.Context, db DBTX, approvalID string, agentID int64) error {
-	appr, err := GetApprovalByIDAndAgent(ctx, db, approvalID, agentID)
-	if err != nil {
-		return err
-	}
-	if appr == nil {
-		return &ApprovalError{Code: ApprovalErrNotFound}
-	}
-	switch appr.Status {
-	case "approved":
-		// Status is correct but UPDATE didn't match — could be expired or locked.
-		if time.Now().After(appr.ExpiresAt) {
-			return &ApprovalError{Code: ApprovalErrExpired}
-		}
-		if appr.VerificationAttempts >= maxApprovalVerificationAttempts {
-			return &ApprovalError{Code: ApprovalErrVerificationLocked}
-		}
-		// Defensive fallback.
-		return &ApprovalError{Code: ApprovalErrVerificationLocked}
-	case "pending":
-		return &ApprovalError{Code: ApprovalErrNotYetApproved}
-	default:
-		return &ApprovalError{Code: ApprovalErrAlreadyResolved, Status: appr.Status}
-	}
-}
-
-// SetApprovalTokenJTI writes the token JTI to the approval row. This is called
-// after successfully minting an action token to enable single-use enforcement.
-// The WHERE clause ensures a JTI can only be set once; attempting to overwrite
-// an existing JTI returns an error.
-func SetApprovalTokenJTI(ctx context.Context, db DBTX, approvalID, jti string) error {
-	tag, err := db.Exec(ctx,
-		`UPDATE approvals SET token_jti = $2 WHERE approval_id = $1 AND token_jti IS NULL`,
-		approvalID, jti,
-	)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("approval %s already has a token_jti assigned", approvalID)
-	}
-	return nil
-}
-
 // Additional ApprovalError codes for agent-facing operations.
 const (
-	ApprovalErrDuplicateRequest   = "duplicate_request"
-	ApprovalErrInvalidCode        = "invalid_code"
-	ApprovalErrVerificationLocked = "verification_locked"
-	ApprovalErrNotYetApproved     = "not_yet_approved"
+	ApprovalErrDuplicateRequest = "duplicate_request"
 )

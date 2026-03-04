@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Loader2, Clock, Shield, Bot, AlertTriangle } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Loader2, Clock, Bot, AlertTriangle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +20,10 @@ import {
   formatCountdown,
   urgencyColor,
   RiskBadge,
-  ConfirmationCodeBanner,
 } from "./approval-components";
+
+/** Auto-close delay (ms) after a successful approval. */
+const SUCCESS_AUTO_CLOSE_MS = 3_000;
 
 interface ReviewApprovalDialogProps {
   approval: ApprovalSummary;
@@ -36,7 +38,7 @@ export function ReviewApprovalDialog({
   open,
   onOpenChange,
 }: ReviewApprovalDialogProps) {
-  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const { approveApproval, isPending: isApproving } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName } = useActionSchema(approval.action.type);
@@ -44,10 +46,17 @@ export function ReviewApprovalDialog({
   const isExpired = remaining <= 0;
   const isBusy = isApproving || isDenying;
 
+  // Auto-close dialog after successful approval
+  useEffect(() => {
+    if (!isApproved) return;
+    const timer = setTimeout(() => onOpenChange(false), SUCCESS_AUTO_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [isApproved, onOpenChange]);
+
   const handleApprove = useCallback(async () => {
     try {
-      const result = await approveApproval(approval.approval_id);
-      setConfirmationCode(result.confirmation_code);
+      await approveApproval(approval.approval_id);
+      setIsApproved(true);
     } catch {
       toast.error("Failed to approve request. Please try again.");
     }
@@ -65,7 +74,7 @@ export function ReviewApprovalDialog({
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
-      setConfirmationCode(null);
+      setIsApproved(false);
     }
     onOpenChange(nextOpen);
   }
@@ -77,15 +86,17 @@ export function ReviewApprovalDialog({
           <DialogTitle>Review Approval Request</DialogTitle>
         </DialogHeader>
 
-        {confirmationCode ? (
-          <div className="space-y-6 py-4">
+        {isApproved ? (
+          <div className="space-y-6 py-4" role="status" aria-live="polite">
             <div className="flex flex-col items-center gap-4">
               <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
-                <Shield className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
+                <CheckCircle className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
               </div>
               <p className="text-lg font-semibold">Request Approved</p>
+              <p className="text-muted-foreground text-sm text-center">
+                The agent has been notified and can now proceed.
+              </p>
             </div>
-            <ConfirmationCodeBanner code={confirmationCode} copyable />
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-6">
@@ -162,6 +173,17 @@ export function ReviewApprovalDialog({
               </details>
             )}
 
+            {/* Expired notice */}
+            {isExpired && (
+              <div role="alert" className="bg-muted/50 flex items-start gap-2 rounded-lg border p-3">
+                <Clock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <p className="text-muted-foreground text-sm">
+                  This request has expired. The agent will need to submit a new
+                  request if the action is still needed.
+                </p>
+              </div>
+            )}
+
             {/* High risk warning */}
             {approval.context.risk_level === "high" && (
               <div role="alert" className="bg-destructive/10 border-destructive/20 flex items-start gap-2 rounded-lg border p-3">
@@ -175,13 +197,24 @@ export function ReviewApprovalDialog({
           </div>
         )}
 
-        {!confirmationCode && (
+        {isApproved ? (
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => onOpenChange(false)}
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        ) : (
           <DialogFooter>
             <Button
               variant="outline"
               size="lg"
               disabled={isBusy || isExpired}
               onClick={handleDeny}
+              aria-label={isDenying ? "Denying request…" : undefined}
             >
               {isDenying ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -193,6 +226,7 @@ export function ReviewApprovalDialog({
               size="lg"
               disabled={isBusy || isExpired}
               onClick={handleApprove}
+              aria-label={isApproving ? "Approving request…" : undefined}
             >
               {isApproving ? (
                 <Loader2 className="size-4 animate-spin" />

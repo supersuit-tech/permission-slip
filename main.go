@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	crand "crypto/rand"
 	"embed"
 	"errors"
 	"io/fs"
@@ -161,17 +158,6 @@ func main() {
 	}
 	deps.BaseURL = os.Getenv("BASE_URL")
 	deps.InviteHMACKey = os.Getenv("INVITE_HMAC_KEY")
-
-	// Generate ECDSA P-256 key pair for signing action tokens (ES256).
-	// The key is ephemeral — tokens are short-lived (≤5 min) so key persistence
-	// is not required. A future iteration may load a stable key from env/secrets.
-	actionKey, err := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
-	if err != nil {
-		log.Fatalf("Failed to generate action token signing key: %v", err)
-	}
-	deps.ActionTokenSigningKey = actionKey
-	deps.ActionTokenKeyID = "action-key-1"
-	log.Println("Action token signing: ES256 key generated")
 
 	// Initialize SSE broker for real-time approval notifications.
 	deps.ApprovalEvents = api.NewApprovalEventBroker()

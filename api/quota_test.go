@@ -384,37 +384,3 @@ func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testin
 	testhelper.RequireUsageCount(t, tx, uid, 1000)
 }
 
-// ── Token-based execution is NOT blocked by quota ───────────────────────────
-// Token execution is not billable (the approval request was already counted),
-// so it must succeed even when the user is at their monthly quota limit.
-
-func TestQuota_TokenExecution_AtLimit_StillSucceeds(t *testing.T) {
-	t.Parallel()
-	tx, deps, router, agentID, privKey, apprID, jti := setupExecuteTest(t)
-
-	userID := userIDFromApproval(t, tx, apprID)
-	testhelper.InsertSubscription(t, tx, userID, db.PlanFree)
-	testhelper.SetUsageCount(t, tx, userID, 1000)
-
-	params := json.RawMessage(`{"to":"alice@example.com"}`)
-	hash, err := HashParameters(params)
-	if err != nil {
-		t.Fatalf("HashParameters: %v", err)
-	}
-
-	token := mintTestActionToken(t, deps.ActionTokenSigningKey, deps.ActionTokenKeyID,
-		agentID, apprID, "email.send", "1", hash, jti, time.Now().Add(5*time.Minute))
-
-	reqBody := fmt.Sprintf(`{"token":%q,"action_id":"email.send","parameters":{"to":"alice@example.com"}}`, token)
-	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	// Token-based execution should succeed even at quota limit — it's not billable.
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 (token execution is not billable), got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Usage should remain at 1000 — token execution is not metered.
-	testhelper.RequireUsageCount(t, tx, userID, 1000)
-}
