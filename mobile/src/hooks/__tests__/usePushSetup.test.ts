@@ -7,6 +7,7 @@ const mockRegisterForPushNotifications = jest.fn();
 const mockRegisterToken = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockClientPost = jest.fn();
+const mockUnregisterDirect = jest.fn();
 
 let mockAuthStatus = "unauthenticated";
 let mockExpoPushToken: string | null = null;
@@ -38,6 +39,7 @@ jest.mock("../useRegisterPushToken", () => ({
     isRegistering: false,
     registerError: null,
   }),
+  unregisterPushTokenDirect: (...args: unknown[]) => mockUnregisterDirect(...args),
 }));
 
 jest.mock("../../auth/AuthContext", () => ({
@@ -56,12 +58,19 @@ import { usePushSetup } from "../usePushSetup";
 
 // --- Hook capture helper ---
 
+interface HookCapture {
+  isTokenRegistered: boolean;
+}
+
 function createHookCapture() {
+  const capture: HookCapture = { isTokenRegistered: false };
+
   function Consumer() {
-    usePushSetup();
+    const result = usePushSetup();
+    capture.isTokenRegistered = result.isTokenRegistered;
     return null;
   }
-  return { Consumer };
+  return { Consumer, capture };
 }
 
 describe("usePushSetup", () => {
@@ -69,6 +78,7 @@ describe("usePushSetup", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     mockAuthStatus = "unauthenticated";
     mockExpoPushToken = null;
     mockSession = null;
@@ -76,9 +86,11 @@ describe("usePushSetup", () => {
     mockRegisterForPushNotifications.mockResolvedValue(null);
     mockRegisterToken.mockResolvedValue({});
     mockClientPost.mockResolvedValue({ data: {}, error: undefined });
+    mockUnregisterDirect.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
+    jest.useRealTimers();
     if (renderer) {
       await act(async () => {
         renderer!.unmount();
@@ -120,12 +132,25 @@ describe("usePushSetup", () => {
       renderer = create(createElement(Consumer));
     });
 
-    // Wait for the async registerToken call
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
-    });
+    // Flush microtasks for the async registerToken call
+    await act(async () => {});
 
     expect(mockRegisterToken).toHaveBeenCalledWith("ExponentPushToken[abc]");
+  });
+
+  it("sets isTokenRegistered to true after successful registration", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    mockExpoPushToken = "ExponentPushToken[abc]";
+    const { Consumer, capture } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    await act(async () => {});
+
+    expect(capture.isTokenRegistered).toBe(true);
   });
 
   it("does not register token when unauthenticated even if token exists", async () => {
@@ -140,24 +165,120 @@ describe("usePushSetup", () => {
     expect(mockRegisterToken).not.toHaveBeenCalled();
   });
 
-  it("does not crash when registerToken fails", async () => {
+  it("retries registration with exponential backoff on failure", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    mockExpoPushToken = "ExponentPushToken[abc]";
+
+    // Fail first two attempts, succeed on third
+    mockRegisterToken
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce({});
+
+    const { Consumer, capture } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    // First attempt fails immediately
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(1);
+    expect(capture.isTokenRegistered).toBe(false);
+
+    // Advance past first retry delay (1000ms)
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+    });
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(2);
+    expect(capture.isTokenRegistered).toBe(false);
+
+    // Advance past second retry delay (2000ms)
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(3);
+    expect(capture.isTokenRegistered).toBe(true);
+  });
+
+  it("stops retrying after MAX_RETRIES failures", async () => {
     mockAuthStatus = "authenticated";
     mockSession = { access_token: "tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
     mockRegisterToken.mockRejectedValue(new Error("Network error"));
+
     const { Consumer } = createHookCapture();
 
     await act(async () => {
       renderer = create(createElement(Consumer));
     });
 
-    // Should not throw
+    // Attempt 1 (immediate)
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(1);
+
+    // Attempt 2 (after 1000ms)
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
+      jest.advanceTimersByTime(1000);
     });
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(2);
+
+    // Attempt 3 (after 2000ms)
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(3);
+
+    // Attempt 4 (after 4000ms)
+    await act(async () => {
+      jest.advanceTimersByTime(4000);
+    });
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(4);
+
+    // No more retries — advancing further should not trigger another call
+    await act(async () => {
+      jest.advanceTimersByTime(10000);
+    });
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(4);
   });
 
-  it("unregisters token on sign-out using captured access token", async () => {
+  it("cancels retry timer on unmount", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    mockExpoPushToken = "ExponentPushToken[abc]";
+    mockRegisterToken.mockRejectedValue(new Error("Network error"));
+
+    const { Consumer } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    // First attempt fails, retry scheduled
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(1);
+
+    // Unmount before retry fires
+    await act(async () => {
+      renderer!.unmount();
+    });
+    renderer = null;
+
+    // Advance past retry delay — should NOT trigger another call
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(mockRegisterToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("unregisters token on sign-out using unregisterPushTokenDirect", async () => {
     mockAuthStatus = "authenticated";
     mockSession = { access_token: "captured-tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
@@ -168,9 +289,7 @@ describe("usePushSetup", () => {
     });
 
     // Let register complete
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
-    });
+    await act(async () => {});
 
     expect(mockRegisterToken).toHaveBeenCalledWith("ExponentPushToken[abc]");
 
@@ -181,18 +300,36 @@ describe("usePushSetup", () => {
       renderer!.update(createElement(Consumer));
     });
 
+    await act(async () => {});
+
+    // Should call the dedicated unregister function
+    expect(mockUnregisterDirect).toHaveBeenCalledWith(
+      "ExponentPushToken[abc]",
+      "captured-tok",
+    );
+  });
+
+  it("sets isTokenRegistered to false on sign-out", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    mockExpoPushToken = "ExponentPushToken[abc]";
+    const { Consumer, capture } = createHookCapture();
+
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
+      renderer = create(createElement(Consumer));
     });
 
-    // Should use the captured token to call the API directly
-    expect(mockClientPost).toHaveBeenCalledWith(
-      "/v1/push-subscriptions/unregister",
-      {
-        headers: { Authorization: "Bearer captured-tok" },
-        body: { expo_token: "ExponentPushToken[abc]" },
-      },
-    );
+    await act(async () => {});
+    expect(capture.isTokenRegistered).toBe(true);
+
+    // Sign out
+    mockAuthStatus = "unauthenticated";
+    mockSession = null;
+    await act(async () => {
+      renderer!.update(createElement(Consumer));
+    });
+
+    expect(capture.isTokenRegistered).toBe(false);
   });
 
   it("invalidates approvals cache when a foreground notification is received", async () => {
@@ -212,20 +349,20 @@ describe("usePushSetup", () => {
     });
   });
 
-  it("does not crash when unregister API call fails", async () => {
+  it("calls unregisterPushTokenDirect even when it would fail", async () => {
     mockAuthStatus = "authenticated";
     mockSession = { access_token: "tok" };
     mockExpoPushToken = "ExponentPushToken[abc]";
-    mockClientPost.mockRejectedValue(new Error("Network error"));
+    // unregisterPushTokenDirect is best-effort and never throws, but we
+    // verify it's still called regardless of what happens internally
+    mockUnregisterDirect.mockResolvedValue(undefined);
     const { Consumer } = createHookCapture();
 
     await act(async () => {
       renderer = create(createElement(Consumer));
     });
 
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
-    });
+    await act(async () => {});
 
     mockAuthStatus = "unauthenticated";
     mockSession = null;
@@ -233,9 +370,11 @@ describe("usePushSetup", () => {
       renderer!.update(createElement(Consumer));
     });
 
-    // Should not throw
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 10));
-    });
+    await act(async () => {});
+
+    expect(mockUnregisterDirect).toHaveBeenCalledWith(
+      "ExponentPushToken[abc]",
+      "tok",
+    );
   });
 });

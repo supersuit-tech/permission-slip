@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../../auth/AuthContext";
-import { useRegisterPushToken } from "../useRegisterPushToken";
+import { useRegisterPushToken, unregisterPushTokenDirect } from "../useRegisterPushToken";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { mockSession, createQueryClient, waitFor } from "../../__test-utils__";
 
@@ -300,5 +300,43 @@ describe("useRegisterPushToken", () => {
 
     expect(thrownError).toBeDefined();
     expect(thrownError!.message).toBe("Token not found");
+  });
+});
+
+describe("unregisterPushTokenDirect", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("calls POST /v1/push-subscriptions/unregister with the provided access token", async () => {
+    mockPost.mockResolvedValue({ data: {}, error: undefined });
+
+    await unregisterPushTokenDirect("ExponentPushToken[abc]", "my-access-token");
+
+    expect(mockPost).toHaveBeenCalledWith("/v1/push-subscriptions/unregister", {
+      headers: { Authorization: "Bearer my-access-token" },
+      body: { expo_token: "ExponentPushToken[abc]" },
+    });
+  });
+
+  it("does not throw on API error", async () => {
+    mockPost.mockResolvedValue({
+      data: undefined,
+      error: { error: { code: "not_found", message: "Token not found" } },
+    });
+
+    // Should not throw
+    await expect(
+      unregisterPushTokenDirect("ExponentPushToken[abc]", "tok"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not throw on network error", async () => {
+    mockPost.mockRejectedValue(new Error("Network error"));
+
+    // Should not throw
+    await expect(
+      unregisterPushTokenDirect("ExponentPushToken[abc]", "tok"),
+    ).resolves.toBeUndefined();
   });
 });
