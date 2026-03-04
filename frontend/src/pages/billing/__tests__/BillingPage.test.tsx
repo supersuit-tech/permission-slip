@@ -298,7 +298,7 @@ describe("BillingPage", () => {
       });
     });
 
-    it("shows per-agent breakdown table with agent names", async () => {
+    it("shows per-agent breakdown table with agent names and links", async () => {
       mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
@@ -312,6 +312,11 @@ describe("BillingPage", () => {
       });
       expect(screen.getByText("Stripe Bot")).toBeInTheDocument();
       expect(screen.getByText("% of total")).toBeInTheDocument();
+      // Agent names link to detail pages
+      expect(screen.getByRole("link", { name: "Gmail Bot" })).toHaveAttribute("href", "/agents/1");
+      expect(screen.getByRole("link", { name: "Stripe Bot" })).toHaveAttribute("href", "/agents/2");
+      // Paid plan shows estimated cost per agent
+      expect(screen.getByText("Est. cost")).toBeInTheDocument();
     });
 
     it("shows SMS usage section for paid plan with SMS", async () => {
