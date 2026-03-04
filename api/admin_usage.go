@@ -75,19 +75,12 @@ func handleAdminGetUsage(deps *Deps) http.HandlerFunc {
 		profile := Profile(r.Context())
 		userID := profile.ID
 
-		periodStart, ok := parsePeriodParam(w, r)
+		periodStart, ok := resolvePeriodParam(w, r)
 		if !ok {
 			return
 		}
 
-		var usage *db.UsagePeriod
-		var err error
-		if periodStart.IsZero() {
-			usage, err = db.GetCurrentPeriodUsage(r.Context(), deps.DB, userID)
-			periodStart, _ = db.BillingPeriodBounds(time.Now())
-		} else {
-			usage, err = db.GetUsageByPeriod(r.Context(), deps.DB, userID, periodStart)
-		}
+		usage, err := db.GetUsageByPeriod(r.Context(), deps.DB, userID, periodStart)
 		if err != nil {
 			log.Printf("[%s] AdminGetUsage: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -132,12 +125,9 @@ func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 		profile := Profile(r.Context())
 		userID := profile.ID
 
-		periodStart, ok := parsePeriodParam(w, r)
+		periodStart, ok := resolvePeriodParam(w, r)
 		if !ok {
 			return
-		}
-		if periodStart.IsZero() {
-			periodStart, _ = db.BillingPeriodBounds(time.Now())
 		}
 
 		connectors, err := db.GetUsageByConnectorForUser(r.Context(), deps.DB, userID, periodStart)
@@ -180,12 +170,9 @@ func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 		profile := Profile(r.Context())
 		userID := profile.ID
 
-		periodStart, ok := parsePeriodParam(w, r)
+		periodStart, ok := resolvePeriodParam(w, r)
 		if !ok {
 			return
-		}
-		if periodStart.IsZero() {
-			periodStart, _ = db.BillingPeriodBounds(time.Now())
 		}
 
 		agents, err := db.GetUsageByAgent(r.Context(), deps.DB, userID, periodStart)
@@ -218,18 +205,17 @@ func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-// parsePeriodParam extracts and validates the "period" query parameter.
-// Accepts three formats for convenience:
-//   - "2026-03"              → YYYY-MM (month shorthand)
-//   - "2026-03-01"           → YYYY-MM-DD (date)
-//   - "2026-03-01T00:00:00Z" → RFC3339 (full timestamp)
+// resolvePeriodParam parses the "period" query parameter and returns the
+// billing period start time. If the parameter is omitted or empty, defaults
+// to the current billing period. On parse failure, writes a 400 error and
+// returns zero time with ok=false.
 //
-// Returns the parsed time and true on success, or writes a 400 error and
-// returns zero time and false on failure.
-func parsePeriodParam(w http.ResponseWriter, r *http.Request) (time.Time, bool) {
+// Accepted formats: YYYY-MM, YYYY-MM-DD, or full RFC3339.
+func resolvePeriodParam(w http.ResponseWriter, r *http.Request) (periodStart time.Time, ok bool) {
 	ps := r.URL.Query().Get("period")
 	if ps == "" {
-		return time.Time{}, true
+		start, _ := db.BillingPeriodBounds(time.Now())
+		return start, true
 	}
 
 	// Try formats from shortest to longest.
