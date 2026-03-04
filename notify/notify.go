@@ -2,7 +2,8 @@
 // Permission Slip. It defines the Sender interface that individual channels
 // (email, web-push, SMS) implement, a Dispatcher that fans out to all
 // configured senders, and the shared types (Approval, Recipient) that
-// senders receive.
+// senders receive. Additional channels (for example, mobile push) can be
+// added by implementing the Sender interface.
 //
 // Adding a new channel requires three steps:
 //  1. Implement the Sender interface.

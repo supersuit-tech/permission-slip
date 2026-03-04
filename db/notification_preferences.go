@@ -9,7 +9,7 @@ import (
 // NotificationPreference represents a row from the notification_preferences table.
 type NotificationPreference struct {
 	UserID  string
-	Channel string // "email", "web-push", or "sms"
+	Channel string // "email", "web-push", "sms", or "mobile-push"
 	Enabled bool
 }
 
