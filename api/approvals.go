@@ -36,9 +36,11 @@ type approvalListResponse struct {
 }
 
 type approveResponse struct {
-	ApprovalID string    `json:"approval_id"`
-	Status     string    `json:"status"`
-	ApprovedAt time.Time `json:"approved_at"`
+	ApprovalID      string           `json:"approval_id"`
+	Status          string           `json:"status"`
+	ApprovedAt      time.Time        `json:"approved_at"`
+	ExecutionStatus *string          `json:"execution_status,omitempty"`
+	ExecutionResult *json.RawMessage `json:"execution_result,omitempty"`
 }
 
 type denyResponse struct {
@@ -137,17 +139,69 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Execute the action via the connector now that the approval is granted.
+		execStatus, execResultJSON := executeApprovalAction(r.Context(), deps, profile.ID, appr)
+
 		emitApprovalAuditEvent(r.Context(), deps.DB, profile.ID, appr, agentMeta)
 
 		// Notify any connected SSE clients (e.g. other browser tabs).
-		notifyApprovalChange(deps, profile.ID, "approval_resolved", appr.ApprovalID)
+		notifyApprovalExecuted(deps, profile.ID, appr.ApprovalID, execStatus)
 
-		RespondJSON(w, http.StatusOK, approveResponse{
-			ApprovalID: appr.ApprovalID,
-			Status:     appr.Status,
-			ApprovedAt: *appr.ApprovedAt,
-		})
+		resp := approveResponse{
+			ApprovalID:      appr.ApprovalID,
+			Status:          appr.Status,
+			ApprovedAt:      *appr.ApprovedAt,
+			ExecutionStatus: &execStatus,
+		}
+		if execResultJSON != nil {
+			raw := json.RawMessage(execResultJSON)
+			resp.ExecutionResult = &raw
+		}
+		RespondJSON(w, http.StatusOK, resp)
 	}
+}
+
+// executeApprovalAction runs the connector action for an approved one-off
+// approval and persists the execution result. Returns the execution status
+// ("success" or "error") and the result JSON. Errors are logged but never
+// fail the approve response — the approval itself is already committed.
+func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr *db.Approval) (string, json.RawMessage) {
+	actionType := actionTypeFromJSON(appr.Action)
+
+	// Extract parameters from the action JSON.
+	var actionObj struct {
+		Parameters json.RawMessage `json:"parameters"`
+	}
+	if len(appr.Action) > 0 {
+		_ = json.Unmarshal(appr.Action, &actionObj)
+	}
+
+	result, execErr := executeConnectorAction(ctx, deps, userID, actionType, actionObj.Parameters)
+
+	var execStatus string
+	var resultJSON json.RawMessage
+
+	if execErr != nil {
+		execStatus = "error"
+		errMsg := execErr.Error()
+		if len(errMsg) > 512 {
+			errMsg = errMsg[:512]
+		}
+		resultJSON, _ = json.Marshal(map[string]string{"error": errMsg})
+		log.Printf("[%s] executeApprovalAction: connector error for approval %s: %v", TraceID(ctx), appr.ApprovalID, execErr)
+	} else {
+		execStatus = "success"
+		if result != nil {
+			resultJSON = result.Data
+		}
+	}
+
+	// Persist execution result on the approval row (best-effort).
+	if err := db.UpdateApprovalExecution(ctx, deps.DB, appr.ApprovalID, execStatus, resultJSON); err != nil {
+		log.Printf("[%s] executeApprovalAction: failed to store execution result for approval %s: %v", TraceID(ctx), appr.ApprovalID, err)
+	}
+
+	return execStatus, resultJSON
 }
 
 func handleDenyApproval(deps *Deps) http.HandlerFunc {
