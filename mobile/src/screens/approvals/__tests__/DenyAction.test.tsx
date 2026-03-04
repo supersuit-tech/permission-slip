@@ -182,7 +182,7 @@ describe("DenyAction", () => {
     alertSpy.mockRestore();
   });
 
-  it("back-to-list button calls onDenied immediately", async () => {
+  it("back-to-list button calls onDenied immediately and cancels auto-nav timer", async () => {
     mockDenyApproval.mockResolvedValue(undefined);
     const alertSpy = jest.spyOn(Alert, "alert");
     await act(async () => {
@@ -199,6 +199,13 @@ describe("DenyAction", () => {
     });
 
     expect(mockOnDenied).toHaveBeenCalledTimes(1);
+
+    // Advance past the auto-nav delay — onDenied should NOT be called again
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(mockOnDenied).toHaveBeenCalledTimes(1);
+
     alertSpy.mockRestore();
   });
 

@@ -79,7 +79,11 @@ export function DenyAction({ approvalId, onDenied }: DenyActionProps) {
         <Pressable
           testID="back-to-list-button"
           style={styles.backToListButton}
-          onPress={onDenied}
+          onPress={() => {
+            // Clear the auto-nav timer so onDenied isn't called twice.
+            if (autoNavTimer.current) clearTimeout(autoNavTimer.current);
+            onDenied();
+          }}
           accessibilityRole="button"
           accessibilityLabel="Go back to approval list"
         >
