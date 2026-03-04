@@ -10,14 +10,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
 import { getApiErrorMessage } from "../api/errors";
+import { isValidApprovalId } from "../lib/approvalId";
 import type { ApprovalSummary } from "./useApprovals";
-
-/**
- * Matches the approval_id format from the OpenAPI spec.
- * Defense-in-depth: prevents API calls with obviously invalid IDs
- * from crafted or malformed deep link URLs.
- */
-const APPROVAL_ID_PATTERN = /^appr_[a-zA-Z0-9]{6,64}$/;
 
 /**
  * Searches the React Query cache for an approval with the given ID.
@@ -48,7 +42,7 @@ export function useApproval(approvalId: string) {
   tokenRef.current = accessToken;
 
   // Validate the approval ID format before making any API calls
-  const isValidId = APPROVAL_ID_PATTERN.test(approvalId);
+  const isValidId = isValidApprovalId(approvalId);
 
   const query = useQuery({
     queryKey: ["approval", approvalId],
