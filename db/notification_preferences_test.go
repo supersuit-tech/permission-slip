@@ -177,3 +177,25 @@ func TestGetNotificationPreferences_Empty(t *testing.T) {
 		t.Errorf("expected 0 preferences, got %d", len(prefs))
 	}
 }
+
+func TestUpsertNotificationPreference_MobilePush(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	ctx := context.Background()
+
+	// mobile-push should be accepted by the CHECK constraint.
+	if err := db.UpsertNotificationPreference(ctx, tx, uid, "mobile-push", true); err != nil {
+		t.Fatalf("upsert mobile-push: %v", err)
+	}
+
+	enabled, err := db.IsNotificationChannelEnabled(ctx, tx, uid, "mobile-push")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !enabled {
+		t.Error("expected mobile-push to be enabled")
+	}
+}
