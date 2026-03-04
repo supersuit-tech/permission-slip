@@ -88,7 +88,7 @@ func handleCreateExpoPushToken(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "token too long"))
 			return
 		}
-		if !strings.HasPrefix(req.Token, "ExponentPushToken[") && !strings.HasPrefix(req.Token, "ExpoPushToken[") {
+		if !isValidExpoPushToken(req.Token) {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "token must be a valid Expo push token (ExponentPushToken[...] or ExpoPushToken[...])"))
 			return
 		}
@@ -136,4 +136,11 @@ func handleDeleteExpoPushToken(deps *Deps) http.HandlerFunc {
 			DeletedAt: time.Now().UTC(),
 		})
 	}
+}
+
+// isValidExpoPushToken checks that the token has a valid Expo push token
+// format: either ExponentPushToken[...] or ExpoPushToken[...].
+func isValidExpoPushToken(token string) bool {
+	return (strings.HasPrefix(token, "ExponentPushToken[") || strings.HasPrefix(token, "ExpoPushToken[")) &&
+		strings.HasSuffix(token, "]")
 }

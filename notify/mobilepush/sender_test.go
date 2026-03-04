@@ -1,10 +1,16 @@
 package mobilepush
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 )
 
@@ -119,5 +125,286 @@ func TestSenderName(t *testing.T) {
 	s := &Sender{}
 	if s.Name() != "mobile-push" {
 		t.Errorf("expected Name() to return 'mobile-push', got %q", s.Name())
+	}
+}
+
+// --- HTTP-level sender tests using httptest.NewServer ---
+
+// mockStore implements TokenStore for sender tests without requiring
+// real pgx types. For full DB integration tests, see db/expo_push_tokens_test.go.
+type mockStore struct {
+	mu            sync.Mutex
+	tokens        []db.ExpoPushToken
+	deletedTokens []string
+}
+
+func (m *mockStore) addToken(id int64, token string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.tokens = append(m.tokens, db.ExpoPushToken{
+		ID:    id,
+		Token: token,
+	})
+}
+
+func (m *mockStore) wasDeleted(token string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, t := range m.deletedTokens {
+		if t == token {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *mockStore) ListTokens(ctx context.Context, userID string) ([]db.ExpoPushToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]db.ExpoPushToken, len(m.tokens))
+	copy(result, m.tokens)
+	return result, nil
+}
+
+func (m *mockStore) DeleteToken(ctx context.Context, token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.deletedTokens = append(m.deletedTokens, token)
+	return nil
+}
+
+func testApproval() notify.Approval {
+	return notify.Approval{
+		ApprovalID:  "appr_test123",
+		AgentName:   "test-agent",
+		ApprovalURL: "https://app.test/approve/appr_test123",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+}
+
+// newTestSender creates a Sender that uses a mockStore directly (bypassing db.DBTX).
+func newTestSender(store TokenStore, accessToken string) *Sender {
+	return &Sender{
+		store:       store,
+		accessToken: accessToken,
+		httpClient:  &http.Client{Timeout: 5 * time.Second},
+	}
+}
+
+func TestSendBatch_Success(t *testing.T) {
+	var capturedBody []byte
+	var capturedHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedHeaders = r.Header
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(expoAPIResponse{
+			Data: []expoTicketResponse{
+				{Status: "ok", ID: "ticket-1"},
+				{Status: "ok", ID: "ticket-2"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	oldURL := ExpoAPIURL
+	ExpoAPIURL = server.URL
+	defer func() { ExpoAPIURL = oldURL }()
+
+	store := &mockStore{}
+	store.addToken(1, "ExponentPushToken[device1]")
+	store.addToken(2, "ExponentPushToken[device2]")
+
+	sender := newTestSender(store, "test-access-token")
+	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify Authorization header
+	if capturedHeaders.Get("Authorization") != "Bearer test-access-token" {
+		t.Errorf("expected Bearer auth header, got %q", capturedHeaders.Get("Authorization"))
+	}
+
+	// Verify Content-Type
+	if capturedHeaders.Get("Content-Type") != "application/json" {
+		t.Errorf("expected application/json content-type, got %q", capturedHeaders.Get("Content-Type"))
+	}
+
+	// Verify batch request body contains both tokens
+	var messages []expoMessage
+	if err := json.Unmarshal(capturedBody, &messages); err != nil {
+		t.Fatalf("failed to unmarshal request body: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages in batch, got %d", len(messages))
+	}
+	if messages[0].To != "ExponentPushToken[device1]" {
+		t.Errorf("expected first token, got %q", messages[0].To)
+	}
+	if messages[1].To != "ExponentPushToken[device2]" {
+		t.Errorf("expected second token, got %q", messages[1].To)
+	}
+}
+
+func TestSendBatch_NoAccessToken(t *testing.T) {
+	var capturedHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedHeaders = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(expoAPIResponse{
+			Data: []expoTicketResponse{{Status: "ok", ID: "ticket-1"}},
+		})
+	}))
+	defer server.Close()
+
+	oldURL := ExpoAPIURL
+	ExpoAPIURL = server.URL
+	defer func() { ExpoAPIURL = oldURL }()
+
+	store := &mockStore{}
+	store.addToken(1, "ExponentPushToken[device1]")
+
+	sender := newTestSender(store, "") // no access token
+	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedHeaders.Get("Authorization") != "" {
+		t.Errorf("expected no Authorization header, got %q", capturedHeaders.Get("Authorization"))
+	}
+}
+
+func TestSendBatch_DeviceNotRegistered_CleansUpToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(expoAPIResponse{
+			Data: []expoTicketResponse{
+				{
+					Status:  "error",
+					Message: "The recipient device is not registered with FCM",
+					Details: &struct {
+						Error string `json:"error"`
+					}{Error: "DeviceNotRegistered"},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	oldURL := ExpoAPIURL
+	ExpoAPIURL = server.URL
+	defer func() { ExpoAPIURL = oldURL }()
+
+	store := &mockStore{}
+	store.addToken(1, "ExponentPushToken[invalid]")
+
+	sender := newTestSender(store, "")
+	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+
+	// DeviceNotRegistered should not be returned as an error
+	if err != nil {
+		t.Fatalf("expected nil error for DeviceNotRegistered, got: %v", err)
+	}
+
+	// Token should have been deleted
+	if !store.wasDeleted("ExponentPushToken[invalid]") {
+		t.Error("expected invalid token to be deleted")
+	}
+}
+
+func TestSendBatch_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("internal server error"))
+	}))
+	defer server.Close()
+
+	oldURL := ExpoAPIURL
+	ExpoAPIURL = server.URL
+	defer func() { ExpoAPIURL = oldURL }()
+
+	store := &mockStore{}
+	store.addToken(1, "ExponentPushToken[device1]")
+
+	sender := newTestSender(store, "")
+	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+
+	if err == nil {
+		t.Fatal("expected error for 500 response")
+	}
+}
+
+func TestSendBatch_TopLevelAPIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(expoAPIResponse{
+			Errors: []struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			}{
+				{Code: "PUSH_TOO_MANY_EXPERIENCE_IDS", Message: "too many experience IDs"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	oldURL := ExpoAPIURL
+	ExpoAPIURL = server.URL
+	defer func() { ExpoAPIURL = oldURL }()
+
+	store := &mockStore{}
+	store.addToken(1, "ExponentPushToken[device1]")
+
+	sender := newTestSender(store, "")
+	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+
+	if err == nil {
+		t.Fatal("expected error for API-level error response")
+	}
+}
+
+func TestSend_NoTokens(t *testing.T) {
+	requestMade := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestMade = true
+	}))
+	defer server.Close()
+
+	oldURL := ExpoAPIURL
+	ExpoAPIURL = server.URL
+	defer func() { ExpoAPIURL = oldURL }()
+
+	store := &mockStore{} // no tokens
+
+	sender := newTestSender(store, "")
+	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requestMade {
+		t.Error("expected no HTTP request when there are no tokens")
 	}
 }
