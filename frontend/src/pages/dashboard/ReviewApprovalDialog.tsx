@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Loader2, Clock, Bot, AlertTriangle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,9 @@ import {
   RiskBadge,
 } from "./approval-components";
 
+/** Auto-close delay (ms) after a successful approval. */
+const SUCCESS_AUTO_CLOSE_MS = 3_000;
+
 interface ReviewApprovalDialogProps {
   approval: ApprovalSummary;
   agentDisplayName: string;
@@ -42,6 +45,13 @@ export function ReviewApprovalDialog({
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
   const isBusy = isApproving || isDenying;
+
+  // Auto-close dialog after successful approval
+  useEffect(() => {
+    if (!isApproved) return;
+    const timer = setTimeout(() => onOpenChange(false), SUCCESS_AUTO_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [isApproved, onOpenChange]);
 
   const handleApprove = useCallback(async () => {
     try {
@@ -77,7 +87,7 @@ export function ReviewApprovalDialog({
         </DialogHeader>
 
         {isApproved ? (
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4" role="status" aria-live="polite">
             <div className="flex flex-col items-center gap-4">
               <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
                 <CheckCircle className="size-8 text-green-600 dark:text-green-400" aria-hidden="true" />
@@ -163,6 +173,17 @@ export function ReviewApprovalDialog({
               </details>
             )}
 
+            {/* Expired notice */}
+            {isExpired && (
+              <div role="alert" className="bg-muted/50 flex items-start gap-2 rounded-lg border p-3">
+                <Clock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <p className="text-muted-foreground text-sm">
+                  This request has expired. The agent will need to submit a new
+                  request if the action is still needed.
+                </p>
+              </div>
+            )}
+
             {/* High risk warning */}
             {approval.context.risk_level === "high" && (
               <div role="alert" className="bg-destructive/10 border-destructive/20 flex items-start gap-2 rounded-lg border p-3">
@@ -176,13 +197,24 @@ export function ReviewApprovalDialog({
           </div>
         )}
 
-        {!isApproved && (
+        {isApproved ? (
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => onOpenChange(false)}
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        ) : (
           <DialogFooter>
             <Button
               variant="outline"
               size="lg"
               disabled={isBusy || isExpired}
               onClick={handleDeny}
+              aria-label={isDenying ? "Denying request…" : undefined}
             >
               {isDenying ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -194,6 +226,7 @@ export function ReviewApprovalDialog({
               size="lg"
               disabled={isBusy || isExpired}
               onClick={handleApprove}
+              aria-label={isApproving ? "Approving request…" : undefined}
             >
               {isApproving ? (
                 <Loader2 className="size-4 animate-spin" />

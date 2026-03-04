@@ -255,6 +255,8 @@ describe("PendingApprovalsCard", () => {
       expect(screen.getByText("Request Approved")).toBeInTheDocument();
     });
     expect(screen.getByText(/The agent has been notified/)).toBeInTheDocument();
+    // "Done" button should be visible in the success state
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
   it("denies via review dialog", async () => {

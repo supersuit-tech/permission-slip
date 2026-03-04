@@ -1,10 +1,11 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
 
 export function useApproveApproval() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (approvalId: string) => {
@@ -24,10 +25,12 @@ export function useApproveApproval() {
     },
     onSuccess: () => {
       trackEvent(PostHogEvents.APPROVAL_APPROVED);
+      // Delay cache invalidation so the success state is visible in the
+      // dialog before the row disappears from the pending list.
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      }, 2_000);
     },
-    // No query invalidation — the approved row stays visible so the user
-    // can see the success state. The 5-second polling in useApprovals
-    // handles eventual removal from the pending list.
   });
 
   return {
