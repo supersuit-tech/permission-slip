@@ -119,3 +119,13 @@ PushSubscriptionId:
     type: integer
     format: int64
   example: 1
+
+ExpoPushTokenId:
+  name: token_id
+  in: path
+  required: true
+  description: Expo push token registration ID (auto-incrementing integer).
+  schema:
+    type: integer
+    format: int64
+  example: 1

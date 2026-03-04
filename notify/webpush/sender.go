@@ -116,44 +116,13 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 }
 
 // buildBody constructs the push notification payload from the approval data.
+// Delegates to notify.BuildPushContent for consistent messaging across channels.
 func buildBody(approval notify.Approval) pushPayload {
-	if approval.Type == notify.NotificationTypePaymentFailed {
-		return pushPayload{
-			Title:      "Payment Failed",
-			Body:       "Your subscription payment could not be processed. Update your payment method to avoid losing access.",
-			URL:        approval.ApprovalURL,
-			ApprovalID: approval.ApprovalID,
-		}
-	}
-
-	title := "Approval Request"
-	if approval.AgentName != "" {
-		title = approval.AgentName
-	}
-
-	body := "Action requires your approval"
-	// Try to extract a human-readable summary from the action JSON.
-	if len(approval.Action) > 0 {
-		var action struct {
-			Type    string `json:"type"`
-			Summary string `json:"summary"`
-		}
-		if json.Unmarshal(approval.Action, &action) == nil && action.Summary != "" {
-			body = action.Summary
-			// Truncate for push display compatibility (200 runes max)
-			runes := []rune(body)
-			if len(runes) > 200 {
-				body = string(runes[:197]) + "..."
-			}
-		} else if action.Type != "" {
-			body = action.Type
-		}
-	}
-
+	c := notify.BuildPushContent(approval)
 	return pushPayload{
-		Title:      title,
-		Body:       body,
-		URL:        approval.ApprovalURL,
-		ApprovalID: approval.ApprovalID,
+		Title:      c.Title,
+		Body:       c.Body,
+		URL:        c.URL,
+		ApprovalID: c.ApprovalID,
 	}
 }
