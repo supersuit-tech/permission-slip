@@ -2,12 +2,16 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, Zap } from "lucide-react";
 
 interface UpgradePromptProps {
+  /** Message shown before the "Upgrade" link, e.g. "Upgrade to add more agents." */
   feature: string;
 }
 
 /**
  * Inline upgrade CTA shown when a user hits a plan limit.
  * Links to the billing page where the user can upgrade.
+ *
+ * @example
+ * <UpgradePrompt feature="Upgrade to add more agents." />
  */
 export function UpgradePrompt({ feature }: UpgradePromptProps) {
   return (
