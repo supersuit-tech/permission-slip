@@ -301,9 +301,12 @@ func BillingPeriodBounds(t time.Time) (start, end time.Time) {
 
 // ── Admin / analytics queries ───────────────────────────────────────────────
 
-// TopUserUsage represents a row from the top-users-by-usage query.
+// TopUserUsage represents a row from the top-users-by-usage query,
+// enriched with the user's profile information for display.
 type TopUserUsage struct {
 	UserID       string
+	Username     string
+	Email        *string
 	RequestCount int
 	SMSCount     int
 	PeriodStart  time.Time
@@ -312,7 +315,8 @@ type TopUserUsage struct {
 
 // GetTopUsersByUsage returns users with the highest request counts for a given
 // billing period, ordered by request_count DESC. limit caps the number of rows
-// returned (clamped to 1–100).
+// returned (clamped to 1–100). Results are enriched with username and email
+// from the profiles table.
 func GetTopUsersByUsage(ctx context.Context, db DBTX, periodStart time.Time, limit int) ([]TopUserUsage, error) {
 	if limit < 1 {
 		limit = 10
@@ -322,10 +326,12 @@ func GetTopUsersByUsage(ctx context.Context, db DBTX, periodStart time.Time, lim
 	}
 
 	rows, err := db.Query(ctx,
-		`SELECT user_id, request_count, sms_count, period_start, period_end
-		 FROM usage_periods
-		 WHERE period_start = $1
-		 ORDER BY request_count DESC
+		`SELECT u.user_id, COALESCE(p.username, ''), p.email,
+		        u.request_count, u.sms_count, u.period_start, u.period_end
+		 FROM usage_periods u
+		 LEFT JOIN profiles p ON p.id = u.user_id
+		 WHERE u.period_start = $1
+		 ORDER BY u.request_count DESC
 		 LIMIT $2`,
 		periodStart, limit)
 	if err != nil {
@@ -336,7 +342,8 @@ func GetTopUsersByUsage(ctx context.Context, db DBTX, periodStart time.Time, lim
 	var result []TopUserUsage
 	for rows.Next() {
 		var u TopUserUsage
-		if err := rows.Scan(&u.UserID, &u.RequestCount, &u.SMSCount, &u.PeriodStart, &u.PeriodEnd); err != nil {
+		if err := rows.Scan(&u.UserID, &u.Username, &u.Email,
+			&u.RequestCount, &u.SMSCount, &u.PeriodStart, &u.PeriodEnd); err != nil {
 			return nil, err
 		}
 		result = append(result, u)
@@ -345,22 +352,24 @@ func GetTopUsersByUsage(ctx context.Context, db DBTX, periodStart time.Time, lim
 }
 
 // ConnectorUsage represents aggregate request counts for a single connector
-// across all users in a billing period.
+// across all users in a billing period, enriched with the connector name.
 type ConnectorUsage struct {
 	ConnectorID  string
+	Name         string // from connectors table; empty if connector was deleted
 	RequestCount int
 }
 
 // GetUsageByConnector aggregates request counts from the JSONB breakdown
 // across all users for a given billing period. Returns connectors ordered
-// by request count DESC.
+// by request count DESC, enriched with connector names.
 func GetUsageByConnector(ctx context.Context, db DBTX, periodStart time.Time) ([]ConnectorUsage, error) {
 	rows, err := db.Query(ctx,
-		`SELECT key, SUM(value::int)::int AS total
-		 FROM usage_periods,
-		      jsonb_each_text(COALESCE(breakdown->'by_connector', '{}'))
-		 WHERE period_start = $1
-		 GROUP BY key
+		`SELECT b.key, COALESCE(c.name, ''), SUM(b.value::int)::int AS total
+		 FROM usage_periods u,
+		      jsonb_each_text(COALESCE(u.breakdown->'by_connector', '{}')) b
+		 LEFT JOIN connectors c ON c.id = b.key
+		 WHERE u.period_start = $1
+		 GROUP BY b.key, c.name
 		 ORDER BY total DESC`,
 		periodStart)
 	if err != nil {
@@ -371,7 +380,7 @@ func GetUsageByConnector(ctx context.Context, db DBTX, periodStart time.Time) ([
 	var result []ConnectorUsage
 	for rows.Next() {
 		var c ConnectorUsage
-		if err := rows.Scan(&c.ConnectorID, &c.RequestCount); err != nil {
+		if err := rows.Scan(&c.ConnectorID, &c.Name, &c.RequestCount); err != nil {
 			return nil, err
 		}
 		result = append(result, c)
@@ -380,21 +389,23 @@ func GetUsageByConnector(ctx context.Context, db DBTX, periodStart time.Time) ([
 }
 
 // AgentUsage represents request counts for a single agent within a user's
-// billing period, extracted from the JSONB breakdown.
+// billing period, extracted from the JSONB breakdown and enriched with agent name.
 type AgentUsage struct {
 	AgentID      string
+	Name         string // from agents.metadata->>'agent_name'; empty if not set
 	RequestCount int
 }
 
 // GetUsageByAgent extracts per-agent request counts from the JSONB breakdown
 // for a specific user and billing period. Returns agents ordered by request
-// count DESC.
+// count DESC, enriched with agent names from metadata.
 func GetUsageByAgent(ctx context.Context, db DBTX, userID string, periodStart time.Time) ([]AgentUsage, error) {
 	rows, err := db.Query(ctx,
-		`SELECT key, value::int AS count
-		 FROM usage_periods,
-		      jsonb_each_text(COALESCE(breakdown->'by_agent', '{}'))
-		 WHERE user_id = $1 AND period_start = $2
+		`SELECT b.key, COALESCE(a.metadata->>'agent_name', ''), b.value::int AS count
+		 FROM usage_periods u,
+		      jsonb_each_text(COALESCE(u.breakdown->'by_agent', '{}')) b
+		 LEFT JOIN agents a ON a.agent_id = b.key::bigint
+		 WHERE u.user_id = $1 AND u.period_start = $2
 		 ORDER BY count DESC`,
 		userID, periodStart)
 	if err != nil {
@@ -405,7 +416,7 @@ func GetUsageByAgent(ctx context.Context, db DBTX, userID string, periodStart ti
 	var result []AgentUsage
 	for rows.Next() {
 		var a AgentUsage
-		if err := rows.Scan(&a.AgentID, &a.RequestCount); err != nil {
+		if err := rows.Scan(&a.AgentID, &a.Name, &a.RequestCount); err != nil {
 			return nil, err
 		}
 		result = append(result, a)

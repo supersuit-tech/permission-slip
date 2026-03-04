@@ -21,15 +21,17 @@ type adminUsageResponse struct {
 }
 
 type topUsersResponse struct {
-	PeriodStart time.Time       `json:"period_start"`
-	PeriodEnd   time.Time       `json:"period_end"`
-	Users       []topUserEntry  `json:"users"`
+	PeriodStart time.Time      `json:"period_start"`
+	PeriodEnd   time.Time      `json:"period_end"`
+	Users       []topUserEntry `json:"users"`
 }
 
 type topUserEntry struct {
-	UserID       string `json:"user_id"`
-	RequestCount int    `json:"request_count"`
-	SMSCount     int    `json:"sms_count"`
+	UserID       string  `json:"user_id"`
+	Username     string  `json:"username"`
+	Email        *string `json:"email,omitempty"`
+	RequestCount int     `json:"request_count"`
+	SMSCount     int     `json:"sms_count"`
 }
 
 type connectorUsageResponse struct {
@@ -40,6 +42,7 @@ type connectorUsageResponse struct {
 
 type connectorUsageEntry struct {
 	ConnectorID  string `json:"connector_id"`
+	Name         string `json:"name,omitempty"`
 	RequestCount int    `json:"request_count"`
 }
 
@@ -52,6 +55,7 @@ type agentUsageResponse struct {
 
 type agentUsageEntry struct {
 	AgentID      string `json:"agent_id"`
+	Name         string `json:"name,omitempty"`
 	RequestCount int    `json:"request_count"`
 }
 
@@ -72,7 +76,7 @@ func RegisterAdminUsageRoutes(mux *http.ServeMux, deps *Deps) {
 // handleAdminGetUsage returns usage metrics for a specific user and billing period.
 // Query params:
 //   - user_id (optional): defaults to the authenticated user
-//   - period (optional): ISO 8601 date-time for the billing period start; defaults to current
+//   - period (optional): billing period in YYYY-MM, YYYY-MM-DD, or RFC3339 format; defaults to current
 func handleAdminGetUsage(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
@@ -82,7 +86,7 @@ func handleAdminGetUsage(deps *Deps) http.HandlerFunc {
 			userID = profile.ID
 		}
 
-		periodStart, ok := parsePeriodStart(w, r)
+		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {
 			return
 		}
@@ -132,11 +136,11 @@ func handleAdminGetUsage(deps *Deps) http.HandlerFunc {
 // handleAdminTopUsers returns the users with the highest request counts
 // for a billing period. Useful for abuse detection.
 // Query params:
-//   - period (optional): ISO 8601 date-time; defaults to current billing period
+//   - period (optional): billing period; defaults to current billing period
 //   - limit (optional): max users to return (1–100, default 10)
 func handleAdminTopUsers(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		periodStart, ok := parsePeriodStart(w, r)
+		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {
 			return
 		}
@@ -168,6 +172,8 @@ func handleAdminTopUsers(deps *Deps) http.HandlerFunc {
 		for i, u := range users {
 			entries[i] = topUserEntry{
 				UserID:       u.UserID,
+				Username:     u.Username,
+				Email:        u.Email,
 				RequestCount: u.RequestCount,
 				SMSCount:     u.SMSCount,
 			}
@@ -186,10 +192,10 @@ func handleAdminTopUsers(deps *Deps) http.HandlerFunc {
 // handleAdminUsageByConnector returns aggregate request counts per connector
 // across all users for a billing period.
 // Query params:
-//   - period (optional): ISO 8601 date-time; defaults to current billing period
+//   - period (optional): billing period; defaults to current billing period
 func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		periodStart, ok := parsePeriodStart(w, r)
+		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {
 			return
 		}
@@ -211,6 +217,7 @@ func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 		for i, c := range connectors {
 			entries[i] = connectorUsageEntry{
 				ConnectorID:  c.ConnectorID,
+				Name:         c.Name,
 				RequestCount: c.RequestCount,
 			}
 		}
@@ -229,7 +236,7 @@ func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 // and billing period.
 // Query params:
 //   - user_id (optional): defaults to the authenticated user
-//   - period (optional): ISO 8601 date-time; defaults to current billing period
+//   - period (optional): billing period; defaults to current billing period
 func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
@@ -239,7 +246,7 @@ func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 			userID = profile.ID
 		}
 
-		periodStart, ok := parsePeriodStart(w, r)
+		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {
 			return
 		}
@@ -261,6 +268,7 @@ func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 		for i, a := range agents {
 			entries[i] = agentUsageEntry{
 				AgentID:      a.AgentID,
+				Name:         a.Name,
 				RequestCount: a.RequestCount,
 			}
 		}
@@ -276,18 +284,28 @@ func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-// parsePeriodStart extracts and validates the "period" query parameter.
+// parsePeriodParam extracts and validates the "period" query parameter.
+// Accepts three formats for convenience:
+//   - "2026-03"              → YYYY-MM (month shorthand)
+//   - "2026-03-01"           → YYYY-MM-DD (date)
+//   - "2026-03-01T00:00:00Z" → RFC3339 (full timestamp)
+//
 // Returns the parsed time and true on success, or writes a 400 error and
 // returns zero time and false on failure.
-func parsePeriodStart(w http.ResponseWriter, r *http.Request) (time.Time, bool) {
+func parsePeriodParam(w http.ResponseWriter, r *http.Request) (time.Time, bool) {
 	ps := r.URL.Query().Get("period")
 	if ps == "" {
 		return time.Time{}, true
 	}
-	parsed, err := time.Parse(time.RFC3339, ps)
-	if err != nil {
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "period must be a valid ISO 8601 date-time"))
-		return time.Time{}, false
+
+	// Try formats from shortest to longest.
+	for _, layout := range []string{"2006-01", "2006-01-02", time.RFC3339} {
+		if parsed, err := time.Parse(layout, ps); err == nil {
+			return parsed.UTC(), true
+		}
 	}
-	return parsed, true
+
+	RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+		"period must be YYYY-MM, YYYY-MM-DD, or a full ISO 8601 date-time"))
+	return time.Time{}, false
 }

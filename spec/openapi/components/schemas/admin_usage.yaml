@@ -52,12 +52,22 @@ TopUserEntry:
   type: object
   required:
     - user_id
+    - username
     - request_count
     - sms_count
   properties:
     user_id:
       type: string
       format: uuid
+    username:
+      type: string
+      description: User's display name from their profile
+      example: jane_doe
+    email:
+      type: string
+      format: email
+      description: User's email address (omitted if not set)
+      example: jane@example.com
     request_count:
       type: integer
       example: 5432
@@ -92,6 +102,10 @@ ConnectorUsageEntry:
     connector_id:
       type: string
       description: Connector identifier
+    name:
+      type: string
+      description: Human-readable connector name (omitted if connector was deleted)
+      example: Gmail
     request_count:
       type: integer
       example: 1542
@@ -127,6 +141,10 @@ AgentUsageEntry:
     agent_id:
       type: string
       description: Agent ID (as string)
+    name:
+      type: string
+      description: Agent name from metadata (omitted if not set)
+      example: deploy-bot
     request_count:
       type: integer
       example: 500

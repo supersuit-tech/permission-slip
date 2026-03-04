@@ -138,6 +138,32 @@ func TestAdminGetUsage_InvalidPeriod(t *testing.T) {
 	}
 }
 
+func TestAdminGetUsage_FlexiblePeriodFormats(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	formats := []string{
+		"2026-03",
+		"2026-03-01",
+		"2026-03-01T00:00:00Z",
+	}
+
+	for _, f := range formats {
+		r := authenticatedRequest(t, http.MethodGet, "/admin/usage?period="+f, uid)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("period=%s: expected 200, got %d: %s", f, w.Code, w.Body.String())
+		}
+	}
+}
+
 // ── GET /admin/usage/top-users ──────────────────────────────────────────────
 
 func TestAdminTopUsers_ReturnsSorted(t *testing.T) {
@@ -182,6 +208,10 @@ func TestAdminTopUsers_ReturnsSorted(t *testing.T) {
 	}
 	if resp.Users[0].RequestCount < resp.Users[1].RequestCount {
 		t.Error("expected users to be sorted by request_count DESC")
+	}
+	// Verify username enrichment.
+	if resp.Users[0].Username == "" {
+		t.Error("expected top user to have a username")
 	}
 }
 

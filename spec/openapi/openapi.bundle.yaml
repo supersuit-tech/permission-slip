@@ -5168,8 +5168,9 @@ paths:
           in: query
           required: false
           description: |
-            Billing period start as an ISO 8601 date-time (e.g., `2026-03-01T00:00:00Z`).
-            Defaults to the current billing period.
+            Billing period to query. Accepts `YYYY-MM` (e.g., `2026-03`),
+            `YYYY-MM-DD` (e.g., `2026-03-01`), or full ISO 8601 date-time
+            (e.g., `2026-03-01T00:00:00Z`). Defaults to the current billing period.
           schema:
             type: string
             format: date-time
@@ -5201,8 +5202,8 @@ paths:
           in: query
           required: false
           description: |
-            Billing period start as an ISO 8601 date-time. Defaults to the
-            current billing period.
+            Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+            full ISO 8601 date-time. Defaults to the current billing period.
           schema:
             type: string
             format: date-time
@@ -5243,8 +5244,8 @@ paths:
           in: query
           required: false
           description: |
-            Billing period start as an ISO 8601 date-time. Defaults to the
-            current billing period.
+            Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+            full ISO 8601 date-time. Defaults to the current billing period.
           schema:
             type: string
             format: date-time
@@ -5284,8 +5285,8 @@ paths:
           in: query
           required: false
           description: |
-            Billing period start as an ISO 8601 date-time. Defaults to the
-            current billing period.
+            Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+            full ISO 8601 date-time. Defaults to the current billing period.
           schema:
             type: string
             format: date-time
@@ -9312,12 +9313,22 @@ components:
       type: object
       required:
         - user_id
+        - username
         - request_count
         - sms_count
       properties:
         user_id:
           type: string
           format: uuid
+        username:
+          type: string
+          description: User's display name from their profile
+          example: jane_doe
+        email:
+          type: string
+          format: email
+          description: User's email address (omitted if not set)
+          example: jane@example.com
         request_count:
           type: integer
           example: 5432
@@ -9350,6 +9361,10 @@ components:
         connector_id:
           type: string
           description: Connector identifier
+        name:
+          type: string
+          description: Human-readable connector name (omitted if connector was deleted)
+          example: Gmail
         request_count:
           type: integer
           example: 1542
@@ -9383,6 +9398,10 @@ components:
         agent_id:
           type: string
           description: Agent ID (as string)
+        name:
+          type: string
+          description: Agent name from metadata (omitted if not set)
+          example: deploy-bot
         request_count:
           type: integer
           example: 500
