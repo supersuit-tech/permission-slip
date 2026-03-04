@@ -200,6 +200,9 @@ func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (
 // DenyApproval. It atomically updates the approval status while enforcing
 // status='pending' AND expires_at > now() to eliminate TOCTOU races. On
 // failure it reads the current row to produce a precise error.
+//
+// Safety: newStatus and timestampCol are caller-controlled constants
+// ("approved"/"denied" and "approved_at"/"denied_at"), never user input.
 func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newStatus, timestampCol string) (*Approval, []byte, error) {
 	query := fmt.Sprintf(
 		`WITH updated AS (
