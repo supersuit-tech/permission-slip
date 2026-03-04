@@ -1,5 +1,9 @@
 AdminUsageResponse:
   type: object
+  description: |
+    Summary of a user's billable usage for a single billing period.
+    The `breakdown` field is only present when at least one breakdown
+    dimension (agent, connector, or action type) has recorded data.
   required:
     - user_id
     - period_start
@@ -10,15 +14,18 @@ AdminUsageResponse:
     user_id:
       type: string
       format: uuid
-      description: The user whose usage is reported
+      description: The authenticated user whose usage is reported
+      example: "d290f1ee-6c54-4b01-90e6-d701748f0851"
     period_start:
       type: string
       format: date-time
       description: Start of the billing period (inclusive, UTC)
+      example: "2026-03-01T00:00:00Z"
     period_end:
       type: string
       format: date-time
       description: End of the billing period (exclusive, UTC)
+      example: "2026-04-01T00:00:00Z"
     request_count:
       type: integer
       description: Total billable requests in the period
@@ -32,6 +39,9 @@ AdminUsageResponse:
 
 ConnectorUsageResponse:
   type: object
+  description: |
+    Per-connector request counts for the authenticated user within a billing
+    period. Connectors are sorted by request count descending.
   required:
     - user_id
     - period_start
@@ -41,14 +51,19 @@ ConnectorUsageResponse:
     user_id:
       type: string
       format: uuid
+      description: The authenticated user whose connector usage is reported
+      example: "d290f1ee-6c54-4b01-90e6-d701748f0851"
     period_start:
       type: string
       format: date-time
+      example: "2026-03-01T00:00:00Z"
     period_end:
       type: string
       format: date-time
+      example: "2026-04-01T00:00:00Z"
     connectors:
       type: array
+      description: Connector usage entries, ordered by request_count descending
       items:
         $ref: '#/ConnectorUsageEntry'
 
@@ -60,17 +75,22 @@ ConnectorUsageEntry:
   properties:
     connector_id:
       type: string
-      description: Connector identifier
+      description: Connector identifier (matches the `id` field in the connectors table)
+      example: gmail
     name:
       type: string
-      description: Human-readable connector name (omitted if connector was deleted)
+      description: Human-readable connector name. Omitted if the connector has been deleted.
       example: Gmail
     request_count:
       type: integer
+      description: Number of billable requests made through this connector
       example: 1542
 
 AgentUsageResponse:
   type: object
+  description: |
+    Per-agent request counts for the authenticated user within a billing
+    period. Agents are sorted by request count descending.
   required:
     - user_id
     - period_start
@@ -80,14 +100,19 @@ AgentUsageResponse:
     user_id:
       type: string
       format: uuid
+      description: The authenticated user whose agent usage is reported
+      example: "d290f1ee-6c54-4b01-90e6-d701748f0851"
     period_start:
       type: string
       format: date-time
+      example: "2026-03-01T00:00:00Z"
     period_end:
       type: string
       format: date-time
+      example: "2026-04-01T00:00:00Z"
     agents:
       type: array
+      description: Agent usage entries, ordered by request_count descending
       items:
         $ref: '#/AgentUsageEntry'
 
@@ -99,11 +124,15 @@ AgentUsageEntry:
   properties:
     agent_id:
       type: string
-      description: Agent ID (as string)
+      description: Agent ID (numeric, serialized as string)
+      example: "42"
     name:
       type: string
-      description: Agent name from metadata (omitted if not set)
+      description: |
+        Agent name from the agent's metadata. Omitted if not set or if the
+        agent has been deleted.
       example: deploy-bot
     request_count:
       type: integer
+      description: Number of billable requests attributed to this agent
       example: 500
