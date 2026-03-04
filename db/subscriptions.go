@@ -194,12 +194,15 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	var total int64
 
 	// Step 1: Create subscriptions for users without one.
+	// FOR KEY SHARE prevents concurrent deletion of the profile row between
+	// the SELECT and the INSERT, avoiding FK violations when parallel
+	// transactions delete profiles (e.g. test cleanup).
 	tag, err := db.Exec(ctx,
 		`INSERT INTO subscriptions (user_id, plan_id)
 		 SELECT p.id, $1
 		 FROM profiles p
-		 LEFT JOIN subscriptions s ON s.user_id = p.id
-		 WHERE s.id IS NULL`,
+		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = p.id)
+		 FOR KEY SHARE OF p`,
 		defaultPlan)
 	if err != nil {
 		return 0, err
