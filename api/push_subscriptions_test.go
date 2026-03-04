@@ -9,6 +9,31 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
 
+func TestIsValidExpoToken(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		token string
+		valid bool
+	}{
+		{"ExponentPushToken[abc123]", true},
+		{"ExpoPushToken[abc123]", true},
+		{"ExponentPushToken[a]", true},
+		{"ExponentPushToken[]", false},       // empty content
+		{"ExpoPushToken[]", false},            // empty content
+		{"ExponentPushToken[no_bracket", false}, // missing closing bracket
+		{"not-a-token", false},
+		{"", false},
+		{"ExponentPushToken", false},         // no brackets at all
+		{"exponentpushtoken[abc]", false},    // wrong case
+	}
+
+	for _, tt := range tests {
+		if got := isValidExpoToken(tt.token); got != tt.valid {
+			t.Errorf("isValidExpoToken(%q) = %v, want %v", tt.token, got, tt.valid)
+		}
+	}
+}
+
 func TestCreatePushSubscription_WebPush(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
