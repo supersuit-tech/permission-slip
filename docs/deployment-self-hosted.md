@@ -111,6 +111,8 @@ These are inlined into the JavaScript bundle by Vite at build time. They must be
 
 ### Web Push Notifications (VAPID)
 
+No external account or signup required — VAPID keys are a self-generated cryptographic key pair.
+
 To enable browser push notifications, set all three:
 
 | Variable | Description | Example |
@@ -184,6 +186,8 @@ All three are required to enable SMS. If partially configured, SMS is disabled w
 
 Optional. Tracks user behavior, feature adoption, and funnel analytics.
 
+To get started: sign up at [posthog.com](https://posthog.com), create a project (choose US or EU cloud for data residency), and copy the **Project API Key** from **Project Settings > Project Variables**.
+
 | Variable | Description |
 |---|---|
 | `VITE_POSTHOG_KEY` | PostHog project API key (**build-time**) |
@@ -205,6 +209,32 @@ Optional. Only needed if you want to enable paid tiers and usage-based billing.
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for frontend (**build-time**) |
 
 When `BILLING_ENABLED=false` (the default), all users get an unlimited plan, Stripe is skipped, request metering is skipped, and billing API endpoints are disabled. This is the recommended setting for self-hosted deployments unless you want to run your own billing.
+
+### Log Aggregation (Better Stack)
+
+Optional. Centralizes log search and alerting. The server already outputs structured JSON logs (`slog.JSONHandler`) with trace IDs, request metadata, and timing — no code changes needed.
+
+Sign up at [betterstack.com](https://betterstack.com), create a workspace, then go to **Telemetry > Sources > Connect source** to create a log source and get your **Source Token**.
+
+**Docker deployments** — pipe container logs to Better Stack via their HTTP log drain:
+
+```bash
+# Option A: Docker log driver (recommended)
+docker run \
+  --log-driver=syslog \
+  --log-opt syslog-address=tcp+tls://in.logs.betterstack.com:6514 \
+  --log-opt tag="permission-slip" \
+  permission-slip
+
+# Option B: Use Vector, Fluentd, or Fluent Bit as a log shipper
+# See: https://betterstack.com/docs/logs/logging-start/
+```
+
+**Fly.io deployments** — use the native Fly.io integration (see [Fly.io deployment guide](deployment.md)).
+
+**VMs / bare metal** — use a log shipper like [Vector](https://vector.dev) or [Fluent Bit](https://fluentbit.io) to forward `stdout` JSON logs to Better Stack's HTTP endpoint.
+
+No app env vars needed — log shipping is configured at the infrastructure level, not in the app.
 
 ### Other Optional Variables
 
