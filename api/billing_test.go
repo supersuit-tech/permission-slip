@@ -254,8 +254,8 @@ func TestGetUsage_ReturnsUsage(t *testing.T) {
 	if resp.Requests.Overage != 0 {
 		t.Errorf("expected requests.overage=0, got %d", resp.Requests.Overage)
 	}
-	if resp.Requests.OverageCostCents != 0 {
-		t.Errorf("expected requests.overage_cost_cents=0, got %d", resp.Requests.OverageCostCents)
+	if resp.Requests.CostCents != 0 {
+		t.Errorf("expected requests.overage_cost_cents=0, got %d", resp.Requests.CostCents)
 	}
 	if resp.SMS.Total != 3 {
 		t.Errorf("expected sms.total=3, got %d", resp.SMS.Total)
@@ -352,8 +352,8 @@ func TestGetUsage_WithOverage(t *testing.T) {
 		t.Errorf("expected requests.overage=50, got %d", resp.Requests.Overage)
 	}
 	// 50 requests at $0.005 = 25 cents. Formula: ceil(50 * 0.5) = 25
-	if resp.Requests.OverageCostCents != 25 {
-		t.Errorf("expected requests.overage_cost_cents=25, got %d", resp.Requests.OverageCostCents)
+	if resp.Requests.CostCents != 25 {
+		t.Errorf("expected requests.overage_cost_cents=25, got %d", resp.Requests.CostCents)
 	}
 }
 

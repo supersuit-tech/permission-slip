@@ -6,6 +6,7 @@ import { useBillingPlan } from "@/hooks/useBillingPlan";
 import { PlanCard } from "./PlanCard";
 import { UsageSummaryCard } from "./UsageSummaryCard";
 import { UpgradeCTA } from "./UpgradeCTA";
+import { UsageDashboard } from "./UsageDashboard";
 import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
 
@@ -43,6 +44,10 @@ export function BillingPage() {
           <UsageSummaryCard
             usage={billingPlan.usage}
             plan={billingPlan.plan}
+          />
+          <UsageDashboard
+            plan={billingPlan.plan}
+            subscription={billingPlan.subscription}
           />
           {billingPlan.subscription.can_upgrade && (
             <UpgradeCTA plan={billingPlan.plan} />

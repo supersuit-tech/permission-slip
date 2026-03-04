@@ -44,17 +44,24 @@ type checkoutResponse struct {
 }
 
 type usageResponse struct {
-	PeriodStart time.Time       `json:"period_start"`
-	PeriodEnd   time.Time       `json:"period_end"`
-	Requests    requestsUsage   `json:"requests"`
-	SMS         smsUsage        `json:"sms"`
+	PeriodStart time.Time          `json:"period_start"`
+	PeriodEnd   time.Time          `json:"period_end"`
+	Requests    requestsUsage      `json:"requests"`
+	SMS         smsUsage           `json:"sms"`
+	Breakdown   *usageBreakdownDTO `json:"breakdown,omitempty"`
+}
+
+type usageBreakdownDTO struct {
+	ByAgent      map[string]int `json:"by_agent,omitempty"`
+	ByConnector  map[string]int `json:"by_connector,omitempty"`
+	ByActionType map[string]int `json:"by_action_type,omitempty"`
 }
 
 type requestsUsage struct {
-	Total           int  `json:"total"`
-	Included        int  `json:"included"`
-	Overage         int  `json:"overage"`
-	OverageCostCents int `json:"overage_cost_cents"`
+	Total     int `json:"total"`
+	Included  int `json:"included"`
+	Overage   int `json:"overage"`
+	CostCents int `json:"cost_cents"`
 }
 
 type smsUsage struct {
@@ -263,11 +270,21 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			// Calculate overage using the shared pricing function.
 			if included > 0 && usage.RequestCount > included {
 				resp.Requests.Overage = usage.RequestCount - included
-				resp.Requests.OverageCostCents = pstripe.OverageCostCents(resp.Requests.Overage)
+				resp.Requests.CostCents = pstripe.OverageCostCents(resp.Requests.Overage)
 			}
 
 			// SMS cost: $0.01/message (us_ca rate).
 			resp.SMS.CostCents = usage.SMSCount
+
+			// Include breakdown if available.
+			b := usage.ParseBreakdown()
+			if len(b.ByAgent) > 0 || len(b.ByConnector) > 0 || len(b.ByActionType) > 0 {
+				resp.Breakdown = &usageBreakdownDTO{
+					ByAgent:      b.ByAgent,
+					ByConnector:  b.ByConnector,
+					ByActionType: b.ByActionType,
+				}
+			}
 		}
 
 		RespondJSON(w, http.StatusOK, resp)
