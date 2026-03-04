@@ -66,10 +66,13 @@ export function useNotificationNavigation() {
 
       // Fetch the approval from the list endpoint. We search "all" statuses
       // since the notification could arrive for any status transition.
+      // The API returns newest first with cursor-based pagination.
+      // We fetch up to 100 items (the max page size) which should cover
+      // virtually all cases since notifications are for recent approvals.
       try {
         const { data, error } = await client.GET("/v1/approvals", {
           headers: { Authorization: `Bearer ${token}` },
-          params: { query: { status: "all" } },
+          params: { query: { status: "all", limit: 100 } },
         });
 
         if (error || !data?.data) {

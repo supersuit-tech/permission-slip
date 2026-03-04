@@ -116,7 +116,7 @@ describe("useNotificationNavigation", () => {
 
     expect(mockClientGet).toHaveBeenCalledWith("/v1/approvals", {
       headers: { Authorization: "Bearer test-token" },
-      params: { query: { status: "all" } },
+      params: { query: { status: "all", limit: 100 } },
     });
     expect(mockNavigate).toHaveBeenCalledWith("ApprovalDetail", {
       approvalId: "appr_abc123",
@@ -310,7 +310,7 @@ describe("useNotificationNavigation", () => {
     // Now it should have fetched and navigated
     expect(mockClientGet).toHaveBeenCalledWith("/v1/approvals", {
       headers: { Authorization: "Bearer test-token" },
-      params: { query: { status: "all" } },
+      params: { query: { status: "all", limit: 100 } },
     });
     expect(mockNavigate).toHaveBeenCalledWith("ApprovalDetail", {
       approvalId: "appr_abc123",
