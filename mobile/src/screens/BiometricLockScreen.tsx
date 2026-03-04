@@ -7,8 +7,9 @@
  * The manual "Unlock" button remains as a fallback if the auto-prompt
  * is dismissed or fails.
  */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { colors } from "../theme/colors";
 
 interface BiometricLockScreenProps {
@@ -26,6 +27,11 @@ export function BiometricLockScreen({ onUnlock }: BiometricLockScreenProps) {
     }
   }, [onUnlock]);
 
+  const handleUnlock = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onUnlock();
+  }, [onUnlock]);
+
   return (
     <View style={styles.container}>
       <View style={styles.lockIcon}>
@@ -37,7 +43,7 @@ export function BiometricLockScreen({ onUnlock }: BiometricLockScreenProps) {
       </Text>
       <TouchableOpacity
         style={styles.button}
-        onPress={onUnlock}
+        onPress={handleUnlock}
         accessibilityLabel="Unlock with biometrics"
         accessibilityRole="button"
         testID="biometric-unlock-button"

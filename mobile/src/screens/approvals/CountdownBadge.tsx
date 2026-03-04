@@ -45,7 +45,20 @@ export function useCountdown(expiresAt: string): number {
   const [remaining, setRemaining] = useState(() => secondsUntil(expiresAt));
 
   useEffect(() => {
-    const cb = () => setRemaining(secondsUntil(expiresAt));
+    // Don't subscribe to the ticker at all if already expired — no point
+    // running a 1-second interval just to keep returning 0.
+    if (secondsUntil(expiresAt) <= 0) return;
+
+    const cb = () => {
+      const secs = secondsUntil(expiresAt);
+      setRemaining(secs);
+      // Once expired, unsubscribe so the shared ticker can stop when
+      // all subscribers have expired or unmounted.
+      if (secs <= 0) {
+        tickerSubscribers.delete(cb);
+        stopTickerIfIdle();
+      }
+    };
     tickerSubscribers.add(cb);
     startTicker();
 

@@ -12,7 +12,7 @@
  * with a user-specific key so multiple accounts on a shared device don't
  * interfere with each other.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
@@ -42,6 +42,10 @@ export function useBiometricAuth(options: UseBiometricAuthOptions = {}) {
   const [status, setStatus] = useState<BiometricStatus>("checking");
   const [isEnabled, setIsEnabled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Guard against concurrent biometric prompts (e.g. rapid taps on unlock,
+  // or app resume firing authenticate while a prompt is already showing).
+  const isAuthenticatingRef = useRef(false);
 
   // Check hardware and enrollment on mount (and when userId changes)
   useEffect(() => {
@@ -100,14 +104,24 @@ export function useBiometricAuth(options: UseBiometricAuthOptions = {}) {
       return true;
     }
 
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Unlock Permission Slip",
-      cancelLabel: "Cancel",
-      disableDeviceFallback: false,
-    });
+    // Prevent concurrent biometric prompts from rapid taps or overlapping
+    // app-resume events. If a prompt is already showing, return false so
+    // the caller doesn't assume authentication succeeded.
+    if (isAuthenticatingRef.current) return false;
+    isAuthenticatingRef.current = true;
 
-    setIsAuthenticated(result.success);
-    return result.success;
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Unlock Permission Slip",
+        cancelLabel: "Cancel",
+        disableDeviceFallback: false,
+      });
+
+      setIsAuthenticated(result.success);
+      return result.success;
+    } finally {
+      isAuthenticatingRef.current = false;
+    }
   }, [isEnabled]);
 
   // Skip biometric gate if not enabled

@@ -274,7 +274,8 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             )}
 
             {approval.context.risk_level &&
-              approval.context.risk_level !== "low" && (
+              approval.context.risk_level !== "low" &&
+              RISK_DESCRIPTIONS[approval.context.risk_level] != null && (
                 <View style={styles.riskRow}>
                   <Text style={styles.riskDescription}>
                     {RISK_DESCRIPTIONS[approval.context.risk_level]}

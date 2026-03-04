@@ -54,7 +54,7 @@ export default function DeepLinkDetailScreen({ route, navigation }: Props) {
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={refetch}
+            onPress={() => refetch()}
             accessibilityLabel="Retry loading approval"
             accessibilityRole="button"
           >
