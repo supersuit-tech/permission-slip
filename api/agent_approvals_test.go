@@ -722,6 +722,108 @@ func TestAgentApprovalStatus_NotFound(t *testing.T) {
 	}
 }
 
+func TestAgentApprovalStatus_Denied(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	approvalID := "appr_status_denied"
+	testhelper.InsertApprovalWithStatus(t, tx, approvalID, agentID, uid, "denied")
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/"+approvalID+"/status", "", privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var statusResp agentApprovalStatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &statusResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if statusResp.Status != "denied" {
+		t.Errorf("expected status 'denied', got %q", statusResp.Status)
+	}
+	if statusResp.ExecutionStatus != nil {
+		t.Errorf("expected nil execution_status for denied approval, got %v", *statusResp.ExecutionStatus)
+	}
+	if statusResp.ExecutionResult != nil {
+		t.Error("expected nil execution_result for denied approval")
+	}
+}
+
+func TestAgentApprovalStatus_FullApproveFlow(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	// 1. Agent requests approval.
+	reqBody := `{"request_id":"req_full_flow","action":{"type":"test.action"},"context":{"description":"test"}}`
+	r1 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, r1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("request: expected 200, got %d: %s", w1.Code, w1.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+
+	// 2. User approves the approval (execution happens inline).
+	r2 := authenticatedRequest(t, http.MethodPost, "/approvals/"+createResp.ApprovalID+"/approve", uid)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("approve: expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	// 3. Agent polls for status — should see approved with execution result.
+	r3 := signedJSONRequest(t, http.MethodGet, "/approvals/"+createResp.ApprovalID+"/status", "", privKey, agentID)
+	w3 := httptest.NewRecorder()
+	router.ServeHTTP(w3, r3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("status: expected 200, got %d: %s", w3.Code, w3.Body.String())
+	}
+
+	var statusResp agentApprovalStatusResponse
+	if err := json.Unmarshal(w3.Body.Bytes(), &statusResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if statusResp.Status != "approved" {
+		t.Errorf("expected status 'approved', got %q", statusResp.Status)
+	}
+	// No connector in test, so execution_status should be "error".
+	if statusResp.ExecutionStatus == nil {
+		t.Fatal("expected execution_status to be set after approval")
+	}
+	if *statusResp.ExecutionStatus != "error" {
+		t.Errorf("expected execution_status 'error' (no connector), got %q", *statusResp.ExecutionStatus)
+	}
+	if statusResp.ExecutionResult == nil {
+		t.Fatal("expected execution_result to be set after approval")
+	}
+}
+
 func TestAgentApprovalStatus_OtherAgentAccess(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

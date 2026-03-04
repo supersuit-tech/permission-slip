@@ -229,6 +229,8 @@ describe("PendingApprovalsCard", () => {
         approval_id: "appr_abc123",
         status: "approved",
         approved_at: "2026-02-21T10:00:05Z",
+        execution_status: "success",
+        execution_result: { data: "ok" },
       },
     });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -252,9 +254,9 @@ describe("PendingApprovalsCard", () => {
     await user.click(screen.getByRole("button", { name: "Approve" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Request Approved")).toBeInTheDocument();
+      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
     });
-    expect(screen.getByText(/The agent has been notified/)).toBeInTheDocument();
+    expect(screen.getByText(/The action has been executed/)).toBeInTheDocument();
     // "Done" button should be visible in the success state
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
