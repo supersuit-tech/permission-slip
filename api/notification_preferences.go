@@ -48,7 +48,7 @@ var allChannels = func() []string {
 	for ch := range validChannels {
 		channels = append(channels, ch)
 	}
-	sort.Strings(channels) // deterministic order: email, sms, web-push
+	sort.Strings(channels) // deterministic order: email, mobile-push, sms, web-push
 	return channels
 }()
 

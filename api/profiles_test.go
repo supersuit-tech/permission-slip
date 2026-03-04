@@ -327,17 +327,33 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if len(resp.Preferences) != len(allChannels) {
 		t.Fatalf("expected %d preferences, got %d", len(allChannels), len(resp.Preferences))
 	}
+
+	// Index preferences by channel for explicit assertions.
+	prefsByChannel := make(map[string]notificationPreferenceResponse, len(resp.Preferences))
+	for _, p := range resp.Preferences {
+		prefsByChannel[p.Channel] = p
+	}
+
 	// All channels default to enabled when no preferences are set.
 	// SMS should not be available on the free plan.
-	for _, p := range resp.Preferences {
+	requiredChannels := []string{"email", "web-push", "sms", "mobile-push"}
+	for _, ch := range requiredChannels {
+		p, ok := prefsByChannel[ch]
+		if !ok {
+			t.Errorf("expected preference for channel %q", ch)
+			continue
+		}
 		if !p.Enabled {
-			t.Errorf("expected channel %q to default to enabled", p.Channel)
+			t.Errorf("expected channel %q to default to enabled", ch)
 		}
-		if p.Channel == "sms" && p.Available {
-			t.Error("expected SMS to be unavailable on free plan")
-		}
-		if p.Channel != "sms" && !p.Available {
-			t.Errorf("expected channel %q to be available", p.Channel)
+		if ch == "sms" {
+			if p.Available {
+				t.Error("expected SMS to be unavailable on free plan")
+			}
+		} else {
+			if !p.Available {
+				t.Errorf("expected channel %q to be available", ch)
+			}
 		}
 	}
 }
