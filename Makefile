@@ -1,6 +1,8 @@
 .PHONY: dev dev-backend dev-frontend build run install setup \
        test test-backend test-frontend test-integration typecheck \
        mobile-install mobile-start mobile-test mobile-typecheck \
+       mobile-build-dev mobile-build-preview mobile-build-prod \
+       mobile-submit mobile-update \
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
        audit audit-backend audit-frontend audit-mobile \
@@ -118,6 +120,26 @@ mobile-test:
 # Type-check mobile app (no emit, just validate)
 mobile-typecheck:
 	cd mobile && npx tsc --noEmit
+
+# EAS Build: development (simulator/internal distribution)
+mobile-build-dev:
+	cd mobile && npx eas-cli build --profile development --platform all
+
+# EAS Build: preview (internal distribution for testers)
+mobile-build-preview:
+	cd mobile && npx eas-cli build --profile preview --platform all
+
+# EAS Build: production (App Store / Google Play)
+mobile-build-prod:
+	cd mobile && npx eas-cli build --profile production --platform all
+
+# EAS Submit: upload latest production build to app stores
+mobile-submit:
+	cd mobile && npx eas-cli submit --profile production --platform all
+
+# EAS Update: publish OTA update to the production channel
+mobile-update:
+	cd mobile && npx eas-cli update --channel production
 
 # ---------- Dependency Audit ----------
 

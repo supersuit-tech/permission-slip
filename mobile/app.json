@@ -3,6 +3,9 @@
     "name": "Permission Slip",
     "slug": "permission-slip",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "scheme": "permissionslip",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,6 +17,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "dev.permissionslip.mobile",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"]
       }
@@ -25,9 +29,11 @@
           "icon": "./assets/icon.png",
           "color": "#1A1A2E"
         }
-      ]
+      ],
+      "expo-updates"
     ],
     "android": {
+      "package": "dev.permissionslip.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -38,6 +44,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/${EXPO_PROJECT_ID}",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
     }
   }
 }
