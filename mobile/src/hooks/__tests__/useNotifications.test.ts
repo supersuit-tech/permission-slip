@@ -13,6 +13,7 @@ jest.mock("expo-notifications", () => ({
   setNotificationChannelAsync: jest.fn(),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
   AndroidImportance: { HIGH: 4 },
 }));
 
@@ -289,5 +290,72 @@ describe("useNotifications", () => {
     });
 
     expect(mockGetToken).toHaveBeenCalledWith({ projectId: "my-project-id" });
+  });
+
+  it("calls onNotificationTap when a notification is tapped", async () => {
+    const onNotificationTap = jest.fn();
+    let responseCallback: ((r: unknown) => void) | null = null;
+
+    (Notifications.addNotificationResponseReceivedListener as jest.Mock).mockImplementation(
+      (cb: (r: unknown) => void) => {
+        responseCallback = cb;
+        return { remove: jest.fn() };
+      },
+    );
+
+    const { Consumer } = createHookCapture({ onNotificationTap });
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    const fakeResponse = {
+      actionIdentifier: "default",
+      notification: { request: { content: { data: { approval_id: "appr_123" } } } },
+    };
+    await act(async () => {
+      responseCallback?.(fakeResponse);
+    });
+
+    expect(onNotificationTap).toHaveBeenCalledWith(fakeResponse);
+  });
+
+  it("calls onNotificationTap on cold start when getLastNotificationResponseAsync returns a response", async () => {
+    const onNotificationTap = jest.fn();
+    const coldStartResponse = {
+      actionIdentifier: "default",
+      notification: { request: { content: { data: { approval_id: "appr_cold" } } } },
+    };
+
+    (Notifications.getLastNotificationResponseAsync as jest.Mock).mockResolvedValue(
+      coldStartResponse,
+    );
+
+    const { Consumer } = createHookCapture({ onNotificationTap });
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    // Wait for the async getLastNotificationResponseAsync to resolve
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(onNotificationTap).toHaveBeenCalledWith(coldStartResponse);
+  });
+
+  it("does not call onNotificationTap on cold start when no launch notification exists", async () => {
+    const onNotificationTap = jest.fn();
+    (Notifications.getLastNotificationResponseAsync as jest.Mock).mockResolvedValue(null);
+
+    const { Consumer } = createHookCapture({ onNotificationTap });
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(onNotificationTap).not.toHaveBeenCalled();
   });
 });

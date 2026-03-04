@@ -12,6 +12,14 @@ let mockAuthStatus = "unauthenticated";
 let mockExpoPushToken: string | null = null;
 let mockSession: { access_token: string } | null = null;
 let capturedOnNotificationReceived: ((n: unknown) => void) | undefined;
+let capturedOnNotificationTap: ((r: unknown) => void) | undefined;
+const mockHandleNotificationTap = jest.fn();
+
+jest.mock("../useNotificationNavigation", () => ({
+  useNotificationNavigation: () => ({
+    handleNotificationTap: mockHandleNotificationTap,
+  }),
+}));
 
 jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
@@ -20,8 +28,12 @@ jest.mock("@tanstack/react-query", () => ({
 }));
 
 jest.mock("../useNotifications", () => ({
-  useNotifications: (options?: { onNotificationReceived?: (n: unknown) => void }) => {
+  useNotifications: (options?: {
+    onNotificationReceived?: (n: unknown) => void;
+    onNotificationTap?: (r: unknown) => void;
+  }) => {
     capturedOnNotificationReceived = options?.onNotificationReceived;
+    capturedOnNotificationTap = options?.onNotificationTap;
     return {
       expoPushToken: mockExpoPushToken,
       permissionGranted: mockExpoPushToken !== null,
@@ -73,6 +85,7 @@ describe("usePushSetup", () => {
     mockExpoPushToken = null;
     mockSession = null;
     capturedOnNotificationReceived = undefined;
+    capturedOnNotificationTap = undefined;
     mockRegisterForPushNotifications.mockResolvedValue(null);
     mockRegisterToken.mockResolvedValue({});
     mockClientPost.mockResolvedValue({ data: {}, error: undefined });
@@ -210,6 +223,36 @@ describe("usePushSetup", () => {
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ["approvals"],
     });
+  });
+
+  it("passes handleNotificationTap as onNotificationTap to useNotifications", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    const { Consumer } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    expect(capturedOnNotificationTap).toBe(mockHandleNotificationTap);
+  });
+
+  it("forwards notification tap to handleNotificationTap", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    const { Consumer } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    const fakeResponse = {
+      actionIdentifier: "default",
+      notification: { request: { content: { data: { approval_id: "appr_123" } } } },
+    };
+    capturedOnNotificationTap?.(fakeResponse);
+
+    expect(mockHandleNotificationTap).toHaveBeenCalledWith(fakeResponse);
   });
 
   it("does not crash when unregister API call fails", async () => {

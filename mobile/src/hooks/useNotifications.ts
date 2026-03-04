@@ -35,10 +35,12 @@ export interface UseNotificationsOptions {
   projectId?: string;
   /** Callback invoked when a notification is received while the app is in the foreground. */
   onNotificationReceived?: (notification: Notifications.Notification) => void;
+  /** Callback invoked when the user taps a notification (foreground, background, or cold start). */
+  onNotificationTap?: (response: Notifications.NotificationResponse) => void;
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
-  const { projectId, onNotificationReceived } = options;
+  const { projectId, onNotificationReceived, onNotificationTap } = options;
   const [state, setState] = useState<NotificationState>({
     expoPushToken: null,
     permissionGranted: false,
@@ -51,9 +53,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   /** The last notification response (tap). Callers can read this for navigation. */
   const lastNotificationResponse = useRef<Notifications.NotificationResponse | null>(null);
 
-  // Keep the callback ref fresh without re-creating the effect subscription
+  // Keep the callback refs fresh without re-creating the effect subscription
   const onNotificationReceivedRef = useRef(onNotificationReceived);
   onNotificationReceivedRef.current = onNotificationReceived;
+  const onNotificationTapRef = useRef(onNotificationTap);
+  onNotificationTapRef.current = onNotificationTap;
 
   const registerForPushNotifications = useCallback(async (): Promise<string | null> => {
     // Push notifications only work on physical devices
@@ -137,12 +141,24 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       },
     );
 
-    // Listen for notification taps (user interaction)
+    // Listen for notification taps (user interaction — app in foreground or background)
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         lastNotificationResponse.current = response;
+        onNotificationTapRef.current?.(response);
       },
     );
+
+    // Handle cold start: check if the app was launched by a notification tap.
+    // getLastNotificationResponseAsync returns the response that opened the app
+    // when it was fully killed, since the listener above only fires for taps
+    // that happen while the JS runtime is already running.
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        lastNotificationResponse.current = response;
+        onNotificationTapRef.current?.(response);
+      }
+    });
 
     return () => {
       if (notificationListener.current) {

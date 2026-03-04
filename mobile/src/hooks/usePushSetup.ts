@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotifications } from "./useNotifications";
 import { useRegisterPushToken } from "./useRegisterPushToken";
+import { useNotificationNavigation } from "./useNotificationNavigation";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
 
@@ -26,13 +27,19 @@ export function usePushSetup() {
     queryClient.invalidateQueries({ queryKey: ["approvals"] });
   }, [queryClient]);
 
+  // Navigate to the approval detail screen when the user taps a notification.
+  const { handleNotificationTap } = useNotificationNavigation();
+
   const {
     expoPushToken,
     permissionGranted,
     error: notificationError,
     registerForPushNotifications,
     lastNotificationResponse,
-  } = useNotifications({ onNotificationReceived });
+  } = useNotifications({
+    onNotificationReceived,
+    onNotificationTap: handleNotificationTap,
+  });
   const { registerToken } = useRegisterPushToken();
 
   // Track the token we last sent to the backend so we can unregister on logout
