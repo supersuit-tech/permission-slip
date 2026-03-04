@@ -74,7 +74,7 @@ jobs:
         run: make test-frontend
 
   mobile:
-    name: Mobile Tests
+    name: Mobile Tests & Typecheck
     runs-on: ubuntu-latest
 
     steps:
@@ -94,6 +94,7 @@ jobs:
 
       - name: Run mobile tests
         run: make mobile-test
+
 
   build:
     name: Build

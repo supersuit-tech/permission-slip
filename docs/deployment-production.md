@@ -21,14 +21,14 @@
                     │  └───────────┬────────────┘  │
                     └──────────────┼───────────────┘
                                    │
-        ┌──────────────┬───────────┼───────────┬───────────────┐
-        │              │           │           │               │
- ┌──────▼───┐  ┌──────▼────┐  ┌──▼────┐  ┌───▼─────┐  ┌──────▼──────┐
- │ Supabase  │  │  Sentry   │  │Twilio │  │ PostHog │  │ Better Stack│
- │ - Auth    │  │  - Errors │  │-SGrid │  │-Analytics│  │ - Logs     │
- │ - Postgres│  │  - Perf   │  │- SMS  │  │-Replays │  │ - Alerts   │
- │ - Vault   │  │  - CSP    │  │       │  │         │  │            │
- └───────────┘  └───────────┘  └───────┘  └─────────┘  └────────────┘
+        ┌──────────────┬───────────┼───────────┐
+        │              │           │           │
+ ┌──────▼───┐  ┌──────▼────┐  ┌──▼────┐  ┌───▼─────┐
+ │ Supabase  │  │  Sentry   │  │Twilio │  │ PostHog │
+ │ - Auth    │  │  - Errors │  │-SGrid │  │-Analytics│
+ │ - Postgres│  │  - Perf   │  │- SMS  │  │-Replays │
+ │ - Vault   │  │  - CSP    │  │       │  │         │
+ └───────────┘  └───────────┘  └───────┘  └─────────┘
                                                 ┌───────────────┐
                                                 │  UptimeRobot  │
                                                 │  - Uptime     │
@@ -52,9 +52,8 @@ Quick reference of every service in the production stack. See detailed sections 
 | 8 | [**Expo Push Service**](#notification-services) | Mobile push notifications (iOS + Android via Expo) | Live |
 | 9 | [**GitHub Actions**](#cicd-pipeline) | CI (tests, build, audit) + planned CD | Live |
 | 10 | [**PostHog**](#posthog-product-analytics) | Product analytics + session replay | Planned |
-| 11 | [**Better Stack**](#better-stack--logtail-log-aggregation) | Log aggregation + alerting | Planned |
-| 12 | [**UptimeRobot**](#uptimerobot-uptime-monitoring) | Uptime monitoring + public status page | Planned |
-| 13 | [**Stripe**](#stripe-billing--payments) | Billing, subscriptions, usage-based payments | Planned |
+| 11 | [**UptimeRobot**](#uptimerobot-uptime-monitoring) | Uptime monitoring + public status page | Planned |
+| 12 | [**Stripe**](#stripe-billing--payments) | Billing, subscriptions, usage-based payments | Planned |
 
 ## Services
 
@@ -288,35 +287,6 @@ This adds:
 - `https://cloudflareinsights.com` to CSP `connect-src` (beacon sends analytics data)
 
 If Cloudflare Web Analytics is disabled in the Cloudflare dashboard, this setting is harmless — it just allows the domains in CSP without effect.
-
-### Better Stack / Logtail (Log Aggregation)
-
-> **Status:** Planned — see [#331](https://github.com/supersuit-tech/permission-slip-web/issues/331)
-
-Centralized log search and alerting. The app already outputs structured JSON logs (`slog.JSONHandler`) with trace IDs, request method/path, status codes, and timing — no code changes needed.
-
-- **Service:** [Better Stack](https://betterstack.com) (Logtail)
-- **Free tier:** 1GB/month ingestion, 3-day retention
-- **Integration:** Native Fly.io log shipping (no sidecar needed)
-
-**Setup steps:**
-1. Sign up at [betterstack.com](https://betterstack.com) and create a workspace
-2. In the dashboard, go to **Telemetry > Sources > Connect source**
-3. Select **Fly.io** as the source type
-4. Copy the **Source Token** — this is the `<logtail-source-token>` used below
-5. Configure Fly.io log shipping:
-   ```bash
-   # Recommended: native Fly.io → Logtail integration
-   fly logs ship --org <fly-org> --access-token <logtail-source-token>
-   ```
-6. Verify logs appear with correct JSON field parsing (`msg`, `level`, `trace_id`, `method`, `path`, `status`)
-7. Create alerts:
-   - 5xx error rate spike (>5 errors in 5 minutes)
-   - Health check failure logs
-   - Panic/crash logs
-8. Create saved views: all errors, slow requests, auth failures
-
-**No app env vars needed** — log shipping is configured at the Fly.io platform level, not in the app.
 
 ### UptimeRobot (Uptime Monitoring)
 
@@ -861,7 +831,6 @@ Quick reference for what's live vs. planned.
 | **VAPID / Web Push** | Browser push notifications | Live | — |
 | **Expo Push Service** | Mobile push notifications (iOS + Android) | Live | — |
 | **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352) |
-| **Better Stack** | Log aggregation + alerting | Planned | [#331](https://github.com/supersuit-tech/permission-slip-web/issues/331) |
 | **UptimeRobot** | Uptime monitoring + status page | Planned | [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332) |
 | **Stripe** | Billing + payments | Planned | [#341](https://github.com/supersuit-tech/permission-slip-web/issues/341) |
 | **GitHub Actions CD** | Auto-deploy on push to main | Planned | [#328](https://github.com/supersuit-tech/permission-slip-web/issues/328) |
