@@ -1,6 +1,11 @@
 /**
  * React Query hook for fetching the authenticated user's approval requests.
- * Polls every 30 seconds and supports filtering by status.
+ *
+ * Pending approvals poll every 10 seconds (time-sensitive — users need to act
+ * quickly). All other statuses (approved, denied, cancelled, all) don't poll
+ * since they represent historical data that rarely changes. When the app
+ * returns to the foreground the focus manager (configured in App.tsx) triggers
+ * an immediate refetch so data is always fresh.
  */
 import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -12,11 +17,13 @@ import type { components } from "../api/schema";
 export type ApprovalSummary = components["schemas"]["ApprovalSummary"];
 export type ApprovalStatus = ApprovalSummary["status"];
 
+/** Polling interval in ms — only pending approvals auto-refresh. */
+const PENDING_POLL_INTERVAL_MS = 10_000;
+
 /**
  * Fetches approval requests for the current user, filtered by status.
- * Uses a stable query key (keyed by userId + status) and auto-refetches
- * every 30 seconds. The access token is stored in a ref to avoid
- * unnecessary query invalidation on token refresh.
+ * Uses a stable query key (keyed by userId + status). The access token is
+ * stored in a ref to avoid unnecessary query invalidation on token refresh.
  */
 export function useApprovals(status: "pending" | "approved" | "denied" | "cancelled" | "all" = "pending") {
   const { session } = useAuth();
@@ -46,10 +53,13 @@ export function useApprovals(status: "pending" | "approved" | "denied" | "cancel
       return data;
     },
     enabled: !!accessToken,
-    refetchInterval: 30_000,
-    // Cache stays fresh for 10 s — avoids redundant refetches when the user
+    // Only pending approvals auto-poll — approved / denied are historical.
+    refetchInterval: status === "pending" ? PENDING_POLL_INTERVAL_MS : false,
+    // Immediately refetch when the app returns to the foreground.
+    refetchOnWindowFocus: true,
+    // Cache stays fresh for 5 s — avoids redundant refetches when the user
     // switches tabs back and forth quickly.
-    staleTime: 10_000,
+    staleTime: 5_000,
   });
 
   return {
@@ -61,5 +71,7 @@ export function useApprovals(status: "pending" | "approved" | "denied" | "cancel
       ? (query.error?.message ?? "Unable to load approvals. Please try again later.")
       : null,
     refetch: query.refetch,
+    /** Epoch ms when the query data was last successfully fetched (0 if never). */
+    dataUpdatedAt: query.dataUpdatedAt,
   };
 }

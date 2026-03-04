@@ -4,6 +4,7 @@ import {
   humanizeActionType,
   buildActionSummary,
   formatRelativeTime,
+  formatLastUpdated,
   safeParams,
   isExpired,
   formatParamValue,
@@ -128,6 +129,43 @@ describe("formatRelativeTime", () => {
     const result = formatRelativeTime(oldDate);
     // Should contain a month abbreviation, not "ago"
     expect(result).not.toContain("ago");
+  });
+});
+
+describe("formatLastUpdated", () => {
+  const NOW = new Date("2026-03-04T12:00:00Z").getTime();
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("returns null when epochMs is 0", () => {
+    expect(formatLastUpdated(0)).toBeNull();
+  });
+
+  it("returns 'Updated just now' for very recent timestamps", () => {
+    expect(formatLastUpdated(NOW - 3_000)).toBe("Updated just now");
+  });
+
+  it("returns 'Updated just now' for future timestamps (clock skew)", () => {
+    expect(formatLastUpdated(NOW + 5_000)).toBe("Updated just now");
+  });
+
+  it("returns seconds for timestamps 10-59 seconds ago", () => {
+    expect(formatLastUpdated(NOW - 30_000)).toBe("Updated 30s ago");
+  });
+
+  it("returns minutes for timestamps 1-59 minutes ago", () => {
+    expect(formatLastUpdated(NOW - 5 * 60_000)).toBe("Updated 5m ago");
+  });
+
+  it("returns hours for timestamps 1+ hours ago", () => {
+    expect(formatLastUpdated(NOW - 2 * 3600_000)).toBe("Updated 2h ago");
   });
 });
 
