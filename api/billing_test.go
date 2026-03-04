@@ -724,7 +724,7 @@ func TestDowngrade_TooManyAgents(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
 	// Create more registered agents than the free plan allows.
-	// Free plan limit is 5 agents (from seed data).
+	// Free plan limit is 3 agents (from seed data).
 	for i := 0; i < 6; i++ {
 		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	}
@@ -762,7 +762,7 @@ func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
 
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-	// Free plan limit is 10 active standing approvals (from seed data).
+	// Free plan limit is 5 active standing approvals (from seed data).
 	for i := 0; i < 11; i++ {
 		saID := testhelper.GenerateID(t, "sa_")
 		testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)

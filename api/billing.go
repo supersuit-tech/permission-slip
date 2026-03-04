@@ -80,18 +80,25 @@ type invoiceListResponse struct {
 	Invoices []pstripe.InvoiceSummary `json:"invoices"`
 }
 
+// billingPlanResponse is the JSON shape returned by GET /billing/plan.
+// It combines plan details (limits), subscription status, and current
+// resource usage in a single response so the frontend can render limit
+// badges, upgrade prompts, and gate features without extra round-trips.
 type billingPlanResponse struct {
 	Plan         billingPlan         `json:"plan"`
 	Subscription billingSubscription `json:"subscription"`
 	Usage        billingUsageSummary `json:"usage"`
 }
 
+// billingPlan identifies the user's plan and its resource limits.
 type billingPlan struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	planLimits
 }
 
+// billingSubscription holds subscription status fields shared by both
+// billingPlanResponse and subscriptionResponse (via embedding).
 type billingSubscription struct {
 	Status             string     `json:"status"`
 	CurrentPeriodStart time.Time  `json:"current_period_start"`
@@ -102,6 +109,8 @@ type billingSubscription struct {
 	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
 }
 
+// billingUsageSummary provides current resource counts for the billing
+// period. Used by the frontend to show usage relative to plan limits.
 type billingUsageSummary struct {
 	Requests          int `json:"requests"`
 	Agents            int `json:"agents"`
