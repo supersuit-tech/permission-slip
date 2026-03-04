@@ -1,17 +1,28 @@
+# Execute action schemas.
+#
+# In the direct execution model, POST /v1/actions/execute only supports
+# standing approval execution. One-off approvals are executed server-side
+# on user approval — agents poll GET /v1/approvals/{id}/status for results.
+#
+# These are thin aliases to the standing approval schemas to maintain the
+# ExecuteAction naming convention used by the paths and openapi.yaml.
+
 ExecuteActionRequest:
-  description: |
-    Execute an action via Permission Slip using a standing approval.
+  allOf:
+    - $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteRequest'
+    - description: |
+        Execute an action via Permission Slip using a standing approval.
 
-    The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
-    Permission Slip matches an active standing approval for the agent + action type + constraints
-    and executes the action using the user's stored credentials.
+        The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
+        Permission Slip matches an active standing approval for the agent + action type + constraints
+        and executes the action using the user's stored credentials.
 
-    One-off approvals are executed directly when the user approves — agents receive results
-    via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
-  $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteRequest'
+        One-off approvals are executed directly when the user approves — agents receive results
+        via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
 
 ExecuteActionResponse:
-  description: |
-    Response from executing an action via a standing approval. Returns the action result,
-    the standing approval that authorized execution, and the remaining execution count.
-  $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteResponse'
+  allOf:
+    - $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteResponse'
+    - description: |
+        Response from executing an action via a standing approval. Returns the action result,
+        the standing approval that authorized execution, and the remaining execution count.

@@ -3228,7 +3228,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StandingApprovalExecuteRequest'
+              $ref: '#/components/schemas/ExecuteActionRequest'
             examples:
               email_read_standing:
                 summary: 'Standing approval: Read emails'
@@ -3259,7 +3259,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StandingApprovalExecuteResponse'
+                $ref: '#/components/schemas/ExecuteActionResponse'
               examples:
                 email_read_standing:
                   summary: 'Standing approval: Emails read successfully'
@@ -6206,9 +6206,23 @@ components:
         id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         deleted_at: '2026-02-25T15:00:00Z'
     ExecuteActionRequest:
-      $ref: '#/components/schemas/StandingApprovalExecuteRequest'
+      allOf:
+        - $ref: '#/components/schemas/StandingApprovalExecuteRequest'
+        - description: |
+            Execute an action via Permission Slip using a standing approval.
+
+            The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
+            Permission Slip matches an active standing approval for the agent + action type + constraints
+            and executes the action using the user's stored credentials.
+
+            One-off approvals are executed directly when the user approves — agents receive results
+            via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
     ExecuteActionResponse:
-      $ref: '#/components/schemas/StandingApprovalExecuteResponse'
+      allOf:
+        - $ref: '#/components/schemas/StandingApprovalExecuteResponse'
+        - description: |
+            Response from executing an action via a standing approval. Returns the action result,
+            the standing approval that authorized execution, and the remaining execution count.
     StoreCredentialRequest:
       type: object
       required:
