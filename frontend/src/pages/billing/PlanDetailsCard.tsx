@@ -17,13 +17,13 @@ import {
 import { useDowngradePlan } from "@/hooks/useDowngradePlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { useBillingInvoices } from "@/hooks/useBillingInvoices";
-import { useBillingPlan } from "@/hooks/useBillingPlan";
-import type { Subscription } from "@/hooks/useBillingPlan";
+import type { Subscription, UsageSummary } from "@/hooks/useBillingPlan";
 import { formatCents, formatDate, isSafeUrl } from "./formatters";
 import { DowngradeConfirmDialog } from "./DowngradeConfirmDialog";
 
 interface PlanDetailsCardProps {
   subscription: Subscription;
+  usage: UsageSummary;
 }
 
 function CostEstimate() {
@@ -94,9 +94,12 @@ function InvoicesList() {
   );
 }
 
-function DowngradeSection() {
+interface DowngradeSectionProps {
+  usage: UsageSummary;
+}
+
+function DowngradeSection({ usage }: DowngradeSectionProps) {
   const { downgrade, isDowngrading } = useDowngradePlan();
-  const { billingPlan } = useBillingPlan();
   const [showConfirm, setShowConfirm] = useState(false);
   const [downgradeError, setDowngradeError] = useState<string | null>(null);
 
@@ -133,13 +136,13 @@ function DowngradeSection() {
         onConfirm={handleDowngrade}
         isPending={isDowngrading}
         error={downgradeError}
-        usage={billingPlan?.usage ?? null}
+        usage={usage}
       />
     </>
   );
 }
 
-export function PlanDetailsCard({ subscription }: PlanDetailsCardProps) {
+export function PlanDetailsCard({ subscription, usage }: PlanDetailsCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -180,7 +183,7 @@ export function PlanDetailsCard({ subscription }: PlanDetailsCardProps) {
 
           {subscription.can_downgrade && (
             <div className="border-t pt-4">
-              <DowngradeSection />
+              <DowngradeSection usage={usage} />
             </div>
           )}
         </div>

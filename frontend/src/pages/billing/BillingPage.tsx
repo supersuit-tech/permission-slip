@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,14 @@ export function BillingPage() {
   const [showSuccess, setShowSuccess] = useState(
     searchParams.get("upgraded") === "true",
   );
+
+  // Refetch billing data when returning from Stripe with upgraded=true
+  // to ensure the plan card reflects the new subscription.
+  useEffect(() => {
+    if (showSuccess) {
+      void refetch();
+    }
+  }, [showSuccess, refetch]);
 
   function dismissSuccess() {
     setShowSuccess(false);
@@ -62,7 +70,10 @@ export function BillingPage() {
             <UpgradeCTA plan={billingPlan.plan} />
           )}
           {billingPlan.subscription.can_downgrade && (
-            <PlanDetailsCard subscription={billingPlan.subscription} />
+            <PlanDetailsCard
+              subscription={billingPlan.subscription}
+              usage={billingPlan.usage}
+            />
           )}
         </>
       ) : null}

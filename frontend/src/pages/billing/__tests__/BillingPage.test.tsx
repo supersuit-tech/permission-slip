@@ -11,6 +11,7 @@ import {
   usageDetailResponse,
   invoicesResponse,
   overLimitPaidPlanResponse,
+  atLimitPaidPlanResponse,
 } from "./fixtures";
 
 vi.mock("../../../lib/supabaseClient");
@@ -198,6 +199,32 @@ describe("BillingPage", () => {
         });
       }
     });
+
+    it("shows error toast when upgrade API fails", async () => {
+      mockBillingApi(freePlanResponse);
+      mockPost.mockResolvedValue({
+        data: undefined,
+        error: { error: { code: "internal_error", message: "Stripe unavailable" } },
+      });
+
+      const user = userEvent.setup();
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Continue to Checkout/ })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: /Continue to Checkout/ }));
+
+      // Dialog should close on error (upgrade CTA button reappears without dialog)
+      await waitFor(() => {
+        expect(screen.queryByText("What you get")).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("Paid plan", () => {
@@ -291,12 +318,62 @@ describe("BillingPage", () => {
       await waitFor(() => {
         expect(screen.getByText(/over free plan limits/)).toBeInTheDocument();
       });
-      expect(screen.getByText(/You have 5 agents/)).toBeInTheDocument();
-      expect(screen.getByText(/You have 10 standing approvals/)).toBeInTheDocument();
-      expect(screen.getByText(/You have 8 credentials/)).toBeInTheDocument();
+      expect(screen.getByText(/You have 10 agents/)).toBeInTheDocument();
+      expect(screen.getByText(/You have 25 standing approvals/)).toBeInTheDocument();
+      expect(screen.getByText(/You have 20 credentials/)).toBeInTheDocument();
 
       // Confirm button should be disabled when over limits
       expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeDisabled();
+
+      // Should show "Manage" links for each over-limit resource
+      expect(screen.getByText("Manage agents")).toBeInTheDocument();
+      expect(screen.getByText("Manage standing approvals")).toBeInTheDocument();
+      expect(screen.getByText("Manage credentials")).toBeInTheDocument();
+    });
+
+    it("does not show limit warnings when at free plan limits", async () => {
+      mockBillingApi(atLimitPaidPlanResponse);
+      const user = userEvent.setup();
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("What changes")).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/over free plan limits/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeEnabled();
+    });
+
+    it("shows error in downgrade dialog when downgrade API fails", async () => {
+      mockBillingApi(atLimitPaidPlanResponse);
+      mockPost.mockResolvedValue({
+        data: undefined,
+        error: { error: { code: "downgrade_limit_exceeded", message: "Too many active agents" } },
+      });
+
+      const user = userEvent.setup();
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade to Free" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Downgrade to Free" }));
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Confirm Downgrade" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Too many active agents")).toBeInTheDocument();
+      });
     });
   });
 
@@ -337,6 +414,19 @@ describe("BillingPage", () => {
         expect(screen.getByText("Current Plan")).toBeInTheDocument();
       });
       expect(screen.queryByText("Welcome to Pay-as-you-go!")).not.toBeInTheDocument();
+    });
+
+    it("success banner has accessible role", async () => {
+      mockBillingApi(paidPlanResponse);
+      wrapper = createAuthWrapper(["/billing?upgraded=true"]);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Welcome to Pay-as-you-go!")).toBeInTheDocument();
+      });
+      const banner = screen.getByText("Welcome to Pay-as-you-go!").closest("[role='status']");
+      expect(banner).toBeInTheDocument();
     });
   });
 });

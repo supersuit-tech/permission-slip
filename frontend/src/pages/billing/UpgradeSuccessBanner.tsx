@@ -6,7 +6,7 @@ interface UpgradeSuccessBannerProps {
 
 export function UpgradeSuccessBanner({ onDismiss }: UpgradeSuccessBannerProps) {
   return (
-    <div className="relative rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950">
+    <div role="status" className="relative rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950">
       <button
         onClick={onDismiss}
         className="absolute top-3 right-3 text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200"

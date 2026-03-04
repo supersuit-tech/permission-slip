@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PAID_PLAN_FEATURES, PAID_PLAN_PRICING } from "./constants";
 
 interface UpgradeConfirmDialogProps {
   open: boolean;
@@ -15,13 +16,6 @@ interface UpgradeConfirmDialogProps {
   onConfirm: () => void;
   isPending: boolean;
 }
-
-const UPGRADE_BENEFITS = [
-  "Unlimited agents",
-  "Unlimited credentials",
-  "Unlimited standing approvals",
-  "90-day audit retention",
-];
 
 export function UpgradeConfirmDialog({
   open,
@@ -44,7 +38,7 @@ export function UpgradeConfirmDialog({
           <div className="rounded-lg border bg-primary/5 p-4 space-y-3">
             <h3 className="text-sm font-semibold">What you get</h3>
             <ul className="space-y-2">
-              {UPGRADE_BENEFITS.map((benefit) => (
+              {PAID_PLAN_FEATURES.map((benefit) => (
                 <li key={benefit} className="flex items-start gap-2 text-sm">
                   <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                   <span>{benefit}</span>
@@ -56,7 +50,7 @@ export function UpgradeConfirmDialog({
           <div className="rounded-lg border p-4 space-y-1">
             <h3 className="text-sm font-semibold">Pricing</h3>
             <p className="text-sm text-muted-foreground">
-              First 1,000 requests/month are free. After that, $0.005 per request.
+              {PAID_PLAN_PRICING}
             </p>
           </div>
         </div>

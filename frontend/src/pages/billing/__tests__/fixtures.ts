@@ -59,30 +59,25 @@ export const paidPlanResponse = {
   },
 };
 
+/** Paid plan where usage exceeds all free plan limits. */
 export const overLimitPaidPlanResponse = {
-  plan: {
-    id: "pay_as_you_go",
-    name: "Pay As You Go",
-    max_requests_per_month: null,
-    max_agents: null,
-    max_standing_approvals: null,
-    max_credentials: null,
-    audit_retention_days: 90,
-  },
-  subscription: {
-    status: "active" as const,
-    current_period_start: "2026-03-01T00:00:00Z",
-    current_period_end: "2026-04-01T00:00:00Z",
-    has_payment_method: true,
-    can_upgrade: false,
-    can_downgrade: true,
-    grace_period_ends_at: null,
-  },
+  ...paidPlanResponse,
   usage: {
-    requests: 1542,
-    agents: 5,
-    standing_approvals: 10,
-    credentials: 8,
+    requests: 3000,
+    agents: 10,
+    standing_approvals: 25,
+    credentials: 20,
+  },
+};
+
+/** Paid plan where usage is exactly at free plan limits (no warnings expected). */
+export const atLimitPaidPlanResponse = {
+  ...paidPlanResponse,
+  usage: {
+    requests: 1000,
+    agents: 3,
+    standing_approvals: 5,
+    credentials: 5,
   },
 };
 

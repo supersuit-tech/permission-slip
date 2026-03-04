@@ -12,6 +12,7 @@ import {
 import { useUpgradePlan } from "@/hooks/useUpgradePlan";
 import type { Plan } from "@/hooks/useBillingPlan";
 import { isSafeUrl } from "./formatters";
+import { PAID_PLAN_FEATURES } from "./constants";
 import { UpgradeConfirmDialog } from "./UpgradeConfirmDialog";
 
 interface UpgradeCTAProps {
@@ -35,10 +36,7 @@ function buildCurrentFeatures(plan: Plan): string[] {
 
 const PAID_FEATURES = [
   "Unlimited requests (pay per use)",
-  "Unlimited agents",
-  "Unlimited standing approvals",
-  "Unlimited credentials",
-  "90-day audit retention",
+  ...PAID_PLAN_FEATURES,
 ];
 
 function FeatureList({ features, variant }: { features: string[]; variant: "free" | "paid" }) {
@@ -63,13 +61,14 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
   async function handleUpgrade() {
     try {
       const result = await upgrade();
-      if (result?.checkout_url) {
-        if (!isSafeUrl(result.checkout_url)) {
-          throw new Error("Invalid checkout URL received");
-        }
-        setIsRedirecting(true);
-        window.location.href = result.checkout_url;
+      if (!result?.checkout_url) {
+        throw new Error("No checkout URL returned. Please try again.");
       }
+      if (!isSafeUrl(result.checkout_url)) {
+        throw new Error("Invalid checkout URL received");
+      }
+      setIsRedirecting(true);
+      window.location.href = result.checkout_url;
     } catch (err) {
       setShowConfirm(false);
       toast.error(

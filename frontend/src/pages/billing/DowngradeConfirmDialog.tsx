@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { UsageSummary } from "@/hooks/useBillingPlan";
+import { FREE_PLAN_LIMITS } from "./constants";
 
 interface DowngradeConfirmDialogProps {
   open: boolean;
@@ -23,36 +25,34 @@ interface LimitWarning {
   resource: string;
   current: number;
   limit: number;
+  managePath: string;
 }
-
-const FREE_LIMITS = {
-  agents: { label: "agents", limit: 3 },
-  standing_approvals: { label: "standing approvals", limit: 5 },
-  credentials: { label: "credentials", limit: 5 },
-} as const;
 
 function buildLimitWarnings(usage: UsageSummary | null): LimitWarning[] {
   if (!usage) return [];
   const warnings: LimitWarning[] = [];
-  if (usage.agents > FREE_LIMITS.agents.limit) {
+  if (usage.agents > FREE_PLAN_LIMITS.agents.limit) {
     warnings.push({
-      resource: FREE_LIMITS.agents.label,
+      resource: FREE_PLAN_LIMITS.agents.label,
       current: usage.agents,
-      limit: FREE_LIMITS.agents.limit,
+      limit: FREE_PLAN_LIMITS.agents.limit,
+      managePath: FREE_PLAN_LIMITS.agents.managePath,
     });
   }
-  if (usage.standing_approvals > FREE_LIMITS.standing_approvals.limit) {
+  if (usage.standing_approvals > FREE_PLAN_LIMITS.standing_approvals.limit) {
     warnings.push({
-      resource: FREE_LIMITS.standing_approvals.label,
+      resource: FREE_PLAN_LIMITS.standing_approvals.label,
       current: usage.standing_approvals,
-      limit: FREE_LIMITS.standing_approvals.limit,
+      limit: FREE_PLAN_LIMITS.standing_approvals.limit,
+      managePath: FREE_PLAN_LIMITS.standing_approvals.managePath,
     });
   }
-  if (usage.credentials > FREE_LIMITS.credentials.limit) {
+  if (usage.credentials > FREE_PLAN_LIMITS.credentials.limit) {
     warnings.push({
-      resource: FREE_LIMITS.credentials.label,
+      resource: FREE_PLAN_LIMITS.credentials.label,
       current: usage.credentials,
-      limit: FREE_LIMITS.credentials.limit,
+      limit: FREE_PLAN_LIMITS.credentials.limit,
+      managePath: FREE_PLAN_LIMITS.credentials.managePath,
     });
   }
   return warnings;
@@ -84,16 +84,21 @@ export function DowngradeConfirmDialog({
           {hasWarnings && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-2 dark:border-amber-800 dark:bg-amber-950">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                 <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
                   You&apos;re over free plan limits
                 </p>
               </div>
-              <ul className="ml-6 space-y-1">
+              <ul className="ml-6 space-y-1.5">
                 {warnings.map((w) => (
                   <li key={w.resource} className="text-sm text-amber-800 dark:text-amber-200">
-                    You have {w.current} {w.resource}. Free tier allows {w.limit}.
-                    You&apos;ll need to remove {w.current - w.limit} before downgrading.
+                    You have {w.current} {w.resource}. Free tier allows {w.limit}.{" "}
+                    <Link
+                      to={w.managePath}
+                      className="underline font-medium hover:text-amber-900 dark:hover:text-amber-100"
+                    >
+                      Manage {w.resource}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -104,7 +109,11 @@ export function DowngradeConfirmDialog({
             <p className="text-sm font-medium">What changes</p>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>Audit retention drops from 90 days to 7 days</li>
-              <li>Resource limits will be enforced (3 agents, 5 approvals, 5 credentials)</li>
+              <li>
+                Resource limits will be enforced ({FREE_PLAN_LIMITS.agents.limit} agents,{" "}
+                {FREE_PLAN_LIMITS.standing_approvals.limit} approvals,{" "}
+                {FREE_PLAN_LIMITS.credentials.limit} credentials)
+              </li>
               <li>1,000 request/month limit</li>
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
