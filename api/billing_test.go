@@ -13,6 +13,184 @@ import (
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 )
 
+// ── GET /billing/plan ──────────────────────────────────────────────────────
+
+func TestGetBillingPlan_ReturnsPlanSubscriptionUsage(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Create agents, standing approvals, credentials, and requests.
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
+	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, "github")
+
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	for i := 0; i < 3; i++ {
+		if _, err := db.IncrementRequestCount(ctx, tx, uid, periodStart, periodEnd); err != nil {
+			t.Fatalf("IncrementRequestCount: %v", err)
+		}
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	// Plan fields.
+	if resp.Plan.ID != db.PlanFree {
+		t.Errorf("expected plan.id=%s, got %s", db.PlanFree, resp.Plan.ID)
+	}
+	if resp.Plan.Name == "" {
+		t.Error("expected plan.name to be non-empty")
+	}
+	if resp.Plan.AuditRetentionDays == 0 {
+		t.Error("expected plan.audit_retention_days > 0")
+	}
+
+	// Subscription fields.
+	if resp.Subscription.Status != "active" {
+		t.Errorf("expected subscription.status=active, got %s", resp.Subscription.Status)
+	}
+	if !resp.Subscription.CanUpgrade {
+		t.Error("expected subscription.can_upgrade=true for free plan")
+	}
+	if resp.Subscription.CanDowngrade {
+		t.Error("expected subscription.can_downgrade=false for free plan")
+	}
+
+	// Usage fields.
+	if resp.Usage.Requests != 3 {
+		t.Errorf("expected usage.requests=3, got %d", resp.Usage.Requests)
+	}
+	if resp.Usage.Agents != 1 {
+		t.Errorf("expected usage.agents=1, got %d", resp.Usage.Agents)
+	}
+	if resp.Usage.StandingApprovals != 1 {
+		t.Errorf("expected usage.standing_approvals=1, got %d", resp.Usage.StandingApprovals)
+	}
+	if resp.Usage.Credentials != 1 {
+		t.Errorf("expected usage.credentials=1, got %d", resp.Usage.Credentials)
+	}
+}
+
+func TestGetBillingPlan_NoSubscription(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetBillingPlan_ZeroUsage(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Usage.Requests != 0 {
+		t.Errorf("expected usage.requests=0, got %d", resp.Usage.Requests)
+	}
+	if resp.Usage.Agents != 0 {
+		t.Errorf("expected usage.agents=0, got %d", resp.Usage.Agents)
+	}
+	if resp.Usage.StandingApprovals != 0 {
+		t.Errorf("expected usage.standing_approvals=0, got %d", resp.Usage.StandingApprovals)
+	}
+	if resp.Usage.Credentials != 0 {
+		t.Errorf("expected usage.credentials=0, got %d", resp.Usage.Credentials)
+	}
+}
+
+func TestGetBillingPlan_PaidPlan(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+
+	// Set Stripe customer ID to verify has_payment_method.
+	customerID := "cus_test_plan"
+	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &customerID, nil); err != nil {
+		t.Fatalf("UpdateSubscriptionStripe: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Plan.ID != db.PlanPayAsYouGo {
+		t.Errorf("expected plan.id=%s, got %s", db.PlanPayAsYouGo, resp.Plan.ID)
+	}
+	if resp.Subscription.CanUpgrade {
+		t.Error("expected can_upgrade=false for paid plan")
+	}
+	if !resp.Subscription.CanDowngrade {
+		t.Error("expected can_downgrade=true for paid plan")
+	}
+	if !resp.Subscription.HasPaymentMethod {
+		t.Error("expected has_payment_method=true when stripe_customer_id is set")
+	}
+}
+
+// ── GET /billing/subscription ─────────────────────────────────────────────
+
 func TestGetSubscription_ReturnsSubscription(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
