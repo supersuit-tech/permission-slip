@@ -150,20 +150,22 @@ describe("useNotifications", () => {
   it("sets error when not on a physical device", async () => {
     Object.defineProperty(Device, "isDevice", { value: false, writable: true });
 
-    const { capture, Consumer } = createHookCapture();
-    await act(async () => {
-      renderer = create(createElement(Consumer));
-    });
+    try {
+      const { capture, Consumer } = createHookCapture();
+      await act(async () => {
+        renderer = create(createElement(Consumer));
+      });
 
-    let token: string | null = "placeholder";
-    await act(async () => {
-      token = await capture.registerForPushNotifications();
-    });
+      let token: string | null = "placeholder";
+      await act(async () => {
+        token = await capture.registerForPushNotifications();
+      });
 
-    expect(token).toBeNull();
-    expect(capture.error).toBe("Push notifications require a physical device");
-
-    Object.defineProperty(Device, "isDevice", { value: true, writable: true });
+      expect(token).toBeNull();
+      expect(capture.error).toBe("Push notifications require a physical device");
+    } finally {
+      Object.defineProperty(Device, "isDevice", { value: true, writable: true });
+    }
   });
 
   it("sets error when token retrieval fails", async () => {
@@ -187,42 +189,46 @@ describe("useNotifications", () => {
     const originalOS = Platform.OS;
     Object.defineProperty(Platform, "OS", { value: "android", writable: true });
 
-    const { capture, Consumer } = createHookCapture();
-    await act(async () => {
-      renderer = create(createElement(Consumer));
-    });
+    try {
+      const { capture, Consumer } = createHookCapture();
+      await act(async () => {
+        renderer = create(createElement(Consumer));
+      });
 
-    await act(async () => {
-      await capture.registerForPushNotifications();
-    });
+      await act(async () => {
+        await capture.registerForPushNotifications();
+      });
 
-    expect(mockSetChannel).toHaveBeenCalledWith(
-      "approval-requests",
-      expect.objectContaining({
-        name: "Approval Requests",
-        importance: Notifications.AndroidImportance.HIGH,
-      }),
-    );
-
-    Object.defineProperty(Platform, "OS", { value: originalOS, writable: true });
+      expect(mockSetChannel).toHaveBeenCalledWith(
+        "approval-requests",
+        expect.objectContaining({
+          name: "Approval Requests",
+          importance: Notifications.AndroidImportance.HIGH,
+        }),
+      );
+    } finally {
+      Object.defineProperty(Platform, "OS", { value: originalOS, writable: true });
+    }
   });
 
   it("does not create Android channel on iOS", async () => {
     const originalOS = Platform.OS;
     Object.defineProperty(Platform, "OS", { value: "ios", writable: true });
 
-    const { capture, Consumer } = createHookCapture();
-    await act(async () => {
-      renderer = create(createElement(Consumer));
-    });
+    try {
+      const { capture, Consumer } = createHookCapture();
+      await act(async () => {
+        renderer = create(createElement(Consumer));
+      });
 
-    await act(async () => {
-      await capture.registerForPushNotifications();
-    });
+      await act(async () => {
+        await capture.registerForPushNotifications();
+      });
 
-    expect(mockSetChannel).not.toHaveBeenCalled();
-
-    Object.defineProperty(Platform, "OS", { value: originalOS, writable: true });
+      expect(mockSetChannel).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(Platform, "OS", { value: originalOS, writable: true });
+    }
   });
 
   it("sets up and cleans up notification listeners", async () => {

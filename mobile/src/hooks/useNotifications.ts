@@ -30,15 +30,6 @@ export interface NotificationState {
   error: string | null;
 }
 
-/**
- * Requests push notification permissions and retrieves the Expo push token.
- *
- * Returns the token, permission status, error state, and a ref for the most
- * recent notification response (for deep-link handling by callers).
- *
- * @param projectId - The Expo project ID (from app.json extra or Constants).
- *   Optional — Expo infers it in managed workflow builds.
- */
 export interface UseNotificationsOptions {
   /** Expo project ID. Optional — inferred in managed workflow builds. */
   projectId?: string;
