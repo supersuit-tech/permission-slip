@@ -36,6 +36,26 @@
                                                 └───────────────┘
 ```
 
+## Service Directory
+
+Quick reference of every service in the production stack. See detailed sections below for setup instructions.
+
+| # | Service | What it does | Status |
+|---|---|---|---|
+| 1 | [**Fly.io**](#flyio-compute) | Compute — hosts the Go+React app | Live |
+| 2 | [**Supabase**](#supabase-auth--database--vault) | Auth (email OTP + MFA), PostgreSQL, credential vault | Live |
+| 3 | [**Cloudflare**](#cloudflare-dns--proxy--web-analytics) | DNS proxy, TLS termination, Web Analytics | Live |
+| 4 | [**Sentry**](#sentry-error-tracking) | Error tracking (backend + frontend) + CSP violation reports | Live |
+| 5 | [**Twilio SendGrid**](#notification-services) | Email delivery for approval notifications | Live |
+| 6 | [**Twilio**](#notification-services) | SMS delivery for approval notifications | Live |
+| 7 | [**VAPID / Web Push**](#notification-services) | Browser push notifications (FCM / Mozilla Push) | Live |
+| 8 | [**Expo Push Service**](#notification-services) | Mobile push notifications (iOS + Android via Expo) | Live |
+| 9 | [**GitHub Actions**](#cicd-pipeline) | CI (tests, build, audit) + planned CD | Live |
+| 10 | [**PostHog**](#posthog-product-analytics) | Product analytics + session replay | Planned |
+| 11 | [**Better Stack**](#better-stack--logtail-log-aggregation) | Log aggregation + alerting | Planned |
+| 12 | [**UptimeRobot**](#uptimerobot-uptime-monitoring) | Uptime monitoring + public status page | Planned |
+| 13 | [**Stripe**](#stripe-billing--payments) | Billing, subscriptions, usage-based payments | Planned |
+
 ## Services
 
 ### Fly.io (Compute)
@@ -168,6 +188,12 @@ fly deploy \
 - No external account or signup needed — VAPID keys are a self-generated key pair
 - VAPID key pair must be consistent across all instances
 
+**Mobile Push — Expo Push Service:**
+- Push notifications to the Permission Slip mobile app (iOS + Android)
+- Uses Expo's push notification infrastructure — no direct APNs/FCM setup needed
+- Works without an access token (lower rate limits); set `EXPO_ACCESS_TOKEN` for production throughput
+- The server discovers registered Expo push tokens for each user automatically
+
 **Fly.io setup:**
 
 ```bash
@@ -188,6 +214,10 @@ fly secrets set \
   VAPID_PUBLIC_KEY="<base64url public key>" \
   VAPID_PRIVATE_KEY="<base64url private key>" \
   VAPID_SUBJECT="mailto:admin@supersuit.tech"
+
+# Mobile Push (Expo) — optional but recommended for production rate limits
+fly secrets set \
+  EXPO_ACCESS_TOKEN="<access token from expo.dev>"
 ```
 
 ### PostHog (Product Analytics)
@@ -393,6 +423,11 @@ fly secrets set \
   VAPID_PRIVATE_KEY="<base64url private key>" \
   VAPID_SUBJECT="mailto:admin@supersuit.tech"
 
+# ── Mobile Push (Expo) — optional ────────────────────────────────────────
+
+fly secrets set \
+  EXPO_ACCESS_TOKEN="<access token from expo.dev>"
+
 # ── Email (SendGrid) ─────────────────────────────────────────────────────
 
 fly secrets set \
@@ -474,6 +509,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `VAPID_PUBLIC_KEY` | Runtime secret | **Required** | Web Push public key |
 | `VAPID_PRIVATE_KEY` | Runtime secret | **Required** | Web Push private key |
 | `VAPID_SUBJECT` | Runtime secret | **Required** | `mailto:admin@supersuit.tech` |
+| `EXPO_ACCESS_TOKEN` | Runtime secret | **Optional** | Expo push notification access token (higher rate limits) |
 | `NOTIFICATION_EMAIL_PROVIDER` | Runtime secret | **Set** | `twilio-sendgrid` |
 | `SENDGRID_API_KEY` | Runtime secret | **Set** | SendGrid API key |
 | `NOTIFICATION_EMAIL_FROM` | Runtime secret | **Set** | Sender address |
@@ -823,6 +859,7 @@ Quick reference for what's live vs. planned.
 | **SendGrid** | Email notifications | Live | — |
 | **Twilio** | SMS notifications | Live | — |
 | **VAPID / Web Push** | Browser push notifications | Live | — |
+| **Expo Push Service** | Mobile push notifications (iOS + Android) | Live | — |
 | **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352) |
 | **Better Stack** | Log aggregation + alerting | Planned | [#331](https://github.com/supersuit-tech/permission-slip-web/issues/331) |
 | **UptimeRobot** | Uptime monitoring + status page | Planned | [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332) |
