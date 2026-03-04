@@ -17,9 +17,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "dev.permissionslip.mobile",
+      "bundleIdentifier": "dev.permissionslip.app",
+      "associatedDomains": ["applinks:app.permissionslip.dev"],
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "NSFaceIDUsageDescription": "Authenticate with Face ID to access Permission Slip"
       }
     },
     "plugins": [
@@ -30,16 +32,31 @@
           "color": "#1A1A2E"
         }
       ],
+      "expo-local-authentication",
       "expo-updates"
     ],
     "android": {
-      "package": "dev.permissionslip.mobile",
+      "package": "dev.permissionslip.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.permissionslip.dev",
+              "pathPrefix": "/permission-slip/approve/"
+            }
+          ],
+          "category": ["DEFAULT", "BROWSABLE"]
+        }
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {

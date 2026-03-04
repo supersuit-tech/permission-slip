@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
@@ -103,7 +104,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       const result = await approveApproval(approval.approval_id);
       setResolvedAt(new Date().toISOString());
       setConfirmationCode(result.confirmation_code);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const message =
         err instanceof Error ? err.message : "Failed to approve request";
       Alert.alert("Approval Failed", message);
@@ -124,7 +127,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
               await denyApproval(approval.approval_id);
               setResolvedAt(new Date().toISOString());
               setIsDenied(true);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (err) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               const message =
                 err instanceof Error ? err.message : "Failed to deny request";
               Alert.alert("Denial Failed", message);
@@ -269,7 +274,8 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             )}
 
             {approval.context.risk_level &&
-              approval.context.risk_level !== "low" && (
+              approval.context.risk_level !== "low" &&
+              RISK_DESCRIPTIONS[approval.context.risk_level] != null && (
                 <View style={styles.riskRow}>
                   <Text style={styles.riskDescription}>
                     {RISK_DESCRIPTIONS[approval.context.risk_level]}
