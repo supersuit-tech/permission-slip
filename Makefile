@@ -1,6 +1,11 @@
 .PHONY: dev dev-backend dev-frontend build run install setup \
        test test-backend test-frontend test-integration typecheck \
        mobile-install mobile-start mobile-test mobile-typecheck \
+       mobile-build-dev mobile-build-preview mobile-build-prod \
+       mobile-build-dev-ios mobile-build-dev-android \
+       mobile-build-preview-ios mobile-build-preview-android \
+       mobile-submit mobile-update \
+       generate-frontend generate-mobile \
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
        audit audit-backend audit-frontend audit-mobile \
@@ -35,12 +40,17 @@ dev-frontend:
 bundle:
 	npx @redocly/cli@2.19.1 bundle spec/openapi/openapi.yaml -o spec/openapi/openapi.bundle.yaml
 
-# Generate typed API client from the bundled OpenAPI spec
-generate: bundle
+# Generate typed API clients from the bundled OpenAPI spec
+generate: generate-frontend generate-mobile
+
+generate-frontend: bundle
 	cd frontend && npm run generate:api
 
+generate-mobile: bundle
+	cd mobile && npm run generate:api
+
 # Type-check frontend (generates API client first, then runs tsc --noEmit)
-typecheck: generate
+typecheck: generate-frontend
 	cd frontend && npx tsc --noEmit
 
 # Build for production (generates API client first, then compiles)
@@ -118,6 +128,34 @@ mobile-test:
 # Type-check mobile app (no emit, just validate)
 mobile-typecheck:
 	cd mobile && npx tsc --noEmit
+
+# EAS Build: development (simulator/internal distribution)
+mobile-build-dev:
+	cd mobile && npx eas-cli build --profile development --platform all
+mobile-build-dev-ios:
+	cd mobile && npx eas-cli build --profile development --platform ios
+mobile-build-dev-android:
+	cd mobile && npx eas-cli build --profile development --platform android
+
+# EAS Build: preview (internal distribution for testers)
+mobile-build-preview:
+	cd mobile && npx eas-cli build --profile preview --platform all
+mobile-build-preview-ios:
+	cd mobile && npx eas-cli build --profile preview --platform ios
+mobile-build-preview-android:
+	cd mobile && npx eas-cli build --profile preview --platform android
+
+# EAS Build: production (App Store / Google Play)
+mobile-build-prod:
+	cd mobile && npx eas-cli build --profile production --platform all
+
+# EAS Submit: upload latest production build to app stores
+mobile-submit:
+	cd mobile && npx eas-cli submit --profile production --platform all
+
+# EAS Update: publish OTA update to the production channel
+mobile-update:
+	cd mobile && npx eas-cli update --channel production
 
 # ---------- Dependency Audit ----------
 

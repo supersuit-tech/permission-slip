@@ -252,12 +252,11 @@ describe("ApprovalDetailScreen", () => {
     expect(hasTestId(renderer, "approve-button")).toBe(false);
   });
 
-  it("shows confirmation code after successful approval", async () => {
+  it("shows success banner after successful approval", async () => {
     mockApproveApproval.mockResolvedValueOnce({
       approval_id: "appr_test123",
       status: "approved",
       approved_at: new Date().toISOString(),
-      confirmation_code: "RK3-P7M",
     });
 
     const approval = makeApproval();
@@ -272,33 +271,10 @@ describe("ApprovalDetailScreen", () => {
     });
 
     const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain("RK3-P7M");
-    expect(json).toContain("Confirmation Code");
     expect(json).toContain("Request Approved");
 
     // Approve/deny buttons should be gone
     expect(hasTestId(renderer, "approve-button")).toBe(false);
-  });
-
-  it("shows copy button for confirmation code", async () => {
-    mockApproveApproval.mockResolvedValueOnce({
-      approval_id: "appr_test123",
-      status: "approved",
-      approved_at: new Date().toISOString(),
-      confirmation_code: "XK7-M9P",
-    });
-
-    const approval = makeApproval();
-    await act(async () => {
-      renderer = renderDetail(approval);
-    });
-
-    const approveButton = findFirstByTestId(renderer, "approve-button");
-    await act(async () => {
-      approveButton?.props.onPress();
-    });
-
-    expect(hasTestId(renderer, "copy-code-button")).toBe(true);
   });
 
   it("shows alert on approve failure", async () => {
@@ -395,7 +371,6 @@ describe("ApprovalDetailScreen", () => {
       approval_id: "appr_test123",
       status: "approved",
       approved_at: new Date().toISOString(),
-      confirmation_code: "AB3-CD5",
     });
 
     const approval = makeApproval();
@@ -440,7 +415,6 @@ describe("ApprovalDetailScreen", () => {
       approval_id: "appr_test123",
       status: "approved",
       approved_at: new Date().toISOString(),
-      confirmation_code: "AB3-CD5",
     });
 
     const approval = makeApproval();
@@ -461,13 +435,11 @@ describe("ApprovalDetailScreen", () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it("copies confirmation code to clipboard", async () => {
-    const Clipboard = require("expo-clipboard");
+  it("hides action buttons after successful approval", async () => {
     mockApproveApproval.mockResolvedValueOnce({
       approval_id: "appr_test123",
       status: "approved",
       approved_at: new Date().toISOString(),
-      confirmation_code: "XK7-M9P",
     });
 
     const approval = makeApproval();
@@ -475,16 +447,16 @@ describe("ApprovalDetailScreen", () => {
       renderer = renderDetail(approval);
     });
 
+    // Buttons should exist before approval
+    expect(hasTestId(renderer, "approve-button")).toBe(true);
+
     const approveButton = findFirstByTestId(renderer, "approve-button");
     await act(async () => {
       approveButton?.props.onPress();
     });
 
-    const copyButton = findFirstByTestId(renderer, "copy-code-button");
-    await act(async () => {
-      copyButton?.props.onPress();
-    });
-
-    expect(Clipboard.setStringAsync).toHaveBeenCalledWith("XK7-M9P");
+    // Buttons should be gone after approval
+    expect(hasTestId(renderer, "approve-button")).toBe(false);
+    expect(hasTestId(renderer, "deny-button")).toBe(false);
   });
 });

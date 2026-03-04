@@ -3,6 +3,9 @@
     "name": "Permission Slip",
     "slug": "permission-slip",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "scheme": "permissionslip",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,7 +32,8 @@
           "color": "#1A1A2E"
         }
       ],
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "expo-updates"
     ],
     "android": {
       "package": "dev.permissionslip.app",
@@ -57,6 +61,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/${EXPO_PROJECT_ID}",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
     }
   }
 }
