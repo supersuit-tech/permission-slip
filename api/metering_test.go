@@ -166,39 +166,6 @@ func TestMetering_AgentStandingExecutionIncrementsUsage(t *testing.T) {
 	)
 }
 
-// ── Token-based execution is NOT billable ───────────────────────────────────
-
-func TestMetering_TokenExecutionDoesNotIncrementUsage(t *testing.T) {
-	t.Parallel()
-	tx, deps, router, agentID, privKey, apprID, jti := setupExecuteTest(t)
-
-	// The approval request already happened in setupExecuteTest (via direct DB
-	// insert), so no usage_period row should exist yet.
-	userID := userIDFromApproval(t, tx, apprID)
-	testhelper.RequireUsageCount(t, tx, userID, 0)
-
-	params := json.RawMessage(`{"to":"alice@example.com"}`)
-	hash, err := HashParameters(params)
-	if err != nil {
-		t.Fatalf("HashParameters: %v", err)
-	}
-
-	token := mintTestActionToken(t, deps.ActionTokenSigningKey, deps.ActionTokenKeyID,
-		agentID, apprID, "email.send", "1", hash, jti, time.Now().Add(5*time.Minute))
-
-	reqBody := fmt.Sprintf(`{"token":%q,"action_id":"email.send","parameters":{"to":"alice@example.com"}}`, token)
-	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Token-based execution is NOT billable — usage should remain 0.
-	testhelper.RequireUsageCount(t, tx, userID, 0)
-}
-
 // userIDFromApproval looks up the approver_id for a given approval.
 func userIDFromApproval(t *testing.T, d db.DBTX, approvalID string) string {
 	t.Helper()
@@ -256,7 +223,7 @@ func TestMetering_DuplicateStandingExecutionDoesNotDoubleCount(t *testing.T) {
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalWithActionType(t, pu.Pool, saID, pu.AgentID, pu.UserID, "email.read")
 
-	deps := testDepsWithSigningKey(t, pu.Pool)
+	deps := testDepsForDB(t, pu.Pool)
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"dedup_sa_001","action":{"type":"email.read","version":"1","parameters":{}}}`
@@ -335,7 +302,7 @@ func TestMetering_ApproveDoesNotIncrementUsage(t *testing.T) {
 
 func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 	t.Parallel()
-	// Uses testDepsWithSigningKey for action token support (standing execution).
+	// Uses testDepsForDB for standing execution test deps.
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -349,7 +316,7 @@ func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "email.read")
 
-	deps := testDepsWithSigningKey(t, tx)
+	deps := testDepsForDB(t, tx)
 	router := NewRouter(deps)
 
 	// 1. Submit approval request (billable).

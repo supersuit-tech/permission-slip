@@ -1,7 +1,6 @@
 package api
 
 import (
-	"crypto/ecdsa"
 	"log/slog"
 	"net/http"
 
@@ -34,8 +33,6 @@ type Deps struct {
 	AgentRateLimiter      *RateLimiter         // post-auth rate limiter (per verified agent); nil disables
 	TrustedProxyHeader    string               // header to read client IP from behind a reverse proxy (e.g. "Fly-Client-IP"); empty uses RemoteAddr
 	AllowedOrigins        []string             // allowed CORS origins; empty means cross-origin requests are blocked
-	ActionTokenSigningKey *ecdsa.PrivateKey     // ECDSA P-256 private key for signing action tokens (ES256); auto-generated at startup
-	ActionTokenKeyID      string               // Key ID for the action token signing key; used in JWT "kid" header
 	Logger                *slog.Logger         // structured logger for request logging; if nil, request logging is skipped
 	ApprovalEvents        *ApprovalEventBroker // SSE broker for real-time approval notifications; nil disables SSE
 }

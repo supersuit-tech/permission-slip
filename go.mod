@@ -6,7 +6,6 @@ toolchain go1.24.13
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
-	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 	github.com/getsentry/sentry-go v0.43.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
