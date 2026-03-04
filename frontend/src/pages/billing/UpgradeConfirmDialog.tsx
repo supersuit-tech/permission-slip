@@ -59,9 +59,9 @@ export function UpgradeConfirmDialog({
           </Button>
           <Button onClick={onConfirm} disabled={isPending}>
             {isPending ? (
-              <Loader2 className="animate-spin" />
+              <Loader2 className="animate-spin" aria-hidden="true" />
             ) : (
-              <ArrowUpRight />
+              <ArrowUpRight aria-hidden="true" />
             )}
             Continue to Checkout
           </Button>

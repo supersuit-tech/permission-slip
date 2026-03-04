@@ -28,6 +28,7 @@ interface LimitWarning {
   managePath: string;
 }
 
+/** Compare current usage against free plan limits and return warnings for resources over the limit. */
 function buildLimitWarnings(usage: UsageSummary | null): LimitWarning[] {
   if (!usage) return [];
   const warnings: LimitWarning[] = [];
@@ -140,7 +141,7 @@ export function DowngradeConfirmDialog({
             onClick={onConfirm}
             disabled={isPending || hasWarnings}
           >
-            {isPending && <Loader2 className="animate-spin" />}
+            {isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
             Confirm Downgrade
           </Button>
         </DialogFooter>

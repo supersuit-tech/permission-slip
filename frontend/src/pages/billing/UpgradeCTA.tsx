@@ -72,7 +72,7 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Sparkles className="text-muted-foreground size-5" />
+            <Sparkles className="text-muted-foreground size-5" aria-hidden="true" />
             <CardTitle>Upgrade Your Plan</CardTitle>
           </div>
           <CardDescription>
@@ -95,9 +95,9 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
           <div className="mt-6 flex justify-end">
             <Button onClick={() => setShowConfirm(true)} disabled={isPending}>
               {isPending ? (
-                <Loader2 className="animate-spin" />
+                <Loader2 className="animate-spin" aria-hidden="true" />
               ) : (
-                <ArrowUpRight />
+                <ArrowUpRight aria-hidden="true" />
               )}
               {isRedirecting ? "Redirecting…" : "Upgrade to Pay-as-you-go"}
             </Button>

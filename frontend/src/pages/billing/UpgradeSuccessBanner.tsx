@@ -12,10 +12,10 @@ export function UpgradeSuccessBanner({ onDismiss }: UpgradeSuccessBannerProps) {
         className="absolute top-3 right-3 text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200"
         aria-label="Dismiss success message"
       >
-        <X className="size-4" />
+        <X className="size-4" aria-hidden="true" />
       </button>
       <div className="flex items-start gap-3 pr-6">
-        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
         <div className="space-y-1">
           <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
             Welcome to Pay-as-you-go!
