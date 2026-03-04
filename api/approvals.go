@@ -36,11 +36,12 @@ type approvalListResponse struct {
 }
 
 type approveResponse struct {
-	ApprovalID      string           `json:"approval_id"`
-	Status          string           `json:"status"`
-	ApprovedAt      time.Time        `json:"approved_at"`
-	ExecutionStatus *string          `json:"execution_status,omitempty"`
-	ExecutionResult *json.RawMessage `json:"execution_result,omitempty"`
+	ApprovalID       string           `json:"approval_id"`
+	Status           string           `json:"status"`
+	ApprovedAt       time.Time        `json:"approved_at"`
+	ConfirmationCode string           `json:"confirmation_code"`
+	ExecutionStatus  *string          `json:"execution_status,omitempty"`
+	ExecutionResult  *json.RawMessage `json:"execution_result,omitempty"`
 }
 
 type denyResponse struct {
@@ -139,6 +140,15 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Generate an ephemeral confirmation code for the approver to share
+		// with the agent as a visual receipt of the approval.
+		confirmCode, err := generateConfirmationCodePlaintext()
+		if err != nil {
+			log.Printf("[%s] generateConfirmationCodePlaintext: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to generate confirmation code"))
+			return
+		}
+
 		// Execute the action via the connector now that the approval is granted.
 		// Detach from the request context so a client disconnect doesn't abort
 		// the connector call or DB update mid-flight.
@@ -154,10 +164,11 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 		notifyApprovalExecuted(deps, profile.ID, appr.ApprovalID, execStatus)
 
 		resp := approveResponse{
-			ApprovalID:      appr.ApprovalID,
-			Status:          appr.Status,
-			ApprovedAt:      *appr.ApprovedAt,
-			ExecutionStatus: &execStatus,
+			ApprovalID:       appr.ApprovalID,
+			Status:           appr.Status,
+			ApprovedAt:       *appr.ApprovedAt,
+			ConfirmationCode: confirmCode,
+			ExecutionStatus:  &execStatus,
 		}
 		if execResultJSON != nil {
 			raw := json.RawMessage(execResultJSON)

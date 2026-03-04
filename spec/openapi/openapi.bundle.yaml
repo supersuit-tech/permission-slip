@@ -2524,6 +2524,7 @@ paths:
                     approval_id: appr_xyz789
                     status: approved
                     approved_at: '2026-02-21T10:30:00Z'
+                    confirmation_code: RK3-P7M
                     execution_status: success
                     execution_result:
                       message_id: msg_abc123
@@ -2534,6 +2535,7 @@ paths:
                     approval_id: appr_xyz789
                     status: approved
                     approved_at: '2026-02-21T10:30:00Z'
+                    confirmation_code: RK3-P7M
                     execution_status: error
                     execution_result:
                       error: upstream_error
@@ -5732,6 +5734,7 @@ components:
         - approval_id
         - status
         - approved_at
+        - confirmation_code
         - execution_status
       properties:
         approval_id:
@@ -5749,6 +5752,14 @@ components:
           format: date-time
           description: When the approval was approved
           example: '2026-02-21T10:30:00Z'
+        confirmation_code:
+          type: string
+          description: |
+            Ephemeral confirmation code in `XXX-XXX` format. Displayed to the
+            approver as a visual receipt and shared with the agent to confirm
+            the approval. Generated at approval time and not persisted.
+          pattern: ^[A-Z2-9]{3}-[A-Z2-9]{3}$
+          example: RK3-P7M
         execution_status:
           $ref: '#/components/schemas/ExecutionStatus'
         execution_result:
