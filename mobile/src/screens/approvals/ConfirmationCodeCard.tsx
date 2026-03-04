@@ -2,7 +2,7 @@
  * Displays the confirmation code after an approval in a large, prominent card.
  * The code is shown in XXX-XXX format with a copy-to-clipboard button.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { colors } from "../../theme/colors";
@@ -13,11 +13,16 @@ interface ConfirmationCodeCardProps {
 
 export function ConfirmationCodeCard({ code }: ConfirmationCodeCardProps) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Clean up timer on unmount to prevent state updates after navigation.
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 2000);
   }, [code]);
 
   return (

@@ -2,13 +2,14 @@
  * React Query mutation hook for approving an approval request.
  * Returns the confirmation code on success (XXX-XXX format).
  */
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
 import { getApiErrorMessage } from "../api/errors";
 
 export function useApproveApproval() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (approvalId: string) => {
@@ -30,9 +31,11 @@ export function useApproveApproval() {
       }
       return data;
     },
-    // No query invalidation — the detail screen stays visible so the user
-    // can read/copy the confirmation code. The 30-second polling in
-    // useApprovals handles eventual list updates.
+    onSuccess: () => {
+      // Invalidate list cache so the approval moves from pending to approved
+      // when the user navigates back.
+      queryClient.invalidateQueries({ queryKey: ["approvals"] });
+    },
   });
 
   return {

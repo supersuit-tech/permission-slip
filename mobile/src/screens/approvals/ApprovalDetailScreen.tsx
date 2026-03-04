@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -74,11 +75,10 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     try {
       const result = await approveApproval(approval.approval_id);
       setConfirmationCode(result.confirmation_code);
-    } catch {
-      Alert.alert(
-        "Approval Failed",
-        "Failed to approve request. The request may have expired or already been resolved.",
-      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to approve request";
+      Alert.alert("Approval Failed", message);
     }
   }, [approveApproval, approval.approval_id]);
 
@@ -95,17 +95,20 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             try {
               await denyApproval(approval.approval_id);
               setIsDenied(true);
-            } catch {
-              Alert.alert(
-                "Denial Failed",
-                "Failed to deny request. The request may have expired or already been resolved.",
-              );
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : "Failed to deny request";
+              Alert.alert("Denial Failed", message);
             }
           },
         },
       ],
     );
   }, [denyApproval, approval.approval_id]);
+
+  const handleDone = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
 
   return (
     <View style={styles.outerContainer}>
@@ -122,17 +125,37 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             <View style={styles.codeSection}>
               <ConfirmationCodeCard code={confirmationCode} />
             </View>
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={handleDone}
+              accessibilityLabel="Done, go back to list"
+              accessibilityRole="button"
+              testID="done-button"
+            >
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Denied confirmation */}
         {isDenied && (
-          <View
-            style={styles.statusBannerDenied}
-            accessibilityRole="alert"
-            testID="denied-banner"
-          >
-            <Text style={styles.statusBannerTextDenied}>Request Denied</Text>
+          <View style={styles.section}>
+            <View
+              style={styles.statusBannerDenied}
+              accessibilityRole="alert"
+              testID="denied-banner"
+            >
+              <Text style={styles.statusBannerTextDenied}>Request Denied</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={handleDone}
+              accessibilityLabel="Done, go back to list"
+              accessibilityRole="button"
+              testID="done-button"
+            >
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -615,6 +638,18 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     textAlign: "center",
     fontFamily: "monospace",
+  },
+  doneButton: {
+    marginTop: 16,
+    backgroundColor: colors.gray900,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  doneButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "600",
   },
   actionBar: {
     backgroundColor: colors.white,

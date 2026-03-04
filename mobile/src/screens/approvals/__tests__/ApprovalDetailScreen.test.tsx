@@ -316,7 +316,7 @@ describe("ApprovalDetailScreen", () => {
 
     expect(alertSpy).toHaveBeenCalledWith(
       "Approval Failed",
-      expect.stringContaining("Failed to approve"),
+      "Approval has expired",
     );
   });
 
@@ -382,10 +382,55 @@ describe("ApprovalDetailScreen", () => {
       await denyAction?.onPress?.();
     });
 
-    // Second alert call should be the error alert
+    // Second alert call should be the error alert with server message
     expect(alertSpy).toHaveBeenCalledWith(
       "Denial Failed",
-      expect.stringContaining("Failed to deny"),
+      "Already resolved",
     );
+  });
+
+  it("shows Done button after approval", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      confirmation_code: "AB3-CD5",
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    expect(hasTestId(renderer, "done-button")).toBe(true);
+  });
+
+  it("shows Done button after denial", async () => {
+    mockDenyApproval.mockResolvedValueOnce(undefined);
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const denyButton = findFirstByTestId(renderer, "deny-button");
+    await act(async () => {
+      denyButton?.props.onPress();
+    });
+
+    const denyAction = alertSpy.mock.calls[0]?.[2]?.find(
+      (btn) => btn.text === "Deny",
+    );
+    await act(async () => {
+      await denyAction?.onPress?.();
+    });
+
+    expect(hasTestId(renderer, "done-button")).toBe(true);
   });
 });
