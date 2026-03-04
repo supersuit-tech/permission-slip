@@ -43,6 +43,10 @@ type checkoutResponse struct {
 	URL string `json:"url"`
 }
 
+// usageResponse is the JSON shape returned by GET /billing/usage.
+// It provides detailed usage metrics for a billing period, including
+// request/SMS totals, overage calculations, and an optional breakdown
+// by agent, connector, and action type.
 type usageResponse struct {
 	PeriodStart time.Time          `json:"period_start"`
 	PeriodEnd   time.Time          `json:"period_end"`
@@ -51,12 +55,17 @@ type usageResponse struct {
 	Breakdown   *usageBreakdownDTO `json:"breakdown,omitempty"`
 }
 
+// usageBreakdownDTO maps identifiers (agent ID, connector ID, action type)
+// to their respective request counts within a billing period. Omitted from
+// the response when no breakdown data has been recorded.
 type usageBreakdownDTO struct {
 	ByAgent      map[string]int `json:"by_agent,omitempty"`
 	ByConnector  map[string]int `json:"by_connector,omitempty"`
 	ByActionType map[string]int `json:"by_action_type,omitempty"`
 }
 
+// requestsUsage holds request count metrics for a billing period.
+// CostCents is the estimated overage cost at $0.005/request, rounded up.
 type requestsUsage struct {
 	Total     int `json:"total"`
 	Included  int `json:"included"`
@@ -64,6 +73,8 @@ type requestsUsage struct {
 	CostCents int `json:"cost_cents"`
 }
 
+// smsUsage holds SMS metrics for a billing period.
+// CostCents is estimated at the US/CA rate ($0.01/message).
 type smsUsage struct {
 	Total     int `json:"total"`
 	CostCents int `json:"cost_cents"`
