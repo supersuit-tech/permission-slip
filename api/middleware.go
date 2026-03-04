@@ -44,7 +44,7 @@ func TraceID(ctx context.Context) string {
 // Sentry events. Obtain the URL from your Sentry project under
 // Settings → Security Headers → report-uri.
 func SecurityHeadersMiddleware(sentryCSPEndpoint string, extraConnectSrc, extraScriptSrc []string) func(http.Handler) http.Handler {
-	connectSrc := "'self' https://*.ingest.sentry.io"
+	connectSrc := "'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io"
 	for _, src := range extraConnectSrc {
 		origin := sanitizeCSPOrigin(src)
 		if origin != "" {
