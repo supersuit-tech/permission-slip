@@ -12,7 +12,7 @@ func TestPushSubscriptionsSchema(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "push_subscriptions", []string{
-		"id", "user_id", "endpoint", "p256dh", "auth", "created_at",
+		"id", "user_id", "channel", "endpoint", "p256dh", "auth", "expo_token", "created_at",
 	})
 }
 
@@ -49,14 +49,20 @@ func TestUpsertPushSubscription(t *testing.T) {
 	if sub.ID == 0 {
 		t.Error("expected non-zero ID")
 	}
-	if sub.Endpoint != "https://push.example.com/sub1" {
-		t.Errorf("expected endpoint, got %q", sub.Endpoint)
+	if sub.Channel != db.PushChannelWebPush {
+		t.Errorf("expected channel %q, got %q", db.PushChannelWebPush, sub.Channel)
 	}
-	if sub.P256dh != "p256dh_key" {
-		t.Errorf("expected p256dh, got %q", sub.P256dh)
+	if sub.Endpoint == nil || *sub.Endpoint != "https://push.example.com/sub1" {
+		t.Errorf("expected endpoint, got %v", sub.Endpoint)
 	}
-	if sub.Auth != "auth_key" {
-		t.Errorf("expected auth, got %q", sub.Auth)
+	if sub.P256dh == nil || *sub.P256dh != "p256dh_key" {
+		t.Errorf("expected p256dh, got %v", sub.P256dh)
+	}
+	if sub.Auth == nil || *sub.Auth != "auth_key" {
+		t.Errorf("expected auth, got %v", sub.Auth)
+	}
+	if sub.ExpoToken != nil {
+		t.Errorf("expected nil expo_token for web-push, got %v", sub.ExpoToken)
 	}
 }
 
@@ -69,7 +75,7 @@ func TestUpsertPushSubscription_Update(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert
-	sub1, err := db.UpsertPushSubscription(ctx, tx, uid, "https://push.example.com/sub1", "old_p256dh", "old_auth")
+	_, err := db.UpsertPushSubscription(ctx, tx, uid, "https://push.example.com/sub1", "old_p256dh", "old_auth")
 	if err != nil {
 		t.Fatalf("first upsert: %v", err)
 	}
@@ -80,17 +86,15 @@ func TestUpsertPushSubscription_Update(t *testing.T) {
 		t.Fatalf("second upsert: %v", err)
 	}
 
-	// ID may differ due to RETURNING behavior, but there should be only one row
-	_ = sub1
-	if sub2.P256dh != "new_p256dh" {
-		t.Errorf("expected updated p256dh, got %q", sub2.P256dh)
+	if sub2.P256dh == nil || *sub2.P256dh != "new_p256dh" {
+		t.Errorf("expected updated p256dh, got %v", sub2.P256dh)
 	}
-	if sub2.Auth != "new_auth" {
-		t.Errorf("expected updated auth, got %q", sub2.Auth)
+	if sub2.Auth == nil || *sub2.Auth != "new_auth" {
+		t.Errorf("expected updated auth, got %v", sub2.Auth)
 	}
 
 	// Should have only 1 subscription
-	subs, err := db.ListPushSubscriptionsByUserID(ctx, tx, uid)
+	subs, err := db.ListWebPushSubscriptionsByUserID(ctx, tx, uid)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -99,7 +103,7 @@ func TestUpsertPushSubscription_Update(t *testing.T) {
 	}
 }
 
-func TestListPushSubscriptionsByUserID(t *testing.T) {
+func TestListWebPushSubscriptionsByUserID(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -108,7 +112,7 @@ func TestListPushSubscriptionsByUserID(t *testing.T) {
 	ctx := context.Background()
 
 	// Empty initially
-	subs, err := db.ListPushSubscriptionsByUserID(ctx, tx, uid)
+	subs, err := db.ListWebPushSubscriptionsByUserID(ctx, tx, uid)
 	if err != nil {
 		t.Fatalf("list empty: %v", err)
 	}
@@ -126,7 +130,7 @@ func TestListPushSubscriptionsByUserID(t *testing.T) {
 		t.Fatalf("upsert 2: %v", err)
 	}
 
-	subs, err = db.ListPushSubscriptionsByUserID(ctx, tx, uid)
+	subs, err = db.ListWebPushSubscriptionsByUserID(ctx, tx, uid)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -157,7 +161,7 @@ func TestDeletePushSubscription(t *testing.T) {
 	}
 
 	// Should be gone
-	subs, err := db.ListPushSubscriptionsByUserID(ctx, tx, uid)
+	subs, err := db.ListWebPushSubscriptionsByUserID(ctx, tx, uid)
 	if err != nil {
 		t.Fatalf("list after delete: %v", err)
 	}
@@ -209,11 +213,65 @@ func TestDeletePushSubscriptionByEndpoint(t *testing.T) {
 		t.Fatalf("delete by endpoint: %v", err)
 	}
 
-	subs, err := db.ListPushSubscriptionsByUserID(ctx, tx, uid)
+	subs, err := db.ListWebPushSubscriptionsByUserID(ctx, tx, uid)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
 	if len(subs) != 0 {
 		t.Errorf("expected 0 subscriptions after endpoint delete, got %d", len(subs))
+	}
+}
+
+func TestDeleteExpoPushTokenForUser(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	ctx := context.Background()
+	_, err := db.UpsertExpoPushToken(ctx, tx, uid, "ExponentPushToken[for_user]")
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	deleted, err := db.DeleteExpoPushTokenForUser(ctx, tx, uid, "ExponentPushToken[for_user]")
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if !deleted {
+		t.Error("expected deleted=true")
+	}
+
+	// Should be gone
+	tokens, err := db.ListExpoPushTokensByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(tokens) != 0 {
+		t.Errorf("expected 0 after delete, got %d", len(tokens))
+	}
+}
+
+func TestDeleteExpoPushTokenForUser_WrongUser(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid1 := testhelper.GenerateUID(t)
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
+	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
+
+	ctx := context.Background()
+	_, err := db.UpsertExpoPushToken(ctx, tx, uid1, "ExponentPushToken[user1_only]")
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// user2 should not be able to delete user1's token
+	deleted, err := db.DeleteExpoPushTokenForUser(ctx, tx, uid2, "ExponentPushToken[user1_only]")
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if deleted {
+		t.Error("expected deleted=false for wrong user")
 	}
 }

@@ -1,12 +1,24 @@
 pushSubscriptions:
   get:
     summary: List push subscriptions
-    description: Returns all Web Push subscriptions registered by the authenticated user.
+    description: |
+      Returns push subscriptions registered by the authenticated user.
+      Optionally filter by channel type using the `channel` query parameter.
     operationId: listPushSubscriptions
     tags:
       - Push Subscriptions
     security:
       - SupabaseSession: []
+    parameters:
+      - name: channel
+        in: query
+        required: false
+        description: Filter by push channel type. Omit to list all subscriptions.
+        schema:
+          type: string
+          enum:
+            - web-push
+            - mobile-push
     responses:
       '200':
         description: Push subscriptions retrieved
@@ -14,6 +26,8 @@ pushSubscriptions:
           application/json:
             schema:
               $ref: '../schemas/push_subscriptions.yaml#/PushSubscriptionListResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
       '500':
@@ -22,9 +36,15 @@ pushSubscriptions:
   post:
     summary: Register push subscription
     description: |
-      Register a Web Push subscription from the browser. If a subscription
-      with the same endpoint already exists for this user, the keys are updated
-      (subscription refresh).
+      Register a push subscription for notifications. Supports two types:
+
+      - **Web Push** (`type: "web-push"` or omitted): Requires `endpoint`, `p256dh`,
+        and `auth` from the browser's PushSubscription. If a subscription with the
+        same endpoint already exists, the keys are updated (subscription refresh).
+
+      - **Expo** (`type: "expo"`): Requires `expo_token` from the mobile app's
+        `expo-notifications` module. If a subscription with the same token already
+        exists, it is refreshed.
     operationId: createPushSubscription
     tags:
       - Push Subscriptions
@@ -53,7 +73,7 @@ pushSubscriptions:
 pushSubscriptionById:
   delete:
     summary: Delete push subscription
-    description: Remove a Web Push subscription by ID.
+    description: Remove a push subscription by ID.
     operationId: deletePushSubscription
     tags:
       - Push Subscriptions
@@ -74,6 +94,40 @@ pushSubscriptionById:
           application/json:
             schema:
               $ref: '../schemas/push_subscriptions.yaml#/DeletePushSubscriptionResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+pushSubscriptionUnregister:
+  post:
+    summary: Unregister Expo push token
+    description: |
+      Remove an Expo push token by value. This is more convenient for mobile
+      clients than DELETE by ID, since the device knows its own token but may
+      not have cached the subscription ID. Typically called on logout.
+    operationId: unregisterExpoPushToken
+    tags:
+      - Push Subscriptions
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/push_subscriptions.yaml#/UnregisterExpoPushTokenRequest'
+    responses:
+      '200':
+        description: Expo push token unregistered
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/push_subscriptions.yaml#/UnregisterExpoPushTokenResponse'
       '400':
         $ref: '../responses/errors.yaml#/BadRequest'
       '401':

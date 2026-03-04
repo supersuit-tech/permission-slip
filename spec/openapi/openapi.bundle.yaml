@@ -4403,12 +4403,24 @@ paths:
   /v1/push-subscriptions:
     get:
       summary: List push subscriptions
-      description: Returns all Web Push subscriptions registered by the authenticated user.
+      description: |
+        Returns push subscriptions registered by the authenticated user.
+        Optionally filter by channel type using the `channel` query parameter.
       operationId: listPushSubscriptions
       tags:
         - Push Subscriptions
       security:
         - SupabaseSession: []
+      parameters:
+        - name: channel
+          in: query
+          required: false
+          description: Filter by push channel type. Omit to list all subscriptions.
+          schema:
+            type: string
+            enum:
+              - web-push
+              - mobile-push
       responses:
         '200':
           description: Push subscriptions retrieved
@@ -4416,6 +4428,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PushSubscriptionListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -4423,9 +4437,15 @@ paths:
     post:
       summary: Register push subscription
       description: |
-        Register a Web Push subscription from the browser. If a subscription
-        with the same endpoint already exists for this user, the keys are updated
-        (subscription refresh).
+        Register a push subscription for notifications. Supports two types:
+
+        - **Web Push** (`type: "web-push"` or omitted): Requires `endpoint`, `p256dh`,
+          and `auth` from the browser's PushSubscription. If a subscription with the
+          same endpoint already exists, the keys are updated (subscription refresh).
+
+        - **Expo** (`type: "expo"`): Requires `expo_token` from the mobile app's
+          `expo-notifications` module. If a subscription with the same token already
+          exists, it is refreshed.
       operationId: createPushSubscription
       tags:
         - Push Subscriptions
@@ -4453,7 +4473,7 @@ paths:
   /v1/push-subscriptions/{subscription_id}:
     delete:
       summary: Delete push subscription
-      description: Remove a Web Push subscription by ID.
+      description: Remove a push subscription by ID.
       operationId: deletePushSubscription
       tags:
         - Push Subscriptions
@@ -4474,6 +4494,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeletePushSubscriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/push-subscriptions/unregister:
+    post:
+      summary: Unregister Expo push token
+      description: |
+        Remove an Expo push token by value. This is more convenient for mobile
+        clients than DELETE by ID, since the device knows its own token but may
+        not have cached the subscription ID. Typically called on logout.
+      operationId: unregisterExpoPushToken
+      tags:
+        - Push Subscriptions
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnregisterExpoPushTokenRequest'
+      responses:
+        '200':
+          description: Expo push token unregistered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnregisterExpoPushTokenResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -8316,13 +8369,34 @@ components:
             recently downgraded from a paid plan. After this timestamp,
             effective_retention_days will match audit_retention_days.
     CreatePushSubscriptionRequest:
+      description: |
+        Register a push subscription. Use `type: "web-push"` (or omit type) for
+        browser Web Push subscriptions, or `type: "expo"` / `type: "mobile-push"`
+        for Expo push tokens from the mobile app.
+      oneOf:
+        - $ref: '#/components/schemas/CreateWebPushSubscriptionRequest'
+        - $ref: '#/components/schemas/CreateExpoPushSubscriptionRequest'
+      discriminator:
+        propertyName: type
+        mapping:
+          web-push: '#/components/schemas/CreateWebPushSubscriptionRequest'
+          expo: '#/components/schemas/CreateExpoPushSubscriptionRequest'
+          mobile-push: '#/components/schemas/CreateExpoPushSubscriptionRequest'
+    CreateWebPushSubscriptionRequest:
       type: object
-      description: Register a Web Push subscription from the browser.
+      description: Register a Web Push subscription from a browser PushSubscription.
       required:
         - endpoint
         - p256dh
         - auth
       properties:
+        type:
+          type: string
+          description: Subscription type. Defaults to "web-push" when omitted.
+          enum:
+            - web-push
+          default: web-push
+          example: web-push
         endpoint:
           type: string
           format: uri
@@ -8336,12 +8410,32 @@ components:
           type: string
           description: Base64url-encoded auth secret from the browser PushSubscription keys
           example: tBHItJI5svbpC7RB5gg6bQ
+    CreateExpoPushSubscriptionRequest:
+      type: object
+      description: Register an Expo push token from the mobile app.
+      required:
+        - type
+        - expo_token
+      properties:
+        type:
+          type: string
+          description: |
+            Subscription type. Use "expo" or "mobile-push" — both are accepted
+            and create a mobile-push channel subscription.
+          enum:
+            - expo
+            - mobile-push
+          example: expo
+        expo_token:
+          type: string
+          description: Expo push token from expo-notifications
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
     PushSubscriptionResponse:
       type: object
-      description: A registered Web Push subscription.
+      description: A registered push subscription (Web Push or Expo).
       required:
         - id
-        - endpoint
+        - channel
         - created_at
       properties:
         id:
@@ -8349,11 +8443,22 @@ components:
           format: int64
           description: Subscription ID
           example: 1
+        channel:
+          type: string
+          description: The push channel type
+          enum:
+            - web-push
+            - mobile-push
+          example: web-push
         endpoint:
           type: string
           format: uri
-          description: Push service endpoint URL
+          description: Push service endpoint URL (present for web-push subscriptions)
           example: https://fcm.googleapis.com/fcm/send/abc123...
+        expo_token:
+          type: string
+          description: Expo push token (present for mobile-push subscriptions)
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
         created_at:
           type: string
           format: date-time
@@ -8385,6 +8490,27 @@ components:
           type: string
           format: date-time
           description: Deletion timestamp
+          example: '2026-02-27T10:05:00Z'
+    UnregisterExpoPushTokenRequest:
+      type: object
+      description: Request to unregister an Expo push token (e.g. on mobile logout).
+      required:
+        - expo_token
+      properties:
+        expo_token:
+          type: string
+          description: The Expo push token to unregister
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+    UnregisterExpoPushTokenResponse:
+      type: object
+      description: Confirmation that the Expo push token was unregistered.
+      required:
+        - unregistered_at
+      properties:
+        unregistered_at:
+          type: string
+          format: date-time
+          description: When the token was unregistered
           example: '2026-02-27T10:05:00Z'
     VAPIDPublicKeyResponse:
       type: object
