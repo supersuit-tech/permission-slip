@@ -185,24 +185,36 @@ func GetApprovalByIDAndApprover(ctx context.Context, db DBTX, approvalID, approv
 }
 
 // ApproveApproval atomically sets the approval status to 'approved' and records
-// the timestamp. The UPDATE enforces status='pending' AND expires_at > now() to
-// eliminate TOCTOU races. On failure it reads the current row to produce a
-// precise error.
-// Returns the updated approval and the agent's current metadata snapshot.
+// the timestamp. Returns the updated approval and the agent's metadata snapshot.
 func ApproveApproval(ctx context.Context, db DBTX, approvalID, approverID string) (*Approval, []byte, error) {
-	row := db.QueryRow(ctx,
+	return resolveApproval(ctx, db, approvalID, approverID, "approved", "approved_at")
+}
+
+// DenyApproval atomically sets the approval status to 'denied' and records the
+// timestamp. Returns the updated approval and the agent's metadata snapshot.
+func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (*Approval, []byte, error) {
+	return resolveApproval(ctx, db, approvalID, approverID, "denied", "denied_at")
+}
+
+// resolveApproval is the shared implementation for ApproveApproval and
+// DenyApproval. It atomically updates the approval status while enforcing
+// status='pending' AND expires_at > now() to eliminate TOCTOU races. On
+// failure it reads the current row to produce a precise error.
+func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newStatus, timestampCol string) (*Approval, []byte, error) {
+	query := fmt.Sprintf(
 		`WITH updated AS (
 			UPDATE approvals
-			SET status = 'approved', approved_at = now()
+			SET status = $3, %s = now()
 			WHERE approval_id = $1 AND approver_id = $2
 			  AND status = 'pending' AND expires_at > now()
-			RETURNING `+approvalColumns+`
+			RETURNING %s
 		)
 		SELECT updated.*, a.metadata
 		FROM updated
 		LEFT JOIN agents a ON a.agent_id = updated.agent_id`,
-		approvalID, approverID,
+		timestampCol, approvalColumns,
 	)
+	row := db.QueryRow(ctx, query, approvalID, approverID, newStatus)
 	appr, agentMeta, err := scanApprovalWithMeta(row)
 	if err == nil {
 		return appr, agentMeta, nil
@@ -212,35 +224,6 @@ func ApproveApproval(ctx context.Context, db DBTX, approvalID, approverID string
 	}
 
 	// UPDATE matched zero rows — determine why.
-	return nil, nil, diagnoseApprovalFailure(ctx, db, approvalID, approverID)
-}
-
-// DenyApproval atomically sets the approval status to 'denied' and records the
-// timestamp. The UPDATE enforces status='pending' AND expires_at > now() to
-// eliminate TOCTOU races.
-// Returns the updated approval and the agent's current metadata snapshot.
-func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (*Approval, []byte, error) {
-	row := db.QueryRow(ctx,
-		`WITH updated AS (
-			UPDATE approvals
-			SET status = 'denied', denied_at = now()
-			WHERE approval_id = $1 AND approver_id = $2
-			  AND status = 'pending' AND expires_at > now()
-			RETURNING `+approvalColumns+`
-		)
-		SELECT updated.*, a.metadata
-		FROM updated
-		LEFT JOIN agents a ON a.agent_id = updated.agent_id`,
-		approvalID, approverID,
-	)
-	appr, agentMeta, err := scanApprovalWithMeta(row)
-	if err == nil {
-		return appr, agentMeta, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil, err
-	}
-
 	return nil, nil, diagnoseApprovalFailure(ctx, db, approvalID, approverID)
 }
 

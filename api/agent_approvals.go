@@ -250,29 +250,9 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 
 // ── Error handling ─────────────────────────────────────────────────────────
 
-// handleAgentApprovalError maps db.ApprovalError to the appropriate HTTP
-// response for agent-facing endpoints. Returns true if the error was handled.
-func handleAgentApprovalError(w http.ResponseWriter, r *http.Request, err error) bool {
-	var apprErr *db.ApprovalError
-	if !errors.As(err, &apprErr) {
-		return false
-	}
-	switch apprErr.Code {
-	case db.ApprovalErrNotFound:
-		RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
-	case db.ApprovalErrAlreadyResolved:
-		resp := Conflict(ErrApprovalAlreadyResolved, "Approval already resolved")
-		if apprErr.Status != "" {
-			resp.Error.Details = map[string]any{"status": apprErr.Status}
-		}
-		RespondError(w, r, http.StatusConflict, resp)
-	case db.ApprovalErrExpired:
-		RespondError(w, r, http.StatusGone, Gone(ErrApprovalExpired, "Approval has expired"))
-	default:
-		return false
-	}
-	return true
-}
+// handleAgentApprovalError is an alias for the shared handleApprovalError
+// in approvals.go. Both dashboard and agent endpoints use the same mapping.
+var handleAgentApprovalError = handleApprovalError
 
 // unprocessableEntity returns a 422 ErrorResponse.
 func unprocessableEntity(code ErrorCode, message string) ErrorResponse {
