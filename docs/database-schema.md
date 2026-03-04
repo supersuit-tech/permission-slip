@@ -415,6 +415,12 @@ The `CHECK (verification_attempts >= 0)` constraint prevents a backend bug from 
 
 **Approvals:** SHA-256 hash stored in `confirmation_code_hash`, compared using constant-time comparison in the Go backend.
 
+### Row-Level Security (RLS)
+
+All application tables have RLS enabled via migration. The sole purpose is locking down the Supabase PostgREST data API — with RLS on and no permissive policies, the `anon` and `authenticated` roles are denied access. The Go backend connects as a superuser and is unaffected.
+
+`TestRLSEnabledOnAllTables` in `db/rls_test.go` enforces this: any new table added to the `public` schema without RLS will fail CI.
+
 ### Extensions
 
 - `uuid-ossp` and `pgcrypto` — enabled in `00001_init.sql`

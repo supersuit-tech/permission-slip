@@ -97,6 +97,23 @@ Permission Slip uses a single Supabase project for:
 
 - `VAULT_SECRET_KEY` is **not** a Fly.io runtime secret. Hosted Supabase manages the pgsodium encryption key automatically at the infrastructure level. The Go app never reads this env var — it only exists in `supabase/config.toml` for local development (`supabase start`). For local dev, generate with `openssl rand -hex 32`.
 
+**Row-Level Security (RLS):**
+
+RLS is enabled on all application tables via a database migration that runs automatically on startup. This locks down the Supabase PostgREST data API — with RLS enabled and no permissive policies, the `anon` and `authenticated` roles cannot read or write any table through PostgREST, even with a valid JWT.
+
+The Go backend connects as the `postgres` superuser, which bypasses RLS entirely. No application code changes are needed.
+
+To verify RLS is enabled after deployment:
+
+```sql
+SELECT tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public' AND tablename != 'goose_db_version'
+ORDER BY tablename;
+```
+
+All rows should show `rowsecurity = true`. A database test (`TestRLSEnabledOnAllTables`) enforces this in CI so new tables can't be added without RLS.
+
 **Fly.io setup:**
 
 ```bash
@@ -824,6 +841,7 @@ These are tracked under [#321](https://github.com/supersuit-tech/permission-slip
 - Database migration linting in CI
 - Automated backup restore tests
 - Penetration test / security audit
+- Row-Level Security policies — add per-user RLS policies and connect `SET LOCAL` in the Go database layer for defense-in-depth on backend queries (RLS is already enabled on all tables; this adds actual policies)
 - Auth endpoint rate limiting (brute force protection)
 - Dependency update automation (Dependabot or Renovate)
 
