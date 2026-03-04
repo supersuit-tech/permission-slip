@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LimitBadge } from "@/components/LimitBadge";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
   Card,
   CardHeader,
@@ -22,6 +24,7 @@ import {
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
 import { useAgents } from "@/hooks/useAgents";
+import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { RevokeStandingApprovalDialog } from "./RevokeStandingApprovalDialog";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 
@@ -121,6 +124,12 @@ export function StandingApprovalsCard() {
   const { standingApprovals, isLoading, error, refetch } =
     useStandingApprovals();
   const { agents } = useAgents();
+  const {
+    max: maxStandingApprovals,
+    current: standingApprovalCount,
+    atLimit,
+    hasData: hasBillingData,
+  } = useResourceLimit("max_standing_approvals", standingApprovals.length);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<StandingApproval | null>(
     null,
@@ -129,7 +138,16 @@ export function StandingApprovalsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Standing Approvals</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle>Standing Approvals</CardTitle>
+          {hasBillingData && (
+            <LimitBadge
+              current={standingApprovalCount}
+              max={maxStandingApprovals}
+              resource="standing approvals"
+            />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="px-3 md:px-6">
         {isLoading ? (
@@ -152,7 +170,11 @@ export function StandingApprovalsCard() {
           />
         )}
       </CardContent>
-      {standingApprovals.length > 0 && (
+      {atLimit ? (
+        <CardFooter>
+          <UpgradePrompt feature="Upgrade to create more standing approvals." />
+        </CardFooter>
+      ) : standingApprovals.length > 0 ? (
         <CardFooter>
           <Button
             className="w-full sm:w-auto"
@@ -161,7 +183,7 @@ export function StandingApprovalsCard() {
             Create Standing Approval
           </Button>
         </CardFooter>
-      )}
+      ) : null}
 
       <CreateStandingApprovalDialog
         agents={agents}
