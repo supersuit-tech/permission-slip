@@ -93,13 +93,9 @@ type billingPlanResponse struct {
 }
 
 type billingPlan struct {
-	ID                   string `json:"id"`
-	Name                 string `json:"name"`
-	MaxRequestsPerMonth  *int   `json:"max_requests_per_month"`
-	MaxAgents            *int   `json:"max_agents"`
-	MaxStandingApprovals *int   `json:"max_standing_approvals"`
-	MaxCredentials       *int   `json:"max_credentials"`
-	AuditRetentionDays   int    `json:"audit_retention_days"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	planLimits
 }
 
 type billingSubscription struct {
@@ -175,13 +171,15 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 
 		resp := billingPlanResponse{
 			Plan: billingPlan{
-				ID:                   sub.PlanID,
-				Name:                 sub.Plan.Name,
-				MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
-				MaxAgents:            sub.Plan.MaxAgents,
-				MaxStandingApprovals: sub.Plan.MaxStandingApprovals,
-				MaxCredentials:       sub.Plan.MaxCredentials,
-				AuditRetentionDays:   sub.Plan.AuditRetentionDays,
+				ID:   sub.PlanID,
+				Name: sub.Plan.Name,
+				planLimits: planLimits{
+					MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
+					MaxAgents:            sub.Plan.MaxAgents,
+					MaxStandingApprovals: sub.Plan.MaxStandingApprovals,
+					MaxCredentials:       sub.Plan.MaxCredentials,
+					AuditRetentionDays:   sub.Plan.AuditRetentionDays,
+				},
 			},
 			Subscription: billingSubscription{
 				Status:             string(sub.Status),
@@ -204,28 +202,25 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			resp.Usage.Requests = usage.RequestCount
 		}
 
-		agentCount, err := db.CountRegisteredAgentsByUser(r.Context(), deps.DB, profile.ID)
-		if err != nil {
+		if count, err := db.CountRegisteredAgentsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetBillingPlan: count agents: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
 		} else {
-			resp.Usage.Agents = agentCount
+			resp.Usage.Agents = count
 		}
 
-		saCount, err := db.CountActiveStandingApprovalsByUser(r.Context(), deps.DB, profile.ID)
-		if err != nil {
+		if count, err := db.CountActiveStandingApprovalsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetBillingPlan: count standing approvals: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
 		} else {
-			resp.Usage.StandingApprovals = saCount
+			resp.Usage.StandingApprovals = count
 		}
 
-		credCount, err := db.CountCredentialsByUser(r.Context(), deps.DB, profile.ID)
-		if err != nil {
+		if count, err := db.CountCredentialsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetBillingPlan: count credentials: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
 		} else {
-			resp.Usage.Credentials = credCount
+			resp.Usage.Credentials = count
 		}
 
 		RespondJSON(w, http.StatusOK, resp)
