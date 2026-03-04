@@ -1,10 +1,13 @@
 /**
  * Approval detail screen — displays the full details of a single approval
  * request including agent info, action parameters, risk level, expiry
- * countdown, context, and timeline.
+ * countdown, context, and timeline. Pending approvals show a deny button.
  */
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
+import { useDenyApproval } from "../../hooks/useDenyApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
@@ -29,10 +33,12 @@ import { CountdownBadge } from "./CountdownBadge";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
-export default function ApprovalDetailScreen({ route }: Props) {
+export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { approval } = route.params;
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
+  const { denyApproval, isPending: isDenying } = useDenyApproval();
+  const [denied, setDenied] = useState(false);
 
   const agent = useMemo(
     () => agents.find((a) => a.agent_id === approval.agent_id),
@@ -53,13 +59,38 @@ export default function ApprovalDetailScreen({ route }: Props) {
 
   const summary = buildActionSummary(approval.action.type, parameters);
 
+  /** Whether the deny action button should be visible. */
+  const showActions = isPending && !expired && !denied;
+
+  const handleDeny = useCallback(() => {
+    Alert.alert(
+      "Deny Request",
+      "Are you sure you want to deny this request?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Deny",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await denyApproval(approval.approval_id);
+              setDenied(true);
+            } catch {
+              Alert.alert("Error", "Failed to deny request. Please try again.");
+            }
+          },
+        },
+      ],
+    );
+  }, [denyApproval, approval.approval_id]);
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
     >
       {/* Status banner for resolved approvals */}
-      {approval.status === "approved" && (
+      {(approval.status === "approved" && !denied) && (
         <View
           style={styles.statusBannerApproved}
           accessibilityRole="alert"
@@ -67,7 +98,7 @@ export default function ApprovalDetailScreen({ route }: Props) {
           <Text style={styles.statusBannerTextApproved}>Approved</Text>
         </View>
       )}
-      {approval.status === "denied" && (
+      {(approval.status === "denied" || denied) && (
         <View
           style={styles.statusBannerDenied}
           accessibilityRole="alert"
@@ -80,7 +111,7 @@ export default function ApprovalDetailScreen({ route }: Props) {
           <Text style={styles.statusBannerText}>Cancelled</Text>
         </View>
       )}
-      {expired && (
+      {expired && !denied && (
         <View style={styles.statusBannerCancelled}>
           <Text style={styles.statusBannerText}>Expired</Text>
         </View>
@@ -163,7 +194,7 @@ export default function ApprovalDetailScreen({ route }: Props) {
       )}
 
       {/* Expiry Countdown */}
-      {isPending && (
+      {isPending && !denied && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Expiry</Text>
           <View style={styles.card}>
@@ -174,6 +205,34 @@ export default function ApprovalDetailScreen({ route }: Props) {
               </Text>
             </View>
           </View>
+        </View>
+      )}
+
+      {/* Deny Action */}
+      {showActions && (
+        <View style={styles.section}>
+          <Pressable
+            testID="deny-button"
+            style={({ pressed }) => [
+              styles.denyButton,
+              pressed && styles.denyButtonPressed,
+              isDenying && styles.denyButtonDisabled,
+            ]}
+            onPress={handleDeny}
+            disabled={isDenying}
+            accessibilityRole="button"
+            accessibilityLabel="Deny request"
+          >
+            {isDenying ? (
+              <ActivityIndicator
+                testID="deny-loading"
+                color={colors.error}
+                size="small"
+              />
+            ) : (
+              <Text style={styles.denyButtonText}>Deny</Text>
+            )}
+          </Pressable>
         </View>
       )}
 
@@ -459,6 +518,26 @@ const styles = StyleSheet.create({
   expiryLabel: {
     fontSize: 14,
     color: colors.gray500,
+  },
+  denyButton: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.error,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  denyButtonPressed: {
+    backgroundColor: colors.riskHighBg,
+  },
+  denyButtonDisabled: {
+    opacity: 0.6,
+  },
+  denyButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.error,
   },
   paramRow: {
     flexDirection: "row",
