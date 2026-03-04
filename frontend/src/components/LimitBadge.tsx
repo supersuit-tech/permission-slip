@@ -14,7 +14,11 @@ interface LimitBadgeProps {
 export function LimitBadge({ current, max, resource }: LimitBadgeProps) {
   if (max == null) {
     return (
-      <Badge variant="outline" className="text-xs font-normal">
+      <Badge
+        variant="outline"
+        className="text-xs font-normal"
+        aria-label={`${current} ${resource} used`}
+      >
         {current} {resource}
       </Badge>
     );
@@ -32,8 +36,13 @@ export function LimitBadge({ current, max, resource }: LimitBadgeProps) {
       " border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400";
   }
 
+  const remaining = max - current;
+  const ariaLabel = atLimit
+    ? `${resource} limit reached (${current} of ${max})`
+    : `${current} of ${max} ${resource} used, ${remaining} remaining`;
+
   return (
-    <Badge variant="outline" className={className}>
+    <Badge variant="outline" className={className} aria-label={ariaLabel}>
       {current} / {max} {resource}
     </Badge>
   );

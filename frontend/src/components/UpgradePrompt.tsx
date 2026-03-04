@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Zap } from "lucide-react";
 
 interface UpgradePromptProps {
   feature: string;
@@ -11,7 +11,8 @@ interface UpgradePromptProps {
  */
 export function UpgradePrompt({ feature }: UpgradePromptProps) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+    <div className="flex w-full items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+      <Zap className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
       <p className="text-sm text-amber-800 dark:text-amber-200">
         {feature}{" "}
         <Link

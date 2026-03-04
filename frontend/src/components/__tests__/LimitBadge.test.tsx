@@ -37,4 +37,25 @@ describe("LimitBadge", () => {
     expect(badge.className).not.toContain("border-red-300");
     expect(badge.className).not.toContain("border-amber-300");
   });
+
+  it("provides accessible aria-label with remaining count", () => {
+    render(<LimitBadge current={2} max={5} resource="agents" />);
+    expect(
+      screen.getByLabelText("2 of 5 agents used, 3 remaining"),
+    ).toBeInTheDocument();
+  });
+
+  it("provides aria-label indicating limit reached", () => {
+    render(<LimitBadge current={3} max={3} resource="agents" />);
+    expect(
+      screen.getByLabelText("agents limit reached (3 of 3)"),
+    ).toBeInTheDocument();
+  });
+
+  it("provides aria-label for unlimited plans", () => {
+    render(<LimitBadge current={5} max={null} resource="agents" />);
+    expect(
+      screen.getByLabelText("5 agents used"),
+    ).toBeInTheDocument();
+  });
 });

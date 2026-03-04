@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Bell, Loader2, AlertTriangle, ArrowUpRight } from "lucide-react";
+import { Bell, Loader2, AlertTriangle, ArrowUpRight, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
@@ -112,11 +112,14 @@ export function NotificationSection() {
               return (
                 <div
                   key={pref.channel}
-                  className={`rounded-lg border p-4${planGated ? " opacity-75" : ""}`}
+                  className={`rounded-lg border p-4${planGated ? " border-dashed opacity-75" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium">
+                        {planGated && (
+                          <Lock className="mr-1.5 inline size-3.5 text-muted-foreground" />
+                        )}
                         {label?.name ?? pref.channel}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -126,7 +129,7 @@ export function NotificationSection() {
                     {planGated ? (
                       <Link
                         to="/billing"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 underline dark:text-amber-400"
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 no-underline transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
                       >
                         Available on paid plan
                         <ArrowUpRight className="size-3" />
