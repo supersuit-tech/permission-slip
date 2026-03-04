@@ -86,6 +86,39 @@ type invoiceListResponse struct {
 	Invoices []pstripe.InvoiceSummary `json:"invoices"`
 }
 
+type billingPlanResponse struct {
+	Plan         billingPlan         `json:"plan"`
+	Subscription billingSubscription `json:"subscription"`
+	Usage        billingUsageSummary `json:"usage"`
+}
+
+type billingPlan struct {
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	MaxRequestsPerMonth  *int   `json:"max_requests_per_month"`
+	MaxAgents            *int   `json:"max_agents"`
+	MaxStandingApprovals *int   `json:"max_standing_approvals"`
+	MaxCredentials       *int   `json:"max_credentials"`
+	AuditRetentionDays   int    `json:"audit_retention_days"`
+}
+
+type billingSubscription struct {
+	Status             string     `json:"status"`
+	CurrentPeriodStart time.Time  `json:"current_period_start"`
+	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
+	HasPaymentMethod   bool       `json:"has_payment_method"`
+	CanUpgrade         bool       `json:"can_upgrade"`
+	CanDowngrade       bool       `json:"can_downgrade"`
+	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
+}
+
+type billingUsageSummary struct {
+	Requests          int `json:"requests"`
+	Agents            int `json:"agents"`
+	StandingApprovals int `json:"standing_approvals"`
+	Credentials       int `json:"credentials"`
+}
+
 type downgradeResponse struct {
 	Status            string     `json:"status"`
 	PlanID            string     `json:"plan_id"`
@@ -112,6 +145,7 @@ const maxInvoiceResults = 24
 // These are only registered when billing is enabled.
 func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
+	mux.Handle("GET /billing/plan", requireProfile(handleGetBillingPlan(deps)))
 	mux.Handle("GET /billing/subscription", requireProfile(handleGetSubscription(deps)))
 	mux.Handle("GET /billing/usage", requireProfile(handleGetUsage(deps)))
 	// Deprecated: use POST /billing/upgrade instead. Kept for backward compatibility.
@@ -119,6 +153,83 @@ func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /billing/upgrade", requireProfile(handleCreateCheckout(deps)))
 	mux.Handle("POST /billing/downgrade", requireProfile(handleDowngrade(deps)))
 	mux.Handle("GET /billing/invoices", requireProfile(handleListInvoices(deps)))
+}
+
+// ── GET /billing/plan ────────────────────────────────────────────────────────
+
+func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		sub, err := db.GetSubscriptionWithPlan(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetBillingPlan: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch subscription"))
+			return
+		}
+		if sub == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No subscription found"))
+			return
+		}
+
+		resp := billingPlanResponse{
+			Plan: billingPlan{
+				ID:                   sub.PlanID,
+				Name:                 sub.Plan.Name,
+				MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
+				MaxAgents:            sub.Plan.MaxAgents,
+				MaxStandingApprovals: sub.Plan.MaxStandingApprovals,
+				MaxCredentials:       sub.Plan.MaxCredentials,
+				AuditRetentionDays:   sub.Plan.AuditRetentionDays,
+			},
+			Subscription: billingSubscription{
+				Status:             string(sub.Status),
+				CurrentPeriodStart: sub.CurrentPeriodStart,
+				CurrentPeriodEnd:   sub.CurrentPeriodEnd,
+				HasPaymentMethod:   sub.StripeCustomerID != nil,
+				CanUpgrade:         sub.PlanID == db.PlanFree,
+				CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
+				GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
+			},
+		}
+
+		// Gather usage counts (non-fatal — return zeros on error).
+		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetBillingPlan: usage lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+		}
+		if usage != nil {
+			resp.Usage.Requests = usage.RequestCount
+		}
+
+		agentCount, err := db.CountRegisteredAgentsByUser(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetBillingPlan: count agents: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+		} else {
+			resp.Usage.Agents = agentCount
+		}
+
+		saCount, err := db.CountActiveStandingApprovalsByUser(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetBillingPlan: count standing approvals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+		} else {
+			resp.Usage.StandingApprovals = saCount
+		}
+
+		credCount, err := db.CountCredentialsByUser(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetBillingPlan: count credentials: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+		} else {
+			resp.Usage.Credentials = credCount
+		}
+
+		RespondJSON(w, http.StatusOK, resp)
+	}
 }
 
 // ── GET /billing/subscription ───────────────────────────────────────────────
