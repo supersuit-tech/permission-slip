@@ -55,12 +55,12 @@ Action:
       description: |
         Action-specific parameters. Structure is defined by the action type and version.
         
-        Permission Slip validates parameters against the expected schema for the action type. 
-        The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and 
-        included in approval tokens as `params_hash` to prevent parameter tampering.
-        
-        **Security**: Permission Slip verifies that request parameters match the params_hash 
-        in the approval token before executing actions.
+        Permission Slip validates parameters against the expected schema for the action type.
+        The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and
+        stored with the approval to prevent parameter tampering.
+
+        **Security**: Permission Slip verifies that request parameters match the stored
+        params_hash before executing actions.
       example:
         from: "alice@example.com"
         to:
@@ -158,3 +158,42 @@ AlternativeUrls:
   example:
     deeplink: "permissionslip://permission-slip/approve?token=eyJ..."
     web: "https://accounts.permissionslip.dev/permission-slip/approve?token=eyJ..."
+
+# Shared execution result fields used by ApproveApprovalResponse,
+# ApprovalStatusResponse, and ApprovalSummary.
+ExecutionStatus:
+  type: string
+  enum:
+    - pending
+    - success
+    - partial
+    - error
+  description: |
+    Status of the action execution.
+
+    - **pending**: Execution is still in progress
+    - **success**: Action executed successfully via the external service
+    - **partial**: Action partially completed (e.g., some recipients failed)
+    - **error**: Action execution failed
+  example: "success"
+
+ExecutionResult:
+  type: object
+  additionalProperties: true
+  nullable: true
+  description: |
+    Result data from executing the action. Structure varies by action type.
+    May be null if execution is still pending or if an error occurred.
+
+    On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
+    On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
+  example:
+    message_id: "msg_abc123"
+    delivery_status: "queued"
+
+ExecutedAt:
+  type: string
+  format: date-time
+  nullable: true
+  description: When the action was executed (null if not yet executed)
+  example: "2026-02-21T10:30:01Z"

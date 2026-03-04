@@ -526,6 +526,12 @@ components:
       $ref: './components/schemas/shared.yaml#/ActionContext'
     AlternativeUrls:
       $ref: './components/schemas/shared.yaml#/AlternativeUrls'
+    ExecutionStatus:
+      $ref: './components/schemas/shared.yaml#/ExecutionStatus'
+    ExecutionResult:
+      $ref: './components/schemas/shared.yaml#/ExecutionResult'
+    ExecutedAt:
+      $ref: './components/schemas/shared.yaml#/ExecutedAt'
     Error:
       $ref: './components/schemas/errors.yaml#/Error'
     ErrorResponse:

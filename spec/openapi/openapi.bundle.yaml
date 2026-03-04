@@ -5476,7 +5476,7 @@ components:
           description: |
             Unique request identifier for replay protection and idempotency. UUID v4 recommended.
 
-            Permission Slip tracks this value within the timestamp window (300 seconds) and rejects 
+            Permission Slip tracks this value within the timestamp window (300 seconds) and rejects
             duplicate requests with `409 Conflict` error code `duplicate_request_id`.
           example: a925fbe0-db83-4969-9dc5-27f40385f12c
         approver:
@@ -5694,29 +5694,16 @@ components:
           description: When the approval request was created
           example: '2026-02-11T13:20:00Z'
         execution_status:
-          type: string
-          enum:
-            - pending
-            - success
-            - partial
-            - error
-          nullable: true
-          description: |
-            Status of the action execution. Only present when status is `approved`.
-            Null for pending, denied, or cancelled approvals.
-          example: success
+          allOf:
+            - $ref: '#/components/schemas/ExecutionStatus'
+            - nullable: true
+              description: |
+                Status of the action execution. Only present when status is `approved`.
+                Null for pending, denied, or cancelled approvals.
         execution_result:
-          type: object
-          additionalProperties: true
-          nullable: true
-          description: |
-            Result data from executing the action. Only present when `execution_status`
-            is `success`, `partial`, or `error`. Structure varies by action type.
+          $ref: '#/components/schemas/ExecutionResult'
         executed_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: When the action was executed (null if not yet executed)
+          $ref: '#/components/schemas/ExecutedAt'
     ApprovalListResponse:
       type: object
       description: Paginated list of approval requests.
@@ -5763,33 +5750,9 @@ components:
           description: When the approval was approved
           example: '2026-02-21T10:30:00Z'
         execution_status:
-          type: string
-          enum:
-            - success
-            - partial
-            - error
-            - pending
-          description: |
-            Status of the action execution that was triggered by the approval.
-
-            - **success**: Action executed successfully via the external service
-            - **partial**: Action partially completed (e.g., some recipients failed)
-            - **error**: Action execution failed
-            - **pending**: Execution is still in progress (async)
-          example: success
+          $ref: '#/components/schemas/ExecutionStatus'
         execution_result:
-          type: object
-          additionalProperties: true
-          nullable: true
-          description: |
-            Result data from executing the action. Structure varies by action type.
-            May be null if execution is still pending or if an error occurred.
-
-            On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
-            On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
-          example:
-            message_id: msg_abc123
-            delivery_status: queued
+          $ref: '#/components/schemas/ExecutionResult'
     DenyApprovalResponse:
       type: object
       required:
@@ -5857,39 +5820,16 @@ components:
           description: When the approval expires
           example: '2026-02-21T10:35:00Z'
         execution_status:
-          type: string
-          enum:
-            - pending
-            - success
-            - partial
-            - error
-          nullable: true
-          description: |
-            Status of the action execution. Only present when approval status is `approved`.
-
-            - **pending**: Execution is still in progress
-            - **success**: Action executed successfully
-            - **partial**: Action partially completed
-            - **error**: Action execution failed
-
-            Null when the approval has not been approved yet.
-          example: success
+          allOf:
+            - $ref: '#/components/schemas/ExecutionStatus'
+            - nullable: true
+              description: |
+                Status of the action execution. Only present when approval status is `approved`.
+                Null when the approval has not been approved yet.
         execution_result:
-          type: object
-          additionalProperties: true
-          nullable: true
-          description: |
-            Result data from executing the action. Only present when `execution_status`
-            is `success`, `partial`, or `error`. Structure varies by action type.
-          example:
-            message_id: msg_abc123
-            delivery_status: queued
+          $ref: '#/components/schemas/ExecutionResult'
         executed_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: When the action was executed (null if not yet executed)
-          example: '2026-02-21T10:30:01Z'
+          $ref: '#/components/schemas/ExecutedAt'
     ActionConfigTemplate:
       type: object
       required:
@@ -9166,12 +9106,12 @@ components:
           description: |
             Action-specific parameters. Structure is defined by the action type and version.
 
-            Permission Slip validates parameters against the expected schema for the action type. 
-            The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and 
-            included in approval tokens as `params_hash` to prevent parameter tampering.
+            Permission Slip validates parameters against the expected schema for the action type.
+            The parameters object is hashed (using RFC 8785 JSON Canonicalization Scheme) and
+            stored with the approval to prevent parameter tampering.
 
-            **Security**: Permission Slip verifies that request parameters match the params_hash 
-            in the approval token before executing actions.
+            **Security**: Permission Slip verifies that request parameters match the stored
+            params_hash before executing actions.
           example:
             from: alice@example.com
             to:
@@ -9261,6 +9201,40 @@ components:
       example:
         deeplink: permissionslip://permission-slip/approve?token=eyJ...
         web: https://accounts.permissionslip.dev/permission-slip/approve?token=eyJ...
+    ExecutionStatus:
+      type: string
+      enum:
+        - pending
+        - success
+        - partial
+        - error
+      description: |
+        Status of the action execution.
+
+        - **pending**: Execution is still in progress
+        - **success**: Action executed successfully via the external service
+        - **partial**: Action partially completed (e.g., some recipients failed)
+        - **error**: Action execution failed
+      example: success
+    ExecutionResult:
+      type: object
+      additionalProperties: true
+      nullable: true
+      description: |
+        Result data from executing the action. Structure varies by action type.
+        May be null if execution is still pending or if an error occurred.
+
+        On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
+        On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
+      example:
+        message_id: msg_abc123
+        delivery_status: queued
+    ExecutedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the action was executed (null if not yet executed)
+      example: '2026-02-21T10:30:01Z'
     Error:
       type: object
       required:

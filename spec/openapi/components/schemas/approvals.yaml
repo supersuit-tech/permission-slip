@@ -15,18 +15,18 @@ ApprovalRequest:
         signing key in the `X-Permission-Slip-Signature` header. If mismatch, Permission Slip
         returns `400 Bad Request` with error code `agent_id_mismatch`.
       example: 42
-    
+
     request_id:
       type: string
       format: uuid
       maxLength: 64
       description: |
         Unique request identifier for replay protection and idempotency. UUID v4 recommended.
-        
-        Permission Slip tracks this value within the timestamp window (300 seconds) and rejects 
+
+        Permission Slip tracks this value within the timestamp window (300 seconds) and rejects
         duplicate requests with `409 Conflict` error code `duplicate_request_id`.
       example: "a925fbe0-db83-4969-9dc5-27f40385f12c"
-    
+
     approver:
       type: string
       pattern: '^[a-zA-Z0-9_-]{1,64}$'
@@ -169,7 +169,7 @@ CancelApprovalRequest:
       description: |
         Unique request identifier for replay protection. UUID v4 recommended.
       example: "21d9ec79-6b20-45b9-8695-83537318966d"
-  
+
   example:
     request_id: "21d9ec79-6b20-45b9-8695-83537318966d"
 
@@ -186,14 +186,14 @@ CancelApprovalResponse:
       description: |
         Approval status. Always `cancelled` for successful cancellation.
       example: "cancelled"
-    
+
     cancelled_at:
       type: string
       format: date-time
       description: |
         ISO 8601 timestamp (RFC 3339 format, UTC) when the approval was cancelled.
       example: "2026-02-11T13:21:00Z"
-  
+
   example:
     status: "cancelled"
     cancelled_at: "2026-02-11T13:21:00Z"
@@ -258,29 +258,16 @@ ApprovalSummary:
       description: When the approval request was created
       example: "2026-02-11T13:20:00Z"
     execution_status:
-      type: string
-      enum:
-        - pending
-        - success
-        - partial
-        - error
-      nullable: true
-      description: |
-        Status of the action execution. Only present when status is `approved`.
-        Null for pending, denied, or cancelled approvals.
-      example: "success"
+      allOf:
+        - $ref: './shared.yaml#/ExecutionStatus'
+        - nullable: true
+          description: |
+            Status of the action execution. Only present when status is `approved`.
+            Null for pending, denied, or cancelled approvals.
     execution_result:
-      type: object
-      additionalProperties: true
-      nullable: true
-      description: |
-        Result data from executing the action. Only present when `execution_status`
-        is `success`, `partial`, or `error`. Structure varies by action type.
+      $ref: './shared.yaml#/ExecutionResult'
     executed_at:
-      type: string
-      format: date-time
-      nullable: true
-      description: When the action was executed (null if not yet executed)
+      $ref: './shared.yaml#/ExecutedAt'
 
 ApprovalListResponse:
   type: object
@@ -329,33 +316,9 @@ ApproveApprovalResponse:
       description: When the approval was approved
       example: "2026-02-21T10:30:00Z"
     execution_status:
-      type: string
-      enum:
-        - success
-        - partial
-        - error
-        - pending
-      description: |
-        Status of the action execution that was triggered by the approval.
-
-        - **success**: Action executed successfully via the external service
-        - **partial**: Action partially completed (e.g., some recipients failed)
-        - **error**: Action execution failed
-        - **pending**: Execution is still in progress (async)
-      example: "success"
+      $ref: './shared.yaml#/ExecutionStatus'
     execution_result:
-      type: object
-      additionalProperties: true
-      nullable: true
-      description: |
-        Result data from executing the action. Structure varies by action type.
-        May be null if execution is still pending or if an error occurred.
-
-        On success, contains the external service response (e.g., `{ "message_id": "msg_abc123" }`).
-        On error, contains error details (e.g., `{ "error": "upstream_timeout", "message": "..." }`).
-      example:
-        message_id: "msg_abc123"
-        delivery_status: "queued"
+      $ref: './shared.yaml#/ExecutionResult'
 
 ApprovalStatusResponse:
   type: object
@@ -402,39 +365,16 @@ ApprovalStatusResponse:
       description: When the approval expires
       example: "2026-02-21T10:35:00Z"
     execution_status:
-      type: string
-      enum:
-        - pending
-        - success
-        - partial
-        - error
-      nullable: true
-      description: |
-        Status of the action execution. Only present when approval status is `approved`.
-
-        - **pending**: Execution is still in progress
-        - **success**: Action executed successfully
-        - **partial**: Action partially completed
-        - **error**: Action execution failed
-
-        Null when the approval has not been approved yet.
-      example: "success"
+      allOf:
+        - $ref: './shared.yaml#/ExecutionStatus'
+        - nullable: true
+          description: |
+            Status of the action execution. Only present when approval status is `approved`.
+            Null when the approval has not been approved yet.
     execution_result:
-      type: object
-      additionalProperties: true
-      nullable: true
-      description: |
-        Result data from executing the action. Only present when `execution_status`
-        is `success`, `partial`, or `error`. Structure varies by action type.
-      example:
-        message_id: "msg_abc123"
-        delivery_status: "queued"
+      $ref: './shared.yaml#/ExecutionResult'
     executed_at:
-      type: string
-      format: date-time
-      nullable: true
-      description: When the action was executed (null if not yet executed)
-      example: "2026-02-21T10:30:01Z"
+      $ref: './shared.yaml#/ExecutedAt'
 
 DenyApprovalResponse:
   type: object
