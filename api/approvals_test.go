@@ -534,6 +534,17 @@ func TestApproveApproval_Success(t *testing.T) {
 		t.Error("expected approved_at to be set")
 	}
 
+	// Execution should have been attempted (no connector in test → "error").
+	if resp.ExecutionStatus == nil {
+		t.Fatal("expected execution_status to be set")
+	}
+	if *resp.ExecutionStatus != "error" {
+		t.Errorf("expected execution_status 'error' (no connector in test), got %q", *resp.ExecutionStatus)
+	}
+	if resp.ExecutionResult == nil {
+		t.Fatal("expected execution_result to be set")
+	}
+
 	// Verify it no longer appears in pending list
 	r2 := authenticatedRequest(t, http.MethodGet, "/approvals", uid)
 	w2 := httptest.NewRecorder()

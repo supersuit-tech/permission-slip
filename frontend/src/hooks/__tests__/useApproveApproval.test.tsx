@@ -12,6 +12,8 @@ const mockApproveResponse = {
   approval_id: "approval-abc",
   status: "approved",
   approved_at: "2026-02-21T12:00:00Z",
+  execution_status: "success" as const,
+  execution_result: { data: "ok" },
 };
 
 describe("useApproveApproval", () => {
@@ -60,6 +62,8 @@ describe("useApproveApproval", () => {
 
     expect(response!.approval_id).toBe("approval-abc");
     expect(response!.status).toBe("approved");
+    expect(response!.execution_status).toBe("success");
+    expect(response!.execution_result).toEqual({ data: "ok" });
   });
 
   it("throws when not authenticated", async () => {
