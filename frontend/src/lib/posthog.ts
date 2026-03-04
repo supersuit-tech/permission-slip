@@ -47,6 +47,11 @@ export function initPostHog(): void {
   devLog("initializing →", POSTHOG_HOST);
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
+    // Route SDK asset requests (config.js, toolbar, surveys widget) through
+    // the same reverse proxy so they aren't blocked by our CSP. Without this,
+    // posthog-js fetches from us-assets.i.posthog.com which isn't in our
+    // script-src allowlist.
+    ui_host: POSTHOG_HOST,
     // Start opted out — no events are sent until the user consents.
     opt_out_capturing_by_default: true,
     // Memory-only persistence avoids writing cookies/localStorage
