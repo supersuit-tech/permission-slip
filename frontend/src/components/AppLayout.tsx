@@ -11,6 +11,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/";
   const isActivity = pathname === "/activity";
   const isSettings = pathname === "/settings";
+  const isBilling = pathname === "/billing";
   const { approvals } = useApprovals();
   const pendingCount = approvals.length;
 
@@ -55,6 +56,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </li>
           <li className="font-medium text-muted-foreground">
             Roles
+          </li>
+          <li className={cn(
+            "pb-1 font-medium",
+            isBilling
+              ? "border-b-2 border-secondary text-foreground"
+              : "text-muted-foreground"
+          )}>
+            <Link to="/billing" aria-current={isBilling ? "page" : undefined}>Billing</Link>
           </li>
           <li className={cn(
             "pb-1 font-medium",
