@@ -6,29 +6,6 @@ import { makeApproval, MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtu
 
 // --- Mocks ---
 
-jest.mock("../../../lib/supabaseClient", () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: jest.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      }),
-      signInWithOtp: jest.fn(),
-      verifyOtp: jest.fn(),
-      signOut: jest.fn(),
-    },
-  },
-}));
-
-jest.mock("../../../hooks/useAgents", () => ({
-  useAgents: () => ({
-    agents: MOCK_AGENTS,
-    isLoading: false,
-    error: null,
-  }),
-  getAgentDisplayName: mockGetAgentDisplayName,
-}));
-
 const mockApproveApproval = jest.fn();
 const mockDenyApproval = jest.fn();
 
@@ -48,6 +25,28 @@ jest.mock("../../../hooks/useDenyApproval", () => ({
     error: null,
     reset: jest.fn(),
   }),
+}));
+
+jest.mock("../../../lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: jest.fn() } },
+      }),
+      signInWithOtp: jest.fn(),
+      verifyOtp: jest.fn(),
+      signOut: jest.fn(),
+    },
+  },
+}));
+
+jest.mock("../../../hooks/useAgents", () => ({
+  useAgents: () => ({
+    agents: MOCK_AGENTS,
+    isLoading: false,
+  }),
+  getAgentDisplayName: mockGetAgentDisplayName,
 }));
 
 jest.mock("react-native-safe-area-context", () => ({

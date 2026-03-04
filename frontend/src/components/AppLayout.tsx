@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Activity } from "lucide-react";
+import { LayoutDashboard, Activity, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
 import { Footer } from "./Footer";
@@ -11,6 +11,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/";
   const isActivity = pathname === "/activity";
   const isSettings = pathname === "/settings";
+  const isBilling = pathname === "/billing";
   const { approvals } = useApprovals();
   const pendingCount = approvals.length;
 
@@ -55,6 +56,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </li>
           <li className="font-medium text-muted-foreground">
             Roles
+          </li>
+          <li className={cn(
+            "pb-1 font-medium",
+            isBilling
+              ? "border-b-2 border-secondary text-foreground"
+              : "text-muted-foreground"
+          )}>
+            <Link to="/billing" aria-current={isBilling ? "page" : undefined}>Billing</Link>
           </li>
           <li className={cn(
             "pb-1 font-medium",
@@ -105,6 +114,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Activity className="size-5" aria-hidden="true" />
             Activity
+          </Link>
+          <Link
+            to="/billing"
+            aria-current={isBilling ? "page" : undefined}
+            className={cn(
+              "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
+              isBilling ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            <CreditCard className="size-5" aria-hidden="true" />
+            Billing
           </Link>
         </div>
       </nav>

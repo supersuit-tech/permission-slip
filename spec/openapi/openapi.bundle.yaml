@@ -99,6 +99,8 @@ tags:
     description: User profile management (session-authenticated)
   - name: Push Subscriptions
     description: Web Push subscription management (session-authenticated)
+  - name: Expo Push Tokens
+    description: Expo push token management for mobile push notifications (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -4705,6 +4707,88 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/expo-push-tokens:
+    get:
+      summary: List Expo push tokens
+      description: Returns all Expo push tokens registered by the authenticated user.
+      operationId: listExpoPushTokens
+      tags:
+        - Expo Push Tokens
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Expo push tokens retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpoPushTokenListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Register Expo push token
+      description: |
+        Register an Expo push token from the mobile app. If the same token
+        already exists for this user, the request is idempotent (no duplicate
+        is created).
+      operationId: createExpoPushToken
+      tags:
+        - Expo Push Tokens
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpoPushTokenRequest'
+      responses:
+        '201':
+          description: Expo push token registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpoPushTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/expo-push-tokens/{token_id}:
+    delete:
+      summary: Delete Expo push token
+      description: Remove an Expo push token registration by ID.
+      operationId: deleteExpoPushToken
+      tags:
+        - Expo Push Tokens
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          description: Expo push token registration ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Expo push token deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteExpoPushTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/billing/subscription:
     get:
       summary: Get current subscription
@@ -8629,6 +8713,65 @@ components:
           type: string
           description: Base64url-encoded VAPID public key
           example: BNx...
+    CreateExpoPushTokenRequest:
+      type: object
+      description: Register an Expo push token from the mobile app.
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Expo push token from the mobile device (e.g. "ExponentPushToken[...]")
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+    ExpoPushTokenResponse:
+      type: object
+      description: A registered Expo push token.
+      required:
+        - id
+        - token
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Token registration ID
+          example: 1
+        token:
+          type: string
+          description: Expo push token string
+          example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+        created_at:
+          type: string
+          format: date-time
+          description: When the token was registered
+          example: '2026-03-04T10:00:00Z'
+    ExpoPushTokenListResponse:
+      type: object
+      description: List of registered Expo push tokens.
+      required:
+        - tokens
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpoPushTokenResponse'
+    DeleteExpoPushTokenResponse:
+      type: object
+      description: Confirmation of Expo push token deletion.
+      required:
+        - id
+        - deleted_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Deleted token ID
+          example: 1
+        deleted_at:
+          type: string
+          format: date-time
+          description: Deletion timestamp
+          example: '2026-03-04T10:05:00Z'
     SubscriptionResponse:
       type: object
       required:
@@ -9781,6 +9924,15 @@ components:
       in: path
       required: true
       description: Push subscription ID (auto-incrementing integer).
+      schema:
+        type: integer
+        format: int64
+      example: 1
+    ExpoPushTokenId:
+      name: token_id
+      in: path
+      required: true
+      description: Expo push token registration ID (auto-incrementing integer).
       schema:
         type: integer
         format: int64

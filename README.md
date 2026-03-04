@@ -214,6 +214,7 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
 | `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
+| `EXPO_ACCESS_TOKEN` | Optional | Expo Push Service access token for higher rate limits — generate at [expo.dev](https://expo.dev/accounts/[account]/settings/access-tokens) |
 
 **Billing (`BILLING_ENABLED`):** Controls whether billing features are active. When unset or `false` (the default), all users are automatically assigned the unlimited `pay_as_you_go` plan — no Stripe keys, metering, or plan restrictions needed. Set to `true` for managed deployments that require plan-based limits and Stripe integration. The server logs the billing mode at startup. The frontend can query `GET /v1/config` to adapt its UI based on whether billing is enabled.
 
@@ -233,6 +234,8 @@ go run ./cmd/generate-vapid-keys --format=heroku
 ```
 
 > **Warning:** Changing VAPID keys invalidates all existing Web Push subscriptions. Users will need to re-subscribe to push notifications.
+
+**Mobile Push (Expo):** Mobile push notifications are always enabled when a database is configured — no additional keys required. The sender uses the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/) to deliver notifications to registered devices. Set `EXPO_ACCESS_TOKEN` for authenticated mode (higher rate limits); without it, unauthenticated mode is used.
 
 ## Mobile App
 

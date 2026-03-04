@@ -196,4 +196,29 @@ describe("useDenyApproval", () => {
     expect(thrownError!.message).toBe("Not authenticated");
     expect(mockPost).not.toHaveBeenCalled();
   });
+
+  it("invalidates approvals queries on success", async () => {
+    mockPost.mockResolvedValue({ data: { approval_id: "appr_1", status: "denied" }, error: undefined });
+
+    const { capture, Consumer } = createHookCapture();
+    currentQueryClient = createQueryClient();
+    const invalidateSpy = jest.spyOn(currentQueryClient, "invalidateQueries");
+
+    await act(async () => {
+      currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
+    });
+
+    const session = mockSession();
+    await act(async () => {
+      authMocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
+    });
+
+    await waitFor(() => capture.denyApproval !== null);
+
+    await act(async () => {
+      await capture.denyApproval!("appr_1");
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["approvals"] });
+  });
 });

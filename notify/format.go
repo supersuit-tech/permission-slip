@@ -46,6 +46,55 @@ func SummarizeAction(action json.RawMessage) string {
 	return "an action"
 }
 
+// PushContent holds the display content for a push notification. Both the
+// web push and mobile push channels use this to build their transport-specific
+// payloads — keeping content generation in one place.
+type PushContent struct {
+	Title      string
+	Body       string
+	URL        string
+	ApprovalID string
+}
+
+// BuildPushContent constructs the push notification display content from
+// approval data. Used by both webpush and mobilepush senders to ensure
+// consistent messaging across push channels.
+func BuildPushContent(approval Approval) PushContent {
+	if approval.Type == NotificationTypePaymentFailed {
+		return PushContent{
+			Title:      "Payment Failed",
+			Body:       "Your subscription payment could not be processed. Update your payment method to avoid losing access.",
+			URL:        approval.ApprovalURL,
+			ApprovalID: approval.ApprovalID,
+		}
+	}
+
+	title := "Approval Request"
+	if approval.AgentName != "" {
+		title = approval.AgentName
+	}
+
+	body := "Action requires your approval"
+	if len(approval.Action) > 0 {
+		var action struct {
+			Type    string `json:"type"`
+			Summary string `json:"summary"`
+		}
+		if json.Unmarshal(approval.Action, &action) == nil && action.Summary != "" {
+			body = TruncateUTF8(action.Summary, 200)
+		} else if action.Type != "" {
+			body = action.Type
+		}
+	}
+
+	return PushContent{
+		Title:      title,
+		Body:       body,
+		URL:        approval.ApprovalURL,
+		ApprovalID: approval.ApprovalID,
+	}
+}
+
 // TruncateUTF8 truncates s to at most maxRunes runes, appending "..." if
 // truncation occurred. This is safe for multi-byte UTF-8 characters — it
 // never splits a character mid-byte.

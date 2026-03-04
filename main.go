@@ -27,8 +27,9 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
+	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
+	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
@@ -280,6 +281,18 @@ func main() {
 			}
 			senders = append(senders, webpush.New(vapidKeys, subject, deps.DB))
 		}
+	}
+
+	// Mobile Push (Expo): Register sender when the database is available.
+	// The Expo access token is optional — unauthenticated requests work
+	// but have lower rate limits.
+	if deps.DB != nil {
+		if notifyCfg.ExpoAccessToken != "" {
+			log.Println("Mobile Push: Expo access token configured (authenticated mode)")
+		} else {
+			log.Println("Mobile Push: no EXPO_ACCESS_TOKEN set, using unauthenticated mode (lower rate limits)")
+		}
+		senders = append(senders, mobilepush.New(deps.DB, notifyCfg.ExpoAccessToken))
 	}
 
 	notify.LogChannelSummary(senders)

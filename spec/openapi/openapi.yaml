@@ -103,6 +103,8 @@ tags:
     description: User profile management (session-authenticated)
   - name: Push Subscriptions
     description: Web Push subscription management (session-authenticated)
+  - name: Expo Push Tokens
+    description: Expo push token management for mobile push notifications (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -225,6 +227,12 @@ paths:
 
   /v1/push-subscriptions/{subscription_id}:
     $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptionById'
+
+  /v1/expo-push-tokens:
+    $ref: './components/paths/expo_push_tokens.yaml#/expoPushTokens'
+
+  /v1/expo-push-tokens/{token_id}:
+    $ref: './components/paths/expo_push_tokens.yaml#/expoPushTokenById'
 
   /v1/billing/subscription:
     $ref: './components/paths/billing.yaml#/subscription'
@@ -449,6 +457,16 @@ components:
     VAPIDPublicKeyResponse:
       $ref: './components/schemas/push_subscriptions.yaml#/VAPIDPublicKeyResponse'
 
+    # Expo Push Tokens
+    CreateExpoPushTokenRequest:
+      $ref: './components/schemas/expo_push_tokens.yaml#/CreateExpoPushTokenRequest'
+    ExpoPushTokenResponse:
+      $ref: './components/schemas/expo_push_tokens.yaml#/ExpoPushTokenResponse'
+    ExpoPushTokenListResponse:
+      $ref: './components/schemas/expo_push_tokens.yaml#/ExpoPushTokenListResponse'
+    DeleteExpoPushTokenResponse:
+      $ref: './components/schemas/expo_push_tokens.yaml#/DeleteExpoPushTokenResponse'
+
     # Billing
     SubscriptionResponse:
       $ref: './components/schemas/billing.yaml#/SubscriptionResponse'
@@ -530,6 +548,8 @@ components:
       $ref: './components/parameters/common.yaml#/StandingApprovalId'
     PushSubscriptionId:
       $ref: './components/parameters/common.yaml#/PushSubscriptionId'
+    ExpoPushTokenId:
+      $ref: './components/parameters/common.yaml#/ExpoPushTokenId'
 
   responses:
     BadRequest:
