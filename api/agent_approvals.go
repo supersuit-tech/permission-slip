@@ -48,6 +48,7 @@ type agentCancelApprovalResponse struct {
 func RegisterAgentApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireAgent := RequireAgentSignature(deps)
 	mux.Handle("POST /approvals/request", requireAgent(handleAgentRequestApproval(deps)))
+	mux.Handle("GET /approvals/{approval_id}/status", requireAgent(handleAgentApprovalStatus(deps)))
 	mux.Handle("POST /approvals/{approval_id}/cancel", requireAgent(handleAgentCancelApproval(deps)))
 }
 
@@ -245,6 +246,56 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 			Status:      appr.Status,
 			CancelledAt: *appr.CancelledAt,
 		})
+	}
+}
+
+// ── GET /approvals/{approval_id}/status ─────────────────────────────────────
+
+type agentApprovalStatusResponse struct {
+	ApprovalID      string           `json:"approval_id"`
+	Status          string           `json:"status"`
+	ExecutionStatus *string          `json:"execution_status,omitempty"`
+	ExecutionResult *json.RawMessage `json:"execution_result,omitempty"`
+	ExpiresAt       time.Time        `json:"expires_at"`
+	CreatedAt       time.Time        `json:"created_at"`
+}
+
+func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		agent := AuthenticatedAgent(r.Context())
+		approvalID := r.PathValue("approval_id")
+
+		if strings.TrimSpace(approvalID) == "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "approval_id is required"))
+			return
+		}
+
+		appr, err := db.GetApprovalByIDAndAgent(r.Context(), deps.DB, approvalID, agent.AgentID)
+		if err != nil {
+			log.Printf("[%s] AgentApprovalStatus: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get approval status"))
+			return
+		}
+		if appr == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
+			return
+		}
+
+		resp := agentApprovalStatusResponse{
+			ApprovalID: appr.ApprovalID,
+			Status:     appr.Status,
+			ExpiresAt:  appr.ExpiresAt,
+			CreatedAt:  appr.CreatedAt,
+		}
+		if appr.ExecutionStatus != nil {
+			resp.ExecutionStatus = appr.ExecutionStatus
+		}
+		if len(appr.ExecutionResult) > 0 {
+			raw := json.RawMessage(appr.ExecutionResult)
+			resp.ExecutionResult = &raw
+		}
+
+		RespondJSON(w, http.StatusOK, resp)
 	}
 }
 
