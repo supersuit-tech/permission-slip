@@ -31,6 +31,10 @@ export function useBillingPlan() {
       return data;
     },
     enabled: !!accessToken,
+    // Plan data changes infrequently (only on upgrade/downgrade). A 2-minute
+    // staleTime prevents redundant refetches when multiple components on the
+    // same page call this hook (e.g. dashboard has agents + standing approvals).
+    staleTime: 2 * 60 * 1000,
   });
 
   return {

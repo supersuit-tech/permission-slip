@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Bell, Loader2, AlertTriangle, ArrowUpRight, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/useProfile";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
@@ -112,7 +113,10 @@ export function NotificationSection() {
               return (
                 <div
                   key={pref.channel}
-                  className={`rounded-lg border p-4${planGated ? " border-dashed opacity-75" : ""}`}
+                  className={cn(
+                    "rounded-lg border p-4",
+                    planGated && "border-dashed opacity-75",
+                  )}
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">

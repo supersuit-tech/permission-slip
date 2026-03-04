@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface LimitBadgeProps {
   current: number;
@@ -27,22 +28,24 @@ export function LimitBadge({ current, max, resource }: LimitBadgeProps) {
   const atLimit = current >= max;
   const nearLimit = max > 0 && current / max >= 0.8;
 
-  let className = "text-xs font-normal";
-  if (atLimit) {
-    className +=
-      " border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400";
-  } else if (nearLimit) {
-    className +=
-      " border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400";
-  }
-
   const remaining = max - current;
   const ariaLabel = atLimit
     ? `${resource} limit reached (${current} of ${max})`
     : `${current} of ${max} ${resource} used, ${remaining} remaining`;
 
   return (
-    <Badge variant="outline" className={className} aria-label={ariaLabel}>
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs font-normal",
+        atLimit &&
+          "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400",
+        !atLimit &&
+          nearLimit &&
+          "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400",
+      )}
+      aria-label={ariaLabel}
+    >
       {current} / {max} {resource}
     </Badge>
   );
