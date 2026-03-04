@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useUpgradePlan } from "@/hooks/useUpgradePlan";
+import { isSafeUrl } from "./formatters";
 
 const FREE_FEATURES = [
   "1,000 requests/month",
@@ -48,6 +49,9 @@ export function UpgradeCTA() {
     try {
       const result = await upgrade();
       if (result?.checkout_url) {
+        if (!isSafeUrl(result.checkout_url)) {
+          throw new Error("Invalid checkout URL received");
+        }
         setIsRedirecting(true);
         window.location.href = result.checkout_url;
       }

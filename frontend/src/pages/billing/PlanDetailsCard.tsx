@@ -19,7 +19,7 @@ import { useDowngradePlan } from "@/hooks/useDowngradePlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { useBillingInvoices } from "@/hooks/useBillingInvoices";
 import type { Subscription } from "@/hooks/useBillingPlan";
-import { formatCents, formatDate } from "./formatters";
+import { formatCents, formatDate, isSafeUrl } from "./formatters";
 
 interface PlanDetailsCardProps {
   subscription: Subscription;
@@ -64,7 +64,7 @@ function InvoicesList() {
           </span>
           <div className="flex items-center gap-3">
             <span className="tabular-nums">{formatCents(invoice.amount_cents)}</span>
-            {invoice.stripe_invoice_url && (
+            {invoice.stripe_invoice_url && isSafeUrl(invoice.stripe_invoice_url) && (
               <a
                 href={invoice.stripe_invoice_url}
                 target="_blank"

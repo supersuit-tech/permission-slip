@@ -5,107 +5,21 @@ import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, mockPost, resetClientMocks } from "../../../api/__mocks__/client";
 import { BillingPage } from "../BillingPage";
+import {
+  freePlanResponse,
+  paidPlanResponse,
+  usageDetailResponse,
+  invoicesResponse,
+} from "./fixtures";
 
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
-const freePlanResponse = {
-  plan: {
-    id: "free",
-    name: "Free",
-    max_requests_per_month: 1000,
-    max_agents: 3,
-    max_standing_approvals: 5,
-    max_credentials: 5,
-    audit_retention_days: 7,
-  },
-  subscription: {
-    status: "active" as const,
-    current_period_start: "2026-03-01T00:00:00Z",
-    current_period_end: "2026-04-01T00:00:00Z",
-    has_payment_method: false,
-    can_upgrade: true,
-    can_downgrade: false,
-    grace_period_ends_at: null,
-  },
-  usage: {
-    requests: 450,
-    agents: 2,
-    standing_approvals: 3,
-    credentials: 1,
-  },
-};
-
-const paidPlanResponse = {
-  plan: {
-    id: "pay_as_you_go",
-    name: "Pay As You Go",
-    max_requests_per_month: null,
-    max_agents: null,
-    max_standing_approvals: null,
-    max_credentials: null,
-    audit_retention_days: 90,
-  },
-  subscription: {
-    status: "active" as const,
-    current_period_start: "2026-03-01T00:00:00Z",
-    current_period_end: "2026-04-01T00:00:00Z",
-    has_payment_method: true,
-    can_upgrade: false,
-    can_downgrade: true,
-    grace_period_ends_at: null,
-  },
-  usage: {
-    requests: 1542,
-    agents: 5,
-    standing_approvals: 10,
-    credentials: 8,
-  },
-};
-
-const usageDetailResponse = {
-  period_start: "2026-03-01T00:00:00Z",
-  period_end: "2026-04-01T00:00:00Z",
-  requests: { total: 1542, included: 1000, overage: 542, cost_cents: 271 },
-  sms: { total: 5, cost_cents: 5 },
-};
-
-const invoicesResponse = {
-  invoices: [
-    {
-      id: "inv_001",
-      date: "2026-02-01T00:00:00Z",
-      period_start: "2026-02-01T00:00:00Z",
-      period_end: "2026-03-01T00:00:00Z",
-      amount_cents: 271,
-      status: "paid",
-      stripe_invoice_url: "https://invoice.stripe.com/i/test",
-    },
-  ],
-  has_more: false,
-};
-
-function mockFreePlanApi() {
+function mockBillingApi(planResponse: typeof freePlanResponse | typeof paidPlanResponse) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/billing/plan") {
-      return Promise.resolve({ data: freePlanResponse });
-    }
-    if (url === "/v1/billing/usage") {
-      return Promise.resolve({ data: usageDetailResponse });
-    }
-    if (url === "/v1/billing/invoices") {
-      return Promise.resolve({ data: invoicesResponse });
-    }
-    return Promise.resolve({ data: null });
-  });
-}
-
-function mockPaidPlanApi() {
-  setupAuthMocks({ authenticated: true });
-  mockGet.mockImplementation((url: string) => {
-    if (url === "/v1/billing/plan") {
-      return Promise.resolve({ data: paidPlanResponse });
+      return Promise.resolve({ data: planResponse });
     }
     if (url === "/v1/billing/usage") {
       return Promise.resolve({ data: usageDetailResponse });
@@ -140,7 +54,7 @@ describe("BillingPage", () => {
   });
 
   it("renders page title and back link", async () => {
-    mockFreePlanApi();
+    mockBillingApi(freePlanResponse);
 
     render(<BillingPage />, { wrapper });
 
@@ -152,7 +66,7 @@ describe("BillingPage", () => {
     ).toHaveAttribute("href", "/");
   });
 
-  it("shows loading state", () => {
+  it("shows loading skeleton", () => {
     setupAuthMocks({ authenticated: true });
     mockGet.mockImplementation(() => new Promise(() => {}));
 
@@ -174,7 +88,7 @@ describe("BillingPage", () => {
 
   describe("Free plan", () => {
     it("renders plan card with Free badge", async () => {
-      mockFreePlanApi();
+      mockBillingApi(freePlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -186,7 +100,7 @@ describe("BillingPage", () => {
     });
 
     it("renders usage summary with progress indicators", async () => {
-      mockFreePlanApi();
+      mockBillingApi(freePlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -202,7 +116,7 @@ describe("BillingPage", () => {
     });
 
     it("shows upgrade CTA for free plan", async () => {
-      mockFreePlanApi();
+      mockBillingApi(freePlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -213,7 +127,7 @@ describe("BillingPage", () => {
     });
 
     it("does not show plan details card for free plan", async () => {
-      mockFreePlanApi();
+      mockBillingApi(freePlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -224,41 +138,42 @@ describe("BillingPage", () => {
     });
 
     it("redirects to Stripe on upgrade click", async () => {
-      mockFreePlanApi();
+      mockBillingApi(freePlanResponse);
       mockPost.mockResolvedValue({
         data: { checkout_url: "https://checkout.stripe.com/test" },
       });
 
-      // Mock window.location for redirect
       const originalLocation = window.location;
       Object.defineProperty(window, "location", {
         writable: true,
         value: { ...originalLocation, href: "" },
       });
 
-      const user = userEvent.setup();
-      render(<BillingPage />, { wrapper });
+      try {
+        const user = userEvent.setup();
+        render(<BillingPage />, { wrapper });
 
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
-      });
+        await waitFor(() => {
+          expect(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ })).toBeInTheDocument();
+        });
 
-      await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
+        await user.click(screen.getByRole("button", { name: /Upgrade to Pay-as-you-go/ }));
 
-      await waitFor(() => {
-        expect(window.location.href).toBe("https://checkout.stripe.com/test");
-      });
-
-      Object.defineProperty(window, "location", {
-        writable: true,
-        value: originalLocation,
-      });
+        await waitFor(() => {
+          expect(window.location.href).toBe("https://checkout.stripe.com/test");
+        });
+      } finally {
+        Object.defineProperty(window, "location", {
+          writable: true,
+          value: originalLocation,
+        });
+      }
     });
   });
 
   describe("Paid plan", () => {
     it("renders plan card with Pay-as-you-go badge", async () => {
-      mockPaidPlanApi();
+      mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -269,20 +184,19 @@ describe("BillingPage", () => {
     });
 
     it("shows unlimited usage for paid plan", async () => {
-      mockPaidPlanApi();
+      mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
 
       await waitFor(() => {
         expect(screen.getByText("Usage")).toBeInTheDocument();
       });
-      // Paid plan has null limits, so usage rows show "Unlimited"
       const unlimitedTexts = screen.getAllByText(/Unlimited/);
       expect(unlimitedTexts.length).toBeGreaterThanOrEqual(1);
     });
 
     it("does not show upgrade CTA for paid plan", async () => {
-      mockPaidPlanApi();
+      mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -293,7 +207,7 @@ describe("BillingPage", () => {
     });
 
     it("shows plan details card with invoices", async () => {
-      mockPaidPlanApi();
+      mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -305,7 +219,7 @@ describe("BillingPage", () => {
     });
 
     it("shows downgrade button on paid plan", async () => {
-      mockPaidPlanApi();
+      mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
 
@@ -315,7 +229,7 @@ describe("BillingPage", () => {
     });
 
     it("shows downgrade confirmation on click", async () => {
-      mockPaidPlanApi();
+      mockBillingApi(paidPlanResponse);
       const user = userEvent.setup();
 
       render(<BillingPage />, { wrapper });
