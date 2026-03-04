@@ -15,19 +15,30 @@ const (
 	maxPushEndpointLength = 2048
 	maxPushP256dhLength   = 256 // P-256 public key is 65 bytes → 88 chars base64url
 	maxPushAuthLength     = 64  // Auth secret is 16 bytes → 22 chars base64url
+	maxExpoTokenLength    = 256 // Expo tokens are ~50 chars; generous limit
 )
 
 // --- Request / response types ---
 
 type createPushSubscriptionRequest struct {
+	// Type discriminates between web-push and expo subscriptions.
+	// Defaults to "web-push" when omitted for backward compatibility.
+	Type string `json:"type"`
+
+	// Web Push fields (required when type is "web-push" or omitted).
 	Endpoint string `json:"endpoint"`
 	P256dh   string `json:"p256dh"`
 	Auth     string `json:"auth"`
+
+	// Expo field (required when type is "expo").
+	ExpoToken string `json:"expo_token"`
 }
 
 type pushSubscriptionResponse struct {
 	ID        int64     `json:"id"`
-	Endpoint  string    `json:"endpoint"`
+	Channel   string    `json:"channel"`
+	Endpoint  *string   `json:"endpoint,omitempty"`
+	ExpoToken *string   `json:"expo_token,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -70,11 +81,7 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 
 		data := make([]pushSubscriptionResponse, len(subs))
 		for i, s := range subs {
-			data[i] = pushSubscriptionResponse{
-				ID:        s.ID,
-				Endpoint:  s.Endpoint,
-				CreatedAt: s.CreatedAt,
-			}
+			data[i] = toPushSubscriptionResponse(s)
 		}
 
 		RespondJSON(w, http.StatusOK, pushSubscriptionListResponse{Subscriptions: data})
@@ -90,48 +97,84 @@ func handleCreatePushSubscription(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.Endpoint == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "endpoint is required"))
-			return
-		}
-		if !strings.HasPrefix(req.Endpoint, "https://") {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "endpoint must be an HTTPS URL"))
-			return
-		}
-		if len(req.Endpoint) > maxPushEndpointLength {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "endpoint URL too long"))
-			return
-		}
-		if req.P256dh == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "p256dh is required"))
-			return
-		}
-		if len(req.P256dh) > maxPushP256dhLength {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "p256dh value too long"))
-			return
-		}
-		if req.Auth == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "auth is required"))
-			return
-		}
-		if len(req.Auth) > maxPushAuthLength {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "auth value too long"))
-			return
+		// Default to web-push for backward compatibility.
+		if req.Type == "" {
+			req.Type = "web-push"
 		}
 
-		sub, err := db.UpsertPushSubscription(r.Context(), deps.DB, profile.ID, req.Endpoint, req.P256dh, req.Auth)
-		if err != nil {
-			log.Printf("[%s] CreatePushSubscription: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create push subscription"))
-			return
+		switch req.Type {
+		case "web-push":
+			handleCreateWebPush(w, r, deps, profile.ID, req)
+		case "expo":
+			handleCreateExpo(w, r, deps, profile.ID, req)
+		default:
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "type must be \"web-push\" or \"expo\""))
 		}
-
-		RespondJSON(w, http.StatusCreated, pushSubscriptionResponse{
-			ID:        sub.ID,
-			Endpoint:  sub.Endpoint,
-			CreatedAt: sub.CreatedAt,
-		})
 	}
+}
+
+func handleCreateWebPush(w http.ResponseWriter, r *http.Request, deps *Deps, userID string, req createPushSubscriptionRequest) {
+	if req.Endpoint == "" {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "endpoint is required"))
+		return
+	}
+	if !strings.HasPrefix(req.Endpoint, "https://") {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "endpoint must be an HTTPS URL"))
+		return
+	}
+	if len(req.Endpoint) > maxPushEndpointLength {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "endpoint URL too long"))
+		return
+	}
+	if req.P256dh == "" {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "p256dh is required"))
+		return
+	}
+	if len(req.P256dh) > maxPushP256dhLength {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "p256dh value too long"))
+		return
+	}
+	if req.Auth == "" {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "auth is required"))
+		return
+	}
+	if len(req.Auth) > maxPushAuthLength {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "auth value too long"))
+		return
+	}
+
+	sub, err := db.UpsertPushSubscription(r.Context(), deps.DB, userID, req.Endpoint, req.P256dh, req.Auth)
+	if err != nil {
+		log.Printf("[%s] CreatePushSubscription: %v", TraceID(r.Context()), err)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create push subscription"))
+		return
+	}
+
+	RespondJSON(w, http.StatusCreated, toPushSubscriptionResponse(*sub))
+}
+
+func handleCreateExpo(w http.ResponseWriter, r *http.Request, deps *Deps, userID string, req createPushSubscriptionRequest) {
+	if req.ExpoToken == "" {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expo_token is required"))
+		return
+	}
+	if !strings.HasPrefix(req.ExpoToken, "ExponentPushToken[") && !strings.HasPrefix(req.ExpoToken, "ExpoPushToken[") {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expo_token must be a valid Expo push token"))
+		return
+	}
+	if len(req.ExpoToken) > maxExpoTokenLength {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expo_token too long"))
+		return
+	}
+
+	sub, err := db.UpsertExpoPushToken(r.Context(), deps.DB, userID, req.ExpoToken)
+	if err != nil {
+		log.Printf("[%s] CreateExpoPushToken: %v", TraceID(r.Context()), err)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create push subscription"))
+		return
+	}
+
+	RespondJSON(w, http.StatusCreated, toPushSubscriptionResponse(*sub))
 }
 
 func handleDeletePushSubscription(deps *Deps) http.HandlerFunc {
@@ -174,5 +217,16 @@ func handleGetVAPIDKey(deps *Deps) http.HandlerFunc {
 		RespondJSON(w, http.StatusOK, vapidPublicKeyResponse{
 			PublicKey: deps.VAPIDPublicKey,
 		})
+	}
+}
+
+// toPushSubscriptionResponse converts a DB PushSubscription to the API response.
+func toPushSubscriptionResponse(s db.PushSubscription) pushSubscriptionResponse {
+	return pushSubscriptionResponse{
+		ID:        s.ID,
+		Channel:   s.Channel,
+		Endpoint:  s.Endpoint,
+		ExpoToken: s.ExpoToken,
+		CreatedAt: s.CreatedAt,
 	}
 }

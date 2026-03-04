@@ -1,7 +1,7 @@
 pushSubscriptions:
   get:
     summary: List push subscriptions
-    description: Returns all Web Push subscriptions registered by the authenticated user.
+    description: Returns all push subscriptions (Web Push and Expo) registered by the authenticated user.
     operationId: listPushSubscriptions
     tags:
       - Push Subscriptions
@@ -22,9 +22,15 @@ pushSubscriptions:
   post:
     summary: Register push subscription
     description: |
-      Register a Web Push subscription from the browser. If a subscription
-      with the same endpoint already exists for this user, the keys are updated
-      (subscription refresh).
+      Register a push subscription for notifications. Supports two types:
+
+      - **Web Push** (`type: "web-push"` or omitted): Requires `endpoint`, `p256dh`,
+        and `auth` from the browser's PushSubscription. If a subscription with the
+        same endpoint already exists, the keys are updated (subscription refresh).
+
+      - **Expo** (`type: "expo"`): Requires `expo_token` from the mobile app's
+        `expo-notifications` module. If a subscription with the same token already
+        exists, it is refreshed.
     operationId: createPushSubscription
     tags:
       - Push Subscriptions

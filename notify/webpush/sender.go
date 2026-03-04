@@ -49,7 +49,7 @@ type pushPayload struct {
 // cleaned up. Partial failures are logged but do not cause the overall
 // Send to return an error — best-effort delivery across all devices.
 func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient notify.Recipient) error {
-	subs, err := db.ListPushSubscriptionsByUserID(ctx, s.db, recipient.UserID)
+	subs, err := db.ListWebPushSubscriptionsByUserID(ctx, s.db, recipient.UserID)
 	if err != nil {
 		return fmt.Errorf("list push subscriptions: %w", err)
 	}
@@ -79,11 +79,12 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 
 	var lastErr error
 	for _, sub := range subs {
+		// Web-push subscriptions always have these fields set (enforced by DB constraint).
 		wpSub := &wplib.Subscription{
-			Endpoint: sub.Endpoint,
+			Endpoint: derefStr(sub.Endpoint),
 			Keys: wplib.Keys{
-				P256dh: sub.P256dh,
-				Auth:   sub.Auth,
+				P256dh: derefStr(sub.P256dh),
+				Auth:   derefStr(sub.Auth),
 			},
 		}
 
@@ -99,7 +100,7 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 		if resp.StatusCode == http.StatusGone {
 			// Subscription expired — clean up
 			log.Printf("webpush: subscription %d expired (410 Gone), removing", sub.ID)
-			if err := db.DeletePushSubscriptionByEndpoint(ctx, s.db, sub.Endpoint); err != nil {
+			if err := db.DeletePushSubscriptionByEndpoint(ctx, s.db, derefStr(sub.Endpoint)); err != nil {
 				log.Printf("webpush: failed to delete expired subscription: %v", err)
 			}
 			continue
@@ -113,6 +114,14 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 	}
 
 	return lastErr
+}
+
+// derefStr returns the string value of a pointer, or "" if nil.
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // buildBody constructs the push notification payload from the approval data.

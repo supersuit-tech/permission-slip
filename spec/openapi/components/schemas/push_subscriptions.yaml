@@ -1,31 +1,44 @@
 CreatePushSubscriptionRequest:
   type: object
-  description: Register a Web Push subscription from the browser.
-  required:
-    - endpoint
-    - p256dh
-    - auth
+  description: |
+    Register a push subscription. Use `type: "web-push"` (or omit type) for
+    browser Web Push subscriptions, or `type: "expo"` for Expo push tokens
+    from the mobile app.
   properties:
+    type:
+      type: string
+      description: |
+        Subscription type. Defaults to "web-push" when omitted for backward
+        compatibility with existing browser clients.
+      enum:
+        - web-push
+        - expo
+      default: web-push
+      example: "web-push"
     endpoint:
       type: string
       format: uri
-      description: Push service endpoint URL from the browser PushSubscription
+      description: Push service endpoint URL from the browser PushSubscription (required for web-push)
       example: "https://fcm.googleapis.com/fcm/send/abc123..."
     p256dh:
       type: string
-      description: Base64url-encoded P-256 public key from the browser PushSubscription keys
+      description: Base64url-encoded P-256 public key from the browser PushSubscription keys (required for web-push)
       example: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8p8REqnSw"
     auth:
       type: string
-      description: Base64url-encoded auth secret from the browser PushSubscription keys
+      description: Base64url-encoded auth secret from the browser PushSubscription keys (required for web-push)
       example: "tBHItJI5svbpC7RB5gg6bQ"
+    expo_token:
+      type: string
+      description: Expo push token from expo-notifications (required for expo type)
+      example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
 
 PushSubscriptionResponse:
   type: object
-  description: A registered Web Push subscription.
+  description: A registered push subscription (Web Push or Expo).
   required:
     - id
-    - endpoint
+    - channel
     - created_at
   properties:
     id:
@@ -33,11 +46,22 @@ PushSubscriptionResponse:
       format: int64
       description: Subscription ID
       example: 1
+    channel:
+      type: string
+      description: The push channel type
+      enum:
+        - web-push
+        - mobile-push
+      example: "web-push"
     endpoint:
       type: string
       format: uri
-      description: Push service endpoint URL
+      description: Push service endpoint URL (present for web-push subscriptions)
       example: "https://fcm.googleapis.com/fcm/send/abc123..."
+    expo_token:
+      type: string
+      description: Expo push token (present for mobile-push subscriptions)
+      example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
     created_at:
       type: string
       format: date-time
