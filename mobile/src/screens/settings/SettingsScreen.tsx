@@ -3,7 +3,7 @@
  * and sign out. Currently shows a toggle for the mobile-push notification
  * channel; other channels are managed via the web app.
  */
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +32,11 @@ export default function SettingsScreen(_props: Props) {
   const { updatePreferences, isUpdating } =
     useUpdateNotificationPreferences();
 
+  const contentContainerStyle = useMemo(
+    () => ({ paddingBottom: insets.bottom + 24 }),
+    [insets.bottom],
+  );
+
   const mobilePushPref = preferences.find((p) => p.channel === "mobile-push");
   const mobilePushEnabled = mobilePushPref?.enabled ?? true;
 
@@ -58,7 +63,7 @@ export default function SettingsScreen(_props: Props) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+      contentContainerStyle={contentContainerStyle}
     >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notifications</Text>
