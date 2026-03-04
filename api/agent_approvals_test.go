@@ -2,9 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	crand "crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,24 +12,12 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
 
-// testActionSigningKey generates a fresh ECDSA P-256 key pair for testing.
-func testActionSigningKey(t *testing.T) *ecdsa.PrivateKey {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
-	if err != nil {
-		t.Fatalf("generate ECDSA test key: %v", err)
-	}
-	return key
-}
-
-// testDepsWithSigningKey creates a Deps with a fresh action token signing key.
-func testDepsWithSigningKey(t *testing.T, tx db.DBTX) *Deps {
+// testDepsForDB creates a Deps suitable for tests that only need a DB and JWT secret.
+func testDepsForDB(t *testing.T, tx db.DBTX) *Deps {
 	t.Helper()
 	return &Deps{
-		DB:                    tx,
-		SupabaseJWTSecret:     testJWTSecret,
-		ActionTokenSigningKey: testActionSigningKey(t),
-		ActionTokenKeyID:      "test-key-1",
+		DB:                tx,
+		SupabaseJWTSecret: testJWTSecret,
 	}
 }
 

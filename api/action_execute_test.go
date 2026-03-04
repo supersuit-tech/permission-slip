@@ -41,7 +41,7 @@ func setupStandingExecuteTest(t *testing.T, actionType string, opts ...testhelpe
 		testhelper.InsertStandingApprovalWithActionType(t, txVal, saIDVal, aid, uidVal, actionType)
 	}
 
-	d := testDepsWithSigningKey(t, txVal)
+	d := testDepsForDB(t, txVal)
 	r := NewRouter(d)
 
 	return txVal, d, r, aid, pk, saIDVal, uidVal
@@ -89,7 +89,7 @@ func TestExecuteActionStanding_NoMatchReturns404WithHint(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := testDepsWithSigningKey(t, tx)
+	deps := testDepsForDB(t, tx)
 	router := NewRouter(deps)
 
 	// No standing approval exists for this agent/action type.
@@ -126,7 +126,7 @@ func TestExecuteActionStanding_MissingAction(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := testDepsWithSigningKey(t, tx)
+	deps := testDepsForDB(t, tx)
 	router := NewRouter(deps)
 
 	// No action field → 400 missing action.

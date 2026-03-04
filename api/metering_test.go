@@ -223,7 +223,7 @@ func TestMetering_DuplicateStandingExecutionDoesNotDoubleCount(t *testing.T) {
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalWithActionType(t, pu.Pool, saID, pu.AgentID, pu.UserID, "email.read")
 
-	deps := testDepsWithSigningKey(t, pu.Pool)
+	deps := testDepsForDB(t, pu.Pool)
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"dedup_sa_001","action":{"type":"email.read","version":"1","parameters":{}}}`
@@ -302,7 +302,7 @@ func TestMetering_ApproveDoesNotIncrementUsage(t *testing.T) {
 
 func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 	t.Parallel()
-	// Uses testDepsWithSigningKey for action token support (standing execution).
+	// Uses testDepsForDB for standing execution test deps.
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -316,7 +316,7 @@ func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "email.read")
 
-	deps := testDepsWithSigningKey(t, tx)
+	deps := testDepsForDB(t, tx)
 	router := NewRouter(deps)
 
 	// 1. Submit approval request (billable).

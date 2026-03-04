@@ -254,11 +254,6 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 // in approvals.go. Both dashboard and agent endpoints use the same mapping.
 var handleAgentApprovalError = handleApprovalError
 
-// unprocessableEntity returns a 422 ErrorResponse.
-func unprocessableEntity(code ErrorCode, message string) ErrorResponse {
-	return ErrorResponse{Error: Error{Code: code, Message: message, Retryable: false}}
-}
-
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.
 // Only the action type is persisted — parameters are redacted.
 // Billable: approval requests count toward the user's monthly request quota.
