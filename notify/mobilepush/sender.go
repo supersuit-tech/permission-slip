@@ -14,8 +14,8 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/notify"
 )
 
-// ExpoAPIURL is the Expo Push Service endpoint. Overridable for testing.
-var ExpoAPIURL = "https://exp.host/--/api/v2/push/send"
+// defaultExpoAPIURL is the production Expo Push Service endpoint.
+const defaultExpoAPIURL = "https://exp.host/--/api/v2/push/send"
 
 // maxBatchSize is the maximum number of messages per Expo Push API request.
 // The API supports up to 100 messages per batch.
@@ -48,6 +48,7 @@ func (s dbTokenStore) DeleteToken(ctx context.Context, token string) error {
 type Sender struct {
 	store       TokenStore
 	accessToken string // optional Expo access token for authenticated requests
+	apiURL      string // Expo Push API endpoint
 	httpClient  *http.Client
 }
 
@@ -58,6 +59,7 @@ func New(d db.DBTX, accessToken string) *Sender {
 	return &Sender{
 		store:       dbTokenStore{dbtx: d},
 		accessToken: accessToken,
+		apiURL:      defaultExpoAPIURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -163,7 +165,7 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 		return fmt.Errorf("marshal expo push messages: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ExpoAPIURL, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiURL, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}

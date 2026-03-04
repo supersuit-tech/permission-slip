@@ -182,16 +182,19 @@ func testApproval() notify.Approval {
 	}
 }
 
-// newTestSender creates a Sender that uses a mockStore directly (bypassing db.DBTX).
-func newTestSender(store TokenStore, accessToken string) *Sender {
+// newTestSender creates a Sender that uses a mockStore and custom API URL
+// (bypassing db.DBTX and the production Expo endpoint).
+func newTestSender(store TokenStore, accessToken, apiURL string) *Sender {
 	return &Sender{
 		store:       store,
 		accessToken: accessToken,
+		apiURL:      apiURL,
 		httpClient:  &http.Client{Timeout: 5 * time.Second},
 	}
 }
 
 func TestSendBatch_Success(t *testing.T) {
+	t.Parallel()
 	var capturedBody []byte
 	var capturedHeaders http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -207,15 +210,11 @@ func TestSendBatch_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	oldURL := ExpoAPIURL
-	ExpoAPIURL = server.URL
-	defer func() { ExpoAPIURL = oldURL }()
-
 	store := &mockStore{}
 	store.addToken(1, "ExponentPushToken[device1]")
 	store.addToken(2, "ExponentPushToken[device2]")
 
-	sender := newTestSender(store, "test-access-token")
+	sender := newTestSender(store, "test-access-token", server.URL)
 	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
 		UserID:   "user-1",
 		Username: "alice",
@@ -252,6 +251,7 @@ func TestSendBatch_Success(t *testing.T) {
 }
 
 func TestSendBatch_NoAccessToken(t *testing.T) {
+	t.Parallel()
 	var capturedHeaders http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedHeaders = r.Header.Clone()
@@ -262,14 +262,10 @@ func TestSendBatch_NoAccessToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	oldURL := ExpoAPIURL
-	ExpoAPIURL = server.URL
-	defer func() { ExpoAPIURL = oldURL }()
-
 	store := &mockStore{}
 	store.addToken(1, "ExponentPushToken[device1]")
 
-	sender := newTestSender(store, "") // no access token
+	sender := newTestSender(store, "", server.URL) // no access token
 	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
 		UserID:   "user-1",
 		Username: "alice",
@@ -285,6 +281,7 @@ func TestSendBatch_NoAccessToken(t *testing.T) {
 }
 
 func TestSendBatch_DeviceNotRegistered_CleansUpToken(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(expoAPIResponse{
@@ -301,14 +298,10 @@ func TestSendBatch_DeviceNotRegistered_CleansUpToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	oldURL := ExpoAPIURL
-	ExpoAPIURL = server.URL
-	defer func() { ExpoAPIURL = oldURL }()
-
 	store := &mockStore{}
 	store.addToken(1, "ExponentPushToken[invalid]")
 
-	sender := newTestSender(store, "")
+	sender := newTestSender(store, "", server.URL)
 	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
 		UserID:   "user-1",
 		Username: "alice",
@@ -326,20 +319,17 @@ func TestSendBatch_DeviceNotRegistered_CleansUpToken(t *testing.T) {
 }
 
 func TestSendBatch_ServerError(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("internal server error"))
 	}))
 	defer server.Close()
 
-	oldURL := ExpoAPIURL
-	ExpoAPIURL = server.URL
-	defer func() { ExpoAPIURL = oldURL }()
-
 	store := &mockStore{}
 	store.addToken(1, "ExponentPushToken[device1]")
 
-	sender := newTestSender(store, "")
+	sender := newTestSender(store, "", server.URL)
 	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
 		UserID:   "user-1",
 		Username: "alice",
@@ -351,6 +341,7 @@ func TestSendBatch_ServerError(t *testing.T) {
 }
 
 func TestSendBatch_TopLevelAPIError(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(expoAPIResponse{
@@ -364,14 +355,10 @@ func TestSendBatch_TopLevelAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	oldURL := ExpoAPIURL
-	ExpoAPIURL = server.URL
-	defer func() { ExpoAPIURL = oldURL }()
-
 	store := &mockStore{}
 	store.addToken(1, "ExponentPushToken[device1]")
 
-	sender := newTestSender(store, "")
+	sender := newTestSender(store, "", server.URL)
 	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
 		UserID:   "user-1",
 		Username: "alice",
@@ -383,19 +370,16 @@ func TestSendBatch_TopLevelAPIError(t *testing.T) {
 }
 
 func TestSend_NoTokens(t *testing.T) {
+	t.Parallel()
 	requestMade := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestMade = true
 	}))
 	defer server.Close()
 
-	oldURL := ExpoAPIURL
-	ExpoAPIURL = server.URL
-	defer func() { ExpoAPIURL = oldURL }()
-
 	store := &mockStore{} // no tokens
 
-	sender := newTestSender(store, "")
+	sender := newTestSender(store, "", server.URL)
 	err := sender.Send(context.Background(), testApproval(), notify.Recipient{
 		UserID:   "user-1",
 		Username: "alice",
