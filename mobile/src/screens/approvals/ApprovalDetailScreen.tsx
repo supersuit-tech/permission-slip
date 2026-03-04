@@ -3,11 +3,8 @@
  * request including agent info, action parameters, risk level, expiry
  * countdown, context, and timeline. Pending approvals show a deny button.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,7 +14,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
-import { useDenyApproval } from "../../hooks/useDenyApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
@@ -30,6 +26,7 @@ import {
 } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
+import { DenyAction } from "./DenyAction";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -37,24 +34,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { approval } = route.params;
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
-  const { denyApproval, isPending: isDenying } = useDenyApproval();
-  const [denied, setDenied] = useState(false);
-  const autoNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-navigate back to the list 1.5s after a successful deny so the user
-  // briefly sees the confirmation then returns to their pending queue.
-  useEffect(() => {
-    if (denied) {
-      autoNavTimer.current = setTimeout(() => {
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-        }
-      }, 1500);
-    }
-    return () => {
-      if (autoNavTimer.current) clearTimeout(autoNavTimer.current);
-    };
-  }, [denied, navigation]);
 
   const agent = useMemo(
     () => agents.find((a) => a.agent_id === approval.agent_id),
@@ -75,30 +54,13 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
   const summary = buildActionSummary(approval.action.type, parameters);
 
-  /** Whether the deny action button should be visible. */
-  const showActions = isPending && !expired && !denied;
+  const showActions = isPending && !expired;
 
-  const handleDeny = useCallback(() => {
-    Alert.alert(
-      "Deny Request",
-      "Are you sure you want to deny this request?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Deny",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await denyApproval(approval.approval_id);
-              setDenied(true);
-            } catch {
-              Alert.alert("Error", "Failed to deny request. Please try again.");
-            }
-          },
-        },
-      ],
-    );
-  }, [denyApproval, approval.approval_id]);
+  const handleDenied = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [navigation]);
 
   return (
     <ScrollView
@@ -106,7 +68,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
     >
       {/* Status banner for resolved approvals */}
-      {(approval.status === "approved" && !denied) && (
+      {approval.status === "approved" && (
         <View
           style={styles.statusBannerApproved}
           accessibilityRole="alert"
@@ -114,7 +76,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           <Text style={styles.statusBannerTextApproved}>Approved</Text>
         </View>
       )}
-      {(approval.status === "denied" && !denied) && (
+      {approval.status === "denied" && (
         <View
           style={styles.statusBannerDenied}
           accessibilityRole="alert"
@@ -122,29 +84,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           <Text style={styles.statusBannerTextDenied}>Denied</Text>
         </View>
       )}
-      {denied && (
-        <View style={styles.deniedConfirmation} accessibilityRole="alert">
-          <Text style={styles.deniedConfirmationTitle}>Request Denied</Text>
-          <Text style={styles.deniedConfirmationSubtitle}>
-            Returning to list...
-          </Text>
-          <Pressable
-            testID="back-to-list-button"
-            style={styles.backToListButton}
-            onPress={() => navigation.canGoBack() && navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Go back to approval list"
-          >
-            <Text style={styles.backToListButtonText}>Back to List</Text>
-          </Pressable>
-        </View>
-      )}
       {approval.status === "cancelled" && (
         <View style={styles.statusBannerCancelled}>
           <Text style={styles.statusBannerText}>Cancelled</Text>
         </View>
       )}
-      {expired && !denied && (
+      {expired && (
         <View style={styles.statusBannerCancelled}>
           <Text style={styles.statusBannerText}>Expired</Text>
         </View>
@@ -227,7 +172,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       )}
 
       {/* Expiry Countdown */}
-      {isPending && !denied && (
+      {isPending && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Expiry</Text>
           <View style={styles.card}>
@@ -243,33 +188,10 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
       {/* Deny Action */}
       {showActions && (
-        <View style={styles.section}>
-          <Pressable
-            testID="deny-button"
-            style={({ pressed }) => [
-              styles.denyButton,
-              pressed && styles.denyButtonPressed,
-              isDenying && styles.denyButtonDisabled,
-            ]}
-            onPress={handleDeny}
-            disabled={isDenying}
-            accessibilityRole="button"
-            accessibilityLabel="Deny request"
-            accessibilityHint="Double-tap to deny this approval request"
-            accessibilityState={{ disabled: isDenying, busy: isDenying }}
-          >
-            {isDenying ? (
-              <ActivityIndicator
-                testID="deny-loading"
-                accessibilityLabel="Denying request"
-                color={colors.error}
-                size="small"
-              />
-            ) : (
-              <Text style={styles.denyButtonText}>Deny</Text>
-            )}
-          </Pressable>
-        </View>
+        <DenyAction
+          approvalId={approval.approval_id}
+          onDenied={handleDenied}
+        />
       )}
 
       {/* Parameters */}
@@ -554,56 +476,6 @@ const styles = StyleSheet.create({
   expiryLabel: {
     fontSize: 14,
     color: colors.gray500,
-  },
-  deniedConfirmation: {
-    backgroundColor: colors.riskHighBg,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    gap: 6,
-  },
-  deniedConfirmationTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.error,
-  },
-  deniedConfirmationSubtitle: {
-    fontSize: 14,
-    color: colors.gray500,
-    marginBottom: 8,
-  },
-  backToListButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  backToListButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.gray700,
-  },
-  denyButton: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.error,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  denyButtonPressed: {
-    backgroundColor: colors.riskHighBg,
-  },
-  denyButtonDisabled: {
-    opacity: 0.6,
-  },
-  denyButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.error,
   },
   paramRow: {
     flexDirection: "row",
