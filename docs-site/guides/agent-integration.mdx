@@ -117,72 +117,52 @@ Response includes:
 - `status` — initially `"pending"`
 - `expires_at` — when the request expires
 
-### 2. Wait for Decision
+### 2. Wait for Decision and Result
 
-The approver reviews the request on their dashboard. You can either:
-- **Poll** by re-requesting and checking the status
-- **Cancel** the request if it's no longer needed via `POST /v1/approvals/{approval_id}/cancel`
+The approver reviews the request on their dashboard. When they approve it, Permission Slip immediately executes the action via the connector and records the result on the approval.
 
-### 3. Verify Approval
-
-Once approved, your user shares the 6-character confirmation code displayed on their screen.
+Poll for the approval status and execution result:
 
 ```
-POST /v1/approvals/{approval_id}/verify
+GET /v1/approvals/{approval_id}/status
 ```
 
-```json
-{
-  "request_id": "unique-uuid",
-  "confirmation_code": "RK3-P7M"
-}
-```
-
-On success, you receive a single-use JWT token:
+Response when the action has been executed:
 
 ```json
 {
   "status": "approved",
   "approved_at": "2026-02-11T13:20:45Z",
-  "token": {
-    "access_token": "eyJhbGci...",
-    "expires_at": "2026-02-11T13:25:45Z",
-    "scope": "github.create_issue",
-    "scope_version": "1"
+  "execution_status": "success",
+  "execution_result": {
+    "issue_number": 42,
+    "url": "https://github.com/acme/app/issues/42"
   }
 }
 ```
 
-<Warning>
-  You have a maximum of **5 attempts** to submit the correct confirmation code. After 5 failures, the approval is locked out.
-</Warning>
-
-### 4. Execute the Action
-
-```
-POST /v1/actions/execute
-```
-
-Pass the token in the JSON request body (not in the Authorization header). The request must also be signed with your Ed25519 key.
+If the request is denied:
 
 ```json
 {
-  "token": "<access_token from verify response>",
-  "action_id": "github.create_issue",
-  "parameters": {
-    "owner": "acme",
-    "repo": "app",
-    "title": "Bug report",
-    "body": "Description of the issue"
-  }
+  "status": "denied",
+  "denied_at": "2026-02-11T13:20:45Z"
 }
 ```
 
-Permission Slip verifies the token, fetches the user's stored credentials, calls the external service, and returns the result. The token is consumed after use — it cannot be reused.
+You can also cancel a pending request if it's no longer needed:
+
+```
+POST /v1/approvals/{approval_id}/cancel
+```
+
+<Info>
+  The execution result contains the raw response from the connector. The shape depends on the action type — check the connector documentation for details.
+</Info>
 
 ## Standing Approvals
 
-If your user has created a standing approval for your action type, you can skip the one-off approval flow. Submit the action directly to the execute endpoint without a token:
+If your user has created a standing approval for your action type, you can skip the one-off approval flow. Submit the action directly to the execute endpoint:
 
 ```json
 {
@@ -207,12 +187,12 @@ Permission Slip checks for matching standing approvals and executes automaticall
 | Status Code | Meaning |
 |-------------|---------|
 | `400` | Invalid request (missing fields, bad parameters, invalid action type) |
-| `401` | Invalid signature, unknown agent, or incorrect confirmation code |
-| `403` | Agent not authorized, token scope mismatch, or parameters don't match |
+| `401` | Invalid signature or unknown agent |
+| `403` | Agent not authorized or parameters don't match |
 | `404` | Approval/resource not found, or no matching standing approval |
 | `409` | Duplicate request ID (replay protection) |
 | `410` | Approval expired or standing approval expired |
-| `429` | Rate limited or too many verification attempts (max 5) |
+| `429` | Rate limited |
 | `502` | External service returned an error |
 
 ## Discovering Available Connectors
