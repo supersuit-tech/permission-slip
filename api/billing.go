@@ -45,20 +45,38 @@ type checkoutResponse struct {
 	URL string `json:"url"`
 }
 
+// usageResponse is the JSON shape returned by GET /billing/usage.
+// It provides detailed usage metrics for a billing period, including
+// request/SMS totals, overage calculations, and an optional breakdown
+// by agent, connector, and action type.
 type usageResponse struct {
-	PeriodStart time.Time       `json:"period_start"`
-	PeriodEnd   time.Time       `json:"period_end"`
-	Requests    requestsUsage   `json:"requests"`
-	SMS         smsUsage        `json:"sms"`
+	PeriodStart time.Time          `json:"period_start"`
+	PeriodEnd   time.Time          `json:"period_end"`
+	Requests    requestsUsage      `json:"requests"`
+	SMS         smsUsage           `json:"sms"`
+	Breakdown   *usageBreakdownDTO `json:"breakdown,omitempty"`
 }
 
+// usageBreakdownDTO maps identifiers (agent ID, connector ID, action type)
+// to their respective request counts within a billing period. Omitted from
+// the response when no breakdown data has been recorded.
+type usageBreakdownDTO struct {
+	ByAgent      map[string]int `json:"by_agent,omitempty"`
+	ByConnector  map[string]int `json:"by_connector,omitempty"`
+	ByActionType map[string]int `json:"by_action_type,omitempty"`
+}
+
+// requestsUsage holds request count metrics for a billing period.
+// CostCents is the estimated overage cost at $0.005/request, rounded up.
 type requestsUsage struct {
-	Total           int  `json:"total"`
-	Included        int  `json:"included"`
-	Overage         int  `json:"overage"`
-	OverageCostCents int `json:"overage_cost_cents"`
+	Total     int `json:"total"`
+	Included  int `json:"included"`
+	Overage   int `json:"overage"`
+	CostCents int `json:"cost_cents"`
 }
 
+// smsUsage holds SMS metrics for a billing period.
+// CostCents is estimated at the US/CA rate ($0.01/message).
 type smsUsage struct {
 	Total     int `json:"total"`
 	CostCents int `json:"cost_cents"`
@@ -254,6 +272,18 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Determine the target billing period. If period_start is provided,
+		// look up that specific period; otherwise default to the current one.
+		var periodStart time.Time
+		if ps := r.URL.Query().Get("period_start"); ps != "" {
+			parsed, parseErr := time.Parse(time.RFC3339, ps)
+			if parseErr != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "period_start must be a valid ISO 8601 date-time"))
+				return
+			}
+			periodStart = parsed
+		}
+
 		resp := usageResponse{
 			PeriodStart: sub.CurrentPeriodStart,
 			PeriodEnd:   sub.CurrentPeriodEnd,
@@ -266,7 +296,17 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 		}
 		resp.Requests.Included = included
 
-		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
+		var usage *db.UsagePeriod
+		if periodStart.IsZero() {
+			// Current billing period.
+			usage, err = db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
+		} else {
+			// Historical period — update response bounds to match the query.
+			_, periodEnd := db.BillingPeriodBounds(periodStart)
+			resp.PeriodStart = periodStart
+			resp.PeriodEnd = periodEnd
+			usage, err = db.GetUsageByPeriod(r.Context(), deps.DB, profile.ID, periodStart)
+		}
 		if err != nil {
 			log.Printf("[%s] GetUsage: usage lookup: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -280,11 +320,21 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			// Calculate overage using the shared pricing function.
 			if included > 0 && usage.RequestCount > included {
 				resp.Requests.Overage = usage.RequestCount - included
-				resp.Requests.OverageCostCents = pstripe.OverageCostCents(resp.Requests.Overage)
+				resp.Requests.CostCents = pstripe.OverageCostCents(resp.Requests.Overage)
 			}
 
 			// SMS cost: $0.01/message (us_ca rate).
 			resp.SMS.CostCents = usage.SMSCount
+
+			// Include breakdown if available.
+			b := usage.ParseBreakdown()
+			if len(b.ByAgent) > 0 || len(b.ByConnector) > 0 || len(b.ByActionType) > 0 {
+				resp.Breakdown = &usageBreakdownDTO{
+					ByAgent:      b.ByAgent,
+					ByConnector:  b.ByConnector,
+					ByActionType: b.ByActionType,
+				}
+			}
 		}
 
 		RespondJSON(w, http.StatusOK, resp)
