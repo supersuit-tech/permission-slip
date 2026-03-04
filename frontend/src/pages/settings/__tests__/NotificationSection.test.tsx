@@ -18,6 +18,7 @@ const allEnabled = [
   { channel: "email", enabled: true },
   { channel: "web-push", enabled: true },
   { channel: "sms", enabled: true },
+  { channel: "mobile-push", enabled: true },
 ];
 
 interface MockProfile {
@@ -80,7 +81,7 @@ describe("NotificationSection", () => {
     });
   });
 
-  it("renders all three channels", async () => {
+  it("renders all four channels", async () => {
     mockApiFetch();
 
     render(<NotificationSection />, { wrapper });
@@ -90,6 +91,7 @@ describe("NotificationSection", () => {
     });
     expect(screen.getByText("Web Push")).toBeInTheDocument();
     expect(screen.getByText("SMS")).toBeInTheDocument();
+    expect(screen.getByText("Mobile Push")).toBeInTheDocument();
   });
 
   it("shows loading state", () => {
@@ -110,6 +112,7 @@ describe("NotificationSection", () => {
       { channel: "email", enabled: true },
       { channel: "web-push", enabled: false },
       { channel: "sms", enabled: true },
+      { channel: "mobile-push", enabled: true },
     ];
     mockApiFetch(profileWithContact, prefs);
 
@@ -123,8 +126,8 @@ describe("NotificationSection", () => {
       const disabledButtons = buttons.filter(
         (b) => b.textContent === "Disabled",
       );
-      // 2 channel enabled (email, sms) + 2 disabled (web-push, product updates)
-      expect(enabledButtons).toHaveLength(2);
+      // 3 channels enabled (email, sms, mobile-push) + 2 disabled (web-push, product updates)
+      expect(enabledButtons).toHaveLength(3);
       expect(disabledButtons).toHaveLength(2);
     });
   });
@@ -178,6 +181,7 @@ describe("NotificationSection", () => {
       { channel: "email", enabled: false },
       { channel: "web-push", enabled: true },
       { channel: "sms", enabled: false },
+      { channel: "mobile-push", enabled: true },
     ];
     mockApiFetch(profileNoContact, prefs);
 
@@ -202,6 +206,7 @@ describe("NotificationSection", () => {
           { channel: "email", enabled: false },
           { channel: "web-push", enabled: true },
           { channel: "sms", enabled: true },
+          { channel: "mobile-push", enabled: true },
         ],
       },
     });
@@ -225,6 +230,43 @@ describe("NotificationSection", () => {
         expect.objectContaining({
           body: {
             preferences: [{ channel: "email", enabled: false }],
+          },
+        }),
+      );
+    });
+  });
+
+  it("can toggle mobile-push channel", async () => {
+    mockApiFetch();
+    mockPut.mockResolvedValue({
+      data: {
+        preferences: allEnabled.map((p) =>
+          p.channel === "mobile-push" ? { ...p, enabled: false } : p,
+        ),
+      },
+    });
+    const user = userEvent.setup();
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Mobile Push")).toBeInTheDocument();
+    });
+
+    // Find the Mobile Push row's Enabled button and click it
+    const enabledButtons = screen.getAllByRole("button").filter(
+      (b) => b.textContent === "Enabled",
+    );
+    // Mobile Push is the last enabled channel button (after email, web-push, sms)
+    const mobilePushBtn = enabledButtons[enabledButtons.length - 1]!;
+    await user.click(mobilePushBtn);
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith(
+        "/v1/profile/notification-preferences",
+        expect.objectContaining({
+          body: {
+            preferences: [{ channel: "mobile-push", enabled: false }],
           },
         }),
       );
