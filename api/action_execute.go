@@ -1,33 +1,20 @@
 package api
 
 import (
-	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/shared"
 )
 
 // ── Request/response types ─────────────────────────────────────────────────
 
-// executeActionRequest is a combined struct used for dual-auth routing.
-// If Token is non-empty, the token path is used. Otherwise, the standing
-// approval path is used.
+// executeActionRequest holds the fields for standing-approval execution.
 type executeActionRequest struct {
-	// Token path fields
-	Token      string          `json:"token"`
-	ActionID   string          `json:"action_id"`
-	Parameters json.RawMessage `json:"parameters"`
-
-	// Standing approval path fields
 	RequestID       string      `json:"request_id"`
 	ConfigurationID string      `json:"configuration_id"`
 	Action          *actionBody `json:"action"`
@@ -37,13 +24,6 @@ type actionBody struct {
 	Type       string          `json:"type"`
 	Version    string          `json:"version"`
 	Parameters json.RawMessage `json:"parameters"`
-}
-
-type executeActionTokenResponse struct {
-	Status     string           `json:"status"`
-	ActionID   string           `json:"action_id"`
-	ExecutedAt time.Time        `json:"executed_at"`
-	Result     *json.RawMessage `json:"result,omitempty"`
 }
 
 type executeActionStandingResponse struct {
@@ -60,7 +40,7 @@ func RegisterActionExecuteRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /actions/execute", requireAgent(handleExecuteAction(deps)))
 }
 
-// ── POST /actions/execute (dual-auth router) ───────────────────────────────
+// ── POST /actions/execute ───────────────────────────────────────────────────
 
 func handleExecuteAction(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,133 +51,8 @@ func handleExecuteAction(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.Token != "" {
-			handleTokenPath(w, r, deps, agent, &req)
-		} else {
-			handleStandingApprovalPath(w, r, deps, agent, &req)
-		}
+		handleStandingApprovalPath(w, r, deps, agent, &req)
 	}
-}
-
-// ── Token-based execution path ─────────────────────────────────────────────
-
-func handleTokenPath(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, req *executeActionRequest) {
-	if req.ActionID == "" {
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Missing required field: action_id"))
-		return
-	}
-	if len(req.Parameters) > shared.MaxParametersBytes {
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters exceeds maximum size"))
-		return
-	}
-	if err := ValidateJSONObject(req.Parameters); err != nil {
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters must be a JSON object"))
-		return
-	}
-
-	// ── Validate the action token ─────────────────────────────────
-
-	if deps.ActionTokenSigningKey == nil {
-		log.Printf("[%s] ExecuteActionToken: action token signing key not configured", TraceID(r.Context()))
-		RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Action token verification not available"))
-		return
-	}
-
-	claims, err := parseAndValidateActionToken(req.Token, &deps.ActionTokenSigningKey.PublicKey)
-	if err != nil {
-		log.Printf("[%s] ExecuteActionToken: token validation: %v", TraceID(r.Context()), err)
-		RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Token is invalid or has expired"))
-		return
-	}
-
-	// Verify the token's subject matches the authenticated agent.
-	tokenAgentID, err := strconv.ParseInt(claims.Subject, 10, 64)
-	if err != nil || tokenAgentID != agent.AgentID {
-		RespondError(w, r, http.StatusForbidden, Forbidden(ErrInvalidToken, "Token does not belong to this agent"))
-		return
-	}
-
-	// Verify scope matches the requested action_id.
-	if claims.Scope != req.ActionID {
-		resp := Forbidden(ErrInsufficientScope, "Token does not have the required scope for this action")
-		resp.Error.Details = map[string]any{
-			"token_scope":      claims.Scope,
-			"requested_action": req.ActionID,
-		}
-		RespondError(w, r, http.StatusForbidden, resp)
-		return
-	}
-
-	// Verify parameters hash matches the token's params_hash claim.
-	if err := VerifyParamsHash(req.Parameters, claims.ParamsHash); err != nil {
-		log.Printf("[%s] ExecuteActionToken: %v", TraceID(r.Context()), err)
-		RespondError(w, r, http.StatusForbidden, Forbidden(ErrInvalidParameters, "Request parameters do not match the approved parameters"))
-		return
-	}
-
-	// ── Cross-reference approval row's token_jti ──────────────────
-
-	approval, err := db.GetApprovalByIDAndAgent(r.Context(), deps.DB, claims.ApprovalID, agent.AgentID)
-	if err != nil {
-		log.Printf("[%s] ExecuteActionToken: approval lookup: %v", TraceID(r.Context()), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate token"))
-		return
-	}
-	if approval == nil {
-		RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
-		return
-	}
-	if approval.TokenJTI == nil || *approval.TokenJTI != claims.ID {
-		RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Token does not match the approval"))
-		return
-	}
-
-	// ── Consume token (replay prevention) ─────────────────────────
-
-	if err := db.ConsumeToken(r.Context(), deps.DB, claims.ID); err != nil {
-		var ctErr *db.ConsumedTokenError
-		if errors.As(err, &ctErr) && ctErr.Code == db.ConsumedTokenErrAlreadyConsumed {
-			resp := Forbidden(ErrTokenAlreadyUsed, "Token has already been consumed")
-			resp.Error.Details = map[string]any{
-				"jti": claims.ID,
-			}
-			RespondError(w, r, http.StatusForbidden, resp)
-			return
-		}
-		log.Printf("[%s] ExecuteActionToken: consume token: %v", TraceID(r.Context()), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to consume token"))
-		return
-	}
-
-	// ── Execute the action via connector ──────────────────────────
-
-	result, execErr := executeConnectorAction(r.Context(), deps, approval.ApproverID, req.ActionID, req.Parameters)
-
-	// Always emit the audit event with the actual execution result,
-	// regardless of success or failure.
-	emitActionExecutedAuditEvent(r.Context(), deps.DB, approval.ApproverID, agent.AgentID, claims.ApprovalID, req.ActionID, agent.Metadata, execErr)
-
-	if execErr != nil {
-		if handleConnectorError(w, r, execErr) {
-			return
-		}
-		log.Printf("[%s] ExecuteActionToken: connector execution: %v", TraceID(r.Context()), execErr)
-		CaptureError(r.Context(), execErr)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute action"))
-		return
-	}
-
-	var actionResultPtr *json.RawMessage
-	if result != nil {
-		actionResultPtr = &result.Data
-	}
-
-	RespondJSON(w, http.StatusOK, executeActionTokenResponse{
-		Status:     "success",
-		ActionID:   req.ActionID,
-		ExecutedAt: time.Now().UTC(),
-		Result:     actionResultPtr,
-	})
 }
 
 // ── Standing approval execution path ───────────────────────────────────────
@@ -363,55 +218,3 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 	})
 }
 
-// ── Audit event emission ───────────────────────────────────────────────────
-
-// emitActionExecutedAuditEvent writes an action.executed audit event for
-// one-off token-based execution. Not billable because the approval request
-// was already counted when it was created.
-//
-// execErr should be the error from connector execution, or nil on success.
-// The execution_status and execution_error fields are derived from execErr.
-func emitActionExecutedAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, approvalID, actionType string, agentMeta []byte, execErr error) {
-	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
-	execStatus, execErrMsg := resolveExecResult(execErr)
-
-	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
-		UserID:          userID,
-		AgentID:         agentID,
-		EventType:       db.AuditEventActionExecuted,
-		Outcome:         "auto_executed",
-		SourceID:        approvalID,
-		SourceType:      "approval",
-		AgentMeta:       agentMeta,
-		Action:          actionJSON,
-		ConnectorID:     connectorIDFromActionType(actionType),
-		ExecutionStatus: &execStatus,
-		ExecutionError:  execErrMsg,
-	}, false)
-}
-
-// ── JWT token parsing ──────────────────────────────────────────────────────
-
-// parseAndValidateActionToken parses an ES256 JWT action token and validates
-// its signature, expiration, and audience.
-func parseAndValidateActionToken(tokenStr string, pubKey *ecdsa.PublicKey) (*ActionTokenClaims, error) {
-	claims := &ActionTokenClaims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims,
-		func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return pubKey, nil
-		},
-		jwt.WithAudience(actionTokenAudience),
-		jwt.WithExpirationRequired(),
-		jwt.WithValidMethods([]string{"ES256"}),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if !token.Valid {
-		return nil, jwt.ErrSignatureInvalid
-	}
-	return claims, nil
-}

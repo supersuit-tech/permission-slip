@@ -24,16 +24,6 @@ func InsertApprovalWithStatus(t *testing.T, d db.DBTX, approvalID string, agentI
 		approvalID, agentID, approverID, status)
 }
 
-// InsertApprovalWithJTI creates an approved approval with a specific token_jti.
-// The agent and approver must already exist via InsertUser and InsertAgent.
-func InsertApprovalWithJTI(t *testing.T, d db.DBTX, approvalID string, agentID int64, approverID, jti string) {
-	t.Helper()
-	mustExec(t, d,
-		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, token_jti, expires_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, now() + interval '1 hour')`,
-		approvalID, agentID, approverID, jti)
-}
-
 // InsertApprovalWithCreatedAt creates a pending approval with an explicit created_at.
 // Useful for testing time-windowed queries like request_count_30d.
 // The agent and approver must already exist via InsertUser and InsertAgent.
