@@ -1,9 +1,9 @@
 /**
  * Approval detail screen — displays the full details of a single approval
  * request including agent info, action parameters, risk level, expiry
- * countdown, context, and timeline.
+ * countdown, context, and timeline. Pending approvals show a deny button.
  */
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -26,10 +26,11 @@ import {
 } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
+import { DenyAction } from "./DenyAction";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
-export default function ApprovalDetailScreen({ route }: Props) {
+export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { approval } = route.params;
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
@@ -52,6 +53,14 @@ export default function ApprovalDetailScreen({ route }: Props) {
   const expired = checkExpired(approval.status, approval.expires_at);
 
   const summary = buildActionSummary(approval.action.type, parameters);
+
+  const showActions = isPending && !expired;
+
+  const handleDenied = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [navigation]);
 
   return (
     <ScrollView
@@ -175,6 +184,14 @@ export default function ApprovalDetailScreen({ route }: Props) {
             </View>
           </View>
         </View>
+      )}
+
+      {/* Deny Action */}
+      {showActions && (
+        <DenyAction
+          approvalId={approval.approval_id}
+          onDenied={handleDenied}
+        />
       )}
 
       {/* Parameters */}
