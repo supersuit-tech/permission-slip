@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -535,18 +533,6 @@ func TestApproveApproval_Success(t *testing.T) {
 	if resp.ApprovedAt.IsZero() {
 		t.Error("expected approved_at to be set")
 	}
-	// Confirmation code: XXX-XXX from alphabet ABCDEFGHJKLMNPQRSTUVWXYZ23456789
-	codePattern := regexp.MustCompile(`^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$`)
-	if !codePattern.MatchString(resp.ConfirmationCode) {
-		t.Errorf("expected confirmation_code matching %q, got %q", codePattern.String(), resp.ConfirmationCode)
-	}
-
-	// Verify confirmation_code_hash in DB matches the returned code (uses
-	// the same hashCodeHex path as the handler — plain SHA-256 when
-	// InviteHMACKey is empty).
-	rawCode := strings.ReplaceAll(resp.ConfirmationCode, "-", "")
-	expectedHash := hashCodeHex(rawCode, "")
-	testhelper.RequireRowValue(t, tx, "approvals", "approval_id", apprID, "confirmation_code_hash", expectedHash)
 
 	// Verify it no longer appears in pending list
 	r2 := authenticatedRequest(t, http.MethodGet, "/approvals", uid)

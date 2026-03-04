@@ -36,10 +36,9 @@ type approvalListResponse struct {
 }
 
 type approveResponse struct {
-	ApprovalID       string    `json:"approval_id"`
-	Status           string    `json:"status"`
-	ApprovedAt       time.Time `json:"approved_at"`
-	ConfirmationCode string    `json:"confirmation_code"`
+	ApprovalID string    `json:"approval_id"`
+	Status     string    `json:"status"`
+	ApprovedAt time.Time `json:"approved_at"`
 }
 
 type denyResponse struct {
@@ -128,14 +127,7 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		code, codeHash, err := generateConfirmationCode(deps.InviteHMACKey)
-		if err != nil {
-			log.Printf("[%s] ApproveApproval: generate confirmation code: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to approve approval"))
-			return
-		}
-
-		appr, agentMeta, err := db.ApproveApproval(r.Context(), deps.DB, approvalID, profile.ID, codeHash)
+		appr, agentMeta, err := db.ApproveApproval(r.Context(), deps.DB, approvalID, profile.ID)
 		if err != nil {
 			if handleApprovalError(w, r, err) {
 				return
@@ -151,10 +143,9 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 		notifyApprovalChange(deps, profile.ID, "approval_resolved", appr.ApprovalID)
 
 		RespondJSON(w, http.StatusOK, approveResponse{
-			ApprovalID:       appr.ApprovalID,
-			Status:           appr.Status,
-			ApprovedAt:       *appr.ApprovedAt,
-			ConfirmationCode: code,
+			ApprovalID: appr.ApprovalID,
+			Status:     appr.Status,
+			ApprovedAt: *appr.ApprovedAt,
 		})
 	}
 }
@@ -298,19 +289,6 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 		Action:      redactActionToType(appr.Action),
 		ConnectorID: connectorIDFromActionType(actionTypeFromJSON(appr.Action)),
 	}, false)
-}
-
-// generateConfirmationCode produces a 6-character confirmation code from the
-// safe character set and its HMAC-SHA256 hash (or plain SHA-256 when hmacKey
-// is empty). Returns (formattedCode "XXX-XXX", hexHash, error).
-// Used by the approvals flow which stores hashed codes.
-func generateConfirmationCode(hmacKey string) (string, string, error) {
-	raw, err := generateRandomCode(shared.ConfirmationCodeLength)
-	if err != nil {
-		return "", "", err
-	}
-	formatted := raw[:3] + "-" + raw[3:]
-	return formatted, hashCodeHex(raw, hmacKey), nil
 }
 
 // generateConfirmationCodePlaintext produces a 6-character confirmation code

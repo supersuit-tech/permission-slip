@@ -276,8 +276,7 @@ ActionCapability:
         will match the best standing approval automatically.
 
         **If empty**: The agent must use the one-off approval flow —
-        `POST /v1/approvals/request` → user approves → `POST /v1/approvals/{id}/verify`
-        → `POST /v1/actions/execute` with token.
+        `POST /v1/approvals/request` → user approves via dashboard.
 
         **If parameters don't match any standing approval's constraints**: The
         request falls through to the one-off approval flow automatically (Permission

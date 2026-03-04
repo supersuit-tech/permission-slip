@@ -67,7 +67,7 @@ agentCapabilities:
         ├─ YES → Reference configuration_id in requests
         │        Has standing approval with matching constraints?
         │          ├─ YES → POST /v1/actions/execute (no token, agent signature only)
-        │          └─ NO  → POST /v1/approvals/request → user approves → verify → execute
+        │          └─ NO  → POST /v1/approvals/request → user approves → agent polls status
         └─ NO  → Ask user to create an action configuration
       ```
 
