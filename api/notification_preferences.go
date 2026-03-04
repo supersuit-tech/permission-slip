@@ -36,9 +36,10 @@ type notificationPreferenceUpdate struct {
 // validChannels is the set of notification channels the DB schema allows.
 // This is the single source of truth — allChannels is derived from it.
 var validChannels = map[string]bool{
-	"email":    true,
-	"web-push": true,
-	"sms":      true,
+	"email":       true,
+	"web-push":    true,
+	"sms":         true,
+	"mobile-push": true,
 }
 
 // allChannels is derived from validChannels to avoid duplication.
@@ -47,7 +48,7 @@ var allChannels = func() []string {
 	for ch := range validChannels {
 		channels = append(channels, ch)
 	}
-	sort.Strings(channels) // deterministic order: email, sms, web-push
+	sort.Strings(channels) // deterministic order: email, mobile-push, sms, web-push
 	return channels
 }()
 
