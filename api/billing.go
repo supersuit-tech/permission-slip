@@ -13,17 +13,11 @@ import (
 // ── Response types ──────────────────────────────────────────────────────────
 
 type subscriptionResponse struct {
-	PlanID             string     `json:"plan_id"`
-	PlanName           string     `json:"plan_name"`
-	Status             string     `json:"status"`
-	CurrentPeriodStart time.Time  `json:"current_period_start"`
-	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
-	HasPaymentMethod   bool       `json:"has_payment_method"`
-	CanUpgrade         bool       `json:"can_upgrade"`
-	CanDowngrade       bool       `json:"can_downgrade"`
-	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
-	PlanLimits         planLimits `json:"plan_limits"`
-	Usage              *usageInfo `json:"usage,omitempty"`
+	PlanID   string `json:"plan_id"`
+	PlanName string `json:"plan_name"`
+	billingSubscription
+	PlanLimits planLimits `json:"plan_limits"`
+	Usage      *usageInfo `json:"usage,omitempty"`
 }
 
 type planLimits struct {
@@ -115,6 +109,30 @@ type billingUsageSummary struct {
 	Credentials       int `json:"credentials"`
 }
 
+// newBillingSubscription builds subscription status fields from a DB subscription.
+func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
+	return billingSubscription{
+		Status:             string(sub.Status),
+		CurrentPeriodStart: sub.CurrentPeriodStart,
+		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
+		HasPaymentMethod:   sub.StripeCustomerID != nil,
+		CanUpgrade:         sub.PlanID == db.PlanFree,
+		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
+		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
+	}
+}
+
+// newPlanLimits builds plan limit fields from a DB plan.
+func newPlanLimits(p *db.Plan) planLimits {
+	return planLimits{
+		MaxRequestsPerMonth:  p.MaxRequestsPerMonth,
+		MaxAgents:            p.MaxAgents,
+		MaxStandingApprovals: p.MaxStandingApprovals,
+		MaxCredentials:       p.MaxCredentials,
+		AuditRetentionDays:   p.AuditRetentionDays,
+	}
+}
+
 type downgradeResponse struct {
 	Status            string     `json:"status"`
 	PlanID            string     `json:"plan_id"`
@@ -171,25 +189,11 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 
 		resp := billingPlanResponse{
 			Plan: billingPlan{
-				ID:   sub.PlanID,
-				Name: sub.Plan.Name,
-				planLimits: planLimits{
-					MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
-					MaxAgents:            sub.Plan.MaxAgents,
-					MaxStandingApprovals: sub.Plan.MaxStandingApprovals,
-					MaxCredentials:       sub.Plan.MaxCredentials,
-					AuditRetentionDays:   sub.Plan.AuditRetentionDays,
-				},
+				ID:         sub.PlanID,
+				Name:       sub.Plan.Name,
+				planLimits: newPlanLimits(&sub.Plan),
 			},
-			Subscription: billingSubscription{
-				Status:             string(sub.Status),
-				CurrentPeriodStart: sub.CurrentPeriodStart,
-				CurrentPeriodEnd:   sub.CurrentPeriodEnd,
-				HasPaymentMethod:   sub.StripeCustomerID != nil,
-				CanUpgrade:         sub.PlanID == db.PlanFree,
-				CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
-				GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
-			},
+			Subscription: newBillingSubscription(sub),
 		}
 
 		// Gather usage counts (non-fatal — return zeros on error).
@@ -246,22 +250,10 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 		}
 
 		resp := subscriptionResponse{
-			PlanID:             sub.PlanID,
-			PlanName:           sub.Plan.Name,
-			Status:             string(sub.Status),
-			CurrentPeriodStart: sub.CurrentPeriodStart,
-			CurrentPeriodEnd:   sub.CurrentPeriodEnd,
-			HasPaymentMethod:   sub.StripeCustomerID != nil,
-			CanUpgrade:         sub.PlanID == db.PlanFree,
-			CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
-			GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
-			PlanLimits: planLimits{
-				MaxRequestsPerMonth:  sub.Plan.MaxRequestsPerMonth,
-				MaxAgents:            sub.Plan.MaxAgents,
-				MaxStandingApprovals: sub.Plan.MaxStandingApprovals,
-				MaxCredentials:       sub.Plan.MaxCredentials,
-				AuditRetentionDays:   sub.Plan.AuditRetentionDays,
-			},
+			PlanID:              sub.PlanID,
+			PlanName:            sub.Plan.Name,
+			billingSubscription: newBillingSubscription(sub),
+			PlanLimits:          newPlanLimits(&sub.Plan),
 		}
 
 		// Attach current period usage if available (non-fatal — subscription
