@@ -216,32 +216,6 @@ Optional. Only needed if you want to enable paid tiers and usage-based billing.
 
 When `BILLING_ENABLED=false` (the default), all users get an unlimited plan, Stripe is skipped, request metering is skipped, and billing API endpoints are disabled. This is the recommended setting for self-hosted deployments unless you want to run your own billing.
 
-### Log Aggregation (Better Stack)
-
-Optional. Centralizes log search and alerting. The server already outputs structured JSON logs (`slog.JSONHandler`) with trace IDs, request metadata, and timing — no code changes needed.
-
-Sign up at [betterstack.com](https://betterstack.com), create a workspace, then go to **Telemetry > Sources > Connect source** to create a log source and get your **Source Token**.
-
-**Docker deployments** — pipe container logs to Better Stack via their HTTP log drain:
-
-```bash
-# Option A: Docker log driver (recommended)
-docker run \
-  --log-driver=syslog \
-  --log-opt syslog-address=tcp+tls://in.logs.betterstack.com:6514 \
-  --log-opt tag="permission-slip" \
-  permission-slip
-
-# Option B: Use Vector, Fluentd, or Fluent Bit as a log shipper
-# See: https://betterstack.com/docs/logs/logging-start/
-```
-
-**Fly.io deployments** — use the native Fly.io integration (see [Fly.io deployment guide](deployment.md)).
-
-**VMs / bare metal** — use a log shipper like [Vector](https://vector.dev) or [Fluent Bit](https://fluentbit.io) to forward `stdout` JSON logs to Better Stack's HTTP endpoint.
-
-No app env vars needed — log shipping is configured at the infrastructure level, not in the app.
-
 ### Other Optional Variables
 
 | Variable | Default | Description |
