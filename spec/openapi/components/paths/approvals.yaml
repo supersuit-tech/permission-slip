@@ -13,10 +13,8 @@ request:
       3. **Permission Slip responds**: Returns approval URL with unique approval_id
       4. **Notification sent**: Permission Slip notifies approver (push notification)
       5. **Approver reviews**: Visits URL, sees full action details, approves/denies
-      6. **Confirmation shown**: If approved, Permission Slip shows 6-character confirmation code
-      7. **Agent verifies**: Collects code from user, submits to verify endpoint
-      8. **Token issued**: Permission Slip returns single-use JWT token
-      9. **Agent executes**: Uses token to call `POST /v1/actions/execute`
+      6. **Direct execution**: If approved, Permission Slip immediately executes the action via the connector
+      7. **Agent polls for result**: Agent calls `GET /v1/approvals/{approval_id}/status` to get execution result
       
       ## Action Types
       
@@ -44,11 +42,10 @@ request:
       - Approval expires after TTL (typically 5 minutes)
       
       ## Parameters Hash
-      
-      The `action.parameters` object is canonicalized using RFC 8785 (JCS) and hashed with 
-      SHA-256. This hash is embedded in the approval token as `params_hash` to prevent 
-      parameter tampering. Permission Slip verifies the hash matches request parameters before 
-      executing actions.
+
+      The `action.parameters` object is canonicalized using RFC 8785 (JCS) and hashed with
+      SHA-256. This hash is stored with the approval to prevent parameter tampering.
+      Permission Slip verifies the hash matches request parameters before executing actions.
     
     tags:
       - Approvals
@@ -448,14 +445,17 @@ approvalEvents:
       |-------|-------------|
       | `connected` | Sent immediately on connection. Confirms the stream is live. |
       | `approval_created` | A new approval was requested by an agent. |
-      | `approval_resolved` | An approval was approved or denied. |
+      | `approval_resolved` | An approval was approved or denied. Includes `execution_status` when approved. |
       | `approval_cancelled` | An agent cancelled an approval. |
 
-      Each event carries a JSON `data` payload with `approval_id`:
+      Each event carries a JSON `data` payload with `approval_id` and relevant fields:
 
       ```
       event: approval_created
       data: {"approval_id":"appr_xyz789"}
+
+      event: approval_resolved
+      data: {"approval_id":"appr_xyz789","status":"approved","execution_status":"success"}
       ```
 
       A `: heartbeat` comment is sent every 30 seconds to keep the connection
@@ -502,6 +502,9 @@ approvalEvents:
 
               event: approval_created
               data: {"approval_id":"appr_xyz789"}
+
+              event: approval_resolved
+              data: {"approval_id":"appr_xyz789","status":"approved","execution_status":"success"}
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
@@ -586,26 +589,57 @@ listApprovals:
           application/json:
             schema:
               $ref: '../schemas/approvals.yaml#/ApprovalListResponse'
-            example:
-              data:
-                - approval_id: "appr_xyz789"
-                  agent_id: 42
-                  action:
-                    type: "email.send"
-                    version: "1"
-                    parameters:
-                      from: "alice@example.com"
-                      to:
-                        - "recipient@example.com"
-                      subject: "Hello World"
-                      body: "This is a test email."
-                  context:
-                    description: "Send welcome email to new user"
-                    risk_level: "low"
-                  status: "pending"
-                  expires_at: "2026-02-11T13:25:00Z"
-                  created_at: "2026-02-11T13:20:00Z"
-              has_more: false
+            examples:
+              pending_approvals:
+                summary: List of pending approvals
+                value:
+                  data:
+                    - approval_id: "appr_xyz789"
+                      agent_id: 42
+                      action:
+                        type: "email.send"
+                        version: "1"
+                        parameters:
+                          from: "alice@example.com"
+                          to:
+                            - "recipient@example.com"
+                          subject: "Hello World"
+                          body: "This is a test email."
+                      context:
+                        description: "Send welcome email to new user"
+                        risk_level: "low"
+                      status: "pending"
+                      expires_at: "2026-02-11T13:25:00Z"
+                      created_at: "2026-02-11T13:20:00Z"
+                  has_more: false
+              approved_with_results:
+                summary: Approved approval with execution result
+                value:
+                  data:
+                    - approval_id: "appr_abc456"
+                      agent_id: 42
+                      action:
+                        type: "email.send"
+                        version: "1"
+                        parameters:
+                          from: "alice@example.com"
+                          to:
+                            - "recipient@example.com"
+                          subject: "Hello World"
+                          body: "This is a test email."
+                      context:
+                        description: "Send welcome email to new user"
+                        risk_level: "low"
+                      status: "approved"
+                      expires_at: "2026-02-11T13:25:00Z"
+                      approved_at: "2026-02-11T13:21:00Z"
+                      created_at: "2026-02-11T13:20:00Z"
+                      execution_status: "success"
+                      execution_result:
+                        message_id: "msg_abc123"
+                        delivery_status: "queued"
+                      executed_at: "2026-02-11T13:21:01Z"
+                  has_more: false
 
       '400':
         description: Invalid query parameters
@@ -654,8 +688,12 @@ approveApproval:
       authenticated user (as approver) and must be in `pending` status and
       not expired.
 
-      This is a dashboard endpoint for human approvers — distinct from the
-      agent-facing verify endpoint which uses confirmation codes.
+      When approved, Permission Slip immediately executes the action via the
+      configured connector using the user's stored credentials. The execution
+      result is stored on the approval row and returned in the response.
+
+      This is a dashboard endpoint for human approvers. Agents can poll for
+      the result via `GET /v1/approvals/{approval_id}/status`.
 
     tags:
       - Approvals
@@ -673,10 +711,27 @@ approveApproval:
           application/json:
             schema:
               $ref: '../schemas/approvals.yaml#/ApproveApprovalResponse'
-            example:
-              approval_id: "appr_xyz789"
-              status: "approved"
-              approved_at: "2026-02-21T10:30:00Z"
+            examples:
+              success:
+                summary: Approved and executed successfully
+                value:
+                  approval_id: "appr_xyz789"
+                  status: "approved"
+                  approved_at: "2026-02-21T10:30:00Z"
+                  execution_status: "success"
+                  execution_result:
+                    message_id: "msg_abc123"
+                    delivery_status: "queued"
+              execution_error:
+                summary: Approved but execution failed
+                value:
+                  approval_id: "appr_xyz789"
+                  status: "approved"
+                  approved_at: "2026-02-21T10:30:00Z"
+                  execution_status: "error"
+                  execution_result:
+                    error: "upstream_error"
+                    message: "External service returned 503"
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
@@ -723,6 +778,135 @@ approveApproval:
                 details:
                   expired_at: "2026-02-21T10:25:00Z"
                 trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '502':
+        description: External service error during action execution
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "upstream_error"
+                message: "External service returned an error"
+                retryable: false
+                details:
+                  service: "gmail"
+                  upstream_status: 503
+                  upstream_message: "Service temporarily unavailable"
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+approvalStatus:
+  get:
+    operationId: getApprovalStatus
+    summary: Get Approval Status
+    description: |
+      Poll the status of an approval request and retrieve the execution result.
+      This is an agent-facing endpoint used to check whether an approval has been
+      resolved and, if approved, to get the result of the executed action.
+
+      ## Polling Flow
+
+      1. **Agent submits approval request**: `POST /v1/approvals/request`
+      2. **Agent polls status**: `GET /v1/approvals/{approval_id}/status`
+      3. **Permission Slip responds**: Returns current status and execution result (if available)
+
+      ## Status Transitions
+
+      - `pending` → `approved` (with execution result) or `denied` or `cancelled`
+      - Once resolved, the status is final and will not change
+
+      ## Recommended Polling Strategy
+
+      - Poll every 1–2 seconds for the first 30 seconds
+      - Then every 5 seconds until expiration
+      - Stop polling when status is no longer `pending` or when `expires_at` has passed
+      - Prefer SSE (`GET /v1/approvals/events`) for real-time notifications when possible
+
+      ## Security
+
+      - Request MUST include valid `X-Permission-Slip-Signature` header
+      - Only the agent that created the approval can poll its status
+
+    tags:
+      - Approvals
+
+    security:
+      - PermissionSlipSignature: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ApprovalId'
+
+    responses:
+      '200':
+        description: Approval status retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/ApprovalStatusResponse'
+            examples:
+              pending:
+                summary: Approval still pending
+                value:
+                  approval_id: "appr_xyz789"
+                  status: "pending"
+                  expires_at: "2026-02-21T10:35:00Z"
+              approved_with_result:
+                summary: Approved and executed successfully
+                value:
+                  approval_id: "appr_xyz789"
+                  status: "approved"
+                  approved_at: "2026-02-21T10:30:00Z"
+                  expires_at: "2026-02-21T10:35:00Z"
+                  execution_status: "success"
+                  execution_result:
+                    message_id: "msg_abc123"
+                    delivery_status: "queued"
+                  executed_at: "2026-02-21T10:30:01Z"
+              approved_execution_pending:
+                summary: Approved but execution still in progress
+                value:
+                  approval_id: "appr_xyz789"
+                  status: "approved"
+                  approved_at: "2026-02-21T10:30:00Z"
+                  expires_at: "2026-02-21T10:35:00Z"
+                  execution_status: "pending"
+              denied:
+                summary: Approval denied
+                value:
+                  approval_id: "appr_xyz789"
+                  status: "denied"
+                  denied_at: "2026-02-21T10:30:00Z"
+                  expires_at: "2026-02-21T10:35:00Z"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: |
+          Approval not found or not owned by this agent. Returns the same error
+          for both cases to prevent approval ID enumeration.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Approval not found"
+                retryable: false
+                details:
+                  approval_id: "appr_xyz789"
+                trace_id: "trace_xyz789"
 
       '429':
         $ref: '../responses/errors.yaml#/TooManyRequests'

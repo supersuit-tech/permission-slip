@@ -15,18 +15,18 @@ ApprovalRequest:
         signing key in the `X-Permission-Slip-Signature` header. If mismatch, Permission Slip
         returns `400 Bad Request` with error code `agent_id_mismatch`.
       example: 42
-    
+
     request_id:
       type: string
       format: uuid
       maxLength: 64
       description: |
         Unique request identifier for replay protection and idempotency. UUID v4 recommended.
-        
-        Permission Slip tracks this value within the timestamp window (300 seconds) and rejects 
+
+        Permission Slip tracks this value within the timestamp window (300 seconds) and rejects
         duplicate requests with `409 Conflict` error code `duplicate_request_id`.
       example: "a925fbe0-db83-4969-9dc5-27f40385f12c"
-    
+
     approver:
       type: string
       pattern: '^[a-zA-Z0-9_-]{1,64}$'
@@ -93,6 +93,10 @@ ApprovalRequest:
 
 ApprovalRequestResponse:
   type: object
+  description: |
+    Response after submitting an approval request. The agent should use the `approval_id`
+    to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
+    or listen for real-time updates via `GET /v1/approvals/events` (SSE).
   required:
     - approval_id
     - approval_url
@@ -105,7 +109,7 @@ ApprovalRequestResponse:
       maxLength: 70
       description: |
         Unique approval identifier assigned by Permission Slip. Used to reference this approval
-        in subsequent operations (cancel, poll status).
+        in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
       example: "appr_xyz789"
 
     approval_url:
@@ -165,7 +169,7 @@ CancelApprovalRequest:
       description: |
         Unique request identifier for replay protection. UUID v4 recommended.
       example: "21d9ec79-6b20-45b9-8695-83537318966d"
-  
+
   example:
     request_id: "21d9ec79-6b20-45b9-8695-83537318966d"
 
@@ -182,14 +186,14 @@ CancelApprovalResponse:
       description: |
         Approval status. Always `cancelled` for successful cancellation.
       example: "cancelled"
-    
+
     cancelled_at:
       type: string
       format: date-time
       description: |
         ISO 8601 timestamp (RFC 3339 format, UTC) when the approval was cancelled.
       example: "2026-02-11T13:21:00Z"
-  
+
   example:
     status: "cancelled"
     cancelled_at: "2026-02-11T13:21:00Z"
@@ -253,6 +257,17 @@ ApprovalSummary:
       format: date-time
       description: When the approval request was created
       example: "2026-02-11T13:20:00Z"
+    execution_status:
+      allOf:
+        - $ref: './shared.yaml#/ExecutionStatus'
+        - nullable: true
+          description: |
+            Status of the action execution. Only present when status is `approved`.
+            Null for pending, denied, or cancelled approvals.
+    execution_result:
+      $ref: './shared.yaml#/ExecutionResult'
+    executed_at:
+      $ref: './shared.yaml#/ExecutedAt'
 
 ApprovalListResponse:
   type: object
@@ -283,6 +298,7 @@ ApproveApprovalResponse:
     - approval_id
     - status
     - approved_at
+    - execution_status
   properties:
     approval_id:
       type: string
@@ -299,6 +315,66 @@ ApproveApprovalResponse:
       format: date-time
       description: When the approval was approved
       example: "2026-02-21T10:30:00Z"
+    execution_status:
+      $ref: './shared.yaml#/ExecutionStatus'
+    execution_result:
+      $ref: './shared.yaml#/ExecutionResult'
+
+ApprovalStatusResponse:
+  type: object
+  description: |
+    Response for agent polling of approval status and execution result.
+    Agents use this to check whether their approval has been resolved and,
+    if approved, to retrieve the execution result.
+  required:
+    - approval_id
+    - status
+  properties:
+    approval_id:
+      type: string
+      description: Unique approval identifier
+      example: "appr_xyz789"
+    status:
+      type: string
+      enum:
+        - pending
+        - approved
+        - denied
+        - cancelled
+      description: Current status of the approval request.
+      example: "approved"
+    approved_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was approved (null if not yet approved)
+      example: "2026-02-21T10:30:00Z"
+    denied_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was denied (null if not denied)
+    cancelled_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the approval was cancelled (null if not cancelled)
+    expires_at:
+      type: string
+      format: date-time
+      description: When the approval expires
+      example: "2026-02-21T10:35:00Z"
+    execution_status:
+      allOf:
+        - $ref: './shared.yaml#/ExecutionStatus'
+        - nullable: true
+          description: |
+            Status of the action execution. Only present when approval status is `approved`.
+            Null when the approval has not been approved yet.
+    execution_result:
+      $ref: './shared.yaml#/ExecutionResult'
+    executed_at:
+      $ref: './shared.yaml#/ExecutedAt'
 
 DenyApprovalResponse:
   type: object
