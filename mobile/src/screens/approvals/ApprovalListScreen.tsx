@@ -7,7 +7,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -25,7 +24,6 @@ import { colors } from "../../theme/colors";
 import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
-import { useAuth } from "../../auth/AuthContext";
 
 type StatusTab = "pending" | "approved" | "denied";
 
@@ -42,7 +40,6 @@ export default function ApprovalListScreen({ navigation }: Props) {
   const { approvals, isLoading, isRefetching, error, refetch, dataUpdatedAt } =
     useApprovals(activeTab);
   const { agents } = useAgents();
-  const { signOut } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Re-render the "Updated X ago" label every 15 seconds so it stays current.
@@ -84,12 +81,9 @@ export default function ApprovalListScreen({ navigation }: Props) {
     [navigation],
   );
 
-  const handleSignOut = useCallback(() => {
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: () => signOut() },
-    ]);
-  }, [signOut]);
+  const handleOpenSettings = useCallback(() => {
+    navigation.navigate("Settings");
+  }, [navigation]);
 
   const renderItem = useCallback(
     ({ item }: { item: ApprovalSummary }) => (
@@ -112,13 +106,13 @@ export default function ApprovalListScreen({ navigation }: Props) {
       <View style={styles.header}>
         <Text style={styles.title}>Approvals</Text>
         <TouchableOpacity
-          testID="sign-out"
-          accessibilityLabel="Sign out"
+          testID="settings-button"
+          accessibilityLabel="Settings"
           accessibilityRole="button"
-          onPress={handleSignOut}
-          style={styles.signOutButton}
+          onPress={handleOpenSettings}
+          style={styles.settingsButton}
         >
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={styles.settingsText}>Settings</Text>
         </TouchableOpacity>
       </View>
 
@@ -315,11 +309,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.gray900,
   },
-  signOutButton: {
+  settingsButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  signOutText: {
+  settingsText: {
     color: colors.gray500,
     fontSize: 14,
     fontWeight: "500",

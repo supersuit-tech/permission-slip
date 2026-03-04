@@ -7,6 +7,7 @@ import LoginScreen from "../screens/LoginScreen";
 import ApprovalListScreen from "../screens/approvals/ApprovalListScreen";
 import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
 import DeepLinkDetailScreen from "../screens/approvals/DeepLinkDetailScreen";
+import SettingsScreen from "../screens/settings/SettingsScreen";
 import type { ApprovalSummary } from "../hooks/useApprovals";
 import { linking } from "./linking";
 import { navigationRef } from "./navigationRef";
@@ -22,6 +23,7 @@ export type RootStackParamList = {
   DeepLinkDetail: {
     approvalId: string;
   };
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -72,6 +74,15 @@ export default function RootNavigator() {
               options={{
                 headerShown: true,
                 headerTitle: "Approval Details",
+                headerBackTitle: "Back",
+              }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Settings",
                 headerBackTitle: "Back",
               }}
             />
