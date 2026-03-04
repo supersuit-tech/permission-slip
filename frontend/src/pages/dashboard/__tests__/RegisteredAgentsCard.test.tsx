@@ -31,9 +31,28 @@ const mockAgentsResponse = {
 
 const emptyResponse = { data: [], has_more: false };
 
-function mockAgentsFetch(response = mockAgentsResponse) {
+const freePlanResponse = {
+  plan: {
+    id: "free",
+    name: "Free",
+    max_requests_per_month: 1000 as number | null,
+    max_agents: 3 as number | null,
+    max_standing_approvals: 5 as number | null,
+    max_credentials: 5 as number | null,
+    audit_retention_days: 7,
+  },
+  subscription: { status: "active", can_upgrade: true, can_downgrade: false },
+  usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
+};
+
+function mockAgentsFetch(response = mockAgentsResponse, billingPlan = freePlanResponse) {
   setupAuthMocks({ authenticated: true });
-  mockGet.mockResolvedValue({ data: response });
+  mockGet.mockImplementation((url: string) => {
+    if (url === "/v1/billing/plan") {
+      return Promise.resolve({ data: billingPlan });
+    }
+    return Promise.resolve({ data: response });
+  });
 }
 
 describe("RegisteredAgentsCard", () => {
@@ -354,6 +373,51 @@ describe("RegisteredAgentsCard", () => {
     expect(
       screen.getByText("Share this code with the agent to complete registration"),
     ).toBeInTheDocument();
+  });
+
+  it("shows limit badge with plan info", async () => {
+    mockAgentsFetch();
+
+    render(<RegisteredAgentsCard />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("2 / 3 agents")).toBeInTheDocument();
+    });
+  });
+
+  it("shows upgrade prompt when at agent limit", async () => {
+    const atLimitPlan = {
+      ...freePlanResponse,
+      usage: { ...freePlanResponse.usage, agents: 3 },
+    };
+    mockAgentsFetch(mockAgentsResponse, atLimitPlan);
+
+    render(<RegisteredAgentsCard />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Upgrade to add more agents/),
+      ).toBeInTheDocument();
+    });
+    // "Add an Agent" button should not be present when at limit
+    expect(
+      screen.queryByRole("button", { name: "Add an Agent" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows no limit badge for paid plan", async () => {
+    const paidPlan = {
+      plan: { ...freePlanResponse.plan, id: "pay_as_you_go", max_agents: null },
+      subscription: { status: "active", can_upgrade: false, can_downgrade: true },
+      usage: { requests: 10, agents: 5, standing_approvals: 1, credentials: 0 },
+    };
+    mockAgentsFetch(mockAgentsResponse, paidPlan);
+
+    render(<RegisteredAgentsCard />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("5 agents")).toBeInTheDocument();
+    });
   });
 
   it("shows 'Awaiting verification' for pending agents without expiry", async () => {

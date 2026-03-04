@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Loader2, Bot, Settings, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyableCode } from "@/components/CopyableCode";
+import { LimitBadge } from "@/components/LimitBadge";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
   Card,
   CardHeader,
@@ -21,6 +23,7 @@ import {
 import { AgentStatusBadge } from "@/components/AgentStatusBadge";
 import { formatRelativeTime } from "@/lib/utils";
 import { useAgents, type Agent } from "@/hooks/useAgents";
+import { useBillingPlan } from "@/hooks/useBillingPlan";
 import { getAgentDisplayName } from "@/lib/agents";
 import { InviteCodeDialog } from "./InviteCodeDialog";
 import { ReviewPendingAgentDialog } from "./ReviewPendingAgentDialog";
@@ -176,8 +179,13 @@ export function RegisteredAgentsCard() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const { agents, isLoading, error, refetch } = useAgents();
+  const { billingPlan } = useBillingPlan();
   const { newlyRegistered, clearNewlyRegistered } =
     useRegistrationSuccess(agents);
+
+  const maxAgents = billingPlan?.plan?.max_agents ?? null;
+  const agentCount = billingPlan?.usage?.agents ?? agents.length;
+  const atLimit = maxAgents != null && agentCount >= maxAgents;
 
   const filteredAgents = useMemo(() => {
     if (statusFilter === "all") return agents;
@@ -195,7 +203,16 @@ export function RegisteredAgentsCard() {
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>Registered Agents</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Registered Agents</CardTitle>
+            {billingPlan?.plan && (
+              <LimitBadge
+                current={agentCount}
+                max={maxAgents}
+                resource="agents"
+              />
+            )}
+          </div>
           {agents.length > 0 && (
             <StatusFilterTabs value={statusFilter} onChange={setStatusFilter} />
           )}
@@ -225,7 +242,11 @@ export function RegisteredAgentsCard() {
           <AgentsTable agents={filteredAgents} />
         )}
       </CardContent>
-      {agents.length > 0 && (
+      {atLimit ? (
+        <CardFooter>
+          <UpgradePrompt feature="Upgrade to add more agents." />
+        </CardFooter>
+      ) : agents.length > 0 ? (
         <CardFooter>
           <Button
             className="w-full sm:w-auto"
@@ -234,7 +255,7 @@ export function RegisteredAgentsCard() {
             Add an Agent
           </Button>
         </CardFooter>
-      )}
+      ) : null}
 
       <InviteCodeDialog
         open={inviteDialogOpen}

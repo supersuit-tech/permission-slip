@@ -1,4 +1,5 @@
-import { Bell, Loader2, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Bell, Loader2, AlertTriangle, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
@@ -107,10 +108,11 @@ export function NotificationSection() {
             {preferences.map((pref) => {
               const label = CHANNEL_LABELS[pref.channel];
               const warning = missingContact[pref.channel];
+              const planGated = pref.available === false;
               return (
                 <div
                   key={pref.channel}
-                  className="rounded-lg border p-4"
+                  className={`rounded-lg border p-4${planGated ? " opacity-75" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
@@ -121,16 +123,26 @@ export function NotificationSection() {
                         {label?.description ?? ""}
                       </p>
                     </div>
-                    <Button
-                      variant={pref.enabled ? "default" : "outline"}
-                      size="sm"
-                      disabled={isUpdating}
-                      onClick={() => handleToggle(pref.channel, pref.enabled)}
-                    >
-                      {pref.enabled ? "Enabled" : "Disabled"}
-                    </Button>
+                    {planGated ? (
+                      <Link
+                        to="/billing"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 underline dark:text-amber-400"
+                      >
+                        Available on paid plan
+                        <ArrowUpRight className="size-3" />
+                      </Link>
+                    ) : (
+                      <Button
+                        variant={pref.enabled ? "default" : "outline"}
+                        size="sm"
+                        disabled={isUpdating}
+                        onClick={() => handleToggle(pref.channel, pref.enabled)}
+                      >
+                        {pref.enabled ? "Enabled" : "Disabled"}
+                      </Button>
+                    )}
                   </div>
-                  {warning && pref.enabled && (
+                  {!planGated && warning && pref.enabled && (
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                       <AlertTriangle className="size-3.5 shrink-0" />
                       <span>{warning}</span>

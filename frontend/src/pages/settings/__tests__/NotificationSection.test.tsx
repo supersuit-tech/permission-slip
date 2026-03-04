@@ -15,10 +15,17 @@ vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const allEnabled = [
-  { channel: "email", enabled: true },
-  { channel: "web-push", enabled: true },
-  { channel: "sms", enabled: true },
-  { channel: "mobile-push", enabled: true },
+  { channel: "email", enabled: true, available: true },
+  { channel: "web-push", enabled: true, available: true },
+  { channel: "sms", enabled: true, available: true },
+  { channel: "mobile-push", enabled: true, available: true },
+];
+
+const smsGated = [
+  { channel: "email", enabled: true, available: true },
+  { channel: "web-push", enabled: true, available: true },
+  { channel: "sms", enabled: false, available: false },
+  { channel: "mobile-push", enabled: true, available: true },
 ];
 
 interface MockProfile {
@@ -109,10 +116,10 @@ describe("NotificationSection", () => {
 
   it("shows enabled/disabled state for each channel", async () => {
     const prefs = [
-      { channel: "email", enabled: true },
-      { channel: "web-push", enabled: false },
-      { channel: "sms", enabled: true },
-      { channel: "mobile-push", enabled: true },
+      { channel: "email", enabled: true, available: true },
+      { channel: "web-push", enabled: false, available: true },
+      { channel: "sms", enabled: true, available: true },
+      { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileWithContact, prefs);
 
@@ -178,10 +185,10 @@ describe("NotificationSection", () => {
 
   it("does not show warning for disabled channel even if contact is missing", async () => {
     const prefs = [
-      { channel: "email", enabled: false },
-      { channel: "web-push", enabled: true },
-      { channel: "sms", enabled: false },
-      { channel: "mobile-push", enabled: true },
+      { channel: "email", enabled: false, available: true },
+      { channel: "web-push", enabled: true, available: true },
+      { channel: "sms", enabled: false, available: true },
+      { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileNoContact, prefs);
 
@@ -329,5 +336,51 @@ describe("NotificationSection", () => {
         ),
       ).toBeInTheDocument();
     });
+  });
+
+  it("shows SMS as gated with upgrade link on free plan", async () => {
+    mockApiFetch(profileWithContact, smsGated);
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Available on paid plan"),
+      ).toBeInTheDocument();
+    });
+    const upgradeLink = screen.getByRole("link", {
+      name: /Available on paid plan/,
+    });
+    expect(upgradeLink).toHaveAttribute("href", "/billing");
+  });
+
+  it("does not show toggle button for plan-gated SMS", async () => {
+    mockApiFetch(profileWithContact, smsGated);
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("SMS")).toBeInTheDocument();
+    });
+
+    // Should have 3 enabled buttons (email, web-push, mobile-push)
+    // SMS should not have a toggle button
+    const enabledButtons = screen.getAllByRole("button").filter(
+      (b) => b.textContent === "Enabled",
+    );
+    expect(enabledButtons).toHaveLength(3);
+  });
+
+  it("does not show missing phone warning for plan-gated SMS", async () => {
+    mockApiFetch(profileNoContact, smsGated);
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("SMS")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/Add a phone number/),
+    ).not.toBeInTheDocument();
   });
 });
