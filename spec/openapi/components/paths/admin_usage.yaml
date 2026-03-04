@@ -1,0 +1,117 @@
+adminUsage:
+  get:
+    summary: Get your usage for a billing period
+    description: |
+      Returns the authenticated user's usage metrics for a billing period.
+      Includes request/SMS totals and an optional breakdown by agent,
+      connector, and action type.
+
+      Defaults to the current billing period when no period parameter
+      is provided. All data is scoped to the authenticated user — there
+      is no way to query another user's usage through this endpoint.
+    operationId: adminGetUsage
+    tags:
+      - Admin
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: period
+        in: query
+        required: false
+        description: |
+          Billing period to query. Accepts `YYYY-MM` (e.g., `2026-03`),
+          `YYYY-MM-DD` (e.g., `2026-03-01`), or full ISO 8601 date-time
+          (e.g., `2026-03-01T00:00:00Z`). Defaults to the current billing period.
+        schema:
+          type: string
+        examples:
+          month:
+            value: "2026-03"
+            summary: Month shorthand
+          date:
+            value: "2026-03-01"
+            summary: Date format
+          iso8601:
+            value: "2026-03-01T00:00:00Z"
+            summary: Full ISO 8601 timestamp
+    responses:
+      '200':
+        description: Usage data returned successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/admin_usage.yaml#/AdminUsageResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+adminUsageByConnector:
+  get:
+    summary: Get your usage breakdown by connector
+    description: |
+      Returns the authenticated user's per-connector request counts for a
+      billing period, ordered by request count descending. Each entry
+      includes the connector name when available.
+
+      Useful for understanding which integrations drive the most usage.
+    operationId: adminGetUsageByConnector
+    tags:
+      - Admin
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: period
+        in: query
+        required: false
+        description: |
+          Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+          full ISO 8601 date-time. Defaults to the current billing period.
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Connector usage breakdown returned successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/admin_usage.yaml#/ConnectorUsageResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+adminUsageByAgent:
+  get:
+    summary: Get your usage breakdown by agent
+    description: |
+      Returns the authenticated user's per-agent request counts for a
+      billing period, ordered by request count descending. Each entry
+      includes the agent name from metadata when available.
+
+      Useful for identifying which agents consume the most quota.
+    operationId: adminGetUsageByAgent
+    tags:
+      - Admin
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: period
+        in: query
+        required: false
+        description: |
+          Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+          full ISO 8601 date-time. Defaults to the current billing period.
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Agent usage breakdown returned successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/admin_usage.yaml#/AgentUsageResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'

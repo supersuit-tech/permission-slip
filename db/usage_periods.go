@@ -91,45 +91,49 @@ type UsageBreakdownKeys struct {
 	ActionType  string // may be empty if unknown
 }
 
+// breakdownUpdateSQL generates the nested jsonb_set expression used to
+// atomically increment by_agent, by_connector, and by_action_type counters
+// within the breakdown JSONB column. col is the column reference
+// (e.g. "usage_periods.breakdown" or just "breakdown"), and agentP,
+// connectorP, actionP are the positional parameter numbers for the
+// agent key, connector key, and action type key respectively.
+func breakdownUpdateSQL(col string, agentP, connectorP, actionP int) string {
+	return fmt.Sprintf(`
+		jsonb_set(
+			jsonb_set(
+				jsonb_set(
+					COALESCE(%[1]s, '{}'),
+					'{by_agent}',
+					jsonb_set(
+						COALESCE(%[1]s->'by_agent', '{}'),
+						ARRAY[$%[2]d::text],
+						to_jsonb(COALESCE((%[1]s->'by_agent'->>$%[2]d::text)::int, 0) + 1)
+					)
+				),
+				'{by_connector}',
+				CASE WHEN $%[3]d::text = '' THEN COALESCE(%[1]s->'by_connector', '{}')
+				ELSE jsonb_set(
+					COALESCE(%[1]s->'by_connector', '{}'),
+					ARRAY[$%[3]d::text],
+					to_jsonb(COALESCE((%[1]s->'by_connector'->>$%[3]d::text)::int, 0) + 1)
+				) END
+			),
+			'{by_action_type}',
+			CASE WHEN $%[4]d::text = '' THEN COALESCE(%[1]s->'by_action_type', '{}')
+			ELSE jsonb_set(
+				COALESCE(%[1]s->'by_action_type', '{}'),
+				ARRAY[$%[4]d::text],
+				to_jsonb(COALESCE((%[1]s->'by_action_type'->>$%[4]d::text)::int, 0) + 1)
+			) END
+		)`, col, agentP, connectorP, actionP)
+}
+
 // IncrementRequestCountWithBreakdown atomically increments the request count
 // and updates the JSONB breakdown for the given user and billing period.
 // The breakdown tracks counts by agent, connector, and action type using
 // atomic jsonb_set operations.
 func IncrementRequestCountWithBreakdown(ctx context.Context, db DBTX, userID string, periodStart, periodEnd time.Time, keys UsageBreakdownKeys) (*UsagePeriod, error) {
 	agentKey := strconv.FormatInt(keys.AgentID, 10)
-
-	// Build the breakdown update expression. We use nested jsonb_set calls
-	// to atomically increment counters within the JSONB breakdown column.
-	// Each path (by_agent.<id>, by_connector.<id>, by_action_type.<type>)
-	// is incremented by 1, initialising to 1 if the key doesn't exist.
-	breakdownUpdate := `
-		jsonb_set(
-			jsonb_set(
-				jsonb_set(
-					COALESCE(usage_periods.breakdown, '{}'),
-					'{by_agent}',
-					jsonb_set(
-						COALESCE(usage_periods.breakdown->'by_agent', '{}'),
-						ARRAY[$4::text],
-						to_jsonb(COALESCE((usage_periods.breakdown->'by_agent'->>$4::text)::int, 0) + 1)
-					)
-				),
-				'{by_connector}',
-				CASE WHEN $5::text = '' THEN COALESCE(usage_periods.breakdown->'by_connector', '{}')
-				ELSE jsonb_set(
-					COALESCE(usage_periods.breakdown->'by_connector', '{}'),
-					ARRAY[$5::text],
-					to_jsonb(COALESCE((usage_periods.breakdown->'by_connector'->>$5::text)::int, 0) + 1)
-				) END
-			),
-			'{by_action_type}',
-			CASE WHEN $6::text = '' THEN COALESCE(usage_periods.breakdown->'by_action_type', '{}')
-			ELSE jsonb_set(
-				COALESCE(usage_periods.breakdown->'by_action_type', '{}'),
-				ARRAY[$6::text],
-				to_jsonb(COALESCE((usage_periods.breakdown->'by_action_type'->>$6::text)::int, 0) + 1)
-			) END
-		)`
 
 	query := fmt.Sprintf(
 		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count, breakdown)
@@ -143,7 +147,7 @@ func IncrementRequestCountWithBreakdown(ctx context.Context, db DBTX, userID str
 		              period_end = EXCLUDED.period_end,
 		              breakdown = %s
 		 RETURNING %s`,
-		breakdownUpdate,
+		breakdownUpdateSQL("usage_periods.breakdown", 4, 5, 6),
 		usagePeriodColumns,
 	)
 
@@ -251,36 +255,13 @@ func ReserveRequestQuota(ctx context.Context, d DBTX, userID string, periodStart
 func UpdateUsageBreakdownOnly(ctx context.Context, d DBTX, userID string, periodStart time.Time, keys UsageBreakdownKeys) error {
 	agentKey := strconv.FormatInt(keys.AgentID, 10)
 
-	_, err := d.Exec(ctx,
+	query := fmt.Sprintf(
 		`UPDATE usage_periods
-		 SET breakdown = jsonb_set(
-			jsonb_set(
-				jsonb_set(
-					COALESCE(breakdown, '{}'),
-					'{by_agent}',
-					jsonb_set(
-						COALESCE(breakdown->'by_agent', '{}'),
-						ARRAY[$3::text],
-						to_jsonb(COALESCE((breakdown->'by_agent'->>$3::text)::int, 0) + 1)
-					)
-				),
-				'{by_connector}',
-				CASE WHEN $4::text = '' THEN COALESCE(breakdown->'by_connector', '{}')
-				ELSE jsonb_set(
-					COALESCE(breakdown->'by_connector', '{}'),
-					ARRAY[$4::text],
-					to_jsonb(COALESCE((breakdown->'by_connector'->>$4::text)::int, 0) + 1)
-				) END
-			),
-			'{by_action_type}',
-			CASE WHEN $5::text = '' THEN COALESCE(breakdown->'by_action_type', '{}')
-			ELSE jsonb_set(
-				COALESCE(breakdown->'by_action_type', '{}'),
-				ARRAY[$5::text],
-				to_jsonb(COALESCE((breakdown->'by_action_type'->>$5::text)::int, 0) + 1)
-			) END
-		 )
+		 SET breakdown = %s
 		 WHERE user_id = $1 AND period_start = $2`,
+		breakdownUpdateSQL("breakdown", 3, 4, 5))
+
+	_, err := d.Exec(ctx, query,
 		userID, periodStart, agentKey, keys.ConnectorID, keys.ActionType)
 	return err
 }
@@ -298,3 +279,4 @@ func BillingPeriodBounds(t time.Time) (start, end time.Time) {
 	end = start.AddDate(0, 1, 0)
 	return start, end
 }
+

@@ -108,6 +108,8 @@ tags:
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
     description: Subscription management, checkout, and usage (session-authenticated)
+  - name: Admin
+    description: Internal admin endpoints for usage analytics and abuse detection (session-authenticated)
 
 paths:
   /v1/connectors:
@@ -261,6 +263,15 @@ paths:
 
   /v1/billing/plan:
     $ref: './components/paths/billing.yaml#/plan'
+
+  /v1/admin/usage:
+    $ref: './components/paths/admin_usage.yaml#/adminUsage'
+
+  /v1/admin/usage/by-connector:
+    $ref: './components/paths/admin_usage.yaml#/adminUsageByConnector'
+
+  /v1/admin/usage/by-agent:
+    $ref: './components/paths/admin_usage.yaml#/adminUsageByAgent'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -514,6 +525,18 @@ components:
       $ref: './components/schemas/billing.yaml#/ResourceLimitError'
     ResourceLimitDetails:
       $ref: './components/schemas/billing.yaml#/ResourceLimitDetails'
+
+    # Admin Usage
+    AdminUsageResponse:
+      $ref: './components/schemas/admin_usage.yaml#/AdminUsageResponse'
+    ConnectorUsageResponse:
+      $ref: './components/schemas/admin_usage.yaml#/ConnectorUsageResponse'
+    ConnectorUsageEntry:
+      $ref: './components/schemas/admin_usage.yaml#/ConnectorUsageEntry'
+    AgentUsageResponse:
+      $ref: './components/schemas/admin_usage.yaml#/AgentUsageResponse'
+    AgentUsageEntry:
+      $ref: './components/schemas/admin_usage.yaml#/AgentUsageEntry'
 
     # Config
     ConfigResponse:

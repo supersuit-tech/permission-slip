@@ -104,6 +104,8 @@ tags:
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
     description: Subscription management, checkout, and usage (session-authenticated)
+  - name: Admin
+    description: Internal admin endpoints for usage analytics and abuse detection (session-authenticated)
 paths:
   /v1/connectors:
     get:
@@ -5139,6 +5141,121 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/admin/usage:
+    get:
+      summary: Get your usage for a billing period
+      description: |
+        Returns the authenticated user's usage metrics for a billing period.
+        Includes request/SMS totals and an optional breakdown by agent,
+        connector, and action type.
+
+        Defaults to the current billing period when no period parameter
+        is provided. All data is scoped to the authenticated user — there
+        is no way to query another user's usage through this endpoint.
+      operationId: adminGetUsage
+      tags:
+        - Admin
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: |
+            Billing period to query. Accepts `YYYY-MM` (e.g., `2026-03`),
+            `YYYY-MM-DD` (e.g., `2026-03-01`), or full ISO 8601 date-time
+            (e.g., `2026-03-01T00:00:00Z`). Defaults to the current billing period.
+          schema:
+            type: string
+          examples:
+            month:
+              value: 2026-03
+              summary: Month shorthand
+            date:
+              value: '2026-03-01'
+              summary: Date format
+            iso8601:
+              value: '2026-03-01T00:00:00Z'
+              summary: Full ISO 8601 timestamp
+      responses:
+        '200':
+          description: Usage data returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUsageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/admin/usage/by-connector:
+    get:
+      summary: Get your usage breakdown by connector
+      description: |
+        Returns the authenticated user's per-connector request counts for a
+        billing period, ordered by request count descending. Each entry
+        includes the connector name when available.
+
+        Useful for understanding which integrations drive the most usage.
+      operationId: adminGetUsageByConnector
+      tags:
+        - Admin
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: |
+            Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+            full ISO 8601 date-time. Defaults to the current billing period.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connector usage breakdown returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorUsageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/admin/usage/by-agent:
+    get:
+      summary: Get your usage breakdown by agent
+      description: |
+        Returns the authenticated user's per-agent request counts for a
+        billing period, ordered by request count descending. Each entry
+        includes the agent name from metadata when available.
+
+        Useful for identifying which agents consume the most quota.
+      operationId: adminGetUsageByAgent
+      tags:
+        - Admin
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: |
+            Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
+            full ISO 8601 date-time. Defaults to the current billing period.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent usage breakdown returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentUsageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /v1/config:
     get:
       summary: Get server configuration
@@ -9099,6 +9216,140 @@ components:
           type: string
           description: The user's current plan
           example: free
+    AdminUsageResponse:
+      type: object
+      description: |
+        Summary of a user's billable usage for a single billing period.
+        The `breakdown` field is only present when at least one breakdown
+        dimension (agent, connector, or action type) has recorded data.
+      required:
+        - user_id
+        - period_start
+        - period_end
+        - request_count
+        - sms_count
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: The authenticated user whose usage is reported
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        period_start:
+          type: string
+          format: date-time
+          description: Start of the billing period (inclusive, UTC)
+          example: '2026-03-01T00:00:00Z'
+        period_end:
+          type: string
+          format: date-time
+          description: End of the billing period (exclusive, UTC)
+          example: '2026-04-01T00:00:00Z'
+        request_count:
+          type: integer
+          description: Total billable requests in the period
+          example: 542
+        sms_count:
+          type: integer
+          description: Total SMS messages sent in the period
+          example: 3
+        breakdown:
+          $ref: '#/components/schemas/UsageBreakdown'
+    ConnectorUsageResponse:
+      type: object
+      description: |
+        Per-connector request counts for the authenticated user within a billing
+        period. Connectors are sorted by request count descending.
+      required:
+        - user_id
+        - period_start
+        - period_end
+        - connectors
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: The authenticated user whose connector usage is reported
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        period_start:
+          type: string
+          format: date-time
+          example: '2026-03-01T00:00:00Z'
+        period_end:
+          type: string
+          format: date-time
+          example: '2026-04-01T00:00:00Z'
+        connectors:
+          type: array
+          description: Connector usage entries, ordered by request_count descending
+          items:
+            $ref: '#/components/schemas/ConnectorUsageEntry'
+    ConnectorUsageEntry:
+      type: object
+      required:
+        - connector_id
+        - request_count
+      properties:
+        connector_id:
+          type: string
+          description: Connector identifier (matches the `id` field in the connectors table)
+          example: gmail
+        name:
+          type: string
+          description: Human-readable connector name. Omitted if the connector has been deleted.
+          example: Gmail
+        request_count:
+          type: integer
+          description: Number of billable requests made through this connector
+          example: 1542
+    AgentUsageResponse:
+      type: object
+      description: |
+        Per-agent request counts for the authenticated user within a billing
+        period. Agents are sorted by request count descending.
+      required:
+        - user_id
+        - period_start
+        - period_end
+        - agents
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: The authenticated user whose agent usage is reported
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        period_start:
+          type: string
+          format: date-time
+          example: '2026-03-01T00:00:00Z'
+        period_end:
+          type: string
+          format: date-time
+          example: '2026-04-01T00:00:00Z'
+        agents:
+          type: array
+          description: Agent usage entries, ordered by request_count descending
+          items:
+            $ref: '#/components/schemas/AgentUsageEntry'
+    AgentUsageEntry:
+      type: object
+      required:
+        - agent_id
+        - request_count
+      properties:
+        agent_id:
+          type: string
+          description: Agent ID (numeric, serialized as string)
+          example: '42'
+        name:
+          type: string
+          description: |
+            Agent name from the agent's metadata. Omitted if not set or if the
+            agent has been deleted.
+          example: deploy-bot
+        request_count:
+          type: integer
+          description: Number of billable requests attributed to this agent
+          example: 500
     ConfigResponse:
       type: object
       description: |
