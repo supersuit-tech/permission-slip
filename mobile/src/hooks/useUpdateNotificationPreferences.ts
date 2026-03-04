@@ -9,6 +9,7 @@ import { useAuth } from "../auth/AuthContext";
 import client from "../api/client";
 import { getApiErrorMessage } from "../api/errors";
 import type { components } from "../api/schema";
+import { NOTIFICATION_PREFS_KEY } from "./useNotificationPreferences";
 
 type NotificationPreference = components["schemas"]["NotificationPreference"];
 type NotificationPreferenceUpdate =
@@ -47,7 +48,7 @@ export function useUpdateNotificationPreferences() {
       return data;
     },
     onMutate: async (updates) => {
-      const queryKey = ["notification-preferences", userId ?? ""];
+      const queryKey = [NOTIFICATION_PREFS_KEY, userId ?? ""];
       await queryClient.cancelQueries({ queryKey });
       const previous =
         queryClient.getQueryData<PreferencesResponse>(queryKey);
@@ -67,13 +68,13 @@ export function useUpdateNotificationPreferences() {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        const queryKey = ["notification-preferences", userId ?? ""];
+        const queryKey = [NOTIFICATION_PREFS_KEY, userId ?? ""];
         queryClient.setQueryData(queryKey, context.previous);
       }
     },
     onSettled: () => {
       queryClient.invalidateQueries({
-        queryKey: ["notification-preferences"],
+        queryKey: [NOTIFICATION_PREFS_KEY],
       });
     },
   });

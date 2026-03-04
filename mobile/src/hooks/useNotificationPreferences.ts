@@ -13,6 +13,9 @@ import type { components } from "../api/schema";
 export type NotificationPreference =
   components["schemas"]["NotificationPreference"];
 
+/** Shared query key prefix — used by the update hook for cache invalidation. */
+export const NOTIFICATION_PREFS_KEY = "notification-preferences" as const;
+
 export function useNotificationPreferences() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
@@ -22,7 +25,7 @@ export function useNotificationPreferences() {
   tokenRef.current = accessToken;
 
   const query = useQuery({
-    queryKey: ["notification-preferences", userId ?? ""],
+    queryKey: [NOTIFICATION_PREFS_KEY, userId ?? ""],
     queryFn: async () => {
       const token = tokenRef.current;
       if (!token) throw new Error("Not authenticated");
