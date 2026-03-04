@@ -44,7 +44,7 @@ func TestSecurityHeadersMiddleware(t *testing.T) {
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"font-src 'self' https://fonts.gstatic.com",
 		"img-src 'self' data:",
-		"connect-src 'self' https://*.ingest.sentry.io",
+		"connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
 		"frame-ancestors 'none'",
 	}
 	for _, d := range requiredDirectives {
@@ -69,7 +69,7 @@ func TestSecurityHeadersMiddleware_ExtraConnectSrc(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://abc.supabase.co https://other.example.com") {
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://abc.supabase.co https://other.example.com") {
 		t.Errorf("CSP connect-src missing extra origins; full CSP: %s", csp)
 	}
 }
@@ -145,7 +145,7 @@ func TestSecurityHeadersMiddleware_InvalidExtraConnectSrc(t *testing.T) {
 
 	csp := rec.Header().Get("Content-Security-Policy")
 	// connect-src should only contain 'self' + Sentry — all malicious entries rejected.
-	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io; ") {
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io; ") {
 		t.Errorf("CSP connect-src should be only 'self' + sentry; full CSP: %s", csp)
 	}
 	for _, m := range malicious {
@@ -231,11 +231,11 @@ func TestSecurityHeadersMiddleware_EmptyExtraConnectSrc(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	// connect-src should be "'self' https://*.ingest.sentry.io" with no trailing spaces from empty inputs.
-	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io; ") {
+	// connect-src should be "'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io" with no trailing spaces from empty inputs.
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io; ") {
 		t.Errorf("CSP connect-src has incorrect base formatting; full CSP: %s", csp)
 	}
-	if strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io  ") {
+	if strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io  ") {
 		t.Errorf("CSP connect-src has trailing whitespace from empty extra sources; full CSP: %s", csp)
 	}
 }
