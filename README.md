@@ -236,7 +236,9 @@ go run ./cmd/generate-vapid-keys --format=heroku
 
 ## Mobile App
 
-The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin client for approving and viewing requests from your phone.
+The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin client for approving and viewing requests from your phone — similar to the Microsoft Authenticator approval flow.
+
+**Current capabilities:** login, browse pending/approved/denied requests, view full request details (action parameters, risk level, agent info, expiry countdown), approve with confirmation code display (copyable `XXX-XXX` format), and deny with confirmation.
 
 ```bash
 make mobile-install    # install mobile dependencies
