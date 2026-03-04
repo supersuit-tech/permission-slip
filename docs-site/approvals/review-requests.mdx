@@ -42,7 +42,7 @@ The review dialog shows:
 
 ## Making a Decision
 
-- Click **Approve** to authorize the action. A confirmation code will be displayed — share this with the agent.
+- Click **Approve** to authorize the action. Permission Slip immediately executes it via the connector and shows you the result.
 - Click **Deny** to reject the request. The agent is notified that the request was denied.
 
 <Warning>
@@ -53,9 +53,8 @@ The review dialog shows:
 
 When you approve a request:
 
-1. A **confirmation code** is displayed on screen (format: `ABC-DEF`).
-2. Copy the code and share it with the agent.
-3. The agent submits the code to receive a **single-use execution token**.
-4. The agent uses the token to execute the action.
+1. Permission Slip **executes the action** immediately via the connector using your stored credentials.
+2. The **execution result** (success or failure) is displayed in the review dialog.
+3. The agent receives the result by polling the approval status endpoint or via the real-time events stream.
 
 The approval and execution are recorded in the [Activity Log](/activity/audit-log).
