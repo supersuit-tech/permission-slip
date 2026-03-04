@@ -596,3 +596,167 @@ func TestAgentRequestApproval_EmitsAuditEvent(t *testing.T) {
 		t.Errorf("expected 1 approval.requested audit event, got %d", count)
 	}
 }
+
+// ── GET /approvals/{approval_id}/status ──────────────────────────────────
+
+func TestAgentApprovalStatus_Pending(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	// 1. Create an approval.
+	reqBody := `{"request_id":"req_status_pending","action":{"type":"test.action"},"context":{"description":"test"}}`
+	r1 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, r1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("request: expected 200, got %d: %s", w1.Code, w1.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	json.Unmarshal(w1.Body.Bytes(), &createResp)
+
+	// 2. Poll status — should be pending with no execution fields.
+	r2 := signedJSONRequest(t, http.MethodGet, "/approvals/"+createResp.ApprovalID+"/status", "", privKey, agentID)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("status: expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	var statusResp agentApprovalStatusResponse
+	if err := json.Unmarshal(w2.Body.Bytes(), &statusResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if statusResp.Status != "pending" {
+		t.Errorf("expected status 'pending', got %q", statusResp.Status)
+	}
+	if statusResp.ExecutionStatus != nil {
+		t.Errorf("expected nil execution_status for pending approval, got %v", *statusResp.ExecutionStatus)
+	}
+	if statusResp.ExecutionResult != nil {
+		t.Error("expected nil execution_result for pending approval")
+	}
+}
+
+func TestAgentApprovalStatus_ApprovedWithExecution(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	// Insert an approved approval with execution result.
+	approvalID := "appr_status_exec"
+	testhelper.InsertApprovalWithStatus(t, tx, approvalID, agentID, uid, "approved")
+	_, err = tx.Exec(context.Background(),
+		`UPDATE approvals SET execution_status = 'success', execution_result = '{"data":"ok"}', executed_at = now() WHERE approval_id = $1`,
+		approvalID,
+	)
+	if err != nil {
+		t.Fatalf("set execution: %v", err)
+	}
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/"+approvalID+"/status", "", privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var statusResp agentApprovalStatusResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &statusResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if statusResp.Status != "approved" {
+		t.Errorf("expected status 'approved', got %q", statusResp.Status)
+	}
+	if statusResp.ExecutionStatus == nil || *statusResp.ExecutionStatus != "success" {
+		t.Errorf("expected execution_status 'success', got %v", statusResp.ExecutionStatus)
+	}
+	if statusResp.ExecutionResult == nil {
+		t.Fatal("expected execution_result to be present")
+	}
+}
+
+func TestAgentApprovalStatus_NotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/appr_nonexistent/status", "", privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAgentApprovalStatus_OtherAgentAccess(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	// Create two users, each with their own agent.
+	uid1 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u1_"+uid1[:8])
+	pubKeySSH1, _, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key1: %v", err)
+	}
+	agentID1 := testhelper.InsertAgentWithPublicKey(t, tx, uid1, "registered", pubKeySSH1)
+
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
+	pubKeySSH2, privKey2, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key2: %v", err)
+	}
+	agentID2 := testhelper.InsertAgentWithPublicKey(t, tx, uid2, "registered", pubKeySSH2)
+	_ = agentID2
+
+	// Create an approval for agent1.
+	approvalID := "appr_other_agent"
+	testhelper.InsertApproval(t, tx, approvalID, agentID1, uid1)
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	// Agent2 tries to access agent1's approval — should get 404.
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/"+approvalID+"/status", "", privKey2, agentID2)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for other agent's approval, got %d: %s", w.Code, w.Body.String())
+	}
+}

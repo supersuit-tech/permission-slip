@@ -140,11 +140,17 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		// Execute the action via the connector now that the approval is granted.
-		execStatus, execResultJSON := executeApprovalAction(r.Context(), deps, profile.ID, appr)
+		// Detach from the request context so a client disconnect doesn't abort
+		// the connector call or DB update mid-flight.
+		execCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 30*time.Second)
+		defer cancel()
+		execStatus, execResultJSON := executeApprovalAction(execCtx, deps, profile.ID, appr)
 
 		emitApprovalAuditEvent(r.Context(), deps.DB, profile.ID, appr, agentMeta)
 
 		// Notify any connected SSE clients (e.g. other browser tabs).
+		// Keep approval_resolved for backward compatibility (frontend listens for it).
+		notifyApprovalChange(deps, profile.ID, "approval_resolved", appr.ApprovalID)
 		notifyApprovalExecuted(deps, profile.ID, appr.ApprovalID, execStatus)
 
 		resp := approveResponse{
@@ -189,11 +195,14 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 		}
 		resultJSON, _ = json.Marshal(map[string]string{"error": errMsg})
 		log.Printf("[%s] executeApprovalAction: connector error for approval %s: %v", TraceID(ctx), appr.ApprovalID, execErr)
+	} else if result == nil {
+		// No connector registered for this action type — nothing was executed.
+		execStatus = "error"
+		resultJSON, _ = json.Marshal(map[string]string{"error": "no connector registered for action type"})
+		log.Printf("[%s] executeApprovalAction: no connector for approval %s action type %q", TraceID(ctx), appr.ApprovalID, actionType)
 	} else {
 		execStatus = "success"
-		if result != nil {
-			resultJSON = result.Data
-		}
+		resultJSON = result.Data
 	}
 
 	// Persist execution result on the approval row (best-effort).

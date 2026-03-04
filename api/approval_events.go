@@ -236,9 +236,9 @@ func notifyApprovalChange(deps *Deps, userID string, eventType string, approvalI
 	}
 }
 
-// notifyApprovalExecuted sends an SSE event with execution status when an
-// approved action has been executed. This allows agents listening via SSE to
-// receive execution results without polling.
+// notifyApprovalExecuted sends an SSE event with the execution status when an
+// approved action has been executed. This notifies the approver's connected
+// browser tabs so they can update the UI with the execution outcome.
 func notifyApprovalExecuted(deps *Deps, userID string, approvalID string, executionStatus string) {
 	if deps.ApprovalEvents == nil {
 		return
