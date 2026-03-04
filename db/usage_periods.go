@@ -359,19 +359,18 @@ type ConnectorUsage struct {
 	RequestCount int
 }
 
-// GetUsageByConnector aggregates request counts from the JSONB breakdown
-// across all users for a given billing period. Returns connectors ordered
-// by request count DESC, enriched with connector names.
-func GetUsageByConnector(ctx context.Context, db DBTX, periodStart time.Time) ([]ConnectorUsage, error) {
+// GetUsageByConnectorForUser extracts per-connector request counts from the
+// JSONB breakdown for a specific user and billing period. Returns connectors
+// ordered by request count DESC, enriched with connector names.
+func GetUsageByConnectorForUser(ctx context.Context, db DBTX, userID string, periodStart time.Time) ([]ConnectorUsage, error) {
 	rows, err := db.Query(ctx,
-		`SELECT b.key, COALESCE(c.name, ''), SUM(b.value::int)::int AS total
+		`SELECT b.key, COALESCE(c.name, ''), b.value::int AS count
 		 FROM usage_periods u,
 		      jsonb_each_text(COALESCE(u.breakdown->'by_connector', '{}')) b
 		 LEFT JOIN connectors c ON c.id = b.key
-		 WHERE u.period_start = $1
-		 GROUP BY b.key, c.name
-		 ORDER BY total DESC`,
-		periodStart)
+		 WHERE u.user_id = $1 AND u.period_start = $2
+		 ORDER BY count DESC`,
+		userID, periodStart)
 	if err != nil {
 		return nil, err
 	}

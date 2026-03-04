@@ -80,7 +80,7 @@ func TestGetTopUsersByUsage_ClampLimit(t *testing.T) {
 	_ = results
 }
 
-func TestGetUsageByConnector(t *testing.T) {
+func TestGetUsageByConnectorForUser(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -108,7 +108,7 @@ func TestGetUsageByConnector(t *testing.T) {
 		}
 	}
 
-	// uid2: 5 via gmail
+	// uid2: 5 via gmail — should NOT appear in uid1's results.
 	for i := 0; i < 5; i++ {
 		if _, err := db.IncrementRequestCountWithBreakdown(ctx, tx, uid2, periodStart, periodEnd, db.UsageBreakdownKeys{
 			AgentID: 2, ConnectorID: "gmail", ActionType: "email.send",
@@ -117,19 +117,20 @@ func TestGetUsageByConnector(t *testing.T) {
 		}
 	}
 
-	results, err := db.GetUsageByConnector(ctx, tx, periodStart)
+	// Query uid1's connector usage only.
+	results, err := db.GetUsageByConnectorForUser(ctx, tx, uid1, periodStart)
 	if err != nil {
-		t.Fatalf("GetUsageByConnector: %v", err)
+		t.Fatalf("GetUsageByConnectorForUser: %v", err)
 	}
 	if len(results) != 2 {
-		t.Fatalf("expected 2 connectors, got %d", len(results))
+		t.Fatalf("expected 2 connectors for uid1, got %d", len(results))
 	}
-	// gmail should be first (8 total), stripe second (2 total)
+	// gmail should be first (3 for uid1 only), stripe second (2)
 	if results[0].ConnectorID != "gmail" {
 		t.Errorf("expected first connector to be gmail, got %s", results[0].ConnectorID)
 	}
-	if results[0].RequestCount != 8 {
-		t.Errorf("expected gmail count=8, got %d", results[0].RequestCount)
+	if results[0].RequestCount != 3 {
+		t.Errorf("expected gmail count=3 (uid1 only), got %d", results[0].RequestCount)
 	}
 	if results[1].ConnectorID != "stripe" {
 		t.Errorf("expected second connector to be stripe, got %s", results[1].ConnectorID)

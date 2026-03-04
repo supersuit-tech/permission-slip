@@ -5143,27 +5143,20 @@ paths:
           $ref: '#/components/responses/ServiceUnavailable'
   /v1/admin/usage:
     get:
-      summary: Get user usage for billing period
+      summary: Get your usage for a billing period
       description: |
-        Returns usage metrics for a specific user and billing period. Includes
-        request/SMS totals and an optional breakdown by agent, connector, and
-        action type.
+        Returns the authenticated user's usage metrics for a billing period.
+        Includes request/SMS totals and an optional breakdown by agent,
+        connector, and action type.
 
-        Defaults to the authenticated user's current billing period when no
-        query parameters are provided.
+        Defaults to the current billing period when no period parameter
+        is provided.
       operationId: adminGetUsage
       tags:
         - Admin
       security:
         - SupabaseSession: []
       parameters:
-        - name: user_id
-          in: query
-          required: false
-          description: User ID to query. Defaults to the authenticated user.
-          schema:
-            type: string
-            format: uuid
         - name: period
           in: query
           required: false
@@ -5173,7 +5166,6 @@ paths:
             (e.g., `2026-03-01T00:00:00Z`). Defaults to the current billing period.
           schema:
             type: string
-            format: date-time
       responses:
         '200':
           description: Usage data returned
@@ -5185,55 +5177,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-  /v1/admin/usage/top-users:
-    get:
-      summary: Get top users by request count
-      description: |
-        Returns users with the highest request counts for a billing period,
-        ordered by request count descending. Useful for abuse detection and
-        identifying heavy users.
-      operationId: adminGetTopUsers
-      tags:
-        - Admin
-      security:
-        - SupabaseSession: []
-      parameters:
-        - name: period
-          in: query
-          required: false
-          description: |
-            Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
-            full ISO 8601 date-time. Defaults to the current billing period.
-          schema:
-            type: string
-            format: date-time
-        - name: limit
-          in: query
-          required: false
-          description: Maximum number of users to return (1–100). Defaults to 10.
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
-      responses:
-        '200':
-          description: Top users returned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TopUsersResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
   /v1/admin/usage/by-connector:
     get:
-      summary: Get usage breakdown by connector
+      summary: Get your usage breakdown by connector
       description: |
-        Returns aggregate request counts per connector across all users for a
-        billing period, ordered by request count descending. Useful for product
-        analytics to identify which connectors are most popular.
+        Returns the authenticated user's per-connector request counts for a
+        billing period, ordered by request count descending.
       operationId: adminGetUsageByConnector
       tags:
         - Admin
@@ -5248,7 +5197,6 @@ paths:
             full ISO 8601 date-time. Defaults to the current billing period.
           schema:
             type: string
-            format: date-time
       responses:
         '200':
           description: Connector usage returned
@@ -5262,25 +5210,16 @@ paths:
           $ref: '#/components/responses/Unauthorized'
   /v1/admin/usage/by-agent:
     get:
-      summary: Get usage breakdown by agent for a user
+      summary: Get your usage breakdown by agent
       description: |
-        Returns per-agent request counts for a specific user and billing period,
-        ordered by request count descending.
-
-        Defaults to the authenticated user's current billing period.
+        Returns the authenticated user's per-agent request counts for a
+        billing period, ordered by request count descending.
       operationId: adminGetUsageByAgent
       tags:
         - Admin
       security:
         - SupabaseSession: []
       parameters:
-        - name: user_id
-          in: query
-          required: false
-          description: User ID to query. Defaults to the authenticated user.
-          schema:
-            type: string
-            format: uuid
         - name: period
           in: query
           required: false
@@ -5289,7 +5228,6 @@ paths:
             full ISO 8601 date-time. Defaults to the current billing period.
           schema:
             type: string
-            format: date-time
       responses:
         '200':
           description: Agent usage returned
@@ -9292,56 +9230,17 @@ components:
           example: 3
         breakdown:
           $ref: '#/components/schemas/UsageBreakdown'
-    TopUsersResponse:
-      type: object
-      required:
-        - period_start
-        - period_end
-        - users
-      properties:
-        period_start:
-          type: string
-          format: date-time
-        period_end:
-          type: string
-          format: date-time
-        users:
-          type: array
-          items:
-            $ref: '#/components/schemas/TopUserEntry'
-    TopUserEntry:
-      type: object
-      required:
-        - user_id
-        - username
-        - request_count
-        - sms_count
-      properties:
-        user_id:
-          type: string
-          format: uuid
-        username:
-          type: string
-          description: User's display name from their profile
-          example: jane_doe
-        email:
-          type: string
-          format: email
-          description: User's email address (omitted if not set)
-          example: jane@example.com
-        request_count:
-          type: integer
-          example: 5432
-        sms_count:
-          type: integer
-          example: 12
     ConnectorUsageResponse:
       type: object
       required:
+        - user_id
         - period_start
         - period_end
         - connectors
       properties:
+        user_id:
+          type: string
+          format: uuid
         period_start:
           type: string
           format: date-time

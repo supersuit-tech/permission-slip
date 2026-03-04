@@ -267,9 +267,6 @@ paths:
   /v1/admin/usage:
     $ref: './components/paths/admin_usage.yaml#/adminUsage'
 
-  /v1/admin/usage/top-users:
-    $ref: './components/paths/admin_usage.yaml#/adminTopUsers'
-
   /v1/admin/usage/by-connector:
     $ref: './components/paths/admin_usage.yaml#/adminUsageByConnector'
 
@@ -532,10 +529,6 @@ components:
     # Admin Usage
     AdminUsageResponse:
       $ref: './components/schemas/admin_usage.yaml#/AdminUsageResponse'
-    TopUsersResponse:
-      $ref: './components/schemas/admin_usage.yaml#/TopUsersResponse'
-    TopUserEntry:
-      $ref: './components/schemas/admin_usage.yaml#/TopUserEntry'
     ConnectorUsageResponse:
       $ref: './components/schemas/admin_usage.yaml#/ConnectorUsageResponse'
     ConnectorUsageEntry:

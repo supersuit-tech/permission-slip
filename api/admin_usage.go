@@ -3,7 +3,6 @@ package api
 import (
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -20,21 +19,8 @@ type adminUsageResponse struct {
 	Breakdown   *usageBreakdownDTO `json:"breakdown,omitempty"`
 }
 
-type topUsersResponse struct {
-	PeriodStart time.Time      `json:"period_start"`
-	PeriodEnd   time.Time      `json:"period_end"`
-	Users       []topUserEntry `json:"users"`
-}
-
-type topUserEntry struct {
-	UserID       string  `json:"user_id"`
-	Username     string  `json:"username"`
-	Email        *string `json:"email,omitempty"`
-	RequestCount int     `json:"request_count"`
-	SMSCount     int     `json:"sms_count"`
-}
-
 type connectorUsageResponse struct {
+	UserID      string                `json:"user_id"`
 	PeriodStart time.Time             `json:"period_start"`
 	PeriodEnd   time.Time             `json:"period_end"`
 	Connectors  []connectorUsageEntry `json:"connectors"`
@@ -61,30 +47,33 @@ type agentUsageEntry struct {
 
 // ── Route registration ──────────────────────────────────────────────────────
 
-// RegisterAdminUsageRoutes adds admin usage analytics endpoints to the mux.
-// All endpoints require session auth via RequireProfile.
+// RegisterAdminUsageRoutes adds usage analytics endpoints to the mux.
+// All endpoints require session auth via RequireProfile and are scoped
+// to the authenticated user's own data.
+//
+// NOTE: Cross-user endpoints (top-users leaderboard, platform-wide
+// connector aggregation) are intentionally omitted. They require an
+// admin role system that does not yet exist. Adding them behind
+// RequireProfile alone would create a cross-tenant data leak.
 func RegisterAdminUsageRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /admin/usage", requireProfile(handleAdminGetUsage(deps)))
-	mux.Handle("GET /admin/usage/top-users", requireProfile(handleAdminTopUsers(deps)))
 	mux.Handle("GET /admin/usage/by-connector", requireProfile(handleAdminUsageByConnector(deps)))
 	mux.Handle("GET /admin/usage/by-agent", requireProfile(handleAdminUsageByAgent(deps)))
 }
 
 // ── GET /admin/usage ────────────────────────────────────────────────────────
 
-// handleAdminGetUsage returns usage metrics for a specific user and billing period.
+// handleAdminGetUsage returns the authenticated user's usage metrics for a
+// billing period. Includes request/SMS totals and an optional breakdown by
+// agent, connector, and action type.
+//
 // Query params:
-//   - user_id (optional): defaults to the authenticated user
 //   - period (optional): billing period in YYYY-MM, YYYY-MM-DD, or RFC3339 format; defaults to current
 func handleAdminGetUsage(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
-
-		userID := r.URL.Query().Get("user_id")
-		if userID == "" {
-			userID = profile.ID
-		}
+		userID := profile.ID
 
 		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {
@@ -131,70 +120,18 @@ func handleAdminGetUsage(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// ── GET /admin/usage/top-users ──────────────────────────────────────────────
-
-// handleAdminTopUsers returns the users with the highest request counts
-// for a billing period. Useful for abuse detection.
-// Query params:
-//   - period (optional): billing period; defaults to current billing period
-//   - limit (optional): max users to return (1–100, default 10)
-func handleAdminTopUsers(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		periodStart, ok := parsePeriodParam(w, r)
-		if !ok {
-			return
-		}
-		if periodStart.IsZero() {
-			periodStart, _ = db.BillingPeriodBounds(time.Now())
-		}
-
-		limit := 10
-		if l := r.URL.Query().Get("limit"); l != "" {
-			parsed, err := strconv.Atoi(l)
-			if err != nil || parsed < 1 {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "limit must be a positive integer"))
-				return
-			}
-			limit = parsed
-		}
-
-		users, err := db.GetTopUsersByUsage(r.Context(), deps.DB, periodStart, limit)
-		if err != nil {
-			log.Printf("[%s] AdminTopUsers: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch top users"))
-			return
-		}
-
-		_, periodEnd := db.BillingPeriodBounds(periodStart)
-
-		entries := make([]topUserEntry, len(users))
-		for i, u := range users {
-			entries[i] = topUserEntry{
-				UserID:       u.UserID,
-				Username:     u.Username,
-				Email:        u.Email,
-				RequestCount: u.RequestCount,
-				SMSCount:     u.SMSCount,
-			}
-		}
-
-		RespondJSON(w, http.StatusOK, topUsersResponse{
-			PeriodStart: periodStart,
-			PeriodEnd:   periodEnd,
-			Users:       entries,
-		})
-	}
-}
-
 // ── GET /admin/usage/by-connector ──────────────────────────────────────────
 
-// handleAdminUsageByConnector returns aggregate request counts per connector
-// across all users for a billing period.
+// handleAdminUsageByConnector returns the authenticated user's per-connector
+// request counts for a billing period, ordered by count descending.
+//
 // Query params:
 //   - period (optional): billing period; defaults to current billing period
 func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+		userID := profile.ID
+
 		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {
 			return
@@ -203,7 +140,7 @@ func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 			periodStart, _ = db.BillingPeriodBounds(time.Now())
 		}
 
-		connectors, err := db.GetUsageByConnector(r.Context(), deps.DB, periodStart)
+		connectors, err := db.GetUsageByConnectorForUser(r.Context(), deps.DB, userID, periodStart)
 		if err != nil {
 			log.Printf("[%s] AdminUsageByConnector: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -223,6 +160,7 @@ func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, connectorUsageResponse{
+			UserID:      userID,
 			PeriodStart: periodStart,
 			PeriodEnd:   periodEnd,
 			Connectors:  entries,
@@ -232,19 +170,15 @@ func handleAdminUsageByConnector(deps *Deps) http.HandlerFunc {
 
 // ── GET /admin/usage/by-agent ──────────────────────────────────────────────
 
-// handleAdminUsageByAgent returns per-agent request counts for a specific user
-// and billing period.
+// handleAdminUsageByAgent returns the authenticated user's per-agent request
+// counts for a billing period, ordered by count descending.
+//
 // Query params:
-//   - user_id (optional): defaults to the authenticated user
 //   - period (optional): billing period; defaults to current billing period
 func handleAdminUsageByAgent(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
-
-		userID := r.URL.Query().Get("user_id")
-		if userID == "" {
-			userID = profile.ID
-		}
+		userID := profile.ID
 
 		periodStart, ok := parsePeriodParam(w, r)
 		if !ok {

@@ -14,7 +14,7 @@ import (
 
 // ── GET /admin/usage ────────────────────────────────────────────────────────
 
-func TestAdminGetUsage_DefaultsToCurrentUser(t *testing.T) {
+func TestAdminGetUsage_ReturnsAuthenticatedUserData(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -48,6 +48,49 @@ func TestAdminGetUsage_DefaultsToCurrentUser(t *testing.T) {
 	}
 	if resp.Requests != 5 {
 		t.Errorf("expected request_count=5, got %d", resp.Requests)
+	}
+}
+
+func TestAdminGetUsage_IgnoresUserIDParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	// Create two users, only the authenticated one should have data returned.
+	uid1 := testhelper.GenerateUID(t)
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u1_"+uid1[:8])
+	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
+
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	for i := 0; i < 10; i++ {
+		if _, err := db.IncrementRequestCount(ctx, tx, uid2, periodStart, periodEnd); err != nil {
+			t.Fatalf("IncrementRequestCount: %v", err)
+		}
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	// Try to view uid2's data while authenticated as uid1 — should return uid1's data (0), not uid2's.
+	r := authenticatedRequest(t, http.MethodGet, "/admin/usage?user_id="+uid2, uid1)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp adminUsageResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	// Must return the authenticated user's ID and data, NOT the queried user_id.
+	if resp.UserID != uid1 {
+		t.Errorf("IDOR: expected user_id=%s (authenticated user), got %s", uid1, resp.UserID)
+	}
+	if resp.Requests != 0 {
+		t.Errorf("IDOR: expected request_count=0 for uid1, got %d (may be returning uid2's data)", resp.Requests)
 	}
 }
 
@@ -164,78 +207,9 @@ func TestAdminGetUsage_FlexiblePeriodFormats(t *testing.T) {
 	}
 }
 
-// ── GET /admin/usage/top-users ──────────────────────────────────────────────
-
-func TestAdminTopUsers_ReturnsSorted(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
-
-	uid1 := testhelper.GenerateUID(t)
-	uid2 := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid1, "u1_"+uid1[:8])
-	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
-
-	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
-	for i := 0; i < 3; i++ {
-		if _, err := db.IncrementRequestCount(ctx, tx, uid1, periodStart, periodEnd); err != nil {
-			t.Fatalf("increment uid1: %v", err)
-		}
-	}
-	for i := 0; i < 7; i++ {
-		if _, err := db.IncrementRequestCount(ctx, tx, uid2, periodStart, periodEnd); err != nil {
-			t.Fatalf("increment uid2: %v", err)
-		}
-	}
-
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
-	router := NewRouter(deps)
-
-	r := authenticatedRequest(t, http.MethodGet, "/admin/usage/top-users?limit=10", uid1)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp topUsersResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	if len(resp.Users) < 2 {
-		t.Fatalf("expected at least 2 users, got %d", len(resp.Users))
-	}
-	if resp.Users[0].RequestCount < resp.Users[1].RequestCount {
-		t.Error("expected users to be sorted by request_count DESC")
-	}
-	// Verify username enrichment.
-	if resp.Users[0].Username == "" {
-		t.Error("expected top user to have a username")
-	}
-}
-
-func TestAdminTopUsers_InvalidLimit(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
-	router := NewRouter(deps)
-
-	r := authenticatedRequest(t, http.MethodGet, "/admin/usage/top-users?limit=abc", uid)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
 // ── GET /admin/usage/by-connector ──────────────────────────────────────────
 
-func TestAdminUsageByConnector_Aggregated(t *testing.T) {
+func TestAdminUsageByConnector_ScopedToAuthenticatedUser(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -272,6 +246,9 @@ func TestAdminUsageByConnector_Aggregated(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
+	if resp.UserID != uid {
+		t.Errorf("expected user_id=%s, got %s", uid, resp.UserID)
+	}
 	if len(resp.Connectors) != 2 {
 		t.Fatalf("expected 2 connectors, got %d", len(resp.Connectors))
 	}
@@ -283,9 +260,50 @@ func TestAdminUsageByConnector_Aggregated(t *testing.T) {
 	}
 }
 
+func TestAdminUsageByConnector_DoesNotLeakCrossUserData(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	uid1 := testhelper.GenerateUID(t)
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u1_"+uid1[:8])
+	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
+
+	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
+	// uid2 has 10 requests via slack — uid1 should NOT see this.
+	for i := 0; i < 10; i++ {
+		if _, err := db.IncrementRequestCountWithBreakdown(ctx, tx, uid2, periodStart, periodEnd, db.UsageBreakdownKeys{
+			AgentID: 1, ConnectorID: "slack", ActionType: "message.send",
+		}); err != nil {
+			t.Fatalf("increment uid2: %v", err)
+		}
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	// uid1 should see 0 connectors (no usage of their own).
+	r := authenticatedRequest(t, http.MethodGet, "/admin/usage/by-connector", uid1)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp connectorUsageResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp.Connectors) != 0 {
+		t.Errorf("cross-tenant leak: expected 0 connectors for uid1, got %d", len(resp.Connectors))
+	}
+}
+
 // ── GET /admin/usage/by-agent ──────────────────────────────────────────────
 
-func TestAdminUsageByAgent_DefaultsToCurrentUser(t *testing.T) {
+func TestAdminUsageByAgent_ScopedToAuthenticatedUser(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -366,7 +384,6 @@ func TestAdminEndpoints_RequireAuth(t *testing.T) {
 
 	endpoints := []string{
 		"/admin/usage",
-		"/admin/usage/top-users",
 		"/admin/usage/by-connector",
 		"/admin/usage/by-agent",
 	}

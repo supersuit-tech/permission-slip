@@ -30,58 +30,17 @@ AdminUsageResponse:
     breakdown:
       $ref: '../schemas/billing.yaml#/UsageBreakdown'
 
-TopUsersResponse:
-  type: object
-  required:
-    - period_start
-    - period_end
-    - users
-  properties:
-    period_start:
-      type: string
-      format: date-time
-    period_end:
-      type: string
-      format: date-time
-    users:
-      type: array
-      items:
-        $ref: '#/TopUserEntry'
-
-TopUserEntry:
-  type: object
-  required:
-    - user_id
-    - username
-    - request_count
-    - sms_count
-  properties:
-    user_id:
-      type: string
-      format: uuid
-    username:
-      type: string
-      description: User's display name from their profile
-      example: jane_doe
-    email:
-      type: string
-      format: email
-      description: User's email address (omitted if not set)
-      example: jane@example.com
-    request_count:
-      type: integer
-      example: 5432
-    sms_count:
-      type: integer
-      example: 12
-
 ConnectorUsageResponse:
   type: object
   required:
+    - user_id
     - period_start
     - period_end
     - connectors
   properties:
+    user_id:
+      type: string
+      format: uuid
     period_start:
       type: string
       format: date-time

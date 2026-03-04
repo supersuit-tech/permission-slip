@@ -1,26 +1,19 @@
 adminUsage:
   get:
-    summary: Get user usage for billing period
+    summary: Get your usage for a billing period
     description: |
-      Returns usage metrics for a specific user and billing period. Includes
-      request/SMS totals and an optional breakdown by agent, connector, and
-      action type.
+      Returns the authenticated user's usage metrics for a billing period.
+      Includes request/SMS totals and an optional breakdown by agent,
+      connector, and action type.
 
-      Defaults to the authenticated user's current billing period when no
-      query parameters are provided.
+      Defaults to the current billing period when no period parameter
+      is provided.
     operationId: adminGetUsage
     tags:
       - Admin
     security:
       - SupabaseSession: []
     parameters:
-      - name: user_id
-        in: query
-        required: false
-        description: User ID to query. Defaults to the authenticated user.
-        schema:
-          type: string
-          format: uuid
       - name: period
         in: query
         required: false
@@ -30,7 +23,6 @@ adminUsage:
           (e.g., `2026-03-01T00:00:00Z`). Defaults to the current billing period.
         schema:
           type: string
-          format: date-time
     responses:
       '200':
         description: Usage data returned
@@ -43,56 +35,12 @@ adminUsage:
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
 
-adminTopUsers:
-  get:
-    summary: Get top users by request count
-    description: |
-      Returns users with the highest request counts for a billing period,
-      ordered by request count descending. Useful for abuse detection and
-      identifying heavy users.
-    operationId: adminGetTopUsers
-    tags:
-      - Admin
-    security:
-      - SupabaseSession: []
-    parameters:
-      - name: period
-        in: query
-        required: false
-        description: |
-          Billing period to query. Accepts `YYYY-MM`, `YYYY-MM-DD`, or
-          full ISO 8601 date-time. Defaults to the current billing period.
-        schema:
-          type: string
-          format: date-time
-      - name: limit
-        in: query
-        required: false
-        description: Maximum number of users to return (1–100). Defaults to 10.
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 10
-    responses:
-      '200':
-        description: Top users returned
-        content:
-          application/json:
-            schema:
-              $ref: '../schemas/admin_usage.yaml#/TopUsersResponse'
-      '400':
-        $ref: '../responses/errors.yaml#/BadRequest'
-      '401':
-        $ref: '../responses/errors.yaml#/Unauthorized'
-
 adminUsageByConnector:
   get:
-    summary: Get usage breakdown by connector
+    summary: Get your usage breakdown by connector
     description: |
-      Returns aggregate request counts per connector across all users for a
-      billing period, ordered by request count descending. Useful for product
-      analytics to identify which connectors are most popular.
+      Returns the authenticated user's per-connector request counts for a
+      billing period, ordered by request count descending.
     operationId: adminGetUsageByConnector
     tags:
       - Admin
@@ -107,7 +55,6 @@ adminUsageByConnector:
           full ISO 8601 date-time. Defaults to the current billing period.
         schema:
           type: string
-          format: date-time
     responses:
       '200':
         description: Connector usage returned
@@ -122,25 +69,16 @@ adminUsageByConnector:
 
 adminUsageByAgent:
   get:
-    summary: Get usage breakdown by agent for a user
+    summary: Get your usage breakdown by agent
     description: |
-      Returns per-agent request counts for a specific user and billing period,
-      ordered by request count descending.
-
-      Defaults to the authenticated user's current billing period.
+      Returns the authenticated user's per-agent request counts for a
+      billing period, ordered by request count descending.
     operationId: adminGetUsageByAgent
     tags:
       - Admin
     security:
       - SupabaseSession: []
     parameters:
-      - name: user_id
-        in: query
-        required: false
-        description: User ID to query. Defaults to the authenticated user.
-        schema:
-          type: string
-          format: uuid
       - name: period
         in: query
         required: false
@@ -149,7 +87,6 @@ adminUsageByAgent:
           full ISO 8601 date-time. Defaults to the current billing period.
         schema:
           type: string
-          format: date-time
     responses:
       '200':
         description: Agent usage returned
