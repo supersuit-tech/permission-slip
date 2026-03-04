@@ -30,7 +30,7 @@ export function RetentionBanner({ retention }: RetentionBannerProps) {
           <span className="font-medium">
             {formatGracePeriodDate(grace_period_ends_at)}
           </span>
-          . After that, retention will be {days === 90 ? days : 7} days.{" "}
+          . After that, retention will drop to 7 days.{" "}
           <Link to="/billing" className="font-medium underline">
             Upgrade
           </Link>{" "}

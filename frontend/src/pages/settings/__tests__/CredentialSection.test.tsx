@@ -357,4 +357,46 @@ describe("CredentialSection", () => {
       screen.queryByRole("button", { name: "Add Credential" }),
     ).not.toBeInTheDocument();
   });
+
+  it("falls back to plain count badge when billing data is unavailable", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/profile") {
+        return Promise.resolve({
+          data: {
+            id: "user-123",
+            username: "alice",
+            marketing_opt_in: false,
+            created_at: "2026-01-01T00:00:00Z",
+          },
+          response: { status: 200 },
+        });
+      }
+      if (url === "/v1/credentials") {
+        return Promise.resolve({
+          data: {
+            credentials: [
+              { id: "cred-1", service: "GitHub", label: "Token", created_at: "2026-01-15T00:00:00Z" },
+            ],
+          },
+        });
+      }
+      if (url === "/v1/billing/plan") {
+        return Promise.reject(new Error("Billing unavailable"));
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    render(<CredentialSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("GitHub")).toBeInTheDocument();
+    });
+    // Should show plain count badge (fallback), not limit badge
+    expect(screen.getByText("1")).toBeInTheDocument();
+    // Should still show Add Credential button (not gated since billing unknown)
+    expect(
+      screen.getByRole("button", { name: "Add Credential" }),
+    ).toBeInTheDocument();
+  });
 });

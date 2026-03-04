@@ -24,4 +24,13 @@ describe("UpgradePrompt", () => {
     const link = screen.getByRole("link", { name: /Upgrade/ });
     expect(link).toHaveAttribute("href", "/billing");
   });
+
+  it("has alert role for screen reader announcement", () => {
+    render(
+      <MemoryRouter>
+        <UpgradePrompt feature="Upgrade to add more agents." />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
 });

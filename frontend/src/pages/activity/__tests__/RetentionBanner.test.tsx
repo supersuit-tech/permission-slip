@@ -37,4 +37,12 @@ describe("RetentionBanner", () => {
     expect(screen.getByText(/90-day audit history is preserved until/)).toBeInTheDocument();
     expect(screen.getByText("Upgrade")).toBeInTheDocument();
   });
+
+  it("always shows 7-day retention after grace period ends", () => {
+    renderBanner({
+      days: 7,
+      grace_period_ends_at: "2026-03-08T14:30:00Z",
+    });
+    expect(screen.getByText(/retention will drop to 7 days/)).toBeInTheDocument();
+  });
 });
