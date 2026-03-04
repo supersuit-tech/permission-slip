@@ -6,7 +6,6 @@ import { create, act, type ReactTestRenderer } from "react-test-renderer";
 const mockRegisterForPushNotifications = jest.fn();
 const mockRegisterToken = jest.fn();
 const mockInvalidateQueries = jest.fn();
-const mockClientPost = jest.fn();
 const mockUnregisterDirect = jest.fn();
 
 let mockAuthStatus = "unauthenticated";
@@ -49,11 +48,6 @@ jest.mock("../../auth/AuthContext", () => ({
   }),
 }));
 
-jest.mock("../../api/client", () => ({
-  __esModule: true,
-  default: { POST: (...args: unknown[]) => mockClientPost(...args) },
-}));
-
 import { usePushSetup } from "../usePushSetup";
 
 // --- Hook capture helper ---
@@ -85,7 +79,6 @@ describe("usePushSetup", () => {
     capturedOnNotificationReceived = undefined;
     mockRegisterForPushNotifications.mockResolvedValue(null);
     mockRegisterToken.mockResolvedValue({});
-    mockClientPost.mockResolvedValue({ data: {}, error: undefined });
     mockUnregisterDirect.mockResolvedValue(undefined);
   });
 
@@ -347,6 +340,39 @@ describe("usePushSetup", () => {
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ["approvals"],
     });
+  });
+
+  it("cancels in-flight retry when user signs out", async () => {
+    mockAuthStatus = "authenticated";
+    mockSession = { access_token: "tok" };
+    mockExpoPushToken = "ExponentPushToken[abc]";
+    mockRegisterToken.mockRejectedValue(new Error("Network error"));
+
+    const { Consumer } = createHookCapture();
+
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    // First attempt fails, retry scheduled for 1000ms
+    await act(async () => {});
+    expect(mockRegisterToken).toHaveBeenCalledTimes(1);
+
+    // Sign out before retry fires — should cancel the pending timer
+    mockAuthStatus = "unauthenticated";
+    mockSession = null;
+    await act(async () => {
+      renderer!.update(createElement(Consumer));
+    });
+
+    // Advance past when retry would have fired
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+    await act(async () => {});
+
+    // Retry should NOT have fired after sign-out
+    expect(mockRegisterToken).toHaveBeenCalledTimes(1);
   });
 
   it("calls unregisterPushTokenDirect even when it would fail", async () => {
