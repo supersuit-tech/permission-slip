@@ -39,7 +39,6 @@ jest.mock("../useNotifications", () => ({
       permissionGranted: mockExpoPushToken !== null,
       error: null,
       registerForPushNotifications: mockRegisterForPushNotifications,
-      lastNotificationResponse: { current: null },
     };
   },
 }));

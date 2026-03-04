@@ -52,7 +52,6 @@ export function usePushSetup() {
     permissionGranted,
     error: notificationError,
     registerForPushNotifications,
-    lastNotificationResponse,
   } = useNotifications({
     onNotificationReceived,
     onNotificationTap,
@@ -173,7 +172,6 @@ export function usePushSetup() {
   }, [authStatus]);
 
   return {
-    lastNotificationResponse,
     expoPushToken,
     permissionGranted,
     notificationError,

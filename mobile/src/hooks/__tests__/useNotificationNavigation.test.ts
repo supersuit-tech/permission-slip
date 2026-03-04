@@ -138,6 +138,22 @@ describe("useNotificationNavigation", () => {
     expect(mockSetBadgeCount).toHaveBeenCalledWith(0);
   });
 
+  it("does not navigate when approval_id has invalid format", async () => {
+    const { capture, Consumer } = createHookCapture();
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    // Invalid format — doesn't match ^appr_[a-zA-Z0-9]{6,64}$
+    const response = makeNotificationResponse("invalid-id");
+    await act(async () => {
+      await capture.handleNotificationTap(response);
+    });
+
+    expect(mockClientGet).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it("does not navigate when approval_id is missing from notification data", async () => {
     const { capture, Consumer } = createHookCapture();
     await act(async () => {

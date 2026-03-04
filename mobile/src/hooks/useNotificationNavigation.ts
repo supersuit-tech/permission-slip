@@ -20,8 +20,16 @@ import { navigationRef } from "../navigation/RootNavigator";
 import type { ApprovalSummary } from "./useApprovals";
 
 /**
- * Extracts the approval_id from a notification response's data payload.
- * The backend sends `{ approval_id, url }` in the notification data.
+ * Matches the approval_id format from the OpenAPI spec.
+ * Defense-in-depth: prevents API calls with obviously invalid IDs
+ * from crafted or malformed notification payloads.
+ */
+const APPROVAL_ID_PATTERN = /^appr_[a-zA-Z0-9]{6,64}$/;
+
+/**
+ * Extracts and validates the approval_id from a notification response's data
+ * payload. The backend sends `{ approval_id, url }` in the notification data.
+ * Returns null if the ID is missing or doesn't match the expected format.
  */
 function extractApprovalId(response: NotificationResponse): string | null {
   const data = response.notification.request.content.data as
@@ -29,7 +37,10 @@ function extractApprovalId(response: NotificationResponse): string | null {
     | undefined;
   if (!data) return null;
   const id = data.approval_id;
-  return typeof id === "string" && id.length > 0 ? id : null;
+  if (typeof id !== "string" || !APPROVAL_ID_PATTERN.test(id)) {
+    return null;
+  }
+  return id;
 }
 
 export function useNotificationNavigation() {
@@ -160,7 +171,9 @@ export function useNotificationNavigation() {
 
     const approvalId = extractApprovalId(pending);
     if (approvalId) {
-      navigateToApproval(approvalId);
+      // navigateToApproval has internal try/catch so this won't reject,
+      // but void the promise explicitly to satisfy lint rules.
+      void navigateToApproval(approvalId);
     }
   }, [authStatus, navigateToApproval]);
 

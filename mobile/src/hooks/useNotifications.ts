@@ -50,9 +50,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
-  /** The last notification response (tap). Callers can read this for navigation. */
-  const lastNotificationResponse = useRef<Notifications.NotificationResponse | null>(null);
-
   // Keep the callback refs fresh without re-creating the effect subscription
   const onNotificationReceivedRef = useRef(onNotificationReceived);
   onNotificationReceivedRef.current = onNotificationReceived;
@@ -144,7 +141,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     // Listen for notification taps (user interaction — app in foreground or background)
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        lastNotificationResponse.current = response;
         onNotificationTapRef.current?.(response);
       },
     );
@@ -155,7 +151,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     // that happen while the JS runtime is already running.
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) {
-        lastNotificationResponse.current = response;
         onNotificationTapRef.current?.(response);
       }
     });
@@ -172,7 +167,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
   return {
     ...state,
-    lastNotificationResponse,
     registerForPushNotifications,
   };
 }
