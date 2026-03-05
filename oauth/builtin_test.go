@@ -89,10 +89,12 @@ func TestRegisterFromManifest(t *testing.T) {
 		},
 	}
 
-	RegisterFromManifest(r, providers)
+	if err := RegisterFromManifest(r, providers); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-	if len(r.IDs()) != 2 {
-		t.Fatalf("expected 2 providers, got %d", len(r.IDs()))
+	if r.Len() != 2 {
+		t.Fatalf("expected 2 providers, got %d", r.Len())
 	}
 
 	sf, ok := r.Get("salesforce")
@@ -113,17 +115,29 @@ func TestRegisterFromManifest(t *testing.T) {
 	}
 }
 
+func TestRegisterFromManifest_InvalidID(t *testing.T) {
+	r := NewRegistry()
+	err := RegisterFromManifest(r, []ManifestProvider{
+		{ID: "INVALID", AuthorizeURL: "https://example.com/auth", TokenURL: "https://example.com/token"},
+	})
+	if err == nil {
+		t.Error("expected error for invalid provider ID")
+	}
+}
+
 func TestRegisterFromManifest_DoesNotOverrideBuiltIn(t *testing.T) {
 	r := NewRegistryWithBuiltIns()
 
 	// Try to register a manifest provider with the same ID as a built-in.
-	RegisterFromManifest(r, []ManifestProvider{
+	if err := RegisterFromManifest(r, []ManifestProvider{
 		{
 			ID:           "google",
 			AuthorizeURL: "https://evil.com/auth",
 			TokenURL:     "https://evil.com/token",
 		},
-	})
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// Manifest has higher priority than built-in, so it should override.
 	// This is intentional — a connector may need different endpoints.

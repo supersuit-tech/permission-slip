@@ -1,6 +1,9 @@
 package oauth
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 // BuiltInProviders returns the platform's pre-configured OAuth providers.
 // Client credentials are read from environment variables; if not set, the
@@ -37,11 +40,14 @@ func BuiltInProviders() []Provider {
 }
 
 // NewRegistryWithBuiltIns creates a new provider registry pre-populated with
-// the platform's built-in providers.
+// the platform's built-in providers. Panics if a built-in provider has an
+// invalid ID (programming error).
 func NewRegistryWithBuiltIns() *Registry {
 	r := NewRegistry()
 	for _, p := range BuiltInProviders() {
-		r.Register(p)
+		if err := r.Register(p); err != nil {
+			panic(fmt.Sprintf("failed to register built-in OAuth provider %q: %v", p.ID, err))
+		}
 	}
 	return r
 }
@@ -50,16 +56,20 @@ func NewRegistryWithBuiltIns() *Registry {
 // oauth_providers section. These are external providers that the platform
 // doesn't have built-in support for (e.g. Salesforce, HubSpot). They are
 // registered without client credentials — users must supply those via BYOA.
-func RegisterFromManifest(r *Registry, providers []ManifestProvider) {
+// Returns an error if any provider fails validation.
+func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {
-		r.Register(Provider{
+		if err := r.Register(Provider{
 			ID:           mp.ID,
 			AuthorizeURL: mp.AuthorizeURL,
 			TokenURL:     mp.TokenURL,
 			Scopes:       mp.Scopes,
 			Source:       SourceManifest,
-		})
+		}); err != nil {
+			return fmt.Errorf("registering manifest OAuth provider %q: %w", mp.ID, err)
+		}
 	}
+	return nil
 }
 
 // ManifestProvider mirrors the OAuth provider declaration in a connector

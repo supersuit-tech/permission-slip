@@ -310,8 +310,7 @@ func main() {
 	oauthRegistry := poauth.NewRegistryWithBuiltIns()
 	registerManifestOAuthProviders(oauthRegistry, registry)
 	deps.OAuthProviders = oauthRegistry
-	oauthIDs := oauthRegistry.IDs()
-	log.Printf("OAuth provider registry: %d provider(s) registered", len(oauthIDs))
+	log.Printf("OAuth provider registry: %d provider(s) registered", oauthRegistry.Len())
 	for _, p := range oauthRegistry.List() {
 		if p.HasClientCredentials() {
 			log.Printf("  %s: configured (client credentials set)", p.ID)
@@ -585,7 +584,9 @@ func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connecto
 				Scopes:       p.Scopes,
 			}
 		}
-		poauth.RegisterFromManifest(oauthReg, providers)
+		if err := poauth.RegisterFromManifest(oauthReg, providers); err != nil {
+			log.Printf("Warning: failed to register OAuth providers from connector %q: %v", id, err)
+		}
 	}
 }
 

@@ -21,7 +21,9 @@ func TestRegistry_RegisterAndGet(t *testing.T) {
 		TokenURL:     "https://example.com/token",
 		Source:       SourceBuiltIn,
 	}
-	r.Register(p)
+	if err := r.Register(p); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	got, ok := r.Get("test")
 	if !ok {
@@ -45,39 +47,46 @@ func TestRegistry_GetNotFound(t *testing.T) {
 
 func TestRegistry_List(t *testing.T) {
 	r := NewRegistry()
-	r.Register(Provider{ID: "a", Source: SourceBuiltIn})
-	r.Register(Provider{ID: "b", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "b", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "a", Source: SourceBuiltIn})
 
 	list := r.List()
 	if len(list) != 2 {
 		t.Fatalf("len(List) = %d, want 2", len(list))
 	}
 
-	ids := make([]string, len(list))
-	for i, p := range list {
-		ids[i] = p.ID
-	}
-	sort.Strings(ids)
-	if ids[0] != "a" || ids[1] != "b" {
-		t.Errorf("IDs = %v, want [a b]", ids)
+	// List should be sorted by ID.
+	if list[0].ID != "a" || list[1].ID != "b" {
+		t.Errorf("List not sorted: got [%s, %s], want [a, b]", list[0].ID, list[1].ID)
 	}
 }
 
 func TestRegistry_IDs(t *testing.T) {
 	r := NewRegistry()
-	r.Register(Provider{ID: "x", Source: SourceBuiltIn})
-	r.Register(Provider{ID: "y", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "y", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "x", Source: SourceBuiltIn})
 
 	ids := r.IDs()
-	sort.Strings(ids)
 	if len(ids) != 2 || ids[0] != "x" || ids[1] != "y" {
 		t.Errorf("IDs = %v, want [x y]", ids)
 	}
 }
 
+func TestRegistry_Len(t *testing.T) {
+	r := NewRegistry()
+	if r.Len() != 0 {
+		t.Errorf("Len() = %d, want 0", r.Len())
+	}
+	mustRegister(t, r, Provider{ID: "a", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "b", Source: SourceBuiltIn})
+	if r.Len() != 2 {
+		t.Errorf("Len() = %d, want 2", r.Len())
+	}
+}
+
 func TestRegistry_Remove(t *testing.T) {
 	r := NewRegistry()
-	r.Register(Provider{ID: "removeme", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "removeme", Source: SourceBuiltIn})
 
 	if err := r.Remove("removeme"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -94,11 +103,39 @@ func TestRegistry_RemoveNotFound(t *testing.T) {
 	}
 }
 
+func TestRegistry_RegisterValidation(t *testing.T) {
+	r := NewRegistry()
+
+	t.Run("empty ID", func(t *testing.T) {
+		if err := r.Register(Provider{ID: "", Source: SourceBuiltIn}); err == nil {
+			t.Error("expected error for empty ID")
+		}
+	})
+
+	t.Run("invalid ID with uppercase", func(t *testing.T) {
+		if err := r.Register(Provider{ID: "Google", Source: SourceBuiltIn}); err == nil {
+			t.Error("expected error for uppercase ID")
+		}
+	})
+
+	t.Run("invalid ID with spaces", func(t *testing.T) {
+		if err := r.Register(Provider{ID: "my provider", Source: SourceBuiltIn}); err == nil {
+			t.Error("expected error for ID with spaces")
+		}
+	})
+
+	t.Run("valid ID with hyphens and underscores", func(t *testing.T) {
+		if err := r.Register(Provider{ID: "my-oauth_provider", Source: SourceBuiltIn}); err != nil {
+			t.Errorf("unexpected error for valid ID: %v", err)
+		}
+	})
+}
+
 func TestRegistry_SourcePriority(t *testing.T) {
 	t.Run("manifest does not override BYOA", func(t *testing.T) {
 		r := NewRegistry()
-		r.Register(Provider{ID: "p", ClientID: "byoa-id", Source: SourceBYOA})
-		r.Register(Provider{ID: "p", ClientID: "manifest-id", Source: SourceManifest})
+		mustRegister(t, r, Provider{ID: "p", ClientID: "byoa-id", Source: SourceBYOA})
+		mustRegister(t, r, Provider{ID: "p", ClientID: "manifest-id", Source: SourceManifest})
 
 		got, _ := r.Get("p")
 		if got.ClientID != "byoa-id" {
@@ -108,8 +145,8 @@ func TestRegistry_SourcePriority(t *testing.T) {
 
 	t.Run("built-in does not override manifest", func(t *testing.T) {
 		r := NewRegistry()
-		r.Register(Provider{ID: "p", AuthorizeURL: "https://manifest.com/auth", Source: SourceManifest})
-		r.Register(Provider{ID: "p", AuthorizeURL: "https://builtin.com/auth", Source: SourceBuiltIn})
+		mustRegister(t, r, Provider{ID: "p", AuthorizeURL: "https://manifest.com/auth", Source: SourceManifest})
+		mustRegister(t, r, Provider{ID: "p", AuthorizeURL: "https://builtin.com/auth", Source: SourceBuiltIn})
 
 		got, _ := r.Get("p")
 		if got.AuthorizeURL != "https://manifest.com/auth" {
@@ -119,8 +156,8 @@ func TestRegistry_SourcePriority(t *testing.T) {
 
 	t.Run("manifest overrides built-in", func(t *testing.T) {
 		r := NewRegistry()
-		r.Register(Provider{ID: "p", AuthorizeURL: "https://builtin.com/auth", Source: SourceBuiltIn})
-		r.Register(Provider{ID: "p", AuthorizeURL: "https://manifest.com/auth", Source: SourceManifest})
+		mustRegister(t, r, Provider{ID: "p", AuthorizeURL: "https://builtin.com/auth", Source: SourceBuiltIn})
+		mustRegister(t, r, Provider{ID: "p", AuthorizeURL: "https://manifest.com/auth", Source: SourceManifest})
 
 		got, _ := r.Get("p")
 		if got.AuthorizeURL != "https://manifest.com/auth" {
@@ -130,9 +167,9 @@ func TestRegistry_SourcePriority(t *testing.T) {
 
 	t.Run("BYOA overrides everything", func(t *testing.T) {
 		r := NewRegistry()
-		r.Register(Provider{ID: "p", Source: SourceBuiltIn})
-		r.Register(Provider{ID: "p", Source: SourceManifest})
-		r.Register(Provider{ID: "p", ClientID: "user-app", Source: SourceBYOA})
+		mustRegister(t, r, Provider{ID: "p", Source: SourceBuiltIn})
+		mustRegister(t, r, Provider{ID: "p", Source: SourceManifest})
+		mustRegister(t, r, Provider{ID: "p", ClientID: "user-app", Source: SourceBYOA})
 
 		got, _ := r.Get("p")
 		if got.ClientID != "user-app" {
@@ -142,12 +179,82 @@ func TestRegistry_SourcePriority(t *testing.T) {
 
 	t.Run("same source replaces", func(t *testing.T) {
 		r := NewRegistry()
-		r.Register(Provider{ID: "p", ClientID: "first", Source: SourceBuiltIn})
-		r.Register(Provider{ID: "p", ClientID: "second", Source: SourceBuiltIn})
+		mustRegister(t, r, Provider{ID: "p", ClientID: "first", Source: SourceBuiltIn})
+		mustRegister(t, r, Provider{ID: "p", ClientID: "second", Source: SourceBuiltIn})
 
 		got, _ := r.Get("p")
 		if got.ClientID != "second" {
 			t.Errorf("ClientID = %q, want %q (same source should replace)", got.ClientID, "second")
+		}
+	})
+}
+
+func TestRegistry_BYOAMerge(t *testing.T) {
+	t.Run("BYOA merges credentials into existing provider", func(t *testing.T) {
+		r := NewRegistry()
+		mustRegister(t, r, Provider{
+			ID:           "google",
+			AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+			TokenURL:     "https://oauth2.googleapis.com/token",
+			Scopes:       []string{"openid", "email"},
+			Source:       SourceBuiltIn,
+		})
+
+		// BYOA registration with only client credentials — no endpoints or scopes.
+		mustRegister(t, r, Provider{
+			ID:           "google",
+			ClientID:     "my-app-id",
+			ClientSecret: "my-app-secret",
+			Source:       SourceBYOA,
+		})
+
+		got, _ := r.Get("google")
+		if got.ClientID != "my-app-id" {
+			t.Errorf("ClientID = %q, want %q", got.ClientID, "my-app-id")
+		}
+		if got.ClientSecret != "my-app-secret" {
+			t.Errorf("ClientSecret = %q, want %q", got.ClientSecret, "my-app-secret")
+		}
+		// Endpoints and scopes should be preserved from the built-in.
+		if got.AuthorizeURL != "https://accounts.google.com/o/oauth2/v2/auth" {
+			t.Errorf("AuthorizeURL not preserved: %q", got.AuthorizeURL)
+		}
+		if got.TokenURL != "https://oauth2.googleapis.com/token" {
+			t.Errorf("TokenURL not preserved: %q", got.TokenURL)
+		}
+		if len(got.Scopes) != 2 {
+			t.Errorf("Scopes not preserved: %v", got.Scopes)
+		}
+		if got.Source != SourceBYOA {
+			t.Errorf("Source = %q, want %q", got.Source, SourceBYOA)
+		}
+	})
+
+	t.Run("BYOA can override endpoints when explicitly provided", func(t *testing.T) {
+		r := NewRegistry()
+		mustRegister(t, r, Provider{
+			ID:           "custom",
+			AuthorizeURL: "https://original.com/auth",
+			TokenURL:     "https://original.com/token",
+			Scopes:       []string{"read"},
+			Source:       SourceManifest,
+		})
+
+		mustRegister(t, r, Provider{
+			ID:           "custom",
+			AuthorizeURL: "https://custom.com/auth",
+			TokenURL:     "https://custom.com/token",
+			ClientID:     "my-id",
+			ClientSecret: "my-secret",
+			Source:       SourceBYOA,
+		})
+
+		got, _ := r.Get("custom")
+		if got.AuthorizeURL != "https://custom.com/auth" {
+			t.Errorf("AuthorizeURL = %q, want overridden URL", got.AuthorizeURL)
+		}
+		if got.TokenURL != "https://custom.com/token" {
+			t.Errorf("TokenURL = %q, want overridden URL", got.TokenURL)
 		}
 	})
 }
@@ -208,5 +315,25 @@ func TestProvider_HasClientCredentials(t *testing.T) {
 				t.Errorf("HasClientCredentials() = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestRegistry_IDsSorted(t *testing.T) {
+	r := NewRegistry()
+	mustRegister(t, r, Provider{ID: "zebra", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "alpha", Source: SourceBuiltIn})
+	mustRegister(t, r, Provider{ID: "middle", Source: SourceBuiltIn})
+
+	ids := r.IDs()
+	if !sort.StringsAreSorted(ids) {
+		t.Errorf("IDs() not sorted: %v", ids)
+	}
+}
+
+// mustRegister is a test helper that registers a provider and fails the test on error.
+func mustRegister(t *testing.T, r *Registry, p Provider) {
+	t.Helper()
+	if err := r.Register(p); err != nil {
+		t.Fatalf("Register(%q) failed: %v", p.ID, err)
 	}
 }

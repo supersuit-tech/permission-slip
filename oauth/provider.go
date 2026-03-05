@@ -6,6 +6,8 @@ package oauth
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"sync"
 	"time"
 )
@@ -105,18 +107,60 @@ func NewRegistry() *Registry {
 	return &Registry{providers: make(map[string]Provider)}
 }
 
+// providerIDPattern matches valid provider IDs: lowercase alphanumeric, hyphens,
+// and underscores. Mirrors the connector manifest ID pattern for consistency.
+var providerIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
+
 // Register adds or replaces a provider in the registry. If a provider with the
 // same ID already exists, it is replaced only if the new source has equal or
 // higher priority: BYOA > Manifest > BuiltIn.
-func (r *Registry) Register(p Provider) {
+//
+// When a BYOA provider overrides an existing provider, the client credentials
+// from the BYOA registration are merged into the existing provider's endpoint
+// and scope configuration. This means BYOA users only need to supply their
+// client ID and secret — they don't need to re-specify authorize/token URLs
+// or default scopes that were already set by the built-in or manifest source.
+//
+// Returns an error if the provider ID is empty or invalid.
+func (r *Registry) Register(p Provider) error {
+	if p.ID == "" {
+		return fmt.Errorf("oauth provider ID is required")
+	}
+	if !providerIDPattern.MatchString(p.ID) {
+		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, providerIDPattern.String())
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	existing, exists := r.providers[p.ID]
 	if exists && sourcePriority(existing.Source) > sourcePriority(p.Source) {
-		return
+		return nil
 	}
+
+	// When BYOA overrides an existing provider, merge client credentials into
+	// the existing config so users don't need to re-specify endpoints/scopes.
+	if exists && p.Source == SourceBYOA {
+		merged := existing
+		merged.ClientID = p.ClientID
+		merged.ClientSecret = p.ClientSecret
+		merged.Source = SourceBYOA
+		// Allow BYOA to override endpoints/scopes only if explicitly provided.
+		if p.AuthorizeURL != "" {
+			merged.AuthorizeURL = p.AuthorizeURL
+		}
+		if p.TokenURL != "" {
+			merged.TokenURL = p.TokenURL
+		}
+		if len(p.Scopes) > 0 {
+			merged.Scopes = p.Scopes
+		}
+		r.providers[p.ID] = merged
+		return nil
+	}
+
 	r.providers[p.ID] = p
+	return nil
 }
 
 // Get returns the provider with the given ID. The second return value is false
@@ -128,8 +172,9 @@ func (r *Registry) Get(id string) (Provider, bool) {
 	return p, ok
 }
 
-// List returns all registered providers. The returned slice is a snapshot;
-// subsequent mutations to the registry are not reflected.
+// List returns all registered providers sorted by ID. The returned slice is a
+// snapshot; subsequent mutations to the registry are not reflected. Sorting
+// ensures deterministic output in logs and API responses.
 func (r *Registry) List() []Provider {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -137,10 +182,12 @@ func (r *Registry) List() []Provider {
 	for _, p := range r.providers {
 		out = append(out, p)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
 
-// IDs returns the IDs of all registered providers.
+// IDs returns the IDs of all registered providers in sorted order.
+// Sorting ensures deterministic output in logs and validation.
 func (r *Registry) IDs() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -148,7 +195,15 @@ func (r *Registry) IDs() []string {
 	for id := range r.providers {
 		ids = append(ids, id)
 	}
+	sort.Strings(ids)
 	return ids
+}
+
+// Len returns the number of registered providers without allocating a slice.
+func (r *Registry) Len() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return len(r.providers)
 }
 
 // Remove deletes a provider from the registry. Returns an error if the
