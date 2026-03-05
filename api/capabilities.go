@@ -14,6 +14,7 @@ import (
 
 type capabilitiesResponse struct {
 	AgentID    int64                    `json:"agent_id"`
+	Approver   *approverInfo            `json:"approver,omitempty"`
 	Connectors []connectorCapability    `json:"connectors"`
 }
 
@@ -96,7 +97,17 @@ func handleGetCapabilities(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, buildCapabilitiesResponse(agentID, caps, deps.BaseURL))
+		resp := buildCapabilitiesResponse(agentID, caps, deps.BaseURL)
+
+		// Look up the approver's profile to include their username.
+		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, agent.ApproverID)
+		if err != nil {
+			log.Printf("[%s] GetCapabilities: lookup approver profile: %v", TraceID(r.Context()), err)
+		} else if profile != nil {
+			resp.Approver = &approverInfo{Username: profile.Username}
+		}
+
+		RespondJSON(w, http.StatusOK, resp)
 	}
 }
 

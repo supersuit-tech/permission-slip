@@ -11,6 +11,14 @@ AgentCapabilitiesResponse:
         The authenticated agent's identifier.
       example: 42
 
+    approver:
+      allOf:
+        - $ref: '../schemas/shared.yaml#/ApproverInfo'
+      description: |
+        The user (approver) whose capabilities are being returned. Identifies
+        which user's connectors, standing approvals, and action configurations
+        are represented in this response.
+
     connectors:
       type: array
       items:
@@ -24,6 +32,8 @@ AgentCapabilitiesResponse:
 
   example:
     agent_id: 42
+    approver:
+      username: "alice"
     connectors:
       - id: "gmail"
         name: "Gmail"

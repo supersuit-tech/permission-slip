@@ -108,10 +108,20 @@ RegisterAgentResponse:
         it via `POST /v1/agents/{agent_id}/verify`.
       example: true
 
+    approver:
+      allOf:
+        - $ref: '../schemas/shared.yaml#/ApproverInfo'
+      description: |
+        The user (approver) this agent is registering with. Included so the
+        agent knows whose account it's connecting to — especially useful when
+        an agent registers with multiple users and needs to distinguish them.
+
   example:
     agent_id: 42
     expires_at: "2026-02-11T13:25:00Z"
     verification_required: true
+    approver:
+      username: "alice"
 
 VerifyRegistrationRequest:
   type: object
@@ -172,7 +182,17 @@ VerifyRegistrationResponse:
       description: |
         ISO 8601 timestamp (RFC 3339 format, UTC) when registration was completed.
       example: "2026-02-11T13:20:15Z"
-  
+
+    approver:
+      allOf:
+        - $ref: '../schemas/shared.yaml#/ApproverInfo'
+      description: |
+        The user (approver) this agent is now registered with. The agent should
+        store this alongside the `agent_id` to identify which user this
+        registration belongs to.
+
   example:
     status: "registered"
     registered_at: "2026-02-11T13:20:15Z"
+    approver:
+      username: "alice"
