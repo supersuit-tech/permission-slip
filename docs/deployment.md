@@ -200,6 +200,7 @@ Then add a CNAME record pointing `app.permissionslip.dev` to your Fly app's host
 
 ## Architecture Notes
 
+- **Production by default** — the server runs in production mode when the `MODE` environment variable is unset (the default). Production mode enables strict config validation, rate limiting, and reports `production` to Sentry. You do **not** need to set `MODE` or any "environment" variable on Fly.io — just leave it unset. Only set `MODE=development` for local development.
 - **Single binary** — the Go server embeds the React frontend via `go:embed`, so there's no separate static file server
 - **Health check** — `GET /api/health` returns 200 when the server is reachable and reports database status when configured (503 if a configured database is unreachable)
 - **Graceful shutdown** — the app handles `SIGTERM` (sent by Fly during deploys) and drains in-flight requests for up to 30 seconds
