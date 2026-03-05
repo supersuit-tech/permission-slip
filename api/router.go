@@ -8,6 +8,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip-web/oauth"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
@@ -26,6 +27,7 @@ type Deps struct {
 	Notifier              *notify.Dispatcher   // notification fan-out; nil means notifications are disabled
 	VAPIDPublicKey        string               // VAPID public key for Web Push; empty if not configured
 	Connectors            *connectors.Registry // connector execution registry; nil means no connectors are available
+	OAuthProviders        *oauth.Registry      // OAuth provider registry; nil means OAuth is not available
 	Stripe                *pstripe.Client      // Stripe API client; nil when billing is disabled or Stripe keys not set
 	BillingEnabled        bool                 // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
 	DevMode               bool                 // true when MODE=development; disables rate limiting

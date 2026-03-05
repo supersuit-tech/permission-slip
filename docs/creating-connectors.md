@@ -376,8 +376,10 @@ OAuthProviders: []connectors.ManifestOAuthProvider{
 
 Requirements:
 - `authorize_url` and `token_url` must use HTTPS
-- Provider IDs must be unique within the manifest
+- Provider IDs must be unique within the manifest and must be lowercase alphanumeric with hyphens/underscores (1-63 chars)
 - Any `oauth_provider` referenced in `required_credentials` must either be a built-in provider or declared in `oauth_providers`
+
+**How it works at runtime:** On startup, the platform builds an OAuth Provider Registry (`oauth.Registry`). Built-in providers (Google, Microsoft) are registered first with endpoints and default scopes. Then, providers declared in connector manifests are merged in. The registry uses a priority system (BYOA > Manifest > BuiltIn) so that user-provided "bring your own app" credentials overlay the platform's built-in configuration. When a BYOA user registers credentials for a provider, only their client ID and secret are required — endpoints and scopes are inherited from the built-in or manifest definition.
 
 **Risk levels:** `low`, `medium`, `high`
 

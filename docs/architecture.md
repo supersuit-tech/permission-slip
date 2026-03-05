@@ -48,6 +48,7 @@ graph TB
         SA["Standing Approval Engine<br/><i>Pre-authorized grants,<br/>constraint matching,<br/>execution counting</i>"]
         NS["Notification Service<br/><i>Push notifications,<br/>webhooks</i>"]
         CV["Credential Vault<br/><i>Encrypted at rest,<br/>OAuth tokens, API keys</i>"]
+        OR["OAuth Provider Registry<br/><i>Built-in + manifest providers,<br/>BYOA client credentials</i>"]
         CE["Connector Engine"]
 
         subgraph Connectors
@@ -79,12 +80,15 @@ graph TB
     CE --> GC & SC & OC
     GC --> CV
     SC --> CV
+    OR --> CV
+    CE --> OR
     GC -- "API call with<br/>user credentials" --> Gmail
     SC -- "API call with<br/>user credentials" --> Stripe
 
     style PS fill:#E8F0FE,stroke:#4A90D9,color:#000
     style GW fill:#4A90D9,color:#fff,stroke:#2A5F9E
     style CV fill:#D93025,color:#fff,stroke:#B9200F
+    style OR fill:#E37400,color:#fff,stroke:#C35400
     style TE fill:#F9AB00,color:#000,stroke:#D98B00
     style AR fill:#7B68EE,color:#fff,stroke:#5B48CE
     style AE fill:#34A853,color:#fff,stroke:#1A8833
