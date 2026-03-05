@@ -90,10 +90,12 @@ func oauthStateSecret(deps *Deps) string {
 	return deps.SupabaseJWTSecret
 }
 
-// createOAuthState produces a short-lived signed JWT encoding the user ID
-// and OAuth provider. This prevents CSRF and state-fixation attacks on the
-// callback endpoint.
-func createOAuthState(deps *Deps, userID, provider string) (string, error) {
+// createOAuthState produces a short-lived signed JWT encoding the user ID,
+// OAuth provider, and requested scopes. This prevents CSRF and state-fixation
+// attacks on the callback endpoint and carries the final scope list so the
+// callback can store exactly what was requested (including any extra scopes
+// from the authorize query params).
+func createOAuthState(deps *Deps, userID, provider string, scopes []string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
 		return "", fmt.Errorf("no OAuth state secret configured")
@@ -102,6 +104,7 @@ func createOAuthState(deps *Deps, userID, provider string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":      userID,
 		"provider": provider,
+		"scopes":   scopes,
 		"iat":      now.Unix(),
 		"exp":      now.Add(oauthStateTTL).Unix(),
 	}
@@ -109,13 +112,20 @@ func createOAuthState(deps *Deps, userID, provider string) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
+// oauthState holds the decoded claims from a verified OAuth state token.
+type oauthState struct {
+	UserID   string
+	Provider string
+	Scopes   []string
+}
+
 // verifyOAuthState validates the signed state JWT and returns the encoded
-// user ID and provider. Returns an error if the signature is invalid, the
-// token is expired, or the claims are missing.
-func verifyOAuthState(deps *Deps, stateStr string) (userID, provider string, err error) {
+// user ID, provider, and requested scopes. Returns an error if the signature
+// is invalid, the token is expired, or the claims are missing.
+func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
-		return "", "", fmt.Errorf("no OAuth state secret configured")
+		return nil, fmt.Errorf("no OAuth state secret configured")
 	}
 	token, err := jwt.Parse(stateStr, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -124,18 +134,27 @@ func verifyOAuthState(deps *Deps, stateStr string) (userID, provider string, err
 		return []byte(secret), nil
 	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
 	if err != nil {
-		return "", "", fmt.Errorf("invalid state token: %w", err)
+		return nil, fmt.Errorf("invalid state token: %w", err)
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return "", "", fmt.Errorf("invalid state claims")
+		return nil, fmt.Errorf("invalid state claims")
 	}
 	sub, _ := claims["sub"].(string)
 	prov, _ := claims["provider"].(string)
 	if sub == "" || prov == "" {
-		return "", "", fmt.Errorf("state token missing required claims")
+		return nil, fmt.Errorf("state token missing required claims")
 	}
-	return sub, prov, nil
+	// Parse scopes from the state token.
+	var scopes []string
+	if rawScopes, ok := claims["scopes"].([]any); ok {
+		for _, s := range rawScopes {
+			if str, ok := s.(string); ok {
+				scopes = append(scopes, str)
+			}
+		}
+	}
+	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes}, nil
 }
 
 // --- Helpers ---
@@ -235,19 +254,21 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID)
-		if err != nil {
-			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
-			return
-		}
-
 		cfg := newOAuth2Config(deps, provider)
 
 		// Request additional scopes from query params if provided.
 		if extraScopes := r.URL.Query()["scope"]; len(extraScopes) > 0 {
 			cfg.Scopes = deduplicateScopes(append(cfg.Scopes, extraScopes...))
+		}
+
+		// Create the CSRF state token after computing the final scope list so
+		// the callback can store exactly which scopes were requested.
+		profile := Profile(r.Context())
+		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes)
+		if err != nil {
+			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
+			return
 		}
 
 		authURL := cfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -286,22 +307,22 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter")
 			return
 		}
-		stateUserID, stateProvider, err := verifyOAuthState(deps, stateStr)
+		state, err := verifyOAuthState(deps, stateStr)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: invalid state: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Invalid or expired state token")
 			return
 		}
-		if stateProvider != providerID {
-			log.Printf("[%s] OAuthCallback: provider mismatch: state=%s path=%s", TraceID(r.Context()), stateProvider, providerID)
+		if state.Provider != providerID {
+			log.Printf("[%s] OAuthCallback: provider mismatch: state=%s path=%s", TraceID(r.Context()), state.Provider, providerID)
 			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch")
 			return
 		}
 
 		// Verify the session user matches the state user
 		sessionUserID := UserID(r.Context())
-		if sessionUserID != stateUserID {
-			log.Printf("[%s] OAuthCallback: user mismatch: state=%s session=%s", TraceID(r.Context()), stateUserID, sessionUserID)
+		if sessionUserID != state.UserID {
+			log.Printf("[%s] OAuthCallback: user mismatch: state=%s session=%s", TraceID(r.Context()), state.UserID, sessionUserID)
 			redirectToFrontend(w, r, deps, providerID, "error", "Session mismatch")
 			return
 		}
@@ -338,8 +359,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Store tokens in vault within a transaction.
-		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, provider.Scopes, token); err != nil {
+		// Store tokens in vault within a transaction. Use scopes from the
+		// state token (set during authorize) so extra scopes are preserved.
+		storedScopes := state.Scopes
+		if len(storedScopes) == 0 {
+			storedScopes = provider.Scopes // fallback for pre-existing state tokens
+		}
+		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token); err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection")
 			return
