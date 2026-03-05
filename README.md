@@ -53,6 +53,49 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **Audit trail** — every request, approval, and execution is logged
 - **User preferences** — per-channel notification settings, contact info, and credential vault management
 
+## Agent Compatibility
+
+Permission Slip requires agents that can **(1) make HTTP requests to arbitrary URLs** (no sandboxed/restricted network) and **(2) generate Ed25519 key pairs** (shell access to crypto tooling). Here's what works and what doesn't:
+
+### Supported
+
+| Agent | Notes |
+|---|---|
+| [OpenClaw](https://openclaw.org) | Full local shell + unrestricted network |
+| [Manis](https://manis.dev) | Full local shell + unrestricted network |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) (Desktop) | Local CLI with full shell access |
+| [Claude Cowork](https://docs.anthropic.com/en/docs/claude-code/overview) (Desktop) | Local IDE integration with full shell access |
+| [Cursor](https://cursor.com) | Local IDE with terminal access |
+| [Windsurf](https://windsurf.com) | Local IDE with terminal access |
+| [Cline](https://github.com/cline/cline) | VS Code extension, runs commands locally |
+| [Aider](https://aider.chat) | Local CLI with full shell access |
+| [Continue](https://continue.dev) | Local IDE extension with terminal access |
+| [Codex CLI](https://github.com/openai/codex) (OpenAI) | Local CLI with full shell access |
+| [Devin](https://devin.ai) | Cloud-based but runs in a full VM with unrestricted network |
+| [GitHub Copilot Coding Agent](https://github.com/features/copilot) | Runs in GitHub Actions VMs with network access |
+
+### Not Supported
+
+| Agent | Reason |
+|---|---|
+| Claude Code (Mobile) | Egress proxy restricts outbound URLs to an allowlist |
+| ChatGPT / Code Interpreter | Sandboxed environment with restricted network |
+| Claude.ai (web chat) | No shell access |
+| Gemini (web) | No shell access |
+| GitHub Copilot Chat (inline) | Code suggestions only — no shell execution |
+| [v0](https://v0.dev) (Vercel) | Sandboxed, focused on UI generation |
+| [Bolt](https://bolt.new) | Sandboxed WebContainer with limited network |
+
+### Uncertain (needs testing)
+
+| Agent | Concern |
+|---|---|
+| [Replit Agent](https://replit.com) | Cloud-hosted — may have network restrictions |
+| [Google Jules](https://jules.google) | Cloud dev agent — network policy unclear |
+| [Amazon Q Developer](https://aws.amazon.com/q/developer/) | Terminal access varies by context |
+
+> **General rule:** if the agent runs locally on your machine with a real shell, it will work. Cloud-hosted agents need case-by-case verification for unrestricted outbound HTTP.
+
 ## Documentation
 
 - **[Docs Site](docs-site/)** — Mintlify-powered user-facing documentation (run `npx mintlify dev` from `docs-site/` to preview)
