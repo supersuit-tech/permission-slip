@@ -48,7 +48,10 @@ Credential types required by a connector. The `service` column is a join key to 
 |---|---|---|
 | `connector_id` | text | PK (composite), FK → connectors ON DELETE CASCADE, max 255 chars |
 | `service` | text | PK (composite), max 255 chars (join key to `credentials.service`) |
-| `auth_type` | text | NOT NULL, CHECK IN ('api_key', 'basic', 'custom') |
+| `auth_type` | text | NOT NULL, CHECK IN ('api_key', 'basic', 'custom', 'oauth2') |
+| `instructions_url` | text | max 2048 chars, optional URL for credential setup docs |
+| `oauth_provider` | text | max 255 chars, required when auth_type = 'oauth2', NULL otherwise |
+| `oauth_scopes` | text[] | DEFAULT '{}', OAuth scopes required when auth_type = 'oauth2' |
 
 ### `registration_invites`
 
@@ -165,6 +168,45 @@ User credentials stored via Supabase Vault. The table holds a reference to the V
 **Constraints:** UNIQUE NULLS NOT DISTINCT on `(user_id, service, label)` — prevents duplicate credentials including when label is NULL.
 
 **Indexes:** `idx_credentials_user_service` on `(user_id, service)`
+
+### `oauth_connections`
+
+Stores OAuth 2.0 connections for users. Each row represents a user's authenticated connection to an OAuth provider (e.g., Google, Microsoft). Tokens are stored in the Vault — this table only holds Vault references.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | text | PK, max 255 chars |
+| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
+| `provider` | text | NOT NULL, max 255 chars (e.g., "google", "microsoft") |
+| `access_token_vault_id` | uuid | NOT NULL |
+| `refresh_token_vault_id` | uuid | Nullable |
+| `scopes` | text[] | NOT NULL, DEFAULT '{}' |
+| `token_expiry` | timestamptz | Nullable |
+| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'needs_reauth', 'revoked') |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Constraints:** UNIQUE on `(user_id, provider)` — one connection per provider per user.
+
+**Indexes:** `idx_oauth_connections_user` on `(user_id)`, `idx_oauth_connections_status` on `(user_id, status)`
+
+### `oauth_provider_configs`
+
+Stores user-provided ("bring your own app") OAuth client credentials. Users register their own OAuth app's client ID and secret for a provider, rather than using a platform-managed app.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | text | PK, max 255 chars |
+| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
+| `provider` | text | NOT NULL, max 255 chars |
+| `client_id_vault_id` | uuid | NOT NULL |
+| `client_secret_vault_id` | uuid | NOT NULL |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Constraints:** UNIQUE on `(user_id, provider)` — one config per provider per user.
+
+**Indexes:** `idx_oauth_provider_configs_user` on `(user_id)`
 
 ### `agent_connectors`
 
@@ -351,6 +393,8 @@ auth.users
         ├── agents (approver_id → profiles, CASCADE)
         ├── approvals (approver_id → profiles, CASCADE)
         ├── credentials (user_id → profiles, CASCADE)
+        ├── oauth_connections (user_id → profiles, CASCADE)
+        ├── oauth_provider_configs (user_id → profiles, CASCADE)
         ├── standing_approvals (user_id → profiles, CASCADE)
         └── audit_events (user_id → profiles, RESTRICT)
 
