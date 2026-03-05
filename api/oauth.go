@@ -1,3 +1,21 @@
+// OAuth 2.0 authorization flow handlers.
+//
+// Flow overview:
+//  1. Frontend redirects user to GET /v1/oauth/{provider}/authorize
+//  2. Server generates a signed CSRF state token and redirects to the provider
+//  3. User grants consent on the provider's consent screen
+//  4. Provider redirects to GET /v1/oauth/{provider}/callback with auth code
+//  5. Server exchanges the code for tokens, encrypts them in the vault,
+//     and creates an oauth_connections row
+//  6. Server redirects to /settings?oauth_status=success (or error)
+//
+// Security:
+//   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
+//   - State encodes user ID + provider to prevent session fixation
+//   - Callback verifies session user matches the state token's user
+//   - Tokens stored server-side in Supabase Vault (AES-256-GCM)
+//   - Provider path params validated against ProviderIDPattern
+//   - No tokens or secrets are ever returned in API responses
 package api
 
 import (
@@ -499,25 +517,26 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 
 // --- URL helpers ---
 
-// oauthCallbackURL constructs the OAuth callback URL for a given provider.
-// Uses OAuthRedirectBaseURL if set, otherwise falls back to BaseURL.
-func oauthCallbackURL(deps *Deps, providerID string) string {
-	base := deps.OAuthRedirectBaseURL
-	if base == "" {
-		base = deps.BaseURL
+// oauthBaseURL returns the public base URL for OAuth-related redirects.
+// Prefers OAuthRedirectBaseURL (for deployments where the public URL differs
+// from the internal BaseURL); falls back to BaseURL.
+func oauthBaseURL(deps *Deps) string {
+	if deps.OAuthRedirectBaseURL != "" {
+		return deps.OAuthRedirectBaseURL
 	}
-	return base + "/api/v1/oauth/" + url.PathEscape(providerID) + "/callback"
+	return deps.BaseURL
+}
+
+// oauthCallbackURL constructs the OAuth callback URL for a given provider.
+func oauthCallbackURL(deps *Deps, providerID string) string {
+	return oauthBaseURL(deps) + "/api/v1/oauth/" + url.PathEscape(providerID) + "/callback"
 }
 
 // redirectToFrontend redirects the user's browser to the frontend settings
 // page with a status and optional error message as query parameters. The
 // oauth_tab param lets the frontend auto-navigate to the connections section.
 func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, provider, status, errMsg string) {
-	base := deps.OAuthRedirectBaseURL
-	if base == "" {
-		base = deps.BaseURL
-	}
-	u := base + "/settings"
+	u := oauthBaseURL(deps) + "/settings"
 	params := url.Values{}
 	params.Set("oauth_provider", provider)
 	params.Set("oauth_status", status)

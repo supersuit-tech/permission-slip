@@ -19,6 +19,50 @@ import (
 
 const testOAuthStateSecret = "test-oauth-state-secret-at-least-32-chars"
 
+// insertTestOAuthConnection creates an OAuth connection in the test DB with
+// vault-stored tokens. Returns the connection ID for further assertions.
+func insertTestOAuthConnection(t *testing.T, tx db.DBTX, v *vault.MockVaultStore, userID, provider string, scopes []string, withRefresh bool) string {
+	t.Helper()
+	accessID, err := v.CreateSecret(t.Context(), tx, "test_access", []byte("access-token"))
+	if err != nil {
+		t.Fatalf("vault create access: %v", err)
+	}
+	var refreshVaultID *string
+	if withRefresh {
+		refreshID, err := v.CreateSecret(t.Context(), tx, "test_refresh", []byte("refresh-token"))
+		if err != nil {
+			t.Fatalf("vault create refresh: %v", err)
+		}
+		refreshVaultID = &refreshID
+	}
+	connID := testhelper.GenerateID(t, "oconn_")
+	_, err = db.CreateOAuthConnection(t.Context(), tx, db.CreateOAuthConnectionParams{
+		ID:                  connID,
+		UserID:              userID,
+		Provider:            provider,
+		AccessTokenVaultID:  accessID,
+		RefreshTokenVaultID: refreshVaultID,
+		Scopes:              scopes,
+	})
+	if err != nil {
+		t.Fatalf("create oauth connection: %v", err)
+	}
+	return connID
+}
+
+// oauthDepsWithVault creates deps with a specific mock vault store. This is
+// useful for tests that need to insert vault secrets before creating deps.
+func oauthDepsWithVault(tx db.DBTX, v *vault.MockVaultStore) *Deps {
+	return &Deps{
+		DB:                tx,
+		Vault:             v,
+		SupabaseJWTSecret: testJWTSecret,
+		OAuthProviders:    oauth.NewRegistry(),
+		OAuthStateSecret:  testOAuthStateSecret,
+		BaseURL:           "http://localhost:3000",
+	}
+}
+
 func oauthDeps(tx db.DBTX) *Deps {
 	reg := oauth.NewRegistry()
 	_ = reg.Register(oauth.Provider{
@@ -402,38 +446,10 @@ func TestListOAuthConnections_ReturnsUserConnections(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	// Insert an OAuth connection directly via DB
 	v := vault.NewMockVaultStore()
-	accessID, err := v.CreateSecret(t.Context(), tx, "test_access", []byte("access-token-value"))
-	if err != nil {
-		t.Fatalf("vault create access: %v", err)
-	}
-	refreshID, err := v.CreateSecret(t.Context(), tx, "test_refresh", []byte("refresh-token-value"))
-	if err != nil {
-		t.Fatalf("vault create refresh: %v", err)
-	}
+	insertTestOAuthConnection(t, tx, v, uid, "google", []string{"openid", "email"}, true)
 
-	connID := testhelper.GenerateID(t, "oconn_")
-	_, err = db.CreateOAuthConnection(t.Context(), tx, db.CreateOAuthConnectionParams{
-		ID:                  connID,
-		UserID:              uid,
-		Provider:            "google",
-		AccessTokenVaultID:  accessID,
-		RefreshTokenVaultID: &refreshID,
-		Scopes:              []string{"openid", "email"},
-	})
-	if err != nil {
-		t.Fatalf("create oauth connection: %v", err)
-	}
-
-	deps := &Deps{
-		DB:                tx,
-		Vault:             v,
-		SupabaseJWTSecret: testJWTSecret,
-		OAuthProviders:    oauth.NewRegistry(),
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
-	}
+	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/connections", uid)
@@ -472,27 +488,9 @@ func TestListOAuthConnections_IsolatedByUser(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
 
 	v := vault.NewMockVaultStore()
-	accessID, _ := v.CreateSecret(t.Context(), tx, "test_access", []byte("token"))
-	connID := testhelper.GenerateID(t, "oconn_")
-	_, err := db.CreateOAuthConnection(t.Context(), tx, db.CreateOAuthConnectionParams{
-		ID:                 connID,
-		UserID:             uid1,
-		Provider:           "google",
-		AccessTokenVaultID: accessID,
-		Scopes:             []string{"openid"},
-	})
-	if err != nil {
-		t.Fatalf("create oauth connection: %v", err)
-	}
+	insertTestOAuthConnection(t, tx, v, uid1, "google", []string{"openid"}, false)
 
-	deps := &Deps{
-		DB:                tx,
-		Vault:             v,
-		SupabaseJWTSecret: testJWTSecret,
-		OAuthProviders:    oauth.NewRegistry(),
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
-	}
+	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
 	// User 2 should see no connections
@@ -522,30 +520,9 @@ func TestDeleteOAuthConnection_Success(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	v := vault.NewMockVaultStore()
-	accessID, _ := v.CreateSecret(t.Context(), tx, "test_access", []byte("access-token"))
-	refreshID, _ := v.CreateSecret(t.Context(), tx, "test_refresh", []byte("refresh-token"))
+	insertTestOAuthConnection(t, tx, v, uid, "google", []string{"openid"}, true)
 
-	connID := testhelper.GenerateID(t, "oconn_")
-	_, err := db.CreateOAuthConnection(t.Context(), tx, db.CreateOAuthConnectionParams{
-		ID:                  connID,
-		UserID:              uid,
-		Provider:            "google",
-		AccessTokenVaultID:  accessID,
-		RefreshTokenVaultID: &refreshID,
-		Scopes:              []string{"openid"},
-	})
-	if err != nil {
-		t.Fatalf("create oauth connection: %v", err)
-	}
-
-	deps := &Deps{
-		DB:                tx,
-		Vault:             v,
-		SupabaseJWTSecret: testJWTSecret,
-		OAuthProviders:    oauth.NewRegistry(),
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
-	}
+	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/connections/google", uid)
@@ -606,27 +583,9 @@ func TestDeleteOAuthConnection_OtherUserCannot(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
 
 	v := vault.NewMockVaultStore()
-	accessID, _ := v.CreateSecret(t.Context(), tx, "test_access", []byte("token"))
-	connID := testhelper.GenerateID(t, "oconn_")
-	_, err := db.CreateOAuthConnection(t.Context(), tx, db.CreateOAuthConnectionParams{
-		ID:                 connID,
-		UserID:             uid1,
-		Provider:           "google",
-		AccessTokenVaultID: accessID,
-		Scopes:             []string{"openid"},
-	})
-	if err != nil {
-		t.Fatalf("create oauth connection: %v", err)
-	}
+	insertTestOAuthConnection(t, tx, v, uid1, "google", []string{"openid"}, false)
 
-	deps := &Deps{
-		DB:                tx,
-		Vault:             v,
-		SupabaseJWTSecret: testJWTSecret,
-		OAuthProviders:    oauth.NewRegistry(),
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
-	}
+	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
 	// User 2 tries to delete user 1's connection
