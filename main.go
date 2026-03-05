@@ -128,15 +128,29 @@ func main() {
 	if deps.BillingEnabled {
 		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
 
+		// When STRIPE_TEST_MODE=true, use _TEST-suffixed env vars instead of
+		// the live keys. This lets developers keep both sets of keys in .env
+		// and switch with a single boolean.
+		stripeTestMode := os.Getenv("STRIPE_TEST_MODE") == "true"
+		stripeKey := os.Getenv("STRIPE_SECRET_KEY")
+		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+		priceID := os.Getenv("STRIPE_PRICE_ID_REQUEST")
+		if stripeTestMode {
+			stripeKey = os.Getenv("STRIPE_SECRET_KEY_TEST")
+			webhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET_TEST")
+			priceID = os.Getenv("STRIPE_PRICE_ID_REQUEST_TEST")
+			log.Println("Stripe: test mode enabled — using _TEST keys")
+		}
+
 		// Initialize Stripe client when billing is enabled and keys are configured.
-		if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
+		if stripeKey != "" {
 			deps.Stripe = pstripe.New(pstripe.Config{
 				SecretKey:      stripeKey,
-				WebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
-				PriceIDRequest: os.Getenv("STRIPE_PRICE_ID_REQUEST"),
+				WebhookSecret:  webhookSecret,
+				PriceIDRequest: priceID,
 			})
 			log.Println("Stripe: client initialized")
-			if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
+			if webhookSecret == "" {
 				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
 			}
 		} else {
