@@ -87,6 +87,37 @@ var validAuthTypes = map[string]bool{
 	"oauth2":  true,
 }
 
+// BuiltInOAuthProviders lists OAuth provider IDs that the platform supports
+// natively. Connectors referencing these providers don't need to declare them
+// in their oauth_providers section. Add new built-in providers here.
+var BuiltInOAuthProviders = map[string]bool{
+	"google":    true,
+	"microsoft": true,
+}
+
+// validateURL parses a URL and checks scheme and host. allowedSchemes specifies
+// which schemes are accepted. Returns a descriptive error if invalid.
+func validateURL(raw, fieldName string, allowedSchemes ...string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid URL: %w", fieldName, err)
+	}
+	schemeOK := false
+	for _, s := range allowedSchemes {
+		if u.Scheme == s {
+			schemeOK = true
+			break
+		}
+	}
+	if !schemeOK {
+		return fmt.Errorf("%s must use %s scheme", fieldName, strings.Join(allowedSchemes, " or "))
+	}
+	if u.Host == "" {
+		return fmt.Errorf("%s must include a host", fieldName)
+	}
+	return nil
+}
+
 // LoadManifest reads and validates a connector.json manifest from the given path.
 func LoadManifest(path string) (*ConnectorManifest, error) {
 	data, err := os.ReadFile(path)
@@ -210,24 +241,17 @@ func (m *ConnectorManifest) Validate() error {
 			if len(c.InstructionsURL) > maxInstructionsURLLen {
 				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url exceeds %d characters", i, maxInstructionsURLLen)
 			}
-			u, err := url.Parse(c.InstructionsURL)
-			if err != nil {
-				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url is not a valid URL: %w", i, err)
-			}
-			if u.Scheme != "http" && u.Scheme != "https" {
-				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url must use http or https scheme", i)
-			}
-			if u.Host == "" {
-				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url must include a host", i)
+			field := fmt.Sprintf("manifest validation: required_credentials[%d].instructions_url", i)
+			if err := validateURL(c.InstructionsURL, field, "http", "https"); err != nil {
+				return err
 			}
 		}
 	}
 
-	// Collect all declared OAuth provider IDs (from OAuthProviders section)
-	// plus well-known built-in providers that don't need to be declared.
-	declaredProviders := map[string]bool{
-		"google":    true,
-		"microsoft": true,
+	// Collect all known OAuth provider IDs: built-in + declared in this manifest.
+	knownProviders := make(map[string]bool, len(BuiltInOAuthProviders)+len(m.OAuthProviders))
+	for id := range BuiltInOAuthProviders {
+		knownProviders[id] = true
 	}
 
 	// Validate OAuth providers (optional, used by external connectors).
@@ -244,31 +268,23 @@ func (m *ConnectorManifest) Validate() error {
 		if p.AuthorizeURL == "" {
 			return fmt.Errorf("manifest validation: oauth_providers[%d].authorize_url is required", i)
 		}
-		au, err := url.Parse(p.AuthorizeURL)
-		if err != nil {
-			return fmt.Errorf("manifest validation: oauth_providers[%d].authorize_url is not a valid URL: %w", i, err)
-		}
-		if au.Scheme != "https" {
-			return fmt.Errorf("manifest validation: oauth_providers[%d].authorize_url must use https scheme", i)
+		if err := validateURL(p.AuthorizeURL, fmt.Sprintf("manifest validation: oauth_providers[%d].authorize_url", i), "https"); err != nil {
+			return err
 		}
 
 		if p.TokenURL == "" {
 			return fmt.Errorf("manifest validation: oauth_providers[%d].token_url is required", i)
 		}
-		tu, err := url.Parse(p.TokenURL)
-		if err != nil {
-			return fmt.Errorf("manifest validation: oauth_providers[%d].token_url is not a valid URL: %w", i, err)
-		}
-		if tu.Scheme != "https" {
-			return fmt.Errorf("manifest validation: oauth_providers[%d].token_url must use https scheme", i)
+		if err := validateURL(p.TokenURL, fmt.Sprintf("manifest validation: oauth_providers[%d].token_url", i), "https"); err != nil {
+			return err
 		}
 
-		declaredProviders[p.ID] = true
+		knownProviders[p.ID] = true
 	}
 
 	// Cross-reference: verify oauth_provider in credentials references a known provider.
 	for i, c := range m.RequiredCredentials {
-		if c.AuthType == "oauth2" && !declaredProviders[c.OAuthProvider] {
+		if c.AuthType == "oauth2" && !knownProviders[c.OAuthProvider] {
 			return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider %q is not a built-in provider and not declared in oauth_providers", i, c.OAuthProvider)
 		}
 	}
