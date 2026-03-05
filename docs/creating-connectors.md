@@ -341,9 +341,43 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 |----------------|----------|---------|
 | Top-level fields | `connectors` | One row per connector (id, name, description) |
 | `actions[]` | `connector_actions` | One row per action (action_type, risk_level, optional parameters_schema) |
-| `required_credentials[]` | `connector_required_credentials` | What credentials this connector needs (service, auth_type, instructions_url) |
+| `required_credentials[]` | `connector_required_credentials` | What credentials this connector needs (service, auth_type, instructions_url, oauth_provider, oauth_scopes) |
 
-**Auth types:** `api_key`, `basic`, `custom`
+**Auth types:** `api_key`, `basic`, `custom`, `oauth2`
+
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+
+```go
+// Example: OAuth2 credential in a manifest
+RequiredCredentials: []connectors.ManifestCredential{
+    {
+        Service:       "google",
+        AuthType:      "oauth2",
+        OAuthProvider: "google",
+        OAuthScopes:   []string{"https://www.googleapis.com/auth/gmail.send"},
+    },
+},
+```
+
+#### Declaring custom OAuth providers
+
+External connectors that use OAuth providers not built into the platform (anything other than `google` or `microsoft`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+
+```go
+OAuthProviders: []connectors.ManifestOAuthProvider{
+    {
+        ID:           "salesforce",
+        AuthorizeURL: "https://login.salesforce.com/services/oauth2/authorize",
+        TokenURL:     "https://login.salesforce.com/services/oauth2/token",
+        Scopes:       []string{"api", "refresh_token"},
+    },
+},
+```
+
+Requirements:
+- `authorize_url` and `token_url` must use HTTPS
+- Provider IDs must be unique within the manifest
+- Any `oauth_provider` referenced in `required_credentials` must either be a built-in provider or declared in `oauth_providers`
 
 **Risk levels:** `low`, `medium`, `high`
 
@@ -817,8 +851,10 @@ CREATE TABLE connector_actions (
 CREATE TABLE connector_required_credentials (
     connector_id    text NOT NULL REFERENCES connectors(id),
     service         text NOT NULL,              -- credential service identifier
-    auth_type       text NOT NULL,              -- 'api_key' | 'basic' | 'custom'
+    auth_type       text NOT NULL,              -- 'api_key' | 'basic' | 'custom' | 'oauth2'
     instructions_url text,                      -- optional URL for credential setup docs
+    oauth_provider  text,                       -- required when auth_type = 'oauth2'
+    oauth_scopes    text[] DEFAULT '{}',        -- OAuth scopes when auth_type = 'oauth2'
     PRIMARY KEY (connector_id, service)
 );
 ```
