@@ -5520,6 +5520,142 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/provider-configs:
+    get:
+      operationId: listOAuthProviderConfigs
+      summary: List BYOA Provider Configs
+      description: |
+        Returns all BYOA (Bring Your Own App) OAuth provider configurations for
+        the authenticated user. Each config indicates that the user has registered
+        their own OAuth client credentials for that provider.
+
+        Client secrets are never included in the response.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: BYOA provider configs listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfigListResponse'
+              example:
+                configs:
+                  - provider: salesforce
+                    created_at: '2026-03-05T12:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createOAuthProviderConfig
+      summary: Register BYOA OAuth Credentials
+      description: |
+        Registers user-provided OAuth client credentials for a provider. The
+        provider must already be declared by a built-in config or connector
+        manifest — this endpoint only supplies the client ID and secret.
+
+        Client credentials are encrypted in Supabase Vault (AES-256-GCM).
+
+        After registration, the provider's OAuth flows will use these credentials
+        immediately. Only one config per provider per user is allowed — delete the
+        existing config before creating a new one.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthProviderConfigRequest'
+      responses:
+        '201':
+          description: BYOA provider config created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfig'
+              example:
+                provider: salesforce
+                created_at: '2026-03-05T12:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth provider not found (not declared by any built-in or connector manifest)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: BYOA config already exists for this provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/provider-configs/{provider}:
+    delete:
+      operationId: deleteOAuthProviderConfig
+      summary: Delete BYOA Provider Config
+      description: |
+        Removes the user's BYOA OAuth client credentials for a provider. The
+        encrypted vault secrets are deleted along with the database row.
+
+        After deletion, the provider reverts to its built-in or manifest
+        configuration (if any). If no built-in credentials exist, the provider
+        will require new BYOA credentials before OAuth flows can be initiated.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to delete the config for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: BYOA provider config deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfigDeleteResponse'
+              example:
+                provider: salesforce
+                deleted_at: '2026-03-05T15:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: BYOA provider config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/config:
     get:
       summary: Get server configuration
@@ -9763,6 +9899,65 @@ components:
           type: string
           format: date-time
           description: When the OAuth provider was disconnected
+          example: '2026-03-05T15:00:00Z'
+    CreateOAuthProviderConfigRequest:
+      type: object
+      required:
+        - provider
+        - client_id
+        - client_secret
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID to configure (must already be declared by a built-in or connector manifest)
+          example: salesforce
+        client_id:
+          type: string
+          description: The OAuth application's client ID
+          example: my-client-id
+        client_secret:
+          type: string
+          description: The OAuth application's client secret
+          example: my-client-secret
+    OAuthProviderConfig:
+      type: object
+      required:
+        - provider
+        - created_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID
+          example: salesforce
+        created_at:
+          type: string
+          format: date-time
+          description: When the provider config was created
+          example: '2026-03-05T12:00:00Z'
+    OAuthProviderConfigListResponse:
+      type: object
+      required:
+        - configs
+      properties:
+        configs:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProviderConfig'
+          description: List of BYOA provider configs for the authenticated user
+    OAuthProviderConfigDeleteResponse:
+      type: object
+      required:
+        - provider
+        - deleted_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider whose config was deleted
+          example: salesforce
+        deleted_at:
+          type: string
+          format: date-time
+          description: When the provider config was deleted
           example: '2026-03-05T15:00:00Z'
     ConfigResponse:
       type: object

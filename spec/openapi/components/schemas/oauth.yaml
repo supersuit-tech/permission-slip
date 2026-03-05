@@ -92,3 +92,66 @@ OAuthDisconnectResponse:
       format: date-time
       description: When the OAuth provider was disconnected
       example: "2026-03-05T15:00:00Z"
+
+CreateOAuthProviderConfigRequest:
+  type: object
+  required:
+    - provider
+    - client_id
+    - client_secret
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider ID to configure (must already be declared by a built-in or connector manifest)
+      example: "salesforce"
+    client_id:
+      type: string
+      description: The OAuth application's client ID
+      example: "my-client-id"
+    client_secret:
+      type: string
+      description: The OAuth application's client secret
+      example: "my-client-secret"
+
+OAuthProviderConfig:
+  type: object
+  required:
+    - provider
+    - created_at
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider ID
+      example: "salesforce"
+    created_at:
+      type: string
+      format: date-time
+      description: When the provider config was created
+      example: "2026-03-05T12:00:00Z"
+
+OAuthProviderConfigListResponse:
+  type: object
+  required:
+    - configs
+  properties:
+    configs:
+      type: array
+      items:
+        $ref: '#/OAuthProviderConfig'
+      description: List of BYOA provider configs for the authenticated user
+
+OAuthProviderConfigDeleteResponse:
+  type: object
+  required:
+    - provider
+    - deleted_at
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider whose config was deleted
+      example: "salesforce"
+    deleted_at:
+      type: string
+      format: date-time
+      description: When the provider config was deleted
+      example: "2026-03-05T15:00:00Z"
