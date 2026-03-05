@@ -2,6 +2,8 @@
 
 This guide covers deploying Permission Slip on your own infrastructure. Permission Slip ships as a single Go binary with the React frontend embedded — no separate web server or static file hosting needed.
 
+> **Running on a Raspberry Pi?** Skip straight to the **[Raspberry Pi Quickstart](raspberry-pi-quickstart.md)** — an opinionated, step-by-step guide that gets you up and running in under 30 minutes with minimal services.
+
 ## Prerequisites
 
 Before deploying, you'll need:

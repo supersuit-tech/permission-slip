@@ -28,6 +28,8 @@ Open-source API key vault where agents execute scoped, time-limited actions on b
 
 Or **[self-host](docs/deployment-self-hosted.md)** on your own infrastructure for full control (Docker, Fly.io, or bare metal).
 
+**Want to run it on a Raspberry Pi?** Follow the **[Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md)** — a step-by-step guide to get Permission Slip running on a [Pi 5](https://a.co/d/0cQXzRi1) in under 30 minutes.
+
 ## Why Permission Slip?
 
 You want your AI agent to book flights, send emails, order food — but you can't trust it with full access to your accounts.
@@ -68,6 +70,7 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **[Community Connectors](docs/community-connectors.md)** — directory of third-party connectors built by the community
 - **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
 - **[Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md)** — step-by-step guide to test the invite/registration flow
+- **[Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md)** — get Permission Slip running on a Raspberry Pi 5 in under 30 minutes
 - **[Self-Hosted Deployment](docs/deployment-self-hosted.md)** — complete guide for deploying on your own infrastructure (Docker, Fly.io, bare metal)
 - **[Production Deployment (internal)](docs/deployment-production.md)** — infrastructure, secrets, and operations for app.permissionslip.dev
 - **[Fly.io Deployment](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
