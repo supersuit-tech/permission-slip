@@ -24,6 +24,20 @@ func TestConnectorsSchema(t *testing.T) {
 	t.Run("connector_required_credentials", func(t *testing.T) {
 		testhelper.RequireColumns(t, tx, "connector_required_credentials", []string{
 			"connector_id", "service", "auth_type", "instructions_url",
+			"oauth_provider", "oauth_scopes",
+		})
+	})
+	t.Run("oauth_connections", func(t *testing.T) {
+		testhelper.RequireColumns(t, tx, "oauth_connections", []string{
+			"id", "user_id", "provider", "access_token_vault_id",
+			"refresh_token_vault_id", "scopes", "token_expiry",
+			"status", "created_at", "updated_at",
+		})
+	})
+	t.Run("oauth_provider_configs", func(t *testing.T) {
+		testhelper.RequireColumns(t, tx, "oauth_provider_configs", []string{
+			"id", "user_id", "provider", "client_id_vault_id",
+			"client_secret_vault_id", "created_at",
 		})
 	})
 }

@@ -6762,8 +6762,10 @@ components:
             - api_key
             - basic
             - custom
+            - oauth2
           description: |
-            Authentication type required by the external service.
+            Authentication type required by the external service. When `oauth2`, the user
+            must connect their account via the OAuth flow instead of providing static credentials.
           example: api_key
         instructions_url:
           type: string
@@ -6773,6 +6775,21 @@ components:
             URL to human-readable documentation explaining how to obtain credentials
             for this service. Only present when the connector provides setup instructions.
           example: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
+        oauth_provider:
+          type: string
+          maxLength: 255
+          description: |
+            OAuth provider identifier. Only present when `auth_type` is `oauth2`.
+            Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft").
+          example: google
+        oauth_scopes:
+          type: array
+          items:
+            type: string
+          description: |
+            OAuth scopes required by this connector. Only present when `auth_type` is `oauth2`.
+          example:
+            - https://www.googleapis.com/auth/gmail.send
       example:
         service: github
         auth_type: api_key
