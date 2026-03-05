@@ -351,6 +351,8 @@ paths:
                 agent_id: 42
                 expires_at: '2026-02-11T13:25:00Z'
                 verification_required: true
+                approver:
+                  username: alice
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -540,6 +542,8 @@ paths:
               example:
                 status: registered
                 registered_at: '2026-02-11T13:20:15Z'
+                approver:
+                  username: alice
         '400':
           description: Invalid request or agent ID mismatch
           content:
@@ -991,6 +995,8 @@ paths:
               example:
                 agent_id: 42
                 status: registered
+                approver:
+                  username: alice
                 metadata:
                   name: My AI Assistant
                   version: 1.0.0
@@ -1126,6 +1132,8 @@ paths:
                   summary: Agent with multiple connectors, mixed readiness
                   value:
                     agent_id: 42
+                    approver:
+                      username: alice
                     connectors:
                       - id: gmail
                         name: Gmail
@@ -1239,11 +1247,15 @@ paths:
                   summary: Agent with no enabled connectors
                   value:
                     agent_id: 43
+                    approver:
+                      username: bob
                     connectors: []
                 standing_approval_only:
                   summary: Single connector, all actions with standing approvals
                   value:
                     agent_id: 44
+                    approver:
+                      username: carol
                     connectors:
                       - id: gmail
                         name: Gmail
@@ -5716,10 +5728,19 @@ components:
             agent registers. The agent must collect the code from the user and submit
             it via `POST /v1/agents/{agent_id}/verify`.
           example: true
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is registering with. Included so the
+            agent knows whose account it's connecting to — especially useful when
+            an agent registers with multiple users and needs to distinguish them.
       example:
         agent_id: 42
         expires_at: '2026-02-11T13:25:00Z'
         verification_required: true
+        approver:
+          username: alice
     VerifyRegistrationRequest:
       type: object
       required:
@@ -5775,9 +5796,18 @@ components:
           description: |
             ISO 8601 timestamp (RFC 3339 format, UTC) when registration was completed.
           example: '2026-02-11T13:20:15Z'
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is now registered with. The agent should
+            store this alongside the `agent_id` to identify which user this
+            registration belongs to.
       example:
         status: registered
         registered_at: '2026-02-11T13:20:15Z'
+        approver:
+          username: alice
     ApprovalRequest:
       type: object
       required:
@@ -7763,6 +7793,12 @@ components:
             - deactivated
           description: Current agent status (always "registered" for successful requests, since the middleware requires it)
           example: registered
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is registered to. Identifies whose
+            account and permissions this agent operates under.
         metadata:
           type: object
           nullable: true
@@ -7819,6 +7855,13 @@ components:
           description: |
             The authenticated agent's identifier.
           example: 42
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) whose capabilities are being returned. Identifies
+            which user's connectors, standing approvals, and action configurations
+            are represented in this response.
         connectors:
           type: array
           items:
@@ -7831,6 +7874,8 @@ components:
             If the agent has no enabled connectors, this array is empty.
       example:
         agent_id: 42
+        approver:
+          username: alice
         connectors:
           - id: gmail
             name: Gmail
@@ -9949,6 +9994,26 @@ components:
             timestamp: '1770816000'
             expected_window: 300 seconds
           trace_id: trace_xyz789
+    ApproverInfo:
+      type: object
+      description: |
+        Identifies the user (approver) an agent is registered to. Included in
+        agent-facing responses so the agent knows which user it's working with.
+
+        Only the username is exposed — email, phone, and other PII are never
+        sent to agents.
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          maxLength: 40
+          description: |
+            The approver's username on Permission Slip. This is the user's
+            public-facing identifier — safe to display and log.
+          example: alice
+      example:
+        username: alice
     AgentListResponse:
       type: object
       description: Paginated list of agents.
