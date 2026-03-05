@@ -2,6 +2,19 @@
 // It manages provider configurations (endpoints, scopes, client credentials)
 // and provides a thread-safe registry that merges built-in providers,
 // connector-manifest-declared providers, and user BYOA configurations.
+//
+// Provider sources have a defined priority: BYOA > Manifest > BuiltIn.
+// When multiple sources register a provider with the same ID, the higher-priority
+// source wins. BYOA registrations are special: they merge client credentials
+// into the existing provider config (preserving endpoints and scopes from the
+// lower-priority source) rather than replacing the entire Provider value.
+//
+// Security: Provider and TokenSet implement fmt.Stringer, fmt.GoStringer, and
+// json.Marshaler to redact secrets (ClientSecret, AccessToken, RefreshToken).
+// Code that needs actual secret values must access struct fields directly.
+//
+// Thread safety: Registry methods are safe for concurrent use. Returned Provider
+// values are deep copies — mutations do not affect the registry.
 package oauth
 
 import (
@@ -77,13 +90,18 @@ type TokenSet struct {
 	Scopes []string
 }
 
-// IsExpired reports whether the access token has expired. It uses a 5-minute
-// buffer to allow pre-emptive refresh before execution.
+// tokenExpiryBuffer is the time before actual expiry at which a token is
+// considered expired. This allows pre-emptive refresh so actions don't fail
+// mid-execution due to an expired token.
+const tokenExpiryBuffer = 5 * time.Minute
+
+// IsExpired reports whether the access token has expired or is within the
+// pre-emptive refresh buffer (5 minutes before actual expiry).
 func (ts TokenSet) IsExpired() bool {
 	if ts.Expiry.IsZero() {
 		return false
 	}
-	return time.Now().After(ts.Expiry.Add(-5 * time.Minute))
+	return time.Now().After(ts.Expiry.Add(-tokenExpiryBuffer))
 }
 
 // HasClientCredentials reports whether the provider has both a client ID and
