@@ -1,0 +1,55 @@
+OAuthConnection:
+  type: object
+  required:
+    - provider
+    - scopes
+    - status
+    - connected_at
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider ID (e.g. "google", "microsoft")
+      example: "google"
+    scopes:
+      type: array
+      items:
+        type: string
+      description: The OAuth scopes granted by the provider
+      example: ["openid", "https://www.googleapis.com/auth/userinfo.email"]
+    status:
+      type: string
+      enum: ["active", "needs_reauth", "revoked"]
+      description: The current status of the connection
+      example: "active"
+    connected_at:
+      type: string
+      format: date-time
+      description: When the OAuth connection was established
+      example: "2026-03-05T10:00:00Z"
+
+OAuthConnectionListResponse:
+  type: object
+  required:
+    - connections
+  properties:
+    connections:
+      type: array
+      items:
+        $ref: '#/OAuthConnection'
+      description: List of OAuth connections for the authenticated user
+
+OAuthDisconnectResponse:
+  type: object
+  required:
+    - provider
+    - disconnected_at
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider that was disconnected
+      example: "google"
+    disconnected_at:
+      type: string
+      format: date-time
+      description: When the OAuth provider was disconnected
+      example: "2026-03-05T15:00:00Z"

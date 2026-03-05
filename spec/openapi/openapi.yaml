@@ -104,6 +104,8 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Expo Push Tokens
     description: Expo push token management for mobile push notifications (session-authenticated)
+  - name: OAuth
+    description: OAuth 2.0 provider authorization and connection management (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -272,6 +274,18 @@ paths:
 
   /v1/admin/usage/by-agent:
     $ref: './components/paths/admin_usage.yaml#/adminUsageByAgent'
+
+  /v1/oauth/{provider}/authorize:
+    $ref: './components/paths/oauth.yaml#/oauthAuthorize'
+
+  /v1/oauth/{provider}/callback:
+    $ref: './components/paths/oauth.yaml#/oauthCallback'
+
+  /v1/oauth/connections:
+    $ref: './components/paths/oauth.yaml#/oauthConnections'
+
+  /v1/oauth/connections/{provider}:
+    $ref: './components/paths/oauth.yaml#/oauthDisconnect'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -537,6 +551,14 @@ components:
       $ref: './components/schemas/admin_usage.yaml#/AgentUsageResponse'
     AgentUsageEntry:
       $ref: './components/schemas/admin_usage.yaml#/AgentUsageEntry'
+
+    # OAuth
+    OAuthConnection:
+      $ref: './components/schemas/oauth.yaml#/OAuthConnection'
+    OAuthConnectionListResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthConnectionListResponse'
+    OAuthDisconnectResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
 
     # Config
     ConfigResponse:

@@ -100,6 +100,8 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Expo Push Tokens
     description: Expo push token management for mobile push notifications (session-authenticated)
+  - name: OAuth
+    description: OAuth 2.0 provider authorization and connection management (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -5256,6 +5258,211 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/oauth/{provider}/authorize:
+    get:
+      operationId: oauthAuthorize
+      summary: Initiate OAuth Authorization
+      description: |
+        Generates an authorization URL for the given OAuth provider and redirects
+        the user's browser to the provider's consent screen. The redirect includes
+        a signed CSRF state parameter that ties the flow to the authenticated user.
+
+        After the user grants consent, the provider redirects back to the callback
+        endpoint (`GET /v1/oauth/{provider}/callback`) with an authorization code.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - A signed state token prevents CSRF and session-fixation attacks
+        - The provider must have client credentials configured (built-in or BYOA)
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: Additional OAuth scopes to request beyond the provider defaults
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '307':
+          description: Redirects to the OAuth provider's authorization endpoint
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth provider not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/{provider}/callback:
+    get:
+      operationId: oauthCallback
+      summary: OAuth Callback
+      description: |
+        Handles the OAuth provider's redirect after user consent. Validates the
+        CSRF state token, exchanges the authorization code for access/refresh
+        tokens, encrypts them in the vault, and creates an `oauth_connections` row.
+
+        On success, redirects the user to the frontend settings page with
+        `?oauth_status=success`. On failure, redirects with `?oauth_status=error`.
+
+        This endpoint is called by the OAuth provider, not directly by the frontend.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: false
+          description: The authorization code from the provider
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: The signed CSRF state token
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Error code from the provider (e.g. "access_denied")
+          schema:
+            type: string
+        - name: error_description
+          in: query
+          required: false
+          description: Human-readable error description from the provider
+          schema:
+            type: string
+      responses:
+        '307':
+          description: Redirects to frontend settings page with success/error status
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/connections:
+    get:
+      operationId: listOAuthConnections
+      summary: List OAuth Connections
+      description: |
+        Returns all active OAuth connections for the authenticated user. Each
+        connection includes the provider, granted scopes, status, and when it
+        was established. Tokens are never included in the response.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - Only returns connections belonging to the authenticated user
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: OAuth connections listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthConnectionListResponse'
+              example:
+                connections:
+                  - provider: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/userinfo.email
+                    status: active
+                    connected_at: '2026-03-05T10:00:00Z'
+                  - provider: microsoft
+                    scopes:
+                      - openid
+                      - offline_access
+                      - User.Read
+                    status: active
+                    connected_at: '2026-03-05T11:30:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/connections/{provider}:
+    delete:
+      operationId: deleteOAuthConnection
+      summary: Disconnect OAuth Provider
+      description: |
+        Disconnects an OAuth provider for the authenticated user. Deletes the
+        OAuth connection row and removes the encrypted tokens from the vault.
+
+        After disconnection, any connector actions that depend on this OAuth
+        provider will fail until the user re-authorizes.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - Only the user who created the connection can delete it
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to disconnect
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth provider disconnected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthDisconnectResponse'
+              example:
+                provider: google
+                disconnected_at: '2026-03-05T15:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/config:
     get:
       summary: Get server configuration
@@ -9367,6 +9574,64 @@ components:
           type: integer
           description: Number of billable requests attributed to this agent
           example: 500
+    OAuthConnection:
+      type: object
+      required:
+        - provider
+        - scopes
+        - status
+        - connected_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          example: google
+        scopes:
+          type: array
+          items:
+            type: string
+          description: The OAuth scopes granted by the provider
+          example:
+            - openid
+            - https://www.googleapis.com/auth/userinfo.email
+        status:
+          type: string
+          enum:
+            - active
+            - needs_reauth
+            - revoked
+          description: The current status of the connection
+          example: active
+        connected_at:
+          type: string
+          format: date-time
+          description: When the OAuth connection was established
+          example: '2026-03-05T10:00:00Z'
+    OAuthConnectionListResponse:
+      type: object
+      required:
+        - connections
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthConnection'
+          description: List of OAuth connections for the authenticated user
+    OAuthDisconnectResponse:
+      type: object
+      required:
+        - provider
+        - disconnected_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider that was disconnected
+          example: google
+        disconnected_at:
+          type: string
+          format: date-time
+          description: When the OAuth provider was disconnected
+          example: '2026-03-05T15:00:00Z'
     ConfigResponse:
       type: object
       description: |
