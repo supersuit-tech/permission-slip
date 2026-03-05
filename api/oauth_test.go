@@ -13,8 +13,8 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
-	"golang.org/x/oauth2"
 	"github.com/supersuit-tech/permission-slip-web/vault"
+	"golang.org/x/oauth2"
 )
 
 const testOAuthStateSecret = "test-oauth-state-secret-at-least-32-chars"
@@ -45,6 +45,113 @@ func oauthDeps(tx db.DBTX) *Deps {
 		OAuthProviders:    reg,
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",
+	}
+}
+
+// ── GET /v1/oauth/providers ────────────────────────────────────────────────────
+
+func TestListOAuthProviders_ReturnsRegistered(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/providers", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp oauthProviderListResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Providers) != 2 {
+		t.Fatalf("expected 2 providers, got %d", len(resp.Providers))
+	}
+
+	// Find the configured provider
+	var found bool
+	for _, p := range resp.Providers {
+		if p.ID == "google" {
+			found = true
+			if !p.HasCredentials {
+				t.Error("expected google to have credentials")
+			}
+			if p.Source != "built_in" {
+				t.Errorf("expected built_in source, got %s", p.Source)
+			}
+		}
+		if p.ID == "unconfigured" {
+			if p.HasCredentials {
+				t.Error("expected unconfigured provider to NOT have credentials")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected google provider in list")
+	}
+}
+
+func TestListOAuthProviders_EmptyWhenNilRegistry(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+	deps.OAuthProviders = nil
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/providers", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp oauthProviderListResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Providers) != 0 {
+		t.Errorf("expected 0 providers, got %d", len(resp.Providers))
+	}
+}
+
+// ── deduplicateScopes ─────────────────────────────────────────────────────────
+
+func TestDeduplicateScopes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{"no duplicates", []string{"a", "b", "c"}, []string{"a", "b", "c"}},
+		{"with duplicates", []string{"openid", "email", "openid"}, []string{"openid", "email"}},
+		{"all same", []string{"x", "x", "x"}, []string{"x"}},
+		{"empty", []string{}, []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := deduplicateScopes(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Fatalf("expected %d scopes, got %d: %v", len(tt.expected), len(got), got)
+			}
+			for i, s := range got {
+				if s != tt.expected[i] {
+					t.Errorf("index %d: expected %q, got %q", i, tt.expected[i], s)
+				}
+			}
+		})
 	}
 }
 

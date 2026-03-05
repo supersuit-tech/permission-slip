@@ -275,6 +275,9 @@ paths:
   /v1/admin/usage/by-agent:
     $ref: './components/paths/admin_usage.yaml#/adminUsageByAgent'
 
+  /v1/oauth/providers:
+    $ref: './components/paths/oauth.yaml#/oauthProviders'
+
   /v1/oauth/{provider}/authorize:
     $ref: './components/paths/oauth.yaml#/oauthAuthorize'
 
@@ -553,6 +556,10 @@ components:
       $ref: './components/schemas/admin_usage.yaml#/AgentUsageEntry'
 
     # OAuth
+    OAuthProvider:
+      $ref: './components/schemas/oauth.yaml#/OAuthProvider'
+    OAuthProviderListResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderListResponse'
     OAuthConnection:
       $ref: './components/schemas/oauth.yaml#/OAuthConnection'
     OAuthConnectionListResponse:

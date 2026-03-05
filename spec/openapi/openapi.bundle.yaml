@@ -5270,6 +5270,51 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/oauth/providers:
+    get:
+      operationId: listOAuthProviders
+      summary: List OAuth Providers
+      description: |
+        Returns all registered OAuth providers and their configuration status.
+        This lets the frontend discover which providers are available, which are
+        ready to use (have credentials configured), and which need BYOA setup.
+
+        Providers come from three sources:
+        - **built_in**: Platform-provided providers (e.g. Google, Microsoft)
+        - **manifest**: Declared in a connector manifest (e.g. Salesforce)
+        - **byoa**: User-configured (Bring Your Own App)
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: OAuth providers listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderListResponse'
+              example:
+                providers:
+                  - id: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/userinfo.email
+                    source: built_in
+                    has_credentials: true
+                  - id: microsoft
+                    scopes:
+                      - openid
+                      - offline_access
+                      - User.Read
+                    source: built_in
+                    has_credentials: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/oauth/{provider}/authorize:
     get:
       operationId: oauthAuthorize
@@ -9619,6 +9664,48 @@ components:
           type: integer
           description: Number of billable requests attributed to this agent
           example: 500
+    OAuthProvider:
+      type: object
+      required:
+        - id
+        - scopes
+        - source
+        - has_credentials
+      properties:
+        id:
+          type: string
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          example: google
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Default OAuth scopes for this provider
+          example:
+            - openid
+            - https://www.googleapis.com/auth/userinfo.email
+        source:
+          type: string
+          enum:
+            - built_in
+            - manifest
+            - byoa
+          description: Where the provider configuration originated
+          example: built_in
+        has_credentials:
+          type: boolean
+          description: Whether the provider has client credentials configured and is ready to use
+          example: true
+    OAuthProviderListResponse:
+      type: object
+      required:
+        - providers
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProvider'
+          description: List of available OAuth providers
     OAuthConnection:
       type: object
       required:

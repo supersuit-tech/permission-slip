@@ -1,3 +1,50 @@
+oauthProviders:
+  get:
+    operationId: listOAuthProviders
+    summary: List OAuth Providers
+    description: |
+      Returns all registered OAuth providers and their configuration status.
+      This lets the frontend discover which providers are available, which are
+      ready to use (have credentials configured), and which need BYOA setup.
+
+      Providers come from three sources:
+      - **built_in**: Platform-provided providers (e.g. Google, Microsoft)
+      - **manifest**: Declared in a connector manifest (e.g. Salesforce)
+      - **byoa**: User-configured (Bring Your Own App)
+
+    tags:
+      - OAuth
+
+    security:
+      - SupabaseSession: []
+
+    responses:
+      '200':
+        description: OAuth providers listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/oauth.yaml#/OAuthProviderListResponse'
+            example:
+              providers:
+                - id: "google"
+                  scopes: ["openid", "https://www.googleapis.com/auth/userinfo.email"]
+                  source: "built_in"
+                  has_credentials: true
+                - id: "microsoft"
+                  scopes: ["openid", "offline_access", "User.Read"]
+                  source: "built_in"
+                  has_credentials: true
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
 oauthAuthorize:
   get:
     operationId: oauthAuthorize

@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"golang.org/x/oauth2"
 )
 
@@ -18,6 +19,17 @@ import (
 const oauthStateTTL = 10 * time.Minute
 
 // --- Response types ---
+
+type oauthProviderResponse struct {
+	ID             string   `json:"id"`
+	Scopes         []string `json:"scopes"`
+	Source         string   `json:"source"`
+	HasCredentials bool     `json:"has_credentials"`
+}
+
+type oauthProviderListResponse struct {
+	Providers []oauthProviderResponse `json:"providers"`
+}
 
 type oauthConnectionResponse struct {
 	Provider    string    `json:"provider"`
@@ -31,7 +43,7 @@ type oauthConnectionListResponse struct {
 }
 
 type oauthDisconnectResponse struct {
-	Provider      string    `json:"provider"`
+	Provider       string    `json:"provider"`
 	DisconnectedAt time.Time `json:"disconnected_at"`
 }
 
@@ -42,6 +54,7 @@ func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	requireSession := RequireSession(deps)
 
+	mux.Handle("GET /v1/oauth/providers", requireProfile(handleListOAuthProviders(deps)))
 	mux.Handle("GET /v1/oauth/{provider}/authorize", requireProfile(handleOAuthAuthorize(deps)))
 	mux.Handle("GET /v1/oauth/{provider}/callback", requireSession(handleOAuthCallback(deps)))
 	mux.Handle("GET /v1/oauth/connections", requireProfile(handleListOAuthConnections(deps)))
@@ -107,7 +120,63 @@ func verifyOAuthState(deps *Deps, stateStr string) (userID, provider string, err
 	return sub, prov, nil
 }
 
+// --- Helpers ---
+
+// newOAuth2Config builds an oauth2.Config from a registry Provider and the
+// callback URL derived from deps. Centralises config construction so the
+// authorize and callback handlers stay in sync.
+func newOAuth2Config(deps *Deps, provider oauth.Provider) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     provider.ClientID,
+		ClientSecret: provider.ClientSecret,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  provider.AuthorizeURL,
+			TokenURL: provider.TokenURL,
+		},
+		RedirectURL: oauthCallbackURL(deps, provider.ID),
+		Scopes:      provider.Scopes,
+	}
+}
+
+// deduplicateScopes returns a new slice with duplicate scope strings removed,
+// preserving original order.
+func deduplicateScopes(scopes []string) []string {
+	seen := make(map[string]struct{}, len(scopes))
+	out := make([]string, 0, len(scopes))
+	for _, s := range scopes {
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // --- Handlers ---
+
+// handleListOAuthProviders returns all registered OAuth providers with their
+// configuration status. This lets the frontend discover which providers are
+// available, which are ready to use, and which need BYOA setup.
+func handleListOAuthProviders(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.OAuthProviders == nil {
+			RespondJSON(w, http.StatusOK, oauthProviderListResponse{Providers: []oauthProviderResponse{}})
+			return
+		}
+
+		providers := deps.OAuthProviders.List()
+		data := make([]oauthProviderResponse, len(providers))
+		for i, p := range providers {
+			data[i] = oauthProviderResponse{
+				ID:             p.ID,
+				Scopes:         p.Scopes,
+				Source:         string(p.Source),
+				HasCredentials: p.HasClientCredentials(),
+			}
+		}
+		RespondJSON(w, http.StatusOK, oauthProviderListResponse{Providers: data})
+	}
+}
 
 // handleOAuthAuthorize generates the authorization URL for a given provider
 // and redirects the user's browser to the provider's consent screen.
@@ -143,21 +212,11 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		redirectURL := oauthCallbackURL(deps, providerID)
-		cfg := &oauth2.Config{
-			ClientID:     provider.ClientID,
-			ClientSecret: provider.ClientSecret,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:  provider.AuthorizeURL,
-				TokenURL: provider.TokenURL,
-			},
-			RedirectURL: redirectURL,
-			Scopes:      provider.Scopes,
-		}
+		cfg := newOAuth2Config(deps, provider)
 
-		// Request additional scopes from query params if provided
+		// Request additional scopes from query params if provided.
 		if extraScopes := r.URL.Query()["scope"]; len(extraScopes) > 0 {
-			cfg.Scopes = append(cfg.Scopes, extraScopes...)
+			cfg.Scopes = deduplicateScopes(append(cfg.Scopes, extraScopes...))
 		}
 
 		authURL := cfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -232,17 +291,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		redirectURL := oauthCallbackURL(deps, providerID)
-		cfg := &oauth2.Config{
-			ClientID:     provider.ClientID,
-			ClientSecret: provider.ClientSecret,
-			Endpoint: oauth2.Endpoint{
-				AuthURL:  provider.AuthorizeURL,
-				TokenURL: provider.TokenURL,
-			},
-			RedirectURL: redirectURL,
-			Scopes:      provider.Scopes,
-		}
+		cfg := newOAuth2Config(deps, provider)
 
 		// Exchange authorization code for tokens.
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
@@ -444,7 +493,8 @@ func oauthCallbackURL(deps *Deps, providerID string) string {
 }
 
 // redirectToFrontend redirects the user's browser to the frontend settings
-// page with a status and optional error message as query parameters.
+// page with a status and optional error message as query parameters. The
+// oauth_tab param lets the frontend auto-navigate to the connections section.
 func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, provider, status, errMsg string) {
 	base := deps.OAuthRedirectBaseURL
 	if base == "" {
@@ -454,6 +504,7 @@ func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, prov
 	params := url.Values{}
 	params.Set("oauth_provider", provider)
 	params.Set("oauth_status", status)
+	params.Set("oauth_tab", "connections")
 	if errMsg != "" {
 		params.Set("oauth_error", errMsg)
 	}
