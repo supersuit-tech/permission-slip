@@ -96,9 +96,7 @@ SQL
 
 Permission Slip is an approval system — approvers need to know when something's waiting for them. Without notifications, they'd have to keep checking the web UI manually.
 
-This guide sets up **SMS** as the primary notification channel (works on every phone, no app install needed) and **Web Push** for desktop browser alerts.
-
-### Twilio SMS (primary — works on any phone)
+### Twilio SMS (works on any phone)
 
 SMS is the most reliable way to reach approvers on the go. It works on every phone — no app to install, no browser to keep open.
 
@@ -114,24 +112,7 @@ You'll add these values to your environment in the next step:
 | `TWILIO_AUTH_TOKEN` | Your Auth Token |
 | `TWILIO_FROM_NUMBER` | Your Twilio phone number (`+15551234567`) |
 
-### Web Push (desktop alerts — no signup needed)
-
-VAPID-based browser push notifications give you real-time desktop alerts without any external service. These are a self-generated key pair — completely free.
-
-```bash
-# Clone the repo (just to use the key generator)
-git clone https://github.com/supersuit-tech/permission-slip-web.git /tmp/permission-slip-web
-cd /tmp/permission-slip-web
-go run ./cmd/generate-vapid-keys
-```
-
-This outputs three values — `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`. Save them; you'll add them to your environment in the next step.
-
-> **Don't have Go installed yet?** You can generate VAPID keys with any Web Push library, or install Go first (see [Build from Source](#step-7-build-from-source-alternative) below) and come back to this step.
-
-### Email (optional)
-
-If you also want email notifications, the easiest option is **Gmail SMTP** (no signup — just generate an [App Password](https://myaccount.google.com/apppasswords)). See the [Self-Hosted Deployment Guide](deployment-self-hosted.md#email-notifications) for setup details.
+> For more notification options (web push, email, mobile app), see the [Self-Hosted Deployment Guide](deployment-self-hosted.md).
 
 ## Step 6: Deploy with Docker
 
@@ -158,11 +139,6 @@ INVITE_HMAC_KEY=generate-me
 TWILIO_ACCOUNT_SID=ACxxxx
 TWILIO_AUTH_TOKEN=your-auth-token
 TWILIO_FROM_NUMBER=+15551234567
-
-# Web Push — paste the values from Step 5
-VAPID_PUBLIC_KEY=your-vapid-public-key
-VAPID_PRIVATE_KEY=your-vapid-private-key
-VAPID_SUBJECT=mailto:you@example.com
 EOF
 ```
 
@@ -239,10 +215,6 @@ export VITE_SUPABASE_URL=https://abcdefgh.supabase.co
 export VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 make build
 
-# Generate VAPID keys for web push notifications
-make generate-vapid-keys
-# Save the output — add these to your .env file
-
 # Run (set all env vars, or use an .env file with source)
 export DATABASE_URL="postgres://permissionslip:changeme-use-a-real-password@localhost:5432/permissionslip?sslmode=disable"
 export SUPABASE_URL="https://abcdefgh.supabase.co"
@@ -252,9 +224,6 @@ export INVITE_HMAC_KEY="$(openssl rand -hex 32)"
 export TWILIO_ACCOUNT_SID="ACxxxx"
 export TWILIO_AUTH_TOKEN="your-auth-token"
 export TWILIO_FROM_NUMBER="+15551234567"
-export VAPID_PUBLIC_KEY="your-vapid-public-key"
-export VAPID_PRIVATE_KEY="your-vapid-private-key"
-export VAPID_SUBJECT="mailto:you@example.com"
 ./bin/server
 ```
 
@@ -389,5 +358,4 @@ Then use the IP directly (e.g., `http://192.168.1.100:8080`).
 
 - **Add agents:** Follow the [Agent Integration Guide](agents.md) to connect your first AI agent
 - **Custom connectors:** Add integrations beyond the built-in GitHub and Slack connectors — see [Custom Connectors](custom-connectors.md)
-- **Email notifications:** Add email as an additional notification channel — see [Self-Hosted Deployment Guide](deployment-self-hosted.md#email-notifications)
-- **Full configuration:** See the [Self-Hosted Deployment Guide](deployment-self-hosted.md) for all available options (error tracking, analytics, billing, etc.)
+- **More configuration:** For web push, email notifications, error tracking, analytics, and more — read the full [Self-Hosted Deployment Guide](deployment-self-hosted.md)
