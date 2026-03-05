@@ -125,7 +125,12 @@ func verifyOAuthState(deps *Deps, stateStr string) (userID, provider string, err
 // newOAuth2Config builds an oauth2.Config from a registry Provider and the
 // callback URL derived from deps. Centralises config construction so the
 // authorize and callback handlers stay in sync.
+//
+// The Scopes slice is defensively copied so callers can append without
+// mutating the provider's data (even though the registry already deep-copies).
 func newOAuth2Config(deps *Deps, provider oauth.Provider) *oauth2.Config {
+	scopes := make([]string, len(provider.Scopes))
+	copy(scopes, provider.Scopes)
 	return &oauth2.Config{
 		ClientID:     provider.ClientID,
 		ClientSecret: provider.ClientSecret,
@@ -134,8 +139,16 @@ func newOAuth2Config(deps *Deps, provider oauth.Provider) *oauth2.Config {
 			TokenURL: provider.TokenURL,
 		},
 		RedirectURL: oauthCallbackURL(deps, provider.ID),
-		Scopes:      provider.Scopes,
+		Scopes:      scopes,
 	}
+}
+
+// validProviderID checks that a provider path parameter matches the expected
+// format (lowercase alphanumeric, hyphens, underscores). Returns false for
+// empty or malformed IDs. This prevents attacker-controlled path segments
+// from appearing in redirect URLs or log messages without validation.
+func validProviderID(id string) bool {
+	return id != "" && oauth.ProviderIDPattern.MatchString(id)
 }
 
 // deduplicateScopes returns a new slice with duplicate scope strings removed,
@@ -188,8 +201,8 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		}
 
 		providerID := r.PathValue("provider")
-		if providerID == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "provider is required"))
+		if !validProviderID(providerID) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid provider ID"))
 			return
 		}
 
@@ -234,6 +247,10 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		}
 
 		providerID := r.PathValue("provider")
+		if !validProviderID(providerID) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid provider ID"))
+			return
+		}
 
 		// Check for error from provider (e.g. user denied consent)
 		if errCode := r.URL.Query().Get("error"); errCode != "" {
@@ -428,8 +445,8 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 
 		profile := Profile(r.Context())
 		providerID := r.PathValue("provider")
-		if providerID == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "provider is required"))
+		if !validProviderID(providerID) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid provider ID"))
 			return
 		}
 

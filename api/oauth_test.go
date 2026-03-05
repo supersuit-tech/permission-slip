@@ -334,6 +334,25 @@ func TestOAuthAuthorize_ProviderUnconfigured(t *testing.T) {
 	}
 }
 
+func TestOAuthAuthorize_InvalidProviderID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+	router := NewRouter(deps)
+
+	// Provider ID with uppercase and special chars should be rejected
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/INVALID%21/authorize", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestOAuthAuthorize_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
