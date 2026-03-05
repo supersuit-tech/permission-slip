@@ -24,6 +24,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
+	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
@@ -303,6 +304,22 @@ func main() {
 	loadExternalConnectors(registry, deps.DB)
 
 	deps.Connectors = registry
+
+	// Initialize OAuth provider registry with built-in providers (Google, Microsoft)
+	// and merge in any providers declared by connector manifests.
+	oauthRegistry := poauth.NewRegistryWithBuiltIns()
+	registerManifestOAuthProviders(oauthRegistry, registry)
+	deps.OAuthProviders = oauthRegistry
+	oauthIDs := oauthRegistry.IDs()
+	log.Printf("OAuth provider registry: %d provider(s) registered", len(oauthIDs))
+	for _, p := range oauthRegistry.List() {
+		if p.HasClientCredentials() {
+			log.Printf("  %s: configured (client credentials set)", p.ID)
+		} else {
+			log.Printf("  %s: registered (no client credentials — BYOA required)", p.ID)
+		}
+	}
+
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
 
 	// Parse allowed CORS origins from a comma-separated list.
@@ -542,6 +559,34 @@ func seedConnectorFromManifest(manifest *connectors.ConnectorManifest, d db.DBTX
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return db.UpsertConnectorFromManifest(ctx, d, manifest.ToDBManifest())
+}
+
+// registerManifestOAuthProviders iterates over all connectors in the registry
+// and registers any OAuth providers declared in their manifests. This allows
+// external connectors to introduce new OAuth providers (e.g. Salesforce) without
+// core code changes.
+func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connectors.Registry) {
+	for _, id := range connReg.IDs() {
+		conn, _ := connReg.Get(id)
+		mp, ok := conn.(connectors.ManifestProvider)
+		if !ok {
+			continue
+		}
+		manifest := mp.Manifest()
+		if len(manifest.OAuthProviders) == 0 {
+			continue
+		}
+		providers := make([]poauth.ManifestProvider, len(manifest.OAuthProviders))
+		for i, p := range manifest.OAuthProviders {
+			providers[i] = poauth.ManifestProvider{
+				ID:           p.ID,
+				AuthorizeURL: p.AuthorizeURL,
+				TokenURL:     p.TokenURL,
+				Scopes:       p.Scopes,
+			}
+		}
+		poauth.RegisterFromManifest(oauthReg, providers)
+	}
 }
 
 // validateConnectorRegistry logs warnings for mismatches between code-registered
