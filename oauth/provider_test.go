@@ -1,7 +1,10 @@
 package oauth
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -327,6 +330,95 @@ func TestRegistry_IDsSorted(t *testing.T) {
 	ids := r.IDs()
 	if !sort.StringsAreSorted(ids) {
 		t.Errorf("IDs() not sorted: %v", ids)
+	}
+}
+
+func TestProvider_StringRedactsSecret(t *testing.T) {
+	p := Provider{
+		ID:           "google",
+		ClientID:     "my-client-id",
+		ClientSecret: "super-secret-value",
+		Source:       SourceBuiltIn,
+	}
+	s := p.String()
+	if strings.Contains(s, "super-secret-value") {
+		t.Errorf("String() exposed ClientSecret: %s", s)
+	}
+	if !strings.Contains(s, "google") {
+		t.Errorf("String() should contain ID: %s", s)
+	}
+
+	// Also test GoString (used by %#v)
+	gs := fmt.Sprintf("%#v", p)
+	if strings.Contains(gs, "super-secret-value") {
+		t.Errorf("GoString() exposed ClientSecret: %s", gs)
+	}
+}
+
+func TestProvider_MarshalJSON_RedactsSecret(t *testing.T) {
+	p := Provider{
+		ID:           "google",
+		ClientID:     "my-client-id",
+		ClientSecret: "super-secret-value",
+		Source:       SourceBuiltIn,
+	}
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("MarshalJSON failed: %v", err)
+	}
+	s := string(data)
+	if strings.Contains(s, "super-secret-value") {
+		t.Errorf("MarshalJSON exposed ClientSecret: %s", s)
+	}
+	if !strings.Contains(s, "[REDACTED]") {
+		t.Errorf("MarshalJSON should contain [REDACTED]: %s", s)
+	}
+	// ClientID should still be visible.
+	if !strings.Contains(s, "my-client-id") {
+		t.Errorf("MarshalJSON should contain ClientID: %s", s)
+	}
+}
+
+func TestProvider_MarshalJSON_NoSecretOmitted(t *testing.T) {
+	p := Provider{
+		ID:     "google",
+		Source: SourceBuiltIn,
+	}
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("MarshalJSON failed: %v", err)
+	}
+	if strings.Contains(string(data), "REDACTED") {
+		t.Errorf("MarshalJSON should not include REDACTED when no secret: %s", string(data))
+	}
+}
+
+func TestTokenSet_StringRedactsTokens(t *testing.T) {
+	ts := TokenSet{
+		AccessToken:  "secret-access-token",
+		RefreshToken: "secret-refresh-token",
+		Scopes:       []string{"openid"},
+	}
+	s := ts.String()
+	if strings.Contains(s, "secret-access-token") {
+		t.Errorf("String() exposed AccessToken: %s", s)
+	}
+	if strings.Contains(s, "secret-refresh-token") {
+		t.Errorf("String() exposed RefreshToken: %s", s)
+	}
+}
+
+func TestTokenSet_MarshalJSON_Redacted(t *testing.T) {
+	ts := TokenSet{
+		AccessToken:  "secret-access-token",
+		RefreshToken: "secret-refresh-token",
+	}
+	data, err := json.Marshal(ts)
+	if err != nil {
+		t.Fatalf("MarshalJSON failed: %v", err)
+	}
+	if strings.Contains(string(data), "secret-access-token") {
+		t.Errorf("MarshalJSON exposed AccessToken: %s", string(data))
 	}
 }
 

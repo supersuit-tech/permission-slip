@@ -5,6 +5,7 @@
 package oauth
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -91,6 +92,67 @@ func (ts TokenSet) IsExpired() bool {
 // supplied.
 func (p Provider) HasClientCredentials() bool {
 	return p.ClientID != "" && p.ClientSecret != ""
+}
+
+// String returns a human-readable representation with secrets redacted.
+// This prevents accidental exposure of ClientSecret in logs or error messages.
+func (p Provider) String() string {
+	creds := "none"
+	if p.HasClientCredentials() {
+		creds = "configured"
+	}
+	return fmt.Sprintf("Provider{ID: %q, Source: %q, Credentials: %s}", p.ID, p.Source, creds)
+}
+
+// GoString redacts secrets in %#v formatting.
+func (p Provider) GoString() string {
+	return p.String()
+}
+
+// MarshalJSON serializes the provider with the ClientSecret redacted. This
+// prevents accidental exposure if a Provider value is included in an API
+// response, log entry, or error report. Code that needs the actual secret
+// should access the ClientSecret field directly.
+func (p Provider) MarshalJSON() ([]byte, error) {
+	type safeProvider struct {
+		ID           string         `json:"id"`
+		AuthorizeURL string         `json:"authorize_url"`
+		TokenURL     string         `json:"token_url"`
+		Scopes       []string       `json:"scopes,omitempty"`
+		ClientID     string         `json:"client_id,omitempty"`
+		ClientSecret string         `json:"client_secret,omitempty"`
+		Source       ProviderSource `json:"source"`
+	}
+	safe := safeProvider{
+		ID:           p.ID,
+		AuthorizeURL: p.AuthorizeURL,
+		TokenURL:     p.TokenURL,
+		Scopes:       p.Scopes,
+		ClientID:     p.ClientID,
+		Source:       p.Source,
+	}
+	if p.ClientSecret != "" {
+		safe.ClientSecret = "[REDACTED]"
+	}
+	return json.Marshal(safe)
+}
+
+// String returns a redacted representation of the token set. This prevents
+// accidental exposure of access/refresh tokens in logs or error messages.
+func (ts TokenSet) String() string {
+	return fmt.Sprintf("TokenSet{Scopes: %v, Expiry: %v, HasRefresh: %v}",
+		ts.Scopes, ts.Expiry, ts.RefreshToken != "")
+}
+
+// GoString redacts tokens in %#v formatting.
+func (ts TokenSet) GoString() string {
+	return ts.String()
+}
+
+// MarshalJSON redacts token values to prevent accidental serialization of
+// access/refresh tokens.
+func (ts TokenSet) MarshalJSON() ([]byte, error) {
+	return []byte(`"[REDACTED]"`), nil
 }
 
 // Registry is a thread-safe registry of OAuth providers. It is populated at
