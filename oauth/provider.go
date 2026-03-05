@@ -192,6 +192,10 @@ func (r *Registry) Register(p Provider) error {
 		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, providerIDPattern.String())
 	}
 
+	// Deep-copy the Scopes slice so the caller cannot mutate the registry's
+	// stored data after registration.
+	p.Scopes = copyStrings(p.Scopes)
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -215,7 +219,10 @@ func (r *Registry) Register(p Provider) error {
 			merged.TokenURL = p.TokenURL
 		}
 		if len(p.Scopes) > 0 {
-			merged.Scopes = p.Scopes
+			merged.Scopes = p.Scopes // Already deep-copied above.
+		} else {
+			// Deep-copy the existing scopes so the merged provider owns its data.
+			merged.Scopes = copyStrings(existing.Scopes)
 		}
 		r.providers[p.ID] = merged
 		return nil
@@ -225,23 +232,28 @@ func (r *Registry) Register(p Provider) error {
 	return nil
 }
 
-// Get returns the provider with the given ID. The second return value is false
-// if the provider is not registered.
+// Get returns a copy of the provider with the given ID. The second return
+// value is false if the provider is not registered. The returned Provider
+// has its own copy of slice fields — mutations do not affect the registry.
 func (r *Registry) Get(id string) (Provider, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	p, ok := r.providers[id]
+	if ok {
+		p.Scopes = copyStrings(p.Scopes)
+	}
 	return p, ok
 }
 
 // List returns all registered providers sorted by ID. The returned slice is a
-// snapshot; subsequent mutations to the registry are not reflected. Sorting
-// ensures deterministic output in logs and API responses.
+// deep snapshot — mutations to the returned providers do not affect the
+// registry. Sorting ensures deterministic output in logs and API responses.
 func (r *Registry) List() []Provider {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	out := make([]Provider, 0, len(r.providers))
 	for _, p := range r.providers {
+		p.Scopes = copyStrings(p.Scopes)
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -278,6 +290,17 @@ func (r *Registry) Remove(id string) error {
 	}
 	delete(r.providers, id)
 	return nil
+}
+
+// copyStrings returns a deep copy of a string slice. Returns nil if the input
+// is nil, preserving the distinction between nil and empty slices.
+func copyStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	cp := make([]string, len(s))
+	copy(cp, s)
+	return cp
 }
 
 // sourcePriority returns a numeric priority for a ProviderSource. Higher values

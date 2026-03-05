@@ -422,6 +422,85 @@ func TestTokenSet_MarshalJSON_Redacted(t *testing.T) {
 	}
 }
 
+func TestRegistry_ConcurrentAccess(t *testing.T) {
+	r := NewRegistry()
+	mustRegister(t, r, Provider{ID: "base", Source: SourceBuiltIn, Scopes: []string{"read"}})
+
+	// Run concurrent reads and writes to verify thread safety.
+	// With -race flag, the race detector will catch any data races.
+	done := make(chan struct{})
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			for j := 0; j < 100; j++ {
+				_ = r.List()
+				_, _ = r.Get("base")
+				_ = r.IDs()
+				_ = r.Len()
+			}
+		}()
+	}
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+}
+
+func TestRegistry_GetReturnsCopy(t *testing.T) {
+	r := NewRegistry()
+	mustRegister(t, r, Provider{
+		ID:     "test",
+		Source: SourceBuiltIn,
+		Scopes: []string{"openid", "email"},
+	})
+
+	// Get a provider and mutate its scopes.
+	got, _ := r.Get("test")
+	got.Scopes[0] = "MUTATED"
+
+	// The registry's copy should be unaffected.
+	original, _ := r.Get("test")
+	if original.Scopes[0] == "MUTATED" {
+		t.Error("Get() returned a reference to the registry's data — mutations leaked back")
+	}
+}
+
+func TestRegistry_ListReturnsCopies(t *testing.T) {
+	r := NewRegistry()
+	mustRegister(t, r, Provider{
+		ID:     "test",
+		Source: SourceBuiltIn,
+		Scopes: []string{"openid"},
+	})
+
+	list := r.List()
+	list[0].Scopes[0] = "MUTATED"
+
+	// The registry's copy should be unaffected.
+	original, _ := r.Get("test")
+	if original.Scopes[0] == "MUTATED" {
+		t.Error("List() returned references to the registry's data — mutations leaked back")
+	}
+}
+
+func TestRegistry_RegisterCopiesScopes(t *testing.T) {
+	r := NewRegistry()
+	scopes := []string{"openid", "email"}
+	mustRegister(t, r, Provider{
+		ID:     "test",
+		Source: SourceBuiltIn,
+		Scopes: scopes,
+	})
+
+	// Mutate the original slice.
+	scopes[0] = "MUTATED"
+
+	// The registry's copy should be unaffected.
+	got, _ := r.Get("test")
+	if got.Scopes[0] == "MUTATED" {
+		t.Error("Register() did not deep-copy Scopes — caller mutation affected registry")
+	}
+}
+
 // mustRegister is a test helper that registers a provider and fails the test on error.
 func mustRegister(t *testing.T, r *Registry, p Provider) {
 	t.Helper()
