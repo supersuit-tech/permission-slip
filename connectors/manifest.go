@@ -223,6 +223,13 @@ func (m *ConnectorManifest) Validate() error {
 		}
 	}
 
+	// Collect all declared OAuth provider IDs (from OAuthProviders section)
+	// plus well-known built-in providers that don't need to be declared.
+	declaredProviders := map[string]bool{
+		"google":    true,
+		"microsoft": true,
+	}
+
 	// Validate OAuth providers (optional, used by external connectors).
 	providerIDs := make(map[string]bool, len(m.OAuthProviders))
 	for i, p := range m.OAuthProviders {
@@ -254,6 +261,15 @@ func (m *ConnectorManifest) Validate() error {
 		}
 		if tu.Scheme != "https" {
 			return fmt.Errorf("manifest validation: oauth_providers[%d].token_url must use https scheme", i)
+		}
+
+		declaredProviders[p.ID] = true
+	}
+
+	// Cross-reference: verify oauth_provider in credentials references a known provider.
+	for i, c := range m.RequiredCredentials {
+		if c.AuthType == "oauth2" && !declaredProviders[c.OAuthProvider] {
+			return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider %q is not a built-in provider and not declared in oauth_providers", i, c.OAuthProvider)
 		}
 	}
 

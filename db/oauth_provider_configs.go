@@ -18,6 +18,7 @@ type OAuthProviderConfig struct {
 	ClientIDVaultID      string
 	ClientSecretVaultID  string
 	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // CreateOAuthProviderConfigParams holds the parameters for inserting a new provider config.
@@ -48,7 +49,7 @@ const (
 // ListOAuthProviderConfigsByUser returns all OAuth provider configs for the given user.
 func ListOAuthProviderConfigsByUser(ctx context.Context, db DBTX, userID string) ([]OAuthProviderConfig, error) {
 	rows, err := db.Query(ctx, `
-		SELECT id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at
+		SELECT id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at, updated_at
 		FROM oauth_provider_configs
 		WHERE user_id = $1
 		ORDER BY created_at DESC`, userID)
@@ -60,7 +61,7 @@ func ListOAuthProviderConfigsByUser(ctx context.Context, db DBTX, userID string)
 	var configs []OAuthProviderConfig
 	for rows.Next() {
 		var c OAuthProviderConfig
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		configs = append(configs, c)
@@ -73,11 +74,11 @@ func ListOAuthProviderConfigsByUser(ctx context.Context, db DBTX, userID string)
 func GetOAuthProviderConfig(ctx context.Context, db DBTX, userID, provider string) (*OAuthProviderConfig, error) {
 	var c OAuthProviderConfig
 	err := db.QueryRow(ctx, `
-		SELECT id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at
+		SELECT id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at, updated_at
 		FROM oauth_provider_configs
 		WHERE user_id = $1 AND provider = $2`,
 		userID, provider,
-	).Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt)
+	).Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -93,9 +94,9 @@ func CreateOAuthProviderConfig(ctx context.Context, db DBTX, p CreateOAuthProvid
 	err := db.QueryRow(ctx, `
 		INSERT INTO oauth_provider_configs (id, user_id, provider, client_id_vault_id, client_secret_vault_id)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at`,
+		RETURNING id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at, updated_at`,
 		p.ID, p.UserID, p.Provider, p.ClientIDVaultID, p.ClientSecretVaultID,
-	).Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt)
+	).Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {

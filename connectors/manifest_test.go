@@ -207,6 +207,59 @@ func TestParseManifest_OAuthProviders(t *testing.T) {
 	}
 }
 
+func TestParseManifest_OAuthProviderCrossReference(t *testing.T) {
+	// Built-in providers (google, microsoft) should be accepted without declaration.
+	t.Run("built-in provider accepted", func(t *testing.T) {
+		input := `{
+			"id": "x",
+			"name": "X",
+			"actions": [{"action_type": "x.a", "name": "A"}],
+			"required_credentials": [
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "microsoft"}
+			]
+		}`
+		_, err := ParseManifest([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// Custom provider declared in oauth_providers should be accepted.
+	t.Run("declared custom provider accepted", func(t *testing.T) {
+		input := `{
+			"id": "x",
+			"name": "X",
+			"actions": [{"action_type": "x.a", "name": "A"}],
+			"required_credentials": [
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "hubspot"}
+			],
+			"oauth_providers": [
+				{"id": "hubspot", "authorize_url": "https://app.hubspot.com/oauth/authorize", "token_url": "https://api.hubapi.com/oauth/v1/token"}
+			]
+		}`
+		_, err := ParseManifest([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// Unknown provider not declared should fail.
+	t.Run("undeclared custom provider rejected", func(t *testing.T) {
+		input := `{
+			"id": "x",
+			"name": "X",
+			"actions": [{"action_type": "x.a", "name": "A"}],
+			"required_credentials": [
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "hubspot"}
+			]
+		}`
+		_, err := ParseManifest([]byte(input))
+		if err == nil {
+			t.Error("expected error for undeclared oauth_provider, got nil")
+		}
+	})
+}
+
 func TestParseManifest_OAuthProviderValidationErrors(t *testing.T) {
 	base := `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"oauth_providers":[%s]}`
 

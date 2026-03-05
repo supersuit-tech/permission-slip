@@ -9,6 +9,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// OAuth connection status values. Must match the CHECK constraint on
+// oauth_connections.status in the migration.
+const (
+	OAuthStatusActive      = "active"
+	OAuthStatusNeedsReauth = "needs_reauth"
+	OAuthStatusRevoked     = "revoked"
+)
+
 // OAuthConnection represents a row from the oauth_connections table.
 type OAuthConnection struct {
 	ID                   string
@@ -50,12 +58,24 @@ const (
 	OAuthConnectionErrDuplicate                        // unique (user_id, provider) violation
 )
 
+// oauthConnectionColumns is the shared SELECT column list for oauth_connections queries.
+const oauthConnectionColumns = `id, user_id, provider, access_token_vault_id, refresh_token_vault_id,
+		       scopes, token_expiry, status, created_at, updated_at`
+
+// scanOAuthConnection scans an OAuthConnection from a row scanner (pgx.Row or pgx.Rows).
+func scanOAuthConnection(scan func(dest ...any) error) (OAuthConnection, error) {
+	var c OAuthConnection
+	err := scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
+		&c.RefreshTokenVaultID, &c.Scopes, &c.TokenExpiry, &c.Status,
+		&c.CreatedAt, &c.UpdatedAt)
+	return c, err
+}
+
 // ListOAuthConnectionsByUser returns all OAuth connections for the given user,
 // ordered by created_at descending (newest first). Tokens are never returned.
 func ListOAuthConnectionsByUser(ctx context.Context, db DBTX, userID string) ([]OAuthConnection, error) {
 	rows, err := db.Query(ctx, `
-		SELECT id, user_id, provider, access_token_vault_id, refresh_token_vault_id,
-		       scopes, token_expiry, status, created_at, updated_at
+		SELECT `+oauthConnectionColumns+`
 		FROM oauth_connections
 		WHERE user_id = $1
 		ORDER BY created_at DESC`, userID)
@@ -66,10 +86,8 @@ func ListOAuthConnectionsByUser(ctx context.Context, db DBTX, userID string) ([]
 
 	var conns []OAuthConnection
 	for rows.Next() {
-		var c OAuthConnection
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
-			&c.RefreshTokenVaultID, &c.Scopes, &c.TokenExpiry, &c.Status,
-			&c.CreatedAt, &c.UpdatedAt); err != nil {
+		c, err := scanOAuthConnection(rows.Scan)
+		if err != nil {
 			return nil, err
 		}
 		conns = append(conns, c)
@@ -80,16 +98,13 @@ func ListOAuthConnectionsByUser(ctx context.Context, db DBTX, userID string) ([]
 // GetOAuthConnectionByProvider returns the OAuth connection for a given user and provider.
 // Returns nil if no connection exists.
 func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider string) (*OAuthConnection, error) {
-	var c OAuthConnection
-	err := db.QueryRow(ctx, `
-		SELECT id, user_id, provider, access_token_vault_id, refresh_token_vault_id,
-		       scopes, token_expiry, status, created_at, updated_at
+	row := db.QueryRow(ctx, `
+		SELECT `+oauthConnectionColumns+`
 		FROM oauth_connections
 		WHERE user_id = $1 AND provider = $2`,
 		userID, provider,
-	).Scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
-		&c.RefreshTokenVaultID, &c.Scopes, &c.TokenExpiry, &c.Status,
-		&c.CreatedAt, &c.UpdatedAt)
+	)
+	c, err := scanOAuthConnection(row.Scan)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -103,21 +118,35 @@ func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider
 // Returns a *OAuthConnectionError with code OAuthConnectionErrDuplicate if
 // the (user_id, provider) unique constraint is violated.
 func CreateOAuthConnection(ctx context.Context, db DBTX, p CreateOAuthConnectionParams) (*OAuthConnection, error) {
-	var c OAuthConnection
-	err := db.QueryRow(ctx, `
+	row := db.QueryRow(ctx, `
 		INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, refresh_token_vault_id, scopes, token_expiry)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, user_id, provider, access_token_vault_id, refresh_token_vault_id,
-		          scopes, token_expiry, status, created_at, updated_at`,
+		RETURNING `+oauthConnectionColumns,
 		p.ID, p.UserID, p.Provider, p.AccessTokenVaultID, p.RefreshTokenVaultID, p.Scopes, p.TokenExpiry,
-	).Scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
-		&c.RefreshTokenVaultID, &c.Scopes, &c.TokenExpiry, &c.Status,
-		&c.CreatedAt, &c.UpdatedAt)
+	)
+	c, err := scanOAuthConnection(row.Scan)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
 			return nil, &OAuthConnectionError{Code: OAuthConnectionErrDuplicate, Message: "OAuth connection already exists for this provider"}
 		}
+		return nil, err
+	}
+	return &c, nil
+}
+
+// GetOAuthConnectionByID returns a single OAuth connection by its ID.
+// Returns nil if not found. Useful for token refresh and status update flows.
+func GetOAuthConnectionByID(ctx context.Context, db DBTX, id string) (*OAuthConnection, error) {
+	row := db.QueryRow(ctx, `
+		SELECT `+oauthConnectionColumns+`
+		FROM oauth_connections
+		WHERE id = $1`, id)
+	c, err := scanOAuthConnection(row.Scan)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -131,10 +160,10 @@ func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id string, access
 		SET access_token_vault_id = $2,
 		    refresh_token_vault_id = $3,
 		    token_expiry = $4,
-		    status = 'active',
+		    status = $5,
 		    updated_at = now()
 		WHERE id = $1`,
-		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiry)
+		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiry, OAuthStatusActive)
 	if err != nil {
 		return err
 	}
