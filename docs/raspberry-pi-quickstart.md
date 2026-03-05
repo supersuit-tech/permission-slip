@@ -13,13 +13,14 @@ Get Permission Slip running on a Raspberry Pi in under 30 minutes. This is an op
 
 ### Accounts to Sign Up For
 
-You only need **one** external account:
+You need **two** external accounts:
 
 | Service | Why | Cost |
 |---|---|---|
 | [Supabase](https://supabase.com) | User authentication (login, MFA, JWTs) | Free tier is sufficient |
+| [Twilio](https://www.twilio.com) | SMS notifications for approval requests | Pay-as-you-go (~$0.0079/SMS) |
 
-That's it. PostgreSQL runs locally on the Pi — no managed database needed.
+Twilio ensures approvers get notified on their phone immediately — even without the app installed, without a browser open, and regardless of iOS vs Android. PostgreSQL runs locally on the Pi — no managed database needed.
 
 ## Step 1: Set Up Your Raspberry Pi
 
@@ -91,12 +92,84 @@ SQL
    - **Authentication > URL Configuration > Redirect URLs:** Add the same URL
    - **Authentication > Email:** Ensure email sign-in is enabled
 
-## Step 5: Deploy with Docker
+## Step 5: Set Up Notifications
+
+Permission Slip is an approval system — approvers need to know when something's waiting for them. Without notifications, they'd have to keep checking the web UI manually.
+
+This guide sets up **SMS** as the primary notification channel (works on every phone, no app install needed) and **Web Push** for desktop browser alerts.
+
+### Twilio SMS (primary — works on any phone)
+
+SMS is the most reliable way to reach approvers on the go. It works on every phone — no app to install, no browser to keep open.
+
+1. Sign up at [twilio.com](https://www.twilio.com) (pay-as-you-go, ~$0.0079/SMS in the US)
+2. From the Twilio console, get your **Account SID** and **Auth Token**
+3. Buy a phone number (or use the trial number to test)
+
+You'll add these values to your environment in the next step:
+
+| Variable | Value |
+|---|---|
+| `TWILIO_ACCOUNT_SID` | Your Account SID (`ACxxxx`) |
+| `TWILIO_AUTH_TOKEN` | Your Auth Token |
+| `TWILIO_FROM_NUMBER` | Your Twilio phone number (`+15551234567`) |
+
+### Web Push (desktop alerts — no signup needed)
+
+VAPID-based browser push notifications give you real-time desktop alerts without any external service. These are a self-generated key pair — completely free.
+
+```bash
+# Clone the repo (just to use the key generator)
+git clone https://github.com/supersuit-tech/permission-slip-web.git /tmp/permission-slip-web
+cd /tmp/permission-slip-web
+go run ./cmd/generate-vapid-keys
+```
+
+This outputs three values — `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`. Save them; you'll add them to your environment in the next step.
+
+> **Don't have Go installed yet?** You can generate VAPID keys with any Web Push library, or install Go first (see [Build from Source](#step-7-build-from-source-alternative) below) and come back to this step.
+
+### Email (optional)
+
+If you also want email notifications, the easiest option is **Gmail SMTP** (no signup — just generate an [App Password](https://myaccount.google.com/apppasswords)). See the [Self-Hosted Deployment Guide](deployment-self-hosted.md#email-notifications) for setup details.
+
+## Step 6: Deploy with Docker
 
 Create a directory for your deployment:
 
 ```bash
 mkdir ~/permission-slip && cd ~/permission-slip
+```
+
+Create a `.env` file with your secrets:
+
+```bash
+cat > .env <<'EOF'
+# Required
+DATABASE_URL=postgres://permissionslip:changeme-use-a-real-password@host.docker.internal:5432/permissionslip?sslmode=disable
+SUPABASE_URL=https://abcdefgh.supabase.co
+BASE_URL=http://raspberrypi.local:8080
+ALLOWED_ORIGINS=http://raspberrypi.local:8080
+
+# Generate with: openssl rand -hex 32
+INVITE_HMAC_KEY=generate-me
+
+# SMS (Twilio) — paste your values from Step 5
+TWILIO_ACCOUNT_SID=ACxxxx
+TWILIO_AUTH_TOKEN=your-auth-token
+TWILIO_FROM_NUMBER=+15551234567
+
+# Web Push — paste the values from Step 5
+VAPID_PUBLIC_KEY=your-vapid-public-key
+VAPID_PRIVATE_KEY=your-vapid-private-key
+VAPID_SUBJECT=mailto:you@example.com
+EOF
+```
+
+Fill in the real values, then generate the HMAC key:
+
+```bash
+sed -i "s/INVITE_HMAC_KEY=generate-me/INVITE_HMAC_KEY=$(openssl rand -hex 32)/" .env
 ```
 
 Create a `docker-compose.yml`:
@@ -113,12 +186,7 @@ services:
     #     VITE_SUPABASE_PUBLISHABLE_KEY: your-publishable-key
     ports:
       - "8080:8080"
-    environment:
-      DATABASE_URL: postgres://permissionslip:changeme-use-a-real-password@host.docker.internal:5432/permissionslip?sslmode=disable
-      SUPABASE_URL: https://abcdefgh.supabase.co
-      BASE_URL: http://raspberrypi.local:8080
-      ALLOWED_ORIGINS: http://raspberrypi.local:8080
-      INVITE_HMAC_KEY: ${INVITE_HMAC_KEY}
+    env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -131,14 +199,7 @@ services:
 
 > **Note:** `host.docker.internal` lets the container reach PostgreSQL running on the host. The `extra_hosts` line makes this work on Linux.
 
-Create a `.env` file with your secrets:
-
-```bash
-# Generate an HMAC key for invite codes
-echo "INVITE_HMAC_KEY=$(openssl rand -hex 32)" > .env
-```
-
-Edit the `docker-compose.yml` to fill in your actual Supabase URL and publishable key, then start it:
+Start it up:
 
 ```bash
 docker compose up -d
@@ -154,7 +215,7 @@ curl http://localhost:8080/api/health
 # Should return 200 OK
 ```
 
-## Step 6: Build from Source (Alternative)
+## Step 7: Build from Source (Alternative)
 
 If you prefer to build and run the binary directly instead of Docker:
 
@@ -178,18 +239,28 @@ export VITE_SUPABASE_URL=https://abcdefgh.supabase.co
 export VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 make build
 
-# Run
+# Generate VAPID keys for web push notifications
+make generate-vapid-keys
+# Save the output — add these to your .env file
+
+# Run (set all env vars, or use an .env file with source)
 export DATABASE_URL="postgres://permissionslip:changeme-use-a-real-password@localhost:5432/permissionslip?sslmode=disable"
 export SUPABASE_URL="https://abcdefgh.supabase.co"
 export BASE_URL="http://raspberrypi.local:8080"
 export ALLOWED_ORIGINS="http://raspberrypi.local:8080"
 export INVITE_HMAC_KEY="$(openssl rand -hex 32)"
+export TWILIO_ACCOUNT_SID="ACxxxx"
+export TWILIO_AUTH_TOKEN="your-auth-token"
+export TWILIO_FROM_NUMBER="+15551234567"
+export VAPID_PUBLIC_KEY="your-vapid-public-key"
+export VAPID_PRIVATE_KEY="your-vapid-private-key"
+export VAPID_SUBJECT="mailto:you@example.com"
 ./bin/server
 ```
 
 > **Tip:** To keep the server running after you close the terminal, use a systemd service. See [Running as a systemd service](#running-as-a-systemd-service) below.
 
-## Step 7: Access Permission Slip
+## Step 8: Access Permission Slip
 
 Open your browser and go to:
 
@@ -262,24 +333,6 @@ sudo tailscale up
 
 Access via your Tailscale IP or MagicDNS hostname. No config changes needed since it's a private network.
 
-## Optional: Enable Notifications
-
-Push notifications are optional but recommended for the full approval flow experience.
-
-**Web Push (no signup needed):**
-
-```bash
-# If using build-from-source, generate VAPID keys:
-cd ~/permission-slip-web
-make generate-vapid-keys
-# Add the output to your .env file
-```
-
-**Email notifications (pick one):**
-
-- **Gmail SMTP** (free, easiest for personal use): Use an [App Password](https://myaccount.google.com/apppasswords) and set `NOTIFICATION_EMAIL_PROVIDER=smtp`, `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USERNAME=you@gmail.com`, `SMTP_PASSWORD=your-app-password`
-- **SendGrid** (free tier: 100 emails/day): Sign up at [sendgrid.com](https://sendgrid.com), set `NOTIFICATION_EMAIL_PROVIDER=twilio-sendgrid` and `SENDGRID_API_KEY`
-
 ## Troubleshooting
 
 **Docker container can't connect to PostgreSQL:**
@@ -336,5 +389,5 @@ Then use the IP directly (e.g., `http://192.168.1.100:8080`).
 
 - **Add agents:** Follow the [Agent Integration Guide](agents.md) to connect your first AI agent
 - **Custom connectors:** Add integrations beyond the built-in GitHub and Slack connectors — see [Custom Connectors](custom-connectors.md)
-- **Mobile app:** Install the Permission Slip mobile app for push notification approvals from your phone
-- **Full configuration:** See the [Self-Hosted Deployment Guide](deployment-self-hosted.md) for all available options (SMS, error tracking, analytics, billing, etc.)
+- **Email notifications:** Add email as an additional notification channel — see [Self-Hosted Deployment Guide](deployment-self-hosted.md#email-notifications)
+- **Full configuration:** See the [Self-Hosted Deployment Guide](deployment-self-hosted.md) for all available options (error tracking, analytics, billing, etc.)
