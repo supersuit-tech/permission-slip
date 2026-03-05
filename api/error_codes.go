@@ -60,6 +60,7 @@ const (
 	ErrOAuthConnectionExists     ErrorCode = "oauth_connection_exists"
 	ErrOAuthStateMismatch        ErrorCode = "oauth_state_mismatch"
 	ErrOAuthExchangeFailed       ErrorCode = "oauth_exchange_failed"
+	ErrOAuthRefreshFailed        ErrorCode = "oauth_refresh_failed"
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )
