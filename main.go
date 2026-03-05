@@ -324,6 +324,8 @@ func main() {
 	oauthRegistry := poauth.NewRegistryWithBuiltIns()
 	registerManifestOAuthProviders(oauthRegistry, registry)
 	deps.OAuthProviders = oauthRegistry
+	deps.OAuthRedirectBaseURL = os.Getenv("OAUTH_REDIRECT_BASE_URL")
+	deps.OAuthStateSecret = os.Getenv("OAUTH_STATE_SECRET")
 	log.Printf("OAuth provider registry: %d provider(s) registered", oauthRegistry.Len())
 	for _, p := range oauthRegistry.List() {
 		if p.HasClientCredentials() {

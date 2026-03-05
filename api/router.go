@@ -28,6 +28,8 @@ type Deps struct {
 	VAPIDPublicKey        string               // VAPID public key for Web Push; empty if not configured
 	Connectors            *connectors.Registry // connector execution registry; nil means no connectors are available
 	OAuthProviders        *oauth.Registry      // OAuth provider registry; nil means OAuth is not available
+	OAuthRedirectBaseURL  string               // Public base URL for OAuth callbacks (e.g. "https://app.permissionslip.dev"); falls back to BaseURL
+	OAuthStateSecret      string               // HMAC-SHA256 secret for signing OAuth CSRF state tokens; if empty, falls back to SupabaseJWTSecret
 	Stripe                *pstripe.Client      // Stripe API client; nil when billing is disabled or Stripe keys not set
 	BillingEnabled        bool                 // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
 	DevMode               bool                 // true when MODE=development; disables rate limiting
@@ -75,6 +77,7 @@ func NewRouter(deps *Deps) http.Handler {
 	RegisterExpoPushTokenRoutes(mux, deps)
 	RegisterStandingApprovalRoutes(mux, deps)
 	RegisterApprovalEventRoutes(mux, deps)
+	RegisterOAuthRoutes(mux, deps)
 
 	// Billing routes are always registered (handlers check deps.BillingEnabled
 	// and deps.Stripe internally) so the OpenAPI spec can document them.

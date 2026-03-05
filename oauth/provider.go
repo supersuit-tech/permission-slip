@@ -187,9 +187,10 @@ func NewRegistry() *Registry {
 	return &Registry{providers: make(map[string]Provider)}
 }
 
-// providerIDPattern matches valid provider IDs: lowercase alphanumeric, hyphens,
+// ProviderIDPattern matches valid provider IDs: lowercase alphanumeric, hyphens,
 // and underscores. Mirrors the connector manifest ID pattern for consistency.
-var providerIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
+// Exported so API handlers can validate path parameters before use.
+var ProviderIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
 
 // Register adds or replaces a provider in the registry. If a provider with the
 // same ID already exists, it is replaced only if the new source has equal or
@@ -206,8 +207,8 @@ func (r *Registry) Register(p Provider) error {
 	if p.ID == "" {
 		return fmt.Errorf("oauth provider ID is required")
 	}
-	if !providerIDPattern.MatchString(p.ID) {
-		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, providerIDPattern.String())
+	if !ProviderIDPattern.MatchString(p.ID) {
+		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, ProviderIDPattern.String())
 	}
 
 	// Deep-copy the Scopes slice so the caller cannot mutate the registry's

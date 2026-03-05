@@ -53,6 +53,13 @@ const (
 	ErrDowngradeLimitExceeded   ErrorCode = "downgrade_limit_exceeded"
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
 	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
+	// OAuth
+	ErrOAuthProviderNotFound     ErrorCode = "oauth_provider_not_found"
+	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"
+	ErrOAuthConnectionNotFound   ErrorCode = "oauth_connection_not_found"
+	ErrOAuthConnectionExists     ErrorCode = "oauth_connection_exists"
+	ErrOAuthStateMismatch        ErrorCode = "oauth_state_mismatch"
+	ErrOAuthExchangeFailed       ErrorCode = "oauth_exchange_failed"
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )
