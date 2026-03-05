@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -153,8 +154,9 @@ func GetOAuthConnectionByID(ctx context.Context, db DBTX, id string) (*OAuthConn
 }
 
 // UpdateOAuthConnectionTokens updates the vault secret IDs and expiry for a connection
-// after a successful token refresh.
-func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id string, accessTokenVaultID string, refreshTokenVaultID *string, tokenExpiry *time.Time) error {
+// after a successful token refresh. The userID parameter ensures the caller
+// owns the connection (defense-in-depth against horizontal privilege escalation).
+func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id, userID string, accessTokenVaultID string, refreshTokenVaultID *string, tokenExpiry *time.Time) error {
 	result, err := db.Exec(ctx, `
 		UPDATE oauth_connections
 		SET access_token_vault_id = $2,
@@ -162,8 +164,8 @@ func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id string, access
 		    token_expiry = $4,
 		    status = $5,
 		    updated_at = now()
-		WHERE id = $1`,
-		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiry, OAuthStatusActive)
+		WHERE id = $1 AND user_id = $6`,
+		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiry, OAuthStatusActive, userID)
 	if err != nil {
 		return err
 	}
@@ -173,13 +175,26 @@ func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id string, access
 	return nil
 }
 
+// validOAuthStatuses is the set of valid OAuth connection statuses.
+// Must match the CHECK constraint on oauth_connections.status.
+var validOAuthStatuses = map[string]bool{
+	OAuthStatusActive:      true,
+	OAuthStatusNeedsReauth: true,
+	OAuthStatusRevoked:     true,
+}
+
 // UpdateOAuthConnectionStatus updates the status of an OAuth connection.
-func UpdateOAuthConnectionStatus(ctx context.Context, db DBTX, id, status string) error {
+// Returns an error if the status value is not one of the valid constants.
+// The userID parameter ensures the caller owns the connection.
+func UpdateOAuthConnectionStatus(ctx context.Context, db DBTX, id, userID, status string) error {
+	if !validOAuthStatuses[status] {
+		return fmt.Errorf("invalid OAuth connection status %q", status)
+	}
 	result, err := db.Exec(ctx, `
 		UPDATE oauth_connections
 		SET status = $2, updated_at = now()
-		WHERE id = $1`,
-		id, status)
+		WHERE id = $1 AND user_id = $3`,
+		id, status, userID)
 	if err != nil {
 		return err
 	}
