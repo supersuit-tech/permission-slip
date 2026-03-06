@@ -20,6 +20,21 @@ func validateEmail(field string, idx int, addr string) error {
 	return nil
 }
 
+// validateGraphID rejects Graph API resource identifiers (team IDs, channel IDs,
+// message IDs, etc.) that contain path traversal sequences or path separators.
+// These values are interpolated into URL paths, so we must ensure they cannot
+// manipulate the request target. Microsoft Graph IDs are opaque strings (typically
+// UUIDs or base64-encoded values) that never contain slashes or dot-dot sequences.
+func validateGraphID(field, value string) error {
+	if value == "" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", field)}
+	}
+	if strings.Contains(value, "..") || strings.Contains(value, "/") || strings.Contains(value, "\\") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain path separators or traversal sequences", field)}
+	}
+	return nil
+}
+
 // detectContentType returns "HTML" if the body contains HTML tags, otherwise "Text".
 func detectContentType(body string) string {
 	if strings.Contains(body, "<") && strings.Contains(body, ">") {
