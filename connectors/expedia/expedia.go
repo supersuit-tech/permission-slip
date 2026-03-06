@@ -112,24 +112,32 @@ func (c *ExpediaConnector) signature(apiKey, secret string) (sig string, timesta
 // customerIP is the end-user's IP address, required by Expedia for fraud
 // prevention. Pass defaultCustomerIP when the real IP is unavailable.
 func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, customerIP string, reqBody, respBody interface{}) error {
+	_, err := c.doWithHeaders(ctx, creds, method, path, customerIP, reqBody, respBody)
+	return err
+}
+
+// doWithHeaders is like do but also returns response headers. Used by actions
+// that need to inspect headers (e.g., search_hotels reads the Link header
+// for pagination).
+func (c *ExpediaConnector) doWithHeaders(ctx context.Context, creds connectors.Credentials, method, path string, customerIP string, reqBody, respBody interface{}) (http.Header, error) {
 	apiKey, _ := creds.Get("api_key")
 	secret, _ := creds.Get("secret")
 	if apiKey == "" || secret == "" {
-		return &connectors.ValidationError{Message: "api_key and secret credentials are required"}
+		return nil, &connectors.ValidationError{Message: "api_key and secret credentials are required"}
 	}
 
 	var body io.Reader
 	if reqBody != nil {
 		payload, err := json.Marshal(reqBody)
 		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
+			return nil, fmt.Errorf("marshaling request body: %w", err)
 		}
 		body = bytes.NewReader(payload)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
 	// Set Expedia Rapid signature auth header.
@@ -147,28 +155,28 @@ func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials,
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Expedia Rapid API request timed out: %v", err)}
+			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Expedia Rapid API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Expedia Rapid API request canceled"}
+			return nil, &connectors.TimeoutError{Message: "Expedia Rapid API request canceled"}
 		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Expedia Rapid API request failed: %v", err)}
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Expedia Rapid API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
 	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
-		return err
+		return nil, err
 	}
 
 	if respBody != nil {
 		if err := json.Unmarshal(respBytes, respBody); err != nil {
-			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Expedia Rapid response: %v", err)}
+			return nil, &connectors.ExternalError{Message: fmt.Sprintf("parsing Expedia Rapid response: %v", err)}
 		}
 	}
-	return nil
+	return resp.Header, nil
 }
