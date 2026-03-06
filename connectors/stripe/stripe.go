@@ -17,7 +17,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
@@ -30,8 +29,8 @@ const (
 	credKeyAPIKey  = "api_key"
 
 	// Stripe secret keys always start with one of these prefixes.
-	livKeyPrefix = "sk_live_"
-	testKeyPrefix = "sk_test_"
+	liveKeyPrefix  = "sk_live_"
+	testKeyPrefix  = "sk_test_"
 	rTestKeyPrefix = "rk_test_"
 	rLiveKeyPrefix = "rk_live_"
 
@@ -56,6 +55,9 @@ const (
 	// See https://docs.stripe.com/api/versioning
 	apiVersion = "2025-12-18.acacia"
 )
+
+// validKeyPrefixes lists all recognized Stripe secret key prefixes.
+var validKeyPrefixes = []string{liveKeyPrefix, testKeyPrefix, rLiveKeyPrefix, rTestKeyPrefix}
 
 // StripeConnector owns the shared HTTP client and base URL used by all
 // Stripe actions. Actions hold a pointer back to the connector to access
@@ -109,7 +111,7 @@ func (c *StripeConnector) ValidateCredentials(_ context.Context, creds connector
 // hasValidPrefix reports whether key starts with a recognized Stripe
 // secret key prefix.
 func hasValidPrefix(key string) bool {
-	for _, prefix := range []string{livKeyPrefix, testKeyPrefix, rLiveKeyPrefix, rTestKeyPrefix} {
+	for _, prefix := range validKeyPrefixes {
 		if strings.HasPrefix(key, prefix) {
 			return true
 		}
@@ -203,73 +205,6 @@ func (c *StripeConnector) doPost(ctx context.Context, creds connectors.Credentia
 	return c.do(ctx, creds, http.MethodPost, path, params, respBody, idempotencyKey)
 }
 
-// stripeError represents the error envelope returned by the Stripe API.
-// See https://docs.stripe.com/api/errors
-type stripeError struct {
-	Error struct {
-		Type    string `json:"type"`
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
-// checkResponse inspects the HTTP status code and Stripe error body, returning
-// an appropriate typed error for non-success responses.
-func checkResponse(statusCode int, header http.Header, body []byte) error {
-	if statusCode >= 200 && statusCode < 300 {
-		return nil
-	}
-
-	// Try to extract Stripe's structured error.
-	var se stripeError
-	msg := truncate(string(body), maxErrorMessageBytes)
-	if json.Unmarshal(body, &se) == nil && se.Error.Message != "" {
-		msg = se.Error.Message
-		// Include the error code when available (e.g., "card_declined",
-		// "expired_card") — useful for debugging and action-level handling.
-		if se.Error.Code != "" {
-			msg = fmt.Sprintf("%s (code: %s)", msg, se.Error.Code)
-		}
-	}
-
-	// Rate limit is checked first regardless of error type.
-	if statusCode == http.StatusTooManyRequests {
-		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
-			Message:    fmt.Sprintf("Stripe API rate limit exceeded: %s", msg),
-			RetryAfter: retryAfter,
-		}
-	}
-
-	// Map Stripe error types to connector error types.
-	if se.Error.Type != "" {
-		switch se.Error.Type {
-		case "authentication_error":
-			return &connectors.AuthError{Message: fmt.Sprintf("Stripe auth error: %s", msg)}
-		case "invalid_request_error":
-			return &connectors.ValidationError{Message: fmt.Sprintf("Stripe validation error: %s", msg)}
-		case "rate_limit_error":
-			retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
-			return &connectors.RateLimitError{
-				Message:    fmt.Sprintf("Stripe rate limit error: %s", msg),
-				RetryAfter: retryAfter,
-			}
-		case "card_error":
-			return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Stripe card error: %s", msg)}
-		case "api_error":
-			return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Stripe API error: %s", msg)}
-		}
-	}
-
-	// Fallback: map by HTTP status code.
-	switch {
-	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: fmt.Sprintf("Stripe auth error (%d): %s", statusCode, msg)}
-	default:
-		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Stripe API error: %s", msg)}
-	}
-}
-
 // formEncode flattens a nested structure into Stripe's bracket-notation
 // form encoding. It handles:
 //   - Flat values: key=value
@@ -309,18 +244,12 @@ func flattenInto(dst map[string]string, prefix string, val any) {
 }
 
 // encodeParams encodes a flat key-value map into a URL-encoded query string.
-// Keys are sorted for deterministic output (important for idempotency key
-// derivation and test assertions).
+// url.Values.Encode() sorts keys alphabetically, giving deterministic output
+// (important for test assertions).
 func encodeParams(params map[string]string) string {
-	keys := make([]string, 0, len(params))
-	for k := range params {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
 	vals := url.Values{}
-	for _, k := range keys {
-		vals.Set(k, params[k])
+	for k, v := range params {
+		vals.Set(k, v)
 	}
 	return vals.Encode()
 }
