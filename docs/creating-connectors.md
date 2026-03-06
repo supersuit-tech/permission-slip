@@ -1,6 +1,6 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub and Slack connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, HubSpot, and Slack connectors as reference implementations.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -8,7 +8,7 @@ For architectural context, see [ADR-009: Connector Execution Architecture](adr/0
 
 ## Overview
 
-A **connector** represents an integration with an external service (e.g., GitHub, Slack, Jira). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
+A **connector** represents an integration with an external service (e.g., GitHub, HubSpot, Slack). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
 
 An **action** is a single operation within a connector (e.g., `github.create_issue`, `slack.send_message`). Each action has its own file, parameter struct, validation, and `Execute` method.
 
@@ -396,6 +396,7 @@ import (
 // In the startup section:
 registry := connectors.NewRegistry()
 registry.Register(ghconnector.New())
+registry.Register(hubspot.New())
 registry.Register(slack.New())
 registry.Register(jiraconnector.New())  // ← add this
 ```
@@ -415,6 +416,7 @@ builtins := []struct {
 	manifest *connectors.ConnectorManifest
 }{
 	{ghconnector.New().Manifest()},
+	{hubspot.New().Manifest()},
 	{slackconnector.New().Manifest()},
 	{jiraconnector.New().Manifest()},  // ← add this
 }
@@ -891,6 +893,13 @@ connectors/
 │   ├── github_test.go        # Connector-level tests
 │   ├── create_issue_test.go  # Action tests
 │   └── merge_pr_test.go      # Action tests
+├── hubspot/
+│   ├── hubspot.go            # HubSpotConnector struct, New(), Manifest(), do(), ValidateCredentials()
+│   ├── response.go           # HubSpot error category → typed error mapping
+│   ├── helpers_test.go       # validCreds() test helper
+│   ├── hubspot_test.go       # Connector-level tests
+│   ├── response_test.go      # Error mapping tests
+│   └── README.md
 └── slack/
     ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
     ├── send_message.go       # slack.send_message action
