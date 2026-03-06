@@ -22,13 +22,7 @@ type getPresentationParams struct {
 }
 
 func (p *getPresentationParams) validate() error {
-	if p.ItemID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
-	}
-	if err := validatePathSegment("item_id", p.ItemID); err != nil {
-		return err
-	}
-	return nil
+	return validateGraphID("item_id", p.ItemID)
 }
 
 // Execute retrieves metadata for a PowerPoint file from OneDrive.

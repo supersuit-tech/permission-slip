@@ -263,7 +263,7 @@ Each action lives in its own file. To add one (e.g., `microsoft.list_contacts`):
 Both `doRequest` and `doPutFileRequest` delegate to `executeAndHandleResponse` for shared response handling (rate limiting, error mapping, body parsing). Each action file only contains what's unique: parameter parsing, validation, request construction, and response shape.
 
 **Security notes for user-supplied path segments:**
-- Use `validatePathSegment()` for opaque IDs interpolated into URL paths (rejects `/`, `\`, `?`, `#`, `%`, `..`)
+- Use `validateGraphID()` for opaque IDs interpolated into URL paths (rejects `/`, `\`, `?`, `#`, `%`, `..`)
 - Use `validateFolderPath()` for folder paths (allows `/` for directory separators, rejects `..`, `?`, `#`, `%`, `\`)
 - URL-encode path segments with `url.PathEscape()` or `escapePathSegments()` as defense-in-depth
 
@@ -280,7 +280,7 @@ connectors/microsoft/
 ├── microsoft.go                    # MicrosoftConnector, Manifest(), doRequest(), doPutFileRequest(), executeAndHandleResponse()
 ├── types.go                        # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
 ├── response.go                     # Graph API error response → typed connector error mapping
-├── validation.go                   # Shared validation helpers (validateEmail, validatePathSegment, escapePathSegments, etc.)
+├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, escapePathSegments, etc.)
 ├── pptx_template.go                # Minimal embedded .pptx template for create_presentation
 ├── send_email.go                   # microsoft.send_email action
 ├── list_emails.go                  # microsoft.list_emails action

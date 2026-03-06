@@ -21,16 +21,18 @@ func validateEmail(field string, idx int, addr string) error {
 }
 
 // validateGraphID rejects Graph API resource identifiers (team IDs, channel IDs,
-// message IDs, etc.) that contain path traversal sequences or path separators.
-// These values are interpolated into URL paths, so we must ensure they cannot
-// manipulate the request target. Microsoft Graph IDs are opaque strings (typically
-// UUIDs or base64-encoded values) that never contain slashes or dot-dot sequences.
+// message IDs, item IDs, etc.) that contain characters which could manipulate
+// the request URL when interpolated into API paths. These IDs are opaque strings
+// (typically UUIDs or base64-encoded values) from Microsoft Graph that never
+// contain slashes, query parameters, or traversal sequences.
 func validateGraphID(field, value string) error {
 	if value == "" {
 		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", field)}
 	}
-	if strings.Contains(value, "..") || strings.Contains(value, "/") || strings.Contains(value, "\\") {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain path separators or traversal sequences", field)}
+	if strings.ContainsAny(value, "/\\?#%") || strings.Contains(value, "..") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: must not contain path separators or URL-special characters (/, \\, ?, #, %%)", field),
+		}
 	}
 	return nil
 }
@@ -41,27 +43,6 @@ func detectContentType(body string) string {
 		return "HTML"
 	}
 	return "Text"
-}
-
-// validatePathSegment rejects values that contain URL-significant characters
-// which could alter the request path or query when interpolated into a Graph
-// API URL. This prevents a crafted item_id like "foo/../me/messages" or
-// "foo?$select=body" from hitting unintended endpoints.
-func validatePathSegment(field, value string) error {
-	for _, ch := range value {
-		switch ch {
-		case '/', '\\', '?', '#', '%':
-			return &connectors.ValidationError{
-				Message: fmt.Sprintf("invalid %s: must not contain URL-special characters (/, \\, ?, #, %%)", field),
-			}
-		}
-	}
-	if strings.Contains(value, "..") {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid %s: must not contain traversal sequences", field),
-		}
-	}
-	return nil
 }
 
 // validateFolderPath checks a OneDrive folder path for traversal sequences and
