@@ -47,7 +47,9 @@ Search available hotels with pricing for given dates and occupancy.
 | `language` | string | No | — | Language code (e.g. en-US) |
 | `sort_by` | string | No | — | Sort by `price`, `distance`, or `rating` |
 | `star_rating` | integer[] | No | — | Filter by star rating(s) |
-| `limit` | integer | No | 20 | Maximum number of results |
+| `limit` | integer | No | 20 | Maximum number of results (max 200) |
+
+Either `region_id` or both `latitude`+`longitude` must be provided. Dates are validated as YYYY-MM-DD and checkout must be after checkin. Occupancy uses the format `"adults"` or `"adults-child1_age,child2_age"` (e.g. `"2-0,4,7"` for 2 adults + 2 children ages 4 and 7).
 
 ---
 
@@ -98,7 +100,9 @@ Book a hotel room. Creates a real reservation and may charge payment.
 | `email` | string | Yes | Guest email address |
 | `phone` | string | Yes | Guest phone number |
 | `payment_method_id` | string | Yes | Stored payment method ID (resolved server-side) |
-| `special_request` | string | No | Special requests for the hotel |
+| `special_request` | string | No | Special requests for the hotel (max 5000 chars) |
+
+**Typical flow:** search_hotels → price_check → create_booking. Each step validates the previous step's data — prices can change between search and booking, so always price-check before booking.
 
 ---
 
@@ -130,6 +134,20 @@ Retrieve booking details and current status.
 | `itinerary_id` | string | Yes | Itinerary ID from the booking |
 | `email` | string | Yes | Email address used for the booking |
 
+## Input Validation
+
+Parameters are validated locally before making API requests to catch errors early and provide clear messages. Shared validation helpers live in `validate.go`:
+
+| Validation | Applied to | Rule |
+|------------|------------|------|
+| Date format | `checkin`, `checkout` | Must be valid YYYY-MM-DD |
+| Date range | `checkin` + `checkout` | Checkout must be after checkin |
+| Occupancy format | `occupancy` | Must match `"adults"` or `"adults-child_age,child_age,..."` pattern |
+| Email format | `email` | Must contain `@` with text on both sides |
+| Limit bounds | `limit` | Cannot exceed 200 |
+| Star rating bounds | `star_rating` | Cannot have more than 5 entries |
+| Special request length | `special_request` | Cannot exceed 5000 characters |
+
 ## Error Handling
 
 The connector maps Expedia Rapid API responses to typed connector errors:
@@ -138,6 +156,7 @@ The connector maps Expedia Rapid API responses to typed connector errors:
 |----------------|-----------------|---------------|
 | 400 | `ValidationError` | 400 Bad Request |
 | 401, 403 | `AuthError` | 502 Bad Gateway |
+| 404 | `ValidationError` | 400 Bad Request |
 | 429 | `RateLimitError` | 429 Too Many Requests |
 | Other 4xx/5xx | `ExternalError` | 502 Bad Gateway |
 | Client timeout / context deadline / canceled | `TimeoutError` | 504 Gateway Timeout |
@@ -196,16 +215,23 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/expedia/
-├── expedia.go          # ExpediaConnector struct, New(), do(), ValidateCredentials(), signature()
-├── manifest.go         # Manifest() with action schemas, credentials, and templates
-├── response.go         # Shared HTTP response → typed error mapping
-├── expedia_test.go     # Connector-level tests (signature, do(), credentials, manifest)
-├── response_test.go    # checkResponse edge case tests
-├── helpers_test.go     # Shared test helpers (validCreds)
-└── README.md           # This file
+├── expedia.go              # ExpediaConnector struct, New(), do(), signature(), Actions()
+├── manifest.go             # Manifest() with action schemas, credentials, and templates
+├── response.go             # Shared HTTP response → typed error mapping
+├── validate.go             # Shared input validation helpers (dates, occupancy, email)
+├── search_hotels.go        # expedia.search_hotels action
+├── get_hotel.go            # expedia.get_hotel action
+├── price_check.go          # expedia.price_check action
+├── create_booking.go       # expedia.create_booking action
+├── cancel_booking.go       # expedia.cancel_booking action
+├── get_booking.go          # expedia.get_booking action
+├── expedia_test.go         # Connector-level tests (signature, do(), credentials, manifest)
+├── response_test.go        # checkResponse edge case tests
+├── validate_test.go        # Input validation tests
+├── helpers_test.go         # Shared test helpers (validCreds)
+├── *_test.go               # Each action has a corresponding test file
+└── README.md               # This file
 ```
-
-Action files (Phase 2) will follow the pattern `<action>.go` + `<action>_test.go`.
 
 ## Testing
 
