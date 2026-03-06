@@ -1,0 +1,94 @@
+OAuthProvider:
+  type: object
+  required:
+    - id
+    - scopes
+    - source
+    - has_credentials
+  properties:
+    id:
+      type: string
+      description: The OAuth provider ID (e.g. "google", "microsoft")
+      example: "google"
+    scopes:
+      type: array
+      items:
+        type: string
+      description: Default OAuth scopes for this provider
+      example: ["openid", "https://www.googleapis.com/auth/userinfo.email"]
+    source:
+      type: string
+      enum: ["built_in", "manifest", "byoa"]
+      description: Where the provider configuration originated
+      example: "built_in"
+    has_credentials:
+      type: boolean
+      description: Whether the provider has client credentials configured and is ready to use
+      example: true
+
+OAuthProviderListResponse:
+  type: object
+  required:
+    - providers
+  properties:
+    providers:
+      type: array
+      items:
+        $ref: '#/OAuthProvider'
+      description: List of available OAuth providers
+
+OAuthConnection:
+  type: object
+  required:
+    - provider
+    - scopes
+    - status
+    - connected_at
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider ID (e.g. "google", "microsoft")
+      example: "google"
+    scopes:
+      type: array
+      items:
+        type: string
+      description: The OAuth scopes granted by the provider
+      example: ["openid", "https://www.googleapis.com/auth/userinfo.email"]
+    status:
+      type: string
+      enum: ["active", "needs_reauth", "revoked"]
+      description: The current status of the connection
+      example: "active"
+    connected_at:
+      type: string
+      format: date-time
+      description: When the OAuth connection was established
+      example: "2026-03-05T10:00:00Z"
+
+OAuthConnectionListResponse:
+  type: object
+  required:
+    - connections
+  properties:
+    connections:
+      type: array
+      items:
+        $ref: '#/OAuthConnection'
+      description: List of OAuth connections for the authenticated user
+
+OAuthDisconnectResponse:
+  type: object
+  required:
+    - provider
+    - disconnected_at
+  properties:
+    provider:
+      type: string
+      description: The OAuth provider that was disconnected
+      example: "google"
+    disconnected_at:
+      type: string
+      format: date-time
+      description: When the OAuth provider was disconnected
+      example: "2026-03-05T15:00:00Z"
