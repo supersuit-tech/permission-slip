@@ -357,5 +357,5 @@ Then use the IP directly (e.g., `http://192.168.1.100:8080`).
 ## What's Next?
 
 - **Add agents:** Follow the [Agent Integration Guide](agents.md) to connect your first AI agent
-- **Custom connectors:** Add integrations beyond the built-in GitHub, Slack, and PostgreSQL connectors — see [Custom Connectors](custom-connectors.md)
+- **Custom connectors:** Add integrations beyond the built-in GitHub, HubSpot, Slack, and PostgreSQL connectors — see [Custom Connectors](custom-connectors.md)
 - **More configuration:** For web push, email notifications, error tracking, analytics, and more — read the full [Self-Hosted Deployment Guide](deployment-self-hosted.md)
