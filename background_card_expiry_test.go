@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log/slog"
 	"testing"
 	"time"
 )
@@ -59,6 +60,55 @@ func TestIsCardExpired(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("isCardExpired(%d, %d, %v) = %v, want %v",
 					tt.expMonth, tt.expYear, tt.now, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCardExpiryCheckInterval(t *testing.T) {
+	// Not parallel: subtests use t.Setenv which modifies process env.
+	logger := slog.Default()
+
+	tests := []struct {
+		name     string
+		envVal   string
+		expected time.Duration
+	}{
+		{
+			name:     "default when unset",
+			envVal:   "",
+			expected: 24 * time.Hour,
+		},
+		{
+			name:     "valid custom interval",
+			envVal:   "6h",
+			expected: 6 * time.Hour,
+		},
+		{
+			name:     "below minimum falls back to default",
+			envVal:   "30m",
+			expected: 24 * time.Hour,
+		},
+		{
+			name:     "invalid format falls back to default",
+			envVal:   "notaduration",
+			expected: 24 * time.Hour,
+		},
+		{
+			name:     "exactly 1 hour is accepted",
+			envVal:   "1h",
+			expected: time.Hour,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envVal != "" {
+				t.Setenv("CARD_EXPIRY_CHECK_INTERVAL", tt.envVal)
+			}
+			got := cardExpiryCheckInterval(logger)
+			if got != tt.expected {
+				t.Errorf("cardExpiryCheckInterval() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

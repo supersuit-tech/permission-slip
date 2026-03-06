@@ -5,6 +5,25 @@ import (
 	"fmt"
 )
 
+// FormatBrand returns a human-readable card brand name. Stripe returns
+// lowercase identifiers like "visa" and "mastercard"; this capitalizes them
+// for display in notifications (e.g. "Visa", "Mastercard", "Amex").
+func FormatBrand(brand string) string {
+	known := map[string]string{
+		"visa":       "Visa",
+		"mastercard": "Mastercard",
+		"amex":       "Amex",
+		"discover":   "Discover",
+		"diners":     "Diners",
+		"jcb":        "JCB",
+		"unionpay":   "UnionPay",
+	}
+	if display, ok := known[brand]; ok {
+		return display
+	}
+	return brand
+}
+
 // AgentDisplayName returns a human-readable name for an agent, falling back
 // to "Agent #<id>" when the name is empty. Used across all notification
 // channels to keep the fallback consistent.
@@ -72,12 +91,12 @@ func BuildPushContent(approval Approval) PushContent {
 	if approval.Type == NotificationTypeCardExpiring {
 		info := extractCardExpiringInfo(approval.Context)
 		title := "Card Expiring Soon"
-		body := fmt.Sprintf("Your %s card ending in %s expires %s. Add a replacement to avoid disruptions.",
-			info.Brand, info.Last4, formatCardExpiry(info.ExpMonth, info.ExpYear))
+		body := fmt.Sprintf("Your %s expires %s. Add a replacement to avoid disruptions.",
+			info.CardIdentifier(), formatCardExpiry(info.ExpMonth, info.ExpYear))
 		if info.Expired {
 			title = "Card Expired"
-			body = fmt.Sprintf("Your %s card ending in %s has expired. Update your payment methods.",
-				info.Brand, info.Last4)
+			body = fmt.Sprintf("Your %s has expired. Update your payment methods.",
+				info.CardIdentifier())
 		}
 		return PushContent{
 			Title:      title,

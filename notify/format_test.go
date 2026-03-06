@@ -212,6 +212,52 @@ func TestBuildPushContent_CardExpired(t *testing.T) {
 	}
 }
 
+// ── FormatBrand tests ────────────────────────────────────────────────────────
+
+func TestFormatBrand_KnownBrands(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"visa":       "Visa",
+		"mastercard": "Mastercard",
+		"amex":       "Amex",
+		"discover":   "Discover",
+		"jcb":        "JCB",
+		"unionpay":   "UnionPay",
+	}
+	for input, expected := range cases {
+		if got := FormatBrand(input); got != expected {
+			t.Errorf("FormatBrand(%q) = %q, want %q", input, got, expected)
+		}
+	}
+}
+
+func TestFormatBrand_UnknownBrand(t *testing.T) {
+	t.Parallel()
+	if got := FormatBrand("elo"); got != "elo" {
+		t.Errorf("expected unknown brand returned as-is, got: %q", got)
+	}
+}
+
+// ── CardExpiringInfo helpers ─────────────────────────────────────────────────
+
+func TestCardIdentifier_WithLabel(t *testing.T) {
+	t.Parallel()
+	info := CardExpiringInfo{Brand: "visa", Last4: "4242", Label: "Work Card"}
+	expected := "Work Card (Visa ending in 4242)"
+	if got := info.CardIdentifier(); got != expected {
+		t.Errorf("CardIdentifier() = %q, want %q", got, expected)
+	}
+}
+
+func TestCardIdentifier_WithoutLabel(t *testing.T) {
+	t.Parallel()
+	info := CardExpiringInfo{Brand: "mastercard", Last4: "5555"}
+	expected := "Mastercard ending in 5555"
+	if got := info.CardIdentifier(); got != expected {
+		t.Errorf("CardIdentifier() = %q, want %q", got, expected)
+	}
+}
+
 // ── AgentDisplayName tests ──────────────────────────────────────────────────
 
 func TestAgentDisplayName_WithName(t *testing.T) {

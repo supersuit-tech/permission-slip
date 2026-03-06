@@ -92,6 +92,7 @@ func runCardExpiryCheck(ctx context.Context, deps CardExpiryCheckDeps, logger *s
 		cardInfo := notify.CardExpiringInfo{
 			Brand:    pm.Brand,
 			Last4:    pm.Last4,
+			Label:    pm.Label,
 			ExpMonth: pm.ExpMonth,
 			ExpYear:  pm.ExpYear,
 			Expired:  expired,

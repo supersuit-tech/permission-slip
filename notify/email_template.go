@@ -189,9 +189,26 @@ func buildPaymentFailedHTMLBody(approval Approval) string {
 type CardExpiringInfo struct {
 	Brand    string `json:"brand"`
 	Last4    string `json:"last4"`
+	Label    string `json:"label,omitempty"` // user-assigned label (e.g. "Work Card")
 	ExpMonth int    `json:"exp_month"`
 	ExpYear  int    `json:"exp_year"`
 	Expired  bool   `json:"expired"` // true if the card is already expired
+}
+
+// DisplayBrand returns the human-readable brand name for card-expiring templates.
+func (c CardExpiringInfo) DisplayBrand() string {
+	return FormatBrand(c.Brand)
+}
+
+// CardIdentifier returns a concise identifier like "Visa ending in 4242" or
+// "Work Card (Visa ending in 4242)" when a label is set. Used in subject lines
+// and notification bodies so users can identify which card needs attention.
+func (c CardExpiringInfo) CardIdentifier() string {
+	base := fmt.Sprintf("%s ending in %s", c.DisplayBrand(), c.Last4)
+	if c.Label != "" {
+		return fmt.Sprintf("%s (%s)", c.Label, base)
+	}
+	return base
 }
 
 // extractCardExpiringInfo pulls card details from the context JSONB.
@@ -211,21 +228,21 @@ func formatCardExpiry(month, year int) string {
 func buildCardExpiringSubject(approval Approval) string {
 	info := extractCardExpiringInfo(approval.Context)
 	if info.Expired {
-		return fmt.Sprintf("Your %s card ending in %s has expired", info.Brand, info.Last4)
+		return fmt.Sprintf("Your %s has expired", info.CardIdentifier())
 	}
-	return fmt.Sprintf("Your %s card ending in %s is expiring soon", info.Brand, info.Last4)
+	return fmt.Sprintf("Your %s is expiring soon", info.CardIdentifier())
 }
 
 func buildCardExpiringPlainBody(approval Approval) string {
 	info := extractCardExpiringInfo(approval.Context)
 	var b strings.Builder
 	if info.Expired {
-		b.WriteString(fmt.Sprintf("Your %s card ending in %s (expires %s) has expired.\n\n",
-			info.Brand, info.Last4, formatCardExpiry(info.ExpMonth, info.ExpYear)))
+		b.WriteString(fmt.Sprintf("Your %s (expires %s) has expired.\n\n",
+			info.CardIdentifier(), formatCardExpiry(info.ExpMonth, info.ExpYear)))
 		b.WriteString("Any connector actions that use this card will fail until you replace it.\n")
 	} else {
-		b.WriteString(fmt.Sprintf("Your %s card ending in %s expires %s.\n\n",
-			info.Brand, info.Last4, formatCardExpiry(info.ExpMonth, info.ExpYear)))
+		b.WriteString(fmt.Sprintf("Your %s expires %s.\n\n",
+			info.CardIdentifier(), formatCardExpiry(info.ExpMonth, info.ExpYear)))
 		b.WriteString("Please add a replacement card before it expires to avoid disruptions to connector actions.\n")
 	}
 	if approval.ApprovalURL != "" {
@@ -253,8 +270,8 @@ func buildCardExpiringHTMLBody(approval Approval) string {
 	b.WriteString(fmt.Sprintf(`<div style="border-bottom:2px solid %s;padding-bottom:16px;margin-bottom:20px;">`, accentColor))
 	b.WriteString(fmt.Sprintf(`<h2 style="margin:0 0 4px 0;font-size:20px;color:%s;">%s</h2>`, accentColor, headerTitle))
 
-	subtitle := fmt.Sprintf("%s ending in %s &middot; expires %s",
-		html.EscapeString(info.Brand), html.EscapeString(info.Last4),
+	subtitle := fmt.Sprintf("%s &middot; expires %s",
+		html.EscapeString(info.CardIdentifier()),
 		html.EscapeString(formatCardExpiry(info.ExpMonth, info.ExpYear)))
 	b.WriteString(fmt.Sprintf(`<p style="margin:0;color:#6b7280;font-size:14px;">%s</p>`, subtitle))
 	b.WriteString(`</div>`)
