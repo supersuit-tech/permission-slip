@@ -173,18 +173,22 @@ User credentials stored via Supabase Vault. The table holds a reference to the V
 
 Stores OAuth 2.0 connections for users. Each row represents a user's authenticated connection to an OAuth provider (e.g., Google, Microsoft). Tokens are stored in the Vault — this table only holds Vault references.
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | text | PK, max 255 chars |
-| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
-| `provider` | text | NOT NULL, max 255 chars (e.g., "google", "microsoft") |
-| `access_token_vault_id` | uuid | NOT NULL |
-| `refresh_token_vault_id` | uuid | Nullable |
-| `scopes` | text[] | NOT NULL, DEFAULT '{}' |
-| `token_expiry` | timestamptz | Nullable |
-| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'needs_reauth', 'revoked') |
-| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
-| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
+A background job proactively refreshes tokens within 15 minutes of expiry (`token_expiry`). If refresh fails (token revoked, no refresh token available), the connection's `status` is set to `needs_reauth`, signaling the user to re-authorize via the Settings page.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | text | PK, max 255 chars | |
+| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE | |
+| `provider` | text | NOT NULL, max 255 chars (e.g., "google", "microsoft") | |
+| `access_token_vault_id` | uuid | NOT NULL | Vault reference; rotated on each refresh |
+| `refresh_token_vault_id` | uuid | Nullable | Nullable — some providers don't issue refresh tokens. If NULL, the connection cannot be refreshed and will be marked `needs_reauth` on expiry. |
+| `scopes` | text[] | NOT NULL, DEFAULT '{}' | |
+| `token_expiry` | timestamptz | Nullable | When the access token expires. The background refresh job queries for tokens where this is within 15 minutes of now. NULL means the token doesn't expire. |
+| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'needs_reauth', 'revoked') | See status lifecycle below |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() | |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() | Updated on token refresh and status change |
+
+**Status lifecycle:** `active` → `needs_reauth` (on refresh failure or token expiry without refresh token) → `active` (on user re-authorization). Users can also set `revoked` by disconnecting the provider.
 
 **Constraints:** UNIQUE on `(user_id, provider)` — one connection per provider per user.
 
