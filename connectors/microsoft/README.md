@@ -16,7 +16,7 @@ This connector uses OAuth 2.0 — credentials are managed automatically by the p
 
 The credential `auth_type` in the database is `oauth2` with `oauth_provider: "microsoft"`. The platform handles the full OAuth lifecycle: redirect, token exchange, encrypted storage in Supabase Vault, and automatic refresh before expiry. The connector never touches OAuth code — it receives a valid access token in `Credentials` at execution time.
 
-**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`
+**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Send`, `ChannelMessage.Read.All`
 
 ## Actions
 
@@ -78,6 +78,125 @@ Lists recent emails from a mail folder.
 ```
 
 **Graph API:** `GET /me/mailFolders/{folder}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/user-list-messages))
+
+---
+
+### `microsoft.list_teams`
+
+Lists the Microsoft Teams the authenticated user is a member of.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `top` | integer | No | `20` | Number of teams to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Engineering",
+    "description": "Engineering team workspace",
+    "visibility": "private"
+  }
+]
+```
+
+**Graph API:** `GET /me/joinedTeams` ([docs](https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams))
+
+---
+
+### `microsoft.list_channels`
+
+Lists channels in a Microsoft Teams team.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team to list channels for |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "19:abc123@thread.tacv2",
+    "name": "General",
+    "description": "General discussion",
+    "membership_type": "standard"
+  }
+]
+```
+
+**Graph API:** `GET /teams/{team-id}/channels` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-list))
+
+---
+
+### `microsoft.send_channel_message`
+
+Sends a message to a Microsoft Teams channel. Supports plain text and HTML (auto-detected). Optionally replies to an existing message thread.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team |
+| `channel_id` | string | Yes | — | The ID of the channel to post to |
+| `message` | string | Yes | — | Message content (HTML or plain text — auto-detected) |
+| `reply_to_message_id` | string | No | — | Message ID to reply to (creates a threaded reply) |
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "1616990032035",
+  "created_at": "2024-01-15T09:00:00Z"
+}
+```
+
+**Graph API:** `POST /teams/{team-id}/channels/{channel-id}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-post-messages))
+When `reply_to_message_id` is provided: `POST /teams/{team-id}/channels/{channel-id}/messages/{message-id}/replies` ([docs](https://learn.microsoft.com/en-us/graph/api/chatmessage-post-replies))
+
+---
+
+### `microsoft.list_channel_messages`
+
+Lists recent messages from a Microsoft Teams channel.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team |
+| `channel_id` | string | Yes | — | The ID of the channel to read messages from |
+| `top` | integer | No | `20` | Number of messages to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "1616990032035",
+    "created_at": "2024-01-15T09:00:00Z",
+    "from": "Jane Smith",
+    "content": "Hello team!"
+  }
+]
+```
+
+**Graph API:** `GET /teams/{team-id}/channels/{channel-id}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-list-messages))
 
 ---
 
@@ -284,6 +403,10 @@ connectors/microsoft/
 ├── pptx_template.go                # Minimal embedded .pptx template for create_presentation
 ├── send_email.go                   # microsoft.send_email action
 ├── list_emails.go                  # microsoft.list_emails action
+├── list_teams.go                   # microsoft.list_teams action
+├── list_channels.go                # microsoft.list_channels action
+├── send_channel_message.go         # microsoft.send_channel_message action
+├── list_channel_messages.go        # microsoft.list_channel_messages action
 ├── create_calendar_event.go        # microsoft.create_calendar_event action
 ├── list_calendar_events.go         # microsoft.list_calendar_events action
 ├── create_presentation.go          # microsoft.create_presentation action
@@ -293,6 +416,10 @@ connectors/microsoft/
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests
 ├── list_emails_test.go             # List emails action tests
+├── list_teams_test.go              # List teams action tests
+├── list_channels_test.go           # List channels action tests
+├── send_channel_message_test.go    # Send channel message action tests
+├── list_channel_messages_test.go   # List channel messages action tests
 ├── create_calendar_event_test.go   # Create calendar event action tests
 ├── list_calendar_events_test.go    # List calendar events action tests
 ├── create_presentation_test.go     # Create presentation action tests
