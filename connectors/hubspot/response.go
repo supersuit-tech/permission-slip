@@ -102,7 +102,7 @@ func mapStatusCodeError(statusCode int, msg string) error {
 	switch {
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("HubSpot auth error (%d): %s", statusCode, msg)}
-	case statusCode == http.StatusUnprocessableEntity || statusCode == http.StatusBadRequest:
+	case statusCode == http.StatusUnprocessableEntity || statusCode == http.StatusBadRequest || statusCode == http.StatusConflict:
 		return &connectors.ValidationError{Message: fmt.Sprintf("HubSpot validation error: %s", msg)}
 	case statusCode == http.StatusNotFound:
 		return &connectors.ValidationError{Message: fmt.Sprintf("HubSpot resource not found: %s", msg)}
