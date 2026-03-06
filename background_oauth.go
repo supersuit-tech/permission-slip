@@ -149,37 +149,32 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 		defer db.RollbackTx(ctx, tx) //nolint:errcheck // best-effort cleanup
 	}
 
-	if err := deps.Vault.DeleteSecret(ctx, tx, conn.AccessTokenVaultID); err != nil {
-		logger.Warn("oauth refresh: failed to delete old access token from vault",
-			append(logAttrs, "vault_id", conn.AccessTokenVaultID, "error", err)...)
+	vaultOps := oauth.VaultOperations{
+		DeleteSecret: func(ctx context.Context, id string) error { return deps.Vault.DeleteSecret(ctx, tx, id) },
+		CreateSecret: func(ctx context.Context, name string, secret []byte) (string, error) {
+			return deps.Vault.CreateSecret(ctx, tx, name, secret)
+		},
 	}
-	newAccessVaultID, err := deps.Vault.CreateSecret(ctx, tx, conn.ID+"_access", []byte(result.AccessToken))
+
+	_, err = oauth.StoreRefreshedTokens(ctx, vaultOps,
+		oauth.StoreRefreshedTokensParams{
+			ConnID:            conn.ID,
+			UserID:            conn.UserID,
+			OldAccessVaultID:  conn.AccessTokenVaultID,
+			OldRefreshVaultID: conn.RefreshTokenVaultID,
+			Result:            result,
+			OldRefreshToken:   string(refreshTokenBytes),
+		},
+		func(what, vaultID string, delErr error) {
+			logger.Warn("oauth refresh: failed to delete old "+what+" from vault",
+				append(logAttrs, "vault_id", vaultID, "error", delErr)...)
+		},
+		func(ctx context.Context, accessVaultID string, refreshVaultID *string, expiry *time.Time) error {
+			return db.UpdateOAuthConnectionTokens(ctx, tx, conn.ID, conn.UserID, accessVaultID, refreshVaultID, expiry)
+		},
+	)
 	if err != nil {
-		return fmt.Errorf("vault create access token: %w", err)
-	}
-
-	var newRefreshVaultID *string
-	if result.RefreshToken != string(refreshTokenBytes) {
-		if err := deps.Vault.DeleteSecret(ctx, tx, *conn.RefreshTokenVaultID); err != nil {
-			logger.Warn("oauth refresh: failed to delete old refresh token from vault",
-				append(logAttrs, "vault_id", *conn.RefreshTokenVaultID, "error", err)...)
-		}
-		id, err := deps.Vault.CreateSecret(ctx, tx, conn.ID+"_refresh", []byte(result.RefreshToken))
-		if err != nil {
-			return fmt.Errorf("vault create refresh token: %w", err)
-		}
-		newRefreshVaultID = &id
-	} else {
-		newRefreshVaultID = conn.RefreshTokenVaultID
-	}
-
-	var tokenExpiry *time.Time
-	if !result.Expiry.IsZero() {
-		tokenExpiry = &result.Expiry
-	}
-
-	if err := db.UpdateOAuthConnectionTokens(ctx, tx, conn.ID, conn.UserID, newAccessVaultID, newRefreshVaultID, tokenExpiry); err != nil {
-		return fmt.Errorf("update connection tokens: %w", err)
+		return err
 	}
 
 	if owned {
