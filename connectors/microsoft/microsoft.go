@@ -23,6 +23,11 @@ const (
 	// defaultRetryAfter is used when the Graph API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 30 * time.Second
+
+	// maxResponseBodySize limits the amount of data read from a Graph API
+	// response to prevent unbounded memory consumption from malicious or
+	// misbehaving responses. 10 MB is generous for JSON API responses.
+	maxResponseBodySize = 10 * 1024 * 1024
 )
 
 // MicrosoftConnector owns the shared HTTP client and base URL used by all
@@ -293,7 +298,7 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 		}
 	}
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

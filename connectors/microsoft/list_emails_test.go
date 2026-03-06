@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -105,6 +106,36 @@ func TestListEmails_TopClamped(t *testing.T) {
 	params.defaults()
 	if params.Top != 50 {
 		t.Errorf("expected top clamped to 50, got %d", params.Top)
+	}
+}
+
+func TestListEmails_FolderPathEscaping(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A path-traversal attempt like "../../admin" should be URL-encoded,
+		// not interpreted as literal path segments.
+		if strings.Contains(r.URL.Path, "..") {
+			t.Errorf("path traversal not escaped: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"value": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listEmailsAction{conn: conn}
+
+	params, _ := json.Marshal(listEmailsParams{Folder: "../../admin"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.list_emails",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
