@@ -18,6 +18,7 @@ AuditEvent:
         - standing_approval.executed
         - agent.registered
         - agent.deactivated
+        - payment_method.charged
       description: The type of event.
       example: "approval.approved"
     timestamp:
@@ -44,8 +45,11 @@ AuditEvent:
         approvals, contains `type`, `version`, and `parameters`. For standing
         approval executions, contains `type`, `version`, `parameters` (the
         actual parameters used in the execution), and `constraints` (the
-        boundary rules from the standing approval). Null for agent lifecycle
-        events.
+        boundary rules from the standing approval). For payment_method.charged
+        events, contains `type`, `payment_method_id`, `brand`, `last4`,
+        `amount_cents`, `currency`, and optionally `description` (a human-readable
+        summary of the charge). Never includes raw card details.
+        Null for agent lifecycle events.
     outcome:
       type: string
       enum:
@@ -57,6 +61,7 @@ AuditEvent:
         - deactivated
         - pending
         - expired
+        - charged
       description: The outcome of the event.
       example: "approved"
     connector_id:
@@ -115,6 +120,7 @@ AuditLogEvent:
         - standing_approval.executed
         - agent.registered
         - agent.deactivated
+        - payment_method.charged
       description: The type of event.
       example: "approval.approved"
     timestamp:
@@ -137,7 +143,9 @@ AuditLogEvent:
       nullable: true
       additionalProperties: true
       description: |
-        Action details for approval and standing approval events.
+        Action details for approval and standing approval events. For
+        payment_method.charged events, contains `type`, `payment_method_id`,
+        `brand`, `last4`, `amount_cents`, and `currency`.
     outcome:
       type: string
       enum:
@@ -149,6 +157,7 @@ AuditLogEvent:
         - deactivated
         - pending
         - expired
+        - charged
       description: The outcome of the event.
       example: "approved"
     source_id:
