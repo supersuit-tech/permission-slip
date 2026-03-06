@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -73,7 +72,7 @@ func (a *addNoteAction) Execute(ctx context.Context, req connectors.ActionReques
 	noteBody := hubspotObjectRequest{
 		Properties: map[string]string{
 			"hs_note_body": params.Body,
-			"hs_timestamp": time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+			"hs_timestamp": a.conn.now().UTC().Format("2006-01-02T15:04:05.000Z"),
 		},
 	}
 	var noteResp hubspotObjectResponse

@@ -18,13 +18,19 @@ The credential `auth_type` in the database is `api_key`. Tokens are stored encry
 
 ## Actions
 
-*Actions are added in Phase 2. The following are planned:*
+| Action | Risk | Description |
+|--------|------|-------------|
+| `hubspot.create_contact` | low | Create a new contact with email, name, phone, company, and custom properties |
+| `hubspot.update_contact` | low | Update properties on an existing contact by ID |
+| `hubspot.create_deal` | low | Create a deal in a pipeline with optional contact associations |
+| `hubspot.create_ticket` | low | Create a support ticket in a pipeline |
+| `hubspot.add_note` | low | Add an engagement note to a contact, deal, or ticket (two-step: create + associate) |
+| `hubspot.search` | low | Search contacts, deals, tickets, or companies with property filters |
 
 ### `hubspot.create_contact`
 
 Creates a new contact in HubSpot CRM.
 
-**Risk level:** low
 **HubSpot API:** `POST /crm/v3/objects/contacts`
 **Required scopes:** `crm.objects.contacts.write`
 
@@ -32,41 +38,48 @@ Creates a new contact in HubSpot CRM.
 
 Updates properties on an existing contact.
 
-**Risk level:** low
 **HubSpot API:** `PATCH /crm/v3/objects/contacts/{contact_id}`
 **Required scopes:** `crm.objects.contacts.write`
 
 ### `hubspot.create_deal`
 
-Creates a new deal in a pipeline.
+Creates a new deal in a pipeline. Optionally associates the deal with contacts via the associations API.
 
-**Risk level:** low
-**HubSpot API:** `POST /crm/v3/objects/deals`
+**HubSpot API:** `POST /crm/v3/objects/deals` + optional `PUT /crm/v3/objects/deals/{id}/associations/contacts/{contact_id}/deal_to_contact`
 **Required scopes:** `crm.objects.deals.write`
 
 ### `hubspot.create_ticket`
 
 Creates a support ticket.
 
-**Risk level:** low
 **HubSpot API:** `POST /crm/v3/objects/tickets`
 **Required scopes:** `tickets`
 
 ### `hubspot.add_note`
 
-Adds an engagement note to a CRM record (contact, deal, or ticket).
+Adds an engagement note to a CRM record (contact, deal, or ticket). This is a two-step flow: create the note, then associate it with the target object.
 
-**Risk level:** low
-**HubSpot API:** `POST /crm/v3/objects/notes` + association call
+**HubSpot API:** `POST /crm/v3/objects/notes` + `PUT /crm/v3/objects/notes/{id}/associations/{type}/{object_id}/note_to_{type}`
 **Required scopes:** `crm.objects.contacts.write` (or the scope for the associated object type)
 
 ### `hubspot.search`
 
-Searches CRM objects with filters.
+Searches CRM objects with filters. Supports contacts, deals, tickets, and companies.
 
-**Risk level:** low
 **HubSpot API:** `POST /crm/v3/objects/{object_type}/search`
 **Required scopes:** `crm.objects.contacts.read`, `crm.objects.deals.read`, `crm.objects.companies.read`, or `tickets` (depending on object type)
+
+**Supported operators:** `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `CONTAINS_TOKEN`, `NOT_CONTAINS_TOKEN`, `HAS_PROPERTY`, `NOT_HAS_PROPERTY`, `BETWEEN`
+
+**Limit:** Defaults to 10, capped at HubSpot's API maximum of 200.
+
+### Key patterns
+
+- **Property merging:** Actions like `create_contact`, `create_deal`, and `create_ticket` accept both explicit fields (e.g., `email`, `dealname`) and a catch-all `properties` map. Explicit fields take precedence over the properties map, so users can pass well-known fields naturally while still sending arbitrary HubSpot properties.
+
+- **Two-step association:** `add_note` and `create_deal` (with `associated_contacts`) use a two-step flow — first create the object, then associate it. If the association call fails, the error includes the created object's ID so the user can recover.
+
+- **Testable time:** The connector accepts a `nowFunc` field for deterministic timestamps in tests (used by `add_note` for `hs_timestamp`).
 
 ## Error Handling
 
@@ -89,16 +102,16 @@ Rate limit: HubSpot allows 100 requests per 10 seconds per private app. The `Rat
 
 ## Adding a New Action
 
-Each action lives in its own file. To add one (e.g., `hubspot.create_contact`):
+Each action lives in its own file. To add one (e.g., `hubspot.create_company`):
 
-1. Create `connectors/hubspot/create_contact.go` with a params struct, `validate()`, and an `Execute` method.
+1. Create `connectors/hubspot/create_company.go` with a params struct, `validate()`, and an `Execute` method.
 2. Use `a.conn.do(ctx, creds, method, path, reqBody, &respBody)` for the HTTP lifecycle — it handles JSON marshaling, auth headers, response checking, and error mapping.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `hubspot.go`.
 5. Add the action to the `Manifest()` return value inside `hubspot.go` — include a `ParametersSchema`.
-6. Add tests in `create_contact_test.go` using `httptest.NewServer` and `newForTest()`.
+6. Add tests in `create_company_test.go` using `httptest.NewServer` and `newForTest()`.
 
-The `do` method means each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape. All shared HTTP concerns (auth, Content-Type, error mapping, rate limiting) are handled once.
+HubSpot's CRM API follows a uniform pattern across object types — all use `/crm/v3/objects/{type}` for CRUD operations. The shared `hubspotObjectRequest` and `hubspotObjectResponse` types (defined in `create_contact.go`) can be reused for most CRM object actions.
 
 ## Parameters Schema
 
@@ -108,30 +121,7 @@ Each action declares a `parameters_schema` (JSON Schema) in its manifest entry. 
 - **Documents the API contract** — agents can use the schema to validate parameters before submitting requests
 - **Populates the database** — auto-seeded into `connector_actions.parameters_schema` on startup
 
-When adding a new action, define its `ParametersSchema` as a `json.RawMessage` in the manifest. Use `connectors.TrimIndent()` to keep the inline JSON readable:
-
-```go
-{
-    ActionType:  "hubspot.create_contact",
-    Name:        "Create Contact",
-    Description: "Create a new contact in HubSpot CRM",
-    RiskLevel:   "low",
-    ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-        "type": "object",
-        "required": ["email"],
-        "properties": {
-            "email": {
-                "type": "string",
-                "description": "Contact email address"
-            },
-            "firstname": {
-                "type": "string",
-                "description": "Contact first name"
-            }
-        }
-    }`)),
-}
-```
+When adding a new action, define its `ParametersSchema` as a `json.RawMessage` in the manifest. Use `connectors.TrimIndent()` to keep the inline JSON readable.
 
 ## Manifest
 
@@ -143,12 +133,19 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/hubspot/
-├── hubspot.go           # HubSpotConnector struct, New(), Manifest(), do(), ValidateCredentials()
-├── response.go          # HubSpot error category → typed error mapping
-├── hubspot_test.go      # Connector-level tests
-├── helpers_test.go      # Shared test helpers (validCreds)
-├── response_test.go     # Error mapping tests
-└── README.md            # This file
+├── hubspot.go              # HubSpotConnector struct, New(), Manifest(), Actions(), do()
+├── response.go             # HubSpot error category → typed error mapping
+├── create_contact.go       # hubspot.create_contact + shared request/response types
+├── update_contact.go       # hubspot.update_contact
+├── create_deal.go          # hubspot.create_deal (with contact associations)
+├── create_ticket.go        # hubspot.create_ticket
+├── add_note.go             # hubspot.add_note (two-step create + associate)
+├── search.go               # hubspot.search
+├── hubspot_test.go         # Connector-level tests
+├── response_test.go        # Error mapping tests
+├── helpers_test.go         # Shared test helpers (validCreds)
+├── *_test.go               # Per-action test files
+└── README.md               # This file
 ```
 
 ## Testing

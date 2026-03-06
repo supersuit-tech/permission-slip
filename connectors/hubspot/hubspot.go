@@ -34,6 +34,7 @@ const (
 type HubSpotConnector struct {
 	client  *http.Client
 	baseURL string
+	nowFunc func() time.Time // defaults to time.Now; override in tests for deterministic timestamps
 }
 
 // New creates a HubSpotConnector with sensible defaults (30s timeout,
@@ -43,6 +44,14 @@ func New() *HubSpotConnector {
 		client:  &http.Client{Timeout: defaultTimeout},
 		baseURL: defaultBaseURL,
 	}
+}
+
+// now returns the current time, using the connector's nowFunc if set.
+func (c *HubSpotConnector) now() time.Time {
+	if c.nowFunc != nil {
+		return c.nowFunc()
+	}
+	return time.Now()
 }
 
 // newForTest creates a HubSpotConnector that points at a test server.

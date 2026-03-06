@@ -216,6 +216,66 @@ func TestSearch_FilterMissingPropertyName(t *testing.T) {
 	}
 }
 
+func TestSearch_InvalidOperator(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &searchAction{conn: conn}
+
+	params, _ := json.Marshal(searchParams{
+		ObjectType: "contacts",
+		Filters:    []searchFilter{{PropertyName: "email", Operator: "LIKE", Value: "x"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.search",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid operator")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSearch_LimitCappedAt200(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body searchRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Limit != 200 {
+			t.Errorf("expected limit to be capped at 200, got %d", body.Limit)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"total": 0, "results": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &searchAction{conn: conn}
+
+	params, _ := json.Marshal(searchParams{
+		ObjectType: "contacts",
+		Filters:    []searchFilter{{PropertyName: "email", Operator: "EQ", Value: "x"}},
+		Limit:      500, // exceeds HubSpot's max of 200
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.search",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSearch_AuthError(t *testing.T) {
 	t.Parallel()
 

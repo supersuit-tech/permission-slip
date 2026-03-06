@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -25,8 +26,9 @@ func TestAddNote_Success(t *testing.T) {
 			if body.Properties["hs_note_body"] != "Called and left a voicemail" {
 				t.Errorf("expected note body, got %q", body.Properties["hs_note_body"])
 			}
-			if body.Properties["hs_timestamp"] == "" {
-				t.Error("expected hs_timestamp to be set")
+			expectedTS := "2026-01-15T10:30:00.000Z"
+			if body.Properties["hs_timestamp"] != expectedTS {
+				t.Errorf("expected hs_timestamp %q, got %q", expectedTS, body.Properties["hs_timestamp"])
 			}
 
 			w.Header().Set("Content-Type", "application/json")
@@ -55,7 +57,9 @@ func TestAddNote_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	fixedTime := time.Date(2026, 1, 15, 10, 30, 0, 0, time.UTC)
 	conn := newForTest(srv.Client(), srv.URL)
+	conn.nowFunc = func() time.Time { return fixedTime }
 	action := &addNoteAction{conn: conn}
 
 	params, _ := json.Marshal(addNoteParams{

@@ -27,13 +27,31 @@ type searchParams struct {
 	Limit      int            `json:"limit"`
 }
 
-const defaultSearchLimit = 10
+const (
+	defaultSearchLimit = 10
+	maxSearchLimit     = 200 // HubSpot API maximum
+)
 
 var validSearchObjectTypes = map[string]bool{
 	"contacts":  true,
 	"deals":     true,
 	"tickets":   true,
 	"companies": true,
+}
+
+// validSearchOperators lists the operators supported by HubSpot's search API.
+var validSearchOperators = map[string]bool{
+	"EQ":                 true,
+	"NEQ":                true,
+	"LT":                 true,
+	"LTE":                true,
+	"GT":                 true,
+	"GTE":                true,
+	"BETWEEN":            true,
+	"CONTAINS_TOKEN":     true,
+	"NOT_CONTAINS_TOKEN": true,
+	"HAS_PROPERTY":       true,
+	"NOT_HAS_PROPERTY":   true,
 }
 
 func (p *searchParams) validate() error {
@@ -52,6 +70,9 @@ func (p *searchParams) validate() error {
 		}
 		if f.Operator == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("filter[%d]: missing operator", i)}
+		}
+		if !validSearchOperators[f.Operator] {
+			return &connectors.ValidationError{Message: fmt.Sprintf("filter[%d]: unsupported operator %q (supported: EQ, NEQ, LT, LTE, GT, GTE, BETWEEN, CONTAINS_TOKEN, NOT_CONTAINS_TOKEN, HAS_PROPERTY, NOT_HAS_PROPERTY)", i, f.Operator)}
 		}
 	}
 	return nil
@@ -83,6 +104,9 @@ func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest
 	limit := params.Limit
 	if limit <= 0 {
 		limit = defaultSearchLimit
+	}
+	if limit > maxSearchLimit {
+		limit = maxSearchLimit
 	}
 
 	body := searchRequest{
