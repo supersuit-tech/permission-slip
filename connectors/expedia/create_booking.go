@@ -57,6 +57,10 @@ func (p *createBookingParams) validate() error {
 }
 
 // Execute creates a hotel booking with the Expedia Rapid API.
+//
+// TODO(#199): Add idempotency handling once stored payment methods are
+// implemented. The Expedia Rapid API supports an Affiliate-Reference-Id
+// header to prevent duplicate bookings on retries.
 func (a *createBookingAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createBookingParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
