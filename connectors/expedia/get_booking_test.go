@@ -85,6 +85,10 @@ func TestGetBooking_MissingParams(t *testing.T) {
 			params: `{}`,
 		},
 		{
+			name:   "invalid email",
+			params: `{"itinerary_id":"itin-789","email":"not-an-email"}`,
+		},
+		{
 			name:   "invalid JSON",
 			params: `{invalid}`,
 		},

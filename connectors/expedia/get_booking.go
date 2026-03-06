@@ -29,6 +29,9 @@ func (p *getBookingParams) validate() error {
 	if p.Email == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: email"}
 	}
+	if err := validateEmail(p.Email); err != nil {
+		return err
+	}
 	return nil
 }
 
