@@ -83,18 +83,32 @@ func TestDeleteDriveFile_InvalidItemID(t *testing.T) {
 	conn := New()
 	action := &deleteDriveFileAction{conn: conn}
 
-	params, _ := json.Marshal(deleteDriveFileParams{ItemID: "../../../etc"})
-
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "microsoft.delete_drive_file",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error for invalid item_id")
+	cases := []struct {
+		name   string
+		itemID string
+	}{
+		{"path-traversal", "../../../etc"},
+		{"path-separator-slash", "a/b"},
+		{"path-separator-backslash", "a\\b"},
+		{"query-injection", "file-123?$expand=malicious"},
+		{"fragment-injection", "file-123#fragment"},
+		{"percent-encoding", "file-123%2F..%2Fetc"},
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			params, _ := json.Marshal(deleteDriveFileParams{ItemID: tc.itemID})
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "microsoft.delete_drive_file",
+				Parameters:  params,
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("expected error for invalid item_id")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got: %T", err)
+			}
+		})
 	}
 }
 

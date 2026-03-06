@@ -16,7 +16,7 @@ This connector uses OAuth 2.0 — credentials are managed automatically by the p
 
 The credential `auth_type` in the database is `oauth2` with `oauth_provider: "microsoft"`. The platform handles the full OAuth lifecycle: redirect, token exchange, encrypted storage in Supabase Vault, and automatic refresh before expiry. The connector never touches OAuth code — it receives a valid access token in `Credentials` at execution time.
 
-**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`
+**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Send`, `ChannelMessage.Read.All`
 
 ## Actions
 
@@ -326,7 +326,7 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 ```
 connectors/microsoft/
 ├── microsoft.go                  # MicrosoftConnector struct, Manifest(), request helpers, ValidateCredentials()
-├── types.go                      # Shared Microsoft Graph API types (email, calendar, drive)
+├── types.go                      # Shared Microsoft Graph API types (email, calendar, drive, Teams)
 ├── response.go                   # Graph API error response → typed connector error mapping
 ├── validation.go                 # Shared validation helpers (validateEmail, detectContentType)
 ├── send_email.go                 # microsoft.send_email action
@@ -337,6 +337,10 @@ connectors/microsoft/
 ├── get_drive_file.go             # microsoft.get_drive_file action + item ID validation
 ├── upload_drive_file.go          # microsoft.upload_drive_file action
 ├── delete_drive_file.go          # microsoft.delete_drive_file action
+├── list_teams.go                 # microsoft.list_teams action
+├── list_channels.go              # microsoft.list_channels action
+├── send_channel_message.go       # microsoft.send_channel_message action
+├── list_channel_messages.go      # microsoft.list_channel_messages action
 ├── microsoft_test.go             # Connector-level tests
 ├── helpers_test.go               # Shared test helpers (validCreds)
 ├── *_test.go                     # Per-action test files
