@@ -297,24 +297,32 @@ Per-execution records for standing approvals. Each row represents a single execu
 
 ### `audit_events`
 
-Immutable log of significant actions: approval decisions, agent lifecycle events, and standing approval executions. Used by the dashboard activity feed.
+Immutable log of significant actions: approval decisions, agent lifecycle events, standing approval executions, and payment method charges. Used by the dashboard activity feed and compliance export.
 
 | Column | Type | Constraints |
 |---|---|---|
 | `id` | bigserial | PK |
 | `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE RESTRICT |
 | `agent_id` | bigint | NOT NULL, FK → agents(agent_id) ON DELETE RESTRICT |
-| `event_type` | text | NOT NULL, CHECK IN ('approval.approved', 'approval.denied', 'approval.cancelled', 'standing_approval.executed', 'agent.registered', 'agent.deactivated') |
-| `outcome` | text | NOT NULL, CHECK IN ('approved', 'denied', 'cancelled', 'auto_executed', 'registered', 'deactivated', 'pending', 'expired') |
+| `event_type` | text | NOT NULL, CHECK IN ('approval.requested', 'approval.approved', 'approval.denied', 'approval.cancelled', 'action.executed', 'standing_approval.executed', 'agent.registered', 'agent.deactivated', 'payment_method.charged') |
+| `outcome` | text | NOT NULL, CHECK IN ('approved', 'denied', 'cancelled', 'auto_executed', 'registered', 'deactivated', 'pending', 'expired', 'charged') |
 | `source_id` | text | |
-| `source_type` | text | CHECK IN ('approval', 'standing_approval', 'agent', 'registration_invite') |
+| `source_type` | text | CHECK IN ('approval', 'standing_approval', 'agent', 'registration_invite', 'payment_method_transaction') |
 | `agent_meta` | jsonb | Point-in-time snapshot of agent metadata |
-| `action` | jsonb | Action context (optional) |
+| `action` | jsonb | Action context (optional, see below) |
+| `connector_id` | text | Nullable — which connector handled the action |
+| `execution_status` | text | Nullable — 'success', 'failure', 'timeout', 'skipped' |
+| `execution_error` | text | Nullable — failure details (truncated to 512 chars) |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 
 **Indexes:** `idx_audit_events_user_created` on `(user_id, created_at DESC, id DESC)`, `idx_audit_events_agent` on `(agent_id, created_at DESC, id DESC)`
 
 **Note:** Audit events use ON DELETE RESTRICT (not CASCADE) to prevent accidental deletion of audit history when cleaning up users or agents. The `agent_meta` column captures a snapshot of the agent's metadata at event time so the audit trail remains meaningful even if the agent is later modified or deactivated.
+
+**Action JSON shapes by event type:**
+- **Approval/standing approval events:** `{"type": "connector.action", "version": "1", "parameters": {...}, "constraints": {...}}`
+- **`payment_method.charged`:** `{"type": "connector.action", "payment_method_id": "pm_...", "brand": "visa", "last4": "4242", "amount_cents": 15000, "currency": "usd", "description": "..."}` — never includes raw card numbers, CVV, or full expiry. Only safe display metadata (brand, last4) and the opaque payment method ID are stored.
+- **Agent lifecycle events:** `null`
 
 ### `plans`
 

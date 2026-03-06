@@ -173,6 +173,9 @@ listAuditEvents:
       - **One-off approvals**: approved, denied, or cancelled approval requests
       - **Standing approval executions**: auto-executed actions via standing approvals
       - **Agent lifecycle**: agent registration and deactivation events
+      - **Payment charges**: when a stored payment method is used by a connector
+        action (`payment_method.charged`). The action object contains only safe
+        display metadata (brand, last4, amount, currency) — never raw card details.
 
       Results are filtered by the user's plan retention window (7 days for free,
       90 days for paid). The response includes a `retention` object with the
@@ -290,6 +293,21 @@ listAuditEvents:
                   outcome: "auto_executed"
                   connector_id: "email"
                   execution_status: "success"
+                - event_type: "payment_method.charged"
+                  timestamp: "2026-02-20T14:20:00Z"
+                  agent_id: 42
+                  agent_metadata:
+                    name: "My AI Assistant"
+                  action:
+                    type: "expedia.create_booking"
+                    payment_method_id: "pm_abc123"
+                    brand: "visa"
+                    last4: "4242"
+                    amount_cents: 15000
+                    currency: "usd"
+                    description: "Hotel booking — 2 nights"
+                  outcome: "charged"
+                  connector_id: "expedia"
                 - event_type: "agent.registered"
                   timestamp: "2026-02-19T10:00:00Z"
                   agent_id: 43
