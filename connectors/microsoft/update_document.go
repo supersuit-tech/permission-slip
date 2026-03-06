@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -24,14 +23,8 @@ type updateDocumentParams struct {
 }
 
 func (p *updateDocumentParams) validate() error {
-	if p.ItemID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
-	}
-	if strings.ContainsAny(p.ItemID, "/\\") || strings.Contains(p.ItemID, "..") {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or traversal sequences"}
-	}
-	if strings.ContainsRune(p.ItemID, 0) {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain null bytes"}
+	if err := validateItemID(p.ItemID); err != nil {
+		return err
 	}
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}

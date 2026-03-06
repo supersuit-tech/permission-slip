@@ -43,13 +43,8 @@ func (p *createDocumentParams) validate() error {
 	if strings.ContainsRune(p.Filename, 0) {
 		return &connectors.ValidationError{Message: "invalid filename: must not contain null bytes"}
 	}
-	if p.FolderPath != "" {
-		if strings.Contains(p.FolderPath, "..") || strings.Contains(p.FolderPath, "\\") {
-			return &connectors.ValidationError{Message: "invalid folder_path: must not contain path traversal sequences or backslashes"}
-		}
-		if strings.ContainsRune(p.FolderPath, 0) {
-			return &connectors.ValidationError{Message: "invalid folder_path: must not contain null bytes"}
-		}
+	if err := validateFolderPath(p.FolderPath); err != nil {
+		return err
 	}
 	if len(p.Content) > maxSimpleUploadSize {
 		return &connectors.ValidationError{Message: fmt.Sprintf("content exceeds maximum size of %d MB for simple upload", maxSimpleUploadSize/(1024*1024))}
@@ -94,19 +89,11 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	}
 	params.defaults()
 
-	// Build the upload path. Escape filename to prevent URL injection
-	// (e.g. characters like ? or # altering URL structure).
+	// Build the upload path. Escape user-provided segments to prevent URL injection.
 	escapedFilename := url.PathEscape(params.Filename)
 	var path string
 	if params.FolderPath != "" {
-		folderPath := strings.TrimPrefix(params.FolderPath, "/")
-		folderPath = strings.TrimSuffix(folderPath, "/")
-		// Escape each segment of the folder path individually to preserve slashes.
-		segments := strings.Split(folderPath, "/")
-		for i, s := range segments {
-			segments[i] = url.PathEscape(s)
-		}
-		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", strings.Join(segments, "/"), escapedFilename)
+		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", escapeFolderPath(params.FolderPath), escapedFilename)
 	} else {
 		path = fmt.Sprintf("/me/drive/root:/%s:/content", escapedFilename)
 	}

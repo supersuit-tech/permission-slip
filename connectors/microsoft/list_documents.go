@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -33,15 +31,7 @@ func (p *listDocumentsParams) defaults() {
 }
 
 func (p *listDocumentsParams) validate() error {
-	if p.FolderPath != "" {
-		if strings.Contains(p.FolderPath, "..") || strings.Contains(p.FolderPath, "\\") {
-			return &connectors.ValidationError{Message: "invalid folder_path: must not contain path traversal sequences or backslashes"}
-		}
-		if strings.ContainsRune(p.FolderPath, 0) {
-			return &connectors.ValidationError{Message: "invalid folder_path: must not contain null bytes"}
-		}
-	}
-	return nil
+	return validateFolderPath(p.FolderPath)
 }
 
 // graphDriveChildren is the Graph API response for listing children of a folder.
@@ -70,16 +60,9 @@ func (a *listDocumentsAction) Execute(ctx context.Context, req connectors.Action
 	params.defaults()
 
 	// Build the list path. Filter for .docx files using $filter on the name.
-	// Escape each folder segment to prevent URL injection.
 	var basePath string
 	if params.FolderPath != "" {
-		folderPath := strings.TrimPrefix(params.FolderPath, "/")
-		folderPath = strings.TrimSuffix(folderPath, "/")
-		segments := strings.Split(folderPath, "/")
-		for i, s := range segments {
-			segments[i] = url.PathEscape(s)
-		}
-		basePath = fmt.Sprintf("/me/drive/root:/%s:/children", strings.Join(segments, "/"))
+		basePath = fmt.Sprintf("/me/drive/root:/%s:/children", escapeFolderPath(params.FolderPath))
 	} else {
 		basePath = "/me/drive/root/children"
 	}
