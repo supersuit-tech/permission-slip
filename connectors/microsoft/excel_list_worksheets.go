@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -59,7 +60,7 @@ func (a *excelListWorksheetsAction) Execute(ctx context.Context, req connectors.
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s/workbook/worksheets", params.ItemID)
+	path := fmt.Sprintf("/me/drive/items/%s/workbook/worksheets", url.PathEscape(params.ItemID))
 
 	var resp graphWorksheetsResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {

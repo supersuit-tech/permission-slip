@@ -62,7 +62,7 @@ func (a *excelWriteRangeAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	path := fmt.Sprintf("/me/drive/items/%s/workbook/worksheets/%s/range(address='%s')",
-		params.ItemID,
+		url.PathEscape(params.ItemID),
 		url.PathEscape(params.SheetName),
 		url.QueryEscape(params.Range),
 	)

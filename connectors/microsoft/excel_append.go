@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -72,7 +73,7 @@ func (a *excelAppendRowsAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s/workbook/tables/%s/rows", params.ItemID, params.TableName)
+	path := fmt.Sprintf("/me/drive/items/%s/workbook/tables/%s/rows", url.PathEscape(params.ItemID), url.PathEscape(params.TableName))
 
 	body := graphAddRowsRequest{Values: params.Values}
 
