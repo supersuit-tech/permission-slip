@@ -23,9 +23,22 @@ func TestShopifyConnector_Actions(t *testing.T) {
 	c := New()
 	actions := c.Actions()
 
-	// Phase 1 scaffold — no actions registered yet.
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 (scaffold)", len(actions))
+	wantActions := []string{
+		"shopify.get_orders",
+		"shopify.get_order",
+		"shopify.update_order",
+		"shopify.create_product",
+		"shopify.update_inventory",
+		"shopify.create_discount",
+	}
+
+	if len(actions) != len(wantActions) {
+		t.Errorf("Actions() returned %d actions, want %d", len(actions), len(wantActions))
+	}
+	for _, actionType := range wantActions {
+		if _, ok := actions[actionType]; !ok {
+			t.Errorf("Actions() missing %q", actionType)
+		}
 	}
 }
 
@@ -123,9 +136,12 @@ func TestShopifyConnector_Manifest(t *testing.T) {
 		t.Error("credential instructions_url is empty, want a URL")
 	}
 
-	// Note: m.Validate() will fail until Phase 2 adds actions to the manifest.
-	// Manifest validation requires at least one action, which is expected
-	// to be absent during the Phase 1 scaffold.
+	if len(m.Actions) != 6 {
+		t.Errorf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	}
+	if err := m.Validate(); err != nil {
+		t.Errorf("Manifest().Validate() = %v, want nil", err)
+	}
 }
 
 func TestShopifyConnector_ActionsMatchManifest(t *testing.T) {
