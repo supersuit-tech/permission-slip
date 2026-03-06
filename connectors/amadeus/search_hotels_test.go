@@ -3,6 +3,7 @@ package amadeus
 import (
 	"encoding/json"
 	"net/http"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -11,9 +12,9 @@ import (
 func TestSearchHotels_Success(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	var callCount atomic.Int32
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
+		callCount.Add(1)
 		if r.Method != http.MethodGet {
 			t.Errorf("method = %s, want GET", r.Method)
 		}
@@ -70,8 +71,8 @@ func TestSearchHotels_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
-	if callCount != 2 {
-		t.Errorf("expected 2 API calls (hotel list + offers), got %d", callCount)
+	if got := callCount.Load(); got != 2 {
+		t.Errorf("expected 2 API calls (hotel list + offers), got %d", got)
 	}
 
 	var data map[string]any
