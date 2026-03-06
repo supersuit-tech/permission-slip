@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -45,12 +46,7 @@ func sortedKeys(m map[string]interface{}) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	// Sort for deterministic output.
-	for i := 1; i < len(keys); i++ {
-		for j := i; j > 0 && keys[j] < keys[j-1]; j-- {
-			keys[j], keys[j-1] = keys[j-1], keys[j]
-		}
-	}
+	sort.Strings(keys)
 	return keys
 }
 

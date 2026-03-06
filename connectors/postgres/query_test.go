@@ -131,6 +131,32 @@ func TestQuery_RejectsNonSelect(t *testing.T) {
 	}
 }
 
+func TestQuery_WithCTE(t *testing.T) {
+	t.Parallel()
+	table := setupTestTable(t)
+
+	conn := New()
+	action := conn.Actions()["postgres.query"]
+
+	// Read-only CTE should succeed.
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "postgres.query",
+		Parameters:  json.RawMessage(fmt.Sprintf(`{"sql":"WITH active AS (SELECT name, value FROM %s WHERE active = true) SELECT * FROM active ORDER BY name"}`, table)),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["row_count"].(float64) != 2 {
+		t.Errorf("row_count = %v, want 2", data["row_count"])
+	}
+}
+
 func TestQuery_ReadOnlyEnforcement(t *testing.T) {
 	t.Parallel()
 	table := setupTestTable(t)

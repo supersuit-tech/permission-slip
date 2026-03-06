@@ -61,7 +61,7 @@ func mapPgError(err error, action string) error {
 	}
 
 	// Read-only transaction violation (SQLSTATE 25006).
-	if strings.Contains(msg, "25006") || strings.Contains(msg, "cannot execute") && strings.Contains(msg, "read-only") {
+	if strings.Contains(msg, "25006") || (strings.Contains(msg, "cannot execute") && strings.Contains(msg, "read-only")) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("PostgreSQL read-only transaction violation: %v", err)}
 	}
 
