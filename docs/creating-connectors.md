@@ -867,7 +867,6 @@ Action types follow the pattern `<connector_id>.<action_name>`:
 
 - `github.create_issue`
 - `github.merge_pr`
-- `shopify.<action_name>` (Phase 2)
 - `slack.send_message`
 - `slack.create_channel`
 
@@ -892,13 +891,6 @@ connectors/
 │   ├── github_test.go        # Connector-level tests
 │   ├── create_issue_test.go  # Action tests
 │   └── merge_pr_test.go      # Action tests
-├── shopify/
-│   ├── shopify.go            # ShopifyConnector struct, New(), Manifest(), do(), ValidateCredentials()
-│   ├── response.go           # HTTP status → typed error mapping
-│   ├── helpers_test.go       # validCreds() test helper
-│   ├── shopify_test.go       # Connector-level tests
-│   ├── response_test.go      # Response parsing tests
-│   └── README.md             # Connector documentation
 └── slack/
     ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
     ├── send_message.go       # slack.send_message action
