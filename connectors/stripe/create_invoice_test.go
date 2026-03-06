@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -356,6 +357,63 @@ func TestCreateInvoice_MultipleLineItems(t *testing.T) {
 	}
 	if got := callCount.Load(); got != 4 {
 		t.Errorf("expected 4 API calls (create + 2 items + finalize), got %d", got)
+	}
+}
+
+func TestCreateInvoice_IdenticalLineItemsGetUniqueIdempotencyKeys(t *testing.T) {
+	t.Parallel()
+
+	// Regression test: two identical line items must get different idempotency
+	// keys, otherwise Stripe deduplicates the second one silently.
+	var mu sync.Mutex
+	var idempotencyKeys []string
+	var callCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		switch {
+		case n == 1 && r.URL.Path == "/v1/invoices":
+			json.NewEncoder(w).Encode(map[string]any{"id": "in_dup", "status": "draft"})
+		case (n == 2 || n == 3) && r.URL.Path == "/v1/invoiceitems":
+			mu.Lock()
+			idempotencyKeys = append(idempotencyKeys, r.Header.Get("Idempotency-Key"))
+			mu.Unlock()
+			json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("ii_%d", n)})
+		case n == 4 && r.URL.Path == "/v1/invoices/in_dup/finalize":
+			json.NewEncoder(w).Encode(map[string]any{"id": "in_dup", "status": "open"})
+		default:
+			t.Errorf("unexpected request #%d: %s %s", n, r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.create_invoice"]
+
+	// Two IDENTICAL line items — same description, amount, quantity.
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType: "stripe.create_invoice",
+		Parameters: json.RawMessage(`{
+			"customer_id": "cus_abc123",
+			"line_items": [
+				{"description": "Consulting", "amount": 5000, "quantity": 1},
+				{"description": "Consulting", "amount": 5000, "quantity": 1}
+			]
+		}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(idempotencyKeys) != 2 {
+		t.Fatalf("expected 2 invoice item requests, got %d", len(idempotencyKeys))
+	}
+	if idempotencyKeys[0] == idempotencyKeys[1] {
+		t.Errorf("identical line items must get different idempotency keys to avoid deduplication, but both got %q", idempotencyKeys[0])
 	}
 }
 

@@ -109,7 +109,7 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	// Step 2: Add line items.
-	for _, item := range params.LineItems {
+	for i, item := range params.LineItems {
 		itemBody := map[string]any{
 			"invoice":  invoiceResp.ID,
 			"amount":   item.Amount,
@@ -123,9 +123,12 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 		}
 
 		// Each invoice item gets its own idempotency key derived from the
-		// invoice ID + item index to ensure retry safety.
+		// invoice ID + item index. The index is critical: without it, two
+		// identical line items (same description/amount/quantity) would
+		// produce the same key, causing Stripe to silently deduplicate them.
+		itemKeyInput := fmt.Sprintf("%s.item.%s.%d", req.ActionType, invoiceResp.ID, i)
 		itemParams, _ := json.Marshal(item)
-		itemKey := deriveIdempotencyKey(req.ActionType+".item."+invoiceResp.ID, itemParams)
+		itemKey := deriveIdempotencyKey(itemKeyInput, itemParams)
 
 		if err := a.conn.do(ctx, req.Credentials, "POST", "/v1/invoiceitems", formEncode(itemBody), nil, itemKey); err != nil {
 			return nil, fmt.Errorf("adding line item to invoice %s: %w", invoiceResp.ID, err)
