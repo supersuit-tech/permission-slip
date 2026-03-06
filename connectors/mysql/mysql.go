@@ -1,6 +1,16 @@
 // Package mysql implements the MySQL connector for the Permission Slip
 // connector execution layer. It uses database/sql with the go-sql-driver/mysql
 // driver to execute parameterized queries against MySQL databases.
+//
+// Security features:
+//   - All values are parameterized (? placeholders) to prevent SQL injection
+//   - Table and column names are validated against [a-zA-Z0-9_] and backtick-quoted
+//   - SELECT queries run in read-only transactions as defense in depth
+//   - Dangerous SQL keywords (INSERT, DROP, INTO, etc.) are blocked in query mode
+//   - Semicolons are rejected to prevent multi-statement injection
+//   - Table and column allowlists can restrict which objects an agent may access
+//   - Statement timeouts prevent runaway queries
+//   - Error messages are sanitized to avoid leaking connection details
 package mysql
 
 import (
