@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -36,11 +37,16 @@ func (p *createCalendarEventParams) validate() error {
 	if p.EndTime == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end_time"}
 	}
-	if _, err := time.Parse(time.RFC3339, p.StartTime); err != nil {
+	start, err := time.Parse(time.RFC3339, p.StartTime)
+	if err != nil {
 		return &connectors.ValidationError{Message: fmt.Sprintf("start_time must be RFC 3339 format: %v", err)}
 	}
-	if _, err := time.Parse(time.RFC3339, p.EndTime); err != nil {
+	end, err := time.Parse(time.RFC3339, p.EndTime)
+	if err != nil {
 		return &connectors.ValidationError{Message: fmt.Sprintf("end_time must be RFC 3339 format: %v", err)}
+	}
+	if !end.After(start) {
+		return &connectors.ValidationError{Message: "end_time must be after start_time"}
 	}
 	return nil
 }
@@ -101,8 +107,8 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 	}
 
 	var resp calendarEventResponse
-	url := a.conn.calendarBaseURL + "/calendars/" + params.CalendarID + "/events"
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, url, body, &resp); err != nil {
+	calURL := a.conn.calendarBaseURL + "/calendars/" + url.PathEscape(params.CalendarID) + "/events"
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, calURL, body, &resp); err != nil {
 		return nil, err
 	}
 

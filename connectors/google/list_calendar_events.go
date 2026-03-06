@@ -118,7 +118,7 @@ func (a *listCalendarEventsAction) Execute(ctx context.Context, req connectors.A
 	}
 
 	var listResp calendarListResponse
-	listURL := a.conn.calendarBaseURL + "/calendars/" + params.CalendarID + "/events?" + q.Encode()
+	listURL := a.conn.calendarBaseURL + "/calendars/" + url.PathEscape(params.CalendarID) + "/events?" + q.Encode()
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, listURL, nil, &listResp); err != nil {
 		return nil, err
 	}

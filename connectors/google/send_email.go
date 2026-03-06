@@ -34,7 +34,19 @@ func (p *sendEmailParams) validate() error {
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}
 	}
+	if containsNewline(p.To) {
+		return &connectors.ValidationError{Message: "to must not contain newlines"}
+	}
+	if containsNewline(p.Subject) {
+		return &connectors.ValidationError{Message: "subject must not contain newlines"}
+	}
 	return nil
+}
+
+// containsNewline returns true if s contains CR or LF characters, which
+// would allow MIME header injection in RFC 2822 messages.
+func containsNewline(s string) bool {
+	return strings.ContainsAny(s, "\r\n")
 }
 
 // gmailSendRequest is the Gmail API request body for messages.send.

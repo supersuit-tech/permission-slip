@@ -181,6 +181,56 @@ func TestCreateCalendarEvent_InvalidEndTime(t *testing.T) {
 	}
 }
 
+func TestCreateCalendarEvent_EndBeforeStart(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"summary":    "Meeting",
+		"start_time": "2024-01-15T10:00:00-05:00",
+		"end_time":   "2024-01-15T09:00:00-05:00",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for end_time before start_time")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateCalendarEvent_EndEqualsStart(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"summary":    "Meeting",
+		"start_time": "2024-01-15T09:00:00-05:00",
+		"end_time":   "2024-01-15T09:00:00-05:00",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for end_time equal to start_time")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateCalendarEvent_AuthFailure(t *testing.T) {
 	t.Parallel()
 
@@ -211,6 +261,44 @@ func TestCreateCalendarEvent_AuthFailure(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("expected AuthError, got: %T", err)
+	}
+}
+
+func TestCreateCalendarEvent_CalendarIDURLEncoded(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Calendar ID with @ should be decoded to the correct path by the server.
+		wantPath := "/calendars/user@group.calendar.google.com/events"
+		if r.URL.Path != wantPath {
+			t.Errorf("expected path %q, got %q", wantPath, r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarEventResponse{
+			ID:     "event-789",
+			Status: "confirmed",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", srv.URL)
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(createCalendarEventParams{
+		Summary:    "Meeting",
+		StartTime:  "2024-01-15T09:00:00-05:00",
+		EndTime:    "2024-01-15T10:00:00-05:00",
+		CalendarID: "user@group.calendar.google.com",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

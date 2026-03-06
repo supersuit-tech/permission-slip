@@ -209,6 +209,56 @@ func TestSendEmail_RateLimit(t *testing.T) {
 	}
 }
 
+func TestSendEmail_HeaderInjectionTo(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendEmailAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"to":      "user@example.com\r\nBcc: attacker@evil.com",
+		"subject": "Test",
+		"body":    "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for newline in to")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSendEmail_HeaderInjectionSubject(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendEmailAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"to":      "user@example.com",
+		"subject": "Test\r\nBcc: attacker@evil.com",
+		"body":    "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for newline in subject")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSendEmail_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

@@ -203,11 +203,25 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"to":"*","subject":"*","body":"*"}`),
 			},
 			{
+				ID:          "tpl_google_send_email_to_recipient",
+				ActionType:  "google.send_email",
+				Name:        "Send email to specific recipient",
+				Description: "Locks the recipient; agent chooses the subject and body.",
+				Parameters:  json.RawMessage(`{"to":"recipient@example.com","subject":"*","body":"*"}`),
+			},
+			{
 				ID:          "tpl_google_list_emails",
 				ActionType:  "google.list_emails",
-				Name:        "List emails",
+				Name:        "Search emails",
 				Description: "Agent can search and list emails from the inbox.",
 				Parameters:  json.RawMessage(`{"query":"*","max_results":"*"}`),
+			},
+			{
+				ID:          "tpl_google_list_unread_emails",
+				ActionType:  "google.list_emails",
+				Name:        "List unread emails",
+				Description: "Agent can list unread emails only. Query is locked to is:unread.",
+				Parameters:  json.RawMessage(`{"query":"is:unread","max_results":"*"}`),
 			},
 			{
 				ID:          "tpl_google_create_calendar_event",
@@ -215,6 +229,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create calendar events",
 				Description: "Agent can create events on any calendar.",
 				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_calendar_event_no_attendees",
+				ActionType:  "google.create_calendar_event",
+				Name:        "Create personal calendar events",
+				Description: "Agent can create events on the primary calendar without inviting attendees.",
+				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
 			},
 			{
 				ID:          "tpl_google_list_calendar_events",
