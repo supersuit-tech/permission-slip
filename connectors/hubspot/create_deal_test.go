@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -73,9 +74,12 @@ func TestCreateDeal_Success(t *testing.T) {
 func TestCreateDeal_WithAssociations(t *testing.T) {
 	t.Parallel()
 
+	var mu sync.Mutex
 	var calls []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		calls = append(calls, r.Method+" "+r.URL.Path)
+		mu.Unlock()
 
 		if r.URL.Path == "/crm/v3/objects/deals" {
 			w.Header().Set("Content-Type", "application/json")
@@ -120,8 +124,12 @@ func TestCreateDeal_WithAssociations(t *testing.T) {
 	}
 
 	// 1 create + 2 associations = 3 calls
-	if len(calls) != 3 {
-		t.Errorf("expected 3 API calls, got %d: %v", len(calls), calls)
+	mu.Lock()
+	callCount := len(calls)
+	callsCopy := append([]string{}, calls...)
+	mu.Unlock()
+	if callCount != 3 {
+		t.Errorf("expected 3 API calls, got %d: %v", callCount, callsCopy)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,9 +15,12 @@ import (
 func TestAddNote_Success(t *testing.T) {
 	t.Parallel()
 
+	var mu sync.Mutex
 	var calls []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		calls = append(calls, r.Method+" "+r.URL.Path)
+		mu.Unlock()
 
 		if r.URL.Path == "/crm/v3/objects/notes" && r.Method == http.MethodPost {
 			var body hubspotObjectRequest
@@ -88,8 +92,12 @@ func TestAddNote_Success(t *testing.T) {
 		t.Errorf("expected object_type contact, got %q", data["object_type"])
 	}
 
-	if len(calls) != 2 {
-		t.Errorf("expected 2 API calls (create + associate), got %d: %v", len(calls), calls)
+	mu.Lock()
+	callCount := len(calls)
+	callsCopy := append([]string{}, calls...)
+	mu.Unlock()
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls (create + associate), got %d: %v", callCount, callsCopy)
 	}
 }
 

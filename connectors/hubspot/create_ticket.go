@@ -38,20 +38,18 @@ func (p *createTicketParams) validate() error {
 }
 
 func (p *createTicketParams) toAPIProperties() map[string]string {
-	props := make(map[string]string)
-	for k, v := range p.Properties {
-		props[k] = v
+	overrides := map[string]string{
+		"subject":           p.Subject,
+		"hs_pipeline":       p.Pipeline,
+		"hs_pipeline_stage": p.PipelineStage,
 	}
-	props["subject"] = p.Subject
-	props["hs_pipeline"] = p.Pipeline
-	props["hs_pipeline_stage"] = p.PipelineStage
 	if p.Content != "" {
-		props["content"] = p.Content
+		overrides["content"] = p.Content
 	}
 	if p.TicketPriority != "" {
-		props["hs_ticket_priority"] = p.TicketPriority
+		overrides["hs_ticket_priority"] = p.TicketPriority
 	}
-	return props
+	return mergeProperties(p.Properties, overrides)
 }
 
 func (a *createTicketAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

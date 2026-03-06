@@ -48,20 +48,18 @@ func (p *createDealParams) validate() error {
 }
 
 func (p *createDealParams) toAPIProperties() map[string]string {
-	props := make(map[string]string)
-	for k, v := range p.Properties {
-		props[k] = v
+	overrides := map[string]string{
+		"dealname":  p.DealName,
+		"pipeline":  p.Pipeline,
+		"dealstage": p.DealStage,
 	}
-	props["dealname"] = p.DealName
-	props["pipeline"] = p.Pipeline
-	props["dealstage"] = p.DealStage
 	if p.Amount != "" {
-		props["amount"] = p.Amount
+		overrides["amount"] = p.Amount
 	}
 	if p.CloseDate != "" {
-		props["closedate"] = p.CloseDate
+		overrides["closedate"] = p.CloseDate
 	}
-	return props
+	return mergeProperties(p.Properties, overrides)
 }
 
 func (a *createDealAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
