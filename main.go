@@ -21,6 +21,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
@@ -327,6 +328,7 @@ func main() {
 	registry.Register(redisconnector.New())
 	registry.Register(square.New())
 	registry.Register(amadeus.New())
+	registry.Register(expedia.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
