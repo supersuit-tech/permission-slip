@@ -10,11 +10,14 @@ import (
 )
 
 // hubspotError represents the standard HubSpot API error response format.
-// HubSpot returns {"status": "error", "category": "...", "message": "..."}.
+// HubSpot returns {"status": "error", "category": "...", "message": "...",
+// "correlationId": "..."}. The correlationId is included in error messages
+// to help users troubleshoot issues with HubSpot support.
 type hubspotError struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-	Category string `json:"category"`
+	Status        string `json:"status"`
+	Message       string `json:"message"`
+	Category      string `json:"category"`
+	CorrelationID string `json:"correlationId"`
 }
 
 // checkResponse inspects the HTTP status code and response body, returning
@@ -30,6 +33,9 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	msg := string(body)
 	if json.Unmarshal(body, &hsErr) == nil && hsErr.Message != "" {
 		msg = hsErr.Message
+		if hsErr.CorrelationID != "" {
+			msg = fmt.Sprintf("%s (correlationId: %s)", msg, hsErr.CorrelationID)
+		}
 	}
 
 	// HTTP 429 always means rate limit, regardless of body category.

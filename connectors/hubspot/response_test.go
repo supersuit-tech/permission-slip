@@ -3,6 +3,7 @@ package hubspot
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -134,5 +135,18 @@ func TestCheckResponse_MalformedBody(t *testing.T) {
 	}
 	if !connectors.IsExternalError(err) {
 		t.Errorf("expected ExternalError for malformed body, got %T", err)
+	}
+}
+
+func TestCheckResponse_CorrelationID(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"status":"error","category":"VALIDATION_ERROR","message":"Property not found","correlationId":"abc-123-def"}`)
+	err := checkResponse(400, http.Header{}, body)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	want := "correlationId: abc-123-def"
+	if got := err.Error(); !strings.Contains(got, want) {
+		t.Errorf("error message %q should contain %q", got, want)
 	}
 }

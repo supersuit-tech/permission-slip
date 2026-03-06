@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.hubapi.com"
-	defaultTimeout = 30 * time.Second
+	defaultBaseURL  = "https://api.hubapi.com"
+	defaultTimeout  = 30 * time.Second
+	maxResponseBody = 10 << 20 // 10 MB — guard against unexpectedly large responses
 )
 
 // HubSpotConnector owns the shared HTTP client and base URL used by all
@@ -123,7 +124,7 @@ func (c *HubSpotConnector) do(ctx context.Context, creds connectors.Credentials,
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
