@@ -66,5 +66,11 @@ func extractErrorMessage(body []byte) string {
 			return first.Title
 		}
 	}
-	return string(body)
+	// Truncate to avoid leaking large upstream responses (e.g., HTML error
+	// pages from a proxy) into error messages.
+	s := string(body)
+	if len(s) > 500 {
+		s = s[:500] + "... (truncated)"
+	}
+	return s
 }
