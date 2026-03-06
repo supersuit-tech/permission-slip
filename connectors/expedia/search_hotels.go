@@ -125,8 +125,21 @@ func (a *searchHotelsAction) Execute(ctx context.Context, req connectors.ActionR
 	path := "/v3/properties/availability?" + q.Encode()
 
 	var resp json.RawMessage
-	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, defaultCustomerIP, nil, &resp); err != nil {
+	headers, err := a.conn.doWithHeaders(ctx, req.Credentials, http.MethodGet, path, defaultCustomerIP, nil, &resp)
+	if err != nil {
 		return nil, err
+	}
+
+	// Wrap the response to include pagination link if present.
+	// Expedia Rapid returns a Link header with rel="next" for paginated results.
+	if link := headers.Get("Link"); link != "" {
+		paginationJSON, _ := json.Marshal(map[string]string{"next_link": link})
+		wrapped := map[string]json.RawMessage{
+			"properties": resp,
+			"pagination": paginationJSON,
+		}
+		data, _ := json.Marshal(wrapped)
+		return &connectors.ActionResult{Data: data}, nil
 	}
 
 	return &connectors.ActionResult{Data: resp}, nil

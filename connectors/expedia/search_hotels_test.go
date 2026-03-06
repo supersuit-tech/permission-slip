@@ -136,6 +136,87 @@ func TestSearchHotels_OptionalParams(t *testing.T) {
 	}
 }
 
+func TestSearchHotels_Pagination(t *testing.T) {
+	t.Parallel()
+
+	nextLink := `<https://api.ean.com/v3/properties/availability?token=abc123>; rel="next"`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Link", nextLink)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"property_id": "111"},
+			{"property_id": "222"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["expedia.search_hotels"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "expedia.search_hotels",
+		Parameters:  json.RawMessage(`{"checkin":"2024-06-15","checkout":"2024-06-17","occupancy":"2","region_id":"178248"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]json.RawMessage
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if _, ok := data["properties"]; !ok {
+		t.Fatal("response missing 'properties' key")
+	}
+	if _, ok := data["pagination"]; !ok {
+		t.Fatal("response missing 'pagination' key")
+	}
+
+	var pagination map[string]string
+	if err := json.Unmarshal(data["pagination"], &pagination); err != nil {
+		t.Fatalf("unmarshaling pagination: %v", err)
+	}
+	if pagination["next_link"] != nextLink {
+		t.Errorf("next_link = %q, want %q", pagination["next_link"], nextLink)
+	}
+}
+
+func TestSearchHotels_NoPagination(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No Link header — response should be raw array, not wrapped.
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"property_id": "111"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["expedia.search_hotels"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "expedia.search_hotels",
+		Parameters:  json.RawMessage(`{"checkin":"2024-06-15","checkout":"2024-06-17","occupancy":"2","region_id":"178248"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	// Without pagination, the response should be the raw array.
+	var data []map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("expected array response without pagination, got error: %v", err)
+	}
+	if len(data) != 1 {
+		t.Fatalf("got %d results, want 1", len(data))
+	}
+}
+
 func TestSearchHotels_MissingParams(t *testing.T) {
 	t.Parallel()
 
