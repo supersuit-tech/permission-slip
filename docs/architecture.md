@@ -105,12 +105,13 @@ graph TB
 
 ## Background Jobs
 
-The server runs periodic background jobs when a database connection is configured. Both jobs are started on server boot, run immediately once, then repeat on a configurable interval. They respect context cancellation for graceful shutdown.
+The server runs periodic background jobs when a database connection is configured. All jobs are started on server boot, run immediately once, then repeat on a configurable interval. They respect context cancellation for graceful shutdown.
 
 | Job | Default Interval | Description |
 |-----|-----------------|-------------|
 | **Audit log purge** | 1 hour (`AUDIT_PURGE_INTERVAL`) | Deletes expired audit events to prevent unbounded table growth. |
 | **OAuth token refresh** | 10 minutes (`OAUTH_REFRESH_INTERVAL`) | Proactively refreshes OAuth access tokens expiring within 15 minutes. Tokens that fail to refresh (revoked, expired refresh token) are marked `needs_reauth`, prompting the user to re-authorize. |
+| **Card expiry check** | 24 hours (`CARD_EXPIRY_CHECK_INTERVAL`) | Detects payment methods expiring within 30 days (or already expired) and sends one-time notifications via email, SMS, and push. Uses atomic claim-before-notify to prevent duplicate alerts across instances. Requires both DB and notification dispatcher. |
 
 ## Agent Registration Flow
 

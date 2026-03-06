@@ -64,6 +64,20 @@ func formatSMSBody(a Approval) string {
 		return msg
 	}
 
+	if a.Type == NotificationTypeCardExpiring {
+		info := extractCardExpiringInfo(a.Context)
+		var msg string
+		if info.Expired {
+			msg = fmt.Sprintf("[Permission Slip] Your %s has expired — update your payment methods", info.CardIdentifier())
+		} else {
+			msg = fmt.Sprintf("[Permission Slip] Your %s expires %s — add a replacement", info.CardIdentifier(), formatCardExpiry(info.ExpMonth, info.ExpYear))
+		}
+		if a.ApprovalURL != "" {
+			return fmt.Sprintf("%s: %s", msg, a.ApprovalURL)
+		}
+		return msg
+	}
+
 	agentName := AgentDisplayName(a.AgentName, a.AgentID)
 	actionSummary := SummarizeAction(a.Action)
 

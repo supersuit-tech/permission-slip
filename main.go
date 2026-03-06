@@ -199,6 +199,7 @@ func main() {
 	defer bgCancel()
 	var auditPurgeDone <-chan struct{}
 	var oauthRefreshDone <-chan struct{}
+	var cardExpiryCheckDone <-chan struct{}
 
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
@@ -371,6 +372,15 @@ func main() {
 		}, logger)
 	}
 
+	// Start background card expiration check (requires DB + notifier).
+	if deps.DB != nil && deps.Notifier != nil {
+		cardExpiryCheckDone = startCardExpiryCheck(bgCtx, CardExpiryCheckDeps{
+			DB:       deps.DB,
+			Notifier: deps.Notifier,
+			BaseURL:  deps.BaseURL,
+		}, logger)
+	}
+
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
 
 	// Parse allowed CORS origins from a comma-separated list.
@@ -514,6 +524,13 @@ func main() {
 		case <-oauthRefreshDone:
 		case <-time.After(5 * time.Second):
 			logger.Warn("oauth refresh goroutine did not exit in time")
+		}
+	}
+	if cardExpiryCheckDone != nil {
+		select {
+		case <-cardExpiryCheckDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("card expiry check goroutine did not exit in time")
 		}
 	}
 

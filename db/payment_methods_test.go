@@ -3,6 +3,7 @@ package db_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
@@ -225,6 +226,141 @@ func TestPaymentMethodTransactions(t *testing.T) {
 	}
 	if spend != 23500 {
 		t.Errorf("expected 23500 monthly spend, got %d", spend)
+	}
+}
+
+func TestListExpiringPaymentMethods(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pmexpiry_"+uid[:8])
+
+	// Create a card that expires in 2 months — should NOT be returned.
+	_, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_far_" + uid[:8],
+		Brand:                 "visa",
+		Last4:                 "1111",
+		ExpMonth:              5,
+		ExpYear:               2027,
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod (far future): %v", err)
+	}
+
+	// Create a card that expires this month — should be returned.
+	now := time.Now()
+	_, err = db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_soon_" + uid[:8],
+		Brand:                 "mastercard",
+		Last4:                 "2222",
+		ExpMonth:              int(now.Month()),
+		ExpYear:               now.Year(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod (expiring soon): %v", err)
+	}
+
+	// Create an already-expired card — should also be returned.
+	_, err = db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_expired_" + uid[:8],
+		Brand:                 "amex",
+		Last4:                 "3333",
+		ExpMonth:              1,
+		ExpYear:               2024,
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod (expired): %v", err)
+	}
+
+	results, err := db.ListExpiringPaymentMethods(ctx, tx, 30)
+	if err != nil {
+		t.Fatalf("ListExpiringPaymentMethods: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 expiring cards, got %d", len(results))
+	}
+
+	// Verify profile info is populated.
+	for _, epm := range results {
+		if epm.Profile.ID != uid {
+			t.Errorf("expected profile ID %s, got %s", uid, epm.Profile.ID)
+		}
+		if epm.Profile.Username == "" {
+			t.Error("expected non-empty profile username")
+		}
+	}
+}
+
+func TestMarkExpirationAlertSent(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pmalert_"+uid[:8])
+
+	// Create an expiring card.
+	now := time.Now()
+	pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_alert_" + uid[:8],
+		Brand:                 "visa",
+		Last4:                 "4444",
+		ExpMonth:              int(now.Month()),
+		ExpYear:               now.Year(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod: %v", err)
+	}
+
+	// Should appear in expiring list initially.
+	results, err := db.ListExpiringPaymentMethods(ctx, tx, 30)
+	if err != nil {
+		t.Fatalf("ListExpiringPaymentMethods: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+
+	// Mark as alerted (first call should claim).
+	claimed, err := db.MarkExpirationAlertSent(ctx, tx, pm.ID)
+	if err != nil {
+		t.Fatalf("MarkExpirationAlertSent: %v", err)
+	}
+	if !claimed {
+		t.Fatal("expected first MarkExpirationAlertSent to claim the card")
+	}
+
+	// Second call should NOT claim (already marked — prevents duplicates).
+	claimed2, err := db.MarkExpirationAlertSent(ctx, tx, pm.ID)
+	if err != nil {
+		t.Fatalf("MarkExpirationAlertSent (second call): %v", err)
+	}
+	if claimed2 {
+		t.Fatal("expected second MarkExpirationAlertSent to return false (already claimed)")
+	}
+
+	// Should no longer appear in expiring list (deduplication).
+	results, err = db.ListExpiringPaymentMethods(ctx, tx, 30)
+	if err != nil {
+		t.Fatalf("ListExpiringPaymentMethods after marking: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0 after marking alert sent, got %d", len(results))
+	}
+
+	// Verify the field is set on the payment method.
+	fetched, err := db.GetPaymentMethodByID(ctx, tx, uid, pm.ID)
+	if err != nil {
+		t.Fatalf("GetPaymentMethodByID: %v", err)
+	}
+	if fetched.ExpirationAlertSentAt == nil {
+		t.Error("expected expiration_alert_sent_at to be non-nil")
 	}
 }
 

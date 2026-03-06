@@ -260,6 +260,7 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
 | `AUDIT_PURGE_INTERVAL` | Optional | How often expired audit events are purged — Go duration format, minimum `1m` (default: `1h`) |
 | `OAUTH_REFRESH_INTERVAL` | Optional | How often the background job checks for expiring OAuth tokens — Go duration format, minimum `1m` (default: `10m`). Tokens within 15 minutes of expiry are proactively refreshed. |
+| `CARD_EXPIRY_CHECK_INTERVAL` | Optional | How often the background job checks for expiring payment methods — Go duration format, minimum `1h` (default: `24h`). Sends one-time email/SMS/push alerts for cards expiring within 30 days. |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
 | `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
