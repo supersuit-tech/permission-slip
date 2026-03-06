@@ -100,6 +100,8 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Expo Push Tokens
     description: Expo push token management for mobile push notifications (session-authenticated)
+  - name: OAuth
+    description: OAuth 2.0 provider authorization and connection management (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -349,6 +351,8 @@ paths:
                 agent_id: 42
                 expires_at: '2026-02-11T13:25:00Z'
                 verification_required: true
+                approver:
+                  username: alice
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -538,6 +542,8 @@ paths:
               example:
                 status: registered
                 registered_at: '2026-02-11T13:20:15Z'
+                approver:
+                  username: alice
         '400':
           description: Invalid request or agent ID mismatch
           content:
@@ -989,6 +995,8 @@ paths:
               example:
                 agent_id: 42
                 status: registered
+                approver:
+                  username: alice
                 metadata:
                   name: My AI Assistant
                   version: 1.0.0
@@ -1124,6 +1132,8 @@ paths:
                   summary: Agent with multiple connectors, mixed readiness
                   value:
                     agent_id: 42
+                    approver:
+                      username: alice
                     connectors:
                       - id: gmail
                         name: Gmail
@@ -1237,11 +1247,15 @@ paths:
                   summary: Agent with no enabled connectors
                   value:
                     agent_id: 43
+                    approver:
+                      username: bob
                     connectors: []
                 standing_approval_only:
                   summary: Single connector, all actions with standing approvals
                   value:
                     agent_id: 44
+                    approver:
+                      username: carol
                     connectors:
                       - id: gmail
                         name: Gmail
@@ -5256,6 +5270,460 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/oauth/providers:
+    get:
+      operationId: listOAuthProviders
+      summary: List OAuth Providers
+      description: |
+        Returns all registered OAuth providers and their configuration status.
+        This lets the frontend discover which providers are available, which are
+        ready to use (have credentials configured), and which need BYOA setup.
+
+        Providers come from three sources:
+        - **built_in**: Platform-provided providers (e.g. Google, Microsoft)
+        - **manifest**: Declared in a connector manifest (e.g. Salesforce)
+        - **byoa**: User-configured (Bring Your Own App)
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: OAuth providers listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderListResponse'
+              example:
+                providers:
+                  - id: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/userinfo.email
+                    source: built_in
+                    has_credentials: true
+                  - id: microsoft
+                    scopes:
+                      - openid
+                      - offline_access
+                      - User.Read
+                    source: built_in
+                    has_credentials: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/oauth/{provider}/authorize:
+    get:
+      operationId: oauthAuthorize
+      summary: Initiate OAuth Authorization
+      description: |
+        Generates an authorization URL for the given OAuth provider and redirects
+        the user's browser to the provider's consent screen. The redirect includes
+        a signed CSRF state parameter that ties the flow to the authenticated user.
+
+        After the user grants consent, the provider redirects back to the callback
+        endpoint (`GET /v1/oauth/{provider}/callback`) with an authorization code.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - A signed state token prevents CSRF and session-fixation attacks
+        - The provider must have client credentials configured (built-in or BYOA)
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: Additional OAuth scopes to request beyond the provider defaults
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '307':
+          description: Redirects to the OAuth provider's authorization endpoint
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth provider not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/{provider}/callback:
+    get:
+      operationId: oauthCallback
+      summary: OAuth Callback
+      description: |
+        Handles the OAuth provider's redirect after user consent. Validates the
+        CSRF state token, exchanges the authorization code for access/refresh
+        tokens, encrypts them in the vault, and creates an `oauth_connections` row.
+
+        On success, redirects the user to the frontend settings page with
+        `?oauth_status=success`. On failure, redirects with `?oauth_status=error`.
+
+        This endpoint is called by the OAuth provider, not directly by the frontend.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: false
+          description: The authorization code from the provider
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: The signed CSRF state token
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Error code from the provider (e.g. "access_denied")
+          schema:
+            type: string
+        - name: error_description
+          in: query
+          required: false
+          description: Human-readable error description from the provider
+          schema:
+            type: string
+      responses:
+        '307':
+          description: Redirects to frontend settings page with success/error status
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/connections:
+    get:
+      operationId: listOAuthConnections
+      summary: List OAuth Connections
+      description: |
+        Returns all active OAuth connections for the authenticated user. Each
+        connection includes the provider, granted scopes, status, and when it
+        was established. Tokens are never included in the response.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - Only returns connections belonging to the authenticated user
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: OAuth connections listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthConnectionListResponse'
+              example:
+                connections:
+                  - provider: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/userinfo.email
+                    status: active
+                    connected_at: '2026-03-05T10:00:00Z'
+                  - provider: microsoft
+                    scopes:
+                      - openid
+                      - offline_access
+                      - User.Read
+                    status: active
+                    connected_at: '2026-03-05T11:30:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/connections/{provider}:
+    delete:
+      operationId: deleteOAuthConnection
+      summary: Disconnect OAuth Provider
+      description: |
+        Disconnects an OAuth provider for the authenticated user. Deletes the
+        OAuth connection row and removes the encrypted tokens from the vault.
+
+        After disconnection, any connector actions that depend on this OAuth
+        provider will fail until the user re-authorizes.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - Only the user who created the connection can delete it
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to disconnect
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth provider disconnected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthDisconnectResponse'
+              example:
+                provider: google
+                disconnected_at: '2026-03-05T15:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/provider-configs:
+    get:
+      operationId: listOAuthProviderConfigs
+      summary: List BYOA Provider Configs
+      description: |
+        Returns all BYOA (Bring Your Own App) OAuth provider configurations for
+        the authenticated user. Each config indicates that the user has registered
+        their own OAuth client credentials for that provider.
+
+        Client secrets are never included in the response — only the provider ID
+        and timestamps are returned.
+
+        ## Related Endpoints
+
+        - `GET /v1/oauth/providers` — lists all available providers (built-in + manifest + BYOA)
+        - `POST /v1/oauth/provider-configs` — register new BYOA credentials
+        - `PUT /v1/oauth/provider-configs/{provider}` — rotate existing credentials
+        - `DELETE /v1/oauth/provider-configs/{provider}` — remove BYOA credentials
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: BYOA provider configs listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfigListResponse'
+              example:
+                configs:
+                  - provider: salesforce
+                    created_at: '2026-03-05T12:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createOAuthProviderConfig
+      summary: Register BYOA OAuth Credentials
+      description: |
+        Registers user-provided OAuth client credentials for a provider. The
+        provider must already be declared by a built-in config or connector
+        manifest — this endpoint only supplies the client ID and secret.
+
+        Client credentials are encrypted in Supabase Vault (AES-256-GCM) and
+        never stored in plaintext. The vault secret IDs are stored in the
+        `oauth_provider_configs` database table.
+
+        After registration, the provider's OAuth flows will use these credentials
+        immediately. Only one config per provider per user is allowed — delete the
+        existing config before creating a new one.
+
+        ## Credential Lifecycle
+
+        1. **Register**: `POST /v1/oauth/provider-configs` (this endpoint)
+        2. **Rotate**: `PUT /v1/oauth/provider-configs/{provider}`
+        3. **Remove**: `DELETE /v1/oauth/provider-configs/{provider}`
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthProviderConfigRequest'
+      responses:
+        '201':
+          description: BYOA provider config created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfig'
+              example:
+                provider: salesforce
+                created_at: '2026-03-05T12:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth provider not found (not declared by any built-in or connector manifest)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: BYOA config already exists for this provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/provider-configs/{provider}:
+    put:
+      operationId: updateOAuthProviderConfig
+      summary: Update BYOA Provider Config
+      description: |
+        Replaces the client credentials for an existing BYOA provider config.
+        This supports credential rotation without requiring delete + create.
+
+        The old vault secrets are deleted and replaced with new ones atomically.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to update
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthProviderConfigRequest'
+      responses:
+        '200':
+          description: BYOA provider config updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfig'
+              example:
+                provider: salesforce
+                created_at: '2026-03-05T12:00:00Z'
+                updated_at: '2026-03-05T14:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: BYOA provider config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteOAuthProviderConfig
+      summary: Delete BYOA Provider Config
+      description: |
+        Removes the user's BYOA OAuth client credentials for a provider. The
+        encrypted vault secrets are deleted along with the database row.
+
+        After deletion, the provider reverts to its built-in or manifest
+        configuration (if any). If no built-in credentials exist, the provider
+        will require new BYOA credentials before OAuth flows can be initiated.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to delete the config for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: BYOA provider config deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfigDeleteResponse'
+              example:
+                provider: salesforce
+                deleted_at: '2026-03-05T15:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: BYOA provider config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/config:
     get:
       summary: Get server configuration
@@ -5509,10 +5977,19 @@ components:
             agent registers. The agent must collect the code from the user and submit
             it via `POST /v1/agents/{agent_id}/verify`.
           example: true
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is registering with. Included so the
+            agent knows whose account it's connecting to — especially useful when
+            an agent registers with multiple users and needs to distinguish them.
       example:
         agent_id: 42
         expires_at: '2026-02-11T13:25:00Z'
         verification_required: true
+        approver:
+          username: alice
     VerifyRegistrationRequest:
       type: object
       required:
@@ -5568,9 +6045,18 @@ components:
           description: |
             ISO 8601 timestamp (RFC 3339 format, UTC) when registration was completed.
           example: '2026-02-11T13:20:15Z'
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is now registered with. The agent should
+            store this alongside the `agent_id` to identify which user this
+            registration belongs to.
       example:
         status: registered
         registered_at: '2026-02-11T13:20:15Z'
+        approver:
+          username: alice
     ApprovalRequest:
       type: object
       required:
@@ -6762,8 +7248,10 @@ components:
             - api_key
             - basic
             - custom
+            - oauth2
           description: |
-            Authentication type required by the external service.
+            Authentication type required by the external service. When `oauth2`, the user
+            must connect their account via the OAuth flow instead of providing static credentials.
           example: api_key
         instructions_url:
           type: string
@@ -6773,6 +7261,21 @@ components:
             URL to human-readable documentation explaining how to obtain credentials
             for this service. Only present when the connector provides setup instructions.
           example: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
+        oauth_provider:
+          type: string
+          maxLength: 255
+          description: |
+            OAuth provider identifier. Only present when `auth_type` is `oauth2`.
+            Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft").
+          example: google
+        oauth_scopes:
+          type: array
+          items:
+            type: string
+          description: |
+            OAuth scopes required by this connector. Only present when `auth_type` is `oauth2`.
+          example:
+            - https://www.googleapis.com/auth/gmail.send
       example:
         service: github
         auth_type: api_key
@@ -7539,6 +8042,12 @@ components:
             - deactivated
           description: Current agent status (always "registered" for successful requests, since the middleware requires it)
           example: registered
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is registered to. Identifies whose
+            account and permissions this agent operates under.
         metadata:
           type: object
           nullable: true
@@ -7595,6 +8104,13 @@ components:
           description: |
             The authenticated agent's identifier.
           example: 42
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) whose capabilities are being returned. Identifies
+            which user's connectors, standing approvals, and action configurations
+            are represented in this response.
         connectors:
           type: array
           items:
@@ -7607,6 +8123,8 @@ components:
             If the agent has no enabled connectors, this array is empty.
       example:
         agent_id: 42
+        approver:
+          username: alice
         connectors:
           - id: gmail
             name: Gmail
@@ -9350,6 +9868,221 @@ components:
           type: integer
           description: Number of billable requests attributed to this agent
           example: 500
+    OAuthProvider:
+      type: object
+      required:
+        - id
+        - scopes
+        - source
+        - has_credentials
+      properties:
+        id:
+          type: string
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          example: google
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Default OAuth scopes for this provider
+          example:
+            - openid
+            - https://www.googleapis.com/auth/userinfo.email
+        source:
+          type: string
+          enum:
+            - built_in
+            - manifest
+            - byoa
+          description: Where the provider configuration originated
+          example: built_in
+        has_credentials:
+          type: boolean
+          description: Whether the provider has client credentials configured and is ready to use
+          example: true
+    OAuthProviderListResponse:
+      type: object
+      required:
+        - providers
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProvider'
+          description: List of available OAuth providers
+    OAuthConnection:
+      type: object
+      required:
+        - provider
+        - scopes
+        - status
+        - connected_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          example: google
+        scopes:
+          type: array
+          items:
+            type: string
+          description: The OAuth scopes granted by the provider
+          example:
+            - openid
+            - https://www.googleapis.com/auth/userinfo.email
+        status:
+          type: string
+          enum:
+            - active
+            - needs_reauth
+            - revoked
+          description: The current status of the connection
+          example: active
+        connected_at:
+          type: string
+          format: date-time
+          description: When the OAuth connection was established
+          example: '2026-03-05T10:00:00Z'
+    OAuthConnectionListResponse:
+      type: object
+      required:
+        - connections
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthConnection'
+          description: List of OAuth connections for the authenticated user
+    OAuthDisconnectResponse:
+      type: object
+      required:
+        - provider
+        - disconnected_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider that was disconnected
+          example: google
+        disconnected_at:
+          type: string
+          format: date-time
+          description: When the OAuth provider was disconnected
+          example: '2026-03-05T15:00:00Z'
+    CreateOAuthProviderConfigRequest:
+      type: object
+      description: |
+        Request body for registering BYOA (Bring Your Own App) OAuth credentials.
+        The provider must already be declared by a built-in config or connector
+        manifest — this endpoint only supplies the client ID and secret.
+        Credentials are encrypted at rest in Supabase Vault (AES-256-GCM).
+        Only one config per provider per user is allowed.
+      required:
+        - provider
+        - client_id
+        - client_secret
+      properties:
+        provider:
+          type: string
+          description: |
+            The OAuth provider ID to configure. Must match a provider already
+            declared by a built-in config or connector manifest (e.g. "salesforce",
+            "google"). Use GET /v1/oauth/providers to discover available providers.
+          example: salesforce
+          maxLength: 128
+        client_id:
+          type: string
+          description: |
+            The OAuth application's client ID, obtained from the provider's
+            developer console (e.g. Google Cloud Console, Salesforce Connected App).
+          example: my-client-id
+          maxLength: 2048
+        client_secret:
+          type: string
+          description: |
+            The OAuth application's client secret. This value is encrypted in
+            Supabase Vault and never returned in API responses.
+          example: my-client-secret
+          maxLength: 2048
+    UpdateOAuthProviderConfigRequest:
+      type: object
+      description: |
+        Request body for rotating BYOA OAuth credentials. Both client_id and
+        client_secret must be provided — partial updates are not supported.
+        The old vault secrets are deleted and replaced atomically within a
+        database transaction.
+      required:
+        - client_id
+        - client_secret
+      properties:
+        client_id:
+          type: string
+          description: The new OAuth application's client ID
+          example: my-new-client-id
+          maxLength: 2048
+        client_secret:
+          type: string
+          description: |
+            The new OAuth application's client secret. Encrypted in Supabase
+            Vault and never returned in API responses.
+          example: my-new-client-secret
+          maxLength: 2048
+    OAuthProviderConfig:
+      type: object
+      description: |
+        A BYOA provider config indicating the user has registered their own
+        OAuth client credentials for this provider. Client secrets are never
+        included — only the provider ID and timestamps are returned.
+      required:
+        - provider
+        - created_at
+        - updated_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID (e.g. "salesforce", "google")
+          example: salesforce
+        created_at:
+          type: string
+          format: date-time
+          description: When the BYOA credentials were first registered
+          example: '2026-03-05T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: When the BYOA credentials were last rotated (equals created_at if never updated)
+          example: '2026-03-05T14:00:00Z'
+    OAuthProviderConfigListResponse:
+      type: object
+      required:
+        - configs
+      properties:
+        configs:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProviderConfig'
+          description: |
+            List of BYOA provider configs for the authenticated user. Each entry
+            indicates the user has registered custom OAuth credentials for that
+            provider. Empty array if no BYOA configs exist.
+    OAuthProviderConfigDeleteResponse:
+      type: object
+      description: |
+        Confirmation that the BYOA provider config and its encrypted vault
+        secrets have been deleted. After deletion, the provider reverts to
+        its built-in or manifest configuration (if any).
+      required:
+        - provider
+        - deleted_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider whose BYOA credentials were deleted
+          example: salesforce
+        deleted_at:
+          type: string
+          format: date-time
+          description: When the BYOA credentials were deleted
+          example: '2026-03-05T15:00:00Z'
     ConfigResponse:
       type: object
       description: |
@@ -9667,6 +10400,26 @@ components:
             timestamp: '1770816000'
             expected_window: 300 seconds
           trace_id: trace_xyz789
+    ApproverInfo:
+      type: object
+      description: |
+        Identifies the user (approver) an agent is registered to. Included in
+        agent-facing responses so the agent knows which user it's working with.
+
+        Only the username is exposed — email, phone, and other PII are never
+        sent to agents.
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          maxLength: 40
+          description: |
+            The approver's username on Permission Slip. This is the user's
+            public-facing identifier — safe to display and log.
+          example: alice
+      example:
+        username: alice
     AgentListResponse:
       type: object
       description: Paginated list of agents.

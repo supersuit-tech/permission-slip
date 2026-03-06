@@ -32,9 +32,11 @@ type connectorActionResponse struct {
 }
 
 type requiredCredentialResponse struct {
-	Service         string  `json:"service"`
-	AuthType        string  `json:"auth_type"`
-	InstructionsURL *string `json:"instructions_url,omitempty"`
+	Service         string   `json:"service"`
+	AuthType        string   `json:"auth_type"`
+	InstructionsURL *string  `json:"instructions_url,omitempty"`
+	OAuthProvider   *string  `json:"oauth_provider,omitempty"`
+	OAuthScopes     []string `json:"oauth_scopes,omitempty"`
 }
 
 type connectorDetailResponse struct {
@@ -129,6 +131,8 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 			Service:         rc.Service,
 			AuthType:        rc.AuthType,
 			InstructionsURL: rc.InstructionsURL,
+			OAuthProvider:   rc.OAuthProvider,
+			OAuthScopes:     rc.OAuthScopes,
 		}
 	}
 
