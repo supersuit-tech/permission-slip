@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email and calendar via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, and OneDrive via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -180,6 +180,91 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.list_drive_files",
+				Name:        "List Drive Files",
+				Description: "List files and folders in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "Relative folder path (e.g. Documents/Work). Defaults to root."
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of items to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_drive_file",
+				Name:        "Get Drive File",
+				Description: "Get file metadata and optionally download text content from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID"
+						},
+						"include_content": {
+							"type": "boolean",
+							"default": false,
+							"description": "Download file content (text files only)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.upload_drive_file",
+				Name:        "Upload Drive File",
+				Description: "Upload or create a file in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_path", "content"],
+					"properties": {
+						"file_path": {
+							"type": "string",
+							"description": "Relative file path (e.g. Documents/report.txt)"
+						},
+						"content": {
+							"type": "string",
+							"description": "File content to upload (max 4 MB)"
+						},
+						"conflict_behavior": {
+							"type": "string",
+							"enum": ["rename", "replace", "fail"],
+							"default": "rename",
+							"description": "Behavior when a file with the same name exists"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.delete_drive_file",
+				Name:        "Delete Drive File",
+				Description: "Move a file to the OneDrive recycle bin (recoverable)",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID to delete"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -190,6 +275,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"Mail.Send",
 					"Mail.Read",
 					"Calendars.ReadWrite",
+					"Files.ReadWrite",
 				},
 			},
 		},
@@ -222,6 +308,41 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can view upcoming calendar events.",
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_list_drive_files",
+				ActionType:  "microsoft.list_drive_files",
+				Name:        "Browse OneDrive files",
+				Description: "Agent can list files and folders in OneDrive.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_drive_file",
+				ActionType:  "microsoft.get_drive_file",
+				Name:        "Read OneDrive files",
+				Description: "Agent can read file metadata and download text content from OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*","include_content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_drive_file_metadata",
+				ActionType:  "microsoft.get_drive_file",
+				Name:        "View OneDrive file metadata",
+				Description: "Agent can view file metadata from OneDrive but cannot download content.",
+				Parameters:  json.RawMessage(`{"item_id":"*","include_content":false}`),
+			},
+			{
+				ID:          "tpl_microsoft_upload_drive_file",
+				ActionType:  "microsoft.upload_drive_file",
+				Name:        "Upload OneDrive files",
+				Description: "Agent can upload files to OneDrive.",
+				Parameters:  json.RawMessage(`{"file_path":"*","content":"*","conflict_behavior":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_delete_drive_file",
+				ActionType:  "microsoft.delete_drive_file",
+				Name:        "Delete OneDrive files",
+				Description: "Agent can move files to the OneDrive recycle bin.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
 		},
 	}
 }
@@ -233,6 +354,10 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"microsoft.list_drive_files":      &listDriveFilesAction{conn: c},
+		"microsoft.get_drive_file":        &getDriveFileAction{conn: c},
+		"microsoft.upload_drive_file":     &uploadDriveFileAction{conn: c},
+		"microsoft.delete_drive_file":     &deleteDriveFileAction{conn: c},
 	}
 }
 
@@ -323,4 +448,97 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	}
 
 	return nil
+}
+
+// doRequestRaw is like doRequest but returns the response body as a string
+// instead of JSON-unmarshaling it. Used for downloading file content.
+func (c *MicrosoftConnector) doRequestRaw(ctx context.Context, method, path string, creds connectors.Credentials) (string, error) {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return "", &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return "", &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return "", &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
+		}
+		return "", &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
+		return "", &connectors.RateLimitError{
+			Message:    "Microsoft Graph API rate limit exceeded",
+			RetryAfter: retryAfter,
+		}
+	}
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+	if err != nil {
+		return "", &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", mapGraphError(resp.StatusCode, respBody)
+	}
+
+	return string(respBody), nil
+}
+
+// doPutRaw sends a PUT request with a raw byte body (not JSON-encoded) and returns
+// the response body bytes. Used for uploading file content to OneDrive.
+func (c *MicrosoftConnector) doPutRaw(ctx context.Context, path string, creds connectors.Credentials, content []byte) ([]byte, error) {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return nil, &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return nil, &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
+		}
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
+		return nil, &connectors.RateLimitError{
+			Message:    "Microsoft Graph API rate limit exceeded",
+			RetryAfter: retryAfter,
+		}
+	}
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, mapGraphError(resp.StatusCode, respBody)
+	}
+
+	return respBody, nil
 }
