@@ -99,7 +99,7 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 	summaries := make([]emailSummary, 0, len(listResp.Messages))
 	for _, m := range listResp.Messages {
 		var msgResp gmailMessageResponse
-		msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + m.ID + "?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date"
+		msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(m.ID) + "?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date"
 		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, msgURL, nil, &msgResp); err != nil {
 			return nil, err
 		}

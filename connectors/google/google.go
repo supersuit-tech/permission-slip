@@ -25,6 +25,10 @@ const (
 	// defaultRetryAfter is used when the Google API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 60 * time.Second
+
+	// maxResponseBytes is the maximum response body size we'll read from
+	// Google APIs. This prevents OOM from unexpectedly large responses.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // GoogleConnector owns the shared HTTP client and base URLs used by all
@@ -189,7 +193,6 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				OAuthScopes: []string{
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
-					"https://www.googleapis.com/auth/calendar",
 					"https://www.googleapis.com/auth/calendar.events",
 				},
 			},
@@ -309,7 +312,7 @@ func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentia
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

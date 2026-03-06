@@ -79,7 +79,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	msg.WriteString("\r\n")
 	msg.WriteString(params.Body)
 
-	raw := base64.URLEncoding.EncodeToString([]byte(msg.String()))
+	raw := base64.RawURLEncoding.EncodeToString([]byte(msg.String()))
 
 	body := gmailSendRequest{Raw: raw}
 	var resp gmailSendResponse
