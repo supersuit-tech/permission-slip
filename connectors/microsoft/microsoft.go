@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -86,7 +87,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Email body (HTML supported)"
+							"description": "Email body (HTML or plain text — auto-detected)"
 						},
 						"cc": {
 							"type": "array",
@@ -285,6 +286,9 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
 	}
