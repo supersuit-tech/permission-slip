@@ -16,7 +16,7 @@ This connector uses OAuth 2.0 — credentials are managed automatically by the p
 
 The credential `auth_type` in the database is `oauth2` with `oauth_provider: "microsoft"`. The platform handles the full OAuth lifecycle: redirect, token exchange, encrypted storage in Supabase Vault, and automatic refresh before expiry. The connector never touches OAuth code — it receives a valid access token in `Credentials` at execution time.
 
-**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `ChannelMessage.Send`
+**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Send`, `ChannelMessage.Read.All`
 
 ## Actions
 
@@ -78,6 +78,125 @@ Lists recent emails from a mail folder.
 ```
 
 **Graph API:** `GET /me/mailFolders/{folder}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/user-list-messages))
+
+---
+
+### `microsoft.list_teams`
+
+Lists the Microsoft Teams the authenticated user is a member of.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `top` | integer | No | `20` | Number of teams to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Engineering",
+    "description": "Engineering team workspace",
+    "visibility": "private"
+  }
+]
+```
+
+**Graph API:** `GET /me/joinedTeams` ([docs](https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams))
+
+---
+
+### `microsoft.list_channels`
+
+Lists channels in a Microsoft Teams team.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team to list channels for |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "19:abc123@thread.tacv2",
+    "name": "General",
+    "description": "General discussion",
+    "membership_type": "standard"
+  }
+]
+```
+
+**Graph API:** `GET /teams/{team-id}/channels` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-list))
+
+---
+
+### `microsoft.send_channel_message`
+
+Sends a message to a Microsoft Teams channel. Supports plain text and HTML (auto-detected). Optionally replies to an existing message thread.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team |
+| `channel_id` | string | Yes | — | The ID of the channel to post to |
+| `message` | string | Yes | — | Message content (HTML or plain text — auto-detected) |
+| `reply_to_message_id` | string | No | — | Message ID to reply to (creates a threaded reply) |
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "1616990032035",
+  "created_at": "2024-01-15T09:00:00Z"
+}
+```
+
+**Graph API:** `POST /teams/{team-id}/channels/{channel-id}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-post-messages))
+When `reply_to_message_id` is provided: `POST /teams/{team-id}/channels/{channel-id}/messages/{message-id}/replies` ([docs](https://learn.microsoft.com/en-us/graph/api/chatmessage-post-replies))
+
+---
+
+### `microsoft.list_channel_messages`
+
+Lists recent messages from a Microsoft Teams channel.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team |
+| `channel_id` | string | Yes | — | The ID of the channel to read messages from |
+| `top` | integer | No | `20` | Number of messages to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "1616990032035",
+    "created_at": "2024-01-15T09:00:00Z",
+    "from": "Jane Smith",
+    "content": "Hello team!"
+  }
+]
+```
+
+**Graph API:** `GET /teams/{team-id}/channels/{channel-id}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-list-messages))
 
 ---
 
@@ -359,6 +478,137 @@ Gets metadata about a specific PowerPoint file by its OneDrive item ID.
 
 **Graph API:** `GET /me/drive/items/{itemId}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
 
+---
+
+### Excel Actions
+
+All Excel actions operate on workbooks stored in OneDrive via the Microsoft Graph workbook API. They require the `Files.ReadWrite` OAuth scope.
+
+**Obtaining `item_id`:** The `item_id` parameter is the OneDrive item ID of the `.xlsx` file. You can find it by browsing OneDrive via the Graph API (`GET /me/drive/root/children`) or by using the OneDrive search endpoint (`GET /me/drive/search(q='.xlsx')`). The ID looks like `01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K`.
+
+**Note on `excel_append_rows`:** This action operates on named [Excel tables](https://support.microsoft.com/en-us/office/create-and-format-tables-e81aa349-b006-4f8a-9806-5af9df0ac664), not raw ranges. The workbook must contain a table created via "Insert > Table" in Excel.
+
+### `microsoft.excel_list_worksheets`
+
+Lists all worksheets in an Excel workbook stored in OneDrive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "{00000000-0001-0000-0000-000000000000}",
+    "name": "Sheet1",
+    "position": 0,
+    "visibility": "Visible"
+  }
+]
+```
+
+**Graph API:** `GET /me/drive/items/{itemId}/workbook/worksheets` ([docs](https://learn.microsoft.com/en-us/graph/api/workbook-list-worksheets))
+
+---
+
+### `microsoft.excel_read_range`
+
+Reads cell values from a worksheet range in an Excel workbook.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+| `sheet_name` | string | Yes | — | Name of the worksheet to read from |
+| `range` | string | Yes | — | Cell range to read (e.g., `A1:C10`) |
+
+**Response:**
+
+```json
+{
+  "address": "Sheet1!A1:B2",
+  "values": [
+    ["Name", "Age"],
+    ["Alice", 30]
+  ],
+  "row_count": 2,
+  "column_count": 2
+}
+```
+
+**Graph API:** `GET /me/drive/items/{itemId}/workbook/worksheets/{sheetName}/range(address='{range}')` ([docs](https://learn.microsoft.com/en-us/graph/api/range-get))
+
+---
+
+### `microsoft.excel_write_range`
+
+Writes cell values to a worksheet range in an Excel workbook.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+| `sheet_name` | string | Yes | — | Name of the worksheet to write to |
+| `range` | string | Yes | — | Cell range to write (e.g., `A1:C3`) |
+| `values` | any[][] | Yes | — | 2D array of cell values to write — all rows must have the same number of columns |
+
+**Response:**
+
+```json
+{
+  "address": "Sheet1!A1:B2",
+  "values": [
+    ["Name", "Age"],
+    ["Alice", 30]
+  ],
+  "row_count": 2,
+  "column_count": 2
+}
+```
+
+**Graph API:** `PATCH /me/drive/items/{itemId}/workbook/worksheets/{sheetName}/range(address='{range}')` ([docs](https://learn.microsoft.com/en-us/graph/api/range-update))
+
+---
+
+### `microsoft.excel_append_rows`
+
+Appends rows to a named table in an Excel workbook.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+| `table_name` | string | Yes | — | Name of the table to append rows to |
+| `values` | any[][] | Yes | — | 2D array of row values to append — all rows must have the same number of columns |
+
+**Response:**
+
+```json
+{
+  "index": 5,
+  "values": [
+    ["Widget", 100, 9.99]
+  ],
+  "rows_added": 1
+}
+```
+
+**Graph API:** `POST /me/drive/items/{itemId}/workbook/tables/{tableName}/rows` ([docs](https://learn.microsoft.com/en-us/graph/api/table-post-rows))
 
 ## Error Handling
 
@@ -405,10 +655,15 @@ connectors/microsoft/
 ├── microsoft.go                    # MicrosoftConnector, Manifest(), doRequest(), doUpload(), executeAndHandleResponse()
 ├── types.go                        # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
 ├── response.go                     # Graph API error response → typed connector error mapping
-├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, escapePathSegments, etc.)
+├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, validateValuesGrid, etc.)
 ├── pptx_template.go                # Minimal embedded .pptx template for create_presentation
+├── excel_helpers.go                # Shared Excel helpers (excelWorkbookPath, newRangeResult, validateItemID)
 ├── send_email.go                   # microsoft.send_email action
 ├── list_emails.go                  # microsoft.list_emails action
+├── list_teams.go                   # microsoft.list_teams action
+├── list_channels.go                # microsoft.list_channels action
+├── send_channel_message.go         # microsoft.send_channel_message action
+├── list_channel_messages.go        # microsoft.list_channel_messages action
 ├── create_calendar_event.go        # microsoft.create_calendar_event action
 ├── list_calendar_events.go         # microsoft.list_calendar_events action
 ├── create_document.go              # microsoft.create_document action (OneDrive)
@@ -418,10 +673,19 @@ connectors/microsoft/
 ├── create_presentation.go          # microsoft.create_presentation action
 ├── list_presentations.go           # microsoft.list_presentations action
 ├── get_presentation.go             # microsoft.get_presentation action
+├── excel_list_worksheets.go        # microsoft.excel_list_worksheets action
+├── excel_read.go                   # microsoft.excel_read_range action
+├── excel_write.go                  # microsoft.excel_write_range action
+├── excel_append.go                 # microsoft.excel_append_rows action
 ├── microsoft_test.go               # Connector-level tests
 ├── helpers_test.go                 # Shared test helpers (validCreds)
+├── validation_test.go              # Validation helper tests (validateGraphID, validateValuesGrid)
 ├── send_email_test.go              # Send email action tests
 ├── list_emails_test.go             # List emails action tests
+├── list_teams_test.go              # List teams action tests
+├── list_channels_test.go           # List channels action tests
+├── send_channel_message_test.go    # Send channel message action tests
+├── list_channel_messages_test.go   # List channel messages action tests
 ├── create_calendar_event_test.go   # Create calendar event action tests
 ├── list_calendar_events_test.go    # List calendar events action tests
 ├── create_document_test.go         # Create document action tests
@@ -431,6 +695,10 @@ connectors/microsoft/
 ├── create_presentation_test.go     # Create presentation action tests
 ├── list_presentations_test.go      # List presentations action tests
 ├── get_presentation_test.go        # Get presentation action tests
+├── excel_list_worksheets_test.go   # Excel list worksheets action tests
+├── excel_read_test.go              # Excel read range action tests
+├── excel_write_test.go             # Excel write range action tests
+├── excel_append_test.go            # Excel append rows action tests
 └── README.md                       # This file
 ```
 
