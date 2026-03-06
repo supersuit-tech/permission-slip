@@ -23,6 +23,9 @@ func (p *excelListWorksheetsParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "item_id is required"}
 	}
+	if err := validatePathSegment("item_id", p.ItemID); err != nil {
+		return err
+	}
 	return nil
 }
 

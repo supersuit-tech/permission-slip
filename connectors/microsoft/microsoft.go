@@ -324,6 +324,13 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
 			{
+				ID:          "tpl_microsoft_excel_list_worksheets",
+				ActionType:  "microsoft.excel_list_worksheets",
+				Name:        "List Excel worksheets",
+				Description: "Agent can list worksheets in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
 				ID:          "tpl_microsoft_excel_read_range",
 				ActionType:  "microsoft.excel_read_range",
 				Name:        "Read Excel range",

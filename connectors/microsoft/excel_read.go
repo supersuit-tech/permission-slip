@@ -33,6 +33,9 @@ func (p *excelReadRangeParams) validate() error {
 	if p.Range == "" {
 		return &connectors.ValidationError{Message: "range is required"}
 	}
+	if err := validatePathSegment("item_id", p.ItemID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -43,9 +46,13 @@ type graphRangeResponse struct {
 }
 
 // rangeResult is the simplified response returned to the caller.
+// RowCount and ColumnCount are computed from the values grid so callers
+// can work with data dimensions without counting manually.
 type rangeResult struct {
-	Address string  `json:"address"`
-	Values  [][]any `json:"values"`
+	Address     string  `json:"address"`
+	Values      [][]any `json:"values"`
+	RowCount    int     `json:"row_count"`
+	ColumnCount int     `json:"column_count"`
 }
 
 // Execute reads cell values from the specified worksheet range.
@@ -69,8 +76,15 @@ func (a *excelReadRangeAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
+	colCount := 0
+	if len(resp.Values) > 0 {
+		colCount = len(resp.Values[0])
+	}
+
 	return connectors.JSONResult(rangeResult{
-		Address: resp.Address,
-		Values:  resp.Values,
+		Address:     resp.Address,
+		Values:      resp.Values,
+		RowCount:    len(resp.Values),
+		ColumnCount: colCount,
 	})
 }

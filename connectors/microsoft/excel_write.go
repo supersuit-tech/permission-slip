@@ -37,6 +37,12 @@ func (p *excelWriteRangeParams) validate() error {
 	if len(p.Values) == 0 {
 		return &connectors.ValidationError{Message: "values is required and must not be empty"}
 	}
+	if err := validatePathSegment("item_id", p.ItemID); err != nil {
+		return err
+	}
+	if err := validateValuesGrid(p.Values); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -68,8 +74,15 @@ func (a *excelWriteRangeAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
+	colCount := 0
+	if len(resp.Values) > 0 {
+		colCount = len(resp.Values[0])
+	}
+
 	return connectors.JSONResult(rangeResult{
-		Address: resp.Address,
-		Values:  resp.Values,
+		Address:     resp.Address,
+		Values:      resp.Values,
+		RowCount:    len(resp.Values),
+		ColumnCount: colCount,
 	})
 }

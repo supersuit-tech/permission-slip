@@ -32,6 +32,15 @@ func (p *excelAppendRowsParams) validate() error {
 	if len(p.Values) == 0 {
 		return &connectors.ValidationError{Message: "values is required and must not be empty"}
 	}
+	if err := validatePathSegment("item_id", p.ItemID); err != nil {
+		return err
+	}
+	if err := validatePathSegment("table_name", p.TableName); err != nil {
+		return err
+	}
+	if err := validateValuesGrid(p.Values); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -48,8 +57,9 @@ type graphAddRowsResponse struct {
 
 // appendRowsResult is the simplified response returned to the caller.
 type appendRowsResult struct {
-	Index  int     `json:"index"`
-	Values [][]any `json:"values"`
+	Index     int     `json:"index"`
+	Values    [][]any `json:"values"`
+	RowsAdded int     `json:"rows_added"`
 }
 
 // Execute appends rows to the specified table in the workbook.
@@ -72,7 +82,8 @@ func (a *excelAppendRowsAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	return connectors.JSONResult(appendRowsResult{
-		Index:  resp.Index,
-		Values: resp.Values,
+		Index:     resp.Index,
+		Values:    resp.Values,
+		RowsAdded: len(resp.Values),
 	})
 }

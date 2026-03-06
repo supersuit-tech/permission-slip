@@ -59,6 +59,37 @@ func TestExcelReadRange_Success(t *testing.T) {
 	if len(rr.Values) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(rr.Values))
 	}
+	if rr.RowCount != 2 {
+		t.Errorf("expected row_count 2, got %d", rr.RowCount)
+	}
+	if rr.ColumnCount != 2 {
+		t.Errorf("expected column_count 2, got %d", rr.ColumnCount)
+	}
+}
+
+func TestExcelReadRange_PathTraversalRejected(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelReadRangeAction{conn: conn}
+
+	params, _ := json.Marshal(excelReadRangeParams{
+		ItemID:    "../../admin",
+		SheetName: "Sheet1",
+		Range:     "A1:B2",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_read_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
 }
 
 func TestExcelReadRange_MissingItemID(t *testing.T) {

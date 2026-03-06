@@ -76,6 +76,87 @@ func TestExcelAppendRows_Success(t *testing.T) {
 	if len(ar.Values) != 2 {
 		t.Errorf("expected 2 rows, got %d", len(ar.Values))
 	}
+	if ar.RowsAdded != 2 {
+		t.Errorf("expected rows_added 2, got %d", ar.RowsAdded)
+	}
+}
+
+func TestExcelAppendRows_PathTraversalItemID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(excelAppendRowsParams{
+		ItemID:    "../../admin",
+		TableName: "SalesTable",
+		Values:    [][]any{{"a"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestExcelAppendRows_PathTraversalTableName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(excelAppendRowsParams{
+		ItemID:    "item-123",
+		TableName: "../../admin",
+		Values:    [][]any{{"a"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in table_name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestExcelAppendRows_InconsistentColumnCount(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(excelAppendRowsParams{
+		ItemID:    "item-123",
+		TableName: "SalesTable",
+		Values: [][]any{
+			{"A", "B", "C"},
+			{"D", "E"},
+		},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for inconsistent column count")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
 }
 
 func TestExcelAppendRows_MissingItemID(t *testing.T) {

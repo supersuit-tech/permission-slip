@@ -26,3 +26,34 @@ func detectContentType(body string) string {
 	}
 	return "Text"
 }
+
+// validatePathSegment checks that a value intended for use in a URL path segment
+// does not contain path traversal sequences or slash characters. This prevents
+// attackers from escaping the intended API path (e.g., using "../../admin" as
+// an item_id or table_name).
+func validatePathSegment(field, value string) error {
+	if strings.Contains(value, "..") || strings.Contains(value, "/") || strings.Contains(value, "\\") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: must not contain path separators or traversal sequences", field),
+		}
+	}
+	return nil
+}
+
+// validateValuesGrid checks that a 2D values array has consistent column counts
+// across all rows. Inconsistent dimensions cause cryptic Graph API errors, so
+// catching them early provides a better developer experience.
+func validateValuesGrid(values [][]any) error {
+	if len(values) == 0 {
+		return nil
+	}
+	cols := len(values[0])
+	for i, row := range values[1:] {
+		if len(row) != cols {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("values row %d has %d columns, but row 0 has %d — all rows must have the same number of columns", i+1, len(row), cols),
+			}
+		}
+	}
+	return nil
+}

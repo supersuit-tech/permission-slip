@@ -73,6 +73,41 @@ func TestExcelWriteRange_Success(t *testing.T) {
 	if rr.Address != "Sheet1!A1:B2" {
 		t.Errorf("expected address 'Sheet1!A1:B2', got %q", rr.Address)
 	}
+	if rr.RowCount != 2 {
+		t.Errorf("expected row_count 2, got %d", rr.RowCount)
+	}
+	if rr.ColumnCount != 2 {
+		t.Errorf("expected column_count 2, got %d", rr.ColumnCount)
+	}
+}
+
+func TestExcelWriteRange_InconsistentColumnCount(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelWriteRangeAction{conn: conn}
+
+	params, _ := json.Marshal(excelWriteRangeParams{
+		ItemID:    "item-123",
+		SheetName: "Sheet1",
+		Range:     "A1:C2",
+		Values: [][]any{
+			{"A", "B", "C"},
+			{"D", "E"}, // only 2 columns instead of 3
+		},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_write_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for inconsistent column count")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
 }
 
 func TestExcelWriteRange_MissingItemID(t *testing.T) {

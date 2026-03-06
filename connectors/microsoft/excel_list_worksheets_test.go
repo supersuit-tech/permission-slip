@@ -94,6 +94,27 @@ func TestExcelListWorksheets_MissingItemID(t *testing.T) {
 	}
 }
 
+func TestExcelListWorksheets_PathTraversalRejected(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelListWorksheetsAction{conn: conn}
+
+	params, _ := json.Marshal(excelListWorksheetsParams{ItemID: "../secret"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_list_worksheets",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestExcelListWorksheets_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
