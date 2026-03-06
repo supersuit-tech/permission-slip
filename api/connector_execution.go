@@ -28,8 +28,9 @@ type paymentParams struct {
 //
 // When the action declares requires_payment_method, the caller must provide
 // a paymentParams with a valid payment_method_id and amount_cents. The function
-// resolves the payment method, enforces spending limits, records the transaction,
-// and passes the Stripe token to the connector.
+// validates the payment method and enforces spending limits before execution,
+// then records the transaction only after the connector succeeds. This ensures
+// failed executions don't count against the user's spending limits.
 func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType string, parameters json.RawMessage, pp *paymentParams) (*connectors.ActionResult, error) {
 	if deps.Connectors == nil {
 		return nil, nil
@@ -69,17 +70,26 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		}
 	}
 
-	// ── Payment method resolution ──────────────────────────────────
+	// ── Payment method validation ─────────────────────────────────
+	// Validate the payment method and enforce spending limits before execution.
+	// The transaction is recorded after execution succeeds (see below).
 	var paymentInfo *connectors.PaymentInfo
+	var resolvedPM *resolvedPaymentMethod
 	requiresPayment, err := db.GetActionRequiresPaymentMethod(ctx, deps.DB, actionType)
 	if err != nil {
 		return nil, fmt.Errorf("check requires_payment_method: %w", err)
 	}
 
 	if requiresPayment {
-		paymentInfo, err = resolvePaymentMethod(ctx, deps, userID, connectorID, actionType, pp)
+		resolvedPM, err = validatePaymentMethod(ctx, deps, userID, pp)
 		if err != nil {
 			return nil, err
+		}
+		paymentInfo = &connectors.PaymentInfo{
+			StripePaymentMethodID: resolvedPM.stripePaymentMethodID,
+			Brand:                 resolvedPM.brand,
+			Last4:                 resolvedPM.last4,
+			AmountCents:           resolvedPM.amount,
 		}
 	}
 
@@ -92,13 +102,55 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	if err != nil {
 		return nil, err
 	}
+
+	// ── Record payment transaction (only on success) ──────────────
+	// The transaction is recorded after the connector succeeds to avoid
+	// counting failed executions against the user's spending limits.
+	if resolvedPM != nil {
+		_, txErr := db.CreatePaymentMethodTransaction(ctx, deps.DB, &db.PaymentMethodTransaction{
+			PaymentMethodID: resolvedPM.paymentMethodID,
+			UserID:          userID,
+			ConnectorID:     connectorID,
+			ActionType:      actionType,
+			AmountCents:     resolvedPM.amount,
+			Description:     fmt.Sprintf("Action execution: %s", actionType),
+		})
+		if txErr != nil {
+			// The connector already executed successfully. Log the failure but
+			// don't fail the request — the payment transaction is for limit
+			// tracking, not for billing. A missing record means slightly lax
+			// monthly limit enforcement, which is safer than discarding a
+			// successful execution result.
+			log.Printf("[payment] failed to record transaction for %s (pm=%s amount=%d): %v",
+				actionType, resolvedPM.paymentMethodID, resolvedPM.amount, txErr)
+		}
+	}
+
 	return result, nil
 }
 
-// resolvePaymentMethod validates, resolves, and enforces spending limits for a
-// payment method. On success it records the transaction and returns PaymentInfo
-// with the Stripe token (never raw card details).
-func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, actionType string, pp *paymentParams) (*connectors.PaymentInfo, error) {
+// resolvedPaymentMethod holds the validated payment method state between
+// validation (pre-execution) and transaction recording (post-execution).
+type resolvedPaymentMethod struct {
+	paymentMethodID      string
+	stripePaymentMethodID string
+	brand                string
+	last4                string
+	amount               int
+}
+
+// validatePaymentMethod validates the payment method, enforces ownership and
+// spending limits, and returns the resolved payment info. Does NOT record the
+// transaction — that happens after successful connector execution.
+//
+// Note: there is a small TOCTOU window between the monthly spend check here
+// and the transaction recording after execution. A concurrent request could
+// pass the limit check in this window, resulting in a slight overspend. This
+// is an acceptable trade-off: the window is small (duration of connector
+// execution), the consequence is minor (slightly exceeding a soft limit), and
+// the alternative (locking the payment method row for the entire execution)
+// would create unacceptable contention for connectors with slow external calls.
+func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *paymentParams) (*resolvedPaymentMethod, error) {
 	if pp == nil || pp.PaymentMethodID == "" {
 		return nil, &connectors.PaymentError{
 			Code:    connectors.PaymentErrMissing,
@@ -137,8 +189,8 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 			Code:    connectors.PaymentErrPerTxLimit,
 			Message: fmt.Sprintf("amount %d cents exceeds per-transaction limit of %d cents", amount, *pm.PerTransactionLimit),
 			Details: map[string]any{
-				"requested_amount_cents":       amount,
-				"per_transaction_limit_cents":  *pm.PerTransactionLimit,
+				"requested_amount_cents":      amount,
+				"per_transaction_limit_cents": *pm.PerTransactionLimit,
 			},
 		}
 	}
@@ -149,7 +201,8 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 		if err != nil {
 			return nil, fmt.Errorf("check monthly spend: %w", err)
 		}
-		if monthlySpend+amount > *pm.MonthlyLimit {
+		remaining := *pm.MonthlyLimit - monthlySpend
+		if amount > remaining {
 			return nil, &connectors.PaymentError{
 				Code:    connectors.PaymentErrMonthlyLimit,
 				Message: fmt.Sprintf("amount %d cents would exceed monthly limit of %d cents (current spend: %d cents)", amount, *pm.MonthlyLimit, monthlySpend),
@@ -157,30 +210,18 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 					"requested_amount_cents": amount,
 					"monthly_limit_cents":    *pm.MonthlyLimit,
 					"current_spend_cents":    monthlySpend,
-					"remaining_cents":        *pm.MonthlyLimit - monthlySpend,
+					"remaining_cents":        remaining,
 				},
 			}
 		}
 	}
 
-	// Record the transaction for monthly limit tracking.
-	_, err = db.CreatePaymentMethodTransaction(ctx, deps.DB, &db.PaymentMethodTransaction{
-		PaymentMethodID: pm.ID,
-		UserID:          userID,
-		ConnectorID:     connectorID,
-		ActionType:      actionType,
-		AmountCents:     amount,
-		Description:     fmt.Sprintf("Action execution: %s", actionType),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("record payment transaction: %w", err)
-	}
-
-	return &connectors.PaymentInfo{
-		StripePaymentMethodID: pm.StripePaymentMethodID,
-		Brand:                 pm.Brand,
-		Last4:                 pm.Last4,
-		AmountCents:           amount,
+	return &resolvedPaymentMethod{
+		paymentMethodID:       pm.ID,
+		stripePaymentMethodID: pm.StripePaymentMethodID,
+		brand:                 pm.Brand,
+		last4:                 pm.Last4,
+		amount:                amount,
 	}, nil
 }
 
