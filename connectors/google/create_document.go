@@ -1,0 +1,86 @@
+package google
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+// createDocumentAction implements connectors.Action for google.create_document.
+// It creates a new Google Doc via the Docs API POST /v1/documents, then
+// optionally inserts body text via a batchUpdate.
+type createDocumentAction struct {
+	conn *GoogleConnector
+}
+
+// createDocumentParams is the user-facing parameter schema.
+type createDocumentParams struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+func (p *createDocumentParams) validate() error {
+	if p.Title == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: title"}
+	}
+	return nil
+}
+
+// docsCreateRequest is the Google Docs API request body for documents.create.
+type docsCreateRequest struct {
+	Title string `json:"title"`
+}
+
+// docsCreateResponse is the Google Docs API response from documents.create.
+type docsCreateResponse struct {
+	DocumentID string `json:"documentId"`
+	Title      string `json:"title"`
+}
+
+// Execute creates a new Google Doc and returns its metadata.
+func (a *createDocumentAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params createDocumentParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := params.validate(); err != nil {
+		return nil, err
+	}
+
+	body := docsCreateRequest{Title: params.Title}
+	var resp docsCreateResponse
+
+	url := a.conn.docsBaseURL + "/v1/documents"
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, url, body, &resp); err != nil {
+		return nil, err
+	}
+
+	// If body text was provided, insert it via batchUpdate.
+	if params.Body != "" {
+		batchReq := docsBatchUpdateRequest{
+			Requests: []docsRequest{
+				{
+					InsertText: &docsInsertTextRequest{
+						Text:               params.Body,
+						EndOfSegmentLocation: &docsEndOfSegmentLocation{},
+					},
+				},
+			},
+		}
+		updateURL := a.conn.docsBaseURL + "/v1/documents/" + resp.DocumentID + ":batchUpdate"
+		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, updateURL, batchReq, nil); err != nil {
+			return nil, err
+		}
+	}
+
+	documentURL := "https://docs.google.com/document/d/" + resp.DocumentID + "/edit"
+
+	return connectors.JSONResult(map[string]string{
+		"document_id":  resp.DocumentID,
+		"title":        resp.Title,
+		"document_url": documentURL,
+	})
+}
