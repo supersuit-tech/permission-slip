@@ -1,12 +1,13 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, and Amadeus connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
 **Which reference to follow:**
 - **GitHub** (`connectors/github/`) — simple API key auth (Bearer token), good starting point
 - **Slack** (`connectors/slack/`) — API key with format validation (token prefix check), Slack-specific response envelope
 - **PostgreSQL** (`connectors/postgresql/`) — custom auth (host + port + user + password + database)
 - **Amadeus** (`connectors/amadeus/`) — OAuth client credentials grant (client_id + client_secret → short-lived bearer token with caching and auto-refresh)
+- **Square** (`connectors/square/`) — environment-aware base URLs (sandbox/production), idempotency key generation, structured error envelope parsing
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 

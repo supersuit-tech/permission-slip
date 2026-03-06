@@ -24,6 +24,7 @@ import (
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
+	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
@@ -312,6 +313,7 @@ func main() {
 	registry.Register(ghconnector.New())
 	registry.Register(pgconnector.New())
 	registry.Register(slack.New())
+	registry.Register(square.New())
 	registry.Register(amadeus.New())
 
 	// Auto-seed built-in connectors from their manifests.
