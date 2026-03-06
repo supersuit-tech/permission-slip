@@ -108,17 +108,18 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 		return fmt.Errorf("provider %q not found in registry", conn.Provider)
 	}
 
-	logAttrs := []any{
+	// Create a scoped logger with connection-level attributes so all log lines
+	// from this function include the connection context automatically.
+	connLog := logger.With(
 		"connection_id", conn.ID,
 		"provider", conn.Provider,
 		"user_id", conn.UserID,
-	}
+	)
 
 	if conn.RefreshTokenVaultID == nil {
 		// Mark as needs_reauth — no refresh token available.
 		if err := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); err != nil {
-			logger.Error("oauth refresh: failed to mark connection as needs_reauth",
-				append(logAttrs, "error", err)...)
+			connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", err)
 			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, err))
 		}
 		return fmt.Errorf("no refresh token for connection %s", conn.ID)
@@ -133,8 +134,7 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 	if err != nil {
 		// Refresh failed — mark as needs_reauth.
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
-			logger.Error("oauth refresh: failed to mark connection as needs_reauth",
-				append(logAttrs, "error", statusErr)...)
+			connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", statusErr)
 			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, statusErr))
 		}
 		return fmt.Errorf("token refresh: %w", err)
@@ -159,15 +159,14 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 	_, err = oauth.StoreRefreshedTokens(ctx, vaultOps,
 		oauth.StoreRefreshedTokensParams{
 			ConnID:            conn.ID,
-			UserID:            conn.UserID,
 			OldAccessVaultID:  conn.AccessTokenVaultID,
 			OldRefreshVaultID: conn.RefreshTokenVaultID,
 			Result:            result,
 			OldRefreshToken:   string(refreshTokenBytes),
 		},
 		func(what, vaultID string, delErr error) {
-			logger.Warn("oauth refresh: failed to delete old "+what+" from vault",
-				append(logAttrs, "vault_id", vaultID, "error", delErr)...)
+			connLog.Warn("oauth refresh: failed to delete old "+what+" from vault",
+				"vault_id", vaultID, "error", delErr)
 		},
 		func(ctx context.Context, accessVaultID string, refreshVaultID *string, expiry *time.Time) error {
 			return db.UpdateOAuthConnectionTokens(ctx, tx, conn.ID, conn.UserID, accessVaultID, refreshVaultID, expiry)

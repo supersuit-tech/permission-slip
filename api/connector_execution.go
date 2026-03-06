@@ -171,8 +171,14 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 }
 
 // refreshOAuthConnection performs a token refresh for the given OAuth connection.
-// On success, it updates the vault secrets and DB row. On failure, it marks
-// the connection as needs_reauth and returns an OAuthRefreshError.
+// On success, it updates the vault secrets and DB row, and sets
+// conn.AccessTokenVaultID to the new vault ID so the caller reads the fresh token.
+// On failure, it marks the connection as needs_reauth and returns an OAuthRefreshError.
+//
+// Note: if the background refresh job refreshes the same connection concurrently,
+// both paths produce valid tokens. The last writer wins in the DB, and the other's
+// vault secrets become orphaned. This is safe (no data loss or auth failure) but
+// may leave unused vault entries until the connection is deleted or re-authorized.
 func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConnection, providerID string) error {
 	provider, ok := deps.OAuthProviders.Get(providerID)
 	if !ok {
@@ -238,7 +244,6 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	newAccessVaultID, err := oauth.StoreRefreshedTokens(ctx, vaultOps,
 		oauth.StoreRefreshedTokensParams{
 			ConnID:            conn.ID,
-			UserID:            conn.UserID,
 			OldAccessVaultID:  conn.AccessTokenVaultID,
 			OldRefreshVaultID: conn.RefreshTokenVaultID,
 			Result:            result,

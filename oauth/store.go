@@ -9,7 +9,6 @@ import (
 // StoreRefreshedTokensParams holds the inputs for persisting refreshed OAuth tokens.
 type StoreRefreshedTokensParams struct {
 	ConnID            string         // OAuth connection ID (used for vault secret naming).
-	UserID            string         // Connection owner (for authorization checks).
 	OldAccessVaultID  string         // Current access token vault secret ID.
 	OldRefreshVaultID *string        // Current refresh token vault secret ID (nil if none).
 	Result            *RefreshResult // The new tokens from the provider.

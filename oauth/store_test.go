@@ -35,7 +35,7 @@ func TestStoreRefreshedTokens_Success(t *testing.T) {
 		context.Background(), vaultOps,
 		StoreRefreshedTokensParams{
 			ConnID:            "conn-123",
-			UserID:            "user-456",
+
 			OldAccessVaultID:  "old-access-vault-id",
 			OldRefreshVaultID: &oldRefreshVaultID,
 			Result: &RefreshResult{
@@ -113,7 +113,7 @@ func TestStoreRefreshedTokens_NoRotation(t *testing.T) {
 		context.Background(), vaultOps,
 		StoreRefreshedTokensParams{
 			ConnID:            "conn-123",
-			UserID:            "user-456",
+
 			OldAccessVaultID:  "old-access-vault-id",
 			OldRefreshVaultID: &oldRefreshVaultID,
 			Result: &RefreshResult{
