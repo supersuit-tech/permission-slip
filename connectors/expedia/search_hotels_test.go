@@ -183,6 +183,14 @@ func TestSearchHotels_MissingParams(t *testing.T) {
 			params: `{"checkin":"2024-06-15","checkout":"2024-06-17","occupancy":"two adults","region_id":"178248"}`,
 		},
 		{
+			name:   "star_rating too many entries",
+			params: `{"checkin":"2024-06-15","checkout":"2024-06-17","occupancy":"2","region_id":"178248","star_rating":[1,2,3,4,5,1]}`,
+		},
+		{
+			name:   "limit too large",
+			params: `{"checkin":"2024-06-15","checkout":"2024-06-17","occupancy":"2","region_id":"178248","limit":500}`,
+		},
+		{
 			name:   "invalid sort_by",
 			params: `{"checkin":"2024-06-15","checkout":"2024-06-17","occupancy":"2","region_id":"178248","sort_by":"invalid"}`,
 		},

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -148,6 +149,16 @@ func TestCreateBooking_MissingParams(t *testing.T) {
 			params: `{invalid}`,
 		},
 	}
+
+	// Add special_request length test separately since it needs a long string.
+	longRequest := `{"room_id":"room-123","given_name":"John","family_name":"Doe","email":"john@example.com","phone":"+1234567890","payment_method_id":"pm_123","special_request":"` + strings.Repeat("x", 5001) + `"}`
+	tests = append(tests, struct {
+		name   string
+		params string
+	}{
+		name:   "special_request too long",
+		params: longRequest,
+	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

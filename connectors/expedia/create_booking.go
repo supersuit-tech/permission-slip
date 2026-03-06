@@ -50,6 +50,9 @@ func (p *createBookingParams) validate() error {
 	if p.PaymentMethodID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: payment_method_id"}
 	}
+	if len(p.SpecialRequest) > 5000 {
+		return &connectors.ValidationError{Message: "special_request cannot exceed 5000 characters"}
+	}
 	return nil
 }
 

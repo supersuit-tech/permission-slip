@@ -70,6 +70,12 @@ func (p *searchHotelsParams) validate() error {
 	if p.SortBy != "" && !validSortBy[p.SortBy] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_by %q: must be price, distance, or rating", p.SortBy)}
 	}
+	if len(p.StarRating) > 5 {
+		return &connectors.ValidationError{Message: "star_rating cannot have more than 5 entries (valid star ratings are 1-5)"}
+	}
+	if p.Limit > 200 {
+		return &connectors.ValidationError{Message: "limit cannot exceed 200"}
+	}
 	return nil
 }
 
