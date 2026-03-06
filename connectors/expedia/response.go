@@ -11,6 +11,13 @@ import (
 // checkResponse inspects the HTTP status code and returns an appropriate
 // typed error for non-success responses. Expedia Rapid API returns errors
 // as {"type": "...", "message": "..."}.
+//
+// Error mapping rationale:
+//   - 400 → ValidationError: Expedia uses 400 for invalid parameters (unlike
+//     GitHub which uses 422), so we map it to ValidationError.
+//   - 401/403 → AuthError: Invalid or expired API key/signature.
+//   - 429 → RateLimitError: With Retry-After header when available.
+//   - Other 4xx/5xx → ExternalError: Includes HTTP status code for debugging.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil

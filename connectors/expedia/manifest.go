@@ -1,5 +1,10 @@
 package expedia
 
+// This file is split from expedia.go to keep the main connector file focused
+// on struct, auth, and HTTP lifecycle. The manifest contains 6 action schemas
+// and 6 templates (~240 lines of JSON Schema definitions) that would obscure
+// the business logic if inlined in the connector file.
+
 import (
 	"encoding/json"
 
@@ -7,7 +12,8 @@ import (
 )
 
 // Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup.
+// auto-seed DB rows on startup. Returns action schemas, required credentials,
+// and configuration templates.
 func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "expedia",
