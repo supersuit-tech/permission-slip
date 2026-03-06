@@ -224,3 +224,32 @@ func GetMonthlySpend(ctx context.Context, db DBTX, paymentMethodID string) (int,
 		paymentMethodID).Scan(&total)
 	return total, err
 }
+
+// GetMonthlySpendBatch returns the total amount_cents spent in the last 30 days
+// for multiple payment methods in a single query. Returns a map of paymentMethodID → spend.
+func GetMonthlySpendBatch(ctx context.Context, db DBTX, paymentMethodIDs []string) (map[string]int, error) {
+	if len(paymentMethodIDs) == 0 {
+		return map[string]int{}, nil
+	}
+	rows, err := db.Query(ctx,
+		`SELECT payment_method_id, COALESCE(SUM(amount_cents), 0)
+		 FROM payment_method_transactions
+		 WHERE payment_method_id = ANY($1) AND created_at >= now() - interval '30 days'
+		 GROUP BY payment_method_id`,
+		paymentMethodIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]int, len(paymentMethodIDs))
+	for rows.Next() {
+		var id string
+		var total int
+		if err := rows.Scan(&id, &total); err != nil {
+			return nil, err
+		}
+		result[id] = total
+	}
+	return result, rows.Err()
+}

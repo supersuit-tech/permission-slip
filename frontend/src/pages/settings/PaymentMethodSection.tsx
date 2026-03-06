@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { CreditCard, Loader2, Plus, Star, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CreditCard,
+  Loader2,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   usePaymentMethods,
@@ -41,8 +48,97 @@ function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+type ExpiryStatus = "expired" | "expiring_soon" | "ok";
+
+function getExpiryStatus(expMonth: number, expYear: number): ExpiryStatus {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1; // 1-indexed
+  const currentYear = now.getFullYear();
+
+  // Card expires at the end of the expiry month
+  if (
+    expYear < currentYear ||
+    (expYear === currentYear && expMonth < currentMonth)
+  ) {
+    return "expired";
+  }
+
+  // Expiring within 30 days
+  const expiryDate = new Date(expYear, expMonth, 0); // last day of exp month
+  const daysUntilExpiry = Math.ceil(
+    (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (daysUntilExpiry <= 30) {
+    return "expiring_soon";
+  }
+
+  return "ok";
+}
+
+function ExpiryBadge({
+  expMonth,
+  expYear,
+}: {
+  expMonth: number;
+  expYear: number;
+}) {
+  const status = getExpiryStatus(expMonth, expYear);
+
+  if (status === "expired") {
+    return (
+      <Badge variant="destructive" className="text-xs">
+        Expired
+      </Badge>
+    );
+  }
+
+  if (status === "expiring_soon") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-yellow-500 text-xs text-yellow-600 dark:text-yellow-400"
+      >
+        <AlertTriangle className="mr-1 size-3" />
+        Expiring soon
+      </Badge>
+    );
+  }
+
+  return null;
+}
+
+function SpendProgressBar({
+  monthlySpend,
+  monthlyLimit,
+}: {
+  monthlySpend: number;
+  monthlyLimit: number;
+}) {
+  const pct = Math.min((monthlySpend / monthlyLimit) * 100, 100);
+  const remaining = Math.max(monthlyLimit - monthlySpend, 0);
+
+  let barColor = "bg-blue-500";
+  if (pct >= 85) barColor = "bg-red-500";
+  else if (pct >= 60) barColor = "bg-yellow-500";
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {formatCents(monthlySpend)} of {formatCents(monthlyLimit)} used
+        {remaining > 0 && ` · ${formatCents(remaining)} remaining`}
+      </p>
+    </div>
+  );
+}
+
 export function PaymentMethodSection() {
-  const { paymentMethods, isLoading, error } = usePaymentMethods();
+  const { paymentMethods, maxAllowed, isLoading, error } = usePaymentMethods();
   const { deletePaymentMethod, isLoading: isDeleting } =
     useDeletePaymentMethod();
   const { updatePaymentMethod } = useUpdatePaymentMethod();
@@ -51,12 +147,12 @@ export function PaymentMethodSection() {
     null,
   );
 
+  const atCardLimit = maxAllowed > 0 && paymentMethods.length >= maxAllowed;
+
   async function handleDelete(pm: PaymentMethod) {
     try {
       await deletePaymentMethod(pm.id);
-      toast.success(
-        `Card ending in ${pm.last4} removed.`,
-      );
+      toast.success(`Card ending in ${pm.last4} removed.`);
     } catch {
       toast.error("Failed to remove payment method.");
     }
@@ -82,6 +178,7 @@ export function PaymentMethodSection() {
               {paymentMethods.length > 0 && (
                 <Badge variant="outline" className="ml-1">
                   {paymentMethods.length}
+                  {maxAllowed > 0 && `/${maxAllowed}`}
                 </Badge>
               )}
             </div>
@@ -89,6 +186,12 @@ export function PaymentMethodSection() {
               variant="outline"
               size="sm"
               onClick={() => setAddDialogOpen(true)}
+              disabled={atCardLimit}
+              title={
+                atCardLimit
+                  ? `Maximum of ${maxAllowed} payment methods reached`
+                  : undefined
+              }
             >
               <Plus className="size-4" />
               Add Card
@@ -122,7 +225,7 @@ export function PaymentMethodSection() {
                   key={pm.id}
                   className="flex items-center justify-between rounded-lg border p-4"
                 >
-                  <div className="space-y-0.5">
+                  <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">
                         {formatBrand(pm.brand)} ending in {pm.last4}
@@ -132,30 +235,40 @@ export function PaymentMethodSection() {
                           Default
                         </Badge>
                       )}
+                      <ExpiryBadge
+                        expMonth={pm.exp_month}
+                        expYear={pm.exp_year}
+                      />
                     </div>
                     <p className="text-muted-foreground text-xs">
                       {pm.label ? `${pm.label} · ` : ""}
                       Expires {formatExpiry(pm.exp_month, pm.exp_year)}
                       {pm.per_transaction_limit != null &&
                         ` · Per-tx limit: ${formatCents(pm.per_transaction_limit)}`}
-                      {pm.monthly_limit != null &&
-                        ` · Monthly limit: ${formatCents(pm.monthly_limit)}`}
-                      {pm.monthly_spend != null &&
-                        pm.monthly_limit != null &&
-                        ` (${formatCents(pm.monthly_spend)} used)`}
                     </p>
+                    {pm.monthly_limit != null && pm.monthly_spend != null && (
+                      <SpendProgressBar
+                        monthlySpend={pm.monthly_spend}
+                        monthlyLimit={pm.monthly_limit}
+                      />
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
-                    {!pm.is_default && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Set as default"
-                        onClick={() => handleSetDefault(pm)}
-                      >
-                        <Star className="text-muted-foreground size-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={
+                        pm.is_default
+                          ? "Default payment method"
+                          : "Set as default"
+                      }
+                      onClick={() => !pm.is_default && handleSetDefault(pm)}
+                      disabled={pm.is_default}
+                    >
+                      <Star
+                        className={`size-4 ${pm.is_default ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                      />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

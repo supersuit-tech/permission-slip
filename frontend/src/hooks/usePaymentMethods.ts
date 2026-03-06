@@ -32,6 +32,7 @@ export function usePaymentMethods() {
 
   return {
     paymentMethods: query.data?.payment_methods ?? [],
+    maxAllowed: query.data?.max_allowed ?? 0,
     isLoading: query.isLoading,
     error: query.isError
       ? "Unable to load payment methods. Please try again later."

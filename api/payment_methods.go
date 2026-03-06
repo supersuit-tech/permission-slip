@@ -11,22 +11,23 @@ import (
 // ── Response types ──────────────────────────────────────────────────────────
 
 type paymentMethodResponse struct {
-	ID                  string     `json:"id"`
-	Label               string     `json:"label"`
-	Brand               string     `json:"brand"`
-	Last4               string     `json:"last4"`
-	ExpMonth            int        `json:"exp_month"`
-	ExpYear             int        `json:"exp_year"`
-	IsDefault           bool       `json:"is_default"`
-	PerTransactionLimit *int       `json:"per_transaction_limit"`
-	MonthlyLimit        *int       `json:"monthly_limit"`
-	MonthlySpend        *int       `json:"monthly_spend,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  string    `json:"id"`
+	Label               string    `json:"label"`
+	Brand               string    `json:"brand"`
+	Last4               string    `json:"last4"`
+	ExpMonth            int       `json:"exp_month"`
+	ExpYear             int       `json:"exp_year"`
+	IsDefault           bool      `json:"is_default"`
+	PerTransactionLimit *int      `json:"per_transaction_limit"`
+	MonthlyLimit        *int      `json:"monthly_limit"`
+	MonthlySpend        *int      `json:"monthly_spend,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 type paymentMethodListResponse struct {
 	PaymentMethods []paymentMethodResponse `json:"payment_methods"`
+	MaxAllowed     int                     `json:"max_allowed"`
 }
 
 type setupIntentResponse struct {
@@ -96,20 +97,28 @@ func handleListPaymentMethods(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Batch-fetch monthly spend for all payment methods in a single query.
+		allIDs := make([]string, len(methods))
+		for i := range methods {
+			allIDs[i] = methods[i].ID
+		}
+		spendMap, err := db.GetMonthlySpendBatch(r.Context(), deps.DB, allIDs)
+		if err != nil {
+			log.Printf("[%s] ListPaymentMethods: monthly spend batch lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			// Non-fatal — continue without spend data.
+		}
+
 		resp := paymentMethodListResponse{
 			PaymentMethods: make([]paymentMethodResponse, 0, len(methods)),
+			MaxAllowed:     maxPaymentMethodsPerUser,
 		}
 		for i := range methods {
 			pmr := toPaymentMethodResponse(&methods[i])
-			// Include monthly spend if the method has a monthly limit.
-			if methods[i].MonthlyLimit != nil {
-				spend, err := db.GetMonthlySpend(r.Context(), deps.DB, methods[i].ID)
-				if err != nil {
-					log.Printf("[%s] ListPaymentMethods: monthly spend lookup: %v", TraceID(r.Context()), err)
-					CaptureError(r.Context(), err)
-				} else {
-					pmr.MonthlySpend = &spend
-				}
+			// Always include monthly spend so the frontend can show usage.
+			if spendMap != nil {
+				spend := spendMap[methods[i].ID] // defaults to 0 if not in map
+				pmr.MonthlySpend = &spend
 			}
 			resp.PaymentMethods = append(resp.PaymentMethods, pmr)
 		}
@@ -272,6 +281,21 @@ func handleUpdatePaymentMethod(deps *Deps) http.HandlerFunc {
 
 		var req updatePaymentMethodRequest
 		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+
+		// Validate spending limits.
+		if req.PerTransactionLimit != nil && *req.PerTransactionLimit < 0 {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Per-transaction limit cannot be negative"))
+			return
+		}
+		if req.MonthlyLimit != nil && *req.MonthlyLimit < 0 {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Monthly limit cannot be negative"))
+			return
+		}
+		if req.PerTransactionLimit != nil && req.MonthlyLimit != nil &&
+			*req.PerTransactionLimit > *req.MonthlyLimit {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Per-transaction limit cannot exceed monthly limit"))
 			return
 		}
 

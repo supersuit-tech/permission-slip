@@ -39,7 +39,7 @@ PaymentMethod:
       description: Maximum monthly spend in cents (null = no limit)
     monthly_spend:
       type: integer
-      description: Current monthly spend in cents (included when monthly_limit is set)
+      description: Current monthly spend in cents (rolling 30-day window)
     created_at:
       type: string
       format: date-time
@@ -51,11 +51,15 @@ PaymentMethodListResponse:
   type: object
   required:
     - payment_methods
+    - max_allowed
   properties:
     payment_methods:
       type: array
       items:
         $ref: '#/PaymentMethod'
+    max_allowed:
+      type: integer
+      description: Maximum number of payment methods a user can store
 
 SetupIntentResponse:
   type: object

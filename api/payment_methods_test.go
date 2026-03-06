@@ -260,6 +260,96 @@ func TestDeletePaymentMethod_Success(t *testing.T) {
 	}
 }
 
+func TestUpdatePaymentMethod_NegativeLimit(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pmneglim_"+uid[:8])
+
+	pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_neg_" + uid[:8],
+		Brand:                 "visa",
+		Last4:                 "1111",
+		ExpMonth:              6,
+		ExpYear:               2028,
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := `{"per_transaction_limit":-100}`
+	r := authenticatedJSONRequest(t, http.MethodPatch, "/payment-methods/"+pm.ID, uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdatePaymentMethod_PerTxExceedsMonthly(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pmexceed_"+uid[:8])
+
+	pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_exceed_" + uid[:8],
+		Brand:                 "visa",
+		Last4:                 "2222",
+		ExpMonth:              6,
+		ExpYear:               2028,
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := `{"per_transaction_limit":10000,"monthly_limit":5000}`
+	r := authenticatedJSONRequest(t, http.MethodPatch, "/payment-methods/"+pm.ID, uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestListPaymentMethods_IncludesMaxAllowed(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pmmax_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/payment-methods", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp paymentMethodListResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxAllowed != maxPaymentMethodsPerUser {
+		t.Errorf("expected max_allowed=%d, got %d", maxPaymentMethodsPerUser, resp.MaxAllowed)
+	}
+}
+
 func TestCreateSetupIntent_NoStripe(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

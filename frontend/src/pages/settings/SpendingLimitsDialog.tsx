@@ -39,8 +39,34 @@ export function SpendingLimitsDialog({
       : "",
   );
   const [label, setLabel] = useState(paymentMethod.label ?? "");
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  function validate(): boolean {
+    const perTx = perTxDollars ? parseFloat(perTxDollars) : null;
+    const monthly = monthlyDollars ? parseFloat(monthlyDollars) : null;
+
+    if (perTx !== null && perTx < 0) {
+      setValidationError("Per-transaction limit cannot be negative.");
+      return false;
+    }
+    if (monthly !== null && monthly < 0) {
+      setValidationError("Monthly limit cannot be negative.");
+      return false;
+    }
+    if (perTx !== null && monthly !== null && perTx > monthly) {
+      setValidationError(
+        "Per-transaction limit cannot exceed the monthly limit.",
+      );
+      return false;
+    }
+
+    setValidationError(null);
+    return true;
+  }
 
   async function handleSave() {
+    if (!validate()) return;
+
     try {
       const perTxCents = perTxDollars
         ? Math.round(parseFloat(perTxDollars) * 100)
@@ -54,8 +80,10 @@ export function SpendingLimitsDialog({
         label: label || undefined,
         per_transaction_limit: perTxCents,
         monthly_limit: monthlyCents,
-        clear_per_transaction_limit: !perTxDollars && paymentMethod.per_transaction_limit != null,
-        clear_monthly_limit: !monthlyDollars && paymentMethod.monthly_limit != null,
+        clear_per_transaction_limit:
+          !perTxDollars && paymentMethod.per_transaction_limit != null,
+        clear_monthly_limit:
+          !monthlyDollars && paymentMethod.monthly_limit != null,
       });
 
       toast.success("Spending limits updated.");
@@ -99,11 +127,14 @@ export function SpendingLimitsDialog({
               step="0.01"
               placeholder="No limit"
               value={perTxDollars}
-              onChange={(e) => setPerTxDollars(e.target.value)}
+              onChange={(e) => {
+                setPerTxDollars(e.target.value);
+                setValidationError(null);
+              }}
               disabled={isLoading}
             />
             <p className="text-muted-foreground text-xs">
-              Maximum amount per individual transaction.
+              Maximum amount per individual agent transaction.
             </p>
           </div>
 
@@ -116,13 +147,21 @@ export function SpendingLimitsDialog({
               step="0.01"
               placeholder="No limit"
               value={monthlyDollars}
-              onChange={(e) => setMonthlyDollars(e.target.value)}
+              onChange={(e) => {
+                setMonthlyDollars(e.target.value);
+                setValidationError(null);
+              }}
               disabled={isLoading}
             />
             <p className="text-muted-foreground text-xs">
-              Maximum total spend in a rolling 30-day window.
+              Maximum total spend across all agent transactions in the last 30
+              days.
             </p>
           </div>
+
+          {validationError && (
+            <p className="text-destructive text-sm">{validationError}</p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">

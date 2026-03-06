@@ -5,7 +5,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import type { Stripe } from "@stripe/stripe-js";
+import type { Stripe, StripeCardElementChangeEvent } from "@stripe/stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -59,6 +59,11 @@ export function AddCardDialog({ open, onOpenChange }: AddCardDialogProps) {
               Payment methods are not available. Stripe is not configured.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -82,31 +87,46 @@ export function AddCardDialog({ open, onOpenChange }: AddCardDialogProps) {
   );
 }
 
+type SubmitStep = "idle" | "creating_intent" | "confirming_card" | "saving";
+
+const stepLabels: Record<SubmitStep, string> = {
+  idle: "Add Card",
+  creating_intent: "Preparing secure form...",
+  confirming_card: "Processing with Stripe...",
+  saving: "Saving card...",
+};
+
 function CardForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
-  const { createSetupIntent, isLoading: isCreatingIntent } =
-    useCreateSetupIntent();
-  const { confirmPaymentMethod, isLoading: isConfirming } =
-    useConfirmPaymentMethod();
+  const { createSetupIntent } = useCreateSetupIntent();
+  const { confirmPaymentMethod } = useConfirmPaymentMethod();
   const [label, setLabel] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<SubmitStep>("idle");
+  const [cardComplete, setCardComplete] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
-  const isLoading = isCreatingIntent || isConfirming || isSubmitting;
+  const isLoading = step !== "idle";
+
+  function handleCardChange(event: StripeCardElementChangeEvent) {
+    setCardComplete(event.complete);
+    setCardError(event.error?.message ?? null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
 
-    setIsSubmitting(true);
     try {
       // 1. Create SetupIntent on our server.
+      setStep("creating_intent");
       const { client_secret } = await createSetupIntent();
 
       // 2. Confirm the SetupIntent with Stripe Elements.
+      setStep("confirming_card");
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) {
-        toast.error("Card element not found.");
+        toast.error("Card element not found. Please refresh and try again.");
         return;
       }
 
@@ -115,17 +135,25 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
       });
 
       if (result.error) {
-        toast.error(result.error.message ?? "Failed to set up card.");
+        const msg = result.error.message ?? "Card could not be verified.";
+        if (result.error.type === "card_error") {
+          toast.error(`Card declined: ${msg}`);
+        } else if (result.error.type === "validation_error") {
+          toast.error(`Invalid card details: ${msg}`);
+        } else {
+          toast.error(msg);
+        }
         return;
       }
 
       const paymentMethodId = result.setupIntent.payment_method;
       if (!paymentMethodId || typeof paymentMethodId !== "string") {
-        toast.error("Unexpected response from Stripe.");
+        toast.error("Unexpected response from Stripe. Please try again.");
         return;
       }
 
       // 3. Save the payment method in our database.
+      setStep("saving");
       await confirmPaymentMethod({
         payment_method_id: paymentMethodId,
         label: label || undefined,
@@ -135,9 +163,11 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
       toast.success("Payment method added successfully.");
       onSuccess();
     } catch {
-      toast.error("Failed to add payment method. Please try again.");
+      toast.error(
+        "Something went wrong while adding your card. Please try again.",
+      );
     } finally {
-      setIsSubmitting(false);
+      setStep("idle");
     }
   }
 
@@ -156,8 +186,15 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
 
       <div className="space-y-2">
         <Label>Card Details</Label>
-        <div className="rounded-md border p-3">
+        <div
+          className={`rounded-md border p-3 transition-colors ${
+            cardError
+              ? "border-red-500"
+              : "focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500"
+          }`}
+        >
           <CardElement
+            onChange={handleCardChange}
             options={{
               style: {
                 base: {
@@ -167,21 +204,28 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
                     color: "hsl(var(--muted-foreground))",
                   },
                 },
+                invalid: {
+                  color: "hsl(var(--destructive))",
+                  iconColor: "hsl(var(--destructive))",
+                },
               },
             }}
           />
         </div>
+        {cardError && (
+          <p className="text-destructive text-xs">{cardError}</p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
         <Button
           type="submit"
-          disabled={!stripe || isLoading}
+          disabled={!stripe || isLoading || !cardComplete}
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
-              Adding...
+              {stepLabels[step]}
             </>
           ) : (
             "Add Card"
