@@ -49,12 +49,12 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "postgres",
 		Name:        "PostgreSQL",
-		Description: "PostgreSQL database connector for parameterized queries",
+		Description: "Read and write PostgreSQL databases with parameterized queries, row limits, and statement timeouts",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "postgres.query",
-				Name:        "Query",
-				Description: "Execute a parameterized SELECT query (read-only)",
+				Name:        "Run SQL Query",
+				Description: "Execute a read-only SELECT query with parameterized values. Results are capped at max_rows.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -62,7 +62,7 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"sql": {
 							"type": "string",
-							"description": "Parameterized SELECT query (use $1, $2, ... for placeholders)"
+							"description": "Parameterized SELECT query. Use $1, $2, ... for placeholders. Example: SELECT * FROM users WHERE email = $1"
 						},
 						"params": {
 							"type": "array",
@@ -86,8 +86,8 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			{
 				ActionType:  "postgres.insert",
-				Name:        "Insert",
-				Description: "Insert rows into a table with parameterized values",
+				Name:        "Insert Rows",
+				Description: "Insert one or more rows into a table. Supports bulk inserts and RETURNING clause.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -126,8 +126,8 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			{
 				ActionType:  "postgres.update",
-				Name:        "Update",
-				Description: "Update rows in a table with parameterized SET and WHERE clauses",
+				Name:        "Update Rows",
+				Description: "Update rows matching a WHERE clause. Unconditional updates are not allowed.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -161,8 +161,8 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			{
 				ActionType:  "postgres.delete",
-				Name:        "Delete",
-				Description: "Delete rows from a table with a parameterized WHERE clause",
+				Name:        "Delete Rows",
+				Description: "Delete rows matching a WHERE clause. Unconditional deletes are not allowed.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -261,8 +261,8 @@ func (c *PostgresConnector) ValidateCredentials(_ context.Context, creds connect
 }
 
 // openDB opens a short-lived database connection using the provided connection
-// string. The caller must close the returned *sql.DB. A statement_timeout is
-// set on the connection to prevent runaway queries.
+// string and verifies connectivity with a Ping. The caller must close the
+// returned *sql.DB.
 func (c *PostgresConnector) openDB(connStr string, timeout time.Duration) (*sql.DB, error) {
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
@@ -273,6 +273,15 @@ func (c *PostgresConnector) openDB(connStr string, timeout time.Duration) (*sql.
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(timeout + 5*time.Second)
+
+	// Ping to fail fast with a clear error if the database is unreachable,
+	// rather than surfacing cryptic errors on the first query.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connecting to database: %w", err)
+	}
 
 	return db, nil
 }
