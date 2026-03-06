@@ -3,7 +3,11 @@ paymentMethods:
     tags:
       - Payment Methods
     summary: List stored payment methods
-    description: Returns all stored payment methods for the authenticated user.
+    description: |
+      Returns all stored payment methods for the authenticated user, ordered by
+      default status (default first) then creation date. Each method includes
+      its current monthly spend (rolling 30-day window) and the maximum number
+      of payment methods allowed per user.
     operationId: listPaymentMethods
     security:
       - SupabaseSession: []
@@ -21,11 +25,22 @@ paymentMethods:
   post:
     tags:
       - Payment Methods
-    summary: Confirm a payment method
+    summary: Confirm and store a payment method
     description: |
       Saves a payment method after it has been set up via Stripe Elements.
-      The payment_method_id is the Stripe pm_* token returned by the
+      The payment_method_id must be a valid Stripe pm_* token returned by the
       SetupIntent confirmation flow on the client.
+
+      **Flow:**
+      1. Client calls POST /payment-methods/setup-intent to get a client_secret
+      2. Client uses stripe.confirmCardSetup(client_secret) with Stripe Elements
+      3. Client calls this endpoint with the resulting pm_* token
+
+      **Constraints:**
+      - Maximum 10 payment methods per user (returns 409 if exceeded)
+      - Label must be 100 characters or fewer
+      - payment_method_id must start with "pm_"
+      - Raw card data never touches our servers — only Stripe tokens are stored
     operationId: confirmPaymentMethod
     security:
       - SupabaseSession: []
@@ -55,11 +70,16 @@ setupIntent:
   post:
     tags:
       - Payment Methods
-    summary: Create a SetupIntent
+    summary: Create a SetupIntent for card collection
     description: |
       Creates a Stripe SetupIntent for collecting payment method details
       via Stripe Elements. Returns a client_secret to use with
       stripe.confirmCardSetup() on the frontend.
+
+      If the user does not yet have a Stripe customer record, one is created
+      automatically and associated with their subscription.
+
+      The client_secret is single-use and expires after 24 hours.
     operationId: createSetupIntent
     security:
       - SupabaseSession: []
@@ -80,7 +100,15 @@ paymentMethodById:
     tags:
       - Payment Methods
     summary: Update a payment method
-    description: Update label, spending limits, or default status of a stored payment method.
+    description: |
+      Update label, spending limits, or default status of a stored payment method.
+
+      **Spending limits:**
+      - Values are in cents (e.g. 5000 = $50.00)
+      - Per-transaction limit cannot exceed monthly limit
+      - Negative values are rejected
+      - Use clear_per_transaction_limit / clear_monthly_limit to remove a limit
+      - Label must be 100 characters or fewer
     operationId: updatePaymentMethod
     security:
       - SupabaseSession: []
@@ -116,6 +144,8 @@ paymentMethodById:
     summary: Delete a payment method
     description: |
       Removes a stored payment method and detaches it from the Stripe customer.
+      The detachment from Stripe is best-effort — the local record is always
+      deleted even if the Stripe API call fails.
     operationId: deletePaymentMethod
     security:
       - SupabaseSession: []
