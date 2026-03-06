@@ -702,44 +702,102 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 
 // ── executeConnectorAction: payment method integration ──────────────────────
 
-func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
-	t.Parallel()
+// paymentExecFixture holds common setup for payment method execution tests.
+type paymentExecFixture struct {
+	TX         db.DBTX
+	UserID     string
+	ConnID     string
+	ActionType string
+	Vault      *vault.MockVaultStore
+	Deps       *Deps
+}
+
+// paymentExecOpts configures setupPaymentExecTest.
+type paymentExecOpts struct {
+	// RequiresPayment controls whether the action requires a payment method.
+	// Defaults to true.
+	RequiresPayment *bool
+	// Connector overrides the default stub connector registration.
+	// When nil, a newTestStubConnector is used.
+	Connector connectors.Connector
+}
+
+// setupPaymentExecTest creates a user, connector, action, credentials, and
+// returns everything needed to call executeConnectorAction. Each call generates
+// a unique connector ID to allow parallel tests without conflicts.
+func setupPaymentExecTest(t *testing.T, opts paymentExecOpts) *paymentExecFixture {
+	t.Helper()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	connID := "testpay"
+	connID := "tpay_" + testhelper.GenerateID(t, "")[:8]
 	actionType := connID + ".book"
 	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+
+	requiresPayment := true
+	if opts.RequiresPayment != nil {
+		requiresPayment = *opts.RequiresPayment
+	}
+	if requiresPayment {
+		testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+	} else {
+		testhelper.InsertConnectorAction(t, tx, connID, actionType, "Search")
+	}
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
 
-	// Store credential.
 	v := vault.NewMockVaultStore()
 	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
 	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
 
-	// Insert payment method with limits.
+	reg := connectors.NewRegistry()
+	if opts.Connector != nil {
+		reg.Register(opts.Connector)
+	} else {
+		reg.Register(newTestStubConnector(connID, actionType))
+	}
+
+	return &paymentExecFixture{
+		TX:         tx,
+		UserID:     uid,
+		ConnID:     connID,
+		ActionType: actionType,
+		Vault:      v,
+		Deps:       &Deps{DB: tx, Vault: v, Connectors: reg},
+	}
+}
+
+func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
+	t.Parallel()
+
+	var capturedPayment *connectors.PaymentInfo
+	// Use a temporary connID for the capturing connector — we need to know
+	// it before calling setup, so we generate the connector inline.
+	f := setupPaymentExecTest(t, paymentExecOpts{
+		Connector: nil, // will be overridden below
+	})
+
+	// Replace the stub connector with a payment-capturing one.
+	capConn := &paymentCapturingConnector{
+		id:         f.ConnID,
+		actionType: f.ActionType,
+		onExec:     func(pi *connectors.PaymentInfo) { capturedPayment = pi },
+	}
+	reg := connectors.NewRegistry()
+	reg.Register(capConn)
+	f.Deps.Connectors = reg
+
 	perTx := 10000
 	monthly := 50000
-	pmID := testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{
+	pmID := testhelper.InsertPaymentMethod(t, f.TX, f.UserID, testhelper.PaymentMethodOpts{
 		PerTransactionLimit: &perTx,
 		MonthlyLimit:        &monthly,
 	})
 
-	var capturedPayment *connectors.PaymentInfo
-	reg := connectors.NewRegistry()
-	reg.Register(&paymentCapturingConnector{
-		id:         connID,
-		actionType: actionType,
-		onExec:     func(pi *connectors.PaymentInfo) { capturedPayment = pi },
-	})
-
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
 	amount := 5000
-	result, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
 	})
@@ -765,8 +823,8 @@ func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
 		t.Errorf("expected AmountCents 5000, got %d", capturedPayment.AmountCents)
 	}
 
-	// Verify transaction was recorded.
-	spend, err := db.GetMonthlySpend(t.Context(), tx, pmID)
+	// Verify transaction was recorded (only on success).
+	spend, err := db.GetMonthlySpend(t.Context(), f.TX, pmID)
 	if err != nil {
 		t.Fatalf("get monthly spend: %v", err)
 	}
@@ -777,29 +835,10 @@ func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
 
 func TestExecuteConnectorAction_PaymentMethod_MissingRequired(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testpay2"
-	actionType := connID + ".book"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
-
-	v := vault.NewMockVaultStore()
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
-	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
-
-	reg := connectors.NewRegistry()
-	reg.Register(newTestStubConnector(connID, actionType))
-
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	// No payment params provided.
-	_, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when payment_method_id is missing")
 	}
@@ -814,33 +853,15 @@ func TestExecuteConnectorAction_PaymentMethod_MissingRequired(t *testing.T) {
 
 func TestExecuteConnectorAction_PaymentMethod_PerTxLimitExceeded(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testpay3"
-	actionType := connID + ".book"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
-
-	v := vault.NewMockVaultStore()
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
-	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	perTx := 1000
-	pmID := testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{
+	pmID := testhelper.InsertPaymentMethod(t, f.TX, f.UserID, testhelper.PaymentMethodOpts{
 		PerTransactionLimit: &perTx,
 	})
 
-	reg := connectors.NewRegistry()
-	reg.Register(newTestStubConnector(connID, actionType))
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
-
 	amount := 5000 // Exceeds 1000 limit
-	_, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
 	})
@@ -867,33 +888,19 @@ func TestExecuteConnectorAction_PaymentMethod_PerTxLimitExceeded(t *testing.T) {
 
 func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testpay4"
-	actionType := connID + ".book"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
-
-	v := vault.NewMockVaultStore()
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
-	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	monthly := 10000
-	pmID := testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{
+	pmID := testhelper.InsertPaymentMethod(t, f.TX, f.UserID, testhelper.PaymentMethodOpts{
 		MonthlyLimit: &monthly,
 	})
 
 	// Pre-seed a transaction to use up most of the monthly limit.
-	_, err := db.CreatePaymentMethodTransaction(t.Context(), tx, &db.PaymentMethodTransaction{
+	_, err := db.CreatePaymentMethodTransaction(t.Context(), f.TX, &db.PaymentMethodTransaction{
 		PaymentMethodID: pmID,
-		UserID:          uid,
-		ConnectorID:     connID,
-		ActionType:      actionType,
+		UserID:          f.UserID,
+		ConnectorID:     f.ConnID,
+		ActionType:      f.ActionType,
 		AmountCents:     9000,
 		Description:     "prior tx",
 	})
@@ -901,12 +908,8 @@ func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T)
 		t.Fatalf("seed transaction: %v", err)
 	}
 
-	reg := connectors.NewRegistry()
-	reg.Register(newTestStubConnector(connID, actionType))
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
-
 	amount := 2000 // 9000 + 2000 = 11000 > 10000 monthly limit
-	_, err = executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+	_, err = executeConnectorAction(t.Context(), f.Deps, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
 	})
@@ -939,28 +942,10 @@ func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T)
 
 func TestExecuteConnectorAction_PaymentMethod_NotFound(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testpay5"
-	actionType := connID + ".book"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
-
-	v := vault.NewMockVaultStore()
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
-	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
-
-	reg := connectors.NewRegistry()
-	reg.Register(newTestStubConnector(connID, actionType))
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	amount := 100
-	_, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: "00000000-0000-0000-0000-000000000099",
 		AmountCents:     &amount,
 	})
@@ -978,28 +963,11 @@ func TestExecuteConnectorAction_PaymentMethod_NotFound(t *testing.T) {
 
 func TestExecuteConnectorAction_NoPaymentMethod_WhenNotRequired(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testfree"
-	actionType := connID + ".search"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, actionType, "Search") // no payment required
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
-
-	v := vault.NewMockVaultStore()
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
-	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
-
-	reg := connectors.NewRegistry()
-	reg.Register(newTestStubConnector(connID, actionType))
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+	noPayment := false
+	f := setupPaymentExecTest(t, paymentExecOpts{RequiresPayment: &noPayment})
 
 	// No payment params — should succeed because action doesn't require payment.
-	result, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
