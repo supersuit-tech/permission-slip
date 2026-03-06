@@ -354,7 +354,7 @@ If using a reverse proxy other than Fly.io, set `TRUSTED_PROXY_HEADER` to the he
 
 ## Custom Connectors
 
-Permission Slip ships with built-in GitHub and Slack connectors. To add custom connectors:
+Permission Slip ships with built-in GitHub, Slack, and PostgreSQL connectors. To add custom connectors:
 
 **Option A — Inline JSON (recommended for containers):**
 
