@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email and calendar via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, and Teams via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -180,6 +180,95 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.list_teams",
+				Name:        "List Teams",
+				Description: "List Microsoft Teams the user is a member of",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"top": {
+							"type": "integer",
+							"default": 20,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of teams to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_channels",
+				Name:        "List Channels",
+				Description: "List channels in a Microsoft Teams team",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team to list channels for"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.send_channel_message",
+				Name:        "Send Channel Message",
+				Description: "Send a message to a Microsoft Teams channel",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id", "channel_id", "message"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team"
+						},
+						"channel_id": {
+							"type": "string",
+							"description": "The ID of the channel to post to"
+						},
+						"message": {
+							"type": "string",
+							"description": "Message content (HTML or plain text — auto-detected)"
+						},
+						"reply_to_message_id": {
+							"type": "string",
+							"description": "Optional message ID to reply to (creates a threaded reply)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_channel_messages",
+				Name:        "List Channel Messages",
+				Description: "List recent messages from a Microsoft Teams channel",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id", "channel_id"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team"
+						},
+						"channel_id": {
+							"type": "string",
+							"description": "The ID of the channel to read messages from"
+						},
+						"top": {
+							"type": "integer",
+							"default": 20,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of messages to return (max 50)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -190,6 +279,10 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"Mail.Send",
 					"Mail.Read",
 					"Calendars.ReadWrite",
+					"Team.ReadBasic.All",
+					"Channel.ReadBasic.All",
+					"ChannelMessage.Send",
+					"ChannelMessage.Read.All",
 				},
 			},
 		},
@@ -222,6 +315,34 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can view upcoming calendar events.",
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_list_teams",
+				ActionType:  "microsoft.list_teams",
+				Name:        "List teams",
+				Description: "Agent can list the Microsoft Teams the user belongs to.",
+				Parameters:  json.RawMessage(`{"top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_channels",
+				ActionType:  "microsoft.list_channels",
+				Name:        "List channels",
+				Description: "Agent can list channels in a specified team.",
+				Parameters:  json.RawMessage(`{"team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_send_channel_message",
+				ActionType:  "microsoft.send_channel_message",
+				Name:        "Send channel messages",
+				Description: "Agent can send messages to any Teams channel.",
+				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","message":"*","reply_to_message_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_channel_messages",
+				ActionType:  "microsoft.list_channel_messages",
+				Name:        "Read channel messages",
+				Description: "Agent can read messages from any Teams channel.",
+				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","top":"*"}`),
+			},
 		},
 	}
 }
@@ -233,6 +354,10 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"microsoft.list_teams":            &listTeamsAction{conn: c},
+		"microsoft.list_channels":         &listChannelsAction{conn: c},
+		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
+		"microsoft.list_channel_messages": &listChannelMessagesAction{conn: c},
 	}
 }
 
