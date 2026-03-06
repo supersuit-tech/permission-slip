@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -98,11 +99,15 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		}
 	}
 
-	// Append LIMIT if not already present.
+	// Append LIMIT if not already present. We request one extra row beyond the
+	// limit so we can detect truncation and tell the caller if more rows exist.
 	query := params.SQL
+	userSuppliedLimit := false
 	normalized := strings.ToUpper(strings.TrimSpace(query))
 	if !strings.Contains(normalized, "LIMIT") {
-		query = fmt.Sprintf("%s LIMIT %d", strings.TrimRight(query, "; "), rowLimit)
+		query = fmt.Sprintf("%s LIMIT %d", strings.TrimRight(query, "; "), rowLimit+1)
+	} else {
+		userSuppliedLimit = true
 	}
 
 	db, err := a.conn.openConn(ctx, req.Credentials)
@@ -111,7 +116,15 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	}
 	defer db.Close()
 
-	rows, err := db.QueryContext(ctx, query, params.Args...)
+	// Start a read-only transaction as defense in depth — even if keyword
+	// filtering is bypassed, MySQL will reject any data-modifying statements.
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("starting read-only transaction: %v", err)}
+	}
+	defer tx.Rollback() //nolint:errcheck // rollback of read-only tx is best-effort
+
+	rows, err := tx.QueryContext(ctx, query, params.Args...)
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("MySQL query timed out: %v", err)}
@@ -151,10 +164,18 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("iterating rows: %v", err)}
 	}
 
+	// Detect whether more rows existed than the limit allowed.
+	truncated := false
+	if !userSuppliedLimit && len(results) > rowLimit {
+		results = results[:rowLimit]
+		truncated = true
+	}
+
 	return connectors.JSONResult(map[string]any{
 		"columns":   columns,
 		"rows":      results,
 		"row_count": len(results),
+		"truncated": truncated,
 	})
 }
 

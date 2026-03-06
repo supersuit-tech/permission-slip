@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -168,6 +169,33 @@ func TestInsert_ColumnNotAllowed(t *testing.T) {
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "mysql.insert",
 		Parameters:  json.RawMessage(`{"table":"users","rows":[{"name":"Alice","password":"secret"}],"allowed_columns":["name","email"]}`),
+		Credentials: validCreds(),
+	})
+
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestInsert_TooManyRows(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["mysql.insert"]
+
+	// Build a rows array with maxInsertRows + 1 entries.
+	rows := make([]map[string]any, maxInsertRows+1)
+	for i := range rows {
+		rows[i] = map[string]any{"name": fmt.Sprintf("user_%d", i)}
+	}
+	params, _ := json.Marshal(map[string]any{"table": "users", "rows": rows})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "mysql.insert",
+		Parameters:  params,
 		Credentials: validCreds(),
 	})
 

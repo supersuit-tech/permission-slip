@@ -36,3 +36,11 @@ func newTestConnector() (*MySQLConnector, sqlmock.Sqlmock, func()) {
 
 	return conn, mock, func() { db.Close() }
 }
+
+// newTestConnectorForQuery creates a test connector pre-configured with
+// expectations for the read-only transaction that query actions use.
+func newTestConnectorForQuery() (*MySQLConnector, sqlmock.Sqlmock, func()) {
+	conn, mock, cleanup := newTestConnector()
+	mock.ExpectBegin()
+	return conn, mock, cleanup
+}

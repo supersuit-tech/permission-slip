@@ -23,6 +23,10 @@ const (
 	// defaultRowLimit caps SELECT result sizes to avoid dumping entire tables.
 	defaultRowLimit = 1000
 
+	// maxInsertRows caps the number of rows per INSERT to prevent massive
+	// single-statement operations that could lock tables or time out.
+	maxInsertRows = 1000
+
 	// credKeyDSN is the credential key for the MySQL connection string.
 	credKeyDSN = "dsn"
 )
@@ -59,12 +63,12 @@ func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "mysql",
 		Name:        "MySQL",
-		Description: "MySQL database connector for safe read and write operations",
+		Description: "MySQL database connector with parameterized queries, table/column allowlists, and read-only enforcement for SELECT operations",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "mysql.query",
 				Name:        "Query",
-				Description: "Execute a parameterized SELECT query (read-only)",
+				Description: "Execute a parameterized SELECT query in a read-only transaction. Supports table allowlists and automatic row limiting. Results include a truncated flag when the row limit is reached.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -96,7 +100,7 @@ func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "mysql.insert",
 				Name:        "Insert",
-				Description: "Insert rows into a table with JSON parameters",
+				Description: "Insert rows into a table using parameterized queries. Supports table and column allowlists. Maximum 1000 rows per request.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -130,7 +134,7 @@ func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "mysql.update",
 				Name:        "Update",
-				Description: "Update rows with constrained WHERE clauses",
+				Description: "Update rows using parameterized queries with required WHERE clauses. Supports table and column allowlists. Unconditional updates are rejected.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -164,7 +168,7 @@ func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "mysql.delete",
 				Name:        "Delete",
-				Description: "Delete rows with constrained WHERE clauses",
+				Description: "Delete rows using parameterized queries with required WHERE clauses. Supports table allowlists. Unconditional deletes are rejected.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -188,7 +192,7 @@ func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "mysql", AuthType: "custom"},
+			{Service: "mysql", AuthType: "custom", InstructionsURL: "https://github.com/go-sql-driver/mysql#dsn-data-source-name"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

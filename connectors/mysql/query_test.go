@@ -11,15 +11,16 @@ import (
 func TestQuery_Success(t *testing.T) {
 	t.Parallel()
 
-	conn, mock, cleanup := newTestConnector()
+	conn, mock, cleanup := newTestConnectorForQuery()
 	defer cleanup()
 
 	rows := sqlmock.NewRows([]string{"id", "name", "email"}).
 		AddRow(1, "Alice", "alice@example.com").
 		AddRow(2, "Bob", "bob@example.com")
-	mock.ExpectQuery("SELECT id, name, email FROM users WHERE active = \\? LIMIT 1000").
+	mock.ExpectQuery("SELECT id, name, email FROM users WHERE active = \\? LIMIT 1001").
 		WithArgs(true).
 		WillReturnRows(rows)
+	mock.ExpectRollback()
 
 	action := conn.Actions()["mysql.query"]
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -39,6 +40,9 @@ func TestQuery_Success(t *testing.T) {
 	if data["row_count"] != float64(2) {
 		t.Errorf("row_count = %v, want 2", data["row_count"])
 	}
+	if data["truncated"] != false {
+		t.Errorf("truncated = %v, want false", data["truncated"])
+	}
 
 	resultRows, ok := data["rows"].([]any)
 	if !ok {
@@ -53,15 +57,56 @@ func TestQuery_Success(t *testing.T) {
 	}
 }
 
+func TestQuery_Truncated(t *testing.T) {
+	t.Parallel()
+
+	conn, mock, cleanup := newTestConnectorForQuery()
+	defer cleanup()
+
+	// Return 4 rows when row_limit is 3 → should be truncated to 3.
+	rows := sqlmock.NewRows([]string{"id"}).
+		AddRow(1).AddRow(2).AddRow(3).AddRow(4)
+	mock.ExpectQuery("SELECT id FROM users LIMIT 4").
+		WillReturnRows(rows)
+	mock.ExpectRollback()
+
+	action := conn.Actions()["mysql.query"]
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "mysql.query",
+		Parameters:  json.RawMessage(`{"sql":"SELECT id FROM users","row_limit":3}`),
+		Credentials: validCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["truncated"] != true {
+		t.Errorf("truncated = %v, want true", data["truncated"])
+	}
+	if data["row_count"] != float64(3) {
+		t.Errorf("row_count = %v, want 3", data["row_count"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled expectations: %v", err)
+	}
+}
+
 func TestQuery_WithRowLimit(t *testing.T) {
 	t.Parallel()
 
-	conn, mock, cleanup := newTestConnector()
+	conn, mock, cleanup := newTestConnectorForQuery()
 	defer cleanup()
 
 	rows := sqlmock.NewRows([]string{"id"}).AddRow(1)
-	mock.ExpectQuery("SELECT id FROM users LIMIT 10").
+	mock.ExpectQuery("SELECT id FROM users LIMIT 11").
 		WillReturnRows(rows)
+	mock.ExpectRollback()
 
 	action := conn.Actions()["mysql.query"]
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -82,12 +127,13 @@ func TestQuery_WithRowLimit(t *testing.T) {
 func TestQuery_ExistingLimitNotOverridden(t *testing.T) {
 	t.Parallel()
 
-	conn, mock, cleanup := newTestConnector()
+	conn, mock, cleanup := newTestConnectorForQuery()
 	defer cleanup()
 
 	rows := sqlmock.NewRows([]string{"id"}).AddRow(1)
 	mock.ExpectQuery("SELECT id FROM users LIMIT 5").
 		WillReturnRows(rows)
+	mock.ExpectRollback()
 
 	action := conn.Actions()["mysql.query"]
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -177,13 +223,14 @@ func TestQuery_DangerousKeywordsInSelect(t *testing.T) {
 func TestQuery_SafeColumnNames(t *testing.T) {
 	t.Parallel()
 
-	conn, mock, cleanup := newTestConnector()
+	conn, mock, cleanup := newTestConnectorForQuery()
 	defer cleanup()
 
 	// Column name "deleted" contains "DELETE" as a substring but should be allowed.
 	rows := sqlmock.NewRows([]string{"deleted"}).AddRow(false)
-	mock.ExpectQuery("SELECT deleted FROM users LIMIT 1000").
+	mock.ExpectQuery("SELECT deleted FROM users LIMIT 1001").
 		WillReturnRows(rows)
+	mock.ExpectRollback()
 
 	action := conn.Actions()["mysql.query"]
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{

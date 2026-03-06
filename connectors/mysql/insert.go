@@ -32,6 +32,11 @@ func (p *insertParams) validate() error {
 	if len(p.Rows) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: rows"}
 	}
+	if len(p.Rows) > maxInsertRows {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many rows: %d exceeds maximum of %d per insert", len(p.Rows), maxInsertRows),
+		}
+	}
 	if err := checkTableAllowed(p.Table, p.AllowedTables); err != nil {
 		return err
 	}
