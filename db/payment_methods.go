@@ -284,13 +284,20 @@ func ListExpiringPaymentMethods(ctx context.Context, db DBTX, withinDays int) ([
 	return results, rows.Err()
 }
 
-// MarkExpirationAlertSent sets expiration_alert_sent_at to now() for the
-// given payment method, preventing duplicate alerts.
-func MarkExpirationAlertSent(ctx context.Context, db DBTX, paymentMethodID string) error {
-	_, err := db.Exec(ctx,
-		`UPDATE payment_methods SET expiration_alert_sent_at = now() WHERE id = $1`,
+// MarkExpirationAlertSent atomically sets expiration_alert_sent_at to now()
+// for the given payment method, but only if it hasn't been set yet. Returns
+// true if the row was updated (caller should send the notification), false
+// if another process already marked it (caller should skip). This prevents
+// duplicate alerts when multiple instances race.
+func MarkExpirationAlertSent(ctx context.Context, db DBTX, paymentMethodID string) (bool, error) {
+	tag, err := db.Exec(ctx,
+		`UPDATE payment_methods SET expiration_alert_sent_at = now()
+		 WHERE id = $1 AND expiration_alert_sent_at IS NULL`,
 		paymentMethodID)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // GetMonthlySpendBatch returns the total amount_cents spent in the last 30 days

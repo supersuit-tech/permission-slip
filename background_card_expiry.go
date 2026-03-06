@@ -85,6 +85,21 @@ func runCardExpiryCheck(ctx context.Context, deps CardExpiryCheckDeps, logger *s
 		pm := epm.PaymentMethod
 		profile := epm.Profile
 
+		// Atomically claim this card for alerting. If another instance
+		// already marked it, skip to avoid duplicate notifications.
+		claimed, err := db.MarkExpirationAlertSent(checkCtx, deps.DB, pm.ID)
+		if err != nil {
+			logger.Error("card expiry check: failed to claim card for alerting",
+				"payment_method_id", pm.ID, "error", err)
+			sentry.CaptureException(err)
+			continue
+		}
+		if !claimed {
+			logger.Debug("card expiry check: already claimed by another instance",
+				"payment_method_id", pm.ID)
+			continue
+		}
+
 		// Determine if the card is already expired
 		expired := isCardExpired(pm.ExpMonth, pm.ExpYear, now)
 
@@ -115,24 +130,16 @@ func runCardExpiryCheck(ctx context.Context, deps CardExpiryCheckDeps, logger *s
 			Phone:    profile.Phone,
 		}
 
-		// Use DispatchSync so we can mark the alert as sent only after
-		// delivery completes (best-effort). This is a background job,
-		// not an HTTP handler, so blocking is fine.
+		// Use DispatchSync so we block until delivery completes (best-effort).
+		// This is a background job, not an HTTP handler, so blocking is fine.
 		deps.Notifier.DispatchSync(checkCtx, approval, recipient)
 
-		// Mark the card as alerted to prevent duplicate notifications.
-		if err := db.MarkExpirationAlertSent(checkCtx, deps.DB, pm.ID); err != nil {
-			logger.Error("card expiry check: failed to mark alert sent",
-				"payment_method_id", pm.ID, "error", err)
-			sentry.CaptureException(err)
-		} else {
-			logger.Info("card expiry check: alert sent",
-				"payment_method_id", pm.ID,
-				"brand", pm.Brand,
-				"last4", pm.Last4,
-				"expired", expired,
-				"user_id", profile.ID)
-		}
+		logger.Info("card expiry check: alert sent",
+			"payment_method_id", pm.ID,
+			"brand", pm.Brand,
+			"last4", pm.Last4,
+			"expired", expired,
+			"user_id", profile.ID)
 	}
 }
 

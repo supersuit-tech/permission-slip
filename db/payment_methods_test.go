@@ -327,9 +327,22 @@ func TestMarkExpirationAlertSent(t *testing.T) {
 		t.Fatalf("expected 1, got %d", len(results))
 	}
 
-	// Mark as alerted.
-	if err := db.MarkExpirationAlertSent(ctx, tx, pm.ID); err != nil {
+	// Mark as alerted (first call should claim).
+	claimed, err := db.MarkExpirationAlertSent(ctx, tx, pm.ID)
+	if err != nil {
 		t.Fatalf("MarkExpirationAlertSent: %v", err)
+	}
+	if !claimed {
+		t.Fatal("expected first MarkExpirationAlertSent to claim the card")
+	}
+
+	// Second call should NOT claim (already marked — prevents duplicates).
+	claimed2, err := db.MarkExpirationAlertSent(ctx, tx, pm.ID)
+	if err != nil {
+		t.Fatalf("MarkExpirationAlertSent (second call): %v", err)
+	}
+	if claimed2 {
+		t.Fatal("expected second MarkExpirationAlertSent to return false (already claimed)")
 	}
 
 	// Should no longer appear in expiring list (deduplication).
