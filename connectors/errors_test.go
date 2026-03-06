@@ -112,6 +112,31 @@ func TestIsValidationError(t *testing.T) {
 	}
 }
 
+func TestOAuthRefreshError(t *testing.T) {
+	t.Parallel()
+	err := &OAuthRefreshError{Provider: "google", Message: "token revoked"}
+
+	expected := `OAuth token refresh failed for provider "google": token revoked`
+	if err.Error() != expected {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestIsOAuthRefreshError(t *testing.T) {
+	t.Parallel()
+	err := &OAuthRefreshError{Provider: "google", Message: "expired"}
+
+	if !IsOAuthRefreshError(err) {
+		t.Error("expected IsOAuthRefreshError to return true for *OAuthRefreshError")
+	}
+	if IsOAuthRefreshError(errors.New("other")) {
+		t.Error("expected IsOAuthRefreshError to return false for non-OAuthRefreshError")
+	}
+	if IsOAuthRefreshError(nil) {
+		t.Error("expected IsOAuthRefreshError(nil) = false")
+	}
+}
+
 func TestIsChecks_WrappedErrors(t *testing.T) {
 	t.Parallel()
 
@@ -125,6 +150,7 @@ func TestIsChecks_WrappedErrors(t *testing.T) {
 		{"wrapped RateLimitError", fmt.Errorf("wrap: %w", &RateLimitError{Message: "slow down", RetryAfter: time.Second}), IsRateLimitError},
 		{"wrapped TimeoutError", fmt.Errorf("wrap: %w", &TimeoutError{Message: "timeout"}), IsTimeoutError},
 		{"wrapped ValidationError", fmt.Errorf("wrap: %w", &ValidationError{Message: "invalid"}), IsValidationError},
+		{"wrapped OAuthRefreshError", fmt.Errorf("wrap: %w", &OAuthRefreshError{Provider: "google", Message: "fail"}), IsOAuthRefreshError},
 	}
 
 	for _, tt := range tests {

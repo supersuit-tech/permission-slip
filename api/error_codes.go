@@ -60,6 +60,7 @@ const (
 	ErrOAuthConnectionExists     ErrorCode = "oauth_connection_exists"
 	ErrOAuthStateMismatch          ErrorCode = "oauth_state_mismatch"
 	ErrOAuthExchangeFailed         ErrorCode = "oauth_exchange_failed"
+	ErrOAuthRefreshFailed          ErrorCode = "oauth_refresh_failed"
 	ErrOAuthProviderConfigExists   ErrorCode = "oauth_provider_config_exists"
 	ErrOAuthProviderConfigNotFound ErrorCode = "oauth_provider_config_not_found"
 	// 429 Too Many Requests (quota)
