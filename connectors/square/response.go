@@ -66,11 +66,24 @@ func extractErrorMessage(body []byte) string {
 
 	details := make([]string, 0, len(sqErr.Errors))
 	for _, e := range sqErr.Errors {
-		if e.Detail != "" {
-			details = append(details, e.Detail)
-		} else if e.Code != "" {
-			details = append(details, e.Code)
+		part := e.Detail
+		if part == "" {
+			part = e.Code
 		}
+		if part == "" {
+			continue
+		}
+		// Prefix with the field name when available so developers can
+		// immediately see which parameter caused the error.
+		if e.Field != "" {
+			part = e.Field + ": " + part
+		}
+		// Append the error code in parentheses when we have both a detail
+		// and a code — the code is machine-readable and useful for debugging.
+		if e.Detail != "" && e.Code != "" {
+			part += " (" + e.Code + ")"
+		}
+		details = append(details, part)
 	}
 	if len(details) == 0 {
 		return string(body)
