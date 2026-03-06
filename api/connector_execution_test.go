@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,6 +256,10 @@ func TestExecuteConnectorAction_OAuthPath_NoConnection(t *testing.T) {
 	if !connectors.IsOAuthRefreshError(err) {
 		t.Errorf("expected OAuthRefreshError, got %T: %v", err, err)
 	}
+	// Verify the error message mentions the provider so agents can display helpful info.
+	if !strings.Contains(err.Error(), "google") {
+		t.Errorf("expected error to mention provider name, got: %s", err.Error())
+	}
 }
 
 func TestExecuteConnectorAction_OAuthPath_NeedsReauth(t *testing.T) {
@@ -400,6 +405,135 @@ func TestExecuteConnectorAction_OAuthPath_NilTokenExpirySkipsRefresh(t *testing.
 	tok, _ := capturedCreds.Get("access_token")
 	if tok != "no-expiry-token" {
 		t.Errorf("expected access_token %q, got %q", "no-expiry-token", tok)
+	}
+}
+
+// TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken is the hardest
+// integration test: it wires up a real mock OAuth token server, stores an expired
+// access token with a valid refresh token, and verifies the full refresh pipeline:
+// token exchange → vault storage → DB update → fresh token passed to connector.
+func TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken(t *testing.T) {
+	t.Parallel()
+
+	// Mock OAuth token endpoint that returns a new access token.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "refreshed-access-token",
+			"refresh_token": "rotated-refresh-token",
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenSrv.Close()
+
+	var capturedCreds connectors.Credentials
+	f := setupOAuthExecutionTest(t, oauthExecOpts{
+		OnExec:     func(creds connectors.Credentials) { capturedCreds = creds },
+		Connection: &testhelper.OAuthConnectionOpts{Status: "active"},
+	})
+
+	// Override the OAuth registry to point at our mock token server.
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           "google",
+		TokenURL:     tokenSrv.URL,
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	f.Deps.OAuthProviders = oauthReg
+
+	// Store an expired access token and a valid refresh token in the vault.
+	accessVaultID, _ := f.Vault.CreateSecret(t.Context(), f.TX, "access", []byte("expired-access-token"))
+	refreshVaultID, _ := f.Vault.CreateSecret(t.Context(), f.TX, "refresh", []byte("old-refresh-token"))
+
+	pastExpiry := time.Now().Add(-10 * time.Minute)
+	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
+	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
+
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	// The connector should receive the refreshed token, not the expired one.
+	tok, ok := capturedCreds.Get("access_token")
+	if !ok {
+		t.Fatal("expected access_token in credentials")
+	}
+	if tok != "refreshed-access-token" {
+		t.Errorf("expected refreshed token %q, got %q", "refreshed-access-token", tok)
+	}
+
+	// Verify the DB was updated with new token info.
+	updated, err := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
+	if err != nil {
+		t.Fatalf("get connection after refresh: %v", err)
+	}
+	if updated.Status != db.OAuthStatusActive {
+		t.Errorf("expected status to remain %q after successful refresh, got %q", db.OAuthStatusActive, updated.Status)
+	}
+	// The access token vault ID should have changed (new vault entry was created).
+	if updated.AccessTokenVaultID == accessVaultID {
+		t.Error("expected access_token_vault_id to change after refresh")
+	}
+}
+
+// TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked verifies that
+// when the OAuth provider rejects the refresh token (e.g., revoked), the connection
+// is marked needs_reauth and an OAuthRefreshError is returned.
+func TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked(t *testing.T) {
+	t.Parallel()
+
+	// Mock OAuth token endpoint that rejects the refresh.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":             "invalid_grant",
+			"error_description": "Token has been revoked",
+		})
+	}))
+	defer tokenSrv.Close()
+
+	f := setupOAuthExecutionTest(t, oauthExecOpts{
+		Connection: &testhelper.OAuthConnectionOpts{Status: "active"},
+	})
+
+	// Override the OAuth registry to point at our mock token server.
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           "google",
+		TokenURL:     tokenSrv.URL,
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	f.Deps.OAuthProviders = oauthReg
+
+	// Store an expired access token with a refresh token.
+	accessVaultID, _ := f.Vault.CreateSecret(t.Context(), f.TX, "access", []byte("expired-token"))
+	refreshVaultID, _ := f.Vault.CreateSecret(t.Context(), f.TX, "refresh", []byte("revoked-refresh-token"))
+	pastExpiry := time.Now().Add(-10 * time.Minute)
+	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
+	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
+
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	if err == nil {
+		t.Fatal("expected error when refresh token is revoked")
+	}
+	if !connectors.IsOAuthRefreshError(err) {
+		t.Errorf("expected OAuthRefreshError, got %T: %v", err, err)
+	}
+
+	// Verify connection was marked needs_reauth after failed refresh.
+	updated, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
+	if updated.Status != db.OAuthStatusNeedsReauth {
+		t.Errorf("expected status %q after failed refresh, got %q", db.OAuthStatusNeedsReauth, updated.Status)
 	}
 }
 
