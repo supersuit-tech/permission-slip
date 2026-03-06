@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -67,32 +66,9 @@ func (a *updateAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, err
 	}
 
-	// Build SET clause with deterministic ordering.
-	setCols := make([]string, 0, len(params.Set))
-	for col := range params.Set {
-		setCols = append(setCols, col)
-	}
-	sort.Strings(setCols)
-
-	setParts := make([]string, len(setCols))
-	var args []any
-	for i, col := range setCols {
-		setParts[i] = quoteIdentifier(col) + " = ?"
-		args = append(args, params.Set[col])
-	}
-
-	// Build WHERE clause with deterministic ordering.
-	whereCols := make([]string, 0, len(params.Where))
-	for col := range params.Where {
-		whereCols = append(whereCols, col)
-	}
-	sort.Strings(whereCols)
-
-	whereParts := make([]string, len(whereCols))
-	for i, col := range whereCols {
-		whereParts[i] = quoteIdentifier(col) + " = ?"
-		args = append(args, params.Where[col])
-	}
+	setParts, setArgs := buildEqualityClauses(params.Set)
+	whereParts, whereArgs := buildEqualityClauses(params.Where)
+	args := append(setArgs, whereArgs...)
 
 	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
 		quoteIdentifier(params.Table),
@@ -108,10 +84,7 @@ func (a *updateAction) Execute(ctx context.Context, req connectors.ActionRequest
 
 	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: "MySQL update timed out"}
-		}
-		return nil, &connectors.ExternalError{Message: "MySQL update failed"}
+		return nil, wrapExecError("update", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()

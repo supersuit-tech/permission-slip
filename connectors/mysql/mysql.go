@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -349,4 +350,33 @@ func checkColumnsAllowed(columns []string, allowedColumns []string) error {
 		}
 	}
 	return nil
+}
+
+// buildEqualityClauses builds "`col` = ?" clauses from a column-value map,
+// sorted deterministically by column name. Returns the SQL fragments and
+// matching positional args.
+func buildEqualityClauses(pairs map[string]interface{}) ([]string, []any) {
+	cols := make([]string, 0, len(pairs))
+	for col := range pairs {
+		cols = append(cols, col)
+	}
+	sort.Strings(cols)
+
+	parts := make([]string, len(cols))
+	args := make([]any, len(cols))
+	for i, col := range cols {
+		parts[i] = quoteIdentifier(col) + " = ?"
+		args[i] = pairs[col]
+	}
+	return parts, args
+}
+
+// wrapExecError wraps a database exec error into the appropriate connector
+// error type, sanitizing the raw driver error to avoid leaking connection
+// details.
+func wrapExecError(operation string, err error) error {
+	if connectors.IsTimeout(err) {
+		return &connectors.TimeoutError{Message: fmt.Sprintf("MySQL %s timed out", operation)}
+	}
+	return &connectors.ExternalError{Message: fmt.Sprintf("MySQL %s failed", operation)}
 }

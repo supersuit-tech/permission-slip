@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -53,19 +52,7 @@ func (a *deleteAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, err
 	}
 
-	// Build WHERE clause with deterministic ordering.
-	whereCols := make([]string, 0, len(params.Where))
-	for col := range params.Where {
-		whereCols = append(whereCols, col)
-	}
-	sort.Strings(whereCols)
-
-	whereParts := make([]string, len(whereCols))
-	var args []any
-	for i, col := range whereCols {
-		whereParts[i] = quoteIdentifier(col) + " = ?"
-		args = append(args, params.Where[col])
-	}
+	whereParts, args := buildEqualityClauses(params.Where)
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE %s",
 		quoteIdentifier(params.Table),
@@ -80,10 +67,7 @@ func (a *deleteAction) Execute(ctx context.Context, req connectors.ActionRequest
 
 	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: "MySQL delete timed out"}
-		}
-		return nil, &connectors.ExternalError{Message: "MySQL delete failed"}
+		return nil, wrapExecError("delete", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()

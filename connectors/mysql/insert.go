@@ -120,10 +120,7 @@ func (a *insertAction) Execute(ctx context.Context, req connectors.ActionRequest
 
 	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: "MySQL insert timed out"}
-		}
-		return nil, &connectors.ExternalError{Message: "MySQL insert failed"}
+		return nil, wrapExecError("insert", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()
