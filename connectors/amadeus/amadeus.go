@@ -26,6 +26,10 @@ const (
 
 	// tokenRefreshBuffer is how long before expiry we proactively refresh.
 	tokenRefreshBuffer = 60 * time.Second
+
+	// maxResponseBytes caps how much data we read from the Amadeus API.
+	// Prevents a misbehaving server from exhausting memory.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // AmadeusConnector owns the shared HTTP client and base URL used by all
@@ -189,7 +193,7 @@ func (c *AmadeusConnector) fetchToken(ctx context.Context, creds connectors.Cred
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return "", &connectors.ExternalError{Message: fmt.Sprintf("reading token response body: %v", err)}
 	}
@@ -311,7 +315,7 @@ func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credenti
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
