@@ -22,18 +22,44 @@ The credential `auth_type` in the database is `api_key`. Keys are stored encrypt
 
 ## Actions
 
-*Actions will be added in Phase 2. Each action will have its own file and test file.*
+All actions are implemented with full test coverage (see [issue #90](https://github.com/supersuit-tech/permission-slip/issues/90)).
 
-Planned actions (see [issue #90](https://github.com/supersuit-tech/permission-slip/issues/90)):
+| Action | Risk | Required Params | Description |
+|--------|------|-----------------|-------------|
+| `stripe.get_balance` | low | *(none)* | Retrieve current account balance (available + pending) |
+| `stripe.create_customer` | low | `email` | Create a customer record. Optional: `name`, `description`, `phone`, `metadata` |
+| `stripe.list_subscriptions` | low | *(none)* | List subscriptions. Optional filters: `customer_id`, `status`, `price_id`, `limit` (default 10, max 100) |
+| `stripe.create_invoice` | medium | `customer_id` | Create an invoice, add line items, and optionally finalize. Optional: `description`, `due_date`, `currency` (default "usd"), `auto_advance`, `line_items[]`, `metadata` |
+| `stripe.create_payment_link` | medium | `line_items[]` | Create a shareable payment link. Each item needs `price_id` + `quantity`. Optional: `after_completion` (redirect URL), `allow_promotion_codes`, `metadata` |
+| `stripe.issue_refund` | **high** | `payment_intent_id` or `charge_id` | Refund a payment. Optional: `amount` (cents, omit for full refund), `reason`, `metadata`. Idempotency keys are mandatory. |
 
-| Action | Risk | Description |
-|--------|------|-------------|
-| `stripe.create_customer` | low | Create a new customer record |
-| `stripe.create_invoice` | medium | Create and optionally send an invoice |
-| `stripe.issue_refund` | **high** | Refund a charge or payment intent |
-| `stripe.list_subscriptions` | low | List subscriptions by customer/status |
-| `stripe.create_payment_link` | medium | Create a shareable payment link |
-| `stripe.get_balance` | low | Retrieve current account balance |
+### Action Details
+
+#### `stripe.create_invoice` — Multi-step Flow
+
+This action performs up to 3 API calls:
+
+1. **POST `/v1/invoices`** — creates the invoice
+2. **POST `/v1/invoiceitems`** — adds each line item (one call per item)
+3. **POST `/v1/invoices/{id}/finalize`** — finalizes the invoice (when `auto_advance` is true or unset)
+
+If a line item or finalize step fails, the error includes the invoice ID for recovery (e.g., `"adding line item to invoice in_xxx: ..."`).
+
+#### `stripe.issue_refund` — High Risk
+
+Refunds move real money. The connector enforces:
+- Exactly one of `payment_intent_id` or `charge_id` (not both, not neither)
+- `reason` must be one of `duplicate`, `fraudulent`, `requested_by_customer`, or empty
+- Deterministic idempotency keys prevent double-refunds on retries
+
+### Validation Limits
+
+All actions enforce these limits client-side for clear error messages:
+
+- **Metadata:** max 50 key-value pairs (Stripe's limit)
+- **Invoice line items:** max 250 (Stripe's limit)
+- **Payment link line items:** max 20 (Stripe's limit)
+- **Subscription list limit:** 1–100 (default 10)
 
 ## Error Handling
 
@@ -78,13 +104,13 @@ metadata[order_id]=12345&metadata[source]=agent
 line_items[0][price]=price_abc&line_items[0][quantity]=2
 ```
 
-The `formEncode()` function handles this flattening. Phase 2 actions call it on their typed params before passing to `do()`.
+The `formEncode()` function handles this flattening. Actions call it on their typed params before passing to `do()`.
 
 ## Idempotency
 
 All POST endpoints support Stripe's `Idempotency-Key` header. The connector derives deterministic keys from a SHA-256 hash of the action type and raw parameters — this ensures the same request always produces the same key, so retries are safe.
 
-The `doPost()` convenience method handles this automatically. Phase 2 actions should use `doPost()` instead of `do()` directly.
+The `doPost()` convenience method handles this automatically. Actions should use `doPost()` instead of `do()` directly. For multi-step flows (like `create_invoice`), each step gets its own deterministic key derived from the step name + step-specific parameters.
 
 ## API Version Pinning
 
@@ -92,16 +118,22 @@ The connector pins the Stripe API version via the `Stripe-Version` header (curre
 
 ## Adding a New Action
 
-Each action lives in its own file. To add one (e.g., `stripe.create_customer`):
+Each action lives in its own file. To add one:
 
-1. Create `connectors/stripe/create_customer.go` with a params struct, `validate()`, and an `Execute` method.
+1. Create `connectors/stripe/<action_name>.go` with a params struct, `validate()`, and an `Execute` method.
 2. Parse and validate parameters from `json.RawMessage`.
 3. Use `formEncode()` to flatten the params into Stripe's bracket notation.
 4. Use `a.conn.doPost(ctx, creds, path, flatParams, &resp, actionType, rawParams)` for POST requests or `a.conn.doGet(ctx, creds, path, queryParams, &resp)` for GET requests.
 5. Return `connectors.JSONResult(resp)` to wrap the response into an `ActionResult`.
 6. Register the action in `Actions()` inside `stripe.go`.
 7. Add the action to the `Manifest()` return value (Phase 3).
-8. Add tests in `create_customer_test.go` using `httptest.NewServer` and `newForTest()`.
+8. Add tests in `<action_name>_test.go` using `httptest.NewServer` and `newForTest()`.
+
+**Validation checklist for new actions:**
+- Call `validateMetadata()` if accepting metadata
+- Cap array parameters (line items, etc.) to prevent resource exhaustion
+- Use `url.PathEscape()` for any user-supplied or API-returned IDs in URL paths
+- Include `t.Parallel()` in all tests and protect shared state with `sync.Mutex`
 
 The `doPost`/`doGet` methods handle auth, form encoding, idempotency, error mapping, and response size limits. Each action file only contains parameter parsing, validation, and the Stripe endpoint path.
 
@@ -109,22 +141,27 @@ The `doPost`/`doGet` methods handle auth, form encoding, idempotency, error mapp
 
 ```
 connectors/stripe/
-├── stripe.go              # StripeConnector struct, New(), do(), doGet(), doPost(), formEncode()
-├── response.go            # Stripe error parsing and typed error mapping
-├── helpers_test.go        # Shared test helpers (validCreds)
-├── stripe_test.go         # Scaffold tests (form encoding, do(), error mapping, idempotency)
-└── README.md              # This file
+├── stripe.go                    # StripeConnector, New(), do(), doGet(), doPost(), formEncode(), validateMetadata()
+├── response.go                  # Stripe error parsing and typed error mapping
+├── create_customer.go           # stripe.create_customer action
+├── create_invoice.go            # stripe.create_invoice action (multi-step: create → items → finalize)
+├── issue_refund.go              # stripe.issue_refund action (high risk, idempotency-critical)
+├── list_subscriptions.go        # stripe.list_subscriptions action
+├── create_payment_link.go       # stripe.create_payment_link action
+├── get_balance.go               # stripe.get_balance action
+├── *_test.go                    # Corresponding test files for each action
+├── helpers_test.go              # Shared test helpers (validCreds)
+├── stripe_test.go               # Core tests (form encoding, do(), error mapping, idempotency)
+└── README.md                    # This file
 ```
-
-*Phase 2 will add action files (e.g., `create_customer.go`, `create_customer_test.go`).*
 
 ## Testing
 
-All tests use `httptest.NewServer` to mock the Stripe API — no real API calls or Stripe keys needed.
+All tests use `httptest.NewServer` to mock the Stripe API — no real API calls or Stripe keys needed. Tests run with `-race` to catch data races.
 
 ```bash
 go test ./connectors/stripe/... -v
 
-# With race detector
+# With race detector (recommended)
 go test ./connectors/stripe/... -race
 ```

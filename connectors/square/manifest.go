@@ -26,9 +26,9 @@ var moneySchema = `{
 	}
 }`
 
-// Manifest returns the connector's metadata manifest. Action metadata is
-// declared here for DB seeding; the actual Action handlers are wired in
-// Actions() as they are implemented in Phase 2.
+// Manifest returns the connector's metadata manifest for DB auto-seeding.
+// Includes full parameter JSON schemas for all 6 actions and configuration
+// templates for common use cases.
 func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "square",
@@ -47,6 +47,57 @@ func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 				Service:         "square",
 				AuthType:        "api_key",
 				InstructionsURL: "https://developer.squareup.com/docs/build-basics/access-tokens",
+			},
+		},
+		Templates: []connectors.ManifestTemplate{
+			{
+				ID:          "tpl_square_create_order",
+				ActionType:  "square.create_order",
+				Name:        "Create orders at a location",
+				Description: "Agent can create orders at a specific Square location. Set location_id to lock to one location, or use \"*\" for any.",
+				Parameters:  json.RawMessage(`{"location_id":"*","line_items":"*","customer_id":"*","note":"*"}`),
+			},
+			{
+				ID:          "tpl_square_create_payment_cash",
+				ActionType:  "square.create_payment",
+				Name:        "Process cash payments only",
+				Description: "Agent can process cash payments only (no card charges). Amount and order are agent-controlled. Requires human approval per payment.",
+				Parameters:  json.RawMessage(`{"source_id":"CASH","amount_money":"*","order_id":"*","customer_id":"*","note":"*","reference_id":"*"}`),
+			},
+			{
+				ID:          "tpl_square_create_payment",
+				ActionType:  "square.create_payment",
+				Name:        "Process payments (all sources)",
+				Description: "Agent can process payments from any source including cards. WARNING: can charge real money. Requires human approval per payment.",
+				Parameters:  json.RawMessage(`{"source_id":"*","amount_money":"*","order_id":"*","customer_id":"*","note":"*","reference_id":"*"}`),
+			},
+			{
+				ID:          "tpl_square_list_catalog",
+				ActionType:  "square.list_catalog",
+				Name:        "Browse catalog (read-only)",
+				Description: "Agent can browse the merchant's full catalog of items, categories, and modifiers.",
+				Parameters:  json.RawMessage(`{"types":"*","cursor":"*"}`),
+			},
+			{
+				ID:          "tpl_square_create_customer",
+				ActionType:  "square.create_customer",
+				Name:        "Create customer profiles",
+				Description: "Agent can create customer records with any contact details.",
+				Parameters:  json.RawMessage(`{"given_name":"*","family_name":"*","email_address":"*","phone_number":"*","company_name":"*","note":"*"}`),
+			},
+			{
+				ID:          "tpl_square_create_booking",
+				ActionType:  "square.create_booking",
+				Name:        "Book appointments",
+				Description: "Agent can schedule appointments at any location for any service. Requires human approval per booking.",
+				Parameters:  json.RawMessage(`{"location_id":"*","customer_id":"*","start_at":"*","service_variation_id":"*","team_member_id":"*","customer_note":"*"}`),
+			},
+			{
+				ID:          "tpl_square_search_orders",
+				ActionType:  "square.search_orders",
+				Name:        "Search orders (read-only)",
+				Description: "Agent can search and filter orders across locations.",
+				Parameters:  json.RawMessage(`{"location_ids":"*","query":"*","limit":"*","cursor":"*"}`),
 			},
 		},
 	}
@@ -266,9 +317,9 @@ func searchOrdersManifest() connectors.ManifestAction {
 				},
 				"limit": {
 					"type": "integer",
-					"minimum": 1,
+					"minimum": 0,
 					"maximum": 500,
-					"description": "Maximum orders to return per page (1-500, default 500)"
+					"description": "Maximum orders per page (1-500). 0 or omit to use Square's default."
 				},
 				"cursor": {
 					"type": "string",

@@ -24,11 +24,21 @@ func TestSquareConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
-	// Phase 1 scaffold: no action handlers yet. Handlers are added in Phase 2.
-	// The manifest declares 6 actions for DB seeding, but the Actions() map
-	// will be populated as each action is implemented.
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 (Phase 1 scaffold)", len(actions))
+	wantActions := []string{
+		"square.create_order",
+		"square.create_payment",
+		"square.list_catalog",
+		"square.create_customer",
+		"square.create_booking",
+		"square.search_orders",
+	}
+	if len(actions) != len(wantActions) {
+		t.Fatalf("Actions() returned %d actions, want %d", len(actions), len(wantActions))
+	}
+	for _, name := range wantActions {
+		if _, ok := actions[name]; !ok {
+			t.Errorf("Actions() missing %q", name)
+		}
 	}
 }
 
@@ -156,6 +166,87 @@ func TestSquareConnector_Manifest(t *testing.T) {
 		if err := json.Unmarshal(a.ParametersSchema, &schema); err != nil {
 			t.Errorf("action %q has invalid ParametersSchema JSON: %v", a.ActionType, err)
 		}
+	}
+}
+
+func TestSquareConnector_ActionsMatchManifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	actions := c.Actions()
+	manifest := c.Manifest()
+
+	manifestTypes := make(map[string]bool, len(manifest.Actions))
+	for _, a := range manifest.Actions {
+		manifestTypes[a.ActionType] = true
+	}
+
+	for actionType := range actions {
+		if !manifestTypes[actionType] {
+			t.Errorf("Actions() has %q but Manifest() does not", actionType)
+		}
+	}
+	for _, a := range manifest.Actions {
+		if _, ok := actions[a.ActionType]; !ok {
+			t.Errorf("Manifest() has %q but Actions() does not", a.ActionType)
+		}
+	}
+}
+
+func TestSquareConnector_ManifestTemplates(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	if len(m.Templates) == 0 {
+		t.Fatal("Manifest().Templates is empty, want at least one template")
+	}
+
+	// Build a set of valid action types for cross-reference.
+	actionTypes := make(map[string]bool, len(m.Actions))
+	for _, a := range m.Actions {
+		actionTypes[a.ActionType] = true
+	}
+
+	seenIDs := make(map[string]bool)
+	for _, tpl := range m.Templates {
+		if seenIDs[tpl.ID] {
+			t.Errorf("duplicate template ID %q", tpl.ID)
+		}
+		seenIDs[tpl.ID] = true
+
+		if !actionTypes[tpl.ActionType] {
+			t.Errorf("template %q references unknown action_type %q", tpl.ID, tpl.ActionType)
+		}
+		if tpl.Name == "" {
+			t.Errorf("template %q has empty name", tpl.ID)
+		}
+		if len(tpl.Parameters) == 0 {
+			t.Errorf("template %q has empty parameters", tpl.ID)
+		}
+		// Verify Parameters is valid JSON.
+		var params map[string]interface{}
+		if err := json.Unmarshal(tpl.Parameters, &params); err != nil {
+			t.Errorf("template %q has invalid Parameters JSON: %v", tpl.ID, err)
+		}
+	}
+
+	// Verify create_payment template constrains source_id to CASH.
+	var foundCashTemplate bool
+	for _, tpl := range m.Templates {
+		if tpl.ActionType != "square.create_payment" {
+			continue
+		}
+		var params map[string]interface{}
+		if err := json.Unmarshal(tpl.Parameters, &params); err != nil {
+			continue
+		}
+		if params["source_id"] == "CASH" {
+			foundCashTemplate = true
+			break
+		}
+	}
+	if !foundCashTemplate {
+		t.Error("expected a create_payment template that constrains source_id to \"CASH\"")
 	}
 }
 
