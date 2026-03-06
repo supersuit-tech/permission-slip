@@ -162,6 +162,9 @@ func TestListDriveFiles_PathTraversalRejected(t *testing.T) {
 		{"dot-dot", "../../admin"},
 		{"backslash", "Documents\\secret"},
 		{"absolute", "/root/files"},
+		{"query-injection", "Documents?$filter=malicious"},
+		{"fragment-injection", "Documents#fragment"},
+		{"percent-encoding", "Documents%2F..%2Fetc"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

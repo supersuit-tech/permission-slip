@@ -149,6 +149,38 @@ func TestGetDriveFile_BinaryContentRejected(t *testing.T) {
 	}
 }
 
+func TestGetDriveFile_NoMimeTypeContentRejected(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":   "file-123",
+			"name": "unknown-file",
+			"size": 1024,
+			"file": map[string]string{},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &getDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(getDriveFileParams{ItemID: "file-123", IncludeContent: true})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.get_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for file with no MIME type")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestGetDriveFile_MissingItemID(t *testing.T) {
 	t.Parallel()
 
@@ -298,7 +330,7 @@ func TestValidateItemID(t *testing.T) {
 		}
 	}
 
-	invalid := []string{"../etc", "a/b", "a\\b", "a..b"}
+	invalid := []string{"../etc", "a/b", "a\\b", "a..b", "id?inject", "id#frag", "id%00"}
 	for _, id := range invalid {
 		if err := validateItemID(id); err == nil {
 			t.Errorf("expected invalid item_id %q to be rejected", id)
