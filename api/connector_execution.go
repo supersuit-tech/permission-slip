@@ -201,7 +201,9 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	// Perform the refresh with a dedicated timeout so the OAuth provider call
 	// gets a fair chance even if the incoming request context has little time left.
-	refreshCtx, refreshCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Use WithoutCancel to preserve context values (trace IDs, Sentry spans) while
+	// detaching from the parent's cancellation signal.
+	refreshCtx, refreshCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer refreshCancel()
 	result, err := oauth.RefreshTokens(refreshCtx, provider, string(refreshTokenBytes))
 	if err != nil {
