@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"log"
 	"net/http"
 
@@ -44,8 +43,10 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		log.Printf("[%s] OAuth refresh error: %v", traceID, err)
 		var oauthErr *connectors.OAuthRefreshError
 		msg := "OAuth authorization required — user must re-connect the provider in Settings"
-		details := map[string]any{}
-		if errors.As(err, &oauthErr) {
+		details := map[string]any{
+			"action_required": "reauthorize",
+		}
+		if connectors.AsOAuthRefreshError(err, &oauthErr) {
 			details["provider"] = oauthErr.Provider
 		}
 		resp := newErrorResponse(ErrOAuthRefreshFailed, msg, false)
