@@ -56,10 +56,28 @@ Refunds move real money. The connector enforces:
 
 All actions enforce these limits client-side for clear error messages:
 
-- **Metadata:** max 50 key-value pairs (Stripe's limit)
+- **Metadata:** max 50 key-value pairs, values must be strings (Stripe's limit). Non-string types (maps, arrays) are rejected client-side.
 - **Invoice line items:** max 250 (Stripe's limit)
 - **Payment link line items:** max 20 (Stripe's limit)
+- **Payment link redirect URL:** must use HTTPS scheme (prevents open redirects via `javascript:`, `data:`, or `http:` schemes)
 - **Subscription list limit:** 1–100 (default 10)
+
+## Configuration Templates
+
+The connector ships with 8 pre-built templates at different permission levels. Administrators can assign templates to agents to grant minimum-necessary access:
+
+| Template | Action | Risk | Notes |
+|----------|--------|------|-------|
+| Check account balance | `get_balance` | Low | Read-only, no financial risk |
+| List active subscriptions | `list_subscriptions` | Low | Status locked to "active" |
+| List subscriptions (any status) | `list_subscriptions` | Low | All statuses including canceled |
+| Create customers | `create_customer` | Low | Any customer details |
+| Create invoices | `create_invoice` | Medium | Any customer, any line items |
+| Create payment links | `create_payment_link` | Medium | Any products |
+| Issue refunds up to $99.99 | `issue_refund` | **High** | Amount capped via `$pattern` regex (`^[1-9]\d{0,3}$` = max 9999 cents) |
+| Issue refunds (any amount) | `issue_refund` | **High** | Uncapped — for trusted agents only |
+
+Templates are defined in `manifest.go` and auto-seeded into the database on startup.
 
 ## Error Handling
 
@@ -126,7 +144,7 @@ Each action lives in its own file. To add one:
 4. Use `a.conn.doPost(ctx, creds, path, flatParams, &resp, actionType, rawParams)` for POST requests or `a.conn.doGet(ctx, creds, path, queryParams, &resp)` for GET requests.
 5. Return `connectors.JSONResult(resp)` to wrap the response into an `ActionResult`.
 6. Register the action in `Actions()` inside `stripe.go`.
-7. Add the action to the `Manifest()` return value (Phase 3).
+7. Add the action schema and any templates in `manifest.go` — the `TestManifest_ActionsMatchRegistered` test will catch any drift between `Actions()` and `Manifest()`.
 8. Add tests in `<action_name>_test.go` using `httptest.NewServer` and `newForTest()`.
 
 **Validation checklist for new actions:**
@@ -142,6 +160,7 @@ The `doPost`/`doGet` methods handle auth, form encoding, idempotency, error mapp
 ```
 connectors/stripe/
 ├── stripe.go                    # StripeConnector, New(), do(), doGet(), doPost(), formEncode(), validateMetadata()
+├── manifest.go                  # ManifestProvider: action schemas, credentials, templates
 ├── response.go                  # Stripe error parsing and typed error mapping
 ├── create_customer.go           # stripe.create_customer action
 ├── create_invoice.go            # stripe.create_invoice action (multi-step: create → items → finalize)
@@ -151,7 +170,7 @@ connectors/stripe/
 ├── get_balance.go               # stripe.get_balance action
 ├── *_test.go                    # Corresponding test files for each action
 ├── helpers_test.go              # Shared test helpers (validCreds)
-├── stripe_test.go               # Core tests (form encoding, do(), error mapping, idempotency)
+├── stripe_test.go               # Core tests (form encoding, do(), error mapping, idempotency, manifest validation)
 └── README.md                    # This file
 ```
 
