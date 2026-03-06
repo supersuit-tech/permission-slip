@@ -47,6 +47,10 @@ func RefreshTokens(ctx context.Context, provider Provider, refreshToken string) 
 		return nil, fmt.Errorf("refresh token exchange for provider %q: %w", provider.ID, err)
 	}
 
+	if newToken.AccessToken == "" {
+		return nil, fmt.Errorf("provider %q returned an empty access token during refresh", provider.ID)
+	}
+
 	result := &RefreshResult{
 		AccessToken: newToken.AccessToken,
 		Expiry:      newToken.Expiry,

@@ -152,8 +152,8 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 		}
 	}
 
-	// Check if the token needs refreshing (expired or within 5-minute buffer).
-	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-5*time.Minute)) {
+	// Check if the token needs refreshing (expired or within pre-emptive buffer).
+	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-oauth.TokenExpiryBuffer)) {
 		if err := refreshOAuthConnection(ctx, deps, conn, providerID); err != nil {
 			return zero, err
 		}
@@ -199,16 +199,21 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		return fmt.Errorf("read refresh token from vault: %w", err)
 	}
 
-	// Perform the refresh.
-	result, err := oauth.RefreshTokens(ctx, provider, string(refreshTokenBytes))
+	// Perform the refresh with a dedicated timeout so the OAuth provider call
+	// gets a fair chance even if the incoming request context has little time left.
+	refreshCtx, refreshCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer refreshCancel()
+	result, err := oauth.RefreshTokens(refreshCtx, provider, string(refreshTokenBytes))
 	if err != nil {
 		// Refresh failed (token revoked, expired, etc.). Mark as needs_reauth.
+		// Log the full error server-side for debugging; return a sanitized message to the caller.
+		log.Printf("oauth refresh failed for provider %q connection %s: %v", providerID, conn.ID, err)
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
 			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
-			Message:  fmt.Sprintf("token refresh failed — user must re-authorize: %v", err),
+			Message:  "token refresh failed — user must re-authorize",
 		}
 	}
 
@@ -223,7 +228,9 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	}
 
 	// Delete old access token and create new one.
-	_ = deps.Vault.DeleteSecret(ctx, tx, conn.AccessTokenVaultID)
+	if delErr := deps.Vault.DeleteSecret(ctx, tx, conn.AccessTokenVaultID); delErr != nil {
+		log.Printf("oauth refresh: failed to delete old access token %s from vault: %v", conn.AccessTokenVaultID, delErr)
+	}
 	newAccessVaultID, err := deps.Vault.CreateSecret(ctx, tx, conn.ID+"_access", []byte(result.AccessToken))
 	if err != nil {
 		return fmt.Errorf("vault create refreshed access token: %w", err)
@@ -233,7 +240,9 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	var newRefreshVaultID *string
 	if result.RefreshToken != string(refreshTokenBytes) {
 		// Provider rotated the refresh token — store the new one.
-		_ = deps.Vault.DeleteSecret(ctx, tx, *conn.RefreshTokenVaultID)
+		if delErr := deps.Vault.DeleteSecret(ctx, tx, *conn.RefreshTokenVaultID); delErr != nil {
+			log.Printf("oauth refresh: failed to delete old refresh token %s from vault: %v", *conn.RefreshTokenVaultID, delErr)
+		}
 		id, err := deps.Vault.CreateSecret(ctx, tx, conn.ID+"_refresh", []byte(result.RefreshToken))
 		if err != nil {
 			return fmt.Errorf("vault create rotated refresh token: %w", err)

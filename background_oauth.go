@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"time"
@@ -83,9 +82,10 @@ func runOAuthRefresh(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Lo
 		return
 	}
 
+	start := time.Now()
 	var refreshed, failed int
 	for _, conn := range conns {
-		if err := refreshSingleConnection(refreshCtx, deps, conn); err != nil {
+		if err := refreshSingleConnection(refreshCtx, deps, logger, conn); err != nil {
 			failed++
 			logger.Warn("oauth refresh: failed",
 				"connection_id", conn.ID,
@@ -97,20 +97,29 @@ func runOAuthRefresh(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Lo
 	}
 
 	logger.Info("oauth refresh: completed",
-		"total", len(conns), "refreshed", refreshed, "failed", failed)
+		"total", len(conns), "refreshed", refreshed, "failed", failed,
+		"duration_ms", time.Since(start).Milliseconds())
 }
 
 // refreshSingleConnection refreshes the tokens for a single OAuth connection.
-func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, conn db.OAuthConnection) error {
+func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Logger, conn db.OAuthConnection) error {
 	provider, ok := deps.Registry.Get(conn.Provider)
 	if !ok {
 		return fmt.Errorf("provider %q not found in registry", conn.Provider)
 	}
 
+	logAttrs := []any{
+		"connection_id", conn.ID,
+		"provider", conn.Provider,
+		"user_id", conn.UserID,
+	}
+
 	if conn.RefreshTokenVaultID == nil {
 		// Mark as needs_reauth — no refresh token available.
 		if err := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); err != nil {
-			log.Printf("oauth refresh: failed to mark connection %s as needs_reauth: %v", conn.ID, err)
+			logger.Error("oauth refresh: failed to mark connection as needs_reauth",
+				append(logAttrs, "error", err)...)
+			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, err))
 		}
 		return fmt.Errorf("no refresh token for connection %s", conn.ID)
 	}
@@ -124,7 +133,9 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, conn db
 	if err != nil {
 		// Refresh failed — mark as needs_reauth.
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
-			log.Printf("oauth refresh: failed to mark connection %s as needs_reauth: %v", conn.ID, statusErr)
+			logger.Error("oauth refresh: failed to mark connection as needs_reauth",
+				append(logAttrs, "error", statusErr)...)
+			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, statusErr))
 		}
 		return fmt.Errorf("token refresh: %w", err)
 	}
@@ -138,7 +149,10 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, conn db
 		defer db.RollbackTx(ctx, tx) //nolint:errcheck // best-effort cleanup
 	}
 
-	_ = deps.Vault.DeleteSecret(ctx, tx, conn.AccessTokenVaultID)
+	if err := deps.Vault.DeleteSecret(ctx, tx, conn.AccessTokenVaultID); err != nil {
+		logger.Warn("oauth refresh: failed to delete old access token from vault",
+			append(logAttrs, "vault_id", conn.AccessTokenVaultID, "error", err)...)
+	}
 	newAccessVaultID, err := deps.Vault.CreateSecret(ctx, tx, conn.ID+"_access", []byte(result.AccessToken))
 	if err != nil {
 		return fmt.Errorf("vault create access token: %w", err)
@@ -146,7 +160,10 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, conn db
 
 	var newRefreshVaultID *string
 	if result.RefreshToken != string(refreshTokenBytes) {
-		_ = deps.Vault.DeleteSecret(ctx, tx, *conn.RefreshTokenVaultID)
+		if err := deps.Vault.DeleteSecret(ctx, tx, *conn.RefreshTokenVaultID); err != nil {
+			logger.Warn("oauth refresh: failed to delete old refresh token from vault",
+				append(logAttrs, "vault_id", *conn.RefreshTokenVaultID, "error", err)...)
+		}
 		id, err := deps.Vault.CreateSecret(ctx, tx, conn.ID+"_refresh", []byte(result.RefreshToken))
 		if err != nil {
 			return fmt.Errorf("vault create refresh token: %w", err)

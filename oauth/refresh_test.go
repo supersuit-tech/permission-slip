@@ -119,6 +119,37 @@ func TestRefreshTokens_EmptyRefreshToken(t *testing.T) {
 	}
 }
 
+func TestRefreshTokens_EmptyAccessTokenResponse(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		})
+	}))
+	defer srv.Close()
+
+	provider := Provider{
+		ID:           "test",
+		TokenURL:     srv.URL,
+		ClientID:     "id",
+		ClientSecret: "secret",
+	}
+
+	_, err := RefreshTokens(context.Background(), provider, "some-token")
+	if err == nil {
+		t.Fatal("expected error when provider returns empty access token")
+	}
+	// The oauth2 library or our validation should catch this — either message is acceptable.
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "empty access token") && !strings.Contains(errMsg, "missing access_token") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
 func TestRefreshTokens_TokenEndpointError(t *testing.T) {
 	t.Parallel()
 
