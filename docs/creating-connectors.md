@@ -1,6 +1,6 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub and Slack connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, and Square connectors as reference implementations. The Square connector is a good example of environment-aware base URLs (sandbox/production), idempotency key generation, and structured error envelope parsing.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
