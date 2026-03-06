@@ -102,6 +102,8 @@ tags:
     description: Expo push token management for mobile push notifications (session-authenticated)
   - name: OAuth
     description: OAuth 2.0 provider authorization and connection management (session-authenticated)
+  - name: Payment Methods
+    description: Stored payment methods for agent-initiated purchases (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -3312,17 +3314,31 @@ paths:
                     field: action
                   trace_id: trace_xyz789
         '401':
-          description: Invalid signature
+          description: Invalid signature or OAuth authorization required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_signature
-                  message: Signature verification failed
-                  retryable: false
-                  trace_id: trace_xyz789
+              examples:
+                invalid_signature:
+                  summary: Agent signature verification failed
+                  value:
+                    error:
+                      code: invalid_signature
+                      message: Signature verification failed
+                      retryable: false
+                      trace_id: trace_xyz789
+                oauth_refresh_failed:
+                  summary: OAuth token expired or revoked — user must re-authorize
+                  value:
+                    error:
+                      code: oauth_refresh_failed
+                      message: OAuth authorization required — user must re-connect the provider in Settings
+                      retryable: false
+                      details:
+                        provider: google
+                        action_required: reauthorize
+                      trace_id: trace_xyz789
         '403':
           description: Standing approval exhausted or constraint violation
           content:
@@ -5724,6 +5740,173 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payment-methods:
+    get:
+      tags:
+        - Payment Methods
+      summary: List stored payment methods
+      description: |
+        Returns all stored payment methods for the authenticated user, ordered by
+        default status (default first) then creation date. Each method includes
+        its current monthly spend (rolling 30-day window) and the maximum number
+        of payment methods allowed per user.
+      operationId: listPaymentMethods
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Payment methods retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Payment Methods
+      summary: Confirm and store a payment method
+      description: |
+        Saves a payment method after it has been set up via Stripe Elements.
+        The payment_method_id must be a valid Stripe pm_* token returned by the
+        SetupIntent confirmation flow on the client.
+
+        **Flow:**
+        1. Client calls POST /payment-methods/setup-intent to get a client_secret
+        2. Client uses stripe.confirmCardSetup(client_secret) with Stripe Elements
+        3. Client calls this endpoint with the resulting pm_* token
+
+        **Constraints:**
+        - Maximum 10 payment methods per user (returns 409 if exceeded)
+        - Label must be 100 characters or fewer
+        - payment_method_id must start with "pm_"
+        - Raw card data never touches our servers — only Stripe tokens are stored
+      operationId: confirmPaymentMethod
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentMethodRequest'
+      responses:
+        '201':
+          description: Payment method saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payment-methods/setup-intent:
+    post:
+      tags:
+        - Payment Methods
+      summary: Create a SetupIntent for card collection
+      description: |
+        Creates a Stripe SetupIntent for collecting payment method details
+        via Stripe Elements. Returns a client_secret to use with
+        stripe.confirmCardSetup() on the frontend.
+
+        If the user does not yet have a Stripe customer record, one is created
+        automatically and associated with their subscription.
+
+        The client_secret is single-use and expires after 24 hours.
+      operationId: createSetupIntent
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: SetupIntent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupIntentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payment-methods/{id}:
+    patch:
+      tags:
+        - Payment Methods
+      summary: Update a payment method
+      description: |
+        Update label, spending limits, or default status of a stored payment method.
+
+        **Spending limits:**
+        - Values are in cents (e.g. 5000 = $50.00)
+        - Per-transaction limit cannot exceed monthly limit
+        - Negative values are rejected
+        - Use clear_per_transaction_limit / clear_monthly_limit to remove a limit
+        - Label must be 100 characters or fewer
+      operationId: updatePaymentMethod
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentMethodRequest'
+      responses:
+        '200':
+          description: Payment method updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Payment Methods
+      summary: Delete a payment method
+      description: |
+        Removes a stored payment method and detaches it from the Stripe customer.
+        The detachment from Stripe is best-effort — the local record is always
+        deleted even if the Stripe API call fails.
+      operationId: deletePaymentMethod
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment method deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePaymentMethodResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/config:
     get:
       summary: Get server configuration
@@ -10084,6 +10267,145 @@ components:
           format: date-time
           description: When the BYOA credentials were deleted
           example: '2026-03-05T15:00:00Z'
+    PaymentMethod:
+      type: object
+      description: |
+        A stored payment method (credit/debit card) tokenized via Stripe.
+        Raw card data is never stored — only the Stripe token and display
+        metadata (last4, brand, expiry).
+      required:
+        - id
+        - brand
+        - last4
+        - exp_month
+        - exp_year
+        - is_default
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          maxLength: 100
+          description: User-friendly label for the card (e.g. "Personal Visa")
+        brand:
+          type: string
+          description: Card brand (e.g. visa, mastercard, amex)
+        last4:
+          type: string
+          description: Last 4 digits of the card number
+          pattern: ^\d{4}$
+        exp_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Card expiration month (1-12)
+        exp_year:
+          type: integer
+          description: Card expiration year (e.g. 2027)
+        is_default:
+          type: boolean
+          description: Whether this is the user's default payment method
+        per_transaction_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Maximum amount in cents per individual agent transaction (null = no limit)
+        monthly_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Maximum total spend in cents across all agent transactions in the last 30 days (null = no limit)
+        monthly_spend:
+          type: integer
+          minimum: 0
+          description: Current total spend in cents for the rolling 30-day window. Always included in list responses.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PaymentMethodListResponse:
+      type: object
+      required:
+        - payment_methods
+        - max_allowed
+      properties:
+        payment_methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMethod'
+        max_allowed:
+          type: integer
+          description: Maximum number of payment methods a user can store (currently 10)
+    SetupIntentResponse:
+      type: object
+      required:
+        - client_secret
+      properties:
+        client_secret:
+          type: string
+          description: |
+            Stripe SetupIntent client secret for use with stripe.confirmCardSetup()
+            in Stripe Elements on the frontend. Single-use, expires after 24 hours.
+    ConfirmPaymentMethodRequest:
+      type: object
+      required:
+        - payment_method_id
+      properties:
+        payment_method_id:
+          type: string
+          pattern: ^pm_
+          description: Stripe payment method ID (must start with "pm_")
+        label:
+          type: string
+          maxLength: 100
+          description: User-friendly label for the card (e.g. "Personal Visa")
+        is_default:
+          type: boolean
+          default: false
+          description: Set to true to make this the default payment method
+    UpdatePaymentMethodRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 100
+          description: User-friendly label for the card
+        is_default:
+          type: boolean
+          description: Set to true to make this the default payment method
+        per_transaction_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: |
+            Per-transaction limit in cents. Must not exceed monthly_limit if both
+            are set. Set to a value to create/update the limit.
+        monthly_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: |
+            Monthly spend limit in cents (rolling 30-day window). Must be >= per_transaction_limit
+            if both are set. Set to a value to create/update the limit.
+        clear_per_transaction_limit:
+          type: boolean
+          description: Set to true to remove the per-transaction limit entirely
+        clear_monthly_limit:
+          type: boolean
+          description: Set to true to remove the monthly limit entirely
+    DeletePaymentMethodResponse:
+      type: object
+      required:
+        - deleted
+      properties:
+        deleted:
+          type: boolean
+          description: Always true on successful deletion
     ConfigResponse:
       type: object
       description: |
@@ -10310,6 +10632,7 @@ components:
             - timestamp_expired
             - invalid_code
             - invalid_token
+            - oauth_refresh_failed
             - agent_not_authorized
             - approval_denied
             - token_already_used
