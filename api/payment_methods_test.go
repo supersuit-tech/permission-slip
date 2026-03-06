@@ -350,6 +350,48 @@ func TestListPaymentMethods_IncludesMaxAllowed(t *testing.T) {
 	}
 }
 
+func TestConfirmPaymentMethod_InvalidStripeID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pminvid_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := `{"payment_method_id":"not_a_valid_pm_id"}`
+	r := authenticatedJSONRequest(t, http.MethodPost, "/payment-methods", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid Stripe PM ID, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestConfirmPaymentMethod_LabelTooLong(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "pmlabel_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	longLabel := make([]byte, 200)
+	for i := range longLabel {
+		longLabel[i] = 'a'
+	}
+	body := `{"payment_method_id":"pm_test","label":"` + string(longLabel) + `"}`
+	r := authenticatedJSONRequest(t, http.MethodPost, "/payment-methods", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for long label, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestCreateSetupIntent_NoStripe(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

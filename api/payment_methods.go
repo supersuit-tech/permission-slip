@@ -3,10 +3,14 @@ package api
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
+
+// maxLabelLength is the maximum length of a payment method label.
+const maxLabelLength = 100
 
 // ── Response types ──────────────────────────────────────────────────────────
 
@@ -165,11 +169,24 @@ func handleCreateSetupIntent(deps *Deps) http.HandlerFunc {
 			}
 			stripeCustomerID = cust.ID
 
-			// Persist the Stripe customer ID.
+			// Persist the Stripe customer ID on the subscription record.
 			if sub != nil {
 				if _, err := db.UpdateSubscriptionStripe(r.Context(), deps.DB, profile.ID, &stripeCustomerID, nil); err != nil {
 					log.Printf("[%s] CreateSetupIntent: save customer ID: %v", TraceID(r.Context()), err)
 					CaptureError(r.Context(), err)
+				}
+			} else {
+				// No subscription exists yet — create a free-tier subscription
+				// so the Stripe customer ID is persisted for future use.
+				newSub, createErr := db.CreateSubscription(r.Context(), deps.DB, profile.ID, "free")
+				if createErr != nil {
+					log.Printf("[%s] CreateSetupIntent: create subscription: %v", TraceID(r.Context()), createErr)
+					CaptureError(r.Context(), createErr)
+				} else if newSub != nil {
+					if _, updateErr := db.UpdateSubscriptionStripe(r.Context(), deps.DB, profile.ID, &stripeCustomerID, nil); updateErr != nil {
+						log.Printf("[%s] CreateSetupIntent: save customer ID on new sub: %v", TraceID(r.Context()), updateErr)
+						CaptureError(r.Context(), updateErr)
+					}
 				}
 			}
 		}
@@ -203,6 +220,14 @@ func handleConfirmPaymentMethod(deps *Deps) http.HandlerFunc {
 
 		if req.PaymentMethodID == "" {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "payment_method_id is required"))
+			return
+		}
+		if !strings.HasPrefix(req.PaymentMethodID, "pm_") {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "payment_method_id must be a valid Stripe payment method ID"))
+			return
+		}
+		if len(req.Label) > maxLabelLength {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label exceeds maximum length"))
 			return
 		}
 
@@ -281,6 +306,12 @@ func handleUpdatePaymentMethod(deps *Deps) http.HandlerFunc {
 
 		var req updatePaymentMethodRequest
 		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+
+		// Validate label length.
+		if req.Label != nil && len(*req.Label) > maxLabelLength {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label exceeds maximum length"))
 			return
 		}
 
