@@ -616,6 +616,11 @@ func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connecto
 // database and merges their client credentials into the in-memory provider
 // registry. This ensures BYOA credentials survive server restarts.
 //
+// Multi-tenancy note: BYOA credentials are stored per-user in the DB, but the
+// in-memory registry is global. The last-loaded BYOA config for a given provider
+// wins and becomes the active config for ALL users' OAuth flows on this server.
+// This is acceptable for single-tenant deployments.
+//
 // Only configs whose provider already exists in the registry (from built-in or
 // manifest sources) are loaded. Configs referencing unknown providers are logged
 // as warnings — they'll become active if the provider is registered later.
@@ -623,59 +628,45 @@ func loadBYOAProviderConfigs(oauthReg *poauth.Registry, d db.DBTX, v vault.Vault
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Query all BYOA configs across all users.
-	rows, err := d.Query(ctx, `
-		SELECT user_id, provider, client_id_vault_id, client_secret_vault_id
-		FROM oauth_provider_configs
-		ORDER BY created_at ASC`)
+	configs, err := db.ListAllOAuthProviderConfigs(ctx, d)
 	if err != nil {
 		log.Printf("Warning: failed to load BYOA provider configs: %v", err)
 		return
 	}
-	defer rows.Close()
 
 	var loaded, skipped int
-	for rows.Next() {
-		var userID, provider, clientIDVaultID, clientSecretVaultID string
-		if err := rows.Scan(&userID, &provider, &clientIDVaultID, &clientSecretVaultID); err != nil {
-			log.Printf("Warning: failed to scan BYOA config row: %v", err)
-			continue
-		}
-
+	for _, cfg := range configs {
 		// Only load if the provider exists in the registry.
-		if _, ok := oauthReg.Get(provider); !ok {
-			log.Printf("Warning: BYOA config for unknown provider %q (user %s) — skipping", provider, userID)
+		if _, ok := oauthReg.Get(cfg.Provider); !ok {
+			log.Printf("Warning: BYOA config for unknown provider %q (user %s) — skipping", cfg.Provider, cfg.UserID)
 			skipped++
 			continue
 		}
 
-		clientID, err := v.ReadSecret(ctx, d, clientIDVaultID)
+		clientID, err := v.ReadSecret(ctx, d, cfg.ClientIDVaultID)
 		if err != nil {
-			log.Printf("Warning: failed to read BYOA client_id from vault for provider %q: %v", provider, err)
+			log.Printf("Warning: failed to read BYOA client_id from vault for provider %q: %v", cfg.Provider, err)
 			skipped++
 			continue
 		}
-		clientSecret, err := v.ReadSecret(ctx, d, clientSecretVaultID)
+		clientSecret, err := v.ReadSecret(ctx, d, cfg.ClientSecretVaultID)
 		if err != nil {
-			log.Printf("Warning: failed to read BYOA client_secret from vault for provider %q: %v", provider, err)
+			log.Printf("Warning: failed to read BYOA client_secret from vault for provider %q: %v", cfg.Provider, err)
 			skipped++
 			continue
 		}
 
 		if err := oauthReg.Register(poauth.Provider{
-			ID:           provider,
+			ID:           cfg.Provider,
 			ClientID:     string(clientID),
 			ClientSecret: string(clientSecret),
 			Source:       poauth.SourceBYOA,
 		}); err != nil {
-			log.Printf("Warning: failed to register BYOA provider %q: %v", provider, err)
+			log.Printf("Warning: failed to register BYOA provider %q: %v", cfg.Provider, err)
 			skipped++
 			continue
 		}
 		loaded++
-	}
-	if err := rows.Err(); err != nil {
-		log.Printf("Warning: error iterating BYOA configs: %v", err)
 	}
 	if loaded > 0 || skipped > 0 {
 		log.Printf("BYOA provider configs: %d loaded, %d skipped", loaded, skipped)
