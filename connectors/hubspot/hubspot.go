@@ -22,6 +22,10 @@ const (
 	defaultBaseURL  = "https://api.hubapi.com"
 	defaultTimeout  = 30 * time.Second
 	maxResponseBody = 10 << 20 // 10 MB — guard against unexpectedly large responses
+
+	// credKeyAPIKey is the credential key for HubSpot private app access tokens.
+	// Used in ValidateCredentials and do() — keep in sync.
+	credKeyAPIKey = "api_key"
 )
 
 // HubSpotConnector owns the shared HTTP client and base URL used by all
@@ -80,7 +84,7 @@ func (c *HubSpotConnector) Actions() map[string]connectors.Action {
 // ValidateCredentials checks that the provided credentials contain a
 // non-empty api_key, which is required for all HubSpot API calls.
 func (c *HubSpotConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get("api_key")
+	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
 		return &connectors.ValidationError{Message: "missing required credential: api_key"}
 	}
@@ -109,7 +113,7 @@ func (c *HubSpotConnector) do(ctx context.Context, creds connectors.Credentials,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	key, ok := creds.Get("api_key")
+	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
 		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
 	}

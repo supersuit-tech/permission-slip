@@ -80,6 +80,7 @@ func TestCheckResponse_CategoryMapping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			body, _ := json.Marshal(hubspotError{
 				Status:   "error",
 				Message:  "test error message",
@@ -114,6 +115,7 @@ func TestCheckResponse_StatusCodeFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Use a body without a category to trigger status code fallback.
 			body := []byte(`{"message":"something went wrong"}`)
 			err := checkResponse(tt.status, http.Header{}, body)

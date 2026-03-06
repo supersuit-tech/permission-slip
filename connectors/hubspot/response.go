@@ -9,6 +9,10 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+// maxErrorBodyPreview limits how much of a raw (non-JSON) response body
+// is included in error messages to prevent information leakage and log bloat.
+const maxErrorBodyPreview = 200
+
 // hubspotError represents the standard HubSpot API error response format.
 // HubSpot returns {"status": "error", "category": "...", "message": "...",
 // "correlationId": "..."}. The correlationId is included in error messages
@@ -18,6 +22,18 @@ type hubspotError struct {
 	Message       string `json:"message"`
 	Category      string `json:"category"`
 	CorrelationID string `json:"correlationId"`
+}
+
+// truncateBody returns a safe preview of the response body for error messages.
+// It prevents leaking large or sensitive raw responses into logs/error strings.
+func truncateBody(body []byte) string {
+	if len(body) == 0 {
+		return "(empty response)"
+	}
+	if len(body) <= maxErrorBodyPreview {
+		return string(body)
+	}
+	return string(body[:maxErrorBodyPreview]) + "... (truncated)"
 }
 
 // checkResponse inspects the HTTP status code and response body, returning
@@ -79,20 +95,6 @@ func mapCategoryError(category, msg string, statusCode int) error {
 			Message:    fmt.Sprintf("HubSpot API error (%s): %s", category, msg),
 		}
 	}
-}
-
-const maxErrorBodyPreview = 200
-
-// truncateBody returns a safe preview of the response body for error messages.
-// It prevents leaking large or sensitive raw responses into logs/error strings.
-func truncateBody(body []byte) string {
-	if len(body) == 0 {
-		return "(empty response)"
-	}
-	if len(body) <= maxErrorBodyPreview {
-		return string(body)
-	}
-	return string(body[:maxErrorBodyPreview]) + "... (truncated)"
 }
 
 // mapStatusCodeError is the fallback when the response body lacks a category.
