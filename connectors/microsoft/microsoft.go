@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email and calendar via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, and presentations via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -180,6 +180,64 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create Presentation",
+				Description: "Create a new PowerPoint presentation in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the presentation file (.pptx extension added if missing)"
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (e.g. Documents/Presentations). Defaults to root."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List Presentations",
+				Description: "Search for PowerPoint presentations in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path to search in. Defaults to searching all files."
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of presentations to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_presentation",
+				Name:        "Get Presentation",
+				Description: "Get metadata about a specific PowerPoint presentation",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the presentation"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -190,6 +248,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"Mail.Send",
 					"Mail.Read",
 					"Calendars.ReadWrite",
+					"Files.ReadWrite",
 				},
 			},
 		},
@@ -222,6 +281,27 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can view upcoming calendar events.",
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_create_presentation",
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create presentations",
+				Description: "Agent can create new PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_presentations",
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List presentations",
+				Description: "Agent can search for PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_presentation",
+				ActionType:  "microsoft.get_presentation",
+				Name:        "View presentation details",
+				Description: "Agent can view metadata about PowerPoint presentations.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
 		},
 	}
 }
@@ -233,6 +313,9 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"microsoft.create_presentation":   &createPresentationAction{conn: c},
+		"microsoft.list_presentations":    &listPresentationsAction{conn: c},
+		"microsoft.get_presentation":      &getPresentationAction{conn: c},
 	}
 }
 
@@ -243,6 +326,64 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "missing required credential: access_token"}
 	}
+	return nil
+}
+
+// doPutFileRequest uploads raw file bytes via PUT to a Microsoft Graph endpoint.
+// It handles the same lifecycle as doRequest (auth, rate limiting, error mapping,
+// response parsing) but sends raw bytes with the appropriate content type instead
+// of JSON-marshaling a request body. Used for OneDrive file upload endpoints.
+func (c *MicrosoftConnector) doPutFileRequest(ctx context.Context, path string, creds connectors.Credentials, fileBytes []byte, dest any) error {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(fileBytes))
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
+		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
+		return &connectors.RateLimitError{
+			Message:    "Microsoft Graph API rate limit exceeded",
+			RetryAfter: retryAfter,
+		}
+	}
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return mapGraphError(resp.StatusCode, respBody)
+	}
+
+	if dest != nil && len(respBody) > 0 {
+		if err := json.Unmarshal(respBody, dest); err != nil {
+			return &connectors.ExternalError{
+				StatusCode: resp.StatusCode,
+				Message:    "failed to decode Microsoft Graph API response",
+			}
+		}
+	}
+
 	return nil
 }
 
