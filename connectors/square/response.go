@@ -30,7 +30,9 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	msg := extractErrorMessage(body)
+	// Parse once and reuse for both message extraction and category checks.
+	parsed := parseSquareErrors(body)
+	msg := formatErrorMessage(parsed, body)
 
 	switch {
 	case statusCode == http.StatusTooManyRequests:
@@ -43,7 +45,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return &connectors.AuthError{Message: fmt.Sprintf("Square API auth error: %s", msg)}
 	case statusCode == http.StatusForbidden:
 		// Square uses AUTHENTICATION_ERROR category for auth issues on 403.
-		if hasErrorCategory(body, "AUTHENTICATION_ERROR") {
+		if parsedHasCategory(parsed, "AUTHENTICATION_ERROR") {
 			return &connectors.AuthError{Message: fmt.Sprintf("Square API auth error: %s", msg)}
 		}
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Square API error: %s", msg)}
@@ -55,17 +57,30 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	}
 }
 
-// extractErrorMessage builds a human-readable message from the Square error
-// response. It joins the detail fields from all errors in the array.
-func extractErrorMessage(body []byte) string {
-	var sqErr squareErrorResponse
-	if json.Unmarshal(body, &sqErr) != nil || len(sqErr.Errors) == 0 {
-		// Fall back to raw body if we can't parse the error envelope.
-		return string(body)
+// maxErrorBodyLen caps how much of the raw response body is included in error
+// messages when the structured error envelope can't be parsed. Prevents large
+// or unexpected response data from leaking into logs and user-facing errors.
+const maxErrorBodyLen = 512
+
+// parseSquareErrors attempts to unmarshal the Square error envelope.
+// Returns nil if the body isn't valid JSON or has no errors.
+func parseSquareErrors(body []byte) []squareError {
+	var resp squareErrorResponse
+	if json.Unmarshal(body, &resp) != nil || len(resp.Errors) == 0 {
+		return nil
+	}
+	return resp.Errors
+}
+
+// formatErrorMessage builds a human-readable message from parsed Square errors.
+// Falls back to a truncated raw body when errors is nil (unparseable response).
+func formatErrorMessage(errs []squareError, rawBody []byte) string {
+	if errs == nil {
+		return truncateBody(rawBody)
 	}
 
-	details := make([]string, 0, len(sqErr.Errors))
-	for _, e := range sqErr.Errors {
+	details := make([]string, 0, len(errs))
+	for _, e := range errs {
 		part := e.Detail
 		if part == "" {
 			part = e.Code
@@ -86,22 +101,27 @@ func extractErrorMessage(body []byte) string {
 		details = append(details, part)
 	}
 	if len(details) == 0 {
-		return string(body)
+		return truncateBody(rawBody)
 	}
 	return strings.Join(details, "; ")
 }
 
-// hasErrorCategory checks whether the Square error response contains an
-// error with the given category.
-func hasErrorCategory(body []byte, category string) bool {
-	var sqErr squareErrorResponse
-	if json.Unmarshal(body, &sqErr) != nil {
-		return false
-	}
-	for _, e := range sqErr.Errors {
+// parsedHasCategory checks whether the parsed errors contain a specific category.
+func parsedHasCategory(errs []squareError, category string) bool {
+	for _, e := range errs {
 		if e.Category == category {
 			return true
 		}
 	}
 	return false
+}
+
+// truncateBody returns the raw body as a string, capped at maxErrorBodyLen.
+// This prevents large or unexpected response payloads from leaking into
+// error messages that may surface in logs or API responses.
+func truncateBody(body []byte) string {
+	if len(body) <= maxErrorBodyLen {
+		return string(body)
+	}
+	return string(body[:maxErrorBodyLen]) + "... (truncated)"
 }

@@ -2,12 +2,13 @@ package square
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func TestExtractErrorMessage_FieldAndCode(t *testing.T) {
+func TestFormatErrorMessage_FieldAndCode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -49,11 +50,63 @@ func TestExtractErrorMessage_FieldAndCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractErrorMessage([]byte(tt.body))
+			raw := []byte(tt.body)
+			parsed := parseSquareErrors(raw)
+			got := formatErrorMessage(parsed, raw)
 			if got != tt.want {
-				t.Errorf("extractErrorMessage() = %q, want %q", got, tt.want)
+				t.Errorf("formatErrorMessage() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTruncateBody(t *testing.T) {
+	t.Parallel()
+
+	t.Run("short body unchanged", func(t *testing.T) {
+		body := []byte("short error")
+		got := truncateBody(body)
+		if got != "short error" {
+			t.Errorf("truncateBody() = %q, want %q", got, "short error")
+		}
+	})
+
+	t.Run("long body truncated", func(t *testing.T) {
+		body := []byte(strings.Repeat("x", 1000))
+		got := truncateBody(body)
+		if len(got) > maxErrorBodyLen+20 {
+			t.Errorf("truncateBody() returned %d chars, want at most %d", len(got), maxErrorBodyLen+20)
+		}
+		if !strings.HasSuffix(got, "... (truncated)") {
+			t.Errorf("truncateBody() should end with truncation marker, got %q", got[len(got)-20:])
+		}
+	})
+
+	t.Run("exactly at limit unchanged", func(t *testing.T) {
+		body := []byte(strings.Repeat("x", maxErrorBodyLen))
+		got := truncateBody(body)
+		if strings.Contains(got, "truncated") {
+			t.Error("truncateBody() should not truncate body at exactly the limit")
+		}
+	})
+}
+
+func TestParsedHasCategory(t *testing.T) {
+	t.Parallel()
+
+	errs := []squareError{
+		{Category: "AUTHENTICATION_ERROR", Code: "UNAUTHORIZED"},
+		{Category: "API_ERROR", Code: "INTERNAL_SERVER_ERROR"},
+	}
+
+	if !parsedHasCategory(errs, "AUTHENTICATION_ERROR") {
+		t.Error("parsedHasCategory(AUTHENTICATION_ERROR) = false, want true")
+	}
+	if parsedHasCategory(errs, "RATE_LIMIT_ERROR") {
+		t.Error("parsedHasCategory(RATE_LIMIT_ERROR) = true, want false")
+	}
+	if parsedHasCategory(nil, "AUTHENTICATION_ERROR") {
+		t.Error("parsedHasCategory(nil, ...) = true, want false")
 	}
 }
 
