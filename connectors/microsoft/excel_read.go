@@ -31,6 +31,9 @@ func (p *excelReadRangeParams) validate() error {
 	if p.SheetName == "" {
 		return &connectors.ValidationError{Message: "sheet_name is required"}
 	}
+	if err := validatePathSegment("sheet_name", p.SheetName); err != nil {
+		return err
+	}
 	if p.Range == "" {
 		return &connectors.ValidationError{Message: "range is required"}
 	}

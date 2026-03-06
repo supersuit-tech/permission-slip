@@ -110,6 +110,32 @@ func TestExcelWriteRange_InconsistentColumnCount(t *testing.T) {
 	}
 }
 
+func TestExcelWriteRange_PathTraversalSheetName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelWriteRangeAction{conn: conn}
+
+	params, _ := json.Marshal(excelWriteRangeParams{
+		ItemID:    "item-123",
+		SheetName: "../../admin",
+		Range:     "A1:B2",
+		Values:    [][]any{{"a"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_write_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in sheet_name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestExcelWriteRange_MissingItemID(t *testing.T) {
 	t.Parallel()
 

@@ -92,6 +92,31 @@ func TestExcelReadRange_PathTraversalRejected(t *testing.T) {
 	}
 }
 
+func TestExcelReadRange_PathTraversalSheetName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &excelReadRangeAction{conn: conn}
+
+	params, _ := json.Marshal(excelReadRangeParams{
+		ItemID:    "item-123",
+		SheetName: "../../admin",
+		Range:     "A1:B2",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.excel_read_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in sheet_name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestExcelReadRange_MissingItemID(t *testing.T) {
 	t.Parallel()
 
