@@ -411,6 +411,152 @@ func TestDeleteOAuthProviderConfig_InvalidIDReturns400(t *testing.T) {
 	}
 }
 
+// ── PUT /v1/oauth/provider-configs/{provider} ───────────────────────────────
+
+func TestUpdateOAuthProviderConfig_Success(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps, v := byoaDeps(tx)
+	router := NewRouter(deps)
+
+	// Create a config first.
+	createBody := `{"provider":"salesforce","client_id":"old-id","client_secret":"old-secret"}`
+	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, createBody)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var createResp oauthProviderConfigResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal create: %v", err)
+	}
+
+	// Update the config with new credentials.
+	updateBody := `{"client_id":"new-id","client_secret":"new-secret"}`
+	r2 := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/salesforce", uid, updateBody)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("update: expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	var updateResp oauthProviderConfigResponse
+	if err := json.Unmarshal(w2.Body.Bytes(), &updateResp); err != nil {
+		t.Fatalf("unmarshal update: %v", err)
+	}
+	if updateResp.Provider != "salesforce" {
+		t.Errorf("expected provider 'salesforce', got %q", updateResp.Provider)
+	}
+	if updateResp.CreatedAt != createResp.CreatedAt {
+		t.Error("expected created_at to be preserved after update")
+	}
+	if updateResp.UpdatedAt.IsZero() {
+		t.Error("expected non-zero updated_at after update")
+	}
+	// Note: updated_at may equal created_at when both happen within the same
+	// test transaction. In production, separate requests would have distinct
+	// timestamps.
+
+	// Verify vault has exactly 2 secrets (old ones deleted, new ones created).
+	if v.SecretCount() != 2 {
+		t.Errorf("expected 2 vault secrets after update, got %d", v.SecretCount())
+	}
+
+	// Verify registry has new credentials.
+	p, ok := deps.OAuthProviders.Get("salesforce")
+	if !ok {
+		t.Fatal("expected salesforce in registry")
+	}
+	if p.ClientID != "new-id" {
+		t.Errorf("expected registry to have new client ID, got %q", p.ClientID)
+	}
+}
+
+func TestUpdateOAuthProviderConfig_NotFoundReturns404(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps, _ := byoaDeps(tx)
+	router := NewRouter(deps)
+
+	body := `{"client_id":"id","client_secret":"secret"}`
+	r := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/salesforce", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateOAuthProviderConfig_InvalidIDReturns400(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps, _ := byoaDeps(tx)
+	router := NewRouter(deps)
+
+	body := `{"client_id":"id","client_secret":"secret"}`
+	r := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/INVALID!", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ── Response includes updated_at ────────────────────────────────────────────
+
+func TestListOAuthProviderConfigs_IncludesUpdatedAt(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps, _ := byoaDeps(tx)
+	router := NewRouter(deps)
+
+	// Create a config.
+	body := `{"provider":"salesforce","client_id":"id","client_secret":"secret"}`
+	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// List should include updated_at.
+	r2 := authenticatedRequest(t, http.MethodGet, "/v1/oauth/provider-configs", uid)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	// Verify updated_at is present in JSON.
+	var raw map[string][]map[string]any
+	if err := json.Unmarshal(w2.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("unmarshal raw: %v", err)
+	}
+	configs := raw["configs"]
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 config, got %d", len(configs))
+	}
+	if _, ok := configs[0]["updated_at"]; !ok {
+		t.Error("expected 'updated_at' field in list response")
+	}
+}
+
 // ── Provider resolution order ───────────────────────────────────────────────
 
 func TestBYOA_OverridesBuiltInForAuthorize(t *testing.T) {

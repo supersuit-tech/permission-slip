@@ -294,7 +294,7 @@ paths:
     $ref: './components/paths/oauth.yaml#/oauthProviderConfigs'
 
   /v1/oauth/provider-configs/{provider}:
-    $ref: './components/paths/oauth.yaml#/oauthProviderConfigDelete'
+    $ref: './components/paths/oauth.yaml#/oauthProviderConfigByProvider'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -574,6 +574,8 @@ components:
       $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
     CreateOAuthProviderConfigRequest:
       $ref: './components/schemas/oauth.yaml#/CreateOAuthProviderConfigRequest'
+    UpdateOAuthProviderConfigRequest:
+      $ref: './components/schemas/oauth.yaml#/UpdateOAuthProviderConfigRequest'
     OAuthProviderConfig:
       $ref: './components/schemas/oauth.yaml#/OAuthProviderConfig'
     OAuthProviderConfigListResponse:

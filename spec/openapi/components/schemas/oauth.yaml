@@ -113,11 +113,27 @@ CreateOAuthProviderConfigRequest:
       description: The OAuth application's client secret
       example: "my-client-secret"
 
+UpdateOAuthProviderConfigRequest:
+  type: object
+  required:
+    - client_id
+    - client_secret
+  properties:
+    client_id:
+      type: string
+      description: The new OAuth application's client ID
+      example: "my-new-client-id"
+    client_secret:
+      type: string
+      description: The new OAuth application's client secret
+      example: "my-new-client-secret"
+
 OAuthProviderConfig:
   type: object
   required:
     - provider
     - created_at
+    - updated_at
   properties:
     provider:
       type: string
@@ -128,6 +144,11 @@ OAuthProviderConfig:
       format: date-time
       description: When the provider config was created
       example: "2026-03-05T12:00:00Z"
+    updated_at:
+      type: string
+      format: date-time
+      description: When the provider config was last updated
+      example: "2026-03-05T14:00:00Z"
 
 OAuthProviderConfigListResponse:
   type: object

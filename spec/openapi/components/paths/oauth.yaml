@@ -328,7 +328,71 @@ oauthProviderConfigs:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
-oauthProviderConfigDelete:
+oauthProviderConfigByProvider:
+  put:
+    operationId: updateOAuthProviderConfig
+    summary: Update BYOA Provider Config
+    description: |
+      Replaces the client credentials for an existing BYOA provider config.
+      This supports credential rotation without requiring delete + create.
+
+      The old vault secrets are deleted and replaced with new ones atomically.
+
+    tags:
+      - OAuth
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        description: The OAuth provider ID to update
+        schema:
+          type: string
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/oauth.yaml#/UpdateOAuthProviderConfigRequest'
+
+    responses:
+      '200':
+        description: BYOA provider config updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/oauth.yaml#/OAuthProviderConfig'
+            example:
+              provider: "salesforce"
+              created_at: "2026-03-05T12:00:00Z"
+              updated_at: "2026-03-05T14:00:00Z"
+
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: BYOA provider config not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
   delete:
     operationId: deleteOAuthProviderConfig
     summary: Delete BYOA Provider Config

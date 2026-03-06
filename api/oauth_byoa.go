@@ -30,9 +30,15 @@ type createOAuthProviderConfigRequest struct {
 	ClientSecret string `json:"client_secret" validate:"required"`
 }
 
+type updateOAuthProviderConfigRequest struct {
+	ClientID     string `json:"client_id" validate:"required"`
+	ClientSecret string `json:"client_secret" validate:"required"`
+}
+
 type oauthProviderConfigResponse struct {
 	Provider  string    `json:"provider"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type oauthProviderConfigListResponse struct {
@@ -52,6 +58,7 @@ func RegisterOAuthBYOARoutes(mux *http.ServeMux, deps *Deps) {
 
 	mux.Handle("POST /v1/oauth/provider-configs", requireProfile(handleCreateOAuthProviderConfig(deps)))
 	mux.Handle("GET /v1/oauth/provider-configs", requireProfile(handleListOAuthProviderConfigs(deps)))
+	mux.Handle("PUT /v1/oauth/provider-configs/{provider}", requireProfile(handleUpdateOAuthProviderConfig(deps)))
 	mux.Handle("DELETE /v1/oauth/provider-configs/{provider}", requireProfile(handleDeleteOAuthProviderConfig(deps)))
 }
 
@@ -169,6 +176,110 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		RespondJSON(w, http.StatusCreated, oauthProviderConfigResponse{
 			Provider:  config.Provider,
 			CreatedAt: config.CreatedAt,
+			UpdatedAt: config.UpdatedAt,
+		})
+	}
+}
+
+// handleUpdateOAuthProviderConfig replaces the client credentials for an
+// existing BYOA provider config. This supports credential rotation without
+// requiring delete + create.
+func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if deps.Vault == nil || deps.DB == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("OAuth not available"))
+			return
+		}
+
+		providerID := r.PathValue("provider")
+		if !validProviderID(providerID) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid provider ID"))
+			return
+		}
+
+		var req updateOAuthProviderConfigRequest
+		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+		if !ValidateRequest(w, r, &req) {
+			return
+		}
+
+		profile := Profile(r.Context())
+
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] UpdateOAuthProviderConfig: begin tx: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
+		}
+
+		// Look up existing config.
+		existing, err := db.GetOAuthProviderConfig(r.Context(), tx, profile.ID, providerID)
+		if err != nil {
+			log.Printf("[%s] UpdateOAuthProviderConfig: lookup: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
+			return
+		}
+		if existing == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrOAuthProviderConfigNotFound,
+				"OAuth provider config not found. Create one first with POST."))
+			return
+		}
+
+		// Delete old vault secrets.
+		_ = deps.Vault.DeleteSecret(r.Context(), tx, existing.ClientIDVaultID)
+		_ = deps.Vault.DeleteSecret(r.Context(), tx, existing.ClientSecretVaultID)
+
+		// Store new secrets.
+		newClientIDVaultID, err := deps.Vault.CreateSecret(r.Context(), tx, existing.ID+"_client_id", []byte(req.ClientID))
+		if err != nil {
+			log.Printf("[%s] UpdateOAuthProviderConfig: vault create client_id: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
+			return
+		}
+		newClientSecretVaultID, err := deps.Vault.CreateSecret(r.Context(), tx, existing.ID+"_client_secret", []byte(req.ClientSecret))
+		if err != nil {
+			log.Printf("[%s] UpdateOAuthProviderConfig: vault create client_secret: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
+			return
+		}
+
+		// Update the DB row with new vault IDs.
+		config, err := db.UpdateOAuthProviderConfig(r.Context(), tx, profile.ID, providerID, newClientIDVaultID, newClientSecretVaultID)
+		if err != nil {
+			log.Printf("[%s] UpdateOAuthProviderConfig: db update: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
+			return
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] UpdateOAuthProviderConfig: commit: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
+				return
+			}
+		}
+
+		// Update the in-memory registry.
+		if deps.OAuthProviders != nil {
+			if err := deps.OAuthProviders.Register(oauth.Provider{
+				ID:           providerID,
+				ClientID:     req.ClientID,
+				ClientSecret: req.ClientSecret,
+				Source:       oauth.SourceBYOA,
+			}); err != nil {
+				log.Printf("[%s] UpdateOAuthProviderConfig: registry update: %v", TraceID(r.Context()), err)
+			}
+		}
+
+		RespondJSON(w, http.StatusOK, oauthProviderConfigResponse{
+			Provider:  config.Provider,
+			CreatedAt: config.CreatedAt,
+			UpdatedAt: config.UpdatedAt,
 		})
 	}
 }
@@ -195,6 +306,7 @@ func handleListOAuthProviderConfigs(deps *Deps) http.HandlerFunc {
 			data[i] = oauthProviderConfigResponse{
 				Provider:  c.Provider,
 				CreatedAt: c.CreatedAt,
+				UpdatedAt: c.UpdatedAt,
 			}
 		}
 

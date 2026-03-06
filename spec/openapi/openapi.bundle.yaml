@@ -5609,6 +5609,58 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
   /v1/oauth/provider-configs/{provider}:
+    put:
+      operationId: updateOAuthProviderConfig
+      summary: Update BYOA Provider Config
+      description: |
+        Replaces the client credentials for an existing BYOA provider config.
+        This supports credential rotation without requiring delete + create.
+
+        The old vault secrets are deleted and replaced with new ones atomically.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to update
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthProviderConfigRequest'
+      responses:
+        '200':
+          description: BYOA provider config updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfig'
+              example:
+                provider: salesforce
+                created_at: '2026-03-05T12:00:00Z'
+                updated_at: '2026-03-05T14:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: BYOA provider config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
     delete:
       operationId: deleteOAuthProviderConfig
       summary: Delete BYOA Provider Config
@@ -9919,11 +9971,26 @@ components:
           type: string
           description: The OAuth application's client secret
           example: my-client-secret
+    UpdateOAuthProviderConfigRequest:
+      type: object
+      required:
+        - client_id
+        - client_secret
+      properties:
+        client_id:
+          type: string
+          description: The new OAuth application's client ID
+          example: my-new-client-id
+        client_secret:
+          type: string
+          description: The new OAuth application's client secret
+          example: my-new-client-secret
     OAuthProviderConfig:
       type: object
       required:
         - provider
         - created_at
+        - updated_at
       properties:
         provider:
           type: string
@@ -9934,6 +10001,11 @@ components:
           format: date-time
           description: When the provider config was created
           example: '2026-03-05T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: When the provider config was last updated
+          example: '2026-03-05T14:00:00Z'
     OAuthProviderConfigListResponse:
       type: object
       required:

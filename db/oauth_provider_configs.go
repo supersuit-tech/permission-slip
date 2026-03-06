@@ -107,6 +107,26 @@ func CreateOAuthProviderConfig(ctx context.Context, db DBTX, p CreateOAuthProvid
 	return &c, nil
 }
 
+// UpdateOAuthProviderConfig updates the vault secret IDs for an existing provider
+// config and bumps the updated_at timestamp. Used for credential rotation.
+func UpdateOAuthProviderConfig(ctx context.Context, db DBTX, userID, provider, clientIDVaultID, clientSecretVaultID string) (*OAuthProviderConfig, error) {
+	var c OAuthProviderConfig
+	err := db.QueryRow(ctx, `
+		UPDATE oauth_provider_configs
+		SET client_id_vault_id = $3, client_secret_vault_id = $4, updated_at = now()
+		WHERE user_id = $1 AND provider = $2
+		RETURNING id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at, updated_at`,
+		userID, provider, clientIDVaultID, clientSecretVaultID,
+	).Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt, &c.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, &OAuthProviderConfigError{Code: OAuthProviderConfigErrNotFound, Message: "OAuth provider config not found"}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 // DeleteOAuthProviderConfigResult holds the result of a provider config deletion.
 type DeleteOAuthProviderConfigResult struct {
 	ClientIDVaultID     string
