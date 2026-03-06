@@ -19,6 +19,7 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultSheetsBaseURL   = "https://sheets.googleapis.com/v4"
 	defaultTimeout         = 30 * time.Second
 	credKeyAccessToken     = "access_token"
 
@@ -38,6 +39,7 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	sheetsBaseURL   string
 }
 
 // New creates a GoogleConnector with sensible defaults.
@@ -46,15 +48,17 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		sheetsBaseURL:   defaultSheetsBaseURL,
 	}
 }
 
 // newForTest creates a GoogleConnector that points at a test server.
-func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL string) *GoogleConnector {
+func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL, sheetsBaseURL string) *GoogleConnector {
 	return &GoogleConnector{
 		client:          client,
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
+		sheetsBaseURL:   sheetsBaseURL,
 	}
 }
 
@@ -67,7 +71,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail and Calendar",
+		Description: "Google integration for Gmail, Calendar, and Sheets",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -184,6 +188,98 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.sheets_read_range",
+				Name:        "Read Spreadsheet Range",
+				Description: "Read cell values from a specified range in a Google Sheets spreadsheet",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id", "range"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet to read from"
+						},
+						"range": {
+							"type": "string",
+							"description": "The A1 notation range to read (e.g. 'Sheet1!A1:D10')"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.sheets_write_range",
+				Name:        "Write Spreadsheet Range",
+				Description: "Write cell values to a specified range in a Google Sheets spreadsheet",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id", "range", "values"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet to write to"
+						},
+						"range": {
+							"type": "string",
+							"description": "The A1 notation range to write (e.g. 'Sheet1!A1:D3')"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of cell values to write (rows of columns)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.sheets_append_rows",
+				Name:        "Append Spreadsheet Rows",
+				Description: "Append rows to a sheet or table in a Google Sheets spreadsheet",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id", "range", "values"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet to append to"
+						},
+						"range": {
+							"type": "string",
+							"description": "The A1 notation of the range to search for a table to append to (e.g. 'Sheet1')"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of row values to append (rows of columns)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.sheets_list_sheets",
+				Name:        "List Worksheets",
+				Description: "List all worksheets (tabs) in a Google Sheets spreadsheet",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -194,6 +290,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/spreadsheets",
 				},
 			},
 		},
@@ -247,6 +344,34 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can list upcoming events from any calendar.",
 				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
 			},
+			{
+				ID:          "tpl_google_sheets_read_range",
+				ActionType:  "google.sheets_read_range",
+				Name:        "Read spreadsheet range",
+				Description: "Read any range from a specific spreadsheet.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*","range":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_write_range",
+				ActionType:  "google.sheets_write_range",
+				Name:        "Write spreadsheet range",
+				Description: "Write to any range in a specific spreadsheet.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_append_rows",
+				ActionType:  "google.sheets_append_rows",
+				Name:        "Append spreadsheet rows",
+				Description: "Append rows to a specific spreadsheet.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_read_any",
+				ActionType:  "google.sheets_read_range",
+				Name:        "Read from any spreadsheet",
+				Description: "Agent can read from any spreadsheet and any range.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*","range":"*"}`),
+			},
 		},
 	}
 }
@@ -258,6 +383,10 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.sheets_read_range":     &sheetsReadRangeAction{conn: c},
+		"google.sheets_write_range":    &sheetsWriteRangeAction{conn: c},
+		"google.sheets_append_rows":    &sheetsAppendRowsAction{conn: c},
+		"google.sheets_list_sheets":    &sheetsListSheetsAction{conn: c},
 	}
 }
 

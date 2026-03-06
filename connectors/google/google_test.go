@@ -24,6 +24,10 @@ func TestGoogleConnector_Actions(t *testing.T) {
 		"google.list_emails",
 		"google.create_calendar_event",
 		"google.list_calendar_events",
+		"google.sheets_read_range",
+		"google.sheets_write_range",
+		"google.sheets_append_rows",
+		"google.sheets_list_sheets",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -91,8 +95,8 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 	if m.Name != "Google" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Google")
 	}
-	if len(m.Actions) != 4 {
-		t.Fatalf("Manifest().Actions has %d items, want 4", len(m.Actions))
+	if len(m.Actions) != 8 {
+		t.Fatalf("Manifest().Actions has %d items, want 8", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -103,6 +107,10 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 		"google.list_emails",
 		"google.create_calendar_event",
 		"google.list_calendar_events",
+		"google.sheets_read_range",
+		"google.sheets_write_range",
+		"google.sheets_append_rows",
+		"google.sheets_list_sheets",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

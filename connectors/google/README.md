@@ -1,6 +1,6 @@
 # Google Connector
 
-The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api) and [Google Calendar](https://developers.google.com/calendar/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
+The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), and [Google Sheets](https://developers.google.com/sheets/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
 
 ## Connector ID
 
@@ -21,6 +21,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `gmail.send` | `google.send_email` |
 | `gmail.readonly` | `google.list_emails` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events` |
+| `spreadsheets` | `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
 
 Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management).
 
@@ -168,6 +169,134 @@ Lists upcoming events from Google Calendar.
 
 Events are returned as single instances (recurring events expanded) ordered by start time. All-day events use a date string (e.g., `2024-01-15`) instead of a full RFC 3339 timestamp.
 
+---
+
+### `google.sheets_read_range`
+
+Reads cell values from a specified range in a Google Sheets spreadsheet.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet to read from |
+| `range` | string | Yes | The A1 notation range to read (e.g., `Sheet1!A1:D10`) |
+
+**Response:**
+
+```json
+{
+  "range": "Sheet1!A1:D3",
+  "values": [
+    ["Name", "Age", "City"],
+    ["Alice", 30, "NYC"]
+  ]
+}
+```
+
+**Sheets API:** `GET /v4/spreadsheets/{id}/values/{range}` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/get))
+
+---
+
+### `google.sheets_write_range`
+
+Writes cell values to a specified range in a Google Sheets spreadsheet.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet to write to |
+| `range` | string | Yes | The A1 notation range to write (e.g., `Sheet1!A1:D3`) |
+| `values` | any[][] | Yes | 2D array of cell values to write (rows of columns) |
+
+**Response:**
+
+```json
+{
+  "updated_range": "Sheet1!A1:C2",
+  "updated_rows": 2,
+  "updated_columns": 3,
+  "updated_cells": 6
+}
+```
+
+**Sheets API:** `PUT /v4/spreadsheets/{id}/values/{range}?valueInputOption=USER_ENTERED` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/update))
+
+Values are interpreted as if the user typed them into the UI (`USER_ENTERED`), so formulas and number formats are applied automatically.
+
+---
+
+### `google.sheets_append_rows`
+
+Appends rows to a sheet or table in a Google Sheets spreadsheet.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet to append to |
+| `range` | string | Yes | The A1 notation of the range to search for a table to append to (e.g., `Sheet1`) |
+| `values` | any[][] | Yes | 2D array of row values to append (rows of columns) |
+
+**Response:**
+
+```json
+{
+  "updated_range": "Sheet1!A4:C5",
+  "updated_rows": 2,
+  "updated_columns": 3,
+  "updated_cells": 6
+}
+```
+
+**Sheets API:** `POST /v4/spreadsheets/{id}/values/{range}:append?valueInputOption=USER_ENTERED` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append))
+
+The Sheets API finds the last row with data in the specified range and appends rows after it.
+
+---
+
+### `google.sheets_list_sheets`
+
+Lists all worksheets (tabs) in a Google Sheets spreadsheet.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet |
+
+**Response:**
+
+```json
+{
+  "sheets": [
+    {
+      "sheet_id": 0,
+      "title": "Sheet1",
+      "index": 0,
+      "sheet_type": "GRID"
+    },
+    {
+      "sheet_id": 123456,
+      "title": "Data",
+      "index": 1,
+      "sheet_type": "GRID"
+    }
+  ]
+}
+```
+
+**Sheets API:** `GET /v4/spreadsheets/{id}?fields=sheets.properties` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get))
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -195,6 +324,10 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Create calendar events | `create_calendar_event` | Nothing — agent controls all parameters |
 | Create personal calendar events | `create_calendar_event` | `calendar_id` locked to `primary`, no attendees |
 | List calendar events | `list_calendar_events` | Nothing — agent controls all parameters |
+| Read spreadsheet range | `sheets_read_range` | Nothing — agent controls spreadsheet and range |
+| Write spreadsheet range | `sheets_write_range` | Nothing — agent controls all parameters |
+| Append spreadsheet rows | `sheets_append_rows` | Nothing — agent controls all parameters |
+| Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
 
 ## Adding a New Action
 
@@ -217,12 +350,20 @@ connectors/google/
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
 ├── list_calendar_events.go         # google.list_calendar_events action
+├── sheets_read.go                  # google.sheets_read_range action
+├── sheets_write.go                 # google.sheets_write_range action
+├── sheets_append.go                # google.sheets_append_rows action
+├── sheets_list.go                  # google.sheets_list_sheets action
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
 ├── list_emails_test.go             # List emails action tests
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests
+├── sheets_read_test.go             # Sheets read range tests
+├── sheets_write_test.go            # Sheets write range tests
+├── sheets_append_test.go           # Sheets append rows tests
+├── sheets_list_test.go             # Sheets list worksheets tests
 └── README.md                       # This file
 ```
 
