@@ -24,8 +24,22 @@ func TestAmadeusConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 (Phase 1 scaffold)", len(actions))
+	if len(actions) != 6 {
+		t.Errorf("Actions() returned %d actions, want 6", len(actions))
+	}
+
+	expected := []string{
+		"amadeus.search_airports",
+		"amadeus.search_flights",
+		"amadeus.price_flight",
+		"amadeus.book_flight",
+		"amadeus.search_hotels",
+		"amadeus.search_cars",
+	}
+	for _, actionType := range expected {
+		if _, ok := actions[actionType]; !ok {
+			t.Errorf("Actions() missing %q", actionType)
+		}
 	}
 }
 
