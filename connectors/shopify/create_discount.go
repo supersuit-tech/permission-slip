@@ -118,7 +118,10 @@ func (a *createDiscountAction) Execute(ctx context.Context, req connectors.Actio
 	}
 	path := fmt.Sprintf("/price_rules/%d/discount_codes.json", priceRuleResp.PriceRule.ID)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, discountBody, &discountResp); err != nil {
-		return nil, err
+		// Wrap the error with context about the orphaned price rule so the user
+		// can clean it up if needed.
+		return nil, fmt.Errorf("discount code creation failed (price rule %d was created but has no code attached): %w",
+			priceRuleResp.PriceRule.ID, err)
 	}
 
 	// Return both the price rule ID and the discount code.

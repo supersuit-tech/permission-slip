@@ -27,7 +27,23 @@ Both bare subdomains (`mystore`) and full domains (`mystore.myshopify.com`) are 
 
 ## Actions
 
-*No actions are registered yet — this is a Phase 1 scaffold. Phase 2 will add actions like product management, order management, etc.*
+| Action Type | Name | Risk | Description |
+|---|---|---|---|
+| `shopify.get_orders` | Get Orders | low | List or filter orders by status, financial status, date range |
+| `shopify.get_order` | Get Order | low | Get full details of a single order by ID |
+| `shopify.update_order` | Update Order | medium | Update order notes, tags, email, or shipping address |
+| `shopify.create_product` | Create Product | low | Create a new product with optional variants |
+| `shopify.update_inventory` | Update Inventory | medium | Adjust inventory levels at a specific location |
+| `shopify.create_discount` | Create Discount | medium | Create a discount code (two-step: price rule → discount code) |
+
+### `shopify.create_discount` — Two-Step Flow
+
+Creating a discount code requires two API calls:
+
+1. **POST `/price_rules.json`** — creates the price rule (defines the discount logic)
+2. **POST `/price_rules/{id}/discount_codes.json`** — creates the customer-facing code
+
+If step 2 fails, an orphaned price rule will exist. The error message includes the price rule ID so it can be cleaned up if needed.
 
 ## Error Handling
 
@@ -114,12 +130,17 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/shopify/
-├── shopify.go         # ShopifyConnector struct, New(), Manifest(), do(), ValidateCredentials()
-├── response.go        # Shared HTTP response → typed error mapping
-├── shopify_test.go    # Connector-level tests
-├── response_test.go   # Response parsing / error mapping tests
-├── helpers_test.go    # Shared test helpers (validCreds)
-└── README.md          # This file
+├── shopify.go                # ShopifyConnector struct, New(), Manifest(), Actions(), do()
+├── response.go               # Shared HTTP response → typed error mapping
+├── get_orders.go             # shopify.get_orders action
+├── get_order.go              # shopify.get_order action
+├── update_order.go           # shopify.update_order action
+├── create_product.go         # shopify.create_product action
+├── update_inventory.go       # shopify.update_inventory action
+├── create_discount.go        # shopify.create_discount action (two-step)
+├── *_test.go                 # Tests for each action + connector + response
+├── helpers_test.go           # Shared test helpers (validCreds)
+└── README.md                 # This file
 ```
 
 ## Testing

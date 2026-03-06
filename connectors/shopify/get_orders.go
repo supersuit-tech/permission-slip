@@ -22,6 +22,9 @@ type getOrdersParams struct {
 	FinancialStatus string `json:"financial_status"`
 	CreatedAtMin    string `json:"created_at_min"`
 	CreatedAtMax    string `json:"created_at_max"`
+	UpdatedAtMin    string `json:"updated_at_min"`
+	UpdatedAtMax    string `json:"updated_at_max"`
+	Fields          string `json:"fields"`
 	Limit           int    `json:"limit"`
 }
 
@@ -73,6 +76,15 @@ func (a *getOrdersAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}
 	if params.CreatedAtMax != "" {
 		q.Set("created_at_max", params.CreatedAtMax)
+	}
+	if params.UpdatedAtMin != "" {
+		q.Set("updated_at_min", params.UpdatedAtMin)
+	}
+	if params.UpdatedAtMax != "" {
+		q.Set("updated_at_max", params.UpdatedAtMax)
+	}
+	if params.Fields != "" {
+		q.Set("fields", params.Fields)
 	}
 
 	var resp struct {

@@ -302,7 +302,12 @@ func TestCreateDiscount_DiscountCodeAPIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+	// The wrapped error should still be detectable as a ValidationError.
 	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got %T: %v", err, err)
+		t.Errorf("expected ValidationError (wrapped), got %T: %v", err, err)
+	}
+	// Verify the error message mentions the orphaned price rule ID.
+	if !strings.Contains(err.Error(), "price rule 7003") {
+		t.Errorf("error should mention orphaned price rule ID 7003, got: %v", err)
 	}
 }

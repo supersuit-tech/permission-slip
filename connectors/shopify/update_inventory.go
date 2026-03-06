@@ -29,7 +29,7 @@ func (p *updateInventoryParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: location_id"}
 	}
 	if p.AvailableAdjustment == 0 {
-		return &connectors.ValidationError{Message: "available_adjustment must be non-zero"}
+		return &connectors.ValidationError{Message: "available_adjustment must be non-zero (positive to add inventory, negative to subtract)"}
 	}
 	return nil
 }
