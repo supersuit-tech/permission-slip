@@ -103,13 +103,182 @@ func TestParseManifest_ValidationErrors(t *testing.T) {
 		{"missing cred service", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"auth_type":"api_key"}]}`},
 		{"missing auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s"}]}`},
 		{"invalid auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"magic"}]}`},
-		{"oauth2 auth_type rejected", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"oauth2"}]}`},
+		{"oauth2 missing oauth_provider", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"oauth2"}]}`},
 		{"invalid JSON", `{not json`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParseManifest([]byte(tt.input))
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+// ── OAuth Validation ─────────────────────────────────────────────────────
+
+func TestParseManifest_OAuth2Credential(t *testing.T) {
+	input := `{
+		"id": "google",
+		"name": "Google",
+		"actions": [{"action_type": "google.send_email", "name": "Send Email"}],
+		"required_credentials": [
+			{"service": "google", "auth_type": "oauth2", "oauth_provider": "google", "oauth_scopes": ["https://www.googleapis.com/auth/gmail.send"]}
+		]
+	}`
+
+	m, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(m.RequiredCredentials) != 1 {
+		t.Fatalf("len(RequiredCredentials) = %d, want 1", len(m.RequiredCredentials))
+	}
+	cred := m.RequiredCredentials[0]
+	if cred.AuthType != "oauth2" {
+		t.Errorf("AuthType = %q, want %q", cred.AuthType, "oauth2")
+	}
+	if cred.OAuthProvider != "google" {
+		t.Errorf("OAuthProvider = %q, want %q", cred.OAuthProvider, "google")
+	}
+	if len(cred.OAuthScopes) != 1 || cred.OAuthScopes[0] != "https://www.googleapis.com/auth/gmail.send" {
+		t.Errorf("OAuthScopes = %v, want [https://www.googleapis.com/auth/gmail.send]", cred.OAuthScopes)
+	}
+}
+
+func TestParseManifest_OAuth2ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"oauth2 without oauth_provider", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"oauth2"}]}`},
+		{"non-oauth2 with oauth_provider", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"api_key","oauth_provider":"google"}]}`},
+		{"non-oauth2 with oauth_scopes", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"api_key","oauth_scopes":["scope1"]}]}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseManifest([]byte(tt.input))
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestParseManifest_OAuthProviders(t *testing.T) {
+	input := `{
+		"id": "salesforce",
+		"name": "Salesforce",
+		"actions": [{"action_type": "salesforce.query", "name": "Query"}],
+		"required_credentials": [
+			{"service": "salesforce", "auth_type": "oauth2", "oauth_provider": "salesforce"}
+		],
+		"oauth_providers": [
+			{
+				"id": "salesforce",
+				"authorize_url": "https://login.salesforce.com/services/oauth2/authorize",
+				"token_url": "https://login.salesforce.com/services/oauth2/token",
+				"scopes": ["api", "refresh_token"]
+			}
+		]
+	}`
+
+	m, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(m.OAuthProviders) != 1 {
+		t.Fatalf("len(OAuthProviders) = %d, want 1", len(m.OAuthProviders))
+	}
+	p := m.OAuthProviders[0]
+	if p.ID != "salesforce" {
+		t.Errorf("OAuthProvider ID = %q, want %q", p.ID, "salesforce")
+	}
+	if p.AuthorizeURL != "https://login.salesforce.com/services/oauth2/authorize" {
+		t.Errorf("OAuthProvider AuthorizeURL = %q", p.AuthorizeURL)
+	}
+	if p.TokenURL != "https://login.salesforce.com/services/oauth2/token" {
+		t.Errorf("OAuthProvider TokenURL = %q", p.TokenURL)
+	}
+	if len(p.Scopes) != 2 {
+		t.Errorf("OAuthProvider Scopes = %v, want [api refresh_token]", p.Scopes)
+	}
+}
+
+func TestParseManifest_OAuthProviderCrossReference(t *testing.T) {
+	// Built-in providers (google, microsoft) should be accepted without declaration.
+	t.Run("built-in provider accepted", func(t *testing.T) {
+		input := `{
+			"id": "x",
+			"name": "X",
+			"actions": [{"action_type": "x.a", "name": "A"}],
+			"required_credentials": [
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "microsoft"}
+			]
+		}`
+		_, err := ParseManifest([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// Custom provider declared in oauth_providers should be accepted.
+	t.Run("declared custom provider accepted", func(t *testing.T) {
+		input := `{
+			"id": "x",
+			"name": "X",
+			"actions": [{"action_type": "x.a", "name": "A"}],
+			"required_credentials": [
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "hubspot"}
+			],
+			"oauth_providers": [
+				{"id": "hubspot", "authorize_url": "https://app.hubspot.com/oauth/authorize", "token_url": "https://api.hubapi.com/oauth/v1/token"}
+			]
+		}`
+		_, err := ParseManifest([]byte(input))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// Unknown provider not declared should fail.
+	t.Run("undeclared custom provider rejected", func(t *testing.T) {
+		input := `{
+			"id": "x",
+			"name": "X",
+			"actions": [{"action_type": "x.a", "name": "A"}],
+			"required_credentials": [
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "hubspot"}
+			]
+		}`
+		_, err := ParseManifest([]byte(input))
+		if err == nil {
+			t.Error("expected error for undeclared oauth_provider, got nil")
+		}
+	})
+}
+
+func TestParseManifest_OAuthProviderValidationErrors(t *testing.T) {
+	base := `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"oauth_providers":[%s]}`
+
+	tests := []struct {
+		name     string
+		provider string
+	}{
+		{"missing provider id", `{"authorize_url":"https://example.com/auth","token_url":"https://example.com/token"}`},
+		{"missing authorize_url", `{"id":"p","token_url":"https://example.com/token"}`},
+		{"missing token_url", `{"id":"p","authorize_url":"https://example.com/auth"}`},
+		{"non-https authorize_url", `{"id":"p","authorize_url":"http://example.com/auth","token_url":"https://example.com/token"}`},
+		{"non-https token_url", `{"id":"p","authorize_url":"https://example.com/auth","token_url":"http://example.com/token"}`},
+		{"duplicate provider id", `{"id":"p","authorize_url":"https://a.com/auth","token_url":"https://a.com/token"},{"id":"p","authorize_url":"https://b.com/auth","token_url":"https://b.com/token"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := fmt.Sprintf(base, tt.provider)
+			_, err := ParseManifest([]byte(input))
 			if err == nil {
 				t.Error("expected error, got nil")
 			}

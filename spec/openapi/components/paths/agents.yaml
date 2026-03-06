@@ -326,6 +326,8 @@ agentMe:
             example:
               agent_id: 42
               status: "registered"
+              approver:
+                username: "alice"
               metadata:
                 name: "My AI Assistant"
                 version: "1.0.0"

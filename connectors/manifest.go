@@ -16,12 +16,13 @@ import (
 // required credentials, and optional configuration templates so the server can
 // register and seed DB rows automatically on startup.
 type ConnectorManifest struct {
-	ID                  string               `json:"id"`
-	Name                string               `json:"name"`
-	Description         string               `json:"description"`
-	Actions             []ManifestAction     `json:"actions"`
-	RequiredCredentials []ManifestCredential `json:"required_credentials"`
-	Templates           []ManifestTemplate   `json:"templates,omitempty"`
+	ID                  string                  `json:"id"`
+	Name                string                  `json:"name"`
+	Description         string                  `json:"description"`
+	Actions             []ManifestAction        `json:"actions"`
+	RequiredCredentials []ManifestCredential    `json:"required_credentials"`
+	Templates           []ManifestTemplate      `json:"templates,omitempty"`
+	OAuthProviders      []ManifestOAuthProvider `json:"oauth_providers,omitempty"`
 }
 
 // ManifestAction describes a single action exposed by an external connector.
@@ -35,9 +36,21 @@ type ManifestAction struct {
 
 // ManifestCredential describes a credential requirement for an external connector.
 type ManifestCredential struct {
-	Service         string `json:"service"`
-	AuthType        string `json:"auth_type"`
-	InstructionsURL string `json:"instructions_url,omitempty"`
+	Service         string   `json:"service"`
+	AuthType        string   `json:"auth_type"`
+	InstructionsURL string   `json:"instructions_url,omitempty"`
+	OAuthProvider   string   `json:"oauth_provider,omitempty"`
+	OAuthScopes     []string `json:"oauth_scopes,omitempty"`
+}
+
+// ManifestOAuthProvider describes an OAuth 2.0 provider declared by an external
+// connector. This allows external connectors to register providers that the
+// platform doesn't have built-in support for (e.g. Salesforce, HubSpot).
+type ManifestOAuthProvider struct {
+	ID           string   `json:"id"`
+	AuthorizeURL string   `json:"authorize_url"`
+	TokenURL     string   `json:"token_url"`
+	Scopes       []string `json:"scopes,omitempty"`
 }
 
 // ManifestTemplate describes a predefined configuration preset for an action.
@@ -71,6 +84,38 @@ var validAuthTypes = map[string]bool{
 	"api_key": true,
 	"basic":   true,
 	"custom":  true,
+	"oauth2":  true,
+}
+
+// BuiltInOAuthProviders lists OAuth provider IDs that the platform supports
+// natively. Connectors referencing these providers don't need to declare them
+// in their oauth_providers section. Add new built-in providers here.
+var BuiltInOAuthProviders = map[string]bool{
+	"google":    true,
+	"microsoft": true,
+}
+
+// validateURL parses a URL and checks scheme and host. allowedSchemes specifies
+// which schemes are accepted. Returns a descriptive error if invalid.
+func validateURL(raw, fieldName string, allowedSchemes ...string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid URL: %w", fieldName, err)
+	}
+	schemeOK := false
+	for _, s := range allowedSchemes {
+		if u.Scheme == s {
+			schemeOK = true
+			break
+		}
+	}
+	if !schemeOK {
+		return fmt.Errorf("%s must use %s scheme", fieldName, strings.Join(allowedSchemes, " or "))
+	}
+	if u.Host == "" {
+		return fmt.Errorf("%s must include a host", fieldName)
+	}
+	return nil
 }
 
 // LoadManifest reads and validates a connector.json manifest from the given path.
@@ -177,22 +222,70 @@ func (m *ConnectorManifest) Validate() error {
 			return fmt.Errorf("manifest validation: required_credentials[%d].auth_type is required", i)
 		}
 		if !validAuthTypes[c.AuthType] {
-			return fmt.Errorf("manifest validation: required_credentials[%d].auth_type %q must be api_key, basic, or custom", i, c.AuthType)
+			return fmt.Errorf("manifest validation: required_credentials[%d].auth_type %q must be api_key, basic, custom, or oauth2", i, c.AuthType)
+		}
+		// OAuth2-specific validation.
+		if c.AuthType == "oauth2" {
+			if c.OAuthProvider == "" {
+				return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider is required when auth_type is oauth2", i)
+			}
+		} else {
+			if c.OAuthProvider != "" {
+				return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider must be empty when auth_type is %q", i, c.AuthType)
+			}
+			if len(c.OAuthScopes) > 0 {
+				return fmt.Errorf("manifest validation: required_credentials[%d].oauth_scopes must be empty when auth_type is %q", i, c.AuthType)
+			}
 		}
 		if c.InstructionsURL != "" {
 			if len(c.InstructionsURL) > maxInstructionsURLLen {
 				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url exceeds %d characters", i, maxInstructionsURLLen)
 			}
-			u, err := url.Parse(c.InstructionsURL)
-			if err != nil {
-				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url is not a valid URL: %w", i, err)
+			field := fmt.Sprintf("manifest validation: required_credentials[%d].instructions_url", i)
+			if err := validateURL(c.InstructionsURL, field, "http", "https"); err != nil {
+				return err
 			}
-			if u.Scheme != "http" && u.Scheme != "https" {
-				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url must use http or https scheme", i)
-			}
-			if u.Host == "" {
-				return fmt.Errorf("manifest validation: required_credentials[%d].instructions_url must include a host", i)
-			}
+		}
+	}
+
+	// Collect all known OAuth provider IDs: built-in + declared in this manifest.
+	knownProviders := make(map[string]bool, len(BuiltInOAuthProviders)+len(m.OAuthProviders))
+	for id := range BuiltInOAuthProviders {
+		knownProviders[id] = true
+	}
+
+	// Validate OAuth providers (optional, used by external connectors).
+	providerIDs := make(map[string]bool, len(m.OAuthProviders))
+	for i, p := range m.OAuthProviders {
+		if p.ID == "" {
+			return fmt.Errorf("manifest validation: oauth_providers[%d].id is required", i)
+		}
+		if providerIDs[p.ID] {
+			return fmt.Errorf("manifest validation: duplicate oauth_provider id %q", p.ID)
+		}
+		providerIDs[p.ID] = true
+
+		if p.AuthorizeURL == "" {
+			return fmt.Errorf("manifest validation: oauth_providers[%d].authorize_url is required", i)
+		}
+		if err := validateURL(p.AuthorizeURL, fmt.Sprintf("manifest validation: oauth_providers[%d].authorize_url", i), "https"); err != nil {
+			return err
+		}
+
+		if p.TokenURL == "" {
+			return fmt.Errorf("manifest validation: oauth_providers[%d].token_url is required", i)
+		}
+		if err := validateURL(p.TokenURL, fmt.Sprintf("manifest validation: oauth_providers[%d].token_url", i), "https"); err != nil {
+			return err
+		}
+
+		knownProviders[p.ID] = true
+	}
+
+	// Cross-reference: verify oauth_provider in credentials references a known provider.
+	for i, c := range m.RequiredCredentials {
+		if c.AuthType == "oauth2" && !knownProviders[c.OAuthProvider] {
+			return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider %q is not a built-in provider and not declared in oauth_providers", i, c.OAuthProvider)
 		}
 	}
 
@@ -222,6 +315,8 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 			Service:         c.Service,
 			AuthType:        c.AuthType,
 			InstructionsURL: c.InstructionsURL,
+			OAuthProvider:   c.OAuthProvider,
+			OAuthScopes:     c.OAuthScopes,
 		})
 	}
 	for _, tpl := range m.Templates {
