@@ -266,9 +266,9 @@ func searchOrdersManifest() connectors.ManifestAction {
 				},
 				"limit": {
 					"type": "integer",
-					"minimum": 1,
+					"minimum": 0,
 					"maximum": 500,
-					"description": "Maximum orders to return per page (1-500, default 500)"
+					"description": "Maximum orders per page (1-500). 0 or omit to use Square's default."
 				},
 				"cursor": {
 					"type": "string",

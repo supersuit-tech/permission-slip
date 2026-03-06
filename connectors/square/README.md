@@ -158,6 +158,16 @@ Square represents all monetary amounts in the **smallest currency unit** (cents 
 
 All Square write operations (`create_order`, `create_payment`, `create_customer`, `create_booking`) require an `idempotency_key` (UUID). The connector generates these automatically — callers don't need to provide them. This prevents duplicate charges or double-created records if a request is retried.
 
+## Local Validation
+
+All actions validate parameters locally before sending requests to Square. This catches common mistakes early with clear error messages instead of opaque API errors:
+
+- **Payments:** `amount_money.amount` must be > 0; currency is required. Prevents zero-dollar or negative charges.
+- **Orders:** Line item `quantity` must be a positive integer string; `base_price_money.amount` must not be negative.
+- **Bookings:** `start_at` must be valid RFC 3339 format.
+- **Search orders:** `limit` must be 0-500 (0 uses Square's default); `query` must be a JSON object (not a string or array).
+- **All write actions:** Required fields are checked before the API call.
+
 ## Error Handling
 
 The connector maps Square API responses to typed connector errors:
@@ -190,13 +200,20 @@ Each action lives in its own file. To add one (e.g., `square.update_order`):
 
 ```
 connectors/square/
-├── square.go             # SquareConnector struct, New(), Actions(), ValidateCredentials(), do()
-├── manifest.go           # Manifest() and all action schema declarations
-├── response.go           # Square error envelope parsing and error type mapping
-├── helpers_test.go       # Shared test helpers (validCreds, sandboxCreds)
-├── square_test.go        # Connector-level tests (do, credentials, environment routing)
-├── response_test.go      # Error message formatting and response checking tests
-└── README.md             # This file
+├── square.go              # SquareConnector struct, shared money type, New(), Actions(), do()
+├── manifest.go            # Manifest() and all action schema declarations
+├── response.go            # Square error envelope parsing and error type mapping
+├── create_order.go        # square.create_order action
+├── create_payment.go      # square.create_payment action (high risk)
+├── list_catalog.go        # square.list_catalog action
+├── create_customer.go     # square.create_customer action
+├── create_booking.go      # square.create_booking action
+├── search_orders.go       # square.search_orders action
+├── helpers_test.go        # Shared test helpers (validCreds, sandboxCreds)
+├── square_test.go         # Connector-level tests (do, credentials, environment routing)
+├── response_test.go       # Error message formatting and response checking tests
+├── *_test.go              # Per-action test files (one per action)
+└── README.md              # This file
 ```
 
 ## Testing
