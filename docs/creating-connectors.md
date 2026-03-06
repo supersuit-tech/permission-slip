@@ -1,6 +1,13 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub and Slack connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
+
+**Which reference to follow:**
+- **GitHub** (`connectors/github/`) — simple API key auth (Bearer token), good starting point
+- **Slack** (`connectors/slack/`) — API key with format validation (token prefix check), Slack-specific response envelope
+- **PostgreSQL** (`connectors/postgresql/`) — custom auth (host + port + user + password + database)
+- **Amadeus** (`connectors/amadeus/`) — OAuth client credentials grant (client_id + client_secret → short-lived bearer token with caching and auto-refresh)
+- **Square** (`connectors/square/`) — environment-aware base URLs (sandbox/production), idempotency key generation, structured error envelope parsing
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -8,7 +15,7 @@ For architectural context, see [ADR-009: Connector Execution Architecture](adr/0
 
 ## Overview
 
-A **connector** represents an integration with an external service (e.g., GitHub, Slack, Jira). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
+A **connector** represents an integration with an external service or database (e.g., GitHub, Slack, PostgreSQL). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
 
 An **action** is a single operation within a connector (e.g., `github.create_issue`, `slack.send_message`). Each action has its own file, parameter struct, validation, and `Execute` method.
 
@@ -23,7 +30,7 @@ Connector (shared state: HTTP client, base URL, auth)
 
 - **In-process Go**: Connectors compile into the binary. No plugins, sidecars, or external processes.
 - **One action per file**: Adding an action means adding one file + one line of registration.
-- **Plain `net/http`**: No third-party SDKs. Keeps the dependency footprint minimal.
+- **Plain `net/http` or `database/sql`**: HTTP connectors (GitHub, Slack) use plain net/http. Database connectors (MySQL) use database/sql with parameterized queries. No third-party SDKs beyond drivers.
 - **Typed errors**: Actions return specific error types that map to HTTP status codes.
 - **Credentials at execution time**: Decrypted from the vault only when an action runs, never cached.
 
@@ -397,6 +404,7 @@ import (
 registry := connectors.NewRegistry()
 registry.Register(ghconnector.New())
 registry.Register(slack.New())
+registry.Register(amadeus.New())
 registry.Register(jiraconnector.New())  // ← add this
 ```
 
@@ -891,11 +899,28 @@ connectors/
 │   ├── github_test.go        # Connector-level tests
 │   ├── create_issue_test.go  # Action tests
 │   └── merge_pr_test.go      # Action tests
-└── slack/
-    ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
-    ├── send_message.go       # slack.send_message action
-    ├── create_channel.go     # slack.create_channel action
-    └── ...tests...
+├── mysql/
+│   ├── mysql.go              # MySQLConnector struct, New(), Manifest(), openConn(), shared helpers
+│   ├── query.go              # mysql.query action (read-only, parameterized SELECT)
+│   ├── insert.go             # mysql.insert action (parameterized INSERT with batch limits)
+│   ├── update.go             # mysql.update action (parameterized UPDATE, WHERE required)
+│   ├── delete.go             # mysql.delete action (parameterized DELETE, WHERE required)
+│   ├── helpers_test.go       # validCreds(), newTestConnector() with sqlmock
+│   ├── mysql_test.go         # Connector-level tests
+│   └── *_test.go             # Per-action tests
+├── slack/
+│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
+│   ├── send_message.go       # slack.send_message action
+│   ├── create_channel.go     # slack.create_channel action
+│   └── ...tests...
+└── expedia/
+    ├── expedia.go            # ExpediaConnector struct, New(), SHA-512 signature auth, do()
+    ├── manifest.go           # Manifest() with 6 action schemas and templates
+    ├── response.go           # HTTP status → typed error mapping
+    ├── README.md             # Connector documentation
+    ├── helpers_test.go       # validCreds() test helper
+    ├── expedia_test.go       # Connector and do() lifecycle tests
+    └── response_test.go      # checkResponse() error mapping tests
 ```
 
 ### Execution flow
