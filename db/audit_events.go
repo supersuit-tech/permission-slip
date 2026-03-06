@@ -20,7 +20,8 @@ const (
 	AuditEventActionExecuted    AuditEventType = "action.executed"
 	AuditEventStandingExecution AuditEventType = "standing_approval.executed"
 	AuditEventAgentRegistered   AuditEventType = "agent.registered"
-	AuditEventAgentDeactivated  AuditEventType = "agent.deactivated"
+	AuditEventAgentDeactivated      AuditEventType = "agent.deactivated"
+	AuditEventPaymentMethodCharged  AuditEventType = "payment_method.charged"
 )
 
 // validAuditEventTypes is used for input validation.
@@ -32,7 +33,8 @@ var validAuditEventTypes = map[AuditEventType]bool{
 	AuditEventActionExecuted:    true,
 	AuditEventStandingExecution: true,
 	AuditEventAgentRegistered:   true,
-	AuditEventAgentDeactivated:  true,
+	AuditEventAgentDeactivated:      true,
+	AuditEventPaymentMethodCharged:  true,
 }
 
 // IsValidAuditEventType checks if the given event type is valid.

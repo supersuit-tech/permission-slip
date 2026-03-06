@@ -14,6 +14,8 @@ func SourceTypeForEvent(eventType string) string {
 		return "agent"
 	case eventType == "standing_approval.executed":
 		return "standing_approval"
+	case eventType == "payment_method.charged":
+		return "payment_method_transaction"
 	default:
 		return "approval"
 	}

@@ -7,6 +7,7 @@ import {
   Ban,
   Clock,
   TimerOff,
+  CreditCard,
   HelpCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ export const OUTCOME_CONFIG: Record<string, OutcomeStyle> = {
   deactivated: { label: "Deactivated", variant: "destructive", Icon: Power },
   pending: { label: "Pending", variant: "outline", Icon: Clock },
   expired: { label: "Expired", variant: "secondary", Icon: TimerOff },
+  charged: { label: "Charged", variant: "default", Icon: CreditCard },
 };
 
 /** All outcome values (derived from OUTCOME_CONFIG) plus "all", for the full activity page. */
@@ -89,6 +91,18 @@ export function getActionSummary(event: AuditEvent): string {
   }
 
   const actionType = typeof action.type === "string" ? action.type : "";
+
+  // Payment method charged events include amount and card metadata.
+  if (event.event_type === "payment_method.charged") {
+    const cents = typeof action.amount_cents === "number" ? action.amount_cents : 0;
+    const currency = typeof action.currency === "string" ? action.currency.toUpperCase() : "USD";
+    const amount = (cents / 100).toFixed(2);
+    const brand = typeof action.brand === "string" ? action.brand : "";
+    const last4 = typeof action.last4 === "string" ? action.last4 : "";
+    const cardLabel = brand && last4 ? ` (${brand} ••${last4})` : "";
+    return `${actionType} — ${currency} $${amount}${cardLabel}`;
+  }
+
   const params = action.parameters as Record<string, unknown> | undefined;
 
   if (params) {

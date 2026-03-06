@@ -242,6 +242,7 @@ listAuditEvents:
             - deactivated
             - pending
             - expired
+            - charged
         example: "approved"
       - name: connector_id
         in: query

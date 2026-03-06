@@ -1793,6 +1793,7 @@ paths:
               - deactivated
               - pending
               - expired
+              - charged
           example: approved
         - name: connector_id
           in: query
@@ -7910,6 +7911,7 @@ components:
             - standing_approval.executed
             - agent.registered
             - agent.deactivated
+            - payment_method.charged
           description: The type of event.
           example: approval.approved
         timestamp:
@@ -7936,8 +7938,10 @@ components:
             approvals, contains `type`, `version`, and `parameters`. For standing
             approval executions, contains `type`, `version`, `parameters` (the
             actual parameters used in the execution), and `constraints` (the
-            boundary rules from the standing approval). Null for agent lifecycle
-            events.
+            boundary rules from the standing approval). For payment_method.charged
+            events, contains `type`, `payment_method_id`, `brand`, `last4`,
+            `amount_cents`, and `currency`. Never includes raw card details.
+            Null for agent lifecycle events.
         outcome:
           type: string
           enum:
@@ -7949,6 +7953,7 @@ components:
             - deactivated
             - pending
             - expired
+            - charged
           description: The outcome of the event.
           example: approved
         connector_id:
@@ -8030,6 +8035,7 @@ components:
             - standing_approval.executed
             - agent.registered
             - agent.deactivated
+            - payment_method.charged
           description: The type of event.
           example: approval.approved
         timestamp:
@@ -8052,7 +8058,9 @@ components:
           nullable: true
           additionalProperties: true
           description: |
-            Action details for approval and standing approval events.
+            Action details for approval and standing approval events. For
+            payment_method.charged events, contains `type`, `payment_method_id`,
+            `brand`, `last4`, `amount_cents`, and `currency`.
         outcome:
           type: string
           enum:
@@ -8064,6 +8072,7 @@ components:
             - deactivated
             - pending
             - expired
+            - charged
           description: The outcome of the event.
           example: approved
         source_id:
