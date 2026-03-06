@@ -58,7 +58,7 @@ func TestCheckResponse_ForbiddenIsAuthError(t *testing.T) {
 	}
 }
 
-func TestCheckResponse_404IsExternalError(t *testing.T) {
+func TestCheckResponse_404IsValidationError(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"type":"resource_not_found","message":"Property not found"}`)
@@ -66,8 +66,8 @@ func TestCheckResponse_404IsExternalError(t *testing.T) {
 	if err == nil {
 		t.Fatal("checkResponse(404) expected error, got nil")
 	}
-	if !connectors.IsExternalError(err) {
-		t.Errorf("checkResponse(404) = %T, want *connectors.ExternalError", err)
+	if !connectors.IsValidationError(err) {
+		t.Errorf("checkResponse(404) = %T, want *connectors.ValidationError", err)
 	}
 }
 

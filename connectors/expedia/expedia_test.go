@@ -28,9 +28,11 @@ func TestExpediaConnector_Actions(t *testing.T) {
 	c := New()
 	actions := c.Actions()
 
-	// Phase 1: no actions yet, but the method must return a valid map.
 	if actions == nil {
-		t.Error("Actions() returned nil, want non-nil map")
+		t.Fatal("Actions() returned nil, want non-nil map")
+	}
+	if len(actions) != 6 {
+		t.Errorf("Actions() has %d entries, want 6", len(actions))
 	}
 }
 
@@ -382,10 +384,7 @@ func TestExpediaConnector_ActionsMatchManifest(t *testing.T) {
 	}
 	for _, a := range manifest.Actions {
 		if _, ok := actions[a.ActionType]; !ok {
-			// Phase 1: actions aren't implemented yet, so we just verify
-			// the manifest declares them. This test will catch drift once
-			// Phase 2 adds action handlers.
-			t.Logf("Manifest() has %q but Actions() does not (expected in Phase 1)", a.ActionType)
+			t.Errorf("Manifest() has %q but Actions() does not", a.ActionType)
 		}
 	}
 }
