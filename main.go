@@ -25,6 +25,7 @@ import (
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
@@ -35,9 +36,9 @@ import (
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
-	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
+	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
@@ -322,6 +323,7 @@ func main() {
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
 	registry.Register(hubspot.New())
+	registry.Register(microsoft.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
 	registry.Register(pgconnector.New())
