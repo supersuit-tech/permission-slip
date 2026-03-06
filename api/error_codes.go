@@ -58,8 +58,11 @@ const (
 	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"
 	ErrOAuthConnectionNotFound   ErrorCode = "oauth_connection_not_found"
 	ErrOAuthConnectionExists     ErrorCode = "oauth_connection_exists"
-	ErrOAuthStateMismatch        ErrorCode = "oauth_state_mismatch"
-	ErrOAuthExchangeFailed       ErrorCode = "oauth_exchange_failed"
+	ErrOAuthStateMismatch          ErrorCode = "oauth_state_mismatch"
+	ErrOAuthExchangeFailed         ErrorCode = "oauth_exchange_failed"
+	ErrOAuthRefreshFailed          ErrorCode = "oauth_refresh_failed"
+	ErrOAuthProviderConfigExists   ErrorCode = "oauth_provider_config_exists"
+	ErrOAuthProviderConfigNotFound ErrorCode = "oauth_provider_config_not_found"
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )

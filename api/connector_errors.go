@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -37,6 +38,19 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		log.Printf("[%s] connector external error: %v", traceID, err)
 		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service returned an error", true))
+		return true
+
+	case connectors.IsOAuthRefreshError(err):
+		log.Printf("[%s] OAuth refresh error: %v", traceID, err)
+		var oauthErr *connectors.OAuthRefreshError
+		msg := "OAuth authorization required — user must re-connect the provider in Settings"
+		details := map[string]any{}
+		if errors.As(err, &oauthErr) {
+			details["provider"] = oauthErr.Provider
+		}
+		resp := newErrorResponse(ErrOAuthRefreshFailed, msg, false)
+		resp.Error.Details = details
+		RespondError(w, r, http.StatusUnauthorized, resp)
 		return true
 
 	case connectors.IsAuthError(err):
