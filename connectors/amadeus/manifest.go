@@ -152,7 +152,71 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				InstructionsURL: "https://developers.amadeus.com/get-started/get-started-with-self-service-apis-335",
 			},
 		},
-		Templates: []connectors.ManifestTemplate{},
+		Templates: []connectors.ManifestTemplate{
+			{
+				ID:          "tpl_amadeus_search_airports",
+				ActionType:  "amadeus.search_airports",
+				Name:        "Look up airports",
+				Description: "Agent can search for airports by name or IATA code. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"keyword":"*","subtype":"*"}`),
+			},
+			{
+				ID:          "tpl_amadeus_search_flights_economy",
+				ActionType:  "amadeus.search_flights",
+				Name:        "Search economy flights",
+				Description: "Agent can search for economy-class flights between any airports. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"origin":"*","destination":"*","departure_date":"*","return_date":"*","adults":"*","cabin":"ECONOMY","nonstop":"*","max_results":"*"}`),
+			},
+			{
+				ID:          "tpl_amadeus_search_flights_any",
+				ActionType:  "amadeus.search_flights",
+				Name:        "Search flights (all cabins)",
+				Description: "Agent can search flights in any cabin class between any airports. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"origin":"*","destination":"*","departure_date":"*","return_date":"*","adults":"*","cabin":"*","nonstop":"*","max_results":"*"}`),
+			},
+			{
+				ID:          "tpl_amadeus_price_flight",
+				ActionType:  "amadeus.price_flight",
+				Name:        "Confirm flight pricing",
+				Description: "Agent can confirm real-time pricing for flight offers. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"flight_offer":"*"}`),
+			},
+			{
+				ID:          "tpl_amadeus_book_flight_solo",
+				ActionType:  "amadeus.book_flight",
+				Name:        "Book flights (1 traveler)",
+				Description: "Agent can book flights for a single traveler. HIGH RISK — creates real reservations. Requires human approval per booking.",
+				Parameters:  json.RawMessage(`{"flight_offer":"*","travelers":"*","payment_method_id":"*","idempotency_key":"*","remarks":"*","_max_travelers":1}`),
+			},
+			{
+				ID:          "tpl_amadeus_book_flight_duo",
+				ActionType:  "amadeus.book_flight",
+				Name:        "Book flights (up to 2 travelers)",
+				Description: "Agent can book flights for up to 2 travelers. HIGH RISK — creates real reservations. Requires human approval per booking.",
+				Parameters:  json.RawMessage(`{"flight_offer":"*","travelers":"*","payment_method_id":"*","idempotency_key":"*","remarks":"*","_max_travelers":2}`),
+			},
+			{
+				ID:          "tpl_amadeus_search_hotels_4star",
+				ActionType:  "amadeus.search_hotels",
+				Name:        "Search 4-star hotels",
+				Description: "Agent can search for 4- and 5-star hotels by city or coordinates. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"city_code":"*","latitude":"*","longitude":"*","check_in_date":"*","check_out_date":"*","adults":"*","room_quantity":"*","ratings":[4,5],"price_range":"*","currency":"*"}`),
+			},
+			{
+				ID:          "tpl_amadeus_search_hotels_any",
+				ActionType:  "amadeus.search_hotels",
+				Name:        "Search hotels (all ratings)",
+				Description: "Agent can search hotels of any star rating by city or coordinates. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"city_code":"*","latitude":"*","longitude":"*","check_in_date":"*","check_out_date":"*","adults":"*","room_quantity":"*","ratings":"*","price_range":"*","currency":"*"}`),
+			},
+			{
+				ID:          "tpl_amadeus_search_cars",
+				ActionType:  "amadeus.search_cars",
+				Name:        "Search rental cars",
+				Description: "Agent can search for available rental cars at any airport location. Read-only, no booking capability.",
+				Parameters:  json.RawMessage(`{"pickup_location":"*","pickup_date":"*","dropoff_date":"*","dropoff_location":"*","provider":"*"}`),
+			},
+		},
 	}
 }
 
