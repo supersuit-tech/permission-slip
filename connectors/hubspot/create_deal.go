@@ -1,0 +1,83 @@
+package hubspot
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+// createDealAction implements connectors.Action for hubspot.create_deal.
+// It creates a new deal via POST /crm/v3/objects/deals, then optionally
+// associates it with contacts.
+type createDealAction struct {
+	conn *HubSpotConnector
+}
+
+type createDealParams struct {
+	DealName           string            `json:"dealname"`
+	Pipeline           string            `json:"pipeline"`
+	DealStage          string            `json:"dealstage"`
+	Amount             string            `json:"amount"`
+	CloseDate          string            `json:"closedate"`
+	AssociatedContacts []string          `json:"associated_contacts"`
+	Properties         map[string]string `json:"properties"`
+}
+
+func (p *createDealParams) validate() error {
+	if p.DealName == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: dealname"}
+	}
+	if p.Pipeline == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: pipeline"}
+	}
+	if p.DealStage == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: dealstage"}
+	}
+	return nil
+}
+
+func (p *createDealParams) toAPIProperties() map[string]string {
+	props := make(map[string]string)
+	for k, v := range p.Properties {
+		props[k] = v
+	}
+	props["dealname"] = p.DealName
+	props["pipeline"] = p.Pipeline
+	props["dealstage"] = p.DealStage
+	if p.Amount != "" {
+		props["amount"] = p.Amount
+	}
+	if p.CloseDate != "" {
+		props["closedate"] = p.CloseDate
+	}
+	return props
+}
+
+func (a *createDealAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params createDealParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := params.validate(); err != nil {
+		return nil, err
+	}
+
+	body := hubspotObjectRequest{Properties: params.toAPIProperties()}
+	var resp hubspotObjectResponse
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/crm/v3/objects/deals", body, &resp); err != nil {
+		return nil, err
+	}
+
+	// Associate with contacts if specified.
+	for _, contactID := range params.AssociatedContacts {
+		path := fmt.Sprintf("/crm/v3/objects/deals/%s/associations/contacts/%s/deal_to_contact", resp.ID, contactID)
+		if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, nil, nil); err != nil {
+			return nil, fmt.Errorf("deal created (id=%s) but association with contact %s failed: %w", resp.ID, contactID, err)
+		}
+	}
+
+	return connectors.JSONResult(resp)
+}
