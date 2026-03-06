@@ -20,27 +20,36 @@ func validateEmail(field string, idx int, addr string) error {
 	return nil
 }
 
+// validateGraphID rejects Graph API resource identifiers (team IDs, channel IDs,
+// item IDs, etc.) that contain path traversal sequences, path separators, or null
+// bytes. These values are interpolated into URL paths, so we must ensure they
+// cannot manipulate the request target. Microsoft Graph IDs are opaque strings
+// (typically UUIDs or base64-encoded values) that never contain slashes or
+// dot-dot sequences.
+func validateGraphID(field, value string) error {
+	if value == "" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", field)}
+	}
+	if strings.ContainsAny(value, "/\\") || strings.Contains(value, "..") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain path separators or traversal sequences", field)}
+	}
+	if strings.ContainsRune(value, 0) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain null bytes", field)}
+	}
+	return nil
+}
+
+// validateItemID checks that an item_id is a valid Graph API identifier.
+func validateItemID(id string) error {
+	return validateGraphID("item_id", id)
+}
+
 // detectContentType returns "HTML" if the body contains HTML tags, otherwise "Text".
 func detectContentType(body string) string {
 	if strings.Contains(body, "<") && strings.Contains(body, ">") {
 		return "HTML"
 	}
 	return "Text"
-}
-
-// validateItemID checks that an item_id is non-empty and does not contain
-// path traversal sequences, separators, or null bytes.
-func validateItemID(id string) error {
-	if id == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
-	}
-	if strings.ContainsAny(id, "/\\") || strings.Contains(id, "..") {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or traversal sequences"}
-	}
-	if strings.ContainsRune(id, 0) {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain null bytes"}
-	}
-	return nil
 }
 
 // validateFolderPath checks that a folder path does not contain path traversal,
