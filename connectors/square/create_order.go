@@ -29,11 +29,6 @@ type orderLineItem struct {
 	BasePriceMoney money  `json:"base_price_money"`
 }
 
-type money struct {
-	Amount   int64  `json:"amount"`
-	Currency string `json:"currency"`
-}
-
 func (p *createOrderParams) validate() error {
 	if p.LocationID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: location_id"}

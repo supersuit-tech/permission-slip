@@ -30,6 +30,13 @@ const (
 	credKeyEnvironment = "environment"
 )
 
+// money represents Square's Money object. Amount is in the smallest currency
+// unit (e.g., cents for USD). Shared across create_order and create_payment.
+type money struct {
+	Amount   int64  `json:"amount"`
+	Currency string `json:"currency"`
+}
+
 // SquareConnector owns the shared HTTP client and base URL used by all
 // Square actions. Actions hold a pointer back to the connector to access
 // these shared resources.
