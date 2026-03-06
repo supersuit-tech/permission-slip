@@ -111,3 +111,9 @@ func IsOAuthRefreshError(err error) bool {
 	var target *OAuthRefreshError
 	return errors.As(err, &target)
 }
+
+// AsOAuthRefreshError extracts an *OAuthRefreshError from err if present.
+// Convenience wrapper around errors.As for callers that need the Provider field.
+func AsOAuthRefreshError(err error, target **OAuthRefreshError) bool {
+	return errors.As(err, target)
+}

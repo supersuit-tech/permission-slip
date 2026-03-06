@@ -3312,17 +3312,31 @@ paths:
                     field: action
                   trace_id: trace_xyz789
         '401':
-          description: Invalid signature
+          description: Invalid signature or OAuth authorization required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_signature
-                  message: Signature verification failed
-                  retryable: false
-                  trace_id: trace_xyz789
+              examples:
+                invalid_signature:
+                  summary: Agent signature verification failed
+                  value:
+                    error:
+                      code: invalid_signature
+                      message: Signature verification failed
+                      retryable: false
+                      trace_id: trace_xyz789
+                oauth_refresh_failed:
+                  summary: OAuth token expired or revoked — user must re-authorize
+                  value:
+                    error:
+                      code: oauth_refresh_failed
+                      message: OAuth authorization required — user must re-connect the provider in Settings
+                      retryable: false
+                      details:
+                        provider: google
+                        action_required: reauthorize
+                      trace_id: trace_xyz789
         '403':
           description: Standing approval exhausted or constraint violation
           content:
@@ -10310,6 +10324,7 @@ components:
             - timestamp_expired
             - invalid_code
             - invalid_token
+            - oauth_refresh_failed
             - agent_not_authorized
             - approval_denied
             - token_already_used
