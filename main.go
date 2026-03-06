@@ -22,8 +22,14 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
+	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
+	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
+	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
+	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
+	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
@@ -310,8 +316,14 @@ func main() {
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
+	registry.Register(hubspot.New())
+	registry.Register(mongodb.New())
+	registry.Register(mysqlconnector.New())
 	registry.Register(pgconnector.New())
+	registry.Register(shopify.New())
 	registry.Register(slack.New())
+	registry.Register(redisconnector.New())
+	registry.Register(square.New())
 	registry.Register(amadeus.New())
 
 	// Auto-seed built-in connectors from their manifests.

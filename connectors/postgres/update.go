@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // updateAction implements connectors.Action for postgres.update.
@@ -70,7 +71,7 @@ func (a *updateAction) Execute(ctx context.Context, req connectors.ActionRequest
 	defer env.Close()
 
 	// Build SET clause.
-	setCols := sortedKeys(params.Set)
+	setCols := sqldb.SortedKeys(params.Set)
 	var setClauses []string
 	var args []interface{}
 	paramIdx := 1

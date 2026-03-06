@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // txEnv bundles a prepared transaction with its context and cancel function.
@@ -98,7 +99,9 @@ func execMutation(env *txEnv, query string, args []interface{}, hasReturning boo
 		}
 		defer rows.Close()
 
-		returned, err := scanRows(rows)
+		_, returned, err := sqldb.ScanRows(rows, 0, func(e error) error {
+			return mapPgError(e, "iterating rows")
+		})
 		if err != nil {
 			return nil, err
 		}
