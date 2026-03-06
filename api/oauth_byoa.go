@@ -21,6 +21,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -91,6 +92,36 @@ func validateClientCredentialLengths(w http.ResponseWriter, r *http.Request, cli
 	return true
 }
 
+// storeClientCredentials encrypts client_id and client_secret in the vault
+// and returns the vault secret IDs. Used by both create and update handlers.
+func storeClientCredentials(ctx context.Context, deps *Deps, tx db.DBTX, namePrefix, clientID, clientSecret string) (clientIDVaultID, clientSecretVaultID string, err error) {
+	clientIDVaultID, err = deps.Vault.CreateSecret(ctx, tx, namePrefix+"_client_id", []byte(clientID))
+	if err != nil {
+		return "", "", err
+	}
+	clientSecretVaultID, err = deps.Vault.CreateSecret(ctx, tx, namePrefix+"_client_secret", []byte(clientSecret))
+	if err != nil {
+		return "", "", err
+	}
+	return clientIDVaultID, clientSecretVaultID, nil
+}
+
+// updateOAuthRegistry merges BYOA credentials into the in-memory provider
+// registry. Non-fatal — DB is the source of truth.
+func updateOAuthRegistry(deps *Deps, providerID, clientID, clientSecret string) {
+	if deps.OAuthProviders == nil {
+		return
+	}
+	if err := deps.OAuthProviders.Register(oauth.Provider{
+		ID:           providerID,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Source:       oauth.SourceBYOA,
+	}); err != nil {
+		log.Printf("BYOA registry update for %q: %v", providerID, err)
+	}
+}
+
 // --- Handlers ---
 
 // handleCreateOAuthProviderConfig stores user-provided OAuth client credentials
@@ -149,16 +180,9 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		clientIDVaultID, err := deps.Vault.CreateSecret(r.Context(), tx, configID+"_client_id", []byte(req.ClientID))
+		clientIDVaultID, clientSecretVaultID, err := storeClientCredentials(r.Context(), deps, tx, configID, req.ClientID, req.ClientSecret)
 		if err != nil {
-			log.Printf("[%s] CreateOAuthProviderConfig: vault create client_id: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
-			return
-		}
-
-		clientSecretVaultID, err := deps.Vault.CreateSecret(r.Context(), tx, configID+"_client_secret", []byte(req.ClientSecret))
-		if err != nil {
-			log.Printf("[%s] CreateOAuthProviderConfig: vault create client_secret: %v", TraceID(r.Context()), err)
+			log.Printf("[%s] CreateOAuthProviderConfig: vault store: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
 			return
 		}
@@ -191,19 +215,8 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		}
 
 		// Update the in-memory registry so subsequent OAuth flows pick up the
-		// new BYOA credentials immediately.
-		if deps.OAuthProviders != nil {
-			if err := deps.OAuthProviders.Register(oauth.Provider{
-				ID:           req.Provider,
-				ClientID:     req.ClientID,
-				ClientSecret: req.ClientSecret,
-				Source:       oauth.SourceBYOA,
-			}); err != nil {
-				log.Printf("[%s] CreateOAuthProviderConfig: registry update: %v", TraceID(r.Context()), err)
-				// Non-fatal — DB is the source of truth. Registry will be
-				// consistent after a restart.
-			}
-		}
+		// new BYOA credentials immediately. Non-fatal — DB is the source of truth.
+		updateOAuthRegistry(deps, req.Provider, req.ClientID, req.ClientSecret)
 
 		RespondJSON(w, http.StatusCreated, oauthProviderConfigResponse{
 			Provider:  config.Provider,
@@ -265,20 +278,14 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Delete old vault secrets.
+		// Delete old vault secrets (best-effort).
 		_ = deps.Vault.DeleteSecret(r.Context(), tx, existing.ClientIDVaultID)
 		_ = deps.Vault.DeleteSecret(r.Context(), tx, existing.ClientSecretVaultID)
 
 		// Store new secrets.
-		newClientIDVaultID, err := deps.Vault.CreateSecret(r.Context(), tx, existing.ID+"_client_id", []byte(req.ClientID))
+		newClientIDVaultID, newClientSecretVaultID, err := storeClientCredentials(r.Context(), deps, tx, existing.ID, req.ClientID, req.ClientSecret)
 		if err != nil {
-			log.Printf("[%s] UpdateOAuthProviderConfig: vault create client_id: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
-			return
-		}
-		newClientSecretVaultID, err := deps.Vault.CreateSecret(r.Context(), tx, existing.ID+"_client_secret", []byte(req.ClientSecret))
-		if err != nil {
-			log.Printf("[%s] UpdateOAuthProviderConfig: vault create client_secret: %v", TraceID(r.Context()), err)
+			log.Printf("[%s] UpdateOAuthProviderConfig: vault store: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
 			return
 		}
@@ -299,17 +306,8 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Update the in-memory registry.
-		if deps.OAuthProviders != nil {
-			if err := deps.OAuthProviders.Register(oauth.Provider{
-				ID:           providerID,
-				ClientID:     req.ClientID,
-				ClientSecret: req.ClientSecret,
-				Source:       oauth.SourceBYOA,
-			}); err != nil {
-				log.Printf("[%s] UpdateOAuthProviderConfig: registry update: %v", TraceID(r.Context()), err)
-			}
-		}
+		// Update the in-memory registry. Non-fatal — DB is the source of truth.
+		updateOAuthRegistry(deps, providerID, req.ClientID, req.ClientSecret)
 
 		RespondJSON(w, http.StatusOK, oauthProviderConfigResponse{
 			Provider:  config.Provider,
