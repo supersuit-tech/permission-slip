@@ -109,9 +109,9 @@ func (a *updateAction) Execute(ctx context.Context, req connectors.ActionRequest
 	result, err := db.ExecContext(ctx, query, args...)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("MySQL update timed out: %v", err)}
+			return nil, &connectors.TimeoutError{Message: "MySQL update timed out"}
 		}
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("MySQL update failed: %v", err)}
+		return nil, &connectors.ExternalError{Message: "MySQL update failed"}
 	}
 
 	rowsAffected, _ := result.RowsAffected()

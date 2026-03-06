@@ -264,7 +264,8 @@ func (c *MySQLConnector) openConn(ctx context.Context, creds connectors.Credenti
 
 	db, err := c.openDB(dsn)
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("opening MySQL connection: %v", err)}
+		// Don't include raw driver error — it may contain the DSN with credentials.
+		return nil, &connectors.ExternalError{Message: "failed to open MySQL connection"}
 	}
 
 	// Limit to a single connection since we open/close per request.
@@ -275,9 +276,10 @@ func (c *MySQLConnector) openConn(ctx context.Context, creds connectors.Credenti
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
 		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("MySQL connection timed out: %v", err)}
+			return nil, &connectors.TimeoutError{Message: "MySQL connection timed out"}
 		}
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("MySQL connection failed: %v", err)}
+		// Don't include raw driver error — it may contain connection details.
+		return nil, &connectors.ExternalError{Message: "MySQL connection failed — verify your DSN is correct"}
 	}
 
 	// Set statement timeout to prevent runaway queries.

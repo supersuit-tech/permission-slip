@@ -32,7 +32,12 @@ func (p *queryParams) validate() error {
 		return &connectors.ValidationError{Message: "only SELECT queries are allowed"}
 	}
 	// Block dangerous keywords that could modify data.
-	for _, keyword := range []string{"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE"} {
+	// Block semicolons to prevent multi-statement injection (defense in depth —
+	// the go-sql-driver also rejects multi-statements by default).
+	if strings.Contains(normalized, ";") {
+		return &connectors.ValidationError{Message: "query must not contain semicolons"}
+	}
+	for _, keyword := range []string{"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE", "INTO"} {
 		// Check for the keyword as a standalone word (preceded by space/start and followed by space/end).
 		if containsKeyword(normalized, keyword) {
 			return &connectors.ValidationError{
@@ -42,6 +47,9 @@ func (p *queryParams) validate() error {
 	}
 	if p.RowLimit < 0 {
 		return &connectors.ValidationError{Message: "row_limit must be non-negative"}
+	}
+	if p.RowLimit > 10000 {
+		return &connectors.ValidationError{Message: "row_limit must not exceed 10000"}
 	}
 	return nil
 }
@@ -127,9 +135,10 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	rows, err := tx.QueryContext(ctx, query, params.Args...)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("MySQL query timed out: %v", err)}
+			return nil, &connectors.TimeoutError{Message: "MySQL query timed out"}
 		}
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("MySQL query failed: %v", err)}
+		// Don't include raw driver error — it may contain connection details.
+		return nil, &connectors.ExternalError{Message: "MySQL query failed"}
 	}
 	defer rows.Close()
 

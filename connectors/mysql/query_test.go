@@ -151,6 +151,26 @@ func TestQuery_ExistingLimitNotOverridden(t *testing.T) {
 	}
 }
 
+func TestQuery_RowLimitExceedsMax(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["mysql.query"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "mysql.query",
+		Parameters:  json.RawMessage(`{"sql":"SELECT id FROM users","row_limit":99999}`),
+		Credentials: validCreds(),
+	})
+
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestQuery_NonSelectRejected(t *testing.T) {
 	t.Parallel()
 
@@ -196,10 +216,10 @@ func TestQuery_DangerousKeywordsInSelect(t *testing.T) {
 		name string
 		sql  string
 	}{
-		{"select with delete", "SELECT * FROM users; DELETE FROM users"},
-		{"select with drop", "SELECT * FROM users; DROP TABLE users"},
-		{"select with insert", "SELECT * FROM users; INSERT INTO users (name) VALUES ('hack')"},
-		{"select with update", "SELECT * FROM users; UPDATE users SET name = 'hack'"},
+		{"semicolon multi-statement", "SELECT * FROM users; DELETE FROM users"},
+		{"select into outfile", "SELECT * FROM users INTO OUTFILE '/tmp/data.txt'"},
+		{"select into dumpfile", "SELECT * FROM users INTO DUMPFILE '/tmp/data.bin'"},
+		{"select into variable", "SELECT name INTO @var FROM users"},
 	}
 
 	for _, tt := range tests {
