@@ -22,6 +22,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
+	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
@@ -313,6 +314,7 @@ func main() {
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
+	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
 	registry.Register(pgconnector.New())
 	registry.Register(slack.New())
