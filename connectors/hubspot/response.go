@@ -28,9 +28,12 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	// Try to extract HubSpot's structured error.
+	// Try to extract HubSpot's structured error message. If the body
+	// isn't valid JSON, fall back to a generic message with a truncated
+	// body preview — never pass the full raw body into error messages
+	// to avoid leaking internal server details or bloating logs.
 	var hsErr hubspotError
-	msg := string(body)
+	msg := truncateBody(body)
 	if json.Unmarshal(body, &hsErr) == nil && hsErr.Message != "" {
 		msg = hsErr.Message
 		if hsErr.CorrelationID != "" {
@@ -76,6 +79,20 @@ func mapCategoryError(category, msg string, statusCode int) error {
 			Message:    fmt.Sprintf("HubSpot API error (%s): %s", category, msg),
 		}
 	}
+}
+
+const maxErrorBodyPreview = 200
+
+// truncateBody returns a safe preview of the response body for error messages.
+// It prevents leaking large or sensitive raw responses into logs/error strings.
+func truncateBody(body []byte) string {
+	if len(body) == 0 {
+		return "(empty response)"
+	}
+	if len(body) <= maxErrorBodyPreview {
+		return string(body)
+	}
+	return string(body[:maxErrorBodyPreview]) + "... (truncated)"
 }
 
 // mapStatusCodeError is the fallback when the response body lacks a category.

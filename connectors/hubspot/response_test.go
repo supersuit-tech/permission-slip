@@ -150,3 +150,34 @@ func TestCheckResponse_CorrelationID(t *testing.T) {
 		t.Errorf("error message %q should contain %q", got, want)
 	}
 }
+
+func TestCheckResponse_LargeBodyTruncated(t *testing.T) {
+	t.Parallel()
+	// Simulate a large non-JSON error body (e.g., an HTML error page).
+	largeBody := make([]byte, 1000)
+	for i := range largeBody {
+		largeBody[i] = 'x'
+	}
+	err := checkResponse(500, http.Header{}, largeBody)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "truncated") {
+		t.Errorf("expected truncated body in error, got %q", errMsg)
+	}
+	if len(errMsg) > 500 {
+		t.Errorf("error message too long (%d chars), should be truncated", len(errMsg))
+	}
+}
+
+func TestCheckResponse_EmptyBody(t *testing.T) {
+	t.Parallel()
+	err := checkResponse(500, http.Header{}, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty response") {
+		t.Errorf("expected 'empty response' in error, got %q", err.Error())
+	}
+}
