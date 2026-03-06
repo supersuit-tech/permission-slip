@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -67,6 +68,11 @@ type emailSummary struct {
 	Date    string `json:"date,omitempty"`
 }
 
+// maxConcurrentFetches limits concurrent Gmail API requests when fetching
+// message metadata. This avoids hammering the API while still being much
+// faster than sequential requests.
+const maxConcurrentFetches = 5
+
 // Execute lists recent emails from Gmail and returns their metadata.
 func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listEmailsParams
@@ -90,37 +96,58 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 
 	if len(listResp.Messages) == 0 {
 		return connectors.JSONResult(map[string]any{
-			"emails":       []emailSummary{},
+			"emails":         []emailSummary{},
 			"total_estimate": listResp.ResultSizeEstimate,
 		})
 	}
 
-	// Step 2: fetch metadata for each message.
-	summaries := make([]emailSummary, 0, len(listResp.Messages))
-	for _, m := range listResp.Messages {
-		var msgResp gmailMessageResponse
-		msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(m.ID) + "?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date"
-		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, msgURL, nil, &msgResp); err != nil {
+	// Step 2: fetch metadata for each message concurrently (bounded).
+	summaries := make([]emailSummary, len(listResp.Messages))
+	errs := make([]error, len(listResp.Messages))
+	sem := make(chan struct{}, maxConcurrentFetches)
+
+	var wg sync.WaitGroup
+	for i, m := range listResp.Messages {
+		wg.Add(1)
+		go func(idx int, msgID string) {
+			defer wg.Done()
+
+			sem <- struct{}{}        // acquire
+			defer func() { <-sem }() // release
+
+			var msgResp gmailMessageResponse
+			msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(msgID) + "?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date"
+			if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, msgURL, nil, &msgResp); err != nil {
+				errs[idx] = err
+				return
+			}
+
+			summary := emailSummary{
+				ID:      msgResp.ID,
+				Snippet: msgResp.Snippet,
+			}
+			for _, h := range msgResp.Payload.Headers {
+				switch h.Name {
+				case "From":
+					summary.From = h.Value
+				case "To":
+					summary.To = h.Value
+				case "Subject":
+					summary.Subject = h.Value
+				case "Date":
+					summary.Date = h.Value
+				}
+			}
+			summaries[idx] = summary
+		}(i, m.ID)
+	}
+	wg.Wait()
+
+	// Return the first error encountered.
+	for _, err := range errs {
+		if err != nil {
 			return nil, err
 		}
-
-		summary := emailSummary{
-			ID:      msgResp.ID,
-			Snippet: msgResp.Snippet,
-		}
-		for _, h := range msgResp.Payload.Headers {
-			switch h.Name {
-			case "From":
-				summary.From = h.Value
-			case "To":
-				summary.To = h.Value
-			case "Subject":
-				summary.Subject = h.Value
-			case "Date":
-				summary.Date = h.Value
-			}
-		}
-		summaries = append(summaries, summary)
 	}
 
 	return connectors.JSONResult(map[string]any{

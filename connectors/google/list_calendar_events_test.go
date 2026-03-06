@@ -131,6 +131,30 @@ func TestListCalendarEvents_InvalidTimeMin(t *testing.T) {
 	}
 }
 
+func TestListCalendarEvents_TimeMaxBeforeTimeMin(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &listCalendarEventsAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"time_min": "2024-01-15T10:00:00-05:00",
+		"time_max": "2024-01-15T09:00:00-05:00",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.list_calendar_events",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for time_max before time_min")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestListCalendarEvents_AuthFailure(t *testing.T) {
 	t.Parallel()
 

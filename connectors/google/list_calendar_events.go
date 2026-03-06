@@ -39,15 +39,23 @@ func (p *listCalendarEventsParams) normalize() {
 }
 
 func (p *listCalendarEventsParams) validate() error {
+	var tMin, tMax time.Time
+	var err error
+
 	if p.TimeMin != "" {
-		if _, err := time.Parse(time.RFC3339, p.TimeMin); err != nil {
+		tMin, err = time.Parse(time.RFC3339, p.TimeMin)
+		if err != nil {
 			return &connectors.ValidationError{Message: fmt.Sprintf("time_min must be RFC 3339 format: %v", err)}
 		}
 	}
 	if p.TimeMax != "" {
-		if _, err := time.Parse(time.RFC3339, p.TimeMax); err != nil {
+		tMax, err = time.Parse(time.RFC3339, p.TimeMax)
+		if err != nil {
 			return &connectors.ValidationError{Message: fmt.Sprintf("time_max must be RFC 3339 format: %v", err)}
 		}
+	}
+	if p.TimeMin != "" && p.TimeMax != "" && !tMax.After(tMin) {
+		return &connectors.ValidationError{Message: "time_max must be after time_min"}
 	}
 	return nil
 }
