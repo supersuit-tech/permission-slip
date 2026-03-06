@@ -172,6 +172,46 @@ func TestFormEncode_Empty(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// validateMetadata
+// ---------------------------------------------------------------------------
+
+func TestValidateMetadata_RejectsNonStringValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		metadata map[string]any
+	}{
+		{"nested object", map[string]any{"key": map[string]any{"nested": "value"}}},
+		{"array value", map[string]any{"key": []any{"a", "b"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateMetadata(tt.metadata)
+			if err == nil {
+				t.Fatal("expected error for non-string metadata value, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestValidateMetadata_AcceptsStringValues(t *testing.T) {
+	t.Parallel()
+
+	err := validateMetadata(map[string]any{
+		"string_val": "hello",
+		"number_val": float64(42),
+		"bool_val":   true,
+	})
+	if err != nil {
+		t.Errorf("validateMetadata() unexpected error: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // encodeParams (deterministic ordering)
 // ---------------------------------------------------------------------------
 

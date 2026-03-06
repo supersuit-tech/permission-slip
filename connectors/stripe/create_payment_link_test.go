@@ -261,6 +261,42 @@ func TestCreatePaymentLink_Timeout(t *testing.T) {
 	}
 }
 
+func TestCreatePaymentLink_RejectsNonHTTPSRedirect(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_payment_link"]
+
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"http scheme", "http://example.com/thanks"},
+		{"javascript scheme", "javascript:alert(1)"},
+		{"data URI", "data:text/html,<h1>phish</h1>"},
+		{"no scheme", "example.com/thanks"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params, _ := json.Marshal(map[string]any{
+				"line_items":       []map[string]any{{"price_id": "price_abc", "quantity": 1}},
+				"after_completion": tt.url,
+			})
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "stripe.create_payment_link",
+				Parameters:  json.RawMessage(params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatalf("Execute() expected error for %q, got nil", tt.url)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestCreatePaymentLink_TooManyLineItems(t *testing.T) {
 	t.Parallel()
 

@@ -65,11 +65,25 @@ const (
 var validKeyPrefixes = []string{liveKeyPrefix, testKeyPrefix, rLiveKeyPrefix, rTestKeyPrefix}
 
 // validateMetadata checks that the metadata map does not exceed Stripe's
-// 50-key limit. Returns nil if metadata is nil or within bounds.
+// 50-key limit and that all values are strings. Stripe metadata only supports
+// string values — rejecting non-string types here gives a clear error instead
+// of a confusing Stripe API rejection or unexpected form-encoding behavior.
 func validateMetadata(metadata map[string]any) error {
 	if len(metadata) > maxMetadataKeys {
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(metadata), maxMetadataKeys),
+		}
+	}
+	for k, v := range metadata {
+		switch v.(type) {
+		case string:
+			// OK — expected type.
+		case float64, bool, nil:
+			// Acceptable — will be stringified by formEncode.
+		default:
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("metadata[%q] must be a string, got %T", k, v),
+			}
 		}
 	}
 	return nil
