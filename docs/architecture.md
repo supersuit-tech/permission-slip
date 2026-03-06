@@ -52,15 +52,17 @@ graph TB
         CE["Connector Engine"]
 
         subgraph Connectors
-            GC["Gmail<br/>Connector"]
-            SC["Stripe<br/>Connector"]
+            GC["GitHub<br/>Connector"]
+            SlC["Slack<br/>Connector"]
+            MC["MySQL<br/>Connector"]
             OC["..."]
         end
     end
 
     subgraph External ["External Services"]
-        Gmail["Gmail API"]
-        Stripe["Stripe API"]
+        GH["GitHub API"]
+        SlAPI["Slack API"]
+        MySQL["MySQL DB"]
     end
 
     User["User / Approver"]
@@ -77,13 +79,15 @@ graph TB
     GW --> SA
     SA --> CE
     TE --> CE
-    CE --> GC & SC & OC
+    CE --> GC & SlC & MC & OC
     GC --> CV
-    SC --> CV
+    SlC --> CV
+    MC --> CV
     OR --> CV
     CE --> OR
-    GC -- "API call with<br/>user credentials" --> Gmail
-    SC -- "API call with<br/>user credentials" --> Stripe
+    GC -- "API call with<br/>user credentials" --> GH
+    SlC -- "API call with<br/>user credentials" --> SlAPI
+    MC -- "Query with<br/>user credentials" --> MySQL
 
     style PS fill:#E8F0FE,stroke:#4A90D9,color:#000
     style GW fill:#4A90D9,color:#fff,stroke:#2A5F9E

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // queryAction implements connectors.Action for postgres.query.
@@ -80,52 +81,14 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	}
 	defer rows.Close()
 
-	columns, err := rows.Columns()
+	columns, results, err := sqldb.ScanRows(rows, maxRows, func(e error) error {
+		return mapPgError(e, "iterating rows")
+	})
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading column names: %v", err)}
+		return nil, err
 	}
 
-	// Read up to maxRows+1 to detect truncation.
-	var results []map[string]interface{}
-	for rows.Next() {
-		if len(results) >= maxRows+1 {
-			break
-		}
-
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, &connectors.ExternalError{Message: fmt.Sprintf("scanning row: %v", err)}
-		}
-
-		row := make(map[string]interface{}, len(columns))
-		for i, col := range columns {
-			val := values[i]
-			// Convert []byte to string for JSON serialization.
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, mapPgError(err, "iterating rows")
-	}
-
-	// If we read more than maxRows, truncate and flag it.
-	truncated := len(results) > maxRows
-	if truncated {
-		results = results[:maxRows]
-	}
-	if results == nil {
-		results = []map[string]interface{}{}
-	}
+	results, truncated := sqldb.DetectTruncation(results, maxRows)
 
 	return connectors.JSONResult(map[string]interface{}{
 		"columns":   columns,
