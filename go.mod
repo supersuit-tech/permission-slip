@@ -1,8 +1,6 @@
 module github.com/supersuit-tech/permission-slip-web
 
-go 1.24.7
-
-toolchain go1.24.13
+go 1.25.8
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
