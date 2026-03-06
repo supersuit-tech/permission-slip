@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email and calendar via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, and Excel via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -180,6 +180,106 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.excel_list_worksheets",
+				Name:        "List Excel Worksheets",
+				Description: "List all worksheets in an Excel workbook stored in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read Excel Range",
+				Description: "Read cell values from a worksheet range in an Excel workbook",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "sheet_name", "range"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Name of the worksheet to read from"
+						},
+						"range": {
+							"type": "string",
+							"description": "Cell range to read (e.g. A1:C10)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_write_range",
+				Name:        "Write Excel Range",
+				Description: "Write cell values to a worksheet range in an Excel workbook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "sheet_name", "range", "values"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Name of the worksheet to write to"
+						},
+						"range": {
+							"type": "string",
+							"description": "Cell range to write (e.g. A1:C3)"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of cell values to write"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_append_rows",
+				Name:        "Append Excel Rows",
+				Description: "Append rows to a named table in an Excel workbook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "table_name", "values"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"table_name": {
+							"type": "string",
+							"description": "Name of the table to append rows to"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of row values to append"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -190,6 +290,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"Mail.Send",
 					"Mail.Read",
 					"Calendars.ReadWrite",
+					"Files.ReadWrite",
 				},
 			},
 		},
@@ -222,6 +323,34 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can view upcoming calendar events.",
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_excel_read_range",
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read Excel range",
+				Description: "Agent can read any range from a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_write_range",
+				ActionType:  "microsoft.excel_write_range",
+				Name:        "Write Excel range",
+				Description: "Agent can write to any range in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_append_rows",
+				ActionType:  "microsoft.excel_append_rows",
+				Name:        "Append Excel rows",
+				Description: "Agent can append rows to a table in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","table_name":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_read_any",
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read from any workbook",
+				Description: "Agent can read from any Excel workbook the user has access to.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			},
 		},
 	}
 }
@@ -233,6 +362,10 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"microsoft.excel_list_worksheets": &excelListWorksheetsAction{conn: c},
+		"microsoft.excel_read_range":      &excelReadRangeAction{conn: c},
+		"microsoft.excel_write_range":     &excelWriteRangeAction{conn: c},
+		"microsoft.excel_append_rows":     &excelAppendRowsAction{conn: c},
 	}
 }
 
