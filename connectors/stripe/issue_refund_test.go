@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -294,5 +295,33 @@ func TestIssueRefund_Timeout(t *testing.T) {
 	}
 	if !connectors.IsTimeoutError(err) {
 		t.Errorf("expected TimeoutError, got %T: %v", err, err)
+	}
+}
+
+func TestIssueRefund_TooManyMetadataKeys(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.issue_refund"]
+
+	metadata := make(map[string]any, 51)
+	for i := range 51 {
+		metadata[fmt.Sprintf("key_%d", i)] = "value"
+	}
+	params, _ := json.Marshal(map[string]any{
+		"payment_intent_id": "pi_abc123",
+		"metadata":          metadata,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.issue_refund",
+		Parameters:  json.RawMessage(params),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for too many metadata keys, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }

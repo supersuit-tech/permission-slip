@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -257,5 +258,59 @@ func TestCreatePaymentLink_Timeout(t *testing.T) {
 	}
 	if !connectors.IsTimeoutError(err) {
 		t.Errorf("expected TimeoutError, got %T: %v", err, err)
+	}
+}
+
+func TestCreatePaymentLink_TooManyLineItems(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_payment_link"]
+
+	// Build 21 line items (exceeds maxPaymentLinkLineItems=20).
+	items := make([]map[string]any, 21)
+	for i := range items {
+		items[i] = map[string]any{"price_id": fmt.Sprintf("price_%d", i), "quantity": 1}
+	}
+	params, _ := json.Marshal(map[string]any{"line_items": items})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_payment_link",
+		Parameters:  json.RawMessage(params),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for too many line items, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestCreatePaymentLink_TooManyMetadataKeys(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_payment_link"]
+
+	metadata := make(map[string]any, 51)
+	for i := range 51 {
+		metadata[fmt.Sprintf("key_%d", i)] = "value"
+	}
+	params, _ := json.Marshal(map[string]any{
+		"line_items": []map[string]any{{"price_id": "price_abc", "quantity": 1}},
+		"metadata":   metadata,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_payment_link",
+		Parameters:  json.RawMessage(params),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for too many metadata keys, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
