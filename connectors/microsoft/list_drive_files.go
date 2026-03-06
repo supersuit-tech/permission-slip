@@ -30,30 +30,6 @@ func (p *listDriveFilesParams) defaults() {
 	}
 }
 
-// graphDriveItemsResponse is the Microsoft Graph API response for listing drive items.
-type graphDriveItemsResponse struct {
-	Value []graphDriveItem `json:"value"`
-}
-
-type graphDriveItem struct {
-	ID               string          `json:"id"`
-	Name             string          `json:"name"`
-	Size             int64           `json:"size"`
-	WebURL           string          `json:"webUrl,omitempty"`
-	CreatedDateTime  string          `json:"createdDateTime,omitempty"`
-	ModifiedDateTime string          `json:"lastModifiedDateTime,omitempty"`
-	Folder           *graphFolder    `json:"folder,omitempty"`
-	File             *graphFileFacet `json:"file,omitempty"`
-}
-
-type graphFolder struct {
-	ChildCount int `json:"childCount"`
-}
-
-type graphFileFacet struct {
-	MimeType string `json:"mimeType"`
-}
-
 // driveFileSummary is the simplified response returned to the caller.
 type driveFileSummary struct {
 	ID          string `json:"id"`

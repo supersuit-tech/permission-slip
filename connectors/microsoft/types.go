@@ -41,3 +41,30 @@ type graphAttendee struct {
 	} `json:"emailAddress"`
 	Type string `json:"type"`
 }
+
+// graphDriveItem represents a file or folder in OneDrive in Graph API format.
+type graphDriveItem struct {
+	ID               string          `json:"id"`
+	Name             string          `json:"name"`
+	Size             int64           `json:"size"`
+	WebURL           string          `json:"webUrl,omitempty"`
+	CreatedDateTime  string          `json:"createdDateTime,omitempty"`
+	ModifiedDateTime string          `json:"lastModifiedDateTime,omitempty"`
+	Folder           *graphFolder    `json:"folder,omitempty"`
+	File             *graphFileFacet `json:"file,omitempty"`
+}
+
+// graphFolder represents the folder facet of a OneDrive item.
+type graphFolder struct {
+	ChildCount int `json:"childCount"`
+}
+
+// graphFileFacet represents the file facet of a OneDrive item.
+type graphFileFacet struct {
+	MimeType string `json:"mimeType"`
+}
+
+// graphDriveItemsResponse is the Microsoft Graph API response for listing drive items.
+type graphDriveItemsResponse struct {
+	Value []graphDriveItem `json:"value"`
+}

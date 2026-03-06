@@ -371,146 +371,17 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 	return nil
 }
 
-// doRequest is the shared request lifecycle for all Microsoft Graph actions.
-// It handles:
-//   - JSON marshaling of the request body (if non-nil)
-//   - Authorization header with the OAuth access token
+// executeRequest is the core request lifecycle shared by all Microsoft Graph
+// request methods. It handles:
+//   - Sending the HTTP request
+//   - Timeout and context cancellation detection
 //   - Rate limit detection (HTTP 429 → RateLimitError with Retry-After)
 //   - Response body size limiting (maxResponseBodySize) to prevent OOM
 //   - Error response mapping via mapGraphError (see response.go)
-//   - JSON unmarshaling of successful responses into dest (if non-nil)
-//   - 204 No Content handling (e.g. sendMail returns no body)
 //
-// Callers provide the HTTP method, Graph API path (e.g. "/me/sendMail"),
-// credentials, optional request body, and optional response destination.
-func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
-	}
-
-	var reqBody io.Reader
-	if body != nil {
-		payload, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
-		}
-		reqBody = bytes.NewReader(payload)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	// Microsoft Graph returns 429 for rate limiting.
-	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
-			Message:    "Microsoft Graph API rate limit exceeded",
-			RetryAfter: retryAfter,
-		}
-	}
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return mapGraphError(resp.StatusCode, respBody)
-	}
-
-	// Some endpoints return 204 No Content (e.g. sendMail).
-	if dest != nil && len(respBody) > 0 {
-		if err := json.Unmarshal(respBody, dest); err != nil {
-			return &connectors.ExternalError{
-				StatusCode: resp.StatusCode,
-				Message:    "failed to decode Microsoft Graph API response",
-			}
-		}
-	}
-
-	return nil
-}
-
-// doRequestRaw is like doRequest but returns the response body as a string
-// instead of JSON-unmarshaling it. Used for downloading file content.
-func (c *MicrosoftConnector) doRequestRaw(ctx context.Context, method, path string, creds connectors.Credentials) (string, error) {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return "", &connectors.ValidationError{Message: "access_token credential is missing or empty"}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
-	if err != nil {
-		return "", fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if connectors.IsTimeout(err) {
-			return "", &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return "", &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
-		}
-		return "", &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
-		return "", &connectors.RateLimitError{
-			Message:    "Microsoft Graph API rate limit exceeded",
-			RetryAfter: retryAfter,
-		}
-	}
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
-	if err != nil {
-		return "", &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", mapGraphError(resp.StatusCode, respBody)
-	}
-
-	return string(respBody), nil
-}
-
-// doPutRaw sends a PUT request with a raw byte body (not JSON-encoded) and returns
-// the response body bytes. Used for uploading file content to OneDrive.
-func (c *MicrosoftConnector) doPutRaw(ctx context.Context, path string, creds connectors.Credentials, content []byte) ([]byte, error) {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return nil, &connectors.ValidationError{Message: "access_token credential is missing or empty"}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(content))
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/octet-stream")
-
+// Returns the raw response body on success. Callers handle request construction
+// and response interpretation.
+func (c *MicrosoftConnector) executeRequest(req *http.Request) ([]byte, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
@@ -541,4 +412,97 @@ func (c *MicrosoftConnector) doPutRaw(ctx context.Context, path string, creds co
 	}
 
 	return respBody, nil
+}
+
+// extractToken retrieves the OAuth access token from credentials.
+func extractToken(creds connectors.Credentials) (string, error) {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return "", &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+	return token, nil
+}
+
+// doRequest is the shared request lifecycle for all Microsoft Graph JSON actions.
+// It handles JSON marshaling/unmarshaling, authorization, and delegates to
+// executeRequest for the HTTP lifecycle.
+func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
+	token, err := extractToken(creds)
+	if err != nil {
+		return err
+	}
+
+	var reqBody io.Reader
+	if body != nil {
+		payload, marshalErr := json.Marshal(body)
+		if marshalErr != nil {
+			return fmt.Errorf("marshaling request body: %w", marshalErr)
+		}
+		reqBody = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	respBody, err := c.executeRequest(req)
+	if err != nil {
+		return err
+	}
+
+	// Some endpoints return 204 No Content (e.g. sendMail).
+	if dest != nil && len(respBody) > 0 {
+		if err := json.Unmarshal(respBody, dest); err != nil {
+			return &connectors.ExternalError{
+				Message: "failed to decode Microsoft Graph API response",
+			}
+		}
+	}
+
+	return nil
+}
+
+// doRequestRaw is like doRequest but returns the response body as a string
+// instead of JSON-unmarshaling it. Used for downloading file content.
+func (c *MicrosoftConnector) doRequestRaw(ctx context.Context, method, path string, creds connectors.Credentials) (string, error) {
+	token, err := extractToken(creds)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	respBody, execErr := c.executeRequest(req)
+	if execErr != nil {
+		return "", execErr
+	}
+
+	return string(respBody), nil
+}
+
+// doPutRaw sends a PUT request with a raw byte body (not JSON-encoded) and returns
+// the response body bytes. Used for uploading file content to OneDrive.
+func (c *MicrosoftConnector) doPutRaw(ctx context.Context, path string, creds connectors.Credentials, content []byte) ([]byte, error) {
+	token, err := extractToken(creds)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	return c.executeRequest(req)
 }

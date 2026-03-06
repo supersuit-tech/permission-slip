@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -70,25 +71,23 @@ func TestGetDriveFile_MetadataOnly(t *testing.T) {
 func TestGetDriveFile_WithContent(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
-			// Metadata request
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{
-				"id":   "file-123",
-				"name": "notes.txt",
-				"size": 13,
-				"file": map[string]string{
-					"mimeType": "text/plain",
-				},
-			})
+		if strings.HasSuffix(r.URL.Path, "/content") {
+			// Content download request
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write([]byte("Hello, World!"))
 			return
 		}
-		// Content download request
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte("Hello, World!"))
+		// Metadata request
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":   "file-123",
+			"name": "notes.txt",
+			"size": 13,
+			"file": map[string]string{
+				"mimeType": "text/plain",
+			},
+		})
 	}))
 	defer srv.Close()
 
