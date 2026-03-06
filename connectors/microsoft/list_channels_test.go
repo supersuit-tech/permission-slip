@@ -24,14 +24,16 @@ func TestListChannels_Success(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"value": []map[string]any{
 				{
-					"id":          "channel-1",
-					"displayName": "General",
-					"description": "General discussion",
+					"id":             "channel-1",
+					"displayName":    "General",
+					"description":    "General discussion",
+					"membershipType": "standard",
 				},
 				{
-					"id":          "channel-2",
-					"displayName": "Random",
-					"description": "Random chat",
+					"id":             "channel-2",
+					"displayName":    "Random",
+					"description":    "Random chat",
+					"membershipType": "private",
 				},
 			},
 		})
@@ -64,6 +66,9 @@ func TestListChannels_Success(t *testing.T) {
 	}
 	if summaries[0].Name != "General" {
 		t.Errorf("expected name 'General', got %q", summaries[0].Name)
+	}
+	if summaries[0].MembershipType != "standard" {
+		t.Errorf("expected membership_type 'standard', got %q", summaries[0].MembershipType)
 	}
 }
 

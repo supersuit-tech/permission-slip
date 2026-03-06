@@ -116,6 +116,58 @@ func TestSendChannelMessage_HTMLContent(t *testing.T) {
 	}
 }
 
+func TestSendChannelMessage_Reply(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		expectedPath := "/teams/team-1/channels/channel-1/messages/msg-parent/replies"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":              "msg-reply-1",
+			"createdDateTime": "2024-01-15T10:00:00Z",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendChannelMessageAction{conn: conn}
+
+	params, _ := json.Marshal(sendChannelMessageParams{
+		TeamID:           "team-1",
+		ChannelID:        "channel-1",
+		Message:          "This is a reply",
+		ReplyToMessageID: "msg-parent",
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_channel_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data map[string]string
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["status"] != "sent" {
+		t.Errorf("expected status 'sent', got %q", data["status"])
+	}
+	if data["message_id"] != "msg-reply-1" {
+		t.Errorf("expected message_id 'msg-reply-1', got %q", data["message_id"])
+	}
+}
+
 func TestSendChannelMessage_MissingTeamID(t *testing.T) {
 	t.Parallel()
 

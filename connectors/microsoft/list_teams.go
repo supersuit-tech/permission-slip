@@ -38,6 +38,7 @@ type graphTeam struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
 }
 
 // teamSummary is the simplified response returned to the caller.
@@ -45,6 +46,7 @@ type teamSummary struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
 }
 
 // Execute lists the teams the user has joined.
@@ -55,7 +57,7 @@ func (a *listTeamsAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}
 	params.defaults()
 
-	path := fmt.Sprintf("/me/joinedTeams?$top=%d&$select=id,displayName,description", params.Top)
+	path := fmt.Sprintf("/me/joinedTeams?$top=%d&$select=id,displayName,description,visibility", params.Top)
 
 	var resp graphTeamsResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {
@@ -68,6 +70,7 @@ func (a *listTeamsAction) Execute(ctx context.Context, req connectors.ActionRequ
 			ID:          t.ID,
 			Name:        t.DisplayName,
 			Description: t.Description,
+			Visibility:  t.Visibility,
 		}
 	}
 

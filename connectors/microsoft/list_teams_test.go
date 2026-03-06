@@ -27,11 +27,13 @@ func TestListTeams_Success(t *testing.T) {
 					"id":          "team-1",
 					"displayName": "Engineering",
 					"description": "Engineering team",
+					"visibility":  "private",
 				},
 				{
 					"id":          "team-2",
 					"displayName": "Marketing",
 					"description": "Marketing team",
+					"visibility":  "public",
 				},
 			},
 		})
@@ -64,6 +66,9 @@ func TestListTeams_Success(t *testing.T) {
 	}
 	if summaries[0].Name != "Engineering" {
 		t.Errorf("expected name 'Engineering', got %q", summaries[0].Name)
+	}
+	if summaries[0].Visibility != "private" {
+		t.Errorf("expected visibility 'private', got %q", summaries[0].Visibility)
 	}
 }
 

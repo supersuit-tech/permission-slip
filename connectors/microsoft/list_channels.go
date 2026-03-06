@@ -33,16 +33,18 @@ type graphChannelsResponse struct {
 }
 
 type graphChannel struct {
-	ID          string `json:"id"`
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	Description    string `json:"description"`
+	MembershipType string `json:"membershipType"`
 }
 
 // channelSummary is the simplified response returned to the caller.
 type channelSummary struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	MembershipType string `json:"membership_type"`
 }
 
 // Execute lists channels for the specified team.
@@ -55,7 +57,7 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/teams/%s/channels?$select=id,displayName,description", params.TeamID)
+	path := fmt.Sprintf("/teams/%s/channels?$select=id,displayName,description,membershipType", params.TeamID)
 
 	var resp graphChannelsResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {
@@ -65,9 +67,10 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	summaries := make([]channelSummary, len(resp.Value))
 	for i, ch := range resp.Value {
 		summaries[i] = channelSummary{
-			ID:          ch.ID,
-			Name:        ch.DisplayName,
-			Description: ch.Description,
+			ID:             ch.ID,
+			Name:           ch.DisplayName,
+			Description:    ch.Description,
+			MembershipType: ch.MembershipType,
 		}
 	}
 

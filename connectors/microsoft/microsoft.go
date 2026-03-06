@@ -234,6 +234,37 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						"message": {
 							"type": "string",
 							"description": "Message content (HTML or plain text — auto-detected)"
+						},
+						"reply_to_message_id": {
+							"type": "string",
+							"description": "Optional message ID to reply to (creates a threaded reply)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_channel_messages",
+				Name:        "List Channel Messages",
+				Description: "List recent messages from a Microsoft Teams channel",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id", "channel_id"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team"
+						},
+						"channel_id": {
+							"type": "string",
+							"description": "The ID of the channel to read messages from"
+						},
+						"top": {
+							"type": "integer",
+							"default": 20,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of messages to return (max 50)"
 						}
 					}
 				}`)),
@@ -251,6 +282,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"Team.ReadBasic.All",
 					"Channel.ReadBasic.All",
 					"ChannelMessage.Send",
+					"ChannelMessage.Read.All",
 				},
 			},
 		},
@@ -302,7 +334,14 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "microsoft.send_channel_message",
 				Name:        "Send channel messages",
 				Description: "Agent can send messages to any Teams channel.",
-				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","message":"*"}`),
+				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","message":"*","reply_to_message_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_channel_messages",
+				ActionType:  "microsoft.list_channel_messages",
+				Name:        "Read channel messages",
+				Description: "Agent can read messages from any Teams channel.",
+				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","top":"*"}`),
 			},
 		},
 	}
@@ -318,6 +357,7 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_teams":            &listTeamsAction{conn: c},
 		"microsoft.list_channels":         &listChannelsAction{conn: c},
 		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
+		"microsoft.list_channel_messages": &listChannelMessagesAction{conn: c},
 	}
 }
 

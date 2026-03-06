@@ -17,9 +17,10 @@ type sendChannelMessageAction struct {
 
 // sendChannelMessageParams is the user-facing parameter schema.
 type sendChannelMessageParams struct {
-	TeamID    string `json:"team_id"`
-	ChannelID string `json:"channel_id"`
-	Message   string `json:"message"`
+	TeamID           string `json:"team_id"`
+	ChannelID        string `json:"channel_id"`
+	Message          string `json:"message"`
+	ReplyToMessageID string `json:"reply_to_message_id,omitempty"`
 }
 
 func (p *sendChannelMessageParams) validate() error {
@@ -68,7 +69,13 @@ func (a *sendChannelMessageAction) Execute(ctx context.Context, req connectors.A
 		},
 	}
 
-	path := fmt.Sprintf("/teams/%s/channels/%s/messages", params.TeamID, params.ChannelID)
+	var path string
+	if params.ReplyToMessageID != "" {
+		// Reply to an existing message thread.
+		path = fmt.Sprintf("/teams/%s/channels/%s/messages/%s/replies", params.TeamID, params.ChannelID, params.ReplyToMessageID)
+	} else {
+		path = fmt.Sprintf("/teams/%s/channels/%s/messages", params.TeamID, params.ChannelID)
+	}
 
 	var resp graphChannelMessageResponse
 	if err := a.conn.doRequest(ctx, http.MethodPost, path, req.Credentials, graphReq, &resp); err != nil {
