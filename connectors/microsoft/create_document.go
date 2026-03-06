@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -36,12 +37,18 @@ func (p *createDocumentParams) validate() error {
 	if p.Filename == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: filename"}
 	}
-	if strings.Contains(p.Filename, "/") || strings.Contains(p.Filename, "\\") || strings.Contains(p.Filename, "..") {
+	if strings.ContainsAny(p.Filename, "/\\") || strings.Contains(p.Filename, "..") {
 		return &connectors.ValidationError{Message: "invalid filename: must not contain path separators or traversal sequences"}
 	}
+	if strings.ContainsRune(p.Filename, 0) {
+		return &connectors.ValidationError{Message: "invalid filename: must not contain null bytes"}
+	}
 	if p.FolderPath != "" {
-		if strings.Contains(p.FolderPath, "..") {
-			return &connectors.ValidationError{Message: "invalid folder_path: must not contain path traversal sequences"}
+		if strings.Contains(p.FolderPath, "..") || strings.Contains(p.FolderPath, "\\") {
+			return &connectors.ValidationError{Message: "invalid folder_path: must not contain path traversal sequences or backslashes"}
+		}
+		if strings.ContainsRune(p.FolderPath, 0) {
+			return &connectors.ValidationError{Message: "invalid folder_path: must not contain null bytes"}
 		}
 	}
 	if len(p.Content) > maxSimpleUploadSize {
@@ -87,14 +94,21 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	}
 	params.defaults()
 
-	// Build the upload path.
+	// Build the upload path. Escape filename to prevent URL injection
+	// (e.g. characters like ? or # altering URL structure).
+	escapedFilename := url.PathEscape(params.Filename)
 	var path string
 	if params.FolderPath != "" {
 		folderPath := strings.TrimPrefix(params.FolderPath, "/")
 		folderPath = strings.TrimSuffix(folderPath, "/")
-		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", folderPath, params.Filename)
+		// Escape each segment of the folder path individually to preserve slashes.
+		segments := strings.Split(folderPath, "/")
+		for i, s := range segments {
+			segments[i] = url.PathEscape(s)
+		}
+		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", strings.Join(segments, "/"), escapedFilename)
 	} else {
-		path = fmt.Sprintf("/me/drive/root:/%s:/content", params.Filename)
+		path = fmt.Sprintf("/me/drive/root:/%s:/content", escapedFilename)
 	}
 
 	var content []byte

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -26,8 +27,11 @@ func (p *updateDocumentParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
 	}
-	if strings.Contains(p.ItemID, "/") || strings.Contains(p.ItemID, "\\") || strings.Contains(p.ItemID, "..") {
+	if strings.ContainsAny(p.ItemID, "/\\") || strings.Contains(p.ItemID, "..") {
 		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or traversal sequences"}
+	}
+	if strings.ContainsRune(p.ItemID, 0) {
+		return &connectors.ValidationError{Message: "invalid item_id: must not contain null bytes"}
 	}
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
@@ -48,7 +52,7 @@ func (a *updateDocumentAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s/content", params.ItemID)
+	path := fmt.Sprintf("/me/drive/items/%s/content", url.PathEscape(params.ItemID))
 
 	var item graphDriveItem
 	if err := a.conn.doUpload(ctx, http.MethodPut, path, req.Credentials, []byte(params.Content), docxContentType, &item); err != nil {

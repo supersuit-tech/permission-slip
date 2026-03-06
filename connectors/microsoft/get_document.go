@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -25,8 +26,11 @@ func (p *getDocumentParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
 	}
-	if strings.Contains(p.ItemID, "/") || strings.Contains(p.ItemID, "\\") || strings.Contains(p.ItemID, "..") {
+	if strings.ContainsAny(p.ItemID, "/\\") || strings.Contains(p.ItemID, "..") {
 		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or traversal sequences"}
+	}
+	if strings.ContainsRune(p.ItemID, 0) {
+		return &connectors.ValidationError{Message: "invalid item_id: must not contain null bytes"}
 	}
 	return nil
 }
@@ -52,7 +56,7 @@ func (a *getDocumentAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s?$select=id,name,webUrl,size,createdDateTime,lastModifiedDateTime", params.ItemID)
+	path := fmt.Sprintf("/me/drive/items/%s?$select=id,name,webUrl,size,createdDateTime,lastModifiedDateTime", url.PathEscape(params.ItemID))
 
 	var item graphDriveItem
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &item); err != nil {
