@@ -397,6 +397,11 @@ func TestShopBaseURL(t *testing.T) {
 			want:   "https://my-store.myshopify.com/admin/api/2024-10",
 		},
 		{
+			name:   "uppercase normalized to lowercase",
+			domain: "MyStore",
+			want:   "https://mystore.myshopify.com/admin/api/2024-10",
+		},
+		{
 			name:    "custom domain rejected",
 			domain:  "shop.example.com",
 			wantErr: true,

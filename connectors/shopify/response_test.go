@@ -106,8 +106,19 @@ func TestExtractErrorMessage_StringErrors(t *testing.T) {
 func TestExtractErrorMessage_FieldErrors(t *testing.T) {
 	t.Parallel()
 	msg := extractErrorMessage([]byte(`{"errors":{"title":["can't be blank"]}}`))
-	if msg == "" || msg == "unknown error" {
-		t.Errorf("expected field error message, got %q", msg)
+	want := "title can't be blank"
+	if msg != want {
+		t.Errorf("got %q, want %q", msg, want)
+	}
+}
+
+func TestExtractErrorMessage_MultipleFieldErrors_Sorted(t *testing.T) {
+	t.Parallel()
+	// Fields should be sorted alphabetically for deterministic output.
+	msg := extractErrorMessage([]byte(`{"errors":{"title":["can't be blank"],"body_html":["is too long"],"vendor":["is invalid"]}}`))
+	want := "body_html is too long; title can't be blank; vendor is invalid"
+	if msg != want {
+		t.Errorf("got %q, want %q", msg, want)
 	}
 }
 

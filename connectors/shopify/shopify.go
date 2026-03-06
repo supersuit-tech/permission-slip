@@ -90,9 +90,13 @@ func shopBaseURL(creds connectors.Credentials) (string, error) {
 		return "", &connectors.ValidationError{Message: "shop_domain resolved to an empty subdomain"}
 	}
 
+	// Normalize to lowercase — Shopify subdomains are case-insensitive
+	// and the canonical form is lowercase.
+	shop = strings.ToLower(shop)
+
 	// Validate the subdomain contains only safe hostname characters to prevent
 	// URL injection or SSRF via crafted shop_domain values.
-	if !validSubdomain.MatchString(strings.ToLower(shop)) {
+	if !validSubdomain.MatchString(shop) {
 		return "", &connectors.ValidationError{
 			Message: fmt.Sprintf("shop_domain contains invalid characters: %q (expected lowercase alphanumeric and hyphens)", shop),
 		}
