@@ -15,6 +15,7 @@ type getOrderAction struct {
 	conn *ShopifyConnector
 }
 
+// getOrderParams maps the JSON parameters for the get_order action.
 type getOrderParams struct {
 	OrderID int64 `json:"order_id"`
 }
@@ -26,6 +27,7 @@ func (p *getOrderParams) validate() error {
 	return nil
 }
 
+// Execute retrieves a single order by ID and returns the full order details.
 func (a *getOrderAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params getOrderParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {

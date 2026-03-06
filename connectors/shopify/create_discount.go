@@ -17,6 +17,8 @@ type createDiscountAction struct {
 	conn *ShopifyConnector
 }
 
+// createDiscountParams maps the JSON parameters for the create_discount action.
+// Value must be a negative decimal string (e.g. "-10.0" for 10% off).
 type createDiscountParams struct {
 	Code                  string `json:"code"`
 	ValueType             string `json:"value_type"`
@@ -28,10 +30,13 @@ type createDiscountParams struct {
 	AppliesOncePerCustomer *bool  `json:"applies_once_per_customer,omitempty"`
 }
 
+// validValueTypes are the discount value types accepted by the Shopify Price Rules API.
+// See: https://shopify.dev/docs/api/admin-rest/2024-10/resources/price-rule#post-price-rules
 var validValueTypes = map[string]bool{
 	"percentage": true, "fixed_amount": true,
 }
 
+// validTargetTypes are the target types for price rules — what the discount applies to.
 var validTargetTypes = map[string]bool{
 	"line_item": true, "shipping_line": true,
 }
@@ -58,6 +63,8 @@ func (p *createDiscountParams) validate() error {
 	return nil
 }
 
+// Execute creates a discount code via a two-step Shopify API flow. If step 2
+// fails, the error message includes the orphaned price rule ID for cleanup.
 func (a *createDiscountAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createDiscountParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {

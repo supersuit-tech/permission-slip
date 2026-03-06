@@ -17,6 +17,8 @@ type getOrdersAction struct {
 	conn *ShopifyConnector
 }
 
+// getOrdersParams maps the JSON parameters for the get_orders action.
+// All fields are optional — status defaults to "open" and limit to 50.
 type getOrdersParams struct {
 	Status          string `json:"status"`
 	FinancialStatus string `json:"financial_status"`
@@ -28,10 +30,14 @@ type getOrdersParams struct {
 	Limit           int    `json:"limit"`
 }
 
+// validOrderStatuses are the status values accepted by the Shopify Orders API.
+// See: https://shopify.dev/docs/api/admin-rest/2024-10/resources/order#get-orders
 var validOrderStatuses = map[string]bool{
 	"open": true, "closed": true, "cancelled": true, "any": true,
 }
 
+// validFinancialStatuses are the financial_status values accepted by the Shopify Orders API.
+// See: https://shopify.dev/docs/api/admin-rest/2024-10/resources/order#get-orders
 var validFinancialStatuses = map[string]bool{
 	"paid": true, "unpaid": true, "partially_paid": true, "refunded": true,
 	"authorized": true, "pending": true, "any": true,
@@ -56,6 +62,8 @@ func (p *getOrdersParams) validate() error {
 	return nil
 }
 
+// Execute lists or filters orders from the Shopify store. It builds query
+// parameters from the validated params and returns the raw Shopify response.
 func (a *getOrdersAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params getOrdersParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {

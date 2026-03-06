@@ -15,6 +15,9 @@ type updateOrderAction struct {
 	conn *ShopifyConnector
 }
 
+// updateOrderParams maps the JSON parameters for the update_order action.
+// Pointer fields (Note, Tags, Email) distinguish between "not provided" (nil)
+// and "set to empty string" — both are valid for Shopify's PUT endpoint.
 type updateOrderParams struct {
 	OrderID         int64                  `json:"order_id"`
 	Note            *string                `json:"note,omitempty"`
@@ -34,6 +37,8 @@ func (p *updateOrderParams) validate() error {
 	return nil
 }
 
+// Execute updates order attributes by sending only the provided fields to
+// Shopify's PUT endpoint. Fields not included in params are left unchanged.
 func (a *updateOrderAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params updateOrderParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {

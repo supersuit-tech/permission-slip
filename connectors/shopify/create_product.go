@@ -15,6 +15,8 @@ type createProductAction struct {
 	conn *ShopifyConnector
 }
 
+// createProductParams maps the JSON parameters for the create_product action.
+// Only Title is required; all other fields are optional.
 type createProductParams struct {
 	Title       string                   `json:"title"`
 	BodyHTML    string                   `json:"body_html,omitempty"`
@@ -25,6 +27,8 @@ type createProductParams struct {
 	Variants    []map[string]interface{} `json:"variants,omitempty"`
 }
 
+// validProductStatuses are the product visibility states accepted by the Shopify Products API.
+// See: https://shopify.dev/docs/api/admin-rest/2024-10/resources/product#post-products
 var validProductStatuses = map[string]bool{
 	"active": true, "draft": true, "archived": true,
 }
@@ -39,6 +43,8 @@ func (p *createProductParams) validate() error {
 	return nil
 }
 
+// Execute creates a new product in the Shopify store with the given attributes.
+// Only provided fields are included in the request body.
 func (a *createProductAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createProductParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
