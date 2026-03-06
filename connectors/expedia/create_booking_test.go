@@ -140,6 +140,10 @@ func TestCreateBooking_MissingParams(t *testing.T) {
 			params: `{"room_id":"room-123","given_name":"John","family_name":"Doe","email":"john@example.com","phone":"+1234567890"}`,
 		},
 		{
+			name:   "invalid email",
+			params: `{"room_id":"room-123","given_name":"John","family_name":"Doe","email":"not-an-email","phone":"+1234567890","payment_method_id":"pm_123"}`,
+		},
+		{
 			name:   "invalid JSON",
 			params: `{invalid}`,
 		},

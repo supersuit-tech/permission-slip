@@ -28,6 +28,21 @@ func (p *getHotelParams) validate() error {
 	if p.PropertyID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: property_id"}
 	}
+	if p.Checkin != "" {
+		if err := validateDate("checkin", p.Checkin); err != nil {
+			return err
+		}
+	}
+	if p.Checkout != "" {
+		if err := validateDate("checkout", p.Checkout); err != nil {
+			return err
+		}
+	}
+	if p.Checkin != "" && p.Checkout != "" {
+		if err := validateDateRange(p.Checkin, p.Checkout); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

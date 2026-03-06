@@ -110,6 +110,18 @@ func TestGetHotel_MissingParams(t *testing.T) {
 			params: `{"property_id":""}`,
 		},
 		{
+			name:   "invalid checkin date",
+			params: `{"property_id":"12345","checkin":"not-a-date"}`,
+		},
+		{
+			name:   "invalid checkout date",
+			params: `{"property_id":"12345","checkout":"13/01/2024"}`,
+		},
+		{
+			name:   "checkout before checkin",
+			params: `{"property_id":"12345","checkin":"2024-06-17","checkout":"2024-06-15"}`,
+		},
+		{
 			name:   "invalid JSON",
 			params: `{invalid}`,
 		},
@@ -155,7 +167,7 @@ func TestGetHotel_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("Execute() expected error, got nil")
 	}
-	if !connectors.IsExternalError(err) {
-		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }

@@ -46,8 +46,20 @@ func (p *searchHotelsParams) validate() error {
 	if p.Checkout == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: checkout"}
 	}
+	if err := validateDate("checkin", p.Checkin); err != nil {
+		return err
+	}
+	if err := validateDate("checkout", p.Checkout); err != nil {
+		return err
+	}
+	if err := validateDateRange(p.Checkin, p.Checkout); err != nil {
+		return err
+	}
 	if p.Occupancy == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: occupancy"}
+	}
+	if err := validateOccupancy(p.Occupancy); err != nil {
+		return err
 	}
 	if p.RegionID == "" && p.Latitude == nil && p.Longitude == nil {
 		return &connectors.ValidationError{Message: "either region_id or latitude+longitude is required"}
