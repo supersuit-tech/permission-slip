@@ -240,7 +240,7 @@ func TestRecordPaymentMethodUsage(t *testing.T) {
 			t.Fatalf("failed to parse action JSON: %v", err)
 		}
 
-		requiredFields := []string{"type", "payment_method_id", "brand", "last4", "amount_cents", "currency"}
+		requiredFields := []string{"type", "payment_method_id", "brand", "last4", "amount_cents", "currency", "description"}
 		for _, field := range requiredFields {
 			if _, ok := action[field]; !ok {
 				t.Errorf("action missing field %q", field)
@@ -254,6 +254,15 @@ func TestRecordPaymentMethodUsage(t *testing.T) {
 		}
 		if amountCents != 15000 {
 			t.Errorf("expected amount_cents=15000, got %d", amountCents)
+		}
+
+		// Verify the description is included.
+		var desc string
+		if err := json.Unmarshal(action["description"], &desc); err != nil {
+			t.Fatalf("failed to parse description: %v", err)
+		}
+		if desc != "Hotel booking" {
+			t.Errorf("expected description=%q, got %q", "Hotel booking", desc)
 		}
 	})
 

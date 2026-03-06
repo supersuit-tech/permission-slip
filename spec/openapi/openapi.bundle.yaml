@@ -7940,7 +7940,8 @@ components:
             actual parameters used in the execution), and `constraints` (the
             boundary rules from the standing approval). For payment_method.charged
             events, contains `type`, `payment_method_id`, `brand`, `last4`,
-            `amount_cents`, and `currency`. Never includes raw card details.
+            `amount_cents`, `currency`, and optionally `description` (a human-readable
+            summary of the charge). Never includes raw card details.
             Null for agent lifecycle events.
         outcome:
           type: string

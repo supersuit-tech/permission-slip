@@ -159,14 +159,18 @@ func RecordPaymentMethodUsage(ctx context.Context, d db.DBTX, p PaymentChargePar
 	if currency == "" {
 		currency = "usd"
 	}
-	actionPayload, _ := json.Marshal(map[string]any{
+	actionData := map[string]any{
 		"type":              p.ActionType,
 		"payment_method_id": p.PaymentMethodID,
 		"brand":             p.Brand,
 		"last4":             p.Last4,
 		"amount_cents":      p.AmountCents,
 		"currency":          currency,
-	})
+	}
+	if p.Description != "" {
+		actionData["description"] = p.Description
+	}
+	actionPayload, _ := json.Marshal(actionData)
 
 	connectorID := connectorIDFromActionType(p.ActionType)
 	if connectorID == nil && p.ConnectorID != "" {

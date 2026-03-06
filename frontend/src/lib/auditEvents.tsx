@@ -76,6 +76,19 @@ function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
+/** Format an amount in cents to a locale-aware currency string. */
+function formatCurrency(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+    }).format(cents / 100);
+  } catch {
+    // Fallback for unknown currency codes.
+    return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
 export function getActionSummary(event: AuditEvent): string {
   // action is typed as `unknown` in the generated schema but the server
   // always stores it as a JSON object (or null for lifecycle events)
@@ -95,12 +108,14 @@ export function getActionSummary(event: AuditEvent): string {
   // Payment method charged events include amount and card metadata.
   if (event.event_type === "payment_method.charged") {
     const cents = typeof action.amount_cents === "number" ? action.amount_cents : 0;
-    const currency = typeof action.currency === "string" ? action.currency.toUpperCase() : "USD";
-    const amount = (cents / 100).toFixed(2);
+    const currency = typeof action.currency === "string" ? action.currency.toLowerCase() : "usd";
     const brand = typeof action.brand === "string" ? action.brand : "";
     const last4 = typeof action.last4 === "string" ? action.last4 : "";
+    const description = typeof action.description === "string" ? action.description : "";
+    const formattedAmount = formatCurrency(cents, currency);
     const cardLabel = brand && last4 ? ` (${brand} ••${last4})` : "";
-    return `${actionType} — ${currency} $${amount}${cardLabel}`;
+    const desc = description ? ` — ${truncate(description, 40)}` : "";
+    return `${formattedAmount}${cardLabel}${desc}`;
   }
 
   const params = action.parameters as Record<string, unknown> | undefined;
