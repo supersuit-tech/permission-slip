@@ -38,6 +38,12 @@ const (
 	// defaultRetryAfter is used when Stripe returns a rate limit response
 	// without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 30 * time.Second
+
+	// apiVersion pins the Stripe API version. This prevents breaking changes
+	// when Stripe releases new API versions. Update this deliberately when
+	// you're ready to handle the new response shapes.
+	// See https://docs.stripe.com/api/versioning
+	apiVersion = "2025-12-18.acacia"
 )
 
 // StripeConnector owns the shared HTTP client and base URL used by all
@@ -131,6 +137,7 @@ func (c *StripeConnector) do(ctx context.Context, creds connectors.Credentials, 
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("Stripe-Version", apiVersion)
 	if method != http.MethodGet && len(params) > 0 {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
@@ -171,6 +178,20 @@ func (c *StripeConnector) do(ctx context.Context, creds connectors.Credentials, 
 	return nil
 }
 
+// doGet is a convenience wrapper around do() for GET requests.
+// GET requests never need form bodies or idempotency keys.
+func (c *StripeConnector) doGet(ctx context.Context, creds connectors.Credentials, path string, params map[string]string, respBody any) error {
+	return c.do(ctx, creds, http.MethodGet, path, params, respBody, "")
+}
+
+// doPost is a convenience wrapper around do() for POST requests.
+// It accepts the action type and raw parameters for automatic idempotency
+// key derivation. Phase 2 actions should prefer this over do() directly.
+func (c *StripeConnector) doPost(ctx context.Context, creds connectors.Credentials, path string, params map[string]string, respBody any, actionType string, rawParams json.RawMessage) error {
+	idempotencyKey := deriveIdempotencyKey(actionType, rawParams)
+	return c.do(ctx, creds, http.MethodPost, path, params, respBody, idempotencyKey)
+}
+
 // stripeError represents the error envelope returned by the Stripe API.
 // See https://docs.stripe.com/api/errors
 type stripeError struct {
@@ -193,6 +214,11 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	msg := string(body)
 	if json.Unmarshal(body, &se) == nil && se.Error.Message != "" {
 		msg = se.Error.Message
+		// Include the error code when available (e.g., "card_declined",
+		// "expired_card") — useful for debugging and action-level handling.
+		if se.Error.Code != "" {
+			msg = fmt.Sprintf("%s (code: %s)", msg, se.Error.Code)
+		}
 	}
 
 	// Rate limit is checked first regardless of error type.

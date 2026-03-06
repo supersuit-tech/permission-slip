@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -513,6 +514,113 @@ func TestDo_MissingCredentials(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// doGet / doPost convenience methods
+// ---------------------------------------------------------------------------
+
+func TestDoGet_Success(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if idem := r.Header.Get("Idempotency-Key"); idem != "" {
+			t.Errorf("doGet should not send Idempotency-Key, got %q", idem)
+		}
+
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]string{"id": "bal_1"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	err := conn.doGet(t.Context(), validCreds(), "/v1/balance", nil, &resp)
+	if err != nil {
+		t.Fatalf("doGet() unexpected error: %v", err)
+	}
+	if resp["id"] != "bal_1" {
+		t.Errorf("id = %q, want bal_1", resp["id"])
+	}
+}
+
+func TestDoPost_AutoIdempotency(t *testing.T) {
+	t.Parallel()
+
+	var capturedIdemKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedIdemKey = r.Header.Get("Idempotency-Key")
+
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]string{"id": "cus_1"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	rawParams := json.RawMessage(`{"email":"test@example.com"}`)
+	var resp map[string]string
+	err := conn.doPost(t.Context(), validCreds(), "/v1/customers", map[string]string{"email": "test@example.com"}, &resp, "stripe.create_customer", rawParams)
+	if err != nil {
+		t.Fatalf("doPost() unexpected error: %v", err)
+	}
+
+	if capturedIdemKey == "" {
+		t.Error("doPost should automatically derive and send Idempotency-Key")
+	}
+
+	// Verify determinism — same params produce same key.
+	expectedKey := deriveIdempotencyKey("stripe.create_customer", rawParams)
+	if capturedIdemKey != expectedKey {
+		t.Errorf("Idempotency-Key = %q, want %q", capturedIdemKey, expectedKey)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Stripe-Version header
+// ---------------------------------------------------------------------------
+
+func TestDo_StripeVersionHeader(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ver := r.Header.Get("Stripe-Version")
+		if ver == "" {
+			t.Error("Stripe-Version header missing")
+		}
+		if ver != apiVersion {
+			t.Errorf("Stripe-Version = %q, want %q", ver, apiVersion)
+		}
+
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]string{})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/v1/balance", nil, nil, "")
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Error code inclusion in messages
+// ---------------------------------------------------------------------------
+
+func TestCheckResponse_IncludesErrorCode(t *testing.T) {
+	t.Parallel()
+
+	body := `{"error":{"type":"card_error","code":"card_declined","message":"Your card was declined"}}`
+	err := checkResponse(402, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if got := err.Error(); !strings.Contains(got, "card_declined") {
+		t.Errorf("error message should include code, got: %s", got)
 	}
 }
 
