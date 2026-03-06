@@ -144,8 +144,10 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 		}
 	}
 
-	// Check connection status.
-	if conn.Status == db.OAuthStatusNeedsReauth || conn.Status == db.OAuthStatusRevoked {
+	// Check connection status (allowlist: only "active" connections may be used).
+	// Using != active instead of checking individual non-active statuses ensures
+	// that any new status added in the future is denied by default.
+	if conn.Status != db.OAuthStatusActive {
 		return zero, &connectors.OAuthRefreshError{
 			Provider: providerID,
 			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", providerID, conn.Status),
