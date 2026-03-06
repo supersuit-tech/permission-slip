@@ -17,6 +17,7 @@ type excelAppendRowsAction struct {
 	conn *MicrosoftConnector
 }
 
+// excelAppendRowsParams holds the validated parameters for appending rows to a table.
 type excelAppendRowsParams struct {
 	ItemID    string  `json:"item_id"`
 	TableName string  `json:"table_name"`
@@ -51,6 +52,7 @@ type graphAddRowsResponse struct {
 }
 
 // appendRowsResult is the simplified response returned to the caller.
+// RowsAdded is computed from len(Values) so callers don't need to count manually.
 type appendRowsResult struct {
 	Index     int     `json:"index"`
 	Values    [][]any `json:"values"`

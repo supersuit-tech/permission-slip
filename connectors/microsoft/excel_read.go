@@ -17,6 +17,7 @@ type excelReadRangeAction struct {
 	conn *MicrosoftConnector
 }
 
+// excelReadRangeParams holds the validated parameters for reading a cell range.
 type excelReadRangeParams struct {
 	ItemID    string `json:"item_id"`
 	SheetName string `json:"sheet_name"`

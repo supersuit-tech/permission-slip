@@ -17,6 +17,7 @@ type excelWriteRangeAction struct {
 	conn *MicrosoftConnector
 }
 
+// excelWriteRangeParams holds the validated parameters for writing to a cell range.
 type excelWriteRangeParams struct {
 	ItemID    string  `json:"item_id"`
 	SheetName string  `json:"sheet_name"`

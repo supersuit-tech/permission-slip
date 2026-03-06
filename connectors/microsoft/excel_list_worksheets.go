@@ -15,6 +15,7 @@ type excelListWorksheetsAction struct {
 	conn *MicrosoftConnector
 }
 
+// excelListWorksheetsParams holds the validated parameters for listing worksheets.
 type excelListWorksheetsParams struct {
 	ItemID string `json:"item_id"`
 }

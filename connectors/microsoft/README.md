@@ -149,6 +149,14 @@ Lists upcoming events from the user's calendar.
 
 ---
 
+### Excel Actions
+
+All Excel actions operate on workbooks stored in OneDrive via the Microsoft Graph workbook API. They require the `Files.ReadWrite` OAuth scope.
+
+**Obtaining `item_id`:** The `item_id` parameter is the OneDrive item ID of the `.xlsx` file. You can find it by browsing OneDrive via the Graph API (`GET /me/drive/root/children`) or by using the OneDrive search endpoint (`GET /me/drive/search(q='.xlsx')`). The ID looks like `01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K`.
+
+**Note on `excel_append_rows`:** This action operates on named [Excel tables](https://support.microsoft.com/en-us/office/create-and-format-tables-e81aa349-b006-4f8a-9806-5af9df0ac664), not raw ranges. The workbook must contain a table created via "Insert > Table" in Excel.
+
 ### `microsoft.excel_list_worksheets`
 
 Lists all worksheets in an Excel workbook stored in OneDrive.
@@ -200,7 +208,9 @@ Reads cell values from a worksheet range in an Excel workbook.
   "values": [
     ["Name", "Age"],
     ["Alice", 30]
-  ]
+  ],
+  "row_count": 2,
+  "column_count": 2
 }
 ```
 
@@ -221,7 +231,7 @@ Writes cell values to a worksheet range in an Excel workbook.
 | `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
 | `sheet_name` | string | Yes | — | Name of the worksheet to write to |
 | `range` | string | Yes | — | Cell range to write (e.g., `A1:C3`) |
-| `values` | any[][] | Yes | — | 2D array of cell values to write |
+| `values` | any[][] | Yes | — | 2D array of cell values to write — all rows must have the same number of columns |
 
 **Response:**
 
@@ -231,7 +241,9 @@ Writes cell values to a worksheet range in an Excel workbook.
   "values": [
     ["Name", "Age"],
     ["Alice", 30]
-  ]
+  ],
+  "row_count": 2,
+  "column_count": 2
 }
 ```
 
@@ -251,7 +263,7 @@ Appends rows to a named table in an Excel workbook.
 |------|------|----------|---------|-------------|
 | `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
 | `table_name` | string | Yes | — | Name of the table to append rows to |
-| `values` | any[][] | Yes | — | 2D array of row values to append |
+| `values` | any[][] | Yes | — | 2D array of row values to append — all rows must have the same number of columns |
 
 **Response:**
 
@@ -260,7 +272,8 @@ Appends rows to a named table in an Excel workbook.
   "index": 5,
   "values": [
     ["Widget", 100, 9.99]
-  ]
+  ],
+  "rows_added": 1
 }
 ```
 
@@ -318,6 +331,7 @@ connectors/microsoft/
 ├── excel_append.go               # microsoft.excel_append_rows action
 ├── microsoft_test.go             # Connector-level tests
 ├── helpers_test.go               # Shared test helpers (validCreds)
+├── validation_test.go            # Validation helper tests (path segment, values grid)
 ├── send_email_test.go            # Send email action tests
 ├── list_emails_test.go           # List emails action tests
 ├── create_calendar_event_test.go # Create calendar event action tests
