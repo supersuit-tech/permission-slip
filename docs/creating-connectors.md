@@ -1,12 +1,13 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, and Amadeus connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
 **Which reference to follow:**
 - **GitHub** (`connectors/github/`) — simple API key auth (Bearer token), good starting point
 - **Slack** (`connectors/slack/`) — API key with format validation (token prefix check), Slack-specific response envelope
 - **PostgreSQL** (`connectors/postgresql/`) — custom auth (host + port + user + password + database)
 - **Amadeus** (`connectors/amadeus/`) — OAuth client credentials grant (client_id + client_secret → short-lived bearer token with caching and auto-refresh)
+- **Square** (`connectors/square/`) — environment-aware base URLs (sandbox/production), idempotency key generation, structured error envelope parsing
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -29,7 +30,7 @@ Connector (shared state: HTTP client, base URL, auth)
 
 - **In-process Go**: Connectors compile into the binary. No plugins, sidecars, or external processes.
 - **One action per file**: Adding an action means adding one file + one line of registration.
-- **Plain `net/http`**: No third-party SDKs. Keeps the dependency footprint minimal.
+- **Plain `net/http` or `database/sql`**: HTTP connectors (GitHub, Slack) use plain net/http. Database connectors (MySQL) use database/sql with parameterized queries. No third-party SDKs beyond drivers.
 - **Typed errors**: Actions return specific error types that map to HTTP status codes.
 - **Credentials at execution time**: Decrypted from the vault only when an action runs, never cached.
 
@@ -898,6 +899,15 @@ connectors/
 │   ├── github_test.go        # Connector-level tests
 │   ├── create_issue_test.go  # Action tests
 │   └── merge_pr_test.go      # Action tests
+├── mysql/
+│   ├── mysql.go              # MySQLConnector struct, New(), Manifest(), openConn(), shared helpers
+│   ├── query.go              # mysql.query action (read-only, parameterized SELECT)
+│   ├── insert.go             # mysql.insert action (parameterized INSERT with batch limits)
+│   ├── update.go             # mysql.update action (parameterized UPDATE, WHERE required)
+│   ├── delete.go             # mysql.delete action (parameterized DELETE, WHERE required)
+│   ├── helpers_test.go       # validCreds(), newTestConnector() with sqlmock
+│   ├── mysql_test.go         # Connector-level tests
+│   └── *_test.go             # Per-action tests
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
 │   ├── send_message.go       # slack.send_message action

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // insertAction implements connectors.Action for postgres.insert.
@@ -39,7 +40,7 @@ func (p *insertParams) validate() error {
 	// Determine columns from explicit list or first row.
 	cols := p.Columns
 	if len(cols) == 0 {
-		cols = sortedKeys(p.Rows[0])
+		cols = sqldb.SortedKeys(p.Rows[0])
 	}
 	if len(cols) == 0 {
 		return &connectors.ValidationError{Message: "rows must contain at least one column"}
@@ -78,7 +79,7 @@ func (a *insertAction) Execute(ctx context.Context, req connectors.ActionRequest
 	// Determine columns.
 	cols := params.Columns
 	if len(cols) == 0 {
-		cols = sortedKeys(params.Rows[0])
+		cols = sqldb.SortedKeys(params.Rows[0])
 	}
 
 	// Build INSERT statement.

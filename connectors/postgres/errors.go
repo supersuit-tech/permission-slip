@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -76,40 +75,4 @@ func containsAny(s string, subs ...string) bool {
 		}
 	}
 	return false
-}
-
-// scanRows reads all rows from a sql.Rows into a slice of maps.
-func scanRows(rows *sql.Rows) ([]map[string]interface{}, error) {
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading column names: %v", err)}
-	}
-
-	var results []map[string]interface{}
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, &connectors.ExternalError{Message: fmt.Sprintf("scanning row: %v", err)}
-		}
-		row := make(map[string]interface{}, len(columns))
-		for i, col := range columns {
-			if b, ok := values[i].([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = values[i]
-			}
-		}
-		results = append(results, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, mapPgError(err, "iterating rows")
-	}
-	if results == nil {
-		results = []map[string]interface{}{}
-	}
-	return results, nil
 }

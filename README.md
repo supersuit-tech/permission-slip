@@ -110,6 +110,7 @@ Permission Slip requires agents that can **(1) make HTTP requests to arbitrary U
 - **[OpenAPI Spec](spec/openapi/)** — machine-readable API definition
 - **[Architecture](docs/architecture.md)** — system diagrams and component overview
 - **[Agent Integration Guide](docs/agents.md)** — how to integrate an autonomous agent with Permission Slip
+- **[Creating Connectors](docs/creating-connectors.md)** — guide to building new built-in connectors (GitHub, Slack, MySQL as references)
 - **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
 - **[Community Connectors](docs/community-connectors.md)** — directory of third-party connectors built by the community
 - **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
