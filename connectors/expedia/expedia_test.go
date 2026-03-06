@@ -1,6 +1,7 @@
 package expedia
 
 import (
+	"context"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
@@ -360,6 +361,81 @@ func TestExpediaConnector_Do_CustomCustomerIP(t *testing.T) {
 	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "203.0.113.42", nil, nil)
 	if err != nil {
 		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
+func TestExpediaConnector_ActionsMatchManifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	actions := c.Actions()
+	manifest := c.Manifest()
+
+	manifestTypes := make(map[string]bool, len(manifest.Actions))
+	for _, a := range manifest.Actions {
+		manifestTypes[a.ActionType] = true
+	}
+
+	for actionType := range actions {
+		if !manifestTypes[actionType] {
+			t.Errorf("Actions() has %q but Manifest() does not", actionType)
+		}
+	}
+	for _, a := range manifest.Actions {
+		if _, ok := actions[a.ActionType]; !ok {
+			// Phase 1: actions aren't implemented yet, so we just verify
+			// the manifest declares them. This test will catch drift once
+			// Phase 2 adds action handlers.
+			t.Logf("Manifest() has %q but Actions() does not (expected in Phase 1)", a.ActionType)
+		}
+	}
+}
+
+func TestExpediaConnector_Do_Timeout(t *testing.T) {
+	t.Parallel()
+
+	// Create a server that never responds.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Block until the request context is canceled.
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	// Use a very short timeout to trigger the timeout path.
+	shortClient := &http.Client{Timeout: 1 * time.Millisecond}
+	conn := &ExpediaConnector{
+		client:  shortClient,
+		baseURL: srv.URL,
+		nowFunc: time.Now,
+	}
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "", nil, nil)
+	if err == nil {
+		t.Fatal("do() expected error, got nil")
+	}
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("do() error = %T (%v), want *connectors.TimeoutError", err, err)
+	}
+}
+
+func TestExpediaConnector_Do_ContextCanceled(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // Cancel immediately.
+
+	err := conn.do(ctx, validCreds(), http.MethodGet, "/test", "", nil, nil)
+	if err == nil {
+		t.Fatal("do() expected error, got nil")
+	}
+	// Should be a TimeoutError (we map context.Canceled to TimeoutError).
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("do() error = %T (%v), want *connectors.TimeoutError", err, err)
 	}
 }
 

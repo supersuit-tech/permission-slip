@@ -149,7 +149,7 @@ Expedia returns errors as `{"type": "...", "message": "..."}`. The connector ext
 Each action lives in its own file. To add one (e.g., `expedia.search_hotels`):
 
 1. Create `connectors/expedia/search_hotels.go` with a params struct, `validate()`, and an `Execute` method.
-2. Use `a.conn.do(ctx, creds, method, path, reqBody, &respBody)` for the HTTP lifecycle — it handles JSON marshaling, signature auth headers, `Customer-Ip`, response checking, and error mapping.
+2. Use `a.conn.do(ctx, creds, method, path, customerIP, reqBody, &respBody)` for the HTTP lifecycle — it handles JSON marshaling, signature auth headers, `Customer-Ip`, response checking, and error mapping.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `expedia.go`.
 5. Add the action to the `Manifest()` return value inside `expedia.go` — include a `ParametersSchema`.
