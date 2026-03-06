@@ -2,8 +2,6 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub and Slack connectors as reference implementations.
 
-> **Non-JSON APIs:** Most connectors use JSON request bodies, but some APIs (like Stripe) use `application/x-www-form-urlencoded`. See the [Stripe connector README](../connectors/stripe/README.md) for an example of handling form-encoded requests with bracket notation.
-
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
 ---
