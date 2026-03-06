@@ -24,11 +24,21 @@ func TestSquareConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
-	// Phase 1 scaffold: no action handlers yet. Handlers are added in Phase 2.
-	// The manifest declares 6 actions for DB seeding, but the Actions() map
-	// will be populated as each action is implemented.
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 (Phase 1 scaffold)", len(actions))
+	wantActions := []string{
+		"square.create_order",
+		"square.create_payment",
+		"square.list_catalog",
+		"square.create_customer",
+		"square.create_booking",
+		"square.search_orders",
+	}
+	if len(actions) != len(wantActions) {
+		t.Fatalf("Actions() returned %d actions, want %d", len(actions), len(wantActions))
+	}
+	for _, name := range wantActions {
+		if _, ok := actions[name]; !ok {
+			t.Errorf("Actions() missing %q", name)
+		}
 	}
 }
 
