@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth, OAuth, custom auth, and more.
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub), OAuth 2.0 (Google), custom auth (Slack), and more.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -903,6 +903,13 @@ connectors/
 │   ├── helpers_test.go       # validCreds(), newTestConnector() with sqlmock
 │   ├── mysql_test.go         # Connector-level tests
 │   └── *_test.go             # Per-action tests
+├── google/
+│   ├── google.go             # GoogleConnector struct, New(), Manifest(), doJSON(), OAuth2 auth
+│   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
+│   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
+│   ├── create_calendar_event.go  # google.create_calendar_event action
+│   ├── list_calendar_events.go   # google.list_calendar_events action
+│   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
 │   ├── send_message.go       # slack.send_message action
