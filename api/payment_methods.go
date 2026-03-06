@@ -273,20 +273,42 @@ func handleConfirmPaymentMethod(deps *Deps) http.HandlerFunc {
 			pm.ExpYear = int(stripePM.Card.ExpYear)
 		}
 
-		// If setting as default, clear existing default first.
+		// Use a transaction to atomically clear old default + create new card.
+		tx, owned, txErr := db.BeginOrContinue(r.Context(), deps.DB)
+		if txErr != nil {
+			log.Printf("[%s] ConfirmPaymentMethod: begin tx: %v", TraceID(r.Context()), txErr)
+			CaptureError(r.Context(), txErr)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save payment method"))
+			return
+		}
+		if owned {
+			defer func() { _ = db.RollbackTx(r.Context(), tx) }()
+		}
+
 		if req.IsDefault {
-			if err := db.ClearDefaultPaymentMethod(r.Context(), deps.DB, profile.ID); err != nil {
+			if err := db.ClearDefaultPaymentMethod(r.Context(), tx, profile.ID); err != nil {
 				log.Printf("[%s] ConfirmPaymentMethod: clear default: %v", TraceID(r.Context()), err)
 				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save payment method"))
+				return
 			}
 		}
 
-		created, err := db.CreatePaymentMethod(r.Context(), deps.DB, pm)
+		created, err := db.CreatePaymentMethod(r.Context(), tx, pm)
 		if err != nil {
 			log.Printf("[%s] ConfirmPaymentMethod: create: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save payment method"))
 			return
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] ConfirmPaymentMethod: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save payment method"))
+				return
+			}
 		}
 
 		RespondJSON(w, http.StatusCreated, toPaymentMethodResponse(created))
@@ -330,11 +352,24 @@ func handleUpdatePaymentMethod(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// If setting as default, clear existing default first.
+		// Use a transaction to atomically clear old default + update card.
+		tx, owned, txErr := db.BeginOrContinue(r.Context(), deps.DB)
+		if txErr != nil {
+			log.Printf("[%s] UpdatePaymentMethod: begin tx: %v", TraceID(r.Context()), txErr)
+			CaptureError(r.Context(), txErr)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update payment method"))
+			return
+		}
+		if owned {
+			defer func() { _ = db.RollbackTx(r.Context(), tx) }()
+		}
+
 		if req.IsDefault != nil && *req.IsDefault {
-			if err := db.ClearDefaultPaymentMethod(r.Context(), deps.DB, profile.ID); err != nil {
+			if err := db.ClearDefaultPaymentMethod(r.Context(), tx, profile.ID); err != nil {
 				log.Printf("[%s] UpdatePaymentMethod: clear default: %v", TraceID(r.Context()), err)
 				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update payment method"))
+				return
 			}
 		}
 
@@ -355,7 +390,7 @@ func handleUpdatePaymentMethod(deps *Deps) http.HandlerFunc {
 			params.ClearMonthlyLimit = true
 		}
 
-		updated, err := db.UpdatePaymentMethod(r.Context(), deps.DB, profile.ID, pmID, params)
+		updated, err := db.UpdatePaymentMethod(r.Context(), tx, profile.ID, pmID, params)
 		if err != nil {
 			log.Printf("[%s] UpdatePaymentMethod: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -365,6 +400,15 @@ func handleUpdatePaymentMethod(deps *Deps) http.HandlerFunc {
 		if updated == nil {
 			RespondError(w, r, http.StatusNotFound, NotFound(ErrPaymentMethodNotFound, "Payment method not found"))
 			return
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] UpdatePaymentMethod: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update payment method"))
+				return
+			}
 		}
 
 		RespondJSON(w, http.StatusOK, toPaymentMethodResponse(updated))
