@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth, OAuth, custom auth, and more.
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth, OAuth, custom auth, and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -908,6 +908,19 @@ connectors/
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
 │   └── ...tests...
+├── shopify/
+│   ├── shopify.go            # ShopifyConnector struct, New(), do(), dynamic base URL from shop_domain
+│   ├── manifest.go           # Manifest() with 6 action schemas and 7 templates
+│   ├── response.go           # HTTP status → typed error mapping (handles 3 Shopify error formats)
+│   ├── get_orders.go         # shopify.get_orders — list/filter orders with query params
+│   ├── get_order.go          # shopify.get_order — single order by ID
+│   ├── update_order.go       # shopify.update_order — partial update via PUT
+│   ├── create_product.go     # shopify.create_product — create with optional variants
+│   ├── update_inventory.go   # shopify.update_inventory — relative inventory adjustment
+│   ├── create_discount.go    # shopify.create_discount — two-step: price rule → discount code
+│   ├── README.md             # Connector documentation
+│   ├── helpers_test.go       # validCreds() test helper
+│   └── *_test.go             # Per-action + connector + response tests
 └── expedia/
     ├── expedia.go            # ExpediaConnector struct, New(), SHA-512 signature auth, do()
     ├── manifest.go           # Manifest() with 6 action schemas and templates
