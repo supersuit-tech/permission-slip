@@ -189,6 +189,7 @@ func main() {
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	defer bgCancel()
 	var auditPurgeDone <-chan struct{}
+	var oauthRefreshDone <-chan struct{}
 
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
@@ -343,6 +344,15 @@ func main() {
 		loadBYOAProviderConfigs(oauthRegistry, deps.DB, deps.Vault)
 	}
 
+	// Start background OAuth token refresh job (requires DB, vault, and OAuth registry).
+	if deps.DB != nil && deps.Vault != nil {
+		oauthRefreshDone = startOAuthRefresh(bgCtx, OAuthRefreshDeps{
+			DB:       deps.DB,
+			Vault:    deps.Vault,
+			Registry: oauthRegistry,
+		}, logger)
+	}
+
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
 
 	// Parse allowed CORS origins from a comma-separated list.
@@ -479,6 +489,13 @@ func main() {
 		case <-auditPurgeDone:
 		case <-time.After(5 * time.Second):
 			logger.Warn("audit purge goroutine did not exit in time")
+		}
+	}
+	if oauthRefreshDone != nil {
+		select {
+		case <-oauthRefreshDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("oauth refresh goroutine did not exit in time")
 		}
 	}
 
