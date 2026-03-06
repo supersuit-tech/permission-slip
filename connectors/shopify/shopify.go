@@ -94,6 +94,13 @@ func shopBaseURL(creds connectors.Credentials) (string, error) {
 	// and the canonical form is lowercase.
 	shop = strings.ToLower(shop)
 
+	// DNS labels are limited to 63 characters.
+	if len(shop) > 63 {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("shop_domain is too long (%d chars, max 63)", len(shop)),
+		}
+	}
+
 	// Validate the subdomain contains only safe hostname characters to prevent
 	// URL injection or SSRF via crafted shop_domain values.
 	if !validSubdomain.MatchString(shop) {

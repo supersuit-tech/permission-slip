@@ -442,6 +442,11 @@ func TestShopBaseURL(t *testing.T) {
 			domain:  "store@evil",
 			wantErr: true,
 		},
+		{
+			name:    "subdomain exceeding DNS label limit",
+			domain:  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmn",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

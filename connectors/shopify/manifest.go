@@ -78,6 +78,7 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"order_id": {
 							"type": "integer",
+							"minimum": 1,
 							"description": "The Shopify order ID"
 						}
 					},
@@ -95,6 +96,7 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"order_id": {
 							"type": "integer",
+							"minimum": 1,
 							"description": "The Shopify order ID"
 						},
 						"note": {
@@ -191,10 +193,12 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"inventory_item_id": {
 							"type": "integer",
+							"minimum": 1,
 							"description": "The inventory item ID (from product variant)"
 						},
 						"location_id": {
 							"type": "integer",
+							"minimum": 1,
 							"description": "The location ID where inventory is stored"
 						},
 						"available_adjustment": {
