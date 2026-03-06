@@ -1,0 +1,139 @@
+paymentMethods:
+  get:
+    tags:
+      - Payment Methods
+    summary: List stored payment methods
+    description: Returns all stored payment methods for the authenticated user.
+    operationId: listPaymentMethods
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Payment methods retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/payment_methods.yaml#/PaymentMethodListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+  post:
+    tags:
+      - Payment Methods
+    summary: Confirm a payment method
+    description: |
+      Saves a payment method after it has been set up via Stripe Elements.
+      The payment_method_id is the Stripe pm_* token returned by the
+      SetupIntent confirmation flow on the client.
+    operationId: confirmPaymentMethod
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/payment_methods.yaml#/ConfirmPaymentMethodRequest'
+    responses:
+      '201':
+        description: Payment method saved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/payment_methods.yaml#/PaymentMethod'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '409':
+        $ref: '../responses/errors.yaml#/Conflict'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+setupIntent:
+  post:
+    tags:
+      - Payment Methods
+    summary: Create a SetupIntent
+    description: |
+      Creates a Stripe SetupIntent for collecting payment method details
+      via Stripe Elements. Returns a client_secret to use with
+      stripe.confirmCardSetup() on the frontend.
+    operationId: createSetupIntent
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: SetupIntent created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/payment_methods.yaml#/SetupIntentResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+paymentMethodById:
+  patch:
+    tags:
+      - Payment Methods
+    summary: Update a payment method
+    description: Update label, spending limits, or default status of a stored payment method.
+    operationId: updatePaymentMethod
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/payment_methods.yaml#/UpdatePaymentMethodRequest'
+    responses:
+      '200':
+        description: Payment method updated
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/payment_methods.yaml#/PaymentMethod'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+  delete:
+    tags:
+      - Payment Methods
+    summary: Delete a payment method
+    description: |
+      Removes a stored payment method and detaches it from the Stripe customer.
+    operationId: deletePaymentMethod
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Payment method deleted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/payment_methods.yaml#/DeletePaymentMethodResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'

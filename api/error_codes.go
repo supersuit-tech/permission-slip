@@ -60,6 +60,9 @@ const (
 	ErrOAuthConnectionExists     ErrorCode = "oauth_connection_exists"
 	ErrOAuthStateMismatch        ErrorCode = "oauth_state_mismatch"
 	ErrOAuthExchangeFailed       ErrorCode = "oauth_exchange_failed"
+	// Payment Methods
+	ErrPaymentMethodNotFound ErrorCode = "payment_method_not_found"
+
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )

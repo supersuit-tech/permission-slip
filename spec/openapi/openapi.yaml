@@ -106,6 +106,8 @@ tags:
     description: Expo push token management for mobile push notifications (session-authenticated)
   - name: OAuth
     description: OAuth 2.0 provider authorization and connection management (session-authenticated)
+  - name: Payment Methods
+    description: Stored payment methods for agent-initiated purchases (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -289,6 +291,15 @@ paths:
 
   /v1/oauth/connections/{provider}:
     $ref: './components/paths/oauth.yaml#/oauthDisconnect'
+
+  /v1/payment-methods:
+    $ref: './components/paths/payment_methods.yaml#/paymentMethods'
+
+  /v1/payment-methods/setup-intent:
+    $ref: './components/paths/payment_methods.yaml#/setupIntent'
+
+  /v1/payment-methods/{id}:
+    $ref: './components/paths/payment_methods.yaml#/paymentMethodById'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -566,6 +577,20 @@ components:
       $ref: './components/schemas/oauth.yaml#/OAuthConnectionListResponse'
     OAuthDisconnectResponse:
       $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
+
+    # Payment Methods
+    PaymentMethod:
+      $ref: './components/schemas/payment_methods.yaml#/PaymentMethod'
+    PaymentMethodListResponse:
+      $ref: './components/schemas/payment_methods.yaml#/PaymentMethodListResponse'
+    SetupIntentResponse:
+      $ref: './components/schemas/payment_methods.yaml#/SetupIntentResponse'
+    ConfirmPaymentMethodRequest:
+      $ref: './components/schemas/payment_methods.yaml#/ConfirmPaymentMethodRequest'
+    UpdatePaymentMethodRequest:
+      $ref: './components/schemas/payment_methods.yaml#/UpdatePaymentMethodRequest'
+    DeletePaymentMethodResponse:
+      $ref: './components/schemas/payment_methods.yaml#/DeletePaymentMethodResponse'
 
     # Config
     ConfigResponse:

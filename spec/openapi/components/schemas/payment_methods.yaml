@@ -1,0 +1,112 @@
+PaymentMethod:
+  type: object
+  required:
+    - id
+    - brand
+    - last4
+    - exp_month
+    - exp_year
+    - is_default
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    label:
+      type: string
+    brand:
+      type: string
+      description: Card brand (e.g. visa, mastercard, amex)
+    last4:
+      type: string
+      description: Last 4 digits of the card number
+    exp_month:
+      type: integer
+      description: Card expiration month (1-12)
+    exp_year:
+      type: integer
+      description: Card expiration year (e.g. 2027)
+    is_default:
+      type: boolean
+    per_transaction_limit:
+      type: integer
+      nullable: true
+      description: Maximum amount in cents per transaction (null = no limit)
+    monthly_limit:
+      type: integer
+      nullable: true
+      description: Maximum monthly spend in cents (null = no limit)
+    monthly_spend:
+      type: integer
+      description: Current monthly spend in cents (included when monthly_limit is set)
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+PaymentMethodListResponse:
+  type: object
+  required:
+    - payment_methods
+  properties:
+    payment_methods:
+      type: array
+      items:
+        $ref: '#/PaymentMethod'
+
+SetupIntentResponse:
+  type: object
+  required:
+    - client_secret
+  properties:
+    client_secret:
+      type: string
+      description: Stripe SetupIntent client secret for use with Stripe Elements
+
+ConfirmPaymentMethodRequest:
+  type: object
+  required:
+    - payment_method_id
+  properties:
+    payment_method_id:
+      type: string
+      description: Stripe payment method ID (pm_*)
+    label:
+      type: string
+      description: User-friendly label for the card
+    is_default:
+      type: boolean
+      default: false
+
+UpdatePaymentMethodRequest:
+  type: object
+  properties:
+    label:
+      type: string
+    is_default:
+      type: boolean
+    per_transaction_limit:
+      type: integer
+      nullable: true
+      description: Per-transaction limit in cents
+    monthly_limit:
+      type: integer
+      nullable: true
+      description: Monthly spend limit in cents
+    clear_per_transaction_limit:
+      type: boolean
+      description: Set to true to remove the per-transaction limit
+    clear_monthly_limit:
+      type: boolean
+      description: Set to true to remove the monthly limit
+
+DeletePaymentMethodResponse:
+  type: object
+  required:
+    - deleted
+  properties:
+    deleted:
+      type: boolean

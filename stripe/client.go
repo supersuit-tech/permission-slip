@@ -10,6 +10,8 @@ import (
 	"github.com/stripe/stripe-go/v82/customer"
 	"github.com/stripe/stripe-go/v82/invoice"
 	"github.com/stripe/stripe-go/v82/invoiceitem"
+	"github.com/stripe/stripe-go/v82/paymentmethod"
+	"github.com/stripe/stripe-go/v82/setupintent"
 	"github.com/stripe/stripe-go/v82/subscription"
 )
 
@@ -217,6 +219,49 @@ func (c *Client) ListInvoices(ctx context.Context, stripeCustomerID string, limi
 		return nil, fmt.Errorf("stripe: list invoices: %w", err)
 	}
 	return invoices, nil
+}
+
+// ── Payment Method operations ─────────────────────────────────────────────
+
+// CreateSetupIntent creates a Stripe SetupIntent for collecting a payment
+// method without charging the customer. The client secret is used with
+// Stripe Elements to securely collect card details.
+func (c *Client) CreateSetupIntent(ctx context.Context, stripeCustomerID string) (*gostripe.SetupIntent, error) {
+	params := &gostripe.SetupIntentParams{
+		Customer:           gostripe.String(stripeCustomerID),
+		PaymentMethodTypes: []*string{gostripe.String("card")},
+	}
+	params.Context = ctx
+
+	si, err := setupintent.New(params)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: create setup intent: %w", err)
+	}
+	return si, nil
+}
+
+// GetPaymentMethod retrieves a Stripe PaymentMethod by ID.
+func (c *Client) GetPaymentMethod(ctx context.Context, paymentMethodID string) (*gostripe.PaymentMethod, error) {
+	params := &gostripe.PaymentMethodParams{}
+	params.Context = ctx
+
+	pm, err := paymentmethod.Get(paymentMethodID, params)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: get payment method: %w", err)
+	}
+	return pm, nil
+}
+
+// DetachPaymentMethod detaches a payment method from its customer.
+func (c *Client) DetachPaymentMethod(ctx context.Context, paymentMethodID string) (*gostripe.PaymentMethod, error) {
+	params := &gostripe.PaymentMethodDetachParams{}
+	params.Context = ctx
+
+	pm, err := paymentmethod.Detach(paymentMethodID, params)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: detach payment method: %w", err)
+	}
+	return pm, nil
 }
 
 // CancelSubscription cancels a Stripe subscription immediately.
