@@ -225,7 +225,7 @@ func TestExecuteConnectorAction_OAuthPath_Success(t *testing.T) {
 		t.Fatalf("update tokens: %v", err)
 	}
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestExecuteConnectorAction_OAuthPath_NoConnection(t *testing.T) {
 		// No Connection — tests the "user hasn't connected" case.
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when no OAuth connection exists")
 	}
@@ -269,7 +269,7 @@ func TestExecuteConnectorAction_OAuthPath_NeedsReauth(t *testing.T) {
 		Connection: &testhelper.OAuthConnectionOpts{Status: "needs_reauth"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for needs_reauth connection")
 	}
@@ -286,7 +286,7 @@ func TestExecuteConnectorAction_OAuthPath_RevokedConnection(t *testing.T) {
 		Connection: &testhelper.OAuthConnectionOpts{Status: "revoked"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.list_emails", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.list_emails", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for revoked connection")
 	}
@@ -300,7 +300,7 @@ func TestExecuteConnectorAction_OAuthPath_NoVault(t *testing.T) {
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{NoVault: true})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when vault is nil")
 	}
@@ -311,7 +311,7 @@ func TestExecuteConnectorAction_OAuthPath_NoOAuthRegistry(t *testing.T) {
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{NoOAuthRegistry: true})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when OAuth registry is nil")
 	}
@@ -330,7 +330,7 @@ func TestExecuteConnectorAction_OAuthPath_ExpiredTokenNoRefreshToken(t *testing.
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, &pastExpiry)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for expired token without refresh token")
 	}
@@ -363,7 +363,7 @@ func TestExecuteConnectorAction_OAuthPath_NonExpiredTokenSkipsRefresh(t *testing
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, &farFuture)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -394,7 +394,7 @@ func TestExecuteConnectorAction_OAuthPath_NilTokenExpirySkipsRefresh(t *testing.
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, nil)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken(t *testing.T) {
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -522,7 +522,7 @@ func TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked(t *testing.T)
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`))
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when refresh token is revoked")
 	}
@@ -569,7 +569,7 @@ func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
 
 	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
 
-	result, err := executeConnectorAction(t.Context(), deps, uid, "testslack.send_message", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(t.Context(), deps, uid, "testslack.send_message", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -592,7 +592,7 @@ func TestExecuteConnectorAction_NilConnectorRegistry(t *testing.T) {
 	t.Parallel()
 
 	deps := &Deps{Connectors: nil}
-	result, err := executeConnectorAction(context.Background(), deps, "any-user", "any.action", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(context.Background(), deps, "any-user", "any.action", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -608,7 +608,7 @@ func TestExecuteConnectorAction_UnknownAction(t *testing.T) {
 	reg.Register(newTestStubConnector("github", "github.create_issue"))
 
 	deps := &Deps{Connectors: reg}
-	result, err := executeConnectorAction(context.Background(), deps, "any-user", "unknown.action", json.RawMessage(`{}`))
+	result, err := executeConnectorAction(context.Background(), deps, "any-user", "unknown.action", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("expected nil error for unknown action, got %v", err)
 	}
@@ -697,5 +697,348 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 	handled := handleConnectorError(w, r, context.DeadlineExceeded)
 	if handled {
 		t.Error("expected handleConnectorError to NOT handle generic errors")
+	}
+}
+
+// ── executeConnectorAction: payment method integration ──────────────────────
+
+func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testpay"
+	actionType := connID + ".book"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	// Store credential.
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
+	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	// Insert payment method with limits.
+	perTx := 10000
+	monthly := 50000
+	pmID := testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{
+		PerTransactionLimit: &perTx,
+		MonthlyLimit:        &monthly,
+	})
+
+	var capturedPayment *connectors.PaymentInfo
+	reg := connectors.NewRegistry()
+	reg.Register(&paymentCapturingConnector{
+		id:         connID,
+		actionType: actionType,
+		onExec:     func(pi *connectors.PaymentInfo) { capturedPayment = pi },
+	})
+
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+	amount := 5000
+	result, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+		PaymentMethodID: pmID,
+		AmountCents:     &amount,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if capturedPayment == nil {
+		t.Fatal("expected payment info to be passed to connector")
+	}
+	if capturedPayment.Brand != "visa" {
+		t.Errorf("expected brand %q, got %q", "visa", capturedPayment.Brand)
+	}
+	if capturedPayment.Last4 != "4242" {
+		t.Errorf("expected last4 %q, got %q", "4242", capturedPayment.Last4)
+	}
+	if capturedPayment.StripePaymentMethodID == "" {
+		t.Error("expected non-empty StripePaymentMethodID")
+	}
+
+	// Verify transaction was recorded.
+	spend, err := db.GetMonthlySpend(t.Context(), tx, pmID)
+	if err != nil {
+		t.Fatalf("get monthly spend: %v", err)
+	}
+	if spend != 5000 {
+		t.Errorf("expected monthly spend of 5000, got %d", spend)
+	}
+}
+
+func TestExecuteConnectorAction_PaymentMethod_MissingRequired(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testpay2"
+	actionType := connID + ".book"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
+	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, actionType))
+
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+
+	// No payment params provided.
+	_, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), nil)
+	if err == nil {
+		t.Fatal("expected error when payment_method_id is missing")
+	}
+	if !connectors.IsPaymentError(err) {
+		t.Errorf("expected PaymentError, got %T: %v", err, err)
+	}
+	var pe *connectors.PaymentError
+	if connectors.AsPaymentError(err, &pe) && pe.Code != connectors.PaymentErrMissing {
+		t.Errorf("expected PaymentErrMissing, got %d", pe.Code)
+	}
+}
+
+func TestExecuteConnectorAction_PaymentMethod_PerTxLimitExceeded(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testpay3"
+	actionType := connID + ".book"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
+	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	perTx := 1000
+	pmID := testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{
+		PerTransactionLimit: &perTx,
+	})
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, actionType))
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+
+	amount := 5000 // Exceeds 1000 limit
+	_, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+		PaymentMethodID: pmID,
+		AmountCents:     &amount,
+	})
+	if err == nil {
+		t.Fatal("expected error when per-transaction limit is exceeded")
+	}
+	var pe *connectors.PaymentError
+	if !connectors.AsPaymentError(err, &pe) {
+		t.Fatalf("expected PaymentError, got %T: %v", err, err)
+	}
+	if pe.Code != connectors.PaymentErrPerTxLimit {
+		t.Errorf("expected PaymentErrPerTxLimit, got %d", pe.Code)
+	}
+}
+
+func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testpay4"
+	actionType := connID + ".book"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
+	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	monthly := 10000
+	pmID := testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{
+		MonthlyLimit: &monthly,
+	})
+
+	// Pre-seed a transaction to use up most of the monthly limit.
+	_, err := db.CreatePaymentMethodTransaction(t.Context(), tx, &db.PaymentMethodTransaction{
+		PaymentMethodID: pmID,
+		UserID:          uid,
+		ConnectorID:     connID,
+		ActionType:      actionType,
+		AmountCents:     9000,
+		Description:     "prior tx",
+	})
+	if err != nil {
+		t.Fatalf("seed transaction: %v", err)
+	}
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, actionType))
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+
+	amount := 2000 // 9000 + 2000 = 11000 > 10000 monthly limit
+	_, err = executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+		PaymentMethodID: pmID,
+		AmountCents:     &amount,
+	})
+	if err == nil {
+		t.Fatal("expected error when monthly limit is exceeded")
+	}
+	var pe *connectors.PaymentError
+	if !connectors.AsPaymentError(err, &pe) {
+		t.Fatalf("expected PaymentError, got %T: %v", err, err)
+	}
+	if pe.Code != connectors.PaymentErrMonthlyLimit {
+		t.Errorf("expected PaymentErrMonthlyLimit, got %d", pe.Code)
+	}
+}
+
+func TestExecuteConnectorAction_PaymentMethod_NotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testpay5"
+	actionType := connID + ".book"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorActionWithPayment(t, tx, connID, actionType, "Book")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
+	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, actionType))
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+
+	amount := 100
+	_, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), &paymentParams{
+		PaymentMethodID: "00000000-0000-0000-0000-000000000099",
+		AmountCents:     &amount,
+	})
+	if err == nil {
+		t.Fatal("expected error for nonexistent payment method")
+	}
+	var pe *connectors.PaymentError
+	if !connectors.AsPaymentError(err, &pe) {
+		t.Fatalf("expected PaymentError, got %T: %v", err, err)
+	}
+	if pe.Code != connectors.PaymentErrNotFound {
+		t.Errorf("expected PaymentErrNotFound, got %d", pe.Code)
+	}
+}
+
+func TestExecuteConnectorAction_NoPaymentMethod_WhenNotRequired(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testfree"
+	actionType := connID + ".search"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, actionType, "Search") // no payment required
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
+	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, actionType))
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+
+	// No payment params — should succeed because action doesn't require payment.
+	result, err := executeConnectorAction(t.Context(), deps, uid, actionType, json.RawMessage(`{}`), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+}
+
+// paymentCapturingConnector is a test connector that captures PaymentInfo.
+type paymentCapturingConnector struct {
+	id         string
+	actionType string
+	onExec     func(*connectors.PaymentInfo)
+}
+
+func (c *paymentCapturingConnector) ID() string { return c.id }
+func (c *paymentCapturingConnector) Actions() map[string]connectors.Action {
+	return map[string]connectors.Action{
+		c.actionType: &paymentCapturingAction{onExec: c.onExec},
+	}
+}
+func (c *paymentCapturingConnector) ValidateCredentials(_ context.Context, _ connectors.Credentials) error {
+	return nil
+}
+
+type paymentCapturingAction struct {
+	onExec func(*connectors.PaymentInfo)
+}
+
+func (a *paymentCapturingAction) Execute(_ context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	if a.onExec != nil {
+		a.onExec(req.Payment)
+	}
+	return &connectors.ActionResult{}, nil
+}
+
+// ── handleConnectorError: PaymentError mapping ──────────────────────────────
+
+func TestHandleConnectorError_PaymentError_Missing(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm1"))
+
+	pe := &connectors.PaymentError{Code: connectors.PaymentErrMissing, Message: "payment_method_id required"}
+	handled := handleConnectorError(w, r, pe)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle PaymentError")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
+func TestHandleConnectorError_PaymentError_LimitExceeded(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm2"))
+
+	pe := &connectors.PaymentError{Code: connectors.PaymentErrPerTxLimit, Message: "exceeds limit"}
+	handled := handleConnectorError(w, r, pe)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle PaymentError")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected status 403, got %d", w.Code)
 	}
 }

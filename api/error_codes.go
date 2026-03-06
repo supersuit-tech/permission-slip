@@ -64,7 +64,9 @@ const (
 	ErrOAuthProviderConfigExists   ErrorCode = "oauth_provider_config_exists"
 	ErrOAuthProviderConfigNotFound ErrorCode = "oauth_provider_config_not_found"
 	// Payment Methods
-	ErrPaymentMethodNotFound ErrorCode = "payment_method_not_found"
+	ErrPaymentMethodNotFound    ErrorCode = "payment_method_not_found"
+	ErrPaymentMethodRequired    ErrorCode = "payment_method_required"
+	ErrPaymentLimitExceeded     ErrorCode = "payment_limit_exceeded"
 
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
