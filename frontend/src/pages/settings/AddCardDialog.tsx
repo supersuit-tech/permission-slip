@@ -23,20 +23,20 @@ import {
   useCreateSetupIntent,
   useConfirmPaymentMethod,
 } from "@/hooks/usePaymentMethods";
+import { useConfig } from "@/hooks/useConfig";
 
-let stripePromise: Promise<Stripe | null> | null = null;
+const stripePromiseCache: Record<string, Promise<Stripe | null>> = {};
 
-function getStripe(): Promise<Stripe | null> {
-  if (!stripePromise) {
-    const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as
-      | string
-      | undefined;
-    if (!key) {
-      return Promise.resolve(null);
-    }
-    stripePromise = loadStripe(key);
-  }
-  return stripePromise;
+function getStripe(testMode: boolean): Promise<Stripe | null> {
+  const key = testMode
+    ? (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_TEST as string | undefined)
+    : (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined);
+  if (!key) return Promise.resolve(null);
+  const cached = stripePromiseCache[key];
+  if (cached) return cached;
+  const promise = loadStripe(key);
+  stripePromiseCache[key] = promise;
+  return promise;
 }
 
 interface AddCardDialogProps {
@@ -45,9 +45,11 @@ interface AddCardDialogProps {
 }
 
 export function AddCardDialog({ open, onOpenChange }: AddCardDialogProps) {
-  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as
-    | string
-    | undefined;
+  const { config } = useConfig();
+  const testMode = config?.stripe_test_mode ?? false;
+  const key = testMode
+    ? (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_TEST as string | undefined)
+    : (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined);
 
   if (!key) {
     return (
@@ -79,7 +81,7 @@ export function AddCardDialog({ open, onOpenChange }: AddCardDialogProps) {
             never touches our servers.
           </DialogDescription>
         </DialogHeader>
-        <Elements stripe={getStripe()}>
+        <Elements stripe={getStripe(testMode)}>
           <CardForm onSuccess={() => onOpenChange(false)} />
         </Elements>
       </DialogContent>
