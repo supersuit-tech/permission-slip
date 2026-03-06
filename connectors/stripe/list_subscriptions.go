@@ -38,7 +38,7 @@ func (p *listSubscriptionsParams) validate() error {
 	}
 	if p.Limit < 0 || p.Limit > maxSubscriptionLimit {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("limit must be between 1 and %d", maxSubscriptionLimit),
+			Message: fmt.Sprintf("limit must be between 0 and %d (0 uses default of %d)", maxSubscriptionLimit, defaultSubscriptionLimit),
 		}
 	}
 	return nil

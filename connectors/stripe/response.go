@@ -68,7 +68,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 
 	// Fallback: map by HTTP status code.
 	switch {
-	case statusCode == http.StatusUnauthorized:
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("Stripe auth error (%d): %s", statusCode, msg)}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Stripe API error: %s", msg)}

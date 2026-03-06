@@ -27,7 +27,9 @@ func TestCreatePaymentLink_Success(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("line_items[0][price]"); got != "price_abc" {
 			t.Errorf("line_items[0][price] = %q, want price_abc", got)
@@ -76,7 +78,9 @@ func TestCreatePaymentLink_WithRedirect(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("after_completion[type]"); got != "redirect" {
 			t.Errorf("after_completion[type] = %q, want redirect", got)
@@ -110,7 +114,9 @@ func TestCreatePaymentLink_WithPromotionCodes(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("allow_promotion_codes"); got != "true" {
 			t.Errorf("allow_promotion_codes = %q, want true", got)
@@ -197,7 +203,9 @@ func TestCreatePaymentLink_MultipleLineItems(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("line_items[0][price]"); got != "price_a" {
 			t.Errorf("line_items[0][price] = %q, want price_a", got)
@@ -258,6 +266,43 @@ func TestCreatePaymentLink_Timeout(t *testing.T) {
 	}
 	if !connectors.IsTimeoutError(err) {
 		t.Errorf("expected TimeoutError, got %T: %v", err, err)
+	}
+}
+
+func TestCreatePaymentLink_RejectsNonHTTPSRedirect(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_payment_link"]
+
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"http scheme", "http://example.com/thanks"},
+		{"javascript scheme", "javascript:alert(1)"},
+		{"data URI", "data:text/html,<h1>phish</h1>"},
+		{"no scheme", "example.com/thanks"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(map[string]any{
+				"line_items":       []map[string]any{{"price_id": "price_abc", "quantity": 1}},
+				"after_completion": tt.url,
+			})
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "stripe.create_payment_link",
+				Parameters:  json.RawMessage(params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatalf("Execute() expected error for %q, got nil", tt.url)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
 	}
 }
 

@@ -31,6 +31,7 @@ func TestValidateCredentials_Valid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			creds := connectors.NewCredentials(map[string]string{"api_key": tt.key})
 			if err := conn.ValidateCredentials(t.Context(), creds); err != nil {
 				t.Errorf("ValidateCredentials() unexpected error: %v", err)
@@ -54,6 +55,7 @@ func TestValidateCredentials_Invalid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := conn.ValidateCredentials(t.Context(), tt.creds)
 			if err == nil {
 				t.Fatal("ValidateCredentials() expected error, got nil")
@@ -168,6 +170,47 @@ func TestFormEncode_Empty(t *testing.T) {
 	result := formEncode(map[string]any{})
 	if len(result) != 0 {
 		t.Errorf("expected empty map, got %d keys", len(result))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// validateMetadata
+// ---------------------------------------------------------------------------
+
+func TestValidateMetadata_RejectsNonStringValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		metadata map[string]any
+	}{
+		{"nested object", map[string]any{"key": map[string]any{"nested": "value"}}},
+		{"array value", map[string]any{"key": []any{"a", "b"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateMetadata(tt.metadata)
+			if err == nil {
+				t.Fatal("expected error for non-string metadata value, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestValidateMetadata_AcceptsStringValues(t *testing.T) {
+	t.Parallel()
+
+	err := validateMetadata(map[string]any{
+		"string_val": "hello",
+		"number_val": float64(42),
+		"bool_val":   true,
+	})
+	if err != nil {
+		t.Errorf("validateMetadata() unexpected error: %v", err)
 	}
 }
 
@@ -314,6 +357,21 @@ func TestCheckResponse_401WithoutStripeBody(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_403ForbiddenMapsToAuthError(t *testing.T) {
+	t.Parallel()
+
+	// Stripe returns 403 when a restricted key lacks permission for an endpoint.
+	// This should map to AuthError, not ExternalError — the fix is re-keying,
+	// not retrying.
+	err := checkResponse(403, http.Header{}, []byte(`Forbidden`))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError for 403 Forbidden, got %T: %v", err, err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // do() integration tests via httptest
 // ---------------------------------------------------------------------------
@@ -360,7 +418,9 @@ func TestDo_POST_FormEncoded(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("ParseForm: %v", err)
+			t.Errorf("ParseForm: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if r.Form.Get("email") != "test@example.com" {
 			t.Errorf("email = %q, want test@example.com", r.Form.Get("email"))
@@ -746,6 +806,58 @@ func TestDeriveIdempotencyKey_DifferentInputs(t *testing.T) {
 
 // Compile-time interface checks (matches GitHub/Slack connector pattern).
 var _ connectors.Connector = (*StripeConnector)(nil)
+var _ connectors.ManifestProvider = (*StripeConnector)(nil)
+
+func TestManifest_Valid(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	m := conn.Manifest()
+	if err := m.Validate(); err != nil {
+		t.Fatalf("Manifest().Validate() error: %v", err)
+	}
+	if m.ID != "stripe" {
+		t.Errorf("Manifest().ID = %q, want %q", m.ID, "stripe")
+	}
+	if len(m.Actions) != 6 {
+		t.Errorf("Manifest().Actions has %d entries, want 6", len(m.Actions))
+	}
+	if len(m.RequiredCredentials) != 1 {
+		t.Errorf("Manifest().RequiredCredentials has %d entries, want 1", len(m.RequiredCredentials))
+	}
+	if m.RequiredCredentials[0].AuthType != "api_key" {
+		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "api_key")
+	}
+	if len(m.Templates) != 8 {
+		t.Errorf("Manifest().Templates has %d entries, want 8", len(m.Templates))
+	}
+}
+
+func TestManifest_ActionsMatchRegistered(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	m := conn.Manifest()
+	actions := conn.Actions()
+
+	for _, ma := range m.Actions {
+		if _, ok := actions[ma.ActionType]; !ok {
+			t.Errorf("Manifest action %q not found in Actions() map", ma.ActionType)
+		}
+	}
+	for actionType := range actions {
+		found := false
+		for _, ma := range m.Actions {
+			if ma.ActionType == actionType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Actions() has %q but it's not in the Manifest", actionType)
+		}
+	}
+}
 
 func TestID(t *testing.T) {
 	t.Parallel()

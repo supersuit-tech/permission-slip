@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -49,6 +50,18 @@ func (p *createPaymentLinkParams) validate() error {
 			return &connectors.ValidationError{
 				Message: fmt.Sprintf("line_items[%d].quantity must be positive", i),
 			}
+		}
+	}
+	if p.AfterCompletion != "" {
+		u, err := url.Parse(p.AfterCompletion)
+		if err != nil {
+			return &connectors.ValidationError{Message: fmt.Sprintf("after_completion is not a valid URL: %v", err)}
+		}
+		if u.Scheme != "https" {
+			return &connectors.ValidationError{Message: "after_completion must use https scheme"}
+		}
+		if u.Host == "" {
+			return &connectors.ValidationError{Message: "after_completion must include a host"}
 		}
 	}
 	return validateMetadata(p.Metadata)
