@@ -88,9 +88,15 @@ func newForTest(client *http.Client, baseURL string) *StripeConnector {
 func (c *StripeConnector) ID() string { return "stripe" }
 
 // Actions returns the registered action handlers keyed by action_type.
-// Phase 2 will populate this map with the actual action implementations.
 func (c *StripeConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
+	return map[string]connectors.Action{
+		"stripe.create_customer":     &createCustomerAction{conn: c},
+		"stripe.create_invoice":      &createInvoiceAction{conn: c},
+		"stripe.issue_refund":        &issueRefundAction{conn: c},
+		"stripe.list_subscriptions":  &listSubscriptionsAction{conn: c},
+		"stripe.create_payment_link": &createPaymentLinkAction{conn: c},
+		"stripe.get_balance":         &getBalanceAction{conn: c},
+	}
 }
 
 // ValidateCredentials checks that the provided credentials contain a
