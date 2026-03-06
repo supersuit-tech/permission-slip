@@ -46,6 +46,8 @@ func (a *deleteDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	return connectors.JSONResult(map[string]string{
-		"status": "deleted",
+		"status":  "deleted",
+		"item_id": params.ItemID,
+		"message": "File moved to recycle bin and can be recovered",
 	})
 }

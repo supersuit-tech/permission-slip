@@ -63,34 +63,40 @@ func TestListDriveFiles_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var summaries []driveFileSummary
-	if err := json.Unmarshal(result.Data, &summaries); err != nil {
+	var resp struct {
+		FolderPath string             `json:"folder_path"`
+		Items      []driveFileSummary `json:"items"`
+	}
+	if err := json.Unmarshal(result.Data, &resp); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if len(summaries) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(summaries))
+	if resp.FolderPath != "/" {
+		t.Errorf("expected folder_path '/', got %q", resp.FolderPath)
+	}
+	if len(resp.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(resp.Items))
 	}
 
 	// Check file
-	if summaries[0].ID != "file-1" {
-		t.Errorf("expected id 'file-1', got %q", summaries[0].ID)
+	if resp.Items[0].ID != "file-1" {
+		t.Errorf("expected id 'file-1', got %q", resp.Items[0].ID)
 	}
-	if summaries[0].Type != "file" {
-		t.Errorf("expected type 'file', got %q", summaries[0].Type)
+	if resp.Items[0].Type != "file" {
+		t.Errorf("expected type 'file', got %q", resp.Items[0].Type)
 	}
-	if summaries[0].MimeType == "" {
+	if resp.Items[0].MimeType == "" {
 		t.Error("expected non-empty mime_type for file")
 	}
 
 	// Check folder
-	if summaries[1].ID != "folder-1" {
-		t.Errorf("expected id 'folder-1', got %q", summaries[1].ID)
+	if resp.Items[1].ID != "folder-1" {
+		t.Errorf("expected id 'folder-1', got %q", resp.Items[1].ID)
 	}
-	if summaries[1].Type != "folder" {
-		t.Errorf("expected type 'folder', got %q", summaries[1].Type)
+	if resp.Items[1].Type != "folder" {
+		t.Errorf("expected type 'folder', got %q", resp.Items[1].Type)
 	}
-	if summaries[1].ChildCount != 5 {
-		t.Errorf("expected child_count 5, got %d", summaries[1].ChildCount)
+	if resp.Items[1].ChildCount != 5 {
+		t.Errorf("expected child_count 5, got %d", resp.Items[1].ChildCount)
 	}
 }
 

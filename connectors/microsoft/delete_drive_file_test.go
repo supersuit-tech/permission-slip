@@ -48,6 +48,12 @@ func TestDeleteDriveFile_Success(t *testing.T) {
 	if data["status"] != "deleted" {
 		t.Errorf("expected status 'deleted', got %q", data["status"])
 	}
+	if data["item_id"] != "file-123" {
+		t.Errorf("expected item_id 'file-123', got %q", data["item_id"])
+	}
+	if data["message"] == "" {
+		t.Error("expected non-empty message")
+	}
 }
 
 func TestDeleteDriveFile_MissingItemID(t *testing.T) {

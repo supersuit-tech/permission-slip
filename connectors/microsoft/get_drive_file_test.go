@@ -249,10 +249,49 @@ func TestGetDriveFile_FolderMetadata(t *testing.T) {
 	}
 }
 
+func TestGetDriveFile_FolderContentSkipped(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":   "folder-1",
+			"name": "Documents",
+			"size": 0,
+			"folder": map[string]any{
+				"childCount": 3,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &getDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(getDriveFileParams{ItemID: "folder-1", IncludeContent: true})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.get_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var detail driveFileDetail
+	if err := json.Unmarshal(result.Data, &detail); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if detail.ContentSkipped == "" {
+		t.Error("expected content_skipped to be set for folder with include_content=true")
+	}
+}
+
 func TestValidateItemID(t *testing.T) {
 	t.Parallel()
 
-	valid := []string{"abc123", "ABC-123-DEF", "item!123"}
+	valid := []string{"abc123", "ABC-123-DEF", "item!123", "item.with.dots"}
 	for _, id := range valid {
 		if err := validateItemID(id); err != nil {
 			t.Errorf("expected valid item_id %q, got error: %v", id, err)

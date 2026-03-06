@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -39,7 +38,7 @@ func (p *uploadDriveFileParams) validate() error {
 	}
 	if len(p.Content) > maxUploadContentSize {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("content exceeds maximum size of %d bytes", maxUploadContentSize),
+			Message: "content exceeds maximum upload size of 4 MB",
 		}
 	}
 	if err := validateFilePath(p.FilePath); err != nil {
@@ -101,14 +100,5 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 
 // validateFilePath rejects paths with traversal sequences, backslashes, or absolute paths.
 func validateFilePath(p string) error {
-	if strings.Contains(p, "..") {
-		return &connectors.ValidationError{Message: "invalid file_path: must not contain path traversal sequences"}
-	}
-	if strings.Contains(p, "\\") {
-		return &connectors.ValidationError{Message: "invalid file_path: must not contain backslashes"}
-	}
-	if strings.HasPrefix(p, "/") {
-		return &connectors.ValidationError{Message: "invalid file_path: must be a relative path"}
-	}
-	return nil
+	return validateRelativePath("file_path", p)
 }

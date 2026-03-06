@@ -33,15 +33,16 @@ func (p *getDriveFileParams) validate() error {
 
 // driveFileDetail is the detailed response for a single drive item.
 type driveFileDetail struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Size       int64  `json:"size"`
-	MimeType   string `json:"mime_type,omitempty"`
-	WebURL     string `json:"web_url,omitempty"`
-	CreatedAt  string `json:"created_at,omitempty"`
-	ModifiedAt string `json:"modified_at,omitempty"`
-	Content    string `json:"content,omitempty"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	Size           int64  `json:"size"`
+	MimeType       string `json:"mime_type,omitempty"`
+	WebURL         string `json:"web_url,omitempty"`
+	CreatedAt      string `json:"created_at,omitempty"`
+	ModifiedAt     string `json:"modified_at,omitempty"`
+	Content        string `json:"content,omitempty"`
+	ContentSkipped string `json:"content_skipped,omitempty"`
 }
 
 // textMimeTypes lists MIME type prefixes that are safe to download as text.
@@ -101,6 +102,9 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	// Optionally download text content.
+	if params.IncludeContent && detail.Type == "folder" {
+		detail.ContentSkipped = "content download is not available for folders"
+	}
 	if params.IncludeContent && detail.Type == "file" {
 		if detail.MimeType != "" && !isTextMimeType(detail.MimeType) {
 			return nil, &connectors.ValidationError{
@@ -118,10 +122,13 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 	return connectors.JSONResult(detail)
 }
 
-// validateItemID rejects item IDs containing path separators or special characters.
+// validateItemID rejects item IDs containing path separators or traversal sequences.
 func validateItemID(id string) error {
-	if strings.ContainsAny(id, "/\\..") {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or special characters"}
+	if strings.ContainsAny(id, "/\\") {
+		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators"}
+	}
+	if strings.Contains(id, "..") {
+		return &connectors.ValidationError{Message: "invalid item_id: must not contain path traversal sequences"}
 	}
 	return nil
 }

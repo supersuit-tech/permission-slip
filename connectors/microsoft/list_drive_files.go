@@ -90,6 +90,11 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
+	folderDisplay := params.FolderPath
+	if folderDisplay == "" {
+		folderDisplay = "/"
+	}
+
 	summaries := make([]driveFileSummary, len(resp.Value))
 	for i, item := range resp.Value {
 		summary := driveFileSummary{
@@ -112,7 +117,13 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 		summaries[i] = summary
 	}
 
-	return connectors.JSONResult(summaries)
+	return connectors.JSONResult(struct {
+		FolderPath string             `json:"folder_path"`
+		Items      []driveFileSummary `json:"items"`
+	}{
+		FolderPath: folderDisplay,
+		Items:      summaries,
+	})
 }
 
 // validateFolderPath rejects paths with traversal sequences, absolute paths, or backslashes.
@@ -120,14 +131,20 @@ func validateFolderPath(p string) error {
 	if p == "" {
 		return nil
 	}
+	return validateRelativePath("folder_path", p)
+}
+
+// validateRelativePath validates that a path is relative and safe from traversal attacks.
+// Used by both folder_path and file_path validation.
+func validateRelativePath(field, p string) error {
 	if strings.Contains(p, "..") {
-		return &connectors.ValidationError{Message: "invalid folder_path: must not contain path traversal sequences"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain path traversal sequences", field)}
 	}
 	if strings.Contains(p, "\\") {
-		return &connectors.ValidationError{Message: "invalid folder_path: must not contain backslashes"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain backslashes", field)}
 	}
 	if strings.HasPrefix(p, "/") {
-		return &connectors.ValidationError{Message: "invalid folder_path: must be a relative path"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must be a relative path", field)}
 	}
 	return nil
 }
