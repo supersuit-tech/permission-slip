@@ -49,7 +49,7 @@ func (a *priceFlightAction) Execute(ctx context.Context, req connectors.ActionRe
 	var resp struct {
 		Data json.RawMessage `json:"data"`
 	}
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v1/shopping/flight-offers/pricing", body, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v1/shopping/flight-offers/pricing", body, &resp, nil); err != nil {
 		return nil, err
 	}
 

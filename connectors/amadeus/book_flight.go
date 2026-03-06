@@ -41,6 +41,7 @@ type bookFlightParams struct {
 	Travelers       []bookFlightTraveler `json:"travelers"`
 	PaymentMethodID string               `json:"payment_method_id"`
 	Remarks         string               `json:"remarks"`
+	IdempotencyKey  string               `json:"idempotency_key"`
 }
 
 func (p *bookFlightParams) validate() error {
@@ -84,6 +85,12 @@ func (p *bookFlightParams) validate() error {
 	}
 	if p.PaymentMethodID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: payment_method_id"}
+	}
+	if p.IdempotencyKey == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: idempotency_key (required to prevent double-bookings)"}
+	}
+	if len(p.IdempotencyKey) > maxIdempotencyKeyLen {
+		return &connectors.ValidationError{Message: fmt.Sprintf("idempotency_key exceeds maximum length of %d characters", maxIdempotencyKeyLen)}
 	}
 	if len(p.Remarks) > maxRemarkLen {
 		return &connectors.ValidationError{Message: fmt.Sprintf("remarks exceeds maximum length of %d characters", maxRemarkLen)}
@@ -147,10 +154,18 @@ func (a *bookFlightAction) Execute(ctx context.Context, req connectors.ActionReq
 		}
 	}
 
+	// Send the idempotency key as a request header to prevent duplicate
+	// bookings. If the same key is sent twice, Amadeus returns the original
+	// booking instead of creating a new one. This is critical — double-booking
+	// is expensive and hard to reverse.
+	headers := http.Header{
+		"X-Idempotency-Key": {params.IdempotencyKey},
+	}
+
 	var resp struct {
 		Data json.RawMessage `json:"data"`
 	}
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v1/booking/flight-orders", body, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v1/booking/flight-orders", body, &resp, headers); err != nil {
 		return nil, err
 	}
 

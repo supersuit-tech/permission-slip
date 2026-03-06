@@ -20,6 +20,11 @@ func TestBookFlight_Success(t *testing.T) {
 			t.Errorf("path = %s, want /v1/booking/flight-orders", r.URL.Path)
 		}
 
+		// Verify the idempotency key header is sent.
+		if got := r.Header.Get("X-Idempotency-Key"); got != "booking-uuid-123" {
+			t.Errorf("X-Idempotency-Key = %q, want %q", got, "booking-uuid-123")
+		}
+
 		body, _ := io.ReadAll(r.Body)
 		var reqBody map[string]any
 		if err := json.Unmarshal(body, &reqBody); err != nil {
@@ -64,7 +69,8 @@ func TestBookFlight_Success(t *testing.T) {
 	params := `{
 		"flight_offer": {"id":"1","type":"flight-offer"},
 		"travelers": [{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"john@example.com","phone":"+14155551234"}}],
-		"payment_method_id": "pm_abc123"
+		"payment_method_id": "pm_abc123",
+		"idempotency_key": "booking-uuid-123"
 	}`
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -122,6 +128,7 @@ func TestBookFlight_WithRemarks(t *testing.T) {
 		"flight_offer": {"id":"1"},
 		"travelers": [{"name":{"firstName":"Jane","lastName":"Smith"},"dateOfBirth":"1985-05-20","gender":"FEMALE","contact":{"email":"jane@example.com","phone":"+14155559999"}}],
 		"payment_method_id": "pm_xyz",
+		"idempotency_key": "remark-booking-456",
 		"remarks": "Window seat preferred"
 	}`
 
@@ -142,22 +149,24 @@ func TestBookFlight_MissingParams(t *testing.T) {
 	action := conn.Actions()["amadeus.book_flight"]
 
 	baseTraveler := `[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}]`
+	baseValid := `"payment_method_id":"pm_1","idempotency_key":"key-1"`
 
 	tests := []struct {
 		name   string
 		params string
 	}{
-		{"missing flight_offer", `{"travelers":` + baseTraveler + `,"payment_method_id":"pm_1"}`},
-		{"null flight_offer", `{"flight_offer":null,"travelers":` + baseTraveler + `,"payment_method_id":"pm_1"}`},
-		{"missing travelers", `{"flight_offer":{"id":"1"},"payment_method_id":"pm_1"}`},
-		{"empty travelers", `{"flight_offer":{"id":"1"},"travelers":[],"payment_method_id":"pm_1"}`},
-		{"missing payment_method_id", `{"flight_offer":{"id":"1"},"travelers":` + baseTraveler + `}`},
-		{"traveler missing firstName", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler missing lastName", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler invalid dateOfBirth", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"not-a-date","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler invalid gender", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"OTHER","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler missing email", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler missing phone", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com"}}],"payment_method_id":"pm_1"}`},
+		{"missing flight_offer", `{"travelers":` + baseTraveler + `,` + baseValid + `}`},
+		{"null flight_offer", `{"flight_offer":null,"travelers":` + baseTraveler + `,` + baseValid + `}`},
+		{"missing travelers", `{"flight_offer":{"id":"1"},` + baseValid + `}`},
+		{"empty travelers", `{"flight_offer":{"id":"1"},"travelers":[],` + baseValid + `}`},
+		{"missing payment_method_id", `{"flight_offer":{"id":"1"},"travelers":` + baseTraveler + `,"idempotency_key":"key-1"}`},
+		{"missing idempotency_key", `{"flight_offer":{"id":"1"},"travelers":` + baseTraveler + `,"payment_method_id":"pm_1"}`},
+		{"traveler missing firstName", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],` + baseValid + `}`},
+		{"traveler missing lastName", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],` + baseValid + `}`},
+		{"traveler invalid dateOfBirth", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"not-a-date","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],` + baseValid + `}`},
+		{"traveler invalid gender", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"OTHER","contact":{"email":"j@e.com","phone":"+1"}}],` + baseValid + `}`},
+		{"traveler missing email", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"phone":"+1"}}],` + baseValid + `}`},
+		{"traveler missing phone", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com"}}],` + baseValid + `}`},
 		{"invalid JSON", `{invalid}`},
 	}
 
@@ -193,7 +202,8 @@ func TestBookFlight_APIError(t *testing.T) {
 	params := `{
 		"flight_offer": {"id":"1"},
 		"travelers": [{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],
-		"payment_method_id": "pm_1"
+		"payment_method_id": "pm_1",
+		"idempotency_key": "api-err-key"
 	}`
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{

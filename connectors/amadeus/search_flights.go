@@ -106,7 +106,7 @@ func (a *searchFlightsAction) Execute(ctx context.Context, req connectors.Action
 		Data         []json.RawMessage      `json:"data"`
 		Dictionaries map[string]interface{} `json:"dictionaries"`
 	}
-	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp, nil); err != nil {
 		return nil, err
 	}
 

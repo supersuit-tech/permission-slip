@@ -87,6 +87,7 @@ Create a flight booking (PNR). **High risk — creates a real reservation.**
 | `flight_offer` | object | Yes | Priced flight offer object (max 100KB) |
 | `travelers` | array | Yes | Array of traveler details (max 9) — see below |
 | `payment_method_id` | string | Yes | Stored payment method ID (resolved server-side) |
+| `idempotency_key` | string | Yes | Unique key to prevent duplicate bookings (e.g., UUID). Max 128 chars. |
 | `remarks` | string | No | Booking remarks (max 500 chars) |
 
 **Traveler object:**
@@ -99,6 +100,8 @@ Create a flight booking (PNR). **High risk — creates a real reservation.**
 | `gender` | string | Yes | `MALE` or `FEMALE` |
 | `contact.email` | string | Yes | Email address |
 | `contact.phone` | string | Yes | Phone number |
+
+**Idempotency:** The `idempotency_key` is sent as an `X-Idempotency-Key` header to the Amadeus API. If the same key is sent twice, the API returns the original booking instead of creating a duplicate. This is required — double-booking is expensive and hard to reverse. Use a UUID or similar unique identifier per booking attempt.
 
 **Payment:** The agent passes a `payment_method_id` and Permission Slip injects the real payment details server-side. The agent never sees raw card data.
 
@@ -180,6 +183,7 @@ All actions validate inputs before making API calls:
 - **Genders** must be MALE or FEMALE
 - **Flight offers** are capped at 100KB to prevent oversized payloads
 - **Travelers** are capped at 9 per booking
+- **Idempotency keys** are required for bookings and capped at 128 characters
 - **Remarks** are capped at 500 characters
 
 ## File Structure

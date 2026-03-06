@@ -55,7 +55,7 @@ func (a *searchAirportsAction) Execute(ctx context.Context, req connectors.Actio
 	var resp struct {
 		Data []json.RawMessage `json:"data"`
 	}
-	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp, nil); err != nil {
 		return nil, err
 	}
 

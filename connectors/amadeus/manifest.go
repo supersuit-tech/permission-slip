@@ -99,9 +99,10 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Array of traveler details"
 						},
 						"payment_method_id": {"type": "string", "description": "Stored payment method ID"},
+						"idempotency_key": {"type": "string", "description": "Unique key to prevent duplicate bookings (e.g. UUID). Required — double-booking is expensive."},
 						"remarks": {"type": "string", "description": "Optional booking remarks"}
 					},
-					"required": ["flight_offer", "travelers", "payment_method_id"]
+					"required": ["flight_offer", "travelers", "payment_method_id", "idempotency_key"]
 				}`),
 			},
 			{

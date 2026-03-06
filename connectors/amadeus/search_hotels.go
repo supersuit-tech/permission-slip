@@ -116,7 +116,7 @@ func (a *searchHotelsAction) fetchHotelIDs(ctx context.Context, creds connectors
 			HotelID string `json:"hotelId"`
 		} `json:"data"`
 	}
-	if err := a.conn.do(ctx, creds, http.MethodGet, path, nil, &resp); err != nil {
+	if err := a.conn.do(ctx, creds, http.MethodGet, path, nil, &resp, nil); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +162,7 @@ func (a *searchHotelsAction) fetchHotelOffers(ctx context.Context, creds connect
 	var resp struct {
 		Data []json.RawMessage `json:"data"`
 	}
-	if err := a.conn.do(ctx, creds, http.MethodGet, path, nil, &resp); err != nil {
+	if err := a.conn.do(ctx, creds, http.MethodGet, path, nil, &resp, nil); err != nil {
 		return nil, err
 	}
 

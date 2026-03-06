@@ -45,6 +45,10 @@ const (
 	// maxRemarkLen is the maximum length of a booking remark.
 	maxRemarkLen = 500
 
+	// maxIdempotencyKeyLen is the maximum length of an idempotency key.
+	// UUIDs are 36 chars; we allow up to 128 for flexibility.
+	maxIdempotencyKeyLen = 128
+
 	// maxResultsCap is the upper bound for max_results in search actions.
 	maxResultsCap = 250
 )

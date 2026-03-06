@@ -78,7 +78,7 @@ func (a *searchCarsAction) Execute(ctx context.Context, req connectors.ActionReq
 	var resp struct {
 		Data []json.RawMessage `json:"data"`
 	}
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v2/shopping/transfer-offers", body, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v2/shopping/transfer-offers", body, &resp, nil); err != nil {
 		return nil, err
 	}
 
