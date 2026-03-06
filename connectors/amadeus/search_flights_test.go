@@ -151,7 +151,9 @@ func TestSearchFlights_MissingParams(t *testing.T) {
 		params string
 	}{
 		{"missing origin", `{"destination":"LAX","departure_date":"2024-06-15","adults":1}`},
+		{"invalid origin format", `{"origin":"sfo","destination":"LAX","departure_date":"2024-06-15","adults":1}`},
 		{"missing destination", `{"origin":"SFO","departure_date":"2024-06-15","adults":1}`},
+		{"invalid destination format", `{"origin":"SFO","destination":"la","departure_date":"2024-06-15","adults":1}`},
 		{"missing departure_date", `{"origin":"SFO","destination":"LAX","adults":1}`},
 		{"invalid departure_date", `{"origin":"SFO","destination":"LAX","departure_date":"not-a-date","adults":1}`},
 		{"invalid return_date", `{"origin":"SFO","destination":"LAX","departure_date":"2024-06-15","return_date":"bad","adults":1}`},

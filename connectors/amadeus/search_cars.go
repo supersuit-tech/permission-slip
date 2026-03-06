@@ -27,6 +27,12 @@ func (p *searchCarsParams) validate() error {
 	if p.PickupLocation == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: pickup_location"}
 	}
+	if !validIATACode(p.PickupLocation) {
+		return &connectors.ValidationError{Message: "pickup_location must be a 3-letter IATA code (e.g., LAX)"}
+	}
+	if p.DropoffLocation != "" && !validIATACode(p.DropoffLocation) {
+		return &connectors.ValidationError{Message: "dropoff_location must be a 3-letter IATA code (e.g., SFO)"}
+	}
 	if p.PickupDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: pickup_date"}
 	}

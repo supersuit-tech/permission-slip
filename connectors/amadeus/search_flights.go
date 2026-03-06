@@ -39,8 +39,14 @@ func (p *searchFlightsParams) validate() error {
 	if p.Origin == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: origin"}
 	}
+	if !validIATACode(p.Origin) {
+		return &connectors.ValidationError{Message: "origin must be a 3-letter IATA code (e.g., SFO)"}
+	}
 	if p.Destination == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: destination"}
+	}
+	if !validIATACode(p.Destination) {
+		return &connectors.ValidationError{Message: "destination must be a 3-letter IATA code (e.g., LAX)"}
 	}
 	if p.DepartureDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: departure_date"}
@@ -79,6 +85,9 @@ func (a *searchFlightsAction) Execute(ctx context.Context, req connectors.Action
 	maxResults := params.MaxResults
 	if maxResults <= 0 {
 		maxResults = 10
+	}
+	if maxResults > maxResultsCap {
+		maxResults = maxResultsCap
 	}
 
 	q := url.Values{

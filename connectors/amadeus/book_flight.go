@@ -52,8 +52,14 @@ func (p *bookFlightParams) validate() error {
 	if len(p.FlightOffer) == 0 || string(p.FlightOffer) == "null" {
 		return &connectors.ValidationError{Message: "missing required parameter: flight_offer"}
 	}
+	if len(p.FlightOffer) > maxFlightOfferBytes {
+		return &connectors.ValidationError{Message: "flight_offer exceeds maximum size"}
+	}
 	if len(p.Travelers) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: travelers"}
+	}
+	if len(p.Travelers) > maxTravelers {
+		return &connectors.ValidationError{Message: fmt.Sprintf("travelers count exceeds maximum of %d", maxTravelers)}
 	}
 	for i, t := range p.Travelers {
 		if t.Name.FirstName == "" {
@@ -83,6 +89,9 @@ func (p *bookFlightParams) validate() error {
 	}
 	if p.PaymentMethodID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: payment_method_id"}
+	}
+	if len(p.Remarks) > maxRemarkLen {
+		return &connectors.ValidationError{Message: fmt.Sprintf("remarks exceeds maximum length of %d characters", maxRemarkLen)}
 	}
 	return nil
 }

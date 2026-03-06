@@ -23,6 +23,9 @@ func (p *priceFlightParams) validate() error {
 	if len(p.FlightOffer) == 0 || string(p.FlightOffer) == "null" {
 		return &connectors.ValidationError{Message: "missing required parameter: flight_offer"}
 	}
+	if len(p.FlightOffer) > maxFlightOfferBytes {
+		return &connectors.ValidationError{Message: "flight_offer exceeds maximum size"}
+	}
 	return nil
 }
 

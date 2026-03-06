@@ -105,6 +105,8 @@ func TestSearchCars_MissingParams(t *testing.T) {
 		params string
 	}{
 		{"missing pickup_location", `{"pickup_date":"2024-07-01","dropoff_date":"2024-07-05"}`},
+		{"invalid pickup_location", `{"pickup_location":"lax","pickup_date":"2024-07-01","dropoff_date":"2024-07-05"}`},
+		{"invalid dropoff_location", `{"pickup_location":"LAX","pickup_date":"2024-07-01","dropoff_date":"2024-07-05","dropoff_location":"sf"}`},
 		{"missing pickup_date", `{"pickup_location":"LAX","dropoff_date":"2024-07-05"}`},
 		{"missing dropoff_date", `{"pickup_location":"LAX","pickup_date":"2024-07-01"}`},
 		{"invalid JSON", `{invalid}`},

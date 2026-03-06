@@ -37,6 +37,9 @@ func (p *searchHotelsParams) validate() error {
 	if p.CityCode == "" && (p.Latitude == "" || p.Longitude == "") {
 		return &connectors.ValidationError{Message: "either city_code or both latitude and longitude are required"}
 	}
+	if p.CityCode != "" && !validIATACode(p.CityCode) {
+		return &connectors.ValidationError{Message: "city_code must be a 3-letter IATA code (e.g., PAR)"}
+	}
 	if p.CheckInDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: check_in_date"}
 	}
