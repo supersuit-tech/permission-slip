@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // updateAction implements connectors.Action for mysql.update.
@@ -35,7 +36,7 @@ func (p *updateParams) validate() error {
 	if len(p.Where) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: where (unconditional updates are not allowed)"}
 	}
-	if err := checkTableAllowed(p.Table, p.AllowedTables); err != nil {
+	if err := sqldb.CheckTableAllowed(p.Table, p.AllowedTables); err != nil {
 		return err
 	}
 
@@ -53,7 +54,7 @@ func (p *updateParams) validate() error {
 		}
 		allCols = append(allCols, col)
 	}
-	return checkColumnsAllowed(allCols, p.AllowedColumns)
+	return sqldb.CheckColumnsAllowed(allCols, p.AllowedColumns)
 }
 
 // Execute updates rows in a MySQL table and returns the number of rows affected.

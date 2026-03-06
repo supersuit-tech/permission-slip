@@ -18,11 +18,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -328,49 +327,11 @@ func quoteIdentifier(name string) string {
 	return "`" + name + "`"
 }
 
-// checkTableAllowed validates that a table name is in the allowlist (if provided).
-func checkTableAllowed(table string, allowedTables []string) error {
-	if len(allowedTables) == 0 {
-		return nil
-	}
-	for _, t := range allowedTables {
-		if strings.EqualFold(t, table) {
-			return nil
-		}
-	}
-	return &connectors.ValidationError{
-		Message: fmt.Sprintf("table %q is not in the allowed tables list", table),
-	}
-}
-
-// checkColumnsAllowed validates that all columns are in the allowlist (if provided).
-func checkColumnsAllowed(columns []string, allowedColumns []string) error {
-	if len(allowedColumns) == 0 {
-		return nil
-	}
-	allowed := make(map[string]bool, len(allowedColumns))
-	for _, c := range allowedColumns {
-		allowed[strings.ToLower(c)] = true
-	}
-	for _, c := range columns {
-		if !allowed[strings.ToLower(c)] {
-			return &connectors.ValidationError{
-				Message: fmt.Sprintf("column %q is not in the allowed columns list", c),
-			}
-		}
-	}
-	return nil
-}
-
 // buildEqualityClauses builds "`col` = ?" clauses from a column-value map,
 // sorted deterministically by column name. Returns the SQL fragments and
 // matching positional args.
 func buildEqualityClauses(pairs map[string]interface{}) ([]string, []any) {
-	cols := make([]string, 0, len(pairs))
-	for col := range pairs {
-		cols = append(cols, col)
-	}
-	sort.Strings(cols)
+	cols := sqldb.SortedKeys(pairs)
 
 	parts := make([]string, len(cols))
 	args := make([]any, len(cols))

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // deleteAction implements connectors.Action for mysql.delete.
@@ -30,7 +31,7 @@ func (p *deleteParams) validate() error {
 	if len(p.Where) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: where (unconditional deletes are not allowed)"}
 	}
-	if err := checkTableAllowed(p.Table, p.AllowedTables); err != nil {
+	if err := sqldb.CheckTableAllowed(p.Table, p.AllowedTables); err != nil {
 		return err
 	}
 

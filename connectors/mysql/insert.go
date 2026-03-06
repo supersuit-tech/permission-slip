@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // insertAction implements connectors.Action for mysql.insert.
@@ -37,7 +37,7 @@ func (p *insertParams) validate() error {
 			Message: fmt.Sprintf("too many rows: %d exceeds maximum of %d per insert", len(p.Rows), maxInsertRows),
 		}
 	}
-	if err := checkTableAllowed(p.Table, p.AllowedTables); err != nil {
+	if err := sqldb.CheckTableAllowed(p.Table, p.AllowedTables); err != nil {
 		return err
 	}
 
@@ -59,7 +59,7 @@ func (p *insertParams) validate() error {
 	for col := range colSet {
 		cols = append(cols, col)
 	}
-	return checkColumnsAllowed(cols, p.AllowedColumns)
+	return sqldb.CheckColumnsAllowed(cols, p.AllowedColumns)
 }
 
 // Execute inserts rows into a MySQL table and returns the number of rows affected.
@@ -73,17 +73,13 @@ func (a *insertAction) Execute(ctx context.Context, req connectors.ActionRequest
 	}
 
 	// Collect all unique column names and sort for deterministic ordering.
-	colSet := make(map[string]bool)
+	colSet := make(map[string]interface{})
 	for _, row := range params.Rows {
 		for col := range row {
 			colSet[col] = true
 		}
 	}
-	columns := make([]string, 0, len(colSet))
-	for col := range colSet {
-		columns = append(columns, col)
-	}
-	sort.Strings(columns)
+	columns := sqldb.SortedKeys(colSet)
 
 	// Build the INSERT statement.
 	quotedCols := make([]string, len(columns))

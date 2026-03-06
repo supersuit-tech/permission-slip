@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // queryAction implements connectors.Action for mysql.query.
@@ -142,42 +143,15 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	}
 	defer rows.Close()
 
-	columns, err := rows.Columns()
+	columns, results, err := sqldb.ScanRows(rows, 0, nil)
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading column names: %v", err)}
-	}
-
-	var results []map[string]any
-	for rows.Next() {
-		values := make([]any, len(columns))
-		valuePtrs := make([]any, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, &connectors.ExternalError{Message: fmt.Sprintf("scanning row: %v", err)}
-		}
-		row := make(map[string]any, len(columns))
-		for i, col := range columns {
-			val := values[i]
-			// Convert []byte to string for JSON-friendly output.
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("iterating rows: %v", err)}
+		return nil, err
 	}
 
 	// Detect whether more rows existed than the limit allowed.
 	truncated := false
-	if !userSuppliedLimit && len(results) > rowLimit {
-		results = results[:rowLimit]
-		truncated = true
+	if !userSuppliedLimit {
+		results, truncated = sqldb.DetectTruncation(results, rowLimit)
 	}
 
 	return connectors.JSONResult(map[string]any{
