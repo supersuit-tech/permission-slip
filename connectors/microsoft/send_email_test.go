@@ -192,6 +192,43 @@ func TestSendEmail_AuthFailure(t *testing.T) {
 	}
 }
 
+func TestSendEmail_ForbiddenMapsToAuthError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error": map[string]string{
+				"code":    "ErrorAccessDenied",
+				"message": "Access is denied.",
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendEmailAction{conn: conn}
+
+	params, _ := json.Marshal(sendEmailParams{
+		To:      []string{"user@example.com"},
+		Subject: "Test",
+		Body:    "body",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for forbidden")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError for 403, got: %T", err)
+	}
+}
+
 func TestSendEmail_RateLimit(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +263,99 @@ func TestSendEmail_RateLimit(t *testing.T) {
 		if rlErr.RetryAfter.Seconds() != 30 {
 			t.Errorf("expected RetryAfter 30s, got %v", rlErr.RetryAfter)
 		}
+	}
+}
+
+func TestSendEmail_InvalidEmailAddress(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendEmailAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"to":      []string{"not-an-email"},
+		"subject": "Test",
+		"body":    "body",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid email")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSendEmail_PlainTextBody(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body graphSendMailRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Message.Body.ContentType != "Text" {
+			t.Errorf("expected content type 'Text' for plain text body, got %q", body.Message.Body.ContentType)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendEmailAction{conn: conn}
+
+	params, _ := json.Marshal(sendEmailParams{
+		To:      []string{"user@example.com"},
+		Subject: "Test",
+		Body:    "Just plain text, no HTML here.",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSendEmail_HTMLBody(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body graphSendMailRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Message.Body.ContentType != "HTML" {
+			t.Errorf("expected content type 'HTML' for HTML body, got %q", body.Message.Body.ContentType)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendEmailAction{conn: conn}
+
+	params, _ := json.Marshal(sendEmailParams{
+		To:      []string{"user@example.com"},
+		Subject: "Test",
+		Body:    "<p>Hello <strong>world</strong></p>",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

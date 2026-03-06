@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -28,8 +29,13 @@ func (p *sendEmailParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: to"}
 	}
 	for i, addr := range p.To {
-		if addr == "" {
-			return &connectors.ValidationError{Message: fmt.Sprintf("to[%d] is empty", i)}
+		if err := validateEmail("to", i, addr); err != nil {
+			return err
+		}
+	}
+	for i, addr := range p.CC {
+		if err := validateEmail("cc", i, addr); err != nil {
+			return err
 		}
 	}
 	if p.Subject == "" {
@@ -63,6 +69,25 @@ type graphEmailBody struct {
 	Content     string `json:"content"`
 }
 
+// validateEmail performs basic email address validation for a recipient list entry.
+func validateEmail(field string, idx int, addr string) error {
+	if addr == "" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("%s[%d] is empty", field, idx)}
+	}
+	if !strings.Contains(addr, "@") || strings.HasPrefix(addr, "@") || strings.HasSuffix(addr, "@") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("%s[%d] is not a valid email address: %q", field, idx, addr)}
+	}
+	return nil
+}
+
+// detectContentType returns "HTML" if the body contains HTML tags, otherwise "Text".
+func detectContentType(body string) string {
+	if strings.Contains(body, "<") && strings.Contains(body, ">") {
+		return "HTML"
+	}
+	return "Text"
+}
+
 func toGraphRecipients(addrs []string) []graphRecipient {
 	recipients := make([]graphRecipient, len(addrs))
 	for i, addr := range addrs {
@@ -85,7 +110,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	var graphReq graphSendMailRequest
 	graphReq.Message.Subject = params.Subject
 	graphReq.Message.Body = graphEmailBody{
-		ContentType: "HTML",
+		ContentType: detectContentType(params.Body),
 		Content:     params.Body,
 	}
 	graphReq.Message.ToRecipients = toGraphRecipients(params.To)
