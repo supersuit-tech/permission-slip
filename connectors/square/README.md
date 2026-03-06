@@ -165,7 +165,7 @@ All actions validate parameters locally before sending requests to Square. This 
 - **Payments:** `amount_money.amount` must be > 0; currency is required. Prevents zero-dollar or negative charges.
 - **Orders:** Line item `quantity` must be a positive integer string; `base_price_money.amount` must not be negative.
 - **Bookings:** `start_at` must be valid RFC 3339 format.
-- **Search orders:** `limit` must be 1-500; `query` must be a JSON object (not a string or array).
+- **Search orders:** `limit` must be 0-500 (0 uses Square's default); `query` must be a JSON object (not a string or array).
 - **All write actions:** Required fields are checked before the API call.
 
 ## Error Handling
