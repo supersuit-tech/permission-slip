@@ -50,13 +50,6 @@ type graphMessage struct {
 	HasAttachments bool              `json:"hasAttachments"`
 }
 
-type graphMailAddress struct {
-	EmailAddress struct {
-		Name    string `json:"name"`
-		Address string `json:"address"`
-	} `json:"emailAddress"`
-}
-
 // emailSummary is the simplified response returned to the caller.
 type emailSummary struct {
 	ID             string   `json:"id"`

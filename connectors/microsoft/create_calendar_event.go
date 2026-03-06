@@ -36,6 +36,11 @@ func (p *createCalendarEventParams) validate() error {
 	if p.End == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end"}
 	}
+	for i, addr := range p.Attendees {
+		if err := validateEmail("attendees", i, addr); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -53,22 +58,6 @@ type graphEventRequest struct {
 	End       graphDateTimeZone  `json:"end"`
 	Attendees []graphAttendee    `json:"attendees,omitempty"`
 	Location  *graphEventLocation `json:"location,omitempty"`
-}
-
-type graphDateTimeZone struct {
-	DateTime string `json:"dateTime"`
-	TimeZone string `json:"timeZone"`
-}
-
-type graphAttendee struct {
-	EmailAddress struct {
-		Address string `json:"address"`
-	} `json:"emailAddress"`
-	Type string `json:"type"`
-}
-
-type graphEventLocation struct {
-	DisplayName string `json:"displayName"`
 }
 
 // graphEventResponse is the Microsoft Graph API response for creating events.

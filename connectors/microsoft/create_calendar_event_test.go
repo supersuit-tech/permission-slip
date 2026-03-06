@@ -168,6 +168,32 @@ func TestCreateCalendarEvent_MissingStart(t *testing.T) {
 	}
 }
 
+func TestCreateCalendarEvent_InvalidAttendeeEmail(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"subject":   "Meeting",
+		"start":     "2024-01-15T09:00:00",
+		"end":       "2024-01-15T10:00:00",
+		"attendees": []string{"not-an-email"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid attendee email")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateCalendarEvent_DefaultTimeZone(t *testing.T) {
 	t.Parallel()
 

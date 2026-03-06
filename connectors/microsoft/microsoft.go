@@ -245,14 +245,6 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 	return nil
 }
 
-// graphError represents a Microsoft Graph API error response.
-type graphError struct {
-	Error struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
 // doRequest is the shared request lifecycle for all Microsoft Graph actions.
 // It sends the request with auth headers, handles rate limiting and errors,
 // and unmarshals the response into dest.
@@ -318,40 +310,4 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	}
 
 	return nil
-}
-
-// mapGraphError converts a Microsoft Graph API error response to the
-// appropriate connector error type with actionable messages.
-func mapGraphError(statusCode int, body []byte) error {
-	var ge graphError
-	if json.Unmarshal(body, &ge) != nil || ge.Error.Message == "" {
-		ge.Error.Message = string(body)
-	}
-
-	code := ge.Error.Code
-
-	switch statusCode {
-	case http.StatusUnauthorized:
-		return &connectors.AuthError{
-			Message: fmt.Sprintf("Microsoft Graph authentication failed (%s): %s — the user may need to reconnect their Microsoft account", code, ge.Error.Message),
-		}
-	case http.StatusForbidden:
-		return &connectors.AuthError{
-			Message: fmt.Sprintf("Microsoft Graph permission denied (%s): %s — ensure the required OAuth scopes are granted", code, ge.Error.Message),
-		}
-	case http.StatusNotFound:
-		return &connectors.ExternalError{
-			StatusCode: statusCode,
-			Message:    fmt.Sprintf("Microsoft Graph resource not found (%s): %s", code, ge.Error.Message),
-		}
-	case http.StatusBadRequest:
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("Microsoft Graph rejected the request (%s): %s", code, ge.Error.Message),
-		}
-	default:
-		return &connectors.ExternalError{
-			StatusCode: statusCode,
-			Message:    fmt.Sprintf("Microsoft Graph API error (%d/%s): %s", statusCode, code, ge.Error.Message),
-		}
-	}
 }
