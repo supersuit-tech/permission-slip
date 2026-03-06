@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -194,10 +195,14 @@ func TestIssueRefund_NegativeAmount(t *testing.T) {
 func TestIssueRefund_IdempotencyKeyDeterministic(t *testing.T) {
 	t.Parallel()
 
+	// Use a mutex to safely collect keys from the httptest handler goroutine.
+	var mu sync.Mutex
 	var keys []string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		keys = append(keys, r.Header.Get("Idempotency-Key"))
+		mu.Unlock()
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":     "re_idem",
 			"amount": 1000,
@@ -222,6 +227,8 @@ func TestIssueRefund_IdempotencyKeyDeterministic(t *testing.T) {
 		}
 	}
 
+	mu.Lock()
+	defer mu.Unlock()
 	if len(keys) != 2 {
 		t.Fatalf("expected 2 requests, got %d", len(keys))
 	}

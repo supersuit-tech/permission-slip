@@ -23,6 +23,16 @@ type createInvoiceAction struct {
 	conn *StripeConnector
 }
 
+// invoiceResponse is the subset of Stripe invoice fields we return to callers.
+// Shared between the create and finalize steps to avoid duplication.
+type invoiceResponse struct {
+	ID               string `json:"id"`
+	Status           string `json:"status"`
+	Currency         string `json:"currency"`
+	HostedInvoiceURL string `json:"hosted_invoice_url"`
+	AmountDue        int64  `json:"amount_due"`
+}
+
 type invoiceLineItem struct {
 	Description string `json:"description"`
 	Amount      int64  `json:"amount"`
@@ -55,12 +65,7 @@ func (p *createInvoiceParams) validate() error {
 			}
 		}
 	}
-	if len(p.Metadata) > maxMetadataKeys {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(p.Metadata), maxMetadataKeys),
-		}
-	}
-	return nil
+	return validateMetadata(p.Metadata)
 }
 
 // Execute creates a Stripe invoice with optional line items and finalization.
@@ -97,13 +102,7 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 		invoiceBody["metadata"] = params.Metadata
 	}
 
-	var invoiceResp struct {
-		ID               string `json:"id"`
-		Status           string `json:"status"`
-		Currency         string `json:"currency"`
-		HostedInvoiceURL string `json:"hosted_invoice_url"`
-		AmountDue        int64  `json:"amount_due"`
-	}
+	var invoiceResp invoiceResponse
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/invoices", formEncode(invoiceBody), &invoiceResp, req.ActionType, req.Parameters); err != nil {
 		return nil, err
@@ -136,13 +135,7 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 	// Step 3: Optionally finalize the invoice.
 	// auto_advance defaults to true — finalize when true or unset.
 	if params.AutoAdvance == nil || *params.AutoAdvance {
-		var finalResp struct {
-			ID               string `json:"id"`
-			Status           string `json:"status"`
-			Currency         string `json:"currency"`
-			HostedInvoiceURL string `json:"hosted_invoice_url"`
-			AmountDue        int64  `json:"amount_due"`
-		}
+		var finalResp invoiceResponse
 		finalizePath := "/v1/invoices/" + url.PathEscape(invoiceResp.ID) + "/finalize"
 		finalizeKey := deriveIdempotencyKey(req.ActionType+".finalize."+invoiceResp.ID, req.Parameters)
 		if err := a.conn.do(ctx, req.Credentials, "POST", finalizePath, nil, &finalResp, finalizeKey); err != nil {

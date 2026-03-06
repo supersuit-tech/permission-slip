@@ -51,12 +51,7 @@ func (p *createPaymentLinkParams) validate() error {
 			}
 		}
 	}
-	if len(p.Metadata) > maxMetadataKeys {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(p.Metadata), maxMetadataKeys),
-		}
-	}
-	return nil
+	return validateMetadata(p.Metadata)
 }
 
 // Execute creates a Stripe payment link and returns the link URL.

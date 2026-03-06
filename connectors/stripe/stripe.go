@@ -64,6 +64,17 @@ const (
 // validKeyPrefixes lists all recognized Stripe secret key prefixes.
 var validKeyPrefixes = []string{liveKeyPrefix, testKeyPrefix, rLiveKeyPrefix, rTestKeyPrefix}
 
+// validateMetadata checks that the metadata map does not exceed Stripe's
+// 50-key limit. Returns nil if metadata is nil or within bounds.
+func validateMetadata(metadata map[string]any) error {
+	if len(metadata) > maxMetadataKeys {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(metadata), maxMetadataKeys),
+		}
+	}
+	return nil
+}
+
 // StripeConnector owns the shared HTTP client and base URL used by all
 // Stripe actions. Actions hold a pointer back to the connector to access
 // these shared resources.

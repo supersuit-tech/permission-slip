@@ -50,12 +50,7 @@ func (p *issueRefundParams) validate() error {
 			Message: fmt.Sprintf("invalid reason %q: must be one of duplicate, fraudulent, requested_by_customer", p.Reason),
 		}
 	}
-	if len(p.Metadata) > maxMetadataKeys {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(p.Metadata), maxMetadataKeys),
-		}
-	}
-	return nil
+	return validateMetadata(p.Metadata)
 }
 
 // Execute issues a Stripe refund and returns the refund data.

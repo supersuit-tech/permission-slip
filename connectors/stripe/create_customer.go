@@ -26,12 +26,7 @@ func (p *createCustomerParams) validate() error {
 	if p.Email == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: email"}
 	}
-	if len(p.Metadata) > maxMetadataKeys {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(p.Metadata), maxMetadataKeys),
-		}
-	}
-	return nil
+	return validateMetadata(p.Metadata)
 }
 
 // Execute creates a Stripe customer and returns the created customer data.
