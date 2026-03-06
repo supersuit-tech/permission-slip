@@ -1,6 +1,6 @@
 // Package google implements the Google connector for the Permission Slip
-// connector execution layer. It uses Google REST APIs (Gmail, Calendar) with
-// plain net/http and OAuth 2.0 access tokens provided by the platform.
+// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Chat)
+// with plain net/http and OAuth 2.0 access tokens provided by the platform.
 package google
 
 import (
@@ -19,6 +19,7 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultChatBaseURL     = "https://chat.googleapis.com"
 	defaultTimeout         = 30 * time.Second
 	credKeyAccessToken     = "access_token"
 
@@ -38,6 +39,7 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	chatBaseURL     string
 }
 
 // New creates a GoogleConnector with sensible defaults.
@@ -46,15 +48,21 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		chatBaseURL:     defaultChatBaseURL,
 	}
 }
 
 // newForTest creates a GoogleConnector that points at a test server.
 func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL string) *GoogleConnector {
+	return newForTestWithChat(client, gmailBaseURL, calendarBaseURL, "")
+}
+
+func newForTestWithChat(client *http.Client, gmailBaseURL, calendarBaseURL, chatBaseURL string) *GoogleConnector {
 	return &GoogleConnector{
 		client:          client,
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
+		chatBaseURL:     chatBaseURL,
 	}
 }
 
@@ -67,7 +75,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail and Calendar",
+		Description: "Google integration for Gmail, Calendar, Chat, and Meet",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -184,6 +192,82 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.send_chat_message",
+				Name:        "Send Chat Message",
+				Description: "Send a message to a Google Chat space",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["space_name", "text"],
+					"properties": {
+						"space_name": {
+							"type": "string",
+							"description": "The resource name of the space (e.g. 'spaces/AAAA1234')"
+						},
+						"text": {
+							"type": "string",
+							"description": "The message text"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.list_chat_spaces",
+				Name:        "List Chat Spaces",
+				Description: "List Google Chat spaces accessible to the user",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"page_size": {
+							"type": "integer",
+							"default": 20,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Maximum number of spaces to return (1-100, default 20)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.create_meeting",
+				Name:        "Create Meeting",
+				Description: "Create a Google Calendar event with an auto-generated Google Meet link",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["summary", "start_time", "end_time"],
+					"properties": {
+						"summary": {
+							"type": "string",
+							"description": "Meeting title"
+						},
+						"description": {
+							"type": "string",
+							"description": "Meeting description"
+						},
+						"start_time": {
+							"type": "string",
+							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')"
+						},
+						"end_time": {
+							"type": "string",
+							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')"
+						},
+						"attendees": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "List of attendee email addresses"
+						},
+						"calendar_id": {
+							"type": "string",
+							"default": "primary",
+							"description": "Calendar ID (defaults to 'primary')"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -194,6 +278,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/chat.spaces.readonly",
+					"https://www.googleapis.com/auth/chat.messages.create",
 				},
 			},
 		},
@@ -247,6 +333,41 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can list upcoming events from any calendar.",
 				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
 			},
+			{
+				ID:          "tpl_google_send_chat_message",
+				ActionType:  "google.send_chat_message",
+				Name:        "Send chat messages",
+				Description: "Agent can send messages to any Google Chat space.",
+				Parameters:  json.RawMessage(`{"space_name":"*","text":"*"}`),
+			},
+			{
+				ID:          "tpl_google_send_chat_message_to_space",
+				ActionType:  "google.send_chat_message",
+				Name:        "Send message to specific space",
+				Description: "Locks the space; agent chooses the message text.",
+				Parameters:  json.RawMessage(`{"space_name":"spaces/EXAMPLE","text":"*"}`),
+			},
+			{
+				ID:          "tpl_google_list_chat_spaces",
+				ActionType:  "google.list_chat_spaces",
+				Name:        "List chat spaces",
+				Description: "Agent can list Google Chat spaces accessible to the user.",
+				Parameters:  json.RawMessage(`{"page_size":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_meeting",
+				ActionType:  "google.create_meeting",
+				Name:        "Create meetings with Meet link",
+				Description: "Agent can create calendar events with Google Meet links.",
+				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_meeting_no_attendees",
+				ActionType:  "google.create_meeting",
+				Name:        "Create personal meetings",
+				Description: "Agent can create meetings on the primary calendar without inviting attendees.",
+				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
+			},
 		},
 	}
 }
@@ -258,6 +379,9 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.send_chat_message":     &sendChatMessageAction{conn: c},
+		"google.list_chat_spaces":      &listChatSpacesAction{conn: c},
+		"google.create_meeting":        &createMeetingAction{conn: c},
 	}
 }
 
