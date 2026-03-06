@@ -78,6 +78,7 @@ func NewRouter(deps *Deps) http.Handler {
 	RegisterStandingApprovalRoutes(mux, deps)
 	RegisterApprovalEventRoutes(mux, deps)
 	RegisterOAuthRoutes(mux, deps)
+	RegisterOAuthBYOARoutes(mux, deps)
 
 	// Billing routes are always registered (handlers check deps.BillingEnabled
 	// and deps.Stripe internally) so the OpenAPI spec can document them.
