@@ -215,7 +215,7 @@ func TestCreateBooking_APIError(t *testing.T) {
 		ActionType: "square.create_booking",
 		Parameters: json.RawMessage(`{
 			"location_id": "L123",
-			"start_at": "not-a-date",
+			"start_at": "2024-03-15T14:30:00Z",
 			"service_variation_id": "SVC123"
 		}`),
 		Credentials: validCreds(),
