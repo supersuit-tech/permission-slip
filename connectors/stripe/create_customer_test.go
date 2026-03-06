@@ -42,9 +42,10 @@ func TestCreateCustomer_Success(t *testing.T) {
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":    "cus_abc123",
-			"email": "alice@example.com",
-			"name":  "Alice Smith",
+			"id":      "cus_abc123",
+			"email":   "alice@example.com",
+			"name":    "Alice Smith",
+			"created": 1709740800,
 		})
 	}))
 	defer srv.Close()
@@ -70,6 +71,9 @@ func TestCreateCustomer_Success(t *testing.T) {
 	}
 	if data["email"] != "alice@example.com" {
 		t.Errorf("email = %v, want alice@example.com", data["email"])
+	}
+	if data["created"] != float64(1709740800) {
+		t.Errorf("created = %v, want 1709740800 (timestamp should be in response)", data["created"])
 	}
 }
 

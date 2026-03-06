@@ -36,8 +36,9 @@ func TestCreatePaymentLink_Success(t *testing.T) {
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":  "plink_test123",
-			"url": "https://buy.stripe.com/test_abc",
+			"id":     "plink_test123",
+			"url":    "https://buy.stripe.com/test_abc",
+			"active": true,
 		})
 	}))
 	defer srv.Close()
@@ -63,6 +64,9 @@ func TestCreatePaymentLink_Success(t *testing.T) {
 	}
 	if data["url"] != "https://buy.stripe.com/test_abc" {
 		t.Errorf("url = %v, want https://buy.stripe.com/test_abc", data["url"])
+	}
+	if data["active"] != true {
+		t.Errorf("active = %v, want true", data["active"])
 	}
 }
 

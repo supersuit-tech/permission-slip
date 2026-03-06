@@ -63,6 +63,7 @@ func (a *createCustomerAction) Execute(ctx context.Context, req connectors.Actio
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Phone       string `json:"phone"`
+		Created     int64  `json:"created"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/customers", formParams, &resp, req.ActionType, req.Parameters); err != nil {

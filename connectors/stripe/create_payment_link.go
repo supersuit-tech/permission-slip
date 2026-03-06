@@ -85,8 +85,9 @@ func (a *createPaymentLinkAction) Execute(ctx context.Context, req connectors.Ac
 	formParams := formEncode(body)
 
 	var resp struct {
-		ID  string `json:"id"`
-		URL string `json:"url"`
+		ID     string `json:"id"`
+		URL    string `json:"url"`
+		Active bool   `json:"active"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/payment_links", formParams, &resp, req.ActionType, req.Parameters); err != nil {

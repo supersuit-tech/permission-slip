@@ -32,13 +32,17 @@ func TestCreateInvoice_FullFlow(t *testing.T) {
 			if got := r.FormValue("description"); got != "Monthly services" {
 				t.Errorf("description = %q, want Monthly services", got)
 			}
+			if got := r.FormValue("currency"); got != "usd" {
+				t.Errorf("currency = %q, want usd (default)", got)
+			}
 			if got := r.Header.Get("Idempotency-Key"); got == "" {
 				t.Error("expected Idempotency-Key on POST")
 			}
 
 			json.NewEncoder(w).Encode(map[string]any{
-				"id":     "in_test123",
-				"status": "draft",
+				"id":       "in_test123",
+				"status":   "draft",
+				"currency": "usd",
 			})
 
 		case n == 2 && r.URL.Path == "/v1/invoiceitems" && r.Method == http.MethodPost:
@@ -61,8 +65,11 @@ func TestCreateInvoice_FullFlow(t *testing.T) {
 		case n == 3 && r.URL.Path == "/v1/invoices/in_test123/finalize" && r.Method == http.MethodPost:
 			// Step 3: Finalize.
 			json.NewEncoder(w).Encode(map[string]any{
-				"id":     "in_test123",
-				"status": "open",
+				"id":                 "in_test123",
+				"status":             "open",
+				"currency":           "usd",
+				"hosted_invoice_url": "https://invoice.stripe.com/i/test123",
+				"amount_due":         5000,
 			})
 
 		default:
@@ -98,8 +105,68 @@ func TestCreateInvoice_FullFlow(t *testing.T) {
 	if data["status"] != "open" {
 		t.Errorf("status = %v, want open (finalized)", data["status"])
 	}
+	if data["hosted_invoice_url"] != "https://invoice.stripe.com/i/test123" {
+		t.Errorf("hosted_invoice_url = %v, want https://invoice.stripe.com/i/test123", data["hosted_invoice_url"])
+	}
+	if data["amount_due"] != float64(5000) {
+		t.Errorf("amount_due = %v, want 5000", data["amount_due"])
+	}
 	if got := callCount.Load(); got != 3 {
 		t.Errorf("expected 3 API calls (create + item + finalize), got %d", got)
+	}
+}
+
+func TestCreateInvoice_CustomCurrency(t *testing.T) {
+	t.Parallel()
+
+	var callCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		switch {
+		case n == 1 && r.URL.Path == "/v1/invoices":
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parsing form: %v", err)
+			}
+			if got := r.FormValue("currency"); got != "eur" {
+				t.Errorf("currency = %q, want eur", got)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"id": "in_eur", "status": "draft", "currency": "eur",
+			})
+		case n == 2 && r.URL.Path == "/v1/invoiceitems":
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("parsing form: %v", err)
+			}
+			if got := r.FormValue("currency"); got != "eur" {
+				t.Errorf("invoice item currency = %q, want eur", got)
+			}
+			json.NewEncoder(w).Encode(map[string]any{"id": "ii_eur"})
+		case n == 3 && r.URL.Path == "/v1/invoices/in_eur/finalize":
+			json.NewEncoder(w).Encode(map[string]any{
+				"id": "in_eur", "status": "open", "currency": "eur",
+			})
+		default:
+			t.Errorf("unexpected request #%d: %s %s", n, r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.create_invoice"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType: "stripe.create_invoice",
+		Parameters: json.RawMessage(`{
+			"customer_id": "cus_abc123",
+			"currency": "eur",
+			"line_items": [{"description": "Service", "amount": 1000, "quantity": 1}]
+		}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 }
 

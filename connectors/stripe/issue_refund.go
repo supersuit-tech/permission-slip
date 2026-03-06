@@ -83,10 +83,11 @@ func (a *issueRefundAction) Execute(ctx context.Context, req connectors.ActionRe
 	formParams := formEncode(body)
 
 	var resp struct {
-		ID     string `json:"id"`
-		Amount int64  `json:"amount"`
-		Status string `json:"status"`
-		Reason string `json:"reason"`
+		ID       string `json:"id"`
+		Amount   int64  `json:"amount"`
+		Currency string `json:"currency"`
+		Status   string `json:"status"`
+		Reason   string `json:"reason"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/refunds", formParams, &resp, req.ActionType, req.Parameters); err != nil {
