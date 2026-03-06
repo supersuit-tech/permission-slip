@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Format a dollar amount from cents (e.g. 271 → "$2.71").
+ */
+export function formatCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+/**
  * Formats an ISO timestamp as a human-readable relative time string.
  * Returns "—" for undefined/null/invalid values.
  */

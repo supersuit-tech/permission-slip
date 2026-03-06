@@ -1,0 +1,144 @@
+PaymentMethod:
+  type: object
+  description: |
+    A stored payment method (credit/debit card) tokenized via Stripe.
+    Raw card data is never stored — only the Stripe token and display
+    metadata (last4, brand, expiry).
+  required:
+    - id
+    - brand
+    - last4
+    - exp_month
+    - exp_year
+    - is_default
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      format: uuid
+    label:
+      type: string
+      maxLength: 100
+      description: User-friendly label for the card (e.g. "Personal Visa")
+    brand:
+      type: string
+      description: Card brand (e.g. visa, mastercard, amex)
+    last4:
+      type: string
+      description: Last 4 digits of the card number
+      pattern: '^\d{4}$'
+    exp_month:
+      type: integer
+      minimum: 1
+      maximum: 12
+      description: Card expiration month (1-12)
+    exp_year:
+      type: integer
+      description: Card expiration year (e.g. 2027)
+    is_default:
+      type: boolean
+      description: Whether this is the user's default payment method
+    per_transaction_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: Maximum amount in cents per individual agent transaction (null = no limit)
+    monthly_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: Maximum total spend in cents across all agent transactions in the last 30 days (null = no limit)
+    monthly_spend:
+      type: integer
+      minimum: 0
+      description: Current total spend in cents for the rolling 30-day window. Always included in list responses.
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+PaymentMethodListResponse:
+  type: object
+  required:
+    - payment_methods
+    - max_allowed
+  properties:
+    payment_methods:
+      type: array
+      items:
+        $ref: '#/PaymentMethod'
+    max_allowed:
+      type: integer
+      description: Maximum number of payment methods a user can store (currently 10)
+
+SetupIntentResponse:
+  type: object
+  required:
+    - client_secret
+  properties:
+    client_secret:
+      type: string
+      description: |
+        Stripe SetupIntent client secret for use with stripe.confirmCardSetup()
+        in Stripe Elements on the frontend. Single-use, expires after 24 hours.
+
+ConfirmPaymentMethodRequest:
+  type: object
+  required:
+    - payment_method_id
+  properties:
+    payment_method_id:
+      type: string
+      pattern: '^pm_'
+      description: Stripe payment method ID (must start with "pm_")
+    label:
+      type: string
+      maxLength: 100
+      description: User-friendly label for the card (e.g. "Personal Visa")
+    is_default:
+      type: boolean
+      default: false
+      description: Set to true to make this the default payment method
+
+UpdatePaymentMethodRequest:
+  type: object
+  properties:
+    label:
+      type: string
+      maxLength: 100
+      description: User-friendly label for the card
+    is_default:
+      type: boolean
+      description: Set to true to make this the default payment method
+    per_transaction_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: |
+        Per-transaction limit in cents. Must not exceed monthly_limit if both
+        are set. Set to a value to create/update the limit.
+    monthly_limit:
+      type: integer
+      nullable: true
+      minimum: 0
+      description: |
+        Monthly spend limit in cents (rolling 30-day window). Must be >= per_transaction_limit
+        if both are set. Set to a value to create/update the limit.
+    clear_per_transaction_limit:
+      type: boolean
+      description: Set to true to remove the per-transaction limit entirely
+    clear_monthly_limit:
+      type: boolean
+      description: Set to true to remove the monthly limit entirely
+
+DeletePaymentMethodResponse:
+  type: object
+  required:
+    - deleted
+  properties:
+    deleted:
+      type: boolean
+      description: Always true on successful deletion
