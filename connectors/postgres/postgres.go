@@ -108,7 +108,8 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "object"
 							},
 							"minItems": 1,
-							"description": "Array of row objects to insert (keys are column names)"
+							"maxItems": 1000,
+							"description": "Array of row objects to insert (keys are column names, max 1000 rows)"
 						},
 						"returning": {
 							"type": "array",

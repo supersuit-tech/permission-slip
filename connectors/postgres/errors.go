@@ -49,7 +49,9 @@ func mapPgError(err error, action string) error {
 	}
 
 	// Constraint violations (SQLSTATE 23xxx).
-	if strings.Contains(msg, "23") && containsAny(msg, "violates", "constraint", "duplicate key", "null value") {
+	// pgx formats these as "ERROR: ... (SQLSTATE 23NNN)" so we check for that pattern.
+	if containsAny(msg, "SQLSTATE 23", "violates unique constraint", "violates not-null constraint",
+		"violates foreign key constraint", "violates check constraint", "duplicate key value") {
 		return &connectors.ValidationError{Message: fmt.Sprintf("PostgreSQL constraint violation: %v", err)}
 	}
 

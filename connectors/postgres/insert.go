@@ -32,6 +32,9 @@ func (p *insertParams) validate() error {
 	if len(p.Rows) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: rows (must contain at least one row)"}
 	}
+	if len(p.Rows) > 1000 {
+		return &connectors.ValidationError{Message: "rows exceeds maximum of 1000 rows per insert"}
+	}
 
 	// Determine columns from explicit list or first row.
 	cols := p.Columns
