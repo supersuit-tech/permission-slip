@@ -204,7 +204,7 @@ func TestExpediaConnector_Do_Success(t *testing.T) {
 
 	conn := newForTest(srv.Client(), srv.URL)
 	var resp map[string]string
-	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", nil, &resp)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "", nil, &resp)
 	if err != nil {
 		t.Fatalf("do() unexpected error: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestExpediaConnector_Do_WithBody(t *testing.T) {
 
 	conn := newForTest(srv.Client(), srv.URL)
 	var resp map[string]string
-	err := conn.do(t.Context(), validCreds(), http.MethodPost, "/test", map[string]string{"name": "test"}, &resp)
+	err := conn.do(t.Context(), validCreds(), http.MethodPost, "/test", "", map[string]string{"name": "test"}, &resp)
 	if err != nil {
 		t.Fatalf("do() unexpected error: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestExpediaConnector_Do_AuthError(t *testing.T) {
 	defer srv.Close()
 
 	conn := newForTest(srv.Client(), srv.URL)
-	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", nil, nil)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "", nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -285,7 +285,7 @@ func TestExpediaConnector_Do_RateLimitError(t *testing.T) {
 	defer srv.Close()
 
 	conn := newForTest(srv.Client(), srv.URL)
-	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", nil, nil)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "", nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -313,7 +313,7 @@ func TestExpediaConnector_Do_ValidationError(t *testing.T) {
 	defer srv.Close()
 
 	conn := newForTest(srv.Client(), srv.URL)
-	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", nil, nil)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "", nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -335,7 +335,7 @@ func TestExpediaConnector_Do_ExternalError(t *testing.T) {
 	defer srv.Close()
 
 	conn := newForTest(srv.Client(), srv.URL)
-	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", nil, nil)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "", nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -344,11 +344,30 @@ func TestExpediaConnector_Do_ExternalError(t *testing.T) {
 	}
 }
 
+func TestExpediaConnector_Do_CustomCustomerIP(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Customer-Ip"); got != "203.0.113.42" {
+			t.Errorf("Customer-Ip = %q, want %q", got, "203.0.113.42")
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/test", "203.0.113.42", nil, nil)
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
 func TestExpediaConnector_Do_MissingCredentials(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
-	err := conn.do(t.Context(), connectors.NewCredentials(map[string]string{}), http.MethodGet, "/test", nil, nil)
+	err := conn.do(t.Context(), connectors.NewCredentials(map[string]string{}), http.MethodGet, "/test", "", nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}

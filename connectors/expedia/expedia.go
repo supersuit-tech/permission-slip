@@ -9,6 +9,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,10 +20,9 @@ import (
 )
 
 const (
-	defaultBaseURL     = "https://api.ean.com"
-	testBaseURL        = "https://test.ean.com"
-	defaultTimeout     = 30 * time.Second
-	defaultCustomerIP  = "127.0.0.1"
+	defaultBaseURL    = "https://api.ean.com"
+	defaultTimeout    = 30 * time.Second
+	defaultCustomerIP = "127.0.0.1"
 )
 
 // ExpediaConnector owns the shared HTTP client and base URL used by all
@@ -254,6 +254,50 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 		RequiredCredentials: []connectors.ManifestCredential{
 			{Service: "expedia", AuthType: "api_key", InstructionsURL: "https://developers.expediagroup.com/docs/products/rapid/setup/getting-started"},
 		},
+		Templates: []connectors.ManifestTemplate{
+			{
+				ID:          "tpl_expedia_search_read_only",
+				ActionType:  "expedia.search_hotels",
+				Name:        "Search hotels (read-only)",
+				Description: "Agent can search hotels for any dates, location, and occupancy. No booking capability.",
+				Parameters:  json.RawMessage(`{"checkin":"*","checkout":"*","occupancy":"*","region_id":"*","latitude":"*","longitude":"*","currency":"*","language":"*","sort_by":"*","star_rating":"*","limit":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_get_hotel",
+				ActionType:  "expedia.get_hotel",
+				Name:        "View hotel details",
+				Description: "Agent can view full details for any hotel property.",
+				Parameters:  json.RawMessage(`{"property_id":"*","checkin":"*","checkout":"*","occupancy":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_price_check",
+				ActionType:  "expedia.price_check",
+				Name:        "Check room pricing",
+				Description: "Agent can confirm pricing and availability for any room.",
+				Parameters:  json.RawMessage(`{"room_id":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_create_booking",
+				ActionType:  "expedia.create_booking",
+				Name:        "Book hotel rooms",
+				Description: "Agent can create hotel bookings. Requires human approval per booking.",
+				Parameters:  json.RawMessage(`{"room_id":"*","given_name":"*","family_name":"*","email":"*","phone":"*","payment_method_id":"*","special_request":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_cancel_booking",
+				ActionType:  "expedia.cancel_booking",
+				Name:        "Cancel bookings",
+				Description: "Agent can cancel hotel bookings. Requires human approval per cancellation.",
+				Parameters:  json.RawMessage(`{"itinerary_id":"*","room_id":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_get_booking",
+				ActionType:  "expedia.get_booking",
+				Name:        "View booking details",
+				Description: "Agent can retrieve booking details and status.",
+				Parameters:  json.RawMessage(`{"itinerary_id":"*","email":"*"}`),
+			},
+		},
 	}
 }
 
@@ -299,7 +343,10 @@ func (c *ExpediaConnector) signature(apiKey, secret string) (sig string, timesta
 // marshals reqBody as JSON, sends the request with signature auth headers,
 // checks the response status, and unmarshals the response into respBody.
 // Either reqBody or respBody may be nil.
-func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
+//
+// customerIP is the end-user's IP address, required by Expedia for fraud
+// prevention. Pass defaultCustomerIP when the real IP is unavailable.
+func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, customerIP string, reqBody, respBody interface{}) error {
 	apiKey, _ := creds.Get("api_key")
 	secret, _ := creds.Get("secret")
 	if apiKey == "" || secret == "" {
@@ -324,7 +371,10 @@ func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials,
 	sig, ts := c.signature(apiKey, secret)
 	req.Header.Set("Authorization", fmt.Sprintf("EAN apikey=%s,signature=%s,timestamp=%s", apiKey, sig, ts))
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Customer-Ip", defaultCustomerIP)
+	if customerIP == "" {
+		customerIP = defaultCustomerIP
+	}
+	req.Header.Set("Customer-Ip", customerIP)
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -333,6 +383,9 @@ func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials,
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Expedia Rapid API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Expedia Rapid API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Expedia Rapid API request failed: %v", err)}
 	}
