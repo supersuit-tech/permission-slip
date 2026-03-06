@@ -258,6 +258,64 @@ func TestCreateInvoice_InvalidLineItemAmount(t *testing.T) {
 	}
 }
 
+func TestCreateInvoice_TooManyLineItems(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_invoice"]
+
+	// Build 251 line items (exceeds maxInvoiceLineItems=250).
+	items := make([]map[string]any, 251)
+	for i := range items {
+		items[i] = map[string]any{"amount": 100, "description": fmt.Sprintf("item-%d", i)}
+	}
+	params, _ := json.Marshal(map[string]any{
+		"customer_id": "cus_abc123",
+		"line_items":  items,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_invoice",
+		Parameters:  json.RawMessage(params),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for too many line items, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestCreateInvoice_TooManyMetadataKeys(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_invoice"]
+
+	// Build 51 metadata keys (exceeds maxMetadataKeys=50).
+	metadata := make(map[string]any, 51)
+	for i := range 51 {
+		metadata[fmt.Sprintf("key_%d", i)] = "value"
+	}
+	params, _ := json.Marshal(map[string]any{
+		"customer_id": "cus_abc123",
+		"metadata":    metadata,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_invoice",
+		Parameters:  json.RawMessage(params),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for too many metadata keys, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestCreateInvoice_MultipleLineItems(t *testing.T) {
 	t.Parallel()
 

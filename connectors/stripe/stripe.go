@@ -54,6 +54,11 @@ const (
 	// you're ready to handle the new response shapes.
 	// See https://docs.stripe.com/api/versioning
 	apiVersion = "2025-12-18.acacia"
+
+	// maxMetadataKeys is the Stripe limit on metadata key-value pairs.
+	// Validating this client-side gives clearer error messages than
+	// relying on the API to reject oversized metadata.
+	maxMetadataKeys = 50
 )
 
 // validKeyPrefixes lists all recognized Stripe secret key prefixes.

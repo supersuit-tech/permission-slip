@@ -26,9 +26,18 @@ type createPaymentLinkParams struct {
 	Metadata            map[string]any        `json:"metadata"`
 }
 
+// maxPaymentLinkLineItems caps the number of line items per payment link.
+// Stripe allows up to 20 line items on a payment link.
+const maxPaymentLinkLineItems = 20
+
 func (p *createPaymentLinkParams) validate() error {
 	if len(p.LineItems) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: line_items"}
+	}
+	if len(p.LineItems) > maxPaymentLinkLineItems {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many line items: %d (max %d)", len(p.LineItems), maxPaymentLinkLineItems),
+		}
 	}
 	for i, item := range p.LineItems {
 		if item.PriceID == "" {
@@ -40,6 +49,11 @@ func (p *createPaymentLinkParams) validate() error {
 			return &connectors.ValidationError{
 				Message: fmt.Sprintf("line_items[%d].quantity must be positive", i),
 			}
+		}
+	}
+	if len(p.Metadata) > maxMetadataKeys {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(p.Metadata), maxMetadataKeys),
 		}
 	}
 	return nil

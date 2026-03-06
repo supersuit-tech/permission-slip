@@ -4,8 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+const (
+	// maxLineItems caps the number of line items per invoice to prevent
+	// resource exhaustion. Stripe's own limit for invoice items is 250.
+	maxInvoiceLineItems = 250
 )
 
 // createInvoiceAction implements connectors.Action for stripe.create_invoice.
@@ -36,11 +43,21 @@ func (p *createInvoiceParams) validate() error {
 	if p.CustomerID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: customer_id"}
 	}
+	if len(p.LineItems) > maxInvoiceLineItems {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many line items: %d (max %d)", len(p.LineItems), maxInvoiceLineItems),
+		}
+	}
 	for i, item := range p.LineItems {
 		if item.Amount <= 0 {
 			return &connectors.ValidationError{
 				Message: fmt.Sprintf("line_items[%d].amount must be positive", i),
 			}
+		}
+	}
+	if len(p.Metadata) > maxMetadataKeys {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(p.Metadata), maxMetadataKeys),
 		}
 	}
 	return nil
@@ -126,8 +143,9 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 			HostedInvoiceURL string `json:"hosted_invoice_url"`
 			AmountDue        int64  `json:"amount_due"`
 		}
+		finalizePath := "/v1/invoices/" + url.PathEscape(invoiceResp.ID) + "/finalize"
 		finalizeKey := deriveIdempotencyKey(req.ActionType+".finalize."+invoiceResp.ID, req.Parameters)
-		if err := a.conn.do(ctx, req.Credentials, "POST", "/v1/invoices/"+invoiceResp.ID+"/finalize", nil, &finalResp, finalizeKey); err != nil {
+		if err := a.conn.do(ctx, req.Credentials, "POST", finalizePath, nil, &finalResp, finalizeKey); err != nil {
 			return nil, fmt.Errorf("finalizing invoice %s: %w", invoiceResp.ID, err)
 		}
 		return connectors.JSONResult(finalResp)
