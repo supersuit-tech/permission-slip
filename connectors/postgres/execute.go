@@ -1,5 +1,12 @@
 package postgres
 
+// execute.go contains shared transaction lifecycle helpers used by all actions.
+// It eliminates boilerplate by providing:
+//   - prepareTx: open DB → begin transaction → set statement_timeout
+//   - execMutation: run a write query with optional RETURNING, commit, return result
+//   - getConnString: extract connection_string from action credentials
+//   - buildReturningClause: build a quoted RETURNING SQL fragment
+
 import (
 	"context"
 	"database/sql"
