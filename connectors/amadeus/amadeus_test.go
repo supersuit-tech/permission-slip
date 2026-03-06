@@ -357,7 +357,11 @@ func TestAmadeusConnector_Do_RateLimitError(t *testing.T) {
 func TestAmadeusConnector_Do_AuthError(t *testing.T) {
 	t.Parallel()
 
+	// do() retries once on 401 after invalidating the token cache.
+	// Both attempts should fail with 401.
+	apiCalls := 0
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		apiCalls++
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write(amadeusErrorResponse(401, 38190, "Unauthorized", "Invalid access token"))
 	})
@@ -370,6 +374,44 @@ func TestAmadeusConnector_Do_AuthError(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("do() returned %T, want *connectors.AuthError", err)
+	}
+	// Should have retried once (2 API calls total).
+	if apiCalls != 2 {
+		t.Errorf("expected 2 API calls (retry on 401), got %d", apiCalls)
+	}
+}
+
+func TestAmadeusConnector_Do_AuthRetrySuccess(t *testing.T) {
+	t.Parallel()
+
+	// First API call returns 401 (expired token), second succeeds after
+	// token refresh.
+	apiCalls := 0
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		apiCalls++
+		if apiCalls == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write(amadeusErrorResponse(401, 38190, "Unauthorized", "Token expired"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok": true}`))
+	})
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	var resp struct {
+		OK bool `json:"ok"`
+	}
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, &resp)
+	if err != nil {
+		t.Fatalf("do() error = %v", err)
+	}
+	if !resp.OK {
+		t.Error("do() resp.OK = false, want true")
+	}
+	if apiCalls != 2 {
+		t.Errorf("expected 2 API calls (retry on 401), got %d", apiCalls)
 	}
 }
 
@@ -427,6 +469,115 @@ func TestAmadeusConnector_Do_ForbiddenError(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("do() returned %T, want *connectors.AuthError", err)
+	}
+}
+
+func TestAmadeusConnector_Do_NotFoundError(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write(amadeusErrorResponse(404, 1797, "NOT FOUND", "No hotel found for the given ID"))
+	})
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	if err == nil {
+		t.Fatal("do() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("do() returned %T, want *connectors.ValidationError", err)
+	}
+}
+
+func TestAmadeusConnector_EnsureToken_PerClientID(t *testing.T) {
+	t.Parallel()
+
+	// Two different client_ids should get separate cached tokens.
+	tokenCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/security/oauth2/token" {
+			tokenCount++
+			_ = r.ParseForm()
+			clientID := r.FormValue("client_id")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"access_token": "token-for-` + clientID + `",
+				"expires_in": 1799
+			}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+
+	credsA := connectors.NewCredentials(map[string]string{
+		"client_id": "client-a", "client_secret": "secret-a",
+	})
+	credsB := connectors.NewCredentials(map[string]string{
+		"client_id": "client-b", "client_secret": "secret-b",
+	})
+
+	tokenA, err := c.ensureToken(t.Context(), credsA)
+	if err != nil {
+		t.Fatalf("ensureToken(A) error = %v", err)
+	}
+	if tokenA != "token-for-client-a" {
+		t.Errorf("tokenA = %q, want %q", tokenA, "token-for-client-a")
+	}
+
+	tokenB, err := c.ensureToken(t.Context(), credsB)
+	if err != nil {
+		t.Fatalf("ensureToken(B) error = %v", err)
+	}
+	if tokenB != "token-for-client-b" {
+		t.Errorf("tokenB = %q, want %q", tokenB, "token-for-client-b")
+	}
+
+	if tokenCount != 2 {
+		t.Errorf("expected 2 token requests (one per client_id), got %d", tokenCount)
+	}
+
+	// Calling again with credsA should use cached token (no new request).
+	_, err = c.ensureToken(t.Context(), credsA)
+	if err != nil {
+		t.Fatalf("ensureToken(A again) error = %v", err)
+	}
+	if tokenCount != 2 {
+		t.Errorf("expected 2 token requests (cached), got %d", tokenCount)
+	}
+}
+
+func TestAmadeusConnector_ResolveBaseURL(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	tests := []struct {
+		name string
+		env  string
+		want string
+	}{
+		{"empty defaults to test", "", defaultTestBaseURL},
+		{"test environment", "test", defaultTestBaseURL},
+		{"production environment", "production", defaultProductionBaseURL},
+		{"unknown defaults to test", "staging", defaultTestBaseURL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			creds := connectors.NewCredentials(map[string]string{
+				"client_id":     "id",
+				"client_secret": "secret",
+				"environment":   tt.env,
+			})
+			got := c.resolveBaseURL(creds)
+			if got != tt.want {
+				t.Errorf("resolveBaseURL() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

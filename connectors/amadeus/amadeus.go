@@ -28,24 +28,36 @@ const (
 	tokenRefreshBuffer = 60 * time.Second
 )
 
-// AmadeusConnector owns the shared HTTP client, base URL, and cached access
-// token used by all Amadeus actions. Actions hold a pointer back to the
-// connector to access these shared resources.
+// AmadeusConnector owns the shared HTTP client and base URL used by all
+// Amadeus actions. Actions hold a pointer back to the connector to access
+// these shared resources.
+//
+// Token caching is keyed by client_id so that different credential sets
+// (e.g., different Amadeus accounts) don't share tokens.
 type AmadeusConnector struct {
 	client  *http.Client
 	baseURL string
 
-	mu       sync.Mutex
-	token    string
-	tokenExp time.Time
+	mu     sync.Mutex
+	tokens map[string]cachedToken // keyed by client_id
+}
+
+// cachedToken holds a cached OAuth2 access token and its expiry.
+type cachedToken struct {
+	accessToken string
+	expiresAt   time.Time
 }
 
 // New creates an AmadeusConnector with sensible defaults (30s timeout,
-// test environment base URL).
+// test environment base URL). The base URL is resolved at request time
+// from the "environment" credential field — "production" uses
+// api.amadeus.com, anything else (including empty) uses the test
+// environment. The baseURL field is only used as a fallback.
 func New() *AmadeusConnector {
 	return &AmadeusConnector{
 		client:  &http.Client{Timeout: defaultTimeout},
 		baseURL: defaultTestBaseURL,
+		tokens:  make(map[string]cachedToken),
 	}
 }
 
@@ -54,7 +66,24 @@ func newForTest(client *http.Client, baseURL string) *AmadeusConnector {
 	return &AmadeusConnector{
 		client:  client,
 		baseURL: baseURL,
+		tokens:  make(map[string]cachedToken),
 	}
+}
+
+// resolveBaseURL returns the API base URL based on the "environment"
+// credential field. "production" → api.amadeus.com, everything else →
+// test.api.amadeus.com. If the connector was created with newForTest, the
+// override base URL is always used.
+func (c *AmadeusConnector) resolveBaseURL(creds connectors.Credentials) string {
+	// Test constructors set a custom baseURL — always honor it.
+	if c.baseURL != defaultTestBaseURL && c.baseURL != defaultProductionBaseURL {
+		return c.baseURL
+	}
+	env, _ := creds.Get("environment")
+	if env == "production" {
+		return defaultProductionBaseURL
+	}
+	return defaultTestBaseURL
 }
 
 // ID returns "amadeus", matching the connectors.id in the database.
@@ -101,20 +130,38 @@ func (c *AmadeusConnector) ValidateCredentials(_ context.Context, creds connecto
 }
 
 // ensureToken returns a valid access token, refreshing it if necessary.
-// It uses the Amadeus client credentials grant: POST /v1/security/oauth2/token
-// with grant_type=client_credentials, client_id, and client_secret as
-// form-encoded body.
+// Tokens are cached per client_id so different credential sets don't
+// share tokens. It uses the Amadeus client credentials grant:
+// POST /v1/security/oauth2/token with grant_type=client_credentials.
 func (c *AmadeusConnector) ensureToken(ctx context.Context, creds connectors.Credentials) (string, error) {
+	clientID, _ := creds.Get("client_id")
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// Return cached token if still valid (with buffer).
-	if c.token != "" && time.Now().Before(c.tokenExp.Add(-tokenRefreshBuffer)) {
-		return c.token, nil
+	if cached, ok := c.tokens[clientID]; ok {
+		if time.Now().Before(cached.expiresAt.Add(-tokenRefreshBuffer)) {
+			return cached.accessToken, nil
+		}
 	}
 
-	clientID, _ := creds.Get("client_id")
+	return c.fetchToken(ctx, creds, clientID)
+}
+
+// invalidateToken clears the cached token for a client_id, forcing a
+// refresh on the next ensureToken call. Used when a 401 response
+// suggests the token has been revoked or expired early.
+func (c *AmadeusConnector) invalidateToken(clientID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.tokens, clientID)
+}
+
+// fetchToken performs the actual token exchange. Must be called with c.mu held.
+func (c *AmadeusConnector) fetchToken(ctx context.Context, creds connectors.Credentials, clientID string) (string, error) {
 	clientSecret, _ := creds.Get("client_secret")
+	baseURL := c.resolveBaseURL(creds)
 
 	form := url.Values{
 		"grant_type":    {"client_credentials"},
@@ -123,7 +170,7 @@ func (c *AmadeusConnector) ensureToken(ctx context.Context, creds connectors.Cre
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		c.baseURL+"/v1/security/oauth2/token",
+		baseURL+"/v1/security/oauth2/token",
 		bytes.NewBufferString(form.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("creating token request: %w", err)
@@ -160,23 +207,20 @@ func (c *AmadeusConnector) ensureToken(ctx context.Context, creds connectors.Cre
 		return "", &connectors.ExternalError{Message: "Amadeus token response missing access_token"}
 	}
 
-	c.token = tokenResp.AccessToken
-	c.tokenExp = time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+	c.tokens[clientID] = cachedToken{
+		accessToken: tokenResp.AccessToken,
+		expiresAt:   time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second),
+	}
 
-	return c.token, nil
+	return tokenResp.AccessToken, nil
 }
 
-// tokenResponse is the Amadeus OAuth2 token endpoint response.
+// tokenResponse holds the fields we need from the Amadeus OAuth2 token
+// endpoint response. Additional fields (type, username, scope, etc.) are
+// ignored — json.Unmarshal silently skips them.
 type tokenResponse struct {
-	Type         string `json:"type"`
-	Username     string `json:"username"`
-	ApplicationName string `json:"application_name"`
-	ClientID     string `json:"client_id"`
-	TokenType    string `json:"token_type"`
-	AccessToken  string `json:"access_token"`
-	ExpiresIn    int    `json:"expires_in"`
-	State        string `json:"state"`
-	Scope        string `json:"scope"`
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
 }
 
 // mapTokenError maps HTTP status codes from the token endpoint to typed errors.
@@ -205,27 +249,52 @@ func mapTokenError(statusCode int, body []byte) error {
 // a valid access token, sends the request with the Bearer header, checks
 // the response status, and unmarshals the response into respBody. Either
 // reqBody or respBody may be nil.
+//
+// If the API returns 401 (token expired or revoked), do() invalidates
+// the cached token and retries once with a fresh token.
 func (c *AmadeusConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
+	// Pre-marshal the request body so we can replay it on retry.
+	var payload []byte
+	if reqBody != nil {
+		var err error
+		payload, err = json.Marshal(reqBody)
+		if err != nil {
+			return fmt.Errorf("marshaling request body: %w", err)
+		}
+	}
+
+	err := c.doOnce(ctx, creds, method, path, payload, respBody)
+	if err != nil && connectors.IsAuthError(err) {
+		// Token may have expired between cache check and request.
+		// Invalidate and retry once with a fresh token.
+		clientID, _ := creds.Get("client_id")
+		c.invalidateToken(clientID)
+		return c.doOnce(ctx, creds, method, path, payload, respBody)
+	}
+	return err
+}
+
+// doOnce executes a single API request. payload is the pre-marshaled
+// JSON body (nil for bodyless requests like GET).
+func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credentials, method, path string, payload []byte, respBody interface{}) error {
 	token, err := c.ensureToken(ctx, creds)
 	if err != nil {
 		return err
 	}
 
+	baseURL := c.resolveBaseURL(creds)
+
 	var body io.Reader
-	if reqBody != nil {
-		payload, err := json.Marshal(reqBody)
-		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
-		}
+	if payload != nil {
 		body = bytes.NewReader(payload)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, body)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	if reqBody != nil {
+	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Authorization", "Bearer "+token)

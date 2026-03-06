@@ -41,6 +41,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return &connectors.AuthError{Message: fmt.Sprintf("Amadeus API forbidden: %s", msg)}
 	case statusCode == http.StatusBadRequest:
 		return &connectors.ValidationError{Message: fmt.Sprintf("Amadeus API validation error: %s", msg)}
+	case statusCode == http.StatusNotFound:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Amadeus API resource not found: %s", msg)}
 	default:
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
