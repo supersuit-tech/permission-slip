@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -31,19 +30,10 @@ func (p *deleteParams) validate() error {
 	if len(p.Where) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: where (unconditional deletes are not allowed)"}
 	}
-	for col := range p.Where {
-		if err := validateIdentifier(col, "where column"); err != nil {
-			return &connectors.ValidationError{Message: err.Error()}
-		}
+	if err := validateWhereCols(p.Where); err != nil {
+		return err
 	}
-	for _, col := range p.Returning {
-		if col != "*" {
-			if err := validateIdentifier(col, "returning column"); err != nil {
-				return &connectors.ValidationError{Message: err.Error()}
-			}
-		}
-	}
-	return nil
+	return validateReturningCols(p.Returning)
 }
 
 // Execute deletes rows from a table and returns the affected count.
@@ -56,101 +46,26 @@ func (a *deleteAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, err
 	}
 
-	connStr, ok := req.Credentials.Get("connection_string")
-	if !ok || connStr == "" {
-		return nil, &connectors.ValidationError{Message: "missing credential: connection_string"}
+	connStr, err := getConnString(req)
+	if err != nil {
+		return nil, err
 	}
 
 	timeout := a.conn.resolveTimeout(params.TimeoutSeconds)
 
-	db, err := a.conn.openDB(connStr, timeout)
+	env, err := prepareTx(ctx, a.conn, connStr, timeout)
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("failed to open database: %v", err)}
+		return nil, err
 	}
-	defer db.Close()
+	defer env.Close()
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	whereSQL, args := buildWhereClause(params.Where, 1)
 
-	// Build WHERE clause.
-	whereCols := sortedKeys(params.Where)
-	var whereClauses []string
-	var args []interface{}
-	paramIdx := 1
-
-	for _, col := range whereCols {
-		val := params.Where[col]
-		if val == nil {
-			whereClauses = append(whereClauses, fmt.Sprintf("%s IS NULL", quoteIdentifier(col)))
-		} else {
-			whereClauses = append(whereClauses, fmt.Sprintf("%s = $%d", quoteIdentifier(col), paramIdx))
-			args = append(args, val)
-			paramIdx++
-		}
-	}
-
-	query := fmt.Sprintf("DELETE FROM %s WHERE %s",
+	query := fmt.Sprintf("DELETE FROM %s WHERE %s%s",
 		quoteIdentifier(params.Table),
-		strings.Join(whereClauses, " AND "),
+		whereSQL,
+		buildReturningClause(params.Returning),
 	)
 
-	hasReturning := len(params.Returning) > 0
-	if hasReturning {
-		quotedReturning := make([]string, len(params.Returning))
-		for i, col := range params.Returning {
-			if col == "*" {
-				quotedReturning[i] = "*"
-			} else {
-				quotedReturning[i] = quoteIdentifier(col)
-			}
-		}
-		query += " RETURNING " + strings.Join(quotedReturning, ", ")
-	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, mapPgError(err, "beginning transaction")
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	timeoutMS := int(timeout.Milliseconds())
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL statement_timeout = %d", timeoutMS)); err != nil {
-		return nil, mapPgError(err, "setting statement timeout")
-	}
-
-	if hasReturning {
-		rows, err := tx.QueryContext(ctx, query, args...)
-		if err != nil {
-			return nil, mapPgError(err, "executing delete")
-		}
-		defer rows.Close()
-
-		returned, err := scanRows(rows)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := tx.Commit(); err != nil {
-			return nil, mapPgError(err, "committing transaction")
-		}
-
-		return connectors.JSONResult(map[string]interface{}{
-			"rows_affected": len(returned),
-			"returned":      returned,
-		})
-	}
-
-	result, err := tx.ExecContext(ctx, query, args...)
-	if err != nil {
-		return nil, mapPgError(err, "executing delete")
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, mapPgError(err, "committing transaction")
-	}
-
-	affected, _ := result.RowsAffected()
-	return connectors.JSONResult(map[string]interface{}{
-		"rows_affected": affected,
-	})
+	return execMutation(env, query, args, len(params.Returning) > 0, "executing delete")
 }

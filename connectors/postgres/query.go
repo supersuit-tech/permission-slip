@@ -52,9 +52,9 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		return nil, err
 	}
 
-	connStr, ok := req.Credentials.Get("connection_string")
-	if !ok || connStr == "" {
-		return nil, &connectors.ValidationError{Message: "missing credential: connection_string"}
+	connStr, err := getConnString(req)
+	if err != nil {
+		return nil, err
 	}
 
 	timeout := a.conn.resolveTimeout(params.TimeoutSeconds)
@@ -63,31 +63,18 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		maxRows = params.MaxRows
 	}
 
-	db, err := a.conn.openDB(connStr, timeout)
+	env, err := prepareTx(ctx, a.conn, connStr, timeout)
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("failed to open database: %v", err)}
+		return nil, err
 	}
-	defer db.Close()
+	defer env.Close()
 
-	// Set statement timeout and read-only transaction.
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, mapPgError(err, "beginning transaction")
-	}
-	defer tx.Rollback() //nolint:errcheck // read-only tx, rollback is cleanup
-
-	timeoutMS := int(timeout.Milliseconds())
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL statement_timeout = %d", timeoutMS)); err != nil {
-		return nil, mapPgError(err, "setting statement timeout")
-	}
-	if _, err := tx.ExecContext(ctx, "SET TRANSACTION READ ONLY"); err != nil {
+	// Enforce read-only transaction to block writes even via CTEs.
+	if _, err := env.Tx.ExecContext(env.Ctx, "SET TRANSACTION READ ONLY"); err != nil {
 		return nil, mapPgError(err, "setting read-only mode")
 	}
 
-	rows, err := tx.QueryContext(ctx, params.SQL, params.Params...)
+	rows, err := env.Tx.QueryContext(env.Ctx, params.SQL, params.Params...)
 	if err != nil {
 		return nil, mapPgError(err, "executing query")
 	}

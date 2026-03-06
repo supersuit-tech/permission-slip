@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 // identifierPattern matches valid PostgreSQL identifiers:
@@ -50,4 +52,49 @@ func sortedKeys(m map[string]interface{}) []string {
 		}
 	}
 	return keys
+}
+
+// validateWhereCols validates all column names in a WHERE map.
+func validateWhereCols(where map[string]interface{}) error {
+	for col := range where {
+		if err := validateIdentifier(col, "where column"); err != nil {
+			return &connectors.ValidationError{Message: err.Error()}
+		}
+	}
+	return nil
+}
+
+// validateReturningCols validates all column names in a RETURNING list.
+func validateReturningCols(cols []string) error {
+	for _, col := range cols {
+		if col != "*" {
+			if err := validateIdentifier(col, "returning column"); err != nil {
+				return &connectors.ValidationError{Message: err.Error()}
+			}
+		}
+	}
+	return nil
+}
+
+// buildWhereClause builds a parameterized WHERE clause from a column-value map.
+// NULL values produce IS NULL conditions; non-null values use $N placeholders.
+// startIdx is the first placeholder index to use.
+func buildWhereClause(where map[string]interface{}, startIdx int) (string, []interface{}) {
+	cols := sortedKeys(where)
+	var clauses []string
+	var args []interface{}
+	paramIdx := startIdx
+
+	for _, col := range cols {
+		val := where[col]
+		if val == nil {
+			clauses = append(clauses, fmt.Sprintf("%s IS NULL", quoteIdentifier(col)))
+		} else {
+			clauses = append(clauses, fmt.Sprintf("%s = $%d", quoteIdentifier(col), paramIdx))
+			args = append(args, val)
+			paramIdx++
+		}
+	}
+
+	return strings.Join(clauses, " AND "), args
 }
