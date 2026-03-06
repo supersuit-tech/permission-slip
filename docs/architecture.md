@@ -99,6 +99,15 @@ graph TB
     style CE fill:#9AA0A6,color:#fff,stroke:#7A8086
 ```
 
+## Background Jobs
+
+The server runs periodic background jobs when a database connection is configured. Both jobs are started on server boot, run immediately once, then repeat on a configurable interval. They respect context cancellation for graceful shutdown.
+
+| Job | Default Interval | Description |
+|-----|-----------------|-------------|
+| **Audit log purge** | 1 hour (`AUDIT_PURGE_INTERVAL`) | Deletes expired audit events to prevent unbounded table growth. |
+| **OAuth token refresh** | 10 minutes (`OAUTH_REFRESH_INTERVAL`) | Proactively refreshes OAuth access tokens expiring within 15 minutes. Tokens that fail to refresh (revoked, expired refresh token) are marked `needs_reauth`, prompting the user to re-authorize. |
+
 ## Agent Registration Flow
 
 > Registration is **user-initiated** via invite codes. See [ADR-005](adr/005-user-initiated-registration.md) for the rationale.

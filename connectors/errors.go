@@ -93,3 +93,21 @@ func IsValidationError(err error) bool {
 func AsRateLimitError(err error, target **RateLimitError) bool {
 	return errors.As(err, target)
 }
+
+// OAuthRefreshError indicates that the OAuth token refresh failed and the user
+// needs to re-authorize. Maps to HTTP 401 with a message telling the agent
+// the user needs to reconnect the OAuth provider.
+type OAuthRefreshError struct {
+	Provider string // OAuth provider ID (e.g. "google")
+	Message  string // human-readable description
+}
+
+func (e *OAuthRefreshError) Error() string {
+	return fmt.Sprintf("OAuth token refresh failed for provider %q: %s", e.Provider, e.Message)
+}
+
+// IsOAuthRefreshError reports whether err is or wraps an *OAuthRefreshError.
+func IsOAuthRefreshError(err error) bool {
+	var target *OAuthRefreshError
+	return errors.As(err, &target)
+}
