@@ -764,8 +764,20 @@ func TestActions_ReturnsMap(t *testing.T) {
 	if actions == nil {
 		t.Fatal("Actions() returned nil")
 	}
-	// Phase 2 will add actions; for now just verify it's an empty map.
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 for Phase 1", len(actions))
+	expectedActions := []string{
+		"stripe.create_customer",
+		"stripe.create_invoice",
+		"stripe.issue_refund",
+		"stripe.list_subscriptions",
+		"stripe.create_payment_link",
+		"stripe.get_balance",
+	}
+	if len(actions) != len(expectedActions) {
+		t.Errorf("Actions() returned %d actions, want %d", len(actions), len(expectedActions))
+	}
+	for _, name := range expectedActions {
+		if _, ok := actions[name]; !ok {
+			t.Errorf("Actions() missing %q", name)
+		}
 	}
 }
