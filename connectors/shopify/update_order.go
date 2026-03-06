@@ -24,8 +24,8 @@ type updateOrderParams struct {
 }
 
 func (p *updateOrderParams) validate() error {
-	if p.OrderID == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: order_id"}
+	if p.OrderID <= 0 {
+		return &connectors.ValidationError{Message: "order_id must be a positive integer"}
 	}
 	// At least one updatable field must be provided.
 	if p.Note == nil && p.Tags == nil && p.Email == nil && p.ShippingAddress == nil {

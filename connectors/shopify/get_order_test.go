@@ -52,21 +52,35 @@ func TestGetOrder_Success(t *testing.T) {
 	}
 }
 
-func TestGetOrder_MissingOrderID(t *testing.T) {
+func TestGetOrder_InvalidOrderID(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
 	action := conn.Actions()["shopify.get_order"]
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "shopify.get_order",
-		Parameters:  json.RawMessage(`{}`),
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error, got nil")
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{"missing order_id", `{}`},
+		{"zero order_id", `{"order_id":0}`},
+		{"negative order_id", `{"order_id":-1}`},
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got %T: %v", err, err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "shopify.get_order",
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
 	}
 }
 

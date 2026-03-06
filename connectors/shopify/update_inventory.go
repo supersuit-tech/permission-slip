@@ -22,11 +22,11 @@ type updateInventoryParams struct {
 }
 
 func (p *updateInventoryParams) validate() error {
-	if p.InventoryItemID == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: inventory_item_id"}
+	if p.InventoryItemID <= 0 {
+		return &connectors.ValidationError{Message: "inventory_item_id must be a positive integer"}
 	}
-	if p.LocationID == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: location_id"}
+	if p.LocationID <= 0 {
+		return &connectors.ValidationError{Message: "location_id must be a positive integer"}
 	}
 	if p.AvailableAdjustment == 0 {
 		return &connectors.ValidationError{Message: "available_adjustment must be non-zero (positive to add inventory, negative to subtract)"}

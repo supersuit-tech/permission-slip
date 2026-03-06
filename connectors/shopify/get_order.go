@@ -20,8 +20,8 @@ type getOrderParams struct {
 }
 
 func (p *getOrderParams) validate() error {
-	if p.OrderID == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: order_id"}
+	if p.OrderID <= 0 {
+		return &connectors.ValidationError{Message: "order_id must be a positive integer"}
 	}
 	return nil
 }
