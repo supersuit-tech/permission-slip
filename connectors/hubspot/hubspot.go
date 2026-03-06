@@ -34,6 +34,7 @@ const (
 type HubSpotConnector struct {
 	client  *http.Client
 	baseURL string
+	nowFunc func() time.Time // defaults to time.Now; override in tests for deterministic timestamps
 }
 
 // New creates a HubSpotConnector with sensible defaults (30s timeout,
@@ -43,6 +44,14 @@ func New() *HubSpotConnector {
 		client:  &http.Client{Timeout: defaultTimeout},
 		baseURL: defaultBaseURL,
 	}
+}
+
+// now returns the current time, using the connector's nowFunc if set.
+func (c *HubSpotConnector) now() time.Time {
+	if c.nowFunc != nil {
+		return c.nowFunc()
+	}
+	return time.Now()
 }
 
 // newForTest creates a HubSpotConnector that points at a test server.
@@ -56,29 +65,16 @@ func newForTest(client *http.Client, baseURL string) *HubSpotConnector {
 // ID returns "hubspot", matching the connectors.id in the database.
 func (c *HubSpotConnector) ID() string { return "hubspot" }
 
-// Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup. Actions are registered in Phase 2.
-func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "hubspot",
-		Name:        "HubSpot",
-		Description: "HubSpot CRM integration for contacts, deals, tickets, and notes",
-		Actions:     []connectors.ManifestAction{},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{
-				Service:         "hubspot",
-				AuthType:        "api_key",
-				InstructionsURL: "https://developers.hubspot.com/docs/api/private-apps",
-			},
-		},
-		Templates: []connectors.ManifestTemplate{},
-	}
-}
-
 // Actions returns the registered action handlers keyed by action_type.
-// Actions are added in Phase 2.
 func (c *HubSpotConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
+	return map[string]connectors.Action{
+		"hubspot.create_contact": &createContactAction{conn: c},
+		"hubspot.update_contact": &updateContactAction{conn: c},
+		"hubspot.create_deal":    &createDealAction{conn: c},
+		"hubspot.create_ticket":  &createTicketAction{conn: c},
+		"hubspot.add_note":       &addNoteAction{conn: c},
+		"hubspot.search":         &searchAction{conn: c},
+	}
 }
 
 // ValidateCredentials checks that the provided credentials contain a
@@ -89,6 +85,26 @@ func (c *HubSpotConnector) ValidateCredentials(_ context.Context, creds connecto
 		return &connectors.ValidationError{Message: "missing required credential: api_key"}
 	}
 	return nil
+}
+
+// maxAssociations limits the number of associations per request to prevent
+// excessive API calls against HubSpot's rate limit (100 req / 10s).
+const maxAssociations = 50
+
+// isValidHubSpotID checks that an ID string is safe to interpolate into a
+// URL path. HubSpot object IDs are always numeric strings. Rejecting
+// non-numeric values prevents path traversal (e.g., "../../admin/endpoint")
+// from redirecting requests to unintended API endpoints.
+func isValidHubSpotID(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // do is the shared request lifecycle for all HubSpot actions. It marshals
