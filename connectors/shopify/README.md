@@ -76,7 +76,7 @@ Each action lives in its own file. To add one (e.g., `shopify.create_product`):
 2. Use `a.conn.do(ctx, creds, method, path, reqBody, &respBody)` for the HTTP lifecycle — it handles JSON marshaling, auth headers (`X-Shopify-Access-Token`), response checking, and error mapping.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `shopify.go`.
-5. Add the action to the `Manifest()` return value inside `shopify.go` — include a `ParametersSchema` (see below).
+5. Add the action to the `Manifest()` return value inside `manifest.go` — include a `ParametersSchema` (see below).
 6. Add tests in `create_product_test.go` using `httptest.NewServer` and `newForTest()`.
 
 The `do` method means each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape. All shared HTTP concerns (auth, Content-Type, error mapping) are handled once.
@@ -130,7 +130,8 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/shopify/
-├── shopify.go                # ShopifyConnector struct, New(), Manifest(), Actions(), do()
+├── shopify.go                # ShopifyConnector struct, New(), Actions(), ValidateCredentials(), do()
+├── manifest.go               # Manifest() with action schemas, credentials, templates
 ├── response.go               # Shared HTTP response → typed error mapping
 ├── get_orders.go             # shopify.get_orders action
 ├── get_order.go              # shopify.get_order action
