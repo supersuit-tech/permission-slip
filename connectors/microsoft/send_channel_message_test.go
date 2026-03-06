@@ -259,6 +259,82 @@ func TestSendChannelMessage_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestSendChannelMessage_PathTraversalInTeamID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendChannelMessageAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"team_id":    "../admin",
+		"channel_id": "channel-1",
+		"message":    "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_channel_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in team_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSendChannelMessage_SlashInChannelID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendChannelMessageAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"team_id":    "team-1",
+		"channel_id": "channel/../../me/sendMail",
+		"message":    "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_channel_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for slash in channel_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSendChannelMessage_PathTraversalInReplyID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendChannelMessageAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"team_id":              "team-1",
+		"channel_id":           "channel-1",
+		"message":              "Hello",
+		"reply_to_message_id": "../../me/sendMail",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_channel_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in reply_to_message_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSendChannelMessage_AuthFailure(t *testing.T) {
 	t.Parallel()
 

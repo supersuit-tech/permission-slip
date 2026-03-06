@@ -23,11 +23,11 @@ type listChannelMessagesParams struct {
 }
 
 func (p *listChannelMessagesParams) validate() error {
-	if p.TeamID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: team_id"}
+	if err := validateGraphID("team_id", p.TeamID); err != nil {
+		return err
 	}
-	if p.ChannelID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: channel_id"}
+	if err := validateGraphID("channel_id", p.ChannelID); err != nil {
+		return err
 	}
 	return nil
 }

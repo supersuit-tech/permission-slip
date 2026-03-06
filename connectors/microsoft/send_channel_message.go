@@ -24,14 +24,19 @@ type sendChannelMessageParams struct {
 }
 
 func (p *sendChannelMessageParams) validate() error {
-	if p.TeamID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: team_id"}
+	if err := validateGraphID("team_id", p.TeamID); err != nil {
+		return err
 	}
-	if p.ChannelID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: channel_id"}
+	if err := validateGraphID("channel_id", p.ChannelID); err != nil {
+		return err
 	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
+	}
+	if p.ReplyToMessageID != "" {
+		if err := validateGraphID("reply_to_message_id", p.ReplyToMessageID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

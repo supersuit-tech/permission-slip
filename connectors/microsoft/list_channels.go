@@ -21,8 +21,8 @@ type listChannelsParams struct {
 }
 
 func (p *listChannelsParams) validate() error {
-	if p.TeamID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: team_id"}
+	if err := validateGraphID("team_id", p.TeamID); err != nil {
+		return err
 	}
 	return nil
 }
