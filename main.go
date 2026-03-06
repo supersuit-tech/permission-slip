@@ -144,6 +144,7 @@ func main() {
 		// the live keys. This lets developers keep both sets of keys in .env
 		// and switch with a single boolean.
 		stripeTestMode := os.Getenv("STRIPE_TEST_MODE") == "true"
+		deps.StripeTestMode = stripeTestMode
 		stripeKey := os.Getenv("STRIPE_SECRET_KEY")
 		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 		priceID := os.Getenv("STRIPE_PRICE_ID_REQUEST")
