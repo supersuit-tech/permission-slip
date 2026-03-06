@@ -30,6 +30,13 @@ const (
 	credKeyEnvironment = "environment"
 )
 
+// money represents Square's Money object. Amount is in the smallest currency
+// unit (e.g., cents for USD). Shared across create_order and create_payment.
+type money struct {
+	Amount   int64  `json:"amount"`
+	Currency string `json:"currency"`
+}
+
 // SquareConnector owns the shared HTTP client and base URL used by all
 // Square actions. Actions hold a pointer back to the connector to access
 // these shared resources.
@@ -59,9 +66,15 @@ func newForTest(client *http.Client, baseURL string) *SquareConnector {
 func (c *SquareConnector) ID() string { return "square" }
 
 // Actions returns the registered action handlers keyed by action_type.
-// Empty in Phase 1 — actions are wired up in Phase 2.
 func (c *SquareConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
+	return map[string]connectors.Action{
+		"square.create_order":    &createOrderAction{conn: c},
+		"square.create_payment":  &createPaymentAction{conn: c},
+		"square.list_catalog":    &listCatalogAction{conn: c},
+		"square.create_customer": &createCustomerAction{conn: c},
+		"square.create_booking":  &createBookingAction{conn: c},
+		"square.search_orders":   &searchOrdersAction{conn: c},
+	}
 }
 
 // ValidateCredentials checks that the provided credentials contain a
