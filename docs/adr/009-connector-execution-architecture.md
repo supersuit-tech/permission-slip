@@ -50,7 +50,7 @@ type Action interface {
 // It owns shared configuration (HTTP clients, base URLs, auth helpers)
 // and registers the actions it supports.
 type Connector interface {
-    // ID returns the connector identifier (e.g., "github", "slack").
+    // ID returns the connector identifier (e.g., "github", "hubspot", "slack").
     // Must match the connectors.id value in the database.
     ID() string
 
