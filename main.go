@@ -24,7 +24,6 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
-	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
@@ -319,7 +318,7 @@ func main() {
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
 	registry.Register(hubspot.New())
-	registry.Register(microsoft.New())
+	// registry.Register(microsoft.New()) // temporarily disabled for CI diagnosis
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
 	registry.Register(pgconnector.New())
