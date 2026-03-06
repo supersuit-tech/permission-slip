@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 // searchCarsAction implements connectors.Action for amadeus.search_cars.
-// It searches available transfer/rental car offers via GET /v2/shopping/transfer-offers.
+// It searches available transfer/rental car offers via POST /v2/shopping/transfer-offers.
 type searchCarsAction struct {
 	conn *AmadeusConnector
 }
@@ -46,45 +45,34 @@ func (a *searchCarsAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
+	// Default dropoff to pickup location for round-trip rentals.
+	endLocation := params.DropoffLocation
+	if endLocation == "" {
+		endLocation = params.PickupLocation
+	}
+
 	// Build the transfer search request body per Amadeus Transfer API spec.
-	startLocation := map[string]string{"iataCode": params.PickupLocation}
-	endLocation := startLocation
-	if params.DropoffLocation != "" {
-		endLocation = map[string]string{"iataCode": params.DropoffLocation}
-	}
-
 	body := map[string]any{
-		"startLocationCode":    params.PickupLocation,
-		"endLocationCode":      params.DropoffLocation,
-		"startDateTime":        params.PickupDate,
-		"endDateTime":          params.DropoffDate,
-		"startConnectedSegment": startLocation,
-		"endConnectedSegment":   endLocation,
+		"startLocationCode": params.PickupLocation,
+		"endLocationCode":   endLocation,
+		"startDateTime":     params.PickupDate,
+		"endDateTime":       params.DropoffDate,
+		"startConnectedSegment": map[string]string{
+			"iataCode": params.PickupLocation,
+		},
+		"endConnectedSegment": map[string]string{
+			"iataCode": endLocation,
+		},
 	}
 
-	// Use query params approach for transfer offers search.
-	q := url.Values{
-		"startLocationCode": {params.PickupLocation},
-		"startDateTime":     {params.PickupDate},
-		"endDateTime":       {params.DropoffDate},
-	}
-	if params.DropoffLocation != "" {
-		q.Set("endLocationCode", params.DropoffLocation)
-	} else {
-		q.Set("endLocationCode", params.PickupLocation)
-	}
 	if params.Provider != "" {
-		q.Set("transferType", params.Provider)
+		body["transferType"] = params.Provider
 	}
-
-	// The Amadeus Transfer API uses POST for search with a body,
-	// unlike the flight search which uses GET with query params.
-	path := "/v2/shopping/transfer-offers"
 
 	var resp struct {
 		Data []json.RawMessage `json:"data"`
 	}
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/v2/shopping/transfer-offers", body, &resp); err != nil {
 		return nil, err
 	}
 

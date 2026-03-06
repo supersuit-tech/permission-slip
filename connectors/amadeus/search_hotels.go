@@ -40,8 +40,14 @@ func (p *searchHotelsParams) validate() error {
 	if p.CheckInDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: check_in_date"}
 	}
+	if !validDate(p.CheckInDate) {
+		return &connectors.ValidationError{Message: "check_in_date must be YYYY-MM-DD format"}
+	}
 	if p.CheckOutDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: check_out_date"}
+	}
+	if !validDate(p.CheckOutDate) {
+		return &connectors.ValidationError{Message: "check_out_date must be YYYY-MM-DD format"}
 	}
 	for _, r := range p.Ratings {
 		if r < 1 || r > 5 {

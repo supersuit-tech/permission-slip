@@ -162,8 +162,15 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 							"items": {
 								"type": "object",
 								"properties": {
-									"name": {"type": "string"},
-									"dateOfBirth": {"type": "string", "format": "date"},
+									"name": {
+										"type": "object",
+										"properties": {
+											"firstName": {"type": "string", "description": "Traveler's first/given name"},
+											"lastName": {"type": "string", "description": "Traveler's last/family name"}
+										},
+										"required": ["firstName", "lastName"]
+									},
+									"dateOfBirth": {"type": "string", "format": "date", "description": "YYYY-MM-DD"},
 									"gender": {"type": "string", "enum": ["MALE", "FEMALE"]},
 									"contact": {
 										"type": "object",

@@ -37,6 +37,16 @@ func TestBookFlight_Success(t *testing.T) {
 			t.Fatalf("expected 1 traveler, got %v", data["travelers"])
 		}
 
+		// Verify the traveler name is properly split into firstName/lastName.
+		traveler := travelers[0].(map[string]any)
+		name := traveler["name"].(map[string]any)
+		if name["firstName"] != "John" {
+			t.Errorf("firstName = %v, want John", name["firstName"])
+		}
+		if name["lastName"] != "Doe" {
+			t.Errorf("lastName = %v, want Doe", name["lastName"])
+		}
+
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]any{
 			"data": map[string]any{
@@ -53,7 +63,7 @@ func TestBookFlight_Success(t *testing.T) {
 
 	params := `{
 		"flight_offer": {"id":"1","type":"flight-offer"},
-		"travelers": [{"name":"John Doe","dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"john@example.com","phone":"+14155551234"}}],
+		"travelers": [{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"john@example.com","phone":"+14155551234"}}],
 		"payment_method_id": "pm_abc123"
 	}`
 
@@ -110,7 +120,7 @@ func TestBookFlight_WithRemarks(t *testing.T) {
 
 	params := `{
 		"flight_offer": {"id":"1"},
-		"travelers": [{"name":"Jane","dateOfBirth":"1985-05-20","gender":"FEMALE","contact":{"email":"jane@example.com","phone":"+14155559999"}}],
+		"travelers": [{"name":{"firstName":"Jane","lastName":"Smith"},"dateOfBirth":"1985-05-20","gender":"FEMALE","contact":{"email":"jane@example.com","phone":"+14155559999"}}],
 		"payment_method_id": "pm_xyz",
 		"remarks": "Window seat preferred"
 	}`
@@ -131,7 +141,7 @@ func TestBookFlight_MissingParams(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["amadeus.book_flight"]
 
-	baseTraveler := `[{"name":"John","dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}]`
+	baseTraveler := `[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}]`
 
 	tests := []struct {
 		name   string
@@ -142,9 +152,12 @@ func TestBookFlight_MissingParams(t *testing.T) {
 		{"missing travelers", `{"flight_offer":{"id":"1"},"payment_method_id":"pm_1"}`},
 		{"empty travelers", `{"flight_offer":{"id":"1"},"travelers":[],"payment_method_id":"pm_1"}`},
 		{"missing payment_method_id", `{"flight_offer":{"id":"1"},"travelers":` + baseTraveler + `}`},
-		{"traveler missing name", `{"flight_offer":{"id":"1"},"travelers":[{"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler missing email", `{"flight_offer":{"id":"1"},"travelers":[{"name":"John","dateOfBirth":"1990-01-15","gender":"MALE","contact":{"phone":"+1"}}],"payment_method_id":"pm_1"}`},
-		{"traveler missing phone", `{"flight_offer":{"id":"1"},"travelers":[{"name":"John","dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com"}}],"payment_method_id":"pm_1"}`},
+		{"traveler missing firstName", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
+		{"traveler missing lastName", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
+		{"traveler invalid dateOfBirth", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"not-a-date","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
+		{"traveler invalid gender", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"OTHER","contact":{"email":"j@e.com","phone":"+1"}}],"payment_method_id":"pm_1"}`},
+		{"traveler missing email", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"phone":"+1"}}],"payment_method_id":"pm_1"}`},
+		{"traveler missing phone", `{"flight_offer":{"id":"1"},"travelers":[{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com"}}],"payment_method_id":"pm_1"}`},
 		{"invalid JSON", `{invalid}`},
 	}
 
@@ -179,7 +192,7 @@ func TestBookFlight_APIError(t *testing.T) {
 
 	params := `{
 		"flight_offer": {"id":"1"},
-		"travelers": [{"name":"John","dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],
+		"travelers": [{"name":{"firstName":"John","lastName":"Doe"},"dateOfBirth":"1990-01-15","gender":"MALE","contact":{"email":"j@e.com","phone":"+1"}}],
 		"payment_method_id": "pm_1"
 	}`
 

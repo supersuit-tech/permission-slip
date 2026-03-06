@@ -45,6 +45,12 @@ func (p *searchFlightsParams) validate() error {
 	if p.DepartureDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: departure_date"}
 	}
+	if !validDate(p.DepartureDate) {
+		return &connectors.ValidationError{Message: "departure_date must be YYYY-MM-DD format"}
+	}
+	if p.ReturnDate != "" && !validDate(p.ReturnDate) {
+		return &connectors.ValidationError{Message: "return_date must be YYYY-MM-DD format"}
+	}
 	if p.Adults < 1 {
 		return &connectors.ValidationError{Message: "adults must be at least 1"}
 	}

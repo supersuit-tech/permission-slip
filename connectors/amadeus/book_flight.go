@@ -24,8 +24,13 @@ type bookFlightTravelerContact struct {
 	Phone string `json:"phone"`
 }
 
+type bookFlightTravelerName struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
 type bookFlightTraveler struct {
-	Name        string                    `json:"name"`
+	Name        bookFlightTravelerName    `json:"name"`
 	DateOfBirth string                    `json:"dateOfBirth"`
 	Gender      string                    `json:"gender"`
 	Contact     bookFlightTravelerContact `json:"contact"`
@@ -38,6 +43,11 @@ type bookFlightParams struct {
 	Remarks         string               `json:"remarks"`
 }
 
+var validGenders = map[string]bool{
+	"MALE":   true,
+	"FEMALE": true,
+}
+
 func (p *bookFlightParams) validate() error {
 	if len(p.FlightOffer) == 0 || string(p.FlightOffer) == "null" {
 		return &connectors.ValidationError{Message: "missing required parameter: flight_offer"}
@@ -46,14 +56,23 @@ func (p *bookFlightParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: travelers"}
 	}
 	for i, t := range p.Travelers {
-		if t.Name == "" {
-			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: missing required field: name", i)}
+		if t.Name.FirstName == "" {
+			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: missing required field: name.firstName", i)}
+		}
+		if t.Name.LastName == "" {
+			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: missing required field: name.lastName", i)}
 		}
 		if t.DateOfBirth == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: missing required field: dateOfBirth", i)}
 		}
+		if !validDate(t.DateOfBirth) {
+			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: dateOfBirth must be YYYY-MM-DD format", i)}
+		}
 		if t.Gender == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: missing required field: gender", i)}
+		}
+		if !validGenders[t.Gender] {
+			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: gender must be MALE or FEMALE", i)}
 		}
 		if t.Contact.Email == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("travelers[%d]: missing required field: contact.email", i)}
@@ -85,7 +104,8 @@ func (a *bookFlightAction) Execute(ctx context.Context, req connectors.ActionReq
 			"dateOfBirth": t.DateOfBirth,
 			"gender":      t.Gender,
 			"name": map[string]string{
-				"firstName": t.Name, // The agent provides the full name; splitting is left to the caller.
+				"firstName": t.Name.FirstName,
+				"lastName":  t.Name.LastName,
 			},
 			"contact": map[string]any{
 				"emailAddress": t.Contact.Email,

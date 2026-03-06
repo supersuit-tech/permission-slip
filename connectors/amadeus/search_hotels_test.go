@@ -169,6 +169,8 @@ func TestSearchHotels_MissingParams(t *testing.T) {
 		{"missing check_in_date", `{"city_code":"PAR","check_out_date":"2024-07-05"}`},
 		{"missing check_out_date", `{"city_code":"PAR","check_in_date":"2024-07-01"}`},
 		{"partial geocode", `{"latitude":"48.8566","check_in_date":"2024-07-01","check_out_date":"2024-07-05"}`},
+		{"invalid check_in_date", `{"city_code":"PAR","check_in_date":"bad-date","check_out_date":"2024-07-05"}`},
+		{"invalid check_out_date", `{"city_code":"PAR","check_in_date":"2024-07-01","check_out_date":"nope"}`},
 		{"invalid rating", `{"city_code":"PAR","check_in_date":"2024-07-01","check_out_date":"2024-07-05","ratings":[6]}`},
 		{"invalid JSON", `{invalid}`},
 	}
