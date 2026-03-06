@@ -891,11 +891,19 @@ connectors/
 │   ├── github_test.go        # Connector-level tests
 │   ├── create_issue_test.go  # Action tests
 │   └── merge_pr_test.go      # Action tests
-└── slack/
-    ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
-    ├── send_message.go       # slack.send_message action
-    ├── create_channel.go     # slack.create_channel action
-    └── ...tests...
+├── slack/
+│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
+│   ├── send_message.go       # slack.send_message action
+│   ├── create_channel.go     # slack.create_channel action
+│   └── ...tests...
+└── expedia/
+    ├── expedia.go            # ExpediaConnector struct, New(), SHA-512 signature auth, do()
+    ├── manifest.go           # Manifest() with 6 action schemas and templates
+    ├── response.go           # HTTP status → typed error mapping
+    ├── README.md             # Connector documentation
+    ├── helpers_test.go       # validCreds() test helper
+    ├── expedia_test.go       # Connector and do() lifecycle tests
+    └── response_test.go      # checkResponse() error mapping tests
 ```
 
 ### Execution flow
