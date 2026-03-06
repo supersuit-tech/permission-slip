@@ -29,6 +29,7 @@ type PaymentMethod struct {
 	IsDefault             bool       `json:"is_default"`
 	PerTransactionLimit   *int       `json:"per_transaction_limit"`
 	MonthlyLimit          *int       `json:"monthly_limit"`
+	ExpirationAlertSentAt *time.Time `json:"expiration_alert_sent_at"`
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`
 }
@@ -37,7 +38,7 @@ const paymentMethodColumns = `id, user_id, stripe_payment_method_id, label, bran
 	exp_month, exp_year,
 	billing_address_line1, billing_address_line2, billing_address_city,
 	billing_address_state, billing_address_postal, billing_address_country,
-	is_default, per_transaction_limit, monthly_limit, created_at, updated_at`
+	is_default, per_transaction_limit, monthly_limit, expiration_alert_sent_at, created_at, updated_at`
 
 func scanPaymentMethod(row pgx.Row) (*PaymentMethod, error) {
 	var pm PaymentMethod
@@ -48,6 +49,7 @@ func scanPaymentMethod(row pgx.Row) (*PaymentMethod, error) {
 		&pm.BillingAddressLine1, &pm.BillingAddressLine2, &pm.BillingAddressCity,
 		&pm.BillingAddressState, &pm.BillingAddressPostal, &pm.BillingAddressCountry,
 		&pm.IsDefault, &pm.PerTransactionLimit, &pm.MonthlyLimit,
+		&pm.ExpirationAlertSentAt,
 		&pm.CreatedAt, &pm.UpdatedAt,
 	)
 	if err != nil {
@@ -98,6 +100,7 @@ func ListPaymentMethodsByUser(ctx context.Context, db DBTX, userID string) ([]Pa
 			&pm.BillingAddressLine1, &pm.BillingAddressLine2, &pm.BillingAddressCity,
 			&pm.BillingAddressState, &pm.BillingAddressPostal, &pm.BillingAddressCountry,
 			&pm.IsDefault, &pm.PerTransactionLimit, &pm.MonthlyLimit,
+			&pm.ExpirationAlertSentAt,
 			&pm.CreatedAt, &pm.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -223,6 +226,71 @@ func GetMonthlySpend(ctx context.Context, db DBTX, paymentMethodID string) (int,
 		 WHERE payment_method_id = $1 AND created_at >= now() - interval '30 days'`,
 		paymentMethodID).Scan(&total)
 	return total, err
+}
+
+// ExpiringPaymentMethod bundles a payment method with its owner's profile,
+// so the expiration check job can send notifications without extra queries.
+type ExpiringPaymentMethod struct {
+	PaymentMethod PaymentMethod
+	Profile       Profile
+}
+
+// ListExpiringPaymentMethods returns all payment methods that expire within
+// the given number of days (or are already expired) AND have not yet had an
+// expiration alert sent (expiration_alert_sent_at IS NULL). Results are
+// joined with profiles so the caller has contact info for notifications.
+func ListExpiringPaymentMethods(ctx context.Context, db DBTX, withinDays int) ([]ExpiringPaymentMethod, error) {
+	rows, err := db.Query(ctx,
+		`SELECT
+			pm.id, pm.user_id, pm.stripe_payment_method_id, pm.label, pm.brand, pm.last4,
+			pm.exp_month, pm.exp_year,
+			pm.billing_address_line1, pm.billing_address_line2, pm.billing_address_city,
+			pm.billing_address_state, pm.billing_address_postal, pm.billing_address_country,
+			pm.is_default, pm.per_transaction_limit, pm.monthly_limit, pm.expiration_alert_sent_at,
+			pm.created_at, pm.updated_at,
+			p.id, p.username, p.email, p.phone, p.marketing_opt_in, p.created_at
+		FROM payment_methods pm
+		JOIN profiles p ON p.id = pm.user_id
+		WHERE pm.expiration_alert_sent_at IS NULL
+		  AND pm.exp_month > 0 AND pm.exp_year > 0
+		  AND make_date(pm.exp_year, pm.exp_month, 1)
+		      + (interval '1 month' - interval '1 day')  -- last day of exp month
+		      < now() + make_interval(days => $1)`,
+		withinDays)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []ExpiringPaymentMethod
+	for rows.Next() {
+		var epm ExpiringPaymentMethod
+		if err := rows.Scan(
+			&epm.PaymentMethod.ID, &epm.PaymentMethod.UserID, &epm.PaymentMethod.StripePaymentMethodID,
+			&epm.PaymentMethod.Label, &epm.PaymentMethod.Brand, &epm.PaymentMethod.Last4,
+			&epm.PaymentMethod.ExpMonth, &epm.PaymentMethod.ExpYear,
+			&epm.PaymentMethod.BillingAddressLine1, &epm.PaymentMethod.BillingAddressLine2, &epm.PaymentMethod.BillingAddressCity,
+			&epm.PaymentMethod.BillingAddressState, &epm.PaymentMethod.BillingAddressPostal, &epm.PaymentMethod.BillingAddressCountry,
+			&epm.PaymentMethod.IsDefault, &epm.PaymentMethod.PerTransactionLimit, &epm.PaymentMethod.MonthlyLimit,
+			&epm.PaymentMethod.ExpirationAlertSentAt,
+			&epm.PaymentMethod.CreatedAt, &epm.PaymentMethod.UpdatedAt,
+			&epm.Profile.ID, &epm.Profile.Username, &epm.Profile.Email, &epm.Profile.Phone,
+			&epm.Profile.MarketingOptIn, &epm.Profile.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, epm)
+	}
+	return results, rows.Err()
+}
+
+// MarkExpirationAlertSent sets expiration_alert_sent_at to now() for the
+// given payment method, preventing duplicate alerts.
+func MarkExpirationAlertSent(ctx context.Context, db DBTX, paymentMethodID string) error {
+	_, err := db.Exec(ctx,
+		`UPDATE payment_methods SET expiration_alert_sent_at = now() WHERE id = $1`,
+		paymentMethodID)
+	return err
 }
 
 // GetMonthlySpendBatch returns the total amount_cents spent in the last 30 days

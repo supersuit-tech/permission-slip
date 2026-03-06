@@ -69,6 +69,24 @@ func BuildPushContent(approval Approval) PushContent {
 		}
 	}
 
+	if approval.Type == NotificationTypeCardExpiring {
+		info := extractCardExpiringInfo(approval.Context)
+		title := "Card Expiring Soon"
+		body := fmt.Sprintf("Your %s card ending in %s expires %s. Add a replacement to avoid disruptions.",
+			info.Brand, info.Last4, formatCardExpiry(info.ExpMonth, info.ExpYear))
+		if info.Expired {
+			title = "Card Expired"
+			body = fmt.Sprintf("Your %s card ending in %s has expired. Update your payment methods.",
+				info.Brand, info.Last4)
+		}
+		return PushContent{
+			Title:      title,
+			Body:       body,
+			URL:        approval.ApprovalURL,
+			ApprovalID: approval.ApprovalID,
+		}
+	}
+
 	title := "Approval Request"
 	if approval.AgentName != "" {
 		title = approval.AgentName

@@ -14,6 +14,9 @@ func buildEmailSubject(approval Approval) string {
 	if approval.Type == NotificationTypePaymentFailed {
 		return "Action required: Your payment failed"
 	}
+	if approval.Type == NotificationTypeCardExpiring {
+		return buildCardExpiringSubject(approval)
+	}
 	actionType := extractActionType(approval.Action)
 	if actionType != "" {
 		return fmt.Sprintf("Approval needed: %s", actionType)
@@ -25,6 +28,9 @@ func buildEmailSubject(approval Approval) string {
 func buildEmailPlainBody(approval Approval) string {
 	if approval.Type == NotificationTypePaymentFailed {
 		return buildPaymentFailedPlainBody(approval)
+	}
+	if approval.Type == NotificationTypeCardExpiring {
+		return buildCardExpiringPlainBody(approval)
 	}
 
 	var b strings.Builder
@@ -80,6 +86,9 @@ func buildPaymentFailedPlainBody(approval Approval) string {
 func buildEmailHTMLBody(approval Approval) string {
 	if approval.Type == NotificationTypePaymentFailed {
 		return buildPaymentFailedHTMLBody(approval)
+	}
+	if approval.Type == NotificationTypeCardExpiring {
+		return buildCardExpiringHTMLBody(approval)
 	}
 
 	agentName := approval.AgentName
@@ -163,6 +172,111 @@ func buildPaymentFailedHTMLBody(approval Approval) string {
 		<a href="%s" style="display:inline-block;background-color:#dc2626;color:#ffffff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;">Update Payment Method</a>
 		</div>`,
 			html.EscapeString(approval.ApprovalURL),
+		))
+	}
+
+	// Footer
+	b.WriteString(`<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:20px;font-size:12px;color:#9ca3af;">`)
+	b.WriteString(`<p style="margin:0;">This is an automated notification from Permission Slip.</p>`)
+	b.WriteString(`</div>`)
+
+	b.WriteString(`</body></html>`)
+	return b.String()
+}
+
+// CardExpiringInfo extracts card details from the Approval.Context JSON
+// for card-expiring notifications.
+type CardExpiringInfo struct {
+	Brand    string `json:"brand"`
+	Last4    string `json:"last4"`
+	ExpMonth int    `json:"exp_month"`
+	ExpYear  int    `json:"exp_year"`
+	Expired  bool   `json:"expired"` // true if the card is already expired
+}
+
+// extractCardExpiringInfo pulls card details from the context JSONB.
+func extractCardExpiringInfo(raw json.RawMessage) CardExpiringInfo {
+	var info CardExpiringInfo
+	if len(raw) > 0 {
+		json.Unmarshal(raw, &info) //nolint:errcheck // best-effort
+	}
+	return info
+}
+
+// formatCardExpiry returns "MM/YY" for display.
+func formatCardExpiry(month, year int) string {
+	return fmt.Sprintf("%02d/%02d", month, year%100)
+}
+
+func buildCardExpiringSubject(approval Approval) string {
+	info := extractCardExpiringInfo(approval.Context)
+	if info.Expired {
+		return fmt.Sprintf("Your %s card ending in %s has expired", info.Brand, info.Last4)
+	}
+	return fmt.Sprintf("Your %s card ending in %s is expiring soon", info.Brand, info.Last4)
+}
+
+func buildCardExpiringPlainBody(approval Approval) string {
+	info := extractCardExpiringInfo(approval.Context)
+	var b strings.Builder
+	if info.Expired {
+		b.WriteString(fmt.Sprintf("Your %s card ending in %s (expires %s) has expired.\n\n",
+			info.Brand, info.Last4, formatCardExpiry(info.ExpMonth, info.ExpYear)))
+		b.WriteString("Any connector actions that use this card will fail until you replace it.\n")
+	} else {
+		b.WriteString(fmt.Sprintf("Your %s card ending in %s expires %s.\n\n",
+			info.Brand, info.Last4, formatCardExpiry(info.ExpMonth, info.ExpYear)))
+		b.WriteString("Please add a replacement card before it expires to avoid disruptions to connector actions.\n")
+	}
+	if approval.ApprovalURL != "" {
+		b.WriteString(fmt.Sprintf("\nUpdate payment methods:\n%s\n", approval.ApprovalURL))
+	}
+	b.WriteString("\n---\nThis is an automated notification from Permission Slip.\n")
+	return b.String()
+}
+
+func buildCardExpiringHTMLBody(approval Approval) string {
+	info := extractCardExpiringInfo(approval.Context)
+	isExpired := info.Expired
+
+	var b bytes.Buffer
+	b.WriteString(`<!DOCTYPE html><html><head><meta charset="UTF-8"></head>`)
+	b.WriteString(`<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1a1a1a;">`)
+
+	// Header — amber for expiring soon, red for expired
+	accentColor := "#d97706"
+	headerTitle := "Card Expiring Soon"
+	if isExpired {
+		accentColor = "#dc2626"
+		headerTitle = "Card Expired"
+	}
+	b.WriteString(fmt.Sprintf(`<div style="border-bottom:2px solid %s;padding-bottom:16px;margin-bottom:20px;">`, accentColor))
+	b.WriteString(fmt.Sprintf(`<h2 style="margin:0 0 4px 0;font-size:20px;color:%s;">%s</h2>`, accentColor, headerTitle))
+
+	subtitle := fmt.Sprintf("%s ending in %s &middot; expires %s",
+		html.EscapeString(info.Brand), html.EscapeString(info.Last4),
+		html.EscapeString(formatCardExpiry(info.ExpMonth, info.ExpYear)))
+	b.WriteString(fmt.Sprintf(`<p style="margin:0;color:#6b7280;font-size:14px;">%s</p>`, subtitle))
+	b.WriteString(`</div>`)
+
+	// Body
+	b.WriteString(`<p style="margin:0 0 16px 0;line-height:1.6;">`)
+	if isExpired {
+		b.WriteString(`This card has expired. Any connector actions that try to use it will fail. `)
+		b.WriteString(`Please add a replacement card in your payment settings.`)
+	} else {
+		b.WriteString(`This card is expiring soon. Please add a replacement card before it expires `)
+		b.WriteString(`to avoid disruptions to connector actions.`)
+	}
+	b.WriteString(`</p>`)
+
+	// CTA button
+	if approval.ApprovalURL != "" {
+		b.WriteString(fmt.Sprintf(
+			`<div style="text-align:center;margin:24px 0;">
+		<a href="%s" style="display:inline-block;background-color:%s;color:#ffffff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;">Update Payment Methods</a>
+		</div>`,
+			html.EscapeString(approval.ApprovalURL), accentColor,
 		))
 	}
 

@@ -179,6 +179,39 @@ func TestTruncateUTF8_LimitFour(t *testing.T) {
 	}
 }
 
+// ── BuildPushContent — card expiring tests ──────────────────────────────────
+
+func TestBuildPushContent_CardExpiring(t *testing.T) {
+	t.Parallel()
+	a := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Visa","last4":"4242","exp_month":3,"exp_year":2026,"expired":false}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	c := BuildPushContent(a)
+	if c.Title != "Card Expiring Soon" {
+		t.Errorf("expected title 'Card Expiring Soon', got: %s", c.Title)
+	}
+	if !strings.Contains(c.Body, "Visa") || !strings.Contains(c.Body, "4242") {
+		t.Errorf("expected card details in body, got: %s", c.Body)
+	}
+}
+
+func TestBuildPushContent_CardExpired(t *testing.T) {
+	t.Parallel()
+	a := Approval{
+		Type:    NotificationTypeCardExpiring,
+		Context: json.RawMessage(`{"brand":"Amex","last4":"3333","exp_month":1,"exp_year":2024,"expired":true}`),
+	}
+	c := BuildPushContent(a)
+	if c.Title != "Card Expired" {
+		t.Errorf("expected title 'Card Expired', got: %s", c.Title)
+	}
+	if !strings.Contains(c.Body, "Amex") || !strings.Contains(c.Body, "3333") {
+		t.Errorf("expected card details in body, got: %s", c.Body)
+	}
+}
+
 // ── AgentDisplayName tests ──────────────────────────────────────────────────
 
 func TestAgentDisplayName_WithName(t *testing.T) {
