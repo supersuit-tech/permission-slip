@@ -24,8 +24,22 @@ func TestAmadeusConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 (Phase 1 scaffold)", len(actions))
+	if len(actions) != 6 {
+		t.Errorf("Actions() returned %d actions, want 6", len(actions))
+	}
+
+	expected := []string{
+		"amadeus.search_airports",
+		"amadeus.search_flights",
+		"amadeus.price_flight",
+		"amadeus.book_flight",
+		"amadeus.search_hotels",
+		"amadeus.search_cars",
+	}
+	for _, actionType := range expected {
+		if _, ok := actions[actionType]; !ok {
+			t.Errorf("Actions() missing %q", actionType)
+		}
 	}
 }
 
@@ -281,7 +295,7 @@ func TestAmadeusConnector_Do_Success(t *testing.T) {
 	var resp struct {
 		Result string `json:"result"`
 	}
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test/endpoint", nil, &resp)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test/endpoint", nil, &resp, nil)
 	if err != nil {
 		t.Fatalf("do() error = %v", err)
 	}
@@ -320,7 +334,7 @@ func TestAmadeusConnector_Do_WithRequestBody(t *testing.T) {
 	var resp struct {
 		Created bool `json:"created"`
 	}
-	err := c.do(t.Context(), validCreds(), http.MethodPost, "/v1/test/create", reqBody, &resp)
+	err := c.do(t.Context(), validCreds(), http.MethodPost, "/v1/test/create", reqBody, &resp, nil)
 	if err != nil {
 		t.Fatalf("do() error = %v", err)
 	}
@@ -340,7 +354,7 @@ func TestAmadeusConnector_Do_RateLimitError(t *testing.T) {
 	defer srv.Close()
 
 	c := newForTest(srv.Client(), srv.URL)
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -369,7 +383,7 @@ func TestAmadeusConnector_Do_AuthError(t *testing.T) {
 	defer srv.Close()
 
 	c := newForTest(srv.Client(), srv.URL)
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -404,7 +418,7 @@ func TestAmadeusConnector_Do_AuthRetrySuccess(t *testing.T) {
 	var resp struct {
 		OK bool `json:"ok"`
 	}
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, &resp)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, &resp, nil)
 	if err != nil {
 		t.Fatalf("do() error = %v", err)
 	}
@@ -426,7 +440,7 @@ func TestAmadeusConnector_Do_ValidationError(t *testing.T) {
 	defer srv.Close()
 
 	c := newForTest(srv.Client(), srv.URL)
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -445,7 +459,7 @@ func TestAmadeusConnector_Do_ExternalError(t *testing.T) {
 	defer srv.Close()
 
 	c := newForTest(srv.Client(), srv.URL)
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -468,7 +482,7 @@ func TestAmadeusConnector_Do_ForbiddenError_NoRetry(t *testing.T) {
 	defer srv.Close()
 
 	c := newForTest(srv.Client(), srv.URL)
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
@@ -491,7 +505,7 @@ func TestAmadeusConnector_Do_NotFoundError(t *testing.T) {
 	defer srv.Close()
 
 	c := newForTest(srv.Client(), srv.URL)
-	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil)
+	err := c.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, nil, nil)
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
