@@ -229,7 +229,15 @@ oauthProviderConfigs:
       the authenticated user. Each config indicates that the user has registered
       their own OAuth client credentials for that provider.
 
-      Client secrets are never included in the response.
+      Client secrets are never included in the response — only the provider ID
+      and timestamps are returned.
+
+      ## Related Endpoints
+
+      - `GET /v1/oauth/providers` — lists all available providers (built-in + manifest + BYOA)
+      - `POST /v1/oauth/provider-configs` — register new BYOA credentials
+      - `PUT /v1/oauth/provider-configs/{provider}` — rotate existing credentials
+      - `DELETE /v1/oauth/provider-configs/{provider}` — remove BYOA credentials
 
     tags:
       - OAuth
@@ -269,11 +277,19 @@ oauthProviderConfigs:
       provider must already be declared by a built-in config or connector
       manifest — this endpoint only supplies the client ID and secret.
 
-      Client credentials are encrypted in Supabase Vault (AES-256-GCM).
+      Client credentials are encrypted in Supabase Vault (AES-256-GCM) and
+      never stored in plaintext. The vault secret IDs are stored in the
+      `oauth_provider_configs` database table.
 
       After registration, the provider's OAuth flows will use these credentials
       immediately. Only one config per provider per user is allowed — delete the
       existing config before creating a new one.
+
+      ## Credential Lifecycle
+
+      1. **Register**: `POST /v1/oauth/provider-configs` (this endpoint)
+      2. **Rotate**: `PUT /v1/oauth/provider-configs/{provider}`
+      3. **Remove**: `DELETE /v1/oauth/provider-configs/{provider}`
 
     tags:
       - OAuth

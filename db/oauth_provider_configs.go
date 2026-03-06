@@ -11,6 +11,11 @@ import (
 
 // OAuthProviderConfig represents a row from the oauth_provider_configs table.
 // This stores user-provided ("bring your own app") OAuth client credentials.
+//
+// The actual client ID and secret are encrypted in Supabase Vault — this
+// struct only holds the vault secret IDs (references), not plaintext values.
+// The table has a unique constraint on (user_id, provider) to prevent
+// duplicate configs.
 type OAuthProviderConfig struct {
 	ID                   string
 	UserID               string
@@ -45,6 +50,30 @@ const (
 	OAuthProviderConfigErrNotFound  OAuthProviderConfigErrCode = iota
 	OAuthProviderConfigErrDuplicate                            // unique (user_id, provider) violation
 )
+
+// ListAllOAuthProviderConfigs returns all OAuth provider configs across all users,
+// ordered by creation time ascending. Used at startup to reload BYOA credentials
+// into the in-memory provider registry.
+func ListAllOAuthProviderConfigs(ctx context.Context, db DBTX) ([]OAuthProviderConfig, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, user_id, provider, client_id_vault_id, client_secret_vault_id, created_at, updated_at
+		FROM oauth_provider_configs
+		ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var configs []OAuthProviderConfig
+	for rows.Next() {
+		var c OAuthProviderConfig
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Provider, &c.ClientIDVaultID, &c.ClientSecretVaultID, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		configs = append(configs, c)
+	}
+	return configs, rows.Err()
+}
 
 // ListOAuthProviderConfigsByUser returns all OAuth provider configs for the given user.
 func ListOAuthProviderConfigsByUser(ctx context.Context, db DBTX, userID string) ([]OAuthProviderConfig, error) {
