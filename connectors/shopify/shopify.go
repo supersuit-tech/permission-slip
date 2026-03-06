@@ -94,6 +94,13 @@ func shopBaseURL(creds connectors.Credentials) (string, error) {
 	// and the canonical form is lowercase.
 	shop = strings.ToLower(shop)
 
+	// DNS labels are limited to 63 characters.
+	if len(shop) > 63 {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("shop_domain is too long (%d chars, max 63)", len(shop)),
+		}
+	}
+
 	// Validate the subdomain contains only safe hostname characters to prevent
 	// URL injection or SSRF via crafted shop_domain values.
 	if !validSubdomain.MatchString(shop) {
@@ -108,30 +115,16 @@ func shopBaseURL(creds connectors.Credentials) (string, error) {
 // ID returns "shopify", matching the connectors.id in the database.
 func (c *ShopifyConnector) ID() string { return "shopify" }
 
-// Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup. Phase 2 will add the full action schemas;
-// this is a scaffold with no actions registered yet.
-func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "shopify",
-		Name:        "Shopify",
-		Description: "Shopify integration for store management via the Admin REST API",
-		Actions:     []connectors.ManifestAction{},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{
-				Service:         "shopify",
-				AuthType:        "api_key",
-				InstructionsURL: "https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/generate-app-access-tokens-admin",
-			},
-		},
-		Templates: []connectors.ManifestTemplate{},
-	}
-}
-
 // Actions returns the registered action handlers keyed by action_type.
-// Phase 2 will add the individual actions here.
 func (c *ShopifyConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
+	return map[string]connectors.Action{
+		"shopify.get_orders":      &getOrdersAction{conn: c},
+		"shopify.get_order":       &getOrderAction{conn: c},
+		"shopify.update_order":    &updateOrderAction{conn: c},
+		"shopify.create_product":  &createProductAction{conn: c},
+		"shopify.update_inventory": &updateInventoryAction{conn: c},
+		"shopify.create_discount": &createDiscountAction{conn: c},
+	}
 }
 
 // ValidateCredentials checks that the provided credentials contain both a

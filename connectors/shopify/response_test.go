@@ -137,3 +137,19 @@ func TestExtractErrorMessage_EmptyBody(t *testing.T) {
 		t.Errorf("got %q, want %q", msg, "unknown error")
 	}
 }
+
+func TestExtractErrorMessage_LargeBodyTruncated(t *testing.T) {
+	t.Parallel()
+	// Build a non-JSON body longer than 500 chars to trigger truncation.
+	largeBody := make([]byte, 1000)
+	for i := range largeBody {
+		largeBody[i] = 'x'
+	}
+	msg := extractErrorMessage(largeBody)
+	if len(msg) > 520 { // 500 chars + "... (truncated)"
+		t.Errorf("expected truncated message, got %d chars", len(msg))
+	}
+	if msg[len(msg)-1] != ')' {
+		t.Errorf("expected message ending with truncation marker, got %q", msg[len(msg)-15:])
+	}
+}
