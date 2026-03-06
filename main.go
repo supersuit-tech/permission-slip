@@ -20,7 +20,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
+	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -309,8 +311,10 @@ func main() {
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
+	registry.Register(pgconnector.New())
 	registry.Register(slack.New())
 	registry.Register(square.New())
+	registry.Register(amadeus.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
