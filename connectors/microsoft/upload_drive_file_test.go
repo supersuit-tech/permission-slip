@@ -218,6 +218,9 @@ func TestUploadDriveFile_PathTraversalRejected(t *testing.T) {
 		{"dot-dot", "../../etc/passwd"},
 		{"backslash", "Documents\\file.txt"},
 		{"absolute", "/root/file.txt"},
+		{"query-injection", "Documents/file.txt?$filter=malicious"},
+		{"fragment-injection", "Documents/file.txt#fragment"},
+		{"percent-encoding", "Documents%2F..%2Fetc/passwd"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
