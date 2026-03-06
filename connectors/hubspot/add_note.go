@@ -84,6 +84,10 @@ func (a *addNoteAction) Execute(ctx context.Context, req connectors.ActionReques
 	}
 
 	// Step 2: Associate the note with the target object.
+	// Validate the API-returned ID before interpolating into the URL path.
+	if !isValidHubSpotID(noteResp.ID) {
+		return nil, fmt.Errorf("note created but got unexpected non-numeric id %q from HubSpot", noteResp.ID)
+	}
 	plural := pluralObjectType(params.ObjectType)
 	assocPath := fmt.Sprintf("/crm/v3/objects/notes/%s/associations/%s/%s/note_to_%s",
 		noteResp.ID, plural, params.ObjectID, params.ObjectType)

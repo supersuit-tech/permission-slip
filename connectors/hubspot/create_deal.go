@@ -77,7 +77,11 @@ func (a *createDealAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
-	// Associate with contacts if specified.
+	// Associate with contacts if specified. Validate the API-returned ID
+	// as defense-in-depth before interpolating it into subsequent URL paths.
+	if len(params.AssociatedContacts) > 0 && !isValidHubSpotID(resp.ID) {
+		return nil, fmt.Errorf("deal created but got unexpected non-numeric id %q from HubSpot", resp.ID)
+	}
 	for _, contactID := range params.AssociatedContacts {
 		path := fmt.Sprintf("/crm/v3/objects/deals/%s/associations/contacts/%s/deal_to_contact", resp.ID, contactID)
 		if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, nil, nil); err != nil {
