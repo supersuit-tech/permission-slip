@@ -16,7 +16,7 @@ This connector uses OAuth 2.0 — credentials are managed automatically by the p
 
 The credential `auth_type` in the database is `oauth2` with `oauth_provider: "microsoft"`. The platform handles the full OAuth lifecycle: redirect, token exchange, encrypted storage in Supabase Vault, and automatic refresh before expiry. The connector never touches OAuth code — it receives a valid access token in `Credentials` at execution time.
 
-**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`
+**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All`, `ChannelMessage.Send`
 
 ## Actions
 
@@ -271,6 +271,95 @@ Results are filtered server-side using `$filter=endswith(name,'.docx')` so only 
 
 **Graph API:** `GET /me/drive/root:/{path}:/children` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-list-children))
 
+---
+
+### `microsoft.create_presentation`
+
+Creates a new empty PowerPoint (.pptx) file in the user's OneDrive. The file is created using a minimal embedded PPTX template (~1.2 KB) uploaded via the OneDrive file upload endpoint.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `filename` | string | Yes | — | Name for the presentation (`.pptx` extension added if missing) |
+| `folder_path` | string | No | `"/"` (root) | OneDrive folder path (e.g., `Documents/Presentations`) |
+
+**Response:**
+
+```json
+{
+  "item_id": "01NBRZAA...",
+  "name": "Quarterly Report.pptx",
+  "web_url": "https://onedrive.live.com/edit.aspx?id=...",
+  "folder_path": "/Documents/Presentations"
+}
+```
+
+**Graph API:** `PUT /me/drive/root:/{path}/{filename}.pptx:/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+---
+
+### `microsoft.list_presentations`
+
+Searches for PowerPoint files (.pptx) in the user's OneDrive, optionally scoped to a folder.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `folder_path` | string | No | — | OneDrive folder path to search in (searches all files if omitted) |
+| `top` | integer | No | `10` | Number of presentations to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "item_id": "01NBRZAA...",
+    "name": "Q4 Review.pptx",
+    "web_url": "https://onedrive.live.com/edit.aspx?id=...",
+    "size": 1048576,
+    "last_modified": "2024-03-15T14:30:00Z"
+  }
+]
+```
+
+**Graph API:** `GET /me/drive/root/search(q='.pptx')` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-search))
+
+---
+
+### `microsoft.get_presentation`
+
+Gets metadata about a specific PowerPoint file by its OneDrive item ID.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the presentation |
+
+**Response:**
+
+```json
+{
+  "item_id": "01NBRZAA...",
+  "name": "Q4 Review.pptx",
+  "web_url": "https://onedrive.live.com/edit.aspx?id=...",
+  "size": 2048576,
+  "last_modified_by": "Jane Smith",
+  "last_modified": "2024-03-15T14:30:00Z"
+}
+```
+
+**Graph API:** `GET /me/drive/items/{itemId}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
+
+
 ## Error Handling
 
 The connector maps Microsoft Graph API responses to typed connector errors:
@@ -290,14 +379,18 @@ Rate limit responses include the `Retry-After` header value so callers know how 
 Each action lives in its own file. To add one (e.g., `microsoft.list_contacts`):
 
 1. Create `connectors/microsoft/list_contacts.go` with a params struct, `validate()` / `defaults()`, and an `Execute` method.
-2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON APIs, or `a.conn.doUpload(ctx, method, path, creds, body, contentType, &resp)` for file uploads. Both share the same response handling via `handleResponse()`.
-3. Use shared validators from `validation.go`: `validateItemID()`, `validateFolderPath()`, `escapeFolderPath()` for any OneDrive path params.
-4. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
-5. Register the action in `Actions()` inside `microsoft.go`.
-6. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema` and a template.
-7. Add tests in `list_contacts_test.go` using `httptest.NewServer` and `newForTest()`.
+2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON API calls — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection. For binary file uploads, use `a.conn.doUpload(ctx, method, path, creds, fileBytes, contentType, &resp)`.
+3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
+4. Register the action in `Actions()` inside `microsoft.go`.
+5. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema` and a template.
+6. Add tests in `list_contacts_test.go` using `httptest.NewServer` and `newForTest()`.
 
-The `doRequest`/`doUpload` methods mean each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape. All shared HTTP concerns (auth, Content-Type, rate limiting, error mapping) are handled once in `handleResponse()`.
+Both `doRequest` and `doUpload` delegate to `executeAndHandleResponse` for shared response handling (rate limiting, error mapping, body parsing). Each action file only contains what's unique: parameter parsing, validation, request construction, and response shape.
+
+**Security notes for user-supplied path segments:**
+- Use `validateGraphID()` for opaque IDs interpolated into URL paths (rejects `/`, `\`, `?`, `#`, `%`, `..`)
+- Use `validateFolderPath()` for folder paths (allows `/` for directory separators, rejects `..`, `?`, `#`, `%`, `\`)
+- URL-encode path segments with `url.PathEscape()` or `escapePathSegments()` as defense-in-depth
 
 ## Manifest
 
@@ -309,29 +402,36 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/microsoft/
-├── microsoft.go                  # MicrosoftConnector struct, New(), Manifest(), doRequest(), doUpload(), handleResponse()
-├── types.go                      # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
-├── response.go                   # Graph API error response → typed connector error mapping
-├── validation.go                 # Shared validation helpers (validateEmail, validateItemID, validateFolderPath, etc.)
-├── send_email.go                 # microsoft.send_email action
-├── list_emails.go                # microsoft.list_emails action
-├── create_calendar_event.go      # microsoft.create_calendar_event action
-├── list_calendar_events.go       # microsoft.list_calendar_events action
-├── create_document.go            # microsoft.create_document action (OneDrive)
-├── get_document.go               # microsoft.get_document action (OneDrive)
-├── update_document.go            # microsoft.update_document action (OneDrive)
-├── list_documents.go             # microsoft.list_documents action (OneDrive)
-├── microsoft_test.go             # Connector-level tests
-├── helpers_test.go               # Shared test helpers (validCreds)
-├── send_email_test.go            # Send email action tests
-├── list_emails_test.go           # List emails action tests
-├── create_calendar_event_test.go # Create calendar event action tests
-├── list_calendar_events_test.go  # List calendar events action tests
-├── create_document_test.go       # Create document action tests
-├── get_document_test.go          # Get document action tests
-├── update_document_test.go       # Update document action tests
-├── list_documents_test.go        # List documents action tests
-└── README.md                     # This file
+├── microsoft.go                    # MicrosoftConnector, Manifest(), doRequest(), doUpload(), executeAndHandleResponse()
+├── types.go                        # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
+├── response.go                     # Graph API error response → typed connector error mapping
+├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, escapePathSegments, etc.)
+├── pptx_template.go                # Minimal embedded .pptx template for create_presentation
+├── send_email.go                   # microsoft.send_email action
+├── list_emails.go                  # microsoft.list_emails action
+├── create_calendar_event.go        # microsoft.create_calendar_event action
+├── list_calendar_events.go         # microsoft.list_calendar_events action
+├── create_document.go              # microsoft.create_document action (OneDrive)
+├── get_document.go                 # microsoft.get_document action (OneDrive)
+├── update_document.go              # microsoft.update_document action (OneDrive)
+├── list_documents.go               # microsoft.list_documents action (OneDrive)
+├── create_presentation.go          # microsoft.create_presentation action
+├── list_presentations.go           # microsoft.list_presentations action
+├── get_presentation.go             # microsoft.get_presentation action
+├── microsoft_test.go               # Connector-level tests
+├── helpers_test.go                 # Shared test helpers (validCreds)
+├── send_email_test.go              # Send email action tests
+├── list_emails_test.go             # List emails action tests
+├── create_calendar_event_test.go   # Create calendar event action tests
+├── list_calendar_events_test.go    # List calendar events action tests
+├── create_document_test.go         # Create document action tests
+├── get_document_test.go            # Get document action tests
+├── update_document_test.go         # Update document action tests
+├── list_documents_test.go          # List documents action tests
+├── create_presentation_test.go     # Create presentation action tests
+├── list_presentations_test.go      # List presentations action tests
+├── get_presentation_test.go        # Get presentation action tests
+└── README.md                       # This file
 ```
 
 ## Testing

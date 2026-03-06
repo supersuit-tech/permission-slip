@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email, calendar, and Teams via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, Teams, and presentations via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -354,6 +354,64 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create Presentation",
+				Description: "Create a new PowerPoint presentation in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the presentation file (.pptx extension added if missing)"
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (e.g. Documents/Presentations). Defaults to root."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List Presentations",
+				Description: "Search for PowerPoint presentations in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path to search in. Defaults to searching all files."
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of presentations to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_presentation",
+				Name:        "Get Presentation",
+				Description: "Get metadata about a specific PowerPoint presentation",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the presentation"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -457,6 +515,27 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can read messages from any Teams channel.",
 				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_create_presentation",
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create presentations",
+				Description: "Agent can create new PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_presentations",
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List presentations",
+				Description: "Agent can search for PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_presentation",
+				ActionType:  "microsoft.get_presentation",
+				Name:        "View presentation details",
+				Description: "Agent can view metadata about PowerPoint presentations.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
 		},
 	}
 }
@@ -476,6 +555,9 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_channels":         &listChannelsAction{conn: c},
 		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
 		"microsoft.list_channel_messages": &listChannelMessagesAction{conn: c},
+		"microsoft.create_presentation":   &createPresentationAction{conn: c},
+		"microsoft.list_presentations":    &listPresentationsAction{conn: c},
+		"microsoft.get_presentation":      &getPresentationAction{conn: c},
 	}
 }
 
@@ -491,7 +573,8 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 
 // doUpload sends a raw-body request to the Microsoft Graph API.
 // Used by OneDrive file upload endpoints (PUT .../content) where the body is
-// file content rather than JSON. The response is still parsed as JSON into dest.
+// file content rather than JSON. Delegates to executeAndHandleResponse for
+// shared response handling (rate limiting, error mapping, body parsing).
 func (c *MicrosoftConnector) doUpload(ctx context.Context, method, path string, creds connectors.Credentials, body []byte, contentType string, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -512,12 +595,12 @@ func (c *MicrosoftConnector) doUpload(ctx context.Context, method, path string, 
 		req.Header.Set("Content-Type", contentType)
 	}
 
-	return c.handleResponse(req, dest)
+	return c.executeAndHandleResponse(req, dest)
 }
 
-// doRequest is the shared request lifecycle for all Microsoft Graph actions.
-// It handles JSON marshaling of the request body, authorization, and delegates
-// to handleResponse for response processing.
+// doRequest is the shared request lifecycle for JSON-based Microsoft Graph actions.
+// It handles JSON marshaling of the request body, auth, and delegates to
+// executeAndHandleResponse for rate limiting, error mapping, and response parsing.
 func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -542,13 +625,13 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	return c.handleResponse(req, dest)
+	return c.executeAndHandleResponse(req, dest)
 }
 
-// handleResponse executes an HTTP request and handles the response lifecycle:
-// rate limiting (429), error mapping, response body size limiting, and JSON
-// unmarshaling. Shared by doRequest and doUpload to avoid duplicating this logic.
-func (c *MicrosoftConnector) handleResponse(req *http.Request, dest any) error {
+// executeAndHandleResponse executes an HTTP request and handles the response
+// lifecycle shared by all Graph API calls: transport errors, rate limiting,
+// response body reading with size limits, error mapping, and JSON decoding.
+func (c *MicrosoftConnector) executeAndHandleResponse(req *http.Request, dest any) error {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {

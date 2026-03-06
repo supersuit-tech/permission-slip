@@ -62,7 +62,8 @@ func (a *listDocumentsAction) Execute(ctx context.Context, req connectors.Action
 	// Build the list path. Filter for .docx files using $filter on the name.
 	var basePath string
 	if params.FolderPath != "" {
-		basePath = fmt.Sprintf("/me/drive/root:/%s:/children", escapeFolderPath(params.FolderPath))
+		folder := normalizeFolderPath(params.FolderPath)
+		basePath = fmt.Sprintf("/me/drive/root:/%s:/children", escapePathSegments(folder))
 	} else {
 		basePath = "/me/drive/root/children"
 	}

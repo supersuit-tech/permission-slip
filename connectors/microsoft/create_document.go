@@ -93,7 +93,8 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	escapedFilename := url.PathEscape(params.Filename)
 	var path string
 	if params.FolderPath != "" {
-		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", escapeFolderPath(params.FolderPath), escapedFilename)
+		folder := normalizeFolderPath(params.FolderPath)
+		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", escapePathSegments(folder), escapedFilename)
 	} else {
 		path = fmt.Sprintf("/me/drive/root:/%s:/content", escapedFilename)
 	}
