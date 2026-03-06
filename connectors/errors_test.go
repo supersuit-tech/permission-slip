@@ -137,6 +137,39 @@ func TestIsOAuthRefreshError(t *testing.T) {
 	}
 }
 
+func TestAsOAuthRefreshError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("extracts provider from direct error", func(t *testing.T) {
+		err := &OAuthRefreshError{Provider: "microsoft", Message: "expired"}
+		var target *OAuthRefreshError
+		if !AsOAuthRefreshError(err, &target) {
+			t.Fatal("expected AsOAuthRefreshError to return true")
+		}
+		if target.Provider != "microsoft" {
+			t.Errorf("expected provider %q, got %q", "microsoft", target.Provider)
+		}
+	})
+
+	t.Run("extracts provider from wrapped error", func(t *testing.T) {
+		err := fmt.Errorf("wrap: %w", &OAuthRefreshError{Provider: "google", Message: "revoked"})
+		var target *OAuthRefreshError
+		if !AsOAuthRefreshError(err, &target) {
+			t.Fatal("expected AsOAuthRefreshError to return true for wrapped error")
+		}
+		if target.Provider != "google" {
+			t.Errorf("expected provider %q, got %q", "google", target.Provider)
+		}
+	})
+
+	t.Run("returns false for non-OAuth error", func(t *testing.T) {
+		var target *OAuthRefreshError
+		if AsOAuthRefreshError(errors.New("other"), &target) {
+			t.Error("expected AsOAuthRefreshError to return false for non-OAuthRefreshError")
+		}
+	})
+}
+
 func TestIsChecks_WrappedErrors(t *testing.T) {
 	t.Parallel()
 
