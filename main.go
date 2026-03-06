@@ -22,6 +22,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
+	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
@@ -293,6 +294,7 @@ func main() {
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
 	registry.Register(slack.New())
+	registry.Register(square.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
