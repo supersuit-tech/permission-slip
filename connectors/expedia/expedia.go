@@ -63,10 +63,14 @@ func newForTest(client *http.Client, baseURL string) *ExpediaConnector {
 func (c *ExpediaConnector) ID() string { return "expedia" }
 
 // Actions returns the registered action handlers keyed by action_type.
-// Phase 2 will add action implementations here.
 func (c *ExpediaConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		// Phase 2 actions will be registered here.
+		"expedia.search_hotels":  &searchHotelsAction{conn: c},
+		"expedia.get_hotel":      &getHotelAction{conn: c},
+		"expedia.price_check":    &priceCheckAction{conn: c},
+		"expedia.create_booking": &createBookingAction{conn: c},
+		"expedia.cancel_booking": &cancelBookingAction{conn: c},
+		"expedia.get_booking":    &getBookingAction{conn: c},
 	}
 }
 
