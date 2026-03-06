@@ -93,31 +93,6 @@ func (c *AmadeusConnector) resolveBaseURL(creds connectors.Credentials) string {
 // ID returns "amadeus", matching the connectors.id in the database.
 func (c *AmadeusConnector) ID() string { return "amadeus" }
 
-// Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup.
-func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "amadeus",
-		Name:        "Amadeus",
-		Description: "Amadeus travel APIs for flights, hotels, and car rentals",
-		Actions:     []connectors.ManifestAction{},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{
-				Service:         "amadeus",
-				AuthType:        "api_key",
-				InstructionsURL: "https://developers.amadeus.com/get-started/get-started-with-self-service-apis-335",
-			},
-		},
-		Templates: []connectors.ManifestTemplate{},
-	}
-}
-
-// Actions returns the registered action handlers keyed by action_type.
-// Phase 1 has no actions — they are added in Phase 2.
-func (c *AmadeusConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
-}
-
 // ValidateCredentials checks that the provided credentials contain a
 // non-empty client_id and client_secret, which are required for the
 // Amadeus client credentials grant.
@@ -254,9 +229,12 @@ func mapTokenError(statusCode int, body []byte) error {
 // the response status, and unmarshals the response into respBody. Either
 // reqBody or respBody may be nil.
 //
+// extraHeaders are merged into the request (e.g., idempotency keys).
+// Pass nil if no extra headers are needed.
+//
 // If the API returns 401 (token expired or revoked), do() invalidates
 // the cached token and retries once with a fresh token.
-func (c *AmadeusConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
+func (c *AmadeusConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}, extraHeaders http.Header) error {
 	// Pre-marshal the request body so we can replay it on retry.
 	var payload []byte
 	if reqBody != nil {
@@ -267,7 +245,7 @@ func (c *AmadeusConnector) do(ctx context.Context, creds connectors.Credentials,
 		}
 	}
 
-	statusCode, err := c.doOnce(ctx, creds, method, path, payload, respBody)
+	statusCode, err := c.doOnce(ctx, creds, method, path, payload, respBody, extraHeaders)
 
 	// Only retry on 401 (expired/invalid token), not 403 or other auth
 	// errors. A 403 means the credentials lack permission — a fresh
@@ -275,16 +253,17 @@ func (c *AmadeusConnector) do(ctx context.Context, creds connectors.Credentials,
 	if err != nil && statusCode == http.StatusUnauthorized {
 		clientID, _ := creds.Get("client_id")
 		c.invalidateToken(clientID)
-		_, err = c.doOnce(ctx, creds, method, path, payload, respBody)
+		_, err = c.doOnce(ctx, creds, method, path, payload, respBody, extraHeaders)
 		return err
 	}
 	return err
 }
 
 // doOnce executes a single API request. payload is the pre-marshaled
-// JSON body (nil for bodyless requests like GET). Returns the HTTP status
-// code (0 if the request didn't complete) and any error.
-func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credentials, method, path string, payload []byte, respBody interface{}) (int, error) {
+// JSON body (nil for bodyless requests like GET). extraHeaders are merged
+// into the request after standard headers. Returns the HTTP status code
+// (0 if the request didn't complete) and any error.
+func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credentials, method, path string, payload []byte, respBody interface{}, extraHeaders http.Header) (int, error) {
 	token, err := c.ensureToken(ctx, creds)
 	if err != nil {
 		return 0, err
@@ -306,6 +285,11 @@ func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credenti
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	for key, vals := range extraHeaders {
+		for _, v := range vals {
+			req.Header.Set(key, v)
+		}
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {

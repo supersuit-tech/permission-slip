@@ -23,9 +23,21 @@ func TestHubSpotConnector_Actions(t *testing.T) {
 	c := New()
 	actions := c.Actions()
 
-	// Phase 1: no actions registered yet.
-	if len(actions) != 0 {
-		t.Errorf("Actions() returned %d actions, want 0 (Phase 1 scaffold)", len(actions))
+	expected := []string{
+		"hubspot.create_contact",
+		"hubspot.update_contact",
+		"hubspot.create_deal",
+		"hubspot.create_ticket",
+		"hubspot.add_note",
+		"hubspot.search",
+	}
+	for _, name := range expected {
+		if _, ok := actions[name]; !ok {
+			t.Errorf("expected action %q to be registered", name)
+		}
+	}
+	if len(actions) != len(expected) {
+		t.Errorf("expected %d actions, got %d", len(expected), len(actions))
 	}
 }
 
@@ -104,8 +116,12 @@ func TestHubSpotConnector_Manifest(t *testing.T) {
 		t.Error("credential instructions_url is empty, want a URL")
 	}
 
-	// Full Validate() requires actions, which are added in Phase 2.
-	// For now, verify the fields we have are well-formed.
+	if len(m.Actions) != 6 {
+		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	}
+	if err := m.Validate(); err != nil {
+		t.Errorf("Manifest().Validate() = %v", err)
+	}
 }
 
 func TestHubSpotConnector_ActionsMatchManifest(t *testing.T) {
