@@ -124,6 +124,14 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
 
+## Go Toolchain Setup
+
+At the start of each session, set this so Go uses the locally installed toolchain instead of trying to download a newer one (which is blocked by the sandbox network):
+
+```bash
+export GOTOOLCHAIN=local
+```
+
 ## PostgreSQL Setup
 
 At the start of each session, set up PostgreSQL for database tests:
