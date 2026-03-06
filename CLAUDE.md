@@ -54,6 +54,14 @@ Database tests require a running Postgres instance. They use `DATABASE_URL_TEST`
 - **Changed migrations or db/ code:** run `go test ./db/... -v` at minimum
 - **Not sure:** run `make test`
 
+## Go
+
+Always use `GOPROXY=direct` when running Go commands (e.g., `go mod tidy`, `go get`, `go build`, `go test`). This bypasses the default module proxy and fetches dependencies directly from their source. Set it inline or export it at the start of the session:
+
+```bash
+export GOPROXY=direct
+```
+
 ## Creating Migrations
 
 **ALWAYS use `make migrate-create` to create new migration files.** Never manually create migration files or invent timestamps — this has caused duplicate timestamp collisions that break goose.
