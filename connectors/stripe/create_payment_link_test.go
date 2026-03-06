@@ -286,6 +286,7 @@ func TestCreatePaymentLink_RejectsNonHTTPSRedirect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			params, _ := json.Marshal(map[string]any{
 				"line_items":       []map[string]any{{"price_id": "price_abc", "quantity": 1}},
 				"after_completion": tt.url,

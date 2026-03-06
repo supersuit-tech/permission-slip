@@ -31,6 +31,7 @@ func TestValidateCredentials_Valid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			creds := connectors.NewCredentials(map[string]string{"api_key": tt.key})
 			if err := conn.ValidateCredentials(t.Context(), creds); err != nil {
 				t.Errorf("ValidateCredentials() unexpected error: %v", err)
@@ -54,6 +55,7 @@ func TestValidateCredentials_Invalid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := conn.ValidateCredentials(t.Context(), tt.creds)
 			if err == nil {
 				t.Fatal("ValidateCredentials() expected error, got nil")
@@ -187,6 +189,7 @@ func TestValidateMetadata_RejectsNonStringValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateMetadata(tt.metadata)
 			if err == nil {
 				t.Fatal("expected error for non-string metadata value, got nil")
@@ -351,6 +354,21 @@ func TestCheckResponse_401WithoutStripeBody(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("expected AuthError, got %T: %v", err, err)
+	}
+}
+
+func TestCheckResponse_403ForbiddenMapsToAuthError(t *testing.T) {
+	t.Parallel()
+
+	// Stripe returns 403 when a restricted key lacks permission for an endpoint.
+	// This should map to AuthError, not ExternalError — the fix is re-keying,
+	// not retrying.
+	err := checkResponse(403, http.Header{}, []byte(`Forbidden`))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError for 403 Forbidden, got %T: %v", err, err)
 	}
 }
 
