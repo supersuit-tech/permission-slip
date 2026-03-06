@@ -25,6 +25,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
+	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
@@ -128,15 +129,29 @@ func main() {
 	if deps.BillingEnabled {
 		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
 
+		// When STRIPE_TEST_MODE=true, use _TEST-suffixed env vars instead of
+		// the live keys. This lets developers keep both sets of keys in .env
+		// and switch with a single boolean.
+		stripeTestMode := os.Getenv("STRIPE_TEST_MODE") == "true"
+		stripeKey := os.Getenv("STRIPE_SECRET_KEY")
+		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+		priceID := os.Getenv("STRIPE_PRICE_ID_REQUEST")
+		if stripeTestMode {
+			stripeKey = os.Getenv("STRIPE_SECRET_KEY_TEST")
+			webhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET_TEST")
+			priceID = os.Getenv("STRIPE_PRICE_ID_REQUEST_TEST")
+			log.Println("Stripe: test mode enabled — using _TEST keys")
+		}
+
 		// Initialize Stripe client when billing is enabled and keys are configured.
-		if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
+		if stripeKey != "" {
 			deps.Stripe = pstripe.New(pstripe.Config{
 				SecretKey:      stripeKey,
-				WebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
-				PriceIDRequest: os.Getenv("STRIPE_PRICE_ID_REQUEST"),
+				WebhookSecret:  webhookSecret,
+				PriceIDRequest: priceID,
 			})
 			log.Println("Stripe: client initialized")
-			if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
+			if webhookSecret == "" {
 				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
 			}
 		} else {
@@ -305,6 +320,23 @@ func main() {
 	loadExternalConnectors(registry, deps.DB)
 
 	deps.Connectors = registry
+
+	// Initialize OAuth provider registry with built-in providers (Google, Microsoft)
+	// and merge in any providers declared by connector manifests.
+	oauthRegistry := poauth.NewRegistryWithBuiltIns()
+	registerManifestOAuthProviders(oauthRegistry, registry)
+	deps.OAuthProviders = oauthRegistry
+	deps.OAuthRedirectBaseURL = os.Getenv("OAUTH_REDIRECT_BASE_URL")
+	deps.OAuthStateSecret = os.Getenv("OAUTH_STATE_SECRET")
+	log.Printf("OAuth provider registry: %d provider(s) registered", oauthRegistry.Len())
+	for _, p := range oauthRegistry.List() {
+		if p.HasClientCredentials() {
+			log.Printf("  %s: configured (client credentials set)", p.ID)
+		} else {
+			log.Printf("  %s: registered (no client credentials — BYOA required)", p.ID)
+		}
+	}
+
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
 
 	// Parse allowed CORS origins from a comma-separated list.
@@ -544,6 +576,36 @@ func seedConnectorFromManifest(manifest *connectors.ConnectorManifest, d db.DBTX
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return db.UpsertConnectorFromManifest(ctx, d, manifest.ToDBManifest())
+}
+
+// registerManifestOAuthProviders iterates over all connectors in the registry
+// and registers any OAuth providers declared in their manifests. This allows
+// external connectors to introduce new OAuth providers (e.g. Salesforce) without
+// core code changes.
+func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connectors.Registry) {
+	for _, id := range connReg.IDs() {
+		conn, _ := connReg.Get(id)
+		mp, ok := conn.(connectors.ManifestProvider)
+		if !ok {
+			continue
+		}
+		manifest := mp.Manifest()
+		if len(manifest.OAuthProviders) == 0 {
+			continue
+		}
+		providers := make([]poauth.ManifestProvider, len(manifest.OAuthProviders))
+		for i, p := range manifest.OAuthProviders {
+			providers[i] = poauth.ManifestProvider{
+				ID:           p.ID,
+				AuthorizeURL: p.AuthorizeURL,
+				TokenURL:     p.TokenURL,
+				Scopes:       p.Scopes,
+			}
+		}
+		if err := poauth.RegisterFromManifest(oauthReg, providers); err != nil {
+			log.Printf("Warning: failed to register OAuth providers from connector %q: %v", id, err)
+		}
+	}
 }
 
 // validateConnectorRegistry logs warnings for mismatches between code-registered

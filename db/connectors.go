@@ -40,6 +40,8 @@ type RequiredCredential struct {
 	Service         string
 	AuthType        string
 	InstructionsURL *string
+	OAuthProvider   *string
+	OAuthScopes     []string
 }
 
 // ListConnectors returns all connectors with their action types and required credential services.
@@ -111,7 +113,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch required credentials.
 	credRows, err := db.Query(ctx,
-		`SELECT service, auth_type, instructions_url
+		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes
 		 FROM connector_required_credentials
 		 WHERE connector_id = $1
 		 ORDER BY service`,
@@ -124,7 +126,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for credRows.Next() {
 		var rc RequiredCredential
-		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL); err != nil {
+		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
 			return nil, err
 		}
 		cd.RequiredCredentials = append(cd.RequiredCredentials, rc)
@@ -226,6 +228,8 @@ type ExternalConnectorCredential struct {
 	Service         string
 	AuthType        string
 	InstructionsURL string
+	OAuthProvider   string
+	OAuthScopes     []string
 }
 
 // ExternalConnectorTemplate describes a configuration template from a connector manifest.
@@ -297,12 +301,14 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	for _, c := range m.Credentials {
 		services = append(services, c.Service)
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url)
-			VALUES ($1, $2, $3, $4)
+			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			ON CONFLICT (connector_id, service) DO UPDATE SET
 				auth_type = EXCLUDED.auth_type,
-				instructions_url = EXCLUDED.instructions_url`,
-			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL))
+				instructions_url = EXCLUDED.instructions_url,
+				oauth_provider = EXCLUDED.oauth_provider,
+				oauth_scopes = EXCLUDED.oauth_scopes`,
+			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes)
 		if err != nil {
 			return err
 		}
