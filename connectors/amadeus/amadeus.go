@@ -267,23 +267,27 @@ func (c *AmadeusConnector) do(ctx context.Context, creds connectors.Credentials,
 		}
 	}
 
-	err := c.doOnce(ctx, creds, method, path, payload, respBody)
-	if err != nil && connectors.IsAuthError(err) {
-		// Token may have expired between cache check and request.
-		// Invalidate and retry once with a fresh token.
+	statusCode, err := c.doOnce(ctx, creds, method, path, payload, respBody)
+
+	// Only retry on 401 (expired/invalid token), not 403 or other auth
+	// errors. A 403 means the credentials lack permission — a fresh
+	// token won't help.
+	if err != nil && statusCode == http.StatusUnauthorized {
 		clientID, _ := creds.Get("client_id")
 		c.invalidateToken(clientID)
-		return c.doOnce(ctx, creds, method, path, payload, respBody)
+		_, err = c.doOnce(ctx, creds, method, path, payload, respBody)
+		return err
 	}
 	return err
 }
 
 // doOnce executes a single API request. payload is the pre-marshaled
-// JSON body (nil for bodyless requests like GET).
-func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credentials, method, path string, payload []byte, respBody interface{}) error {
+// JSON body (nil for bodyless requests like GET). Returns the HTTP status
+// code (0 if the request didn't complete) and any error.
+func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credentials, method, path string, payload []byte, respBody interface{}) (int, error) {
 	token, err := c.ensureToken(ctx, creds)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	baseURL := c.resolveBaseURL(creds)
@@ -295,7 +299,7 @@ func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credenti
 
 	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return 0, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
 	if payload != nil {
@@ -306,28 +310,28 @@ func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credenti
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Amadeus API request timed out: %v", err)}
+			return 0, &connectors.TimeoutError{Message: fmt.Sprintf("Amadeus API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Amadeus API request canceled"}
+			return 0, &connectors.TimeoutError{Message: "Amadeus API request canceled"}
 		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Amadeus API request failed: %v", err)}
+		return 0, &connectors.ExternalError{Message: fmt.Sprintf("Amadeus API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+		return resp.StatusCode, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
 	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
-		return err
+		return resp.StatusCode, err
 	}
 
 	if respBody != nil {
 		if err := json.Unmarshal(respBytes, respBody); err != nil {
-			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Amadeus response: %v", err)}
+			return resp.StatusCode, &connectors.ExternalError{Message: fmt.Sprintf("parsing Amadeus response: %v", err)}
 		}
 	}
-	return nil
+	return resp.StatusCode, nil
 }

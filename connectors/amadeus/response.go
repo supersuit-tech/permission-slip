@@ -36,7 +36,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 			RetryAfter: retryAfter,
 		}
 	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: fmt.Sprintf("Amadeus API auth error: %s", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("Amadeus API auth error (401): %s", msg)}
 	case statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("Amadeus API forbidden: %s", msg)}
 	case statusCode == http.StatusBadRequest:

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -169,10 +170,10 @@ func TestAmadeusConnector_EnsureToken_Success(t *testing.T) {
 func TestAmadeusConnector_EnsureToken_Caching(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	var callCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/security/oauth2/token" {
-			callCount++
+			callCount.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(tokenJSON))
 			return
@@ -188,8 +189,8 @@ func TestAmadeusConnector_EnsureToken_Caching(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first ensureToken() error = %v", err)
 	}
-	if callCount != 1 {
-		t.Fatalf("expected 1 token request, got %d", callCount)
+	if got := callCount.Load(); got != 1 {
+		t.Fatalf("expected 1 token request, got %d", got)
 	}
 
 	// Second call should use cached token.
@@ -197,18 +198,18 @@ func TestAmadeusConnector_EnsureToken_Caching(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second ensureToken() error = %v", err)
 	}
-	if callCount != 1 {
-		t.Errorf("expected 1 token request (cached), got %d", callCount)
+	if got := callCount.Load(); got != 1 {
+		t.Errorf("expected 1 token request (cached), got %d", got)
 	}
 }
 
 func TestAmadeusConnector_EnsureToken_Refresh(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	var callCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/security/oauth2/token" {
-			callCount++
+			callCount.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			// Token that expires in 30 seconds (less than the 60s buffer).
 			_, _ = w.Write([]byte(`{
@@ -234,8 +235,8 @@ func TestAmadeusConnector_EnsureToken_Refresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second ensureToken() error = %v", err)
 	}
-	if callCount != 2 {
-		t.Errorf("expected 2 token requests (refresh), got %d", callCount)
+	if got := callCount.Load(); got != 2 {
+		t.Errorf("expected 2 token requests (refresh), got %d", got)
 	}
 }
 
@@ -359,9 +360,9 @@ func TestAmadeusConnector_Do_AuthError(t *testing.T) {
 
 	// do() retries once on 401 after invalidating the token cache.
 	// Both attempts should fail with 401.
-	apiCalls := 0
+	var apiCalls atomic.Int32
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		apiCalls++
+		apiCalls.Add(1)
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write(amadeusErrorResponse(401, 38190, "Unauthorized", "Invalid access token"))
 	})
@@ -376,8 +377,8 @@ func TestAmadeusConnector_Do_AuthError(t *testing.T) {
 		t.Errorf("do() returned %T, want *connectors.AuthError", err)
 	}
 	// Should have retried once (2 API calls total).
-	if apiCalls != 2 {
-		t.Errorf("expected 2 API calls (retry on 401), got %d", apiCalls)
+	if got := apiCalls.Load(); got != 2 {
+		t.Errorf("expected 2 API calls (retry on 401), got %d", got)
 	}
 }
 
@@ -386,10 +387,10 @@ func TestAmadeusConnector_Do_AuthRetrySuccess(t *testing.T) {
 
 	// First API call returns 401 (expired token), second succeeds after
 	// token refresh.
-	apiCalls := 0
+	var apiCalls atomic.Int32
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		apiCalls++
-		if apiCalls == 1 {
+		n := apiCalls.Add(1)
+		if n == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write(amadeusErrorResponse(401, 38190, "Unauthorized", "Token expired"))
 			return
@@ -410,8 +411,8 @@ func TestAmadeusConnector_Do_AuthRetrySuccess(t *testing.T) {
 	if !resp.OK {
 		t.Error("do() resp.OK = false, want true")
 	}
-	if apiCalls != 2 {
-		t.Errorf("expected 2 API calls (retry on 401), got %d", apiCalls)
+	if got := apiCalls.Load(); got != 2 {
+		t.Errorf("expected 2 API calls (retry on 401), got %d", got)
 	}
 }
 
@@ -453,10 +454,14 @@ func TestAmadeusConnector_Do_ExternalError(t *testing.T) {
 	}
 }
 
-func TestAmadeusConnector_Do_ForbiddenError(t *testing.T) {
+func TestAmadeusConnector_Do_ForbiddenError_NoRetry(t *testing.T) {
 	t.Parallel()
 
+	// 403 (Forbidden) should NOT trigger a retry — it means the credentials
+	// lack permission, not that the token expired.
+	var apiCalls atomic.Int32
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		apiCalls.Add(1)
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write(amadeusErrorResponse(403, 38196, "Forbidden", "Access denied"))
 	})
@@ -469,6 +474,10 @@ func TestAmadeusConnector_Do_ForbiddenError(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("do() returned %T, want *connectors.AuthError", err)
+	}
+	// Should NOT have retried (only 1 API call).
+	if got := apiCalls.Load(); got != 1 {
+		t.Errorf("expected 1 API call (no retry on 403), got %d", got)
 	}
 }
 
@@ -495,10 +504,10 @@ func TestAmadeusConnector_EnsureToken_PerClientID(t *testing.T) {
 	t.Parallel()
 
 	// Two different client_ids should get separate cached tokens.
-	tokenCount := 0
+	var tokenCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/security/oauth2/token" {
-			tokenCount++
+			tokenCount.Add(1)
 			_ = r.ParseForm()
 			clientID := r.FormValue("client_id")
 			w.Header().Set("Content-Type", "application/json")
@@ -537,8 +546,8 @@ func TestAmadeusConnector_EnsureToken_PerClientID(t *testing.T) {
 		t.Errorf("tokenB = %q, want %q", tokenB, "token-for-client-b")
 	}
 
-	if tokenCount != 2 {
-		t.Errorf("expected 2 token requests (one per client_id), got %d", tokenCount)
+	if got := tokenCount.Load(); got != 2 {
+		t.Errorf("expected 2 token requests (one per client_id), got %d", got)
 	}
 
 	// Calling again with credsA should use cached token (no new request).
@@ -546,8 +555,8 @@ func TestAmadeusConnector_EnsureToken_PerClientID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ensureToken(A again) error = %v", err)
 	}
-	if tokenCount != 2 {
-		t.Errorf("expected 2 token requests (cached), got %d", tokenCount)
+	if got := tokenCount.Load(); got != 2 {
+		t.Errorf("expected 2 token requests (cached), got %d", got)
 	}
 }
 
