@@ -8,6 +8,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatCents } from "@/lib/utils";
 import {
   usePaymentMethods,
   useDeletePaymentMethod,
@@ -42,10 +43,6 @@ function formatBrand(brand: string): string {
     unionpay: "UnionPay",
   };
   return brands[brand] ?? brand;
-}
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 type ExpiryStatus = "expired" | "expiring_soon" | "ok";
