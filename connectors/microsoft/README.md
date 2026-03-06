@@ -16,7 +16,7 @@ This connector uses OAuth 2.0 — credentials are managed automatically by the p
 
 The credential `auth_type` in the database is `oauth2` with `oauth_provider: "microsoft"`. The platform handles the full OAuth lifecycle: redirect, token exchange, encrypted storage in Supabase Vault, and automatic refresh before expiry. The connector never touches OAuth code — it receives a valid access token in `Credentials` at execution time.
 
-**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`
+**Required OAuth scopes:** `Mail.Send`, `Mail.Read`, `Calendars.ReadWrite`, `Files.ReadWrite`
 
 ## Actions
 
@@ -147,6 +147,141 @@ Lists upcoming events from the user's calendar.
 
 **Graph API:** `GET /me/events` ([docs](https://learn.microsoft.com/en-us/graph/api/user-list-events))
 
+---
+
+### `microsoft.list_drive_files`
+
+Lists files and folders in OneDrive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `folder_path` | string | No | root | Relative folder path (e.g., `Documents/Work`) |
+| `top` | integer | No | `10` | Number of items to return (1–50) |
+
+**Response:**
+
+```json
+{
+  "folder_path": "Documents",
+  "items": [
+    {
+      "id": "abc123",
+      "name": "report.docx",
+      "type": "file",
+      "size": 1024,
+      "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "web_url": "https://onedrive.live.com/...",
+      "created_at": "2024-01-15T09:00:00Z",
+      "modified_at": "2024-01-16T10:00:00Z"
+    }
+  ]
+}
+```
+
+**Graph API:** `GET /me/drive/root/children` or `GET /me/drive/root:/{path}:/children` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-list-children))
+
+**Security:** `folder_path` is validated to reject path traversal (`..`), backslashes, absolute paths, and URL-special characters (`?#%`).
+
+---
+
+### `microsoft.get_drive_file`
+
+Gets file metadata and optionally downloads text content.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID |
+| `include_content` | boolean | No | `false` | Download file content (text files only) |
+
+**Response:**
+
+```json
+{
+  "id": "abc123",
+  "name": "notes.txt",
+  "type": "file",
+  "size": 256,
+  "mime_type": "text/plain",
+  "web_url": "https://onedrive.live.com/...",
+  "created_at": "2024-01-15T09:00:00Z",
+  "modified_at": "2024-01-16T10:00:00Z",
+  "content": "File content here..."
+}
+```
+
+**Graph API:** `GET /me/drive/items/{id}` for metadata, `GET /me/drive/items/{id}/content` for download ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
+
+**Security:** Only text MIME types can be downloaded (`text/*`, `application/json`, `application/xml`, etc.). Binary files and files with unknown MIME types are rejected. `item_id` is validated to reject path separators, traversal sequences, and URL-special characters.
+
+---
+
+### `microsoft.upload_drive_file`
+
+Uploads or creates a file in OneDrive (max 4 MB).
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `file_path` | string | Yes | — | Relative file path (e.g., `Documents/report.txt`) |
+| `content` | string | Yes | — | File content to upload (max 4 MB) |
+| `conflict_behavior` | string | No | `"rename"` | Behavior when file exists: `rename`, `replace`, or `fail` |
+
+**Response:**
+
+```json
+{
+  "id": "abc123",
+  "name": "report.txt",
+  "size": 17,
+  "web_url": "https://onedrive.live.com/...",
+  "created_at": "2024-01-15T09:00:00Z",
+  "modified_at": "2024-01-15T09:00:00Z"
+}
+```
+
+**Graph API:** `PUT /me/drive/root:/{path}:/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+**Security:** Content size is capped at 4 MB. `file_path` is validated to reject path traversal, backslashes, absolute paths, and URL-special characters.
+
+---
+
+### `microsoft.delete_drive_file`
+
+Moves a file to the OneDrive recycle bin (recoverable — not permanent deletion).
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID to delete |
+
+**Response:**
+
+```json
+{
+  "status": "deleted",
+  "item_id": "abc123",
+  "message": "File moved to recycle bin and can be recovered"
+}
+```
+
+**Graph API:** `DELETE /me/drive/items/{id}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-delete))
+
+**Security:** `item_id` is validated to reject path separators, traversal sequences, and URL-special characters. The delete operation moves the item to the recycle bin — it is recoverable and not a permanent deletion.
+
 ## Error Handling
 
 The connector maps Microsoft Graph API responses to typed connector errors:
@@ -172,7 +307,13 @@ Each action lives in its own file. To add one (e.g., `microsoft.list_contacts`):
 5. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema`.
 6. Add tests in `list_contacts_test.go` using `httptest.NewServer` and `newForTest()`.
 
-The `doRequest` method means each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape. All shared HTTP concerns (auth, Content-Type, rate limiting, error mapping) are handled once.
+Three request helpers are available depending on the content type:
+
+- `doRequest` — JSON request/response (most actions)
+- `doRequestRaw` — Returns raw string response (file content download)
+- `doPutRaw` — Sends raw bytes, returns raw bytes (file upload)
+
+All three share a common `executeRequest` lifecycle handler for auth, rate limiting, error mapping, and timeout detection. Each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape.
 
 ## Manifest
 
@@ -184,20 +325,21 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/microsoft/
-├── microsoft.go                  # MicrosoftConnector struct, New(), Manifest(), doRequest(), ValidateCredentials()
-├── types.go                      # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
+├── microsoft.go                  # MicrosoftConnector struct, Manifest(), request helpers, ValidateCredentials()
+├── types.go                      # Shared Microsoft Graph API types (email, calendar, drive)
 ├── response.go                   # Graph API error response → typed connector error mapping
 ├── validation.go                 # Shared validation helpers (validateEmail, detectContentType)
 ├── send_email.go                 # microsoft.send_email action
-├── list_emails.go                # microsoft.list_emails action
+├── list_emails.go                # microsoft.list_emails action + path validation helpers
 ├── create_calendar_event.go      # microsoft.create_calendar_event action
 ├── list_calendar_events.go       # microsoft.list_calendar_events action
+├── list_drive_files.go           # microsoft.list_drive_files action
+├── get_drive_file.go             # microsoft.get_drive_file action + item ID validation
+├── upload_drive_file.go          # microsoft.upload_drive_file action
+├── delete_drive_file.go          # microsoft.delete_drive_file action
 ├── microsoft_test.go             # Connector-level tests
 ├── helpers_test.go               # Shared test helpers (validCreds)
-├── send_email_test.go            # Send email action tests
-├── list_emails_test.go           # List emails action tests
-├── create_calendar_event_test.go # Create calendar event action tests
-├── list_calendar_events_test.go  # List calendar events action tests
+├── *_test.go                     # Per-action test files
 └── README.md                     # This file
 ```
 
