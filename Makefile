@@ -90,7 +90,7 @@ deploy:
 test: test-backend test-frontend mobile-test
 
 test-backend:
-	go test ./...
+	go test -v ./... 2>&1 | tail -100
 	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
 		echo "Supabase detected — also running integration tests..."; \
 		DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
