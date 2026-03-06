@@ -112,6 +112,7 @@ func (c *HubSpotConnector) do(ctx context.Context, creds connectors.Credentials,
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set("Accept", "application/json")
 
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
