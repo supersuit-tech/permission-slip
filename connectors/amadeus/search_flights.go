@@ -28,13 +28,6 @@ type searchFlightsParams struct {
 	MaxResults    int    `json:"max_results"`
 }
 
-var validCabins = map[string]bool{
-	"ECONOMY":         true,
-	"PREMIUM_ECONOMY": true,
-	"BUSINESS":        true,
-	"FIRST":           true,
-}
-
 func (p *searchFlightsParams) validate() error {
 	if p.Origin == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: origin"}

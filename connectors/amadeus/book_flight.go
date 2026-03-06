@@ -43,11 +43,6 @@ type bookFlightParams struct {
 	Remarks         string               `json:"remarks"`
 }
 
-var validGenders = map[string]bool{
-	"MALE":   true,
-	"FEMALE": true,
-}
-
 func (p *bookFlightParams) validate() error {
 	if len(p.FlightOffer) == 0 || string(p.FlightOffer) == "null" {
 		return &connectors.ValidationError{Message: "missing required parameter: flight_offer"}
