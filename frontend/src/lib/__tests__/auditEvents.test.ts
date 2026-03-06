@@ -10,8 +10,10 @@ function asEvent(partial: any): AuditEvent {
 }
 
 describe("getActionSummary", () => {
-  it("formats payment_method.charged with amount, card, and description", () => {
+  it("formats payment_method.charged with action type, amount, card, and description", () => {
     const summary = getActionSummary(asEvent(mockPaymentChargedEvent));
+    // Should include the action type so users know what triggered the charge.
+    expect(summary).toContain("expedia.create_booking");
     // Should use locale-aware currency formatting.
     expect(summary).toContain("$150.00");
     // Should include card brand and last4.

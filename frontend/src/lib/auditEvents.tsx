@@ -113,9 +113,11 @@ export function getActionSummary(event: AuditEvent): string {
     const last4 = typeof action.last4 === "string" ? action.last4 : "";
     const description = typeof action.description === "string" ? action.description : "";
     const formattedAmount = formatCurrency(cents, currency);
-    const cardLabel = brand && last4 ? ` (${brand} ••${last4})` : "";
+    const cardLabel = brand && last4 ? ` ${brand} ••${last4}` : "";
     const desc = description ? ` — ${truncate(description, 40)}` : "";
-    return `${formattedAmount}${cardLabel}${desc}`;
+    // Show action type so users know which connector action triggered the charge.
+    const prefix = actionType ? `${actionType}: ` : "";
+    return `${prefix}${formattedAmount}${cardLabel}${desc}`;
   }
 
   const params = action.parameters as Record<string, unknown> | undefined;
