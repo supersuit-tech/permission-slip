@@ -174,6 +174,8 @@ func TestSearchOrders_MissingParams(t *testing.T) {
 	}{
 		{name: "missing location_ids", params: `{}`},
 		{name: "empty location_ids", params: `{"location_ids": []}`},
+		{name: "limit too high", params: `{"location_ids": ["L123"], "limit": 501}`},
+		{name: "limit negative", params: `{"location_ids": ["L123"], "limit": -1}`},
 		{name: "query not an object", params: `{"location_ids": ["L123"], "query": "OPEN"}`},
 		{name: "query is array", params: `{"location_ids": ["L123"], "query": [1,2,3]}`},
 		{name: "invalid JSON", params: `{invalid}`},

@@ -26,6 +26,9 @@ func (p *searchOrdersParams) validate() error {
 	if len(p.LocationIDs) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: location_ids (must have at least one)"}
 	}
+	if p.Limit < 0 || p.Limit > 500 {
+		return &connectors.ValidationError{Message: "limit must be between 1 and 500"}
+	}
 	if len(p.Query) > 0 {
 		var obj map[string]json.RawMessage
 		if err := json.Unmarshal(p.Query, &obj); err != nil {
