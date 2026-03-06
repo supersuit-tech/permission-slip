@@ -19,6 +19,7 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultSlidesBaseURL   = "https://slides.googleapis.com"
 	defaultTimeout         = 30 * time.Second
 	credKeyAccessToken     = "access_token"
 
@@ -38,6 +39,7 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	slidesBaseURL   string
 }
 
 // New creates a GoogleConnector with sensible defaults.
@@ -46,15 +48,17 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		slidesBaseURL:   defaultSlidesBaseURL,
 	}
 }
 
 // newForTest creates a GoogleConnector that points at a test server.
-func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL string) *GoogleConnector {
+func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL, slidesBaseURL string) *GoogleConnector {
 	return &GoogleConnector{
 		client:          client,
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
+		slidesBaseURL:   slidesBaseURL,
 	}
 }
 
@@ -67,7 +71,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail and Calendar",
+		Description: "Google integration for Gmail, Calendar, and Slides",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -184,6 +188,65 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.create_presentation",
+				Name:        "Create Presentation",
+				Description: "Create a new Google Slides presentation",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["title"],
+					"properties": {
+						"title": {
+							"type": "string",
+							"description": "Title of the new presentation"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.get_presentation",
+				Name:        "Get Presentation",
+				Description: "Retrieve metadata about a Google Slides presentation",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["presentation_id"],
+					"properties": {
+						"presentation_id": {
+							"type": "string",
+							"description": "The ID of the presentation to retrieve"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.add_slide",
+				Name:        "Add Slide",
+				Description: "Add a new slide to an existing Google Slides presentation",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["presentation_id"],
+					"properties": {
+						"presentation_id": {
+							"type": "string",
+							"description": "The ID of the presentation to add a slide to"
+						},
+						"layout": {
+							"type": "string",
+							"enum": ["BLANK", "TITLE", "TITLE_AND_BODY"],
+							"default": "BLANK",
+							"description": "Predefined slide layout (defaults to BLANK)"
+						},
+						"insertion_index": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Position to insert the slide at (defaults to end)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -194,6 +257,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/presentations",
 				},
 			},
 		},
@@ -247,6 +311,27 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can list upcoming events from any calendar.",
 				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
 			},
+			{
+				ID:          "tpl_google_create_presentation",
+				ActionType:  "google.create_presentation",
+				Name:        "Create presentations",
+				Description: "Agent can create new Google Slides presentations with any title.",
+				Parameters:  json.RawMessage(`{"title":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_presentation",
+				ActionType:  "google.get_presentation",
+				Name:        "View presentations",
+				Description: "Agent can retrieve metadata about any Google Slides presentation.",
+				Parameters:  json.RawMessage(`{"presentation_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_add_slide",
+				ActionType:  "google.add_slide",
+				Name:        "Add slides to presentations",
+				Description: "Agent can add new slides to any Google Slides presentation.",
+				Parameters:  json.RawMessage(`{"presentation_id":"*","layout":"*","insertion_index":"*"}`),
+			},
 		},
 	}
 }
@@ -258,6 +343,9 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.create_presentation":   &createPresentationAction{conn: c},
+		"google.get_presentation":      &getPresentationAction{conn: c},
+		"google.add_slide":             &addSlideAction{conn: c},
 	}
 }
 
