@@ -181,6 +181,91 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "microsoft.create_document",
+				Name:        "Create Document",
+				Description: "Create a new Word document in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the document (.docx appended if missing)",
+							"examples": ["quarterly-report.docx", "meeting-notes"]
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
+						},
+						"content": {
+							"type": "string",
+							"description": "Initial plain-text document content (max 4 MB)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_document",
+				Name:        "Get Document",
+				Description: "Get metadata of a Word document from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the document (returned by create or list)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.update_document",
+				Name:        "Update Document",
+				Description: "Update the content of a Word document in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "content"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the document (returned by create or list)"
+						},
+						"content": {
+							"type": "string",
+							"description": "New document content (max 4 MB)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_documents",
+				Name:        "List Documents",
+				Description: "List Word documents from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of documents to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "microsoft.list_teams",
 				Name:        "List Teams",
 				Description: "List Microsoft Teams the user is a member of",
@@ -475,6 +560,34 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
 			{
+				ID:          "tpl_microsoft_create_document",
+				ActionType:  "microsoft.create_document",
+				Name:        "Create Word documents",
+				Description: "Agent can create Word documents in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*","content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_document",
+				ActionType:  "microsoft.get_document",
+				Name:        "Read any document",
+				Description: "Agent can read metadata of any document in OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_update_document",
+				ActionType:  "microsoft.update_document",
+				Name:        "Edit any document",
+				Description: "Agent can update the content of any document in OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*","content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_documents",
+				ActionType:  "microsoft.list_documents",
+				Name:        "Browse documents",
+				Description: "Agent can list Word documents in OneDrive folders.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
 				ID:          "tpl_microsoft_list_teams",
 				ActionType:  "microsoft.list_teams",
 				Name:        "List teams",
@@ -569,6 +682,10 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"microsoft.create_document":       &createDocumentAction{conn: c},
+		"microsoft.get_document":          &getDocumentAction{conn: c},
+		"microsoft.update_document":       &updateDocumentAction{conn: c},
+		"microsoft.list_documents":        &listDocumentsAction{conn: c},
 		"microsoft.list_teams":            &listTeamsAction{conn: c},
 		"microsoft.list_channels":         &listChannelsAction{conn: c},
 		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
@@ -593,21 +710,29 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 	return nil
 }
 
-// doPutFileRequest uploads raw file bytes via PUT to a Microsoft Graph endpoint.
-// Used for OneDrive file upload endpoints. Delegates to executeAndHandleResponse
-// for shared response handling.
-func (c *MicrosoftConnector) doPutFileRequest(ctx context.Context, path string, creds connectors.Credentials, fileBytes []byte, dest any) error {
+// doUpload sends a raw-body request to the Microsoft Graph API.
+// Used by OneDrive file upload endpoints (PUT .../content) where the body is
+// file content rather than JSON. Delegates to executeAndHandleResponse for
+// shared response handling (rate limiting, error mapping, body parsing).
+func (c *MicrosoftConnector) doUpload(ctx context.Context, method, path string, creds connectors.Credentials, body []byte, contentType string, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(fileBytes))
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 
 	return c.executeAndHandleResponse(req, dest)
 }

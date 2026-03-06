@@ -28,8 +28,3 @@ func newRangeResult(resp graphRangeResponse) rangeResult {
 	}
 }
 
-// validateItemID validates an item_id parameter using the shared validateGraphID
-// check. This centralizes the common validation pattern used by all Excel actions.
-func validateItemID(itemID string) error {
-	return validateGraphID("item_id", itemID)
-}

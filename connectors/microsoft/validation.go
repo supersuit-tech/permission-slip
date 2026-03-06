@@ -34,7 +34,15 @@ func validateGraphID(field, value string) error {
 			Message: fmt.Sprintf("invalid %s: must not contain path separators or URL-special characters (/, \\, ?, #, %%)", field),
 		}
 	}
+	if strings.ContainsRune(value, 0) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain null bytes", field)}
+	}
 	return nil
+}
+
+// validateItemID checks that an item_id is a valid Graph API identifier.
+func validateItemID(id string) error {
+	return validateGraphID("item_id", id)
 }
 
 // detectContentType returns "HTML" if the body contains HTML tags, otherwise "Text".
@@ -48,7 +56,11 @@ func detectContentType(body string) string {
 // validateFolderPath checks a OneDrive folder path for traversal sequences and
 // URL-significant characters that could manipulate the Graph API request.
 // Slashes are allowed since folder paths are naturally slash-separated.
+// Empty paths are valid (means root).
 func validateFolderPath(folderPath string) error {
+	if folderPath == "" {
+		return nil
+	}
 	if strings.Contains(folderPath, "..") {
 		return &connectors.ValidationError{
 			Message: "invalid folder_path: must not contain '..' traversal sequences (e.g. use 'Documents/Presentations' instead)",
@@ -58,6 +70,9 @@ func validateFolderPath(folderPath string) error {
 		return &connectors.ValidationError{
 			Message: "invalid folder_path: must not contain special characters (?, #, %, \\)",
 		}
+	}
+	if strings.ContainsRune(folderPath, 0) {
+		return &connectors.ValidationError{Message: "invalid folder_path: must not contain null bytes"}
 	}
 	return nil
 }

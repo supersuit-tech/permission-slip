@@ -268,6 +268,130 @@ Lists upcoming events from the user's calendar.
 
 ---
 
+### `microsoft.create_document`
+
+Creates a new Word document in OneDrive via a simple upload.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `filename` | string | Yes | — | Document name (`.docx` appended if missing) |
+| `folder_path` | string | No | root | OneDrive folder path (e.g., `Documents/Work`) |
+| `content` | string | No | — | Initial plain-text content (max 4 MB) |
+
+**Response:**
+
+```json
+{
+  "id": "01BYE5RZ...",
+  "name": "report.docx",
+  "web_url": "https://onedrive.live.com/...",
+  "created_date_time": "2024-01-15T09:00:00Z"
+}
+```
+
+**Graph API:** `PUT /me/drive/root:/{path}:/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+---
+
+### `microsoft.get_document`
+
+Gets metadata (and a temporary download URL) for a Word document in OneDrive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID (returned by `create_document` or `list_documents`) |
+
+**Response:**
+
+```json
+{
+  "id": "01BYE5RZ...",
+  "name": "report.docx",
+  "web_url": "https://onedrive.live.com/...",
+  "size": 12345,
+  "created_date_time": "2024-01-15T09:00:00Z",
+  "last_modified_date_time": "2024-01-16T10:00:00Z",
+  "download_url": "https://download.example.com/..."
+}
+```
+
+The `download_url` is a pre-authenticated temporary URL from `@microsoft.graph.downloadUrl` — it can be used to fetch the file content without additional auth.
+
+**Graph API:** `GET /me/drive/items/{itemId}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
+
+---
+
+### `microsoft.update_document`
+
+Replaces the content of an existing Word document in OneDrive.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID (returned by `create_document` or `list_documents`) |
+| `content` | string | Yes | — | New document content (max 4 MB) |
+
+**Response:**
+
+```json
+{
+  "id": "01BYE5RZ...",
+  "name": "report.docx",
+  "web_url": "https://onedrive.live.com/...",
+  "last_modified_date_time": "2024-01-16T10:00:00Z"
+}
+```
+
+**Graph API:** `PUT /me/drive/items/{itemId}/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+---
+
+### `microsoft.list_documents`
+
+Lists Word documents (`.docx`) from a OneDrive folder.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `folder_path` | string | No | root | OneDrive folder path (e.g., `Documents`) |
+| `top` | integer | No | `10` | Number of documents to return (1–50) |
+
+**Response:**
+
+```json
+{
+  "documents": [
+    {
+      "id": "01BYE5RZ...",
+      "name": "report.docx",
+      "web_url": "https://onedrive.live.com/...",
+      "size": 12345,
+      "last_modified_date_time": "2024-01-16T10:00:00Z"
+    }
+  ]
+}
+```
+
+Results are filtered server-side using `$filter=endswith(name,'.docx')` so only Word documents are returned.
+
+**Graph API:** `GET /me/drive/root:/{path}:/children` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-list-children))
+
+---
+
 ### `microsoft.create_presentation`
 
 Creates a new empty PowerPoint (.pptx) file in the user's OneDrive. The file is created using a minimal embedded PPTX template (~1.2 KB) uploaded via the OneDrive file upload endpoint.
@@ -505,13 +629,13 @@ Rate limit responses include the `Retry-After` header value so callers know how 
 Each action lives in its own file. To add one (e.g., `microsoft.list_contacts`):
 
 1. Create `connectors/microsoft/list_contacts.go` with a params struct, `validate()` / `defaults()`, and an `Execute` method.
-2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON API calls — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection. For binary file uploads, use `a.conn.doPutFileRequest(ctx, path, creds, fileBytes, &resp)`.
+2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON API calls — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection. For binary file uploads, use `a.conn.doUpload(ctx, method, path, creds, fileBytes, contentType, &resp)`.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `microsoft.go`.
 5. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema` and a template.
 6. Add tests in `list_contacts_test.go` using `httptest.NewServer` and `newForTest()`.
 
-Both `doRequest` and `doPutFileRequest` delegate to `executeAndHandleResponse` for shared response handling (rate limiting, error mapping, body parsing). Each action file only contains what's unique: parameter parsing, validation, request construction, and response shape.
+Both `doRequest` and `doUpload` delegate to `executeAndHandleResponse` for shared response handling (rate limiting, error mapping, body parsing). Each action file only contains what's unique: parameter parsing, validation, request construction, and response shape.
 
 **Security notes for user-supplied path segments:**
 - Use `validateGraphID()` for opaque IDs interpolated into URL paths (rejects `/`, `\`, `?`, `#`, `%`, `..`)
@@ -528,7 +652,7 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/microsoft/
-├── microsoft.go                    # MicrosoftConnector, Manifest(), doRequest(), doPutFileRequest(), executeAndHandleResponse()
+├── microsoft.go                    # MicrosoftConnector, Manifest(), doRequest(), doUpload(), executeAndHandleResponse()
 ├── types.go                        # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
 ├── response.go                     # Graph API error response → typed connector error mapping
 ├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, validateValuesGrid, etc.)
@@ -542,6 +666,10 @@ connectors/microsoft/
 ├── list_channel_messages.go        # microsoft.list_channel_messages action
 ├── create_calendar_event.go        # microsoft.create_calendar_event action
 ├── list_calendar_events.go         # microsoft.list_calendar_events action
+├── create_document.go              # microsoft.create_document action (OneDrive)
+├── get_document.go                 # microsoft.get_document action (OneDrive)
+├── update_document.go              # microsoft.update_document action (OneDrive)
+├── list_documents.go               # microsoft.list_documents action (OneDrive)
 ├── create_presentation.go          # microsoft.create_presentation action
 ├── list_presentations.go           # microsoft.list_presentations action
 ├── get_presentation.go             # microsoft.get_presentation action
@@ -560,6 +688,10 @@ connectors/microsoft/
 ├── list_channel_messages_test.go   # List channel messages action tests
 ├── create_calendar_event_test.go   # Create calendar event action tests
 ├── list_calendar_events_test.go    # List calendar events action tests
+├── create_document_test.go         # Create document action tests
+├── get_document_test.go            # Get document action tests
+├── update_document_test.go         # Update document action tests
+├── list_documents_test.go          # List documents action tests
 ├── create_presentation_test.go     # Create presentation action tests
 ├── list_presentations_test.go      # List presentations action tests
 ├── get_presentation_test.go        # Get presentation action tests
