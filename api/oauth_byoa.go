@@ -94,6 +94,9 @@ func validateClientCredentialLengths(w http.ResponseWriter, r *http.Request, cli
 
 // storeClientCredentials encrypts client_id and client_secret in the vault
 // and returns the vault secret IDs. Used by both create and update handlers.
+//
+// If the client_secret vault write fails after client_id succeeded, the
+// client_id secret is cleaned up to prevent orphaned vault entries.
 func storeClientCredentials(ctx context.Context, deps *Deps, tx db.DBTX, namePrefix, clientID, clientSecret string) (clientIDVaultID, clientSecretVaultID string, err error) {
 	clientIDVaultID, err = deps.Vault.CreateSecret(ctx, tx, namePrefix+"_client_id", []byte(clientID))
 	if err != nil {
@@ -101,6 +104,8 @@ func storeClientCredentials(ctx context.Context, deps *Deps, tx db.DBTX, namePre
 	}
 	clientSecretVaultID, err = deps.Vault.CreateSecret(ctx, tx, namePrefix+"_client_secret", []byte(clientSecret))
 	if err != nil {
+		// Clean up the client_id secret to avoid orphaned vault entries.
+		_ = deps.Vault.DeleteSecret(ctx, tx, clientIDVaultID)
 		return "", "", err
 	}
 	return clientIDVaultID, clientSecretVaultID, nil

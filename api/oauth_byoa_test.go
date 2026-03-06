@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -192,6 +193,75 @@ func TestCreateOAuthProviderConfig_MissingFieldsReturns400(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, tc.body)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestCreateOAuthProviderConfig_CredentialTooLongReturns400(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps, _ := byoaDeps(tx)
+	router := NewRouter(deps)
+
+	oversized := strings.Repeat("x", oauthClientCredentialMaxLen+1)
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"client_id too long", `{"provider":"salesforce","client_id":"` + oversized + `","client_secret":"s"}`},
+		{"client_secret too long", `{"provider":"salesforce","client_id":"id","client_secret":"` + oversized + `"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, tc.body)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestUpdateOAuthProviderConfig_CredentialTooLongReturns400(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps, _ := byoaDeps(tx)
+	router := NewRouter(deps)
+
+	// Create a config first so the PUT has something to update.
+	createBody := `{"provider":"salesforce","client_id":"cid","client_secret":"csecret"}`
+	cr := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, createBody)
+	cw := httptest.NewRecorder()
+	router.ServeHTTP(cw, cr)
+	if cw.Code != http.StatusCreated {
+		t.Fatalf("setup: expected 201, got %d: %s", cw.Code, cw.Body.String())
+	}
+
+	oversized := strings.Repeat("x", oauthClientCredentialMaxLen+1)
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"client_id too long", `{"client_id":"` + oversized + `","client_secret":"s"}`},
+		{"client_secret too long", `{"client_id":"id","client_secret":"` + oversized + `"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/salesforce", uid, tc.body)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, r)
 			if w.Code != http.StatusBadRequest {
