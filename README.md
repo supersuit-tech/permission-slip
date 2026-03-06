@@ -53,6 +53,7 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **Self-hostable** — run your own instance for full control
 - **Single binary deployment** — Go server with embedded React frontend
 - **Audit trail** — every request, approval, and execution is logged
+- **OAuth 2.0 connections** — connect Google, Microsoft, or custom OAuth providers; tokens encrypted in vault
 - **User preferences** — per-channel notification settings, contact info, and credential vault management
 
 ## Agent Compatibility

@@ -112,6 +112,12 @@ AgentSelfResponse:
         - deactivated
       description: Current agent status (always "registered" for successful requests, since the middleware requires it)
       example: "registered"
+    approver:
+      allOf:
+        - $ref: '../schemas/shared.yaml#/ApproverInfo'
+      description: |
+        The user (approver) this agent is registered to. Identifies whose
+        account and permissions this agent operates under.
     metadata:
       type: object
       nullable: true
