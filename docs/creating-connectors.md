@@ -1,6 +1,6 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub and Slack connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, and PostgreSQL connectors as reference implementations.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -8,7 +8,7 @@ For architectural context, see [ADR-009: Connector Execution Architecture](adr/0
 
 ## Overview
 
-A **connector** represents an integration with an external service (e.g., GitHub, Slack, Jira). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
+A **connector** represents an integration with an external service or database (e.g., GitHub, Slack, PostgreSQL). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
 
 An **action** is a single operation within a connector (e.g., `github.create_issue`, `slack.send_message`). Each action has its own file, parameter struct, validation, and `Execute` method.
 
