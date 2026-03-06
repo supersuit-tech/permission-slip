@@ -7422,11 +7422,21 @@ components:
                 type: string
               body:
                 type: string
+        requires_payment_method:
+          type: boolean
+          default: false
+          description: |
+            Whether this action requires a payment method to execute. When `true`, the
+            agent must include `payment_method_id` and `amount_cents` in the execute request.
+            The payment method is resolved to a Stripe token at execution time — raw card
+            details are never exposed to the agent.
+          example: false
       example:
         action_type: github.create_issue
         name: Create Issue
         description: Create a new issue in a repository
         risk_level: low
+        requires_payment_method: false
         parameters_schema:
           type: object
           required:
@@ -7656,6 +7666,24 @@ components:
           example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         action:
           $ref: '#/components/schemas/Action'
+        payment_method_id:
+          type: string
+          format: uuid
+          description: |
+            ID of a stored payment method to use for this action. Required when the
+            action declares `requires_payment_method: true`. The payment method must
+            belong to the user who owns the agent. Permission Slip resolves it to a
+            Stripe token at execution time — raw card details are never exposed.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        amount_cents:
+          type: integer
+          minimum: 0
+          description: |
+            Transaction amount in cents. Required when the action declares
+            `requires_payment_method: true`. Used for spending limit enforcement
+            (per-transaction and monthly limits). The authorized amount is passed to
+            the connector alongside the Stripe payment method token.
+          example: 4999
       example:
         request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
         configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d

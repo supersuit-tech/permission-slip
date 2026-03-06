@@ -27,7 +27,12 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrPaymentMethodNotFound, pe.Message))
 		case connectors.PaymentErrPerTxLimit, connectors.PaymentErrMonthlyLimit:
 			resp := newErrorResponse(ErrPaymentLimitExceeded, pe.Message, false)
+			if pe.Details != nil {
+				resp.Error.Details = pe.Details
+			}
 			RespondError(w, r, http.StatusForbidden, resp)
+		case connectors.PaymentErrInvalidAmount:
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrPaymentMethodRequired, pe.Message))
 		default:
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pe.Message))
 		}

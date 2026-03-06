@@ -114,7 +114,7 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 	amount := *pp.AmountCents
 	if amount < 0 {
 		return nil, &connectors.PaymentError{
-			Code:    connectors.PaymentErrAmountRequired,
+			Code:    connectors.PaymentErrInvalidAmount,
 			Message: "amount_cents must be non-negative",
 		}
 	}
@@ -136,6 +136,10 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 		return nil, &connectors.PaymentError{
 			Code:    connectors.PaymentErrPerTxLimit,
 			Message: fmt.Sprintf("amount %d cents exceeds per-transaction limit of %d cents", amount, *pm.PerTransactionLimit),
+			Details: map[string]any{
+				"requested_amount_cents":       amount,
+				"per_transaction_limit_cents":  *pm.PerTransactionLimit,
+			},
 		}
 	}
 
@@ -149,6 +153,12 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 			return nil, &connectors.PaymentError{
 				Code:    connectors.PaymentErrMonthlyLimit,
 				Message: fmt.Sprintf("amount %d cents would exceed monthly limit of %d cents (current spend: %d cents)", amount, *pm.MonthlyLimit, monthlySpend),
+				Details: map[string]any{
+					"requested_amount_cents": amount,
+					"monthly_limit_cents":    *pm.MonthlyLimit,
+					"current_spend_cents":    monthlySpend,
+					"remaining_cents":        *pm.MonthlyLimit - monthlySpend,
+				},
 			}
 		}
 	}
@@ -170,6 +180,7 @@ func resolvePaymentMethod(ctx context.Context, deps *Deps, userID, connectorID, 
 		StripePaymentMethodID: pm.StripePaymentMethodID,
 		Brand:                 pm.Brand,
 		Last4:                 pm.Last4,
+		AmountCents:           amount,
 	}, nil
 }
 

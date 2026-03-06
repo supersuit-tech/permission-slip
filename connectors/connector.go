@@ -49,6 +49,7 @@ type PaymentInfo struct {
 	StripePaymentMethodID string // Stripe payment method token (e.g. "pm_...")
 	Brand                 string // card brand (e.g. "visa")
 	Last4                 string // last 4 digits of the card
+	AmountCents           int    // authorized transaction amount in cents
 }
 
 // ActionResult is returned from a successful execution.

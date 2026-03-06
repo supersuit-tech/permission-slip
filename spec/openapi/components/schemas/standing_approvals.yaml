@@ -426,8 +426,10 @@ StandingApprovalExecuteRequest:
       type: integer
       minimum: 0
       description: |
-        Transaction amount in cents. Required when `payment_method_id` is provided.
-        Used for spending limit enforcement (per-transaction and monthly limits).
+        Transaction amount in cents. Required when the action declares
+        `requires_payment_method: true`. Used for spending limit enforcement
+        (per-transaction and monthly limits). The authorized amount is passed to
+        the connector alongside the Stripe payment method token.
       example: 4999
 
   example:

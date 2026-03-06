@@ -761,6 +761,9 @@ func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
 	if capturedPayment.StripePaymentMethodID == "" {
 		t.Error("expected non-empty StripePaymentMethodID")
 	}
+	if capturedPayment.AmountCents != 5000 {
+		t.Errorf("expected AmountCents 5000, got %d", capturedPayment.AmountCents)
+	}
 
 	// Verify transaction was recorded.
 	spend, err := db.GetMonthlySpend(t.Context(), tx, pmID)
@@ -851,6 +854,15 @@ func TestExecuteConnectorAction_PaymentMethod_PerTxLimitExceeded(t *testing.T) {
 	if pe.Code != connectors.PaymentErrPerTxLimit {
 		t.Errorf("expected PaymentErrPerTxLimit, got %d", pe.Code)
 	}
+	if pe.Details == nil {
+		t.Fatal("expected Details to be populated for limit errors")
+	}
+	if pe.Details["requested_amount_cents"] != 5000 {
+		t.Errorf("expected requested_amount_cents=5000, got %v", pe.Details["requested_amount_cents"])
+	}
+	if pe.Details["per_transaction_limit_cents"] != 1000 {
+		t.Errorf("expected per_transaction_limit_cents=1000, got %v", pe.Details["per_transaction_limit_cents"])
+	}
 }
 
 func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T) {
@@ -907,6 +919,21 @@ func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T)
 	}
 	if pe.Code != connectors.PaymentErrMonthlyLimit {
 		t.Errorf("expected PaymentErrMonthlyLimit, got %d", pe.Code)
+	}
+	if pe.Details == nil {
+		t.Fatal("expected Details to be populated for monthly limit errors")
+	}
+	if pe.Details["requested_amount_cents"] != 2000 {
+		t.Errorf("expected requested_amount_cents=2000, got %v", pe.Details["requested_amount_cents"])
+	}
+	if pe.Details["monthly_limit_cents"] != 10000 {
+		t.Errorf("expected monthly_limit_cents=10000, got %v", pe.Details["monthly_limit_cents"])
+	}
+	if pe.Details["current_spend_cents"] != 9000 {
+		t.Errorf("expected current_spend_cents=9000, got %v", pe.Details["current_spend_cents"])
+	}
+	if pe.Details["remaining_cents"] != 1000 {
+		t.Errorf("expected remaining_cents=1000, got %v", pe.Details["remaining_cents"])
 	}
 }
 
