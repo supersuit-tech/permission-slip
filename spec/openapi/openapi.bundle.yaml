@@ -9732,7 +9732,8 @@ components:
             - active
             - needs_reauth
             - revoked
-          description: The current status of the connection
+          description: |
+            The current status of the connection. `active` — connection is valid and tokens are current (automatically refreshed before expiry). `needs_reauth` — token refresh failed (token revoked, expired refresh token, or no refresh token available); user must re-authorize via Settings. `revoked` — user explicitly disconnected the provider.
           example: active
         connected_at:
           type: string
