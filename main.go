@@ -20,9 +20,13 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
+	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
+	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
+	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
@@ -189,6 +193,7 @@ func main() {
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	defer bgCancel()
 	var auditPurgeDone <-chan struct{}
+	var oauthRefreshDone <-chan struct{}
 
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
@@ -309,7 +314,11 @@ func main() {
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
 	registry.Register(mongodb.New())
+	registry.Register(mysqlconnector.New())
+	registry.Register(pgconnector.New())
 	registry.Register(slack.New())
+	registry.Register(square.New())
+	registry.Register(amadeus.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
@@ -335,6 +344,21 @@ func main() {
 		} else {
 			log.Printf("  %s: registered (no client credentials — BYOA required)", p.ID)
 		}
+	}
+
+	// Load user BYOA configs from the database and merge into the registry
+	// so BYOA credentials survive server restarts.
+	if deps.DB != nil && deps.Vault != nil {
+		loadBYOAProviderConfigs(oauthRegistry, deps.DB, deps.Vault)
+	}
+
+	// Start background OAuth token refresh job (requires DB, vault, and OAuth registry).
+	if deps.DB != nil && deps.Vault != nil {
+		oauthRefreshDone = startOAuthRefresh(bgCtx, OAuthRefreshDeps{
+			DB:       deps.DB,
+			Vault:    deps.Vault,
+			Registry: oauthRegistry,
+		}, logger)
 	}
 
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
@@ -475,6 +499,13 @@ func main() {
 			logger.Warn("audit purge goroutine did not exit in time")
 		}
 	}
+	if oauthRefreshDone != nil {
+		select {
+		case <-oauthRefreshDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("oauth refresh goroutine did not exit in time")
+		}
+	}
 
 	// Allow up to 30 seconds for in-flight requests to complete.
 	shutdownTimeout := 30 * time.Second
@@ -605,6 +636,67 @@ func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connecto
 		if err := poauth.RegisterFromManifest(oauthReg, providers); err != nil {
 			log.Printf("Warning: failed to register OAuth providers from connector %q: %v", id, err)
 		}
+	}
+}
+
+// loadBYOAProviderConfigs reads all user BYOA OAuth provider configs from the
+// database and merges their client credentials into the in-memory provider
+// registry. This ensures BYOA credentials survive server restarts.
+//
+// Multi-tenancy note: BYOA credentials are stored per-user in the DB, but the
+// in-memory registry is global. The last-loaded BYOA config for a given provider
+// wins and becomes the active config for ALL users' OAuth flows on this server.
+// This is acceptable for single-tenant deployments.
+//
+// Only configs whose provider already exists in the registry (from built-in or
+// manifest sources) are loaded. Configs referencing unknown providers are logged
+// as warnings — they'll become active if the provider is registered later.
+func loadBYOAProviderConfigs(oauthReg *poauth.Registry, d db.DBTX, v vault.VaultStore) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	configs, err := db.ListAllOAuthProviderConfigs(ctx, d)
+	if err != nil {
+		log.Printf("Warning: failed to load BYOA provider configs: %v", err)
+		return
+	}
+
+	var loaded, skipped int
+	for _, cfg := range configs {
+		// Only load if the provider exists in the registry.
+		if _, ok := oauthReg.Get(cfg.Provider); !ok {
+			log.Printf("Warning: BYOA config for unknown provider %q (user %s) — skipping", cfg.Provider, cfg.UserID)
+			skipped++
+			continue
+		}
+
+		clientID, err := v.ReadSecret(ctx, d, cfg.ClientIDVaultID)
+		if err != nil {
+			log.Printf("Warning: failed to read BYOA client_id from vault for provider %q: %v", cfg.Provider, err)
+			skipped++
+			continue
+		}
+		clientSecret, err := v.ReadSecret(ctx, d, cfg.ClientSecretVaultID)
+		if err != nil {
+			log.Printf("Warning: failed to read BYOA client_secret from vault for provider %q: %v", cfg.Provider, err)
+			skipped++
+			continue
+		}
+
+		if err := oauthReg.Register(poauth.Provider{
+			ID:           cfg.Provider,
+			ClientID:     string(clientID),
+			ClientSecret: string(clientSecret),
+			Source:       poauth.SourceBYOA,
+		}); err != nil {
+			log.Printf("Warning: failed to register BYOA provider %q: %v", cfg.Provider, err)
+			skipped++
+			continue
+		}
+		loaded++
+	}
+	if loaded > 0 || skipped > 0 {
+		log.Printf("BYOA provider configs: %d loaded, %d skipped", loaded, skipped)
 	}
 }
 
