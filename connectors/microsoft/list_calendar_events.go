@@ -35,14 +35,14 @@ type graphEventsResponse struct {
 }
 
 type graphEventItem struct {
-	ID        string             `json:"id"`
-	Subject   string             `json:"subject"`
-	Start     graphDateTimeZone  `json:"start"`
-	End       graphDateTimeZone  `json:"end"`
+	ID        string              `json:"id"`
+	Subject   string              `json:"subject"`
+	Start     graphDateTimeZone   `json:"start"`
+	End       graphDateTimeZone   `json:"end"`
 	Location  *graphEventLocation `json:"location,omitempty"`
 	Organizer *graphMailAddress   `json:"organizer,omitempty"`
-	WebLink   string             `json:"webLink"`
-	IsAllDay  bool               `json:"isAllDay"`
+	WebLink   string              `json:"webLink"`
+	IsAllDay  bool                `json:"isAllDay"`
 }
 
 // eventSummary is the simplified response returned to the caller.

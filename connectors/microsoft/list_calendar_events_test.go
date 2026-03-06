@@ -37,7 +37,7 @@ func TestListCalendarEvents_Success(t *testing.T) {
 							"address": "manager@example.com",
 						},
 					},
-					"webLink": "https://outlook.office365.com/calendar/item/event-1",
+					"webLink":  "https://outlook.office365.com/calendar/item/event-1",
 					"isAllDay": false,
 				},
 			},

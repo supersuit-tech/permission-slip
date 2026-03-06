@@ -40,14 +40,14 @@ type graphMessagesResponse struct {
 }
 
 type graphMessage struct {
-	ID             string            `json:"id"`
-	Subject        string            `json:"subject"`
+	ID             string             `json:"id"`
+	Subject        string             `json:"subject"`
 	From           *graphMailAddress  `json:"from,omitempty"`
 	ToRecipients   []graphMailAddress `json:"toRecipients,omitempty"`
-	ReceivedAt     string            `json:"receivedDateTime,omitempty"`
-	IsRead         bool              `json:"isRead"`
-	BodyPreview    string            `json:"bodyPreview,omitempty"`
-	HasAttachments bool              `json:"hasAttachments"`
+	ReceivedAt     string             `json:"receivedDateTime,omitempty"`
+	IsRead         bool               `json:"isRead"`
+	BodyPreview    string             `json:"bodyPreview,omitempty"`
+	HasAttachments bool               `json:"hasAttachments"`
 }
 
 // emailSummary is the simplified response returned to the caller.

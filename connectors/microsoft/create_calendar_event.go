@@ -52,11 +52,11 @@ func (p *createCalendarEventParams) defaults() {
 
 // graphEventRequest is the Microsoft Graph API request body for creating events.
 type graphEventRequest struct {
-	Subject   string             `json:"subject"`
-	Body      *graphEmailBody    `json:"body,omitempty"`
-	Start     graphDateTimeZone  `json:"start"`
-	End       graphDateTimeZone  `json:"end"`
-	Attendees []graphAttendee    `json:"attendees,omitempty"`
+	Subject   string              `json:"subject"`
+	Body      *graphEmailBody     `json:"body,omitempty"`
+	Start     graphDateTimeZone   `json:"start"`
+	End       graphDateTimeZone   `json:"end"`
+	Attendees []graphAttendee     `json:"attendees,omitempty"`
 	Location  *graphEventLocation `json:"location,omitempty"`
 }
 
@@ -67,7 +67,7 @@ type graphEventResponse struct {
 	Start     graphDateTimeZone `json:"start"`
 	End       graphDateTimeZone `json:"end"`
 	WebLink   string            `json:"webLink"`
-	Organizer *graphMailAddress  `json:"organizer,omitempty"`
+	Organizer *graphMailAddress `json:"organizer,omitempty"`
 }
 
 // Execute creates a calendar event via the Microsoft Graph API.
