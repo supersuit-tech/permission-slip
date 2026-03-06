@@ -116,6 +116,55 @@ func TestUpdateDocument_MissingContent(t *testing.T) {
 	}
 }
 
+func TestUpdateDocument_ItemIDPathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(updateDocumentParams{
+		ItemID:  "../admin/secrets",
+		Content: "content",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.update_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdateDocument_ContentTooLarge(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateDocumentAction{conn: conn}
+
+	bigContent := string(make([]byte, maxSimpleUploadSize+1))
+	params, _ := json.Marshal(updateDocumentParams{
+		ItemID:  "item-123",
+		Content: bigContent,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.update_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for oversized content")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestUpdateDocument_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

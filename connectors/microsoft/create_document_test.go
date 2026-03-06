@@ -196,6 +196,53 @@ func TestCreateDocument_DocxNotDuplicated(t *testing.T) {
 	}
 }
 
+func TestCreateDocument_WhitespaceOnlyFilename(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(createDocumentParams{Filename: "   "})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for whitespace-only filename")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateDocument_ContentTooLarge(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createDocumentAction{conn: conn}
+
+	// Create content just over the 4MB limit.
+	bigContent := string(make([]byte, maxSimpleUploadSize+1))
+	params, _ := json.Marshal(createDocumentParams{
+		Filename: "big.docx",
+		Content:  bigContent,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for oversized content")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateDocument_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

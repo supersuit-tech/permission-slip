@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -24,6 +25,9 @@ func (p *getDocumentParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
 	}
+	if strings.Contains(p.ItemID, "/") || strings.Contains(p.ItemID, "\\") || strings.Contains(p.ItemID, "..") {
+		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or traversal sequences"}
+	}
 	return nil
 }
 
@@ -35,6 +39,7 @@ type documentMetadata struct {
 	Size                 int64  `json:"size"`
 	CreatedDateTime      string `json:"created_date_time"`
 	LastModifiedDateTime string `json:"last_modified_date_time"`
+	DownloadURL          string `json:"download_url,omitempty"`
 }
 
 // Execute gets metadata for a document in OneDrive.
@@ -61,5 +66,6 @@ func (a *getDocumentAction) Execute(ctx context.Context, req connectors.ActionRe
 		Size:                 item.Size,
 		CreatedDateTime:      item.CreatedDateTime,
 		LastModifiedDateTime: item.LastModifiedDateTime,
+		DownloadURL:          item.DownloadURL,
 	})
 }

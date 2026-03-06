@@ -88,6 +88,67 @@ func TestGetDocument_MissingItemID(t *testing.T) {
 	}
 }
 
+func TestGetDocument_DownloadURL(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":                              "item-123",
+			"name":                            "report.docx",
+			"webUrl":                          "https://onedrive.live.com/report.docx",
+			"size":                            12345,
+			"createdDateTime":                 "2024-01-15T09:00:00Z",
+			"lastModifiedDateTime":            "2024-01-16T10:00:00Z",
+			"@microsoft.graph.downloadUrl":    "https://download.example.com/report.docx?token=abc",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &getDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(getDocumentParams{ItemID: "item-123"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.get_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var doc documentMetadata
+	if err := json.Unmarshal(result.Data, &doc); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if doc.DownloadURL != "https://download.example.com/report.docx?token=abc" {
+		t.Errorf("expected download_url, got %q", doc.DownloadURL)
+	}
+}
+
+func TestGetDocument_ItemIDPathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &getDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(getDocumentParams{ItemID: "../admin/secrets"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.get_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestGetDocument_NotFound(t *testing.T) {
 	t.Parallel()
 

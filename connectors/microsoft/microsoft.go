@@ -191,15 +191,17 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"filename": {
 							"type": "string",
-							"description": "Name for the document (.docx appended if missing)"
+							"description": "Name for the document (.docx appended if missing)",
+							"examples": ["quarterly-report.docx", "meeting-notes"]
 						},
 						"folder_path": {
 							"type": "string",
-							"description": "OneDrive folder path (defaults to root)"
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
 						},
 						"content": {
 							"type": "string",
-							"description": "Initial document content"
+							"description": "Initial plain-text document content (max 4 MB)"
 						}
 					}
 				}`)),
@@ -215,7 +217,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
-							"description": "OneDrive item ID of the document"
+							"description": "OneDrive item ID of the document (returned by create or list)"
 						}
 					}
 				}`)),
@@ -231,11 +233,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
-							"description": "OneDrive item ID of the document"
+							"description": "OneDrive item ID of the document (returned by create or list)"
 						},
 						"content": {
 							"type": "string",
-							"description": "New document content"
+							"description": "New document content (max 4 MB)"
 						}
 					}
 				}`)),
@@ -250,7 +252,8 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"folder_path": {
 							"type": "string",
-							"description": "OneDrive folder path (defaults to root)"
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
 						},
 						"top": {
 							"type": "integer",

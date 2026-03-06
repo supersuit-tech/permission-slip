@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -25,8 +26,14 @@ func (p *updateDocumentParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
 	}
+	if strings.Contains(p.ItemID, "/") || strings.Contains(p.ItemID, "\\") || strings.Contains(p.ItemID, "..") {
+		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators or traversal sequences"}
+	}
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
+	}
+	if len(p.Content) > maxSimpleUploadSize {
+		return &connectors.ValidationError{Message: fmt.Sprintf("content exceeds maximum size of %d MB for simple upload", maxSimpleUploadSize/(1024*1024))}
 	}
 	return nil
 }
@@ -44,7 +51,7 @@ func (a *updateDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	path := fmt.Sprintf("/me/drive/items/%s/content", params.ItemID)
 
 	var item graphDriveItem
-	if err := a.conn.doUpload(ctx, http.MethodPut, path, req.Credentials, []byte(params.Content), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", &item); err != nil {
+	if err := a.conn.doUpload(ctx, http.MethodPut, path, req.Credentials, []byte(params.Content), docxContentType, &item); err != nil {
 		return nil, err
 	}
 

@@ -10,6 +10,14 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+const (
+	// docxContentType is the MIME type for Word documents (.docx).
+	docxContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+	// maxSimpleUploadSize is the OneDrive simple upload limit (4 MB).
+	maxSimpleUploadSize = 4 * 1024 * 1024
+)
+
 // createDocumentAction implements connectors.Action for microsoft.create_document.
 // It creates a new Word document in OneDrive via PUT /me/drive/root:/{path}:/content.
 type createDocumentAction struct {
@@ -24,6 +32,7 @@ type createDocumentParams struct {
 }
 
 func (p *createDocumentParams) validate() error {
+	p.Filename = strings.TrimSpace(p.Filename)
 	if p.Filename == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: filename"}
 	}
@@ -34,6 +43,9 @@ func (p *createDocumentParams) validate() error {
 		if strings.Contains(p.FolderPath, "..") {
 			return &connectors.ValidationError{Message: "invalid folder_path: must not contain path traversal sequences"}
 		}
+	}
+	if len(p.Content) > maxSimpleUploadSize {
+		return &connectors.ValidationError{Message: fmt.Sprintf("content exceeds maximum size of %d MB for simple upload", maxSimpleUploadSize/(1024*1024))}
 	}
 	return nil
 }
@@ -46,12 +58,13 @@ func (p *createDocumentParams) defaults() {
 
 // graphDriveItem represents a OneDrive item returned by the Graph API.
 type graphDriveItem struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	WebURL           string `json:"webUrl"`
-	Size             int64  `json:"size,omitempty"`
-	CreatedDateTime  string `json:"createdDateTime,omitempty"`
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	WebURL               string `json:"webUrl"`
+	Size                 int64  `json:"size,omitempty"`
+	CreatedDateTime      string `json:"createdDateTime,omitempty"`
 	LastModifiedDateTime string `json:"lastModifiedDateTime,omitempty"`
+	DownloadURL          string `json:"@microsoft.graph.downloadUrl,omitempty"`
 }
 
 // documentResult is the simplified response returned to the caller for create/update.
@@ -90,7 +103,7 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	var item graphDriveItem
-	if err := a.conn.doUpload(ctx, http.MethodPut, path, req.Credentials, content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", &item); err != nil {
+	if err := a.conn.doUpload(ctx, http.MethodPut, path, req.Credentials, content, docxContentType, &item); err != nil {
 		return nil, err
 	}
 
