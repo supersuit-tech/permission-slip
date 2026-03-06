@@ -1,6 +1,6 @@
 // Package expedia implements the Expedia Rapid connector for the Permission
-// Slip connector execution layer. It uses the Expedia Rapid API (formerly
-// EAN/Expedia Affiliate Network) with HMAC-SHA512 signature authentication.
+// Slip connector execution layer. It uses the Expedia Rapid API with
+// SHA-512 hash signature authentication (api_key + secret + timestamp).
 package expedia
 
 import (
@@ -23,6 +23,11 @@ const (
 	defaultBaseURL    = "https://api.ean.com"
 	defaultTimeout    = 30 * time.Second
 	defaultCustomerIP = "127.0.0.1"
+
+	// maxResponseBytes caps the response body we read from Expedia to 10 MB.
+	// Prevents a misbehaving upstream from exhausting server memory.
+	maxResponseBytes = 10 * 1024 * 1024
+
 )
 
 // ExpediaConnector owns the shared HTTP client and base URL used by all
@@ -310,7 +315,7 @@ func (c *ExpediaConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key and secret, which are required for HMAC-SHA512 signature
+// non-empty api_key and secret, which are required for SHA-512 signature
 // authentication with the Expedia Rapid API.
 func (c *ExpediaConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	key, ok := creds.Get("api_key")
@@ -324,7 +329,7 @@ func (c *ExpediaConnector) ValidateCredentials(_ context.Context, creds connecto
 	return nil
 }
 
-// signature generates the HMAC-SHA512 signature for Expedia Rapid API
+// signature generates the SHA-512 hash signature for Expedia Rapid API
 // authentication. The signature is SHA512(api_key + secret + unix_timestamp).
 func (c *ExpediaConnector) signature(apiKey, secret string) (sig string, timestamp string) {
 	ts := c.nowFunc().Unix()
@@ -391,7 +396,7 @@ func (c *ExpediaConnector) do(ctx context.Context, creds connectors.Credentials,
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

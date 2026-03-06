@@ -1,6 +1,6 @@
 # Expedia Rapid Connector
 
-The Expedia Rapid connector integrates Permission Slip with the [Expedia Rapid API](https://developers.expediagroup.com/docs/products/rapid) for hotel search, pricing, and booking. It uses plain `net/http` with HMAC-SHA512 signature authentication — no third-party SDK.
+The Expedia Rapid connector integrates Permission Slip with the [Expedia Rapid API](https://developers.expediagroup.com/docs/products/rapid) for hotel search, pricing, and booking. It uses plain `net/http` with SHA-512 signature authentication — no third-party SDK.
 
 ## Connector ID
 
@@ -11,7 +11,7 @@ The Expedia Rapid connector integrates Permission Slip with the [Expedia Rapid A
 | Key | Required | Description |
 |-----|----------|-------------|
 | `api_key` | Yes | Expedia Rapid API key from your [EPS Rapid account](https://developers.expediagroup.com/). |
-| `secret` | Yes | Shared secret for HMAC-SHA512 signature generation. |
+| `secret` | Yes | Shared secret for SHA-512 signature generation. |
 
 The credential `auth_type` in the database is `api_key`. Both values are stored encrypted in Supabase Vault and decrypted only at execution time.
 
