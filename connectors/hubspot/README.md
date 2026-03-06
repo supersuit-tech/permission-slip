@@ -100,6 +100,13 @@ Error messages include HubSpot's `correlationId` when available, which is useful
 
 Rate limit: HubSpot allows 100 requests per 10 seconds per private app. The `RateLimitError` includes a `RetryAfter` duration parsed from the `Retry-After` header (defaults to 10s).
 
+## Security
+
+- **Path injection prevention:** All HubSpot object IDs interpolated into URL paths are validated as numeric-only strings via `isValidHubSpotID()`. This rejects values like `../../admin` that could redirect requests to unintended API endpoints.
+- **Association limits:** `create_deal` caps `associated_contacts` at 50 entries (`maxAssociations`) to prevent excessive API calls against HubSpot's rate limit (100 req / 10s).
+- **Response body limits:** API responses are capped at 10 MB (`maxResponseBody`) to guard against unexpectedly large payloads.
+- **Error body truncation:** Raw (non-JSON) error response bodies are truncated to 200 characters in error messages to prevent information leakage.
+
 ## Adding a New Action
 
 Each action lives in its own file. To add one (e.g., `hubspot.create_company`):
@@ -108,10 +115,10 @@ Each action lives in its own file. To add one (e.g., `hubspot.create_company`):
 2. Use `a.conn.do(ctx, creds, method, path, reqBody, &respBody)` for the HTTP lifecycle — it handles JSON marshaling, auth headers, response checking, and error mapping.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `hubspot.go`.
-5. Add the action to the `Manifest()` return value inside `hubspot.go` — include a `ParametersSchema`.
+5. Add the action to the `Manifest()` return value inside `manifest.go` — include a `ParametersSchema`.
 6. Add tests in `create_company_test.go` using `httptest.NewServer` and `newForTest()`.
 
-HubSpot's CRM API follows a uniform pattern across object types — all use `/crm/v3/objects/{type}` for CRUD operations. The shared `hubspotObjectRequest` and `hubspotObjectResponse` types (defined in `create_contact.go`) can be reused for most CRM object actions.
+HubSpot's CRM API follows a uniform pattern across object types — all use `/crm/v3/objects/{type}` for CRUD operations. The shared `hubspotObjectRequest` and `hubspotObjectResponse` types (defined in `types.go`) can be reused for most CRM object actions. The `mergeProperties` helper (also in `types.go`) handles the convention where explicit action fields override the catch-all `properties` map.
 
 ## Parameters Schema
 
@@ -125,17 +132,19 @@ When adding a new action, define its `ParametersSchema` as a `json.RawMessage` i
 
 ## Manifest
 
-Connector reference data (the `connectors`, `connector_actions`, and `connector_required_credentials` rows) is declared in the `Manifest()` method on `HubSpotConnector`. The server auto-upserts these DB rows on startup from the manifest — no manual SQL or seed files needed.
+Connector reference data (the `connectors`, `connector_actions`, and `connector_required_credentials` rows) is declared in `manifest.go`. The server auto-upserts these DB rows on startup from the manifest — no manual SQL or seed files needed.
 
-When adding a new action, add it to the `Manifest()` return value with a `ParametersSchema`.
+When adding a new action, add it to the `Manifest()` return value in `manifest.go` with a `ParametersSchema`.
 
 ## File Structure
 
 ```
 connectors/hubspot/
-├── hubspot.go              # HubSpotConnector struct, New(), Manifest(), Actions(), do()
+├── hubspot.go              # HubSpotConnector struct, New(), Actions(), do(), validation helpers
+├── manifest.go             # Manifest() — action schemas, credential requirements, templates
+├── types.go                # Shared request/response types and mergeProperties helper
 ├── response.go             # HubSpot error category → typed error mapping
-├── create_contact.go       # hubspot.create_contact + shared request/response types
+├── create_contact.go       # hubspot.create_contact
 ├── update_contact.go       # hubspot.update_contact
 ├── create_deal.go          # hubspot.create_deal (with contact associations)
 ├── create_ticket.go        # hubspot.create_ticket
