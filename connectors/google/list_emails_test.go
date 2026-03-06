@@ -12,7 +12,6 @@ import (
 func TestListEmails_Success(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
@@ -20,9 +19,10 @@ func TestListEmails_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		switch {
-		case r.URL.Path == "/gmail/v1/users/me/messages" && callCount == 0:
-			callCount++
+		// Route on the URL path: /messages is the list call,
+		// /messages/{id} is the get-metadata call.
+		switch r.URL.Path {
+		case "/gmail/v1/users/me/messages":
 			json.NewEncoder(w).Encode(gmailListResponse{
 				Messages: []struct {
 					ID       string `json:"id"`
@@ -33,7 +33,7 @@ func TestListEmails_Success(t *testing.T) {
 				ResultSizeEstimate: 1,
 			})
 		default:
-			// messages.get call
+			// messages.get call for individual message
 			json.NewEncoder(w).Encode(gmailMessageResponse{
 				ID:       "msg-1",
 				ThreadID: "thread-1",

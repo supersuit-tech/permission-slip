@@ -1,9 +1,11 @@
 package google
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -29,6 +31,26 @@ func TestSendEmail_Success(t *testing.T) {
 		}
 		if body.Raw == "" {
 			t.Error("expected non-empty raw message")
+		}
+
+		// Verify the raw message is valid unpadded base64url and decodes
+		// to a well-formed RFC 2822 message.
+		if strings.ContainsRune(body.Raw, '=') {
+			t.Error("raw message contains padding; Gmail API expects unpadded base64url")
+		}
+		decoded, err := base64.RawURLEncoding.DecodeString(body.Raw)
+		if err != nil {
+			t.Fatalf("raw message is not valid base64url: %v", err)
+		}
+		msg := string(decoded)
+		if !strings.Contains(msg, "To: user@example.com") {
+			t.Error("decoded message missing To header")
+		}
+		if !strings.Contains(msg, "Subject: Test Subject") {
+			t.Error("decoded message missing Subject header")
+		}
+		if !strings.Contains(msg, "Hello, world!") {
+			t.Error("decoded message missing body text")
 		}
 
 		w.Header().Set("Content-Type", "application/json")
