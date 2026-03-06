@@ -54,10 +54,26 @@ const (
 	// you're ready to handle the new response shapes.
 	// See https://docs.stripe.com/api/versioning
 	apiVersion = "2025-12-18.acacia"
+
+	// maxMetadataKeys is the Stripe limit on metadata key-value pairs.
+	// Validating this client-side gives clearer error messages than
+	// relying on the API to reject oversized metadata.
+	maxMetadataKeys = 50
 )
 
 // validKeyPrefixes lists all recognized Stripe secret key prefixes.
 var validKeyPrefixes = []string{liveKeyPrefix, testKeyPrefix, rLiveKeyPrefix, rTestKeyPrefix}
+
+// validateMetadata checks that the metadata map does not exceed Stripe's
+// 50-key limit. Returns nil if metadata is nil or within bounds.
+func validateMetadata(metadata map[string]any) error {
+	if len(metadata) > maxMetadataKeys {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many metadata keys: %d (max %d)", len(metadata), maxMetadataKeys),
+		}
+	}
+	return nil
+}
 
 // StripeConnector owns the shared HTTP client and base URL used by all
 // Stripe actions. Actions hold a pointer back to the connector to access
@@ -88,9 +104,15 @@ func newForTest(client *http.Client, baseURL string) *StripeConnector {
 func (c *StripeConnector) ID() string { return "stripe" }
 
 // Actions returns the registered action handlers keyed by action_type.
-// Phase 2 will populate this map with the actual action implementations.
 func (c *StripeConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
+	return map[string]connectors.Action{
+		"stripe.create_customer":     &createCustomerAction{conn: c},
+		"stripe.create_invoice":      &createInvoiceAction{conn: c},
+		"stripe.issue_refund":        &issueRefundAction{conn: c},
+		"stripe.list_subscriptions":  &listSubscriptionsAction{conn: c},
+		"stripe.create_payment_link": &createPaymentLinkAction{conn: c},
+		"stripe.get_balance":         &getBalanceAction{conn: c},
+	}
 }
 
 // ValidateCredentials checks that the provided credentials contain a
