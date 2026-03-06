@@ -28,7 +28,9 @@ func TestIssueRefund_FullRefundByPaymentIntent(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("payment_intent"); got != "pi_abc123" {
 			t.Errorf("payment_intent = %q, want pi_abc123", got)
@@ -75,7 +77,9 @@ func TestIssueRefund_PartialRefundByCharge(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("charge"); got != "ch_xyz789" {
 			t.Errorf("charge = %q, want ch_xyz789", got)

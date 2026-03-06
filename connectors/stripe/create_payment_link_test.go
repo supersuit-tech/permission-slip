@@ -27,7 +27,9 @@ func TestCreatePaymentLink_Success(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("line_items[0][price]"); got != "price_abc" {
 			t.Errorf("line_items[0][price] = %q, want price_abc", got)
@@ -76,7 +78,9 @@ func TestCreatePaymentLink_WithRedirect(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("after_completion[type]"); got != "redirect" {
 			t.Errorf("after_completion[type] = %q, want redirect", got)
@@ -110,7 +114,9 @@ func TestCreatePaymentLink_WithPromotionCodes(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("allow_promotion_codes"); got != "true" {
 			t.Errorf("allow_promotion_codes = %q, want true", got)
@@ -197,7 +203,9 @@ func TestCreatePaymentLink_MultipleLineItems(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("line_items[0][price]"); got != "price_a" {
 			t.Errorf("line_items[0][price] = %q, want price_a", got)

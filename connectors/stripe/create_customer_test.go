@@ -30,7 +30,9 @@ func TestCreateCustomer_Success(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("email"); got != "alice@example.com" {
 			t.Errorf("email = %q, want alice@example.com", got)
@@ -83,7 +85,9 @@ func TestCreateCustomer_EmailOnly(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if got := r.FormValue("email"); got != "bob@example.com" {
 			t.Errorf("email = %q, want bob@example.com", got)

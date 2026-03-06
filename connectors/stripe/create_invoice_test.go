@@ -25,7 +25,9 @@ func TestCreateInvoice_FullFlow(t *testing.T) {
 		case n == 1 && r.URL.Path == "/v1/invoices" && r.Method == http.MethodPost:
 			// Step 1: Create invoice.
 			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parsing form: %v", err)
+				t.Errorf("parsing form: %v", err)
+				http.Error(w, "bad request", http.StatusInternalServerError)
+				return
 			}
 			if got := r.FormValue("customer"); got != "cus_abc123" {
 				t.Errorf("customer = %q, want cus_abc123", got)
@@ -49,7 +51,9 @@ func TestCreateInvoice_FullFlow(t *testing.T) {
 		case n == 2 && r.URL.Path == "/v1/invoiceitems" && r.Method == http.MethodPost:
 			// Step 2: Add line item.
 			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parsing form: %v", err)
+				t.Errorf("parsing form: %v", err)
+				http.Error(w, "bad request", http.StatusInternalServerError)
+				return
 			}
 			if got := r.FormValue("invoice"); got != "in_test123" {
 				t.Errorf("invoice = %q, want in_test123", got)
@@ -127,7 +131,9 @@ func TestCreateInvoice_CustomCurrency(t *testing.T) {
 		switch {
 		case n == 1 && r.URL.Path == "/v1/invoices":
 			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parsing form: %v", err)
+				t.Errorf("parsing form: %v", err)
+				http.Error(w, "bad request", http.StatusInternalServerError)
+				return
 			}
 			if got := r.FormValue("currency"); got != "eur" {
 				t.Errorf("currency = %q, want eur", got)
@@ -137,7 +143,9 @@ func TestCreateInvoice_CustomCurrency(t *testing.T) {
 			})
 		case n == 2 && r.URL.Path == "/v1/invoiceitems":
 			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parsing form: %v", err)
+				t.Errorf("parsing form: %v", err)
+				http.Error(w, "bad request", http.StatusInternalServerError)
+				return
 			}
 			if got := r.FormValue("currency"); got != "eur" {
 				t.Errorf("invoice item currency = %q, want eur", got)
@@ -181,7 +189,9 @@ func TestCreateInvoice_NoFinalize(t *testing.T) {
 		switch {
 		case n == 1 && r.URL.Path == "/v1/invoices":
 			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parsing form: %v", err)
+				t.Errorf("parsing form: %v", err)
+				http.Error(w, "bad request", http.StatusInternalServerError)
+				return
 			}
 			if got := r.FormValue("auto_advance"); got != "false" {
 				t.Errorf("auto_advance = %q, want false", got)
@@ -414,6 +424,58 @@ func TestCreateInvoice_IdenticalLineItemsGetUniqueIdempotencyKeys(t *testing.T) 
 	}
 	if idempotencyKeys[0] == idempotencyKeys[1] {
 		t.Errorf("identical line items must get different idempotency keys to avoid deduplication, but both got %q", idempotencyKeys[0])
+	}
+}
+
+func TestCreateInvoice_LineItemFailureMidCreation(t *testing.T) {
+	t.Parallel()
+
+	var callCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		switch {
+		case n == 1 && r.URL.Path == "/v1/invoices":
+			json.NewEncoder(w).Encode(map[string]any{"id": "in_partial", "status": "draft"})
+		case n == 2 && r.URL.Path == "/v1/invoiceitems":
+			// First line item succeeds.
+			json.NewEncoder(w).Encode(map[string]any{"id": "ii_ok"})
+		case n == 3 && r.URL.Path == "/v1/invoiceitems":
+			// Second line item fails with a validation error.
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{
+					"type":    "invalid_request_error",
+					"message": "Amount must be positive",
+				},
+			})
+		default:
+			t.Errorf("unexpected request #%d: %s %s", n, r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.create_invoice"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType: "stripe.create_invoice",
+		Parameters: json.RawMessage(`{
+			"customer_id": "cus_abc123",
+			"line_items": [
+				{"description": "Good item", "amount": 1000, "quantity": 1},
+				{"description": "Bad item", "amount": 100, "quantity": 1}
+			]
+		}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for line item failure, got nil")
+	}
+	// Ensure we never reached the finalize step.
+	if got := callCount.Load(); got != 3 {
+		t.Errorf("expected 3 API calls (create + 1 ok item + 1 failed item), got %d", got)
 	}
 }
 
