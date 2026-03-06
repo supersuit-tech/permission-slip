@@ -196,9 +196,11 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/expedia/
-├── expedia.go          # ExpediaConnector struct, New(), Manifest(), do(), ValidateCredentials(), signature()
+├── expedia.go          # ExpediaConnector struct, New(), do(), ValidateCredentials(), signature()
+├── manifest.go         # Manifest() with action schemas, credentials, and templates
 ├── response.go         # Shared HTTP response → typed error mapping
 ├── expedia_test.go     # Connector-level tests (signature, do(), credentials, manifest)
+├── response_test.go    # checkResponse edge case tests
 ├── helpers_test.go     # Shared test helpers (validCreds)
 └── README.md           # This file
 ```

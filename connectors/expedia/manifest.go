@@ -1,0 +1,249 @@
+package expedia
+
+import (
+	"encoding/json"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+// Manifest returns the connector's metadata manifest. Used by the server to
+// auto-seed DB rows on startup.
+func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
+	return &connectors.ConnectorManifest{
+		ID:          "expedia",
+		Name:        "Expedia Rapid",
+		Description: "Expedia Rapid API integration for hotel search and booking",
+		Actions: []connectors.ManifestAction{
+			{
+				ActionType:  "expedia.search_hotels",
+				Name:        "Search Hotels",
+				Description: "Search available hotels with pricing",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["checkin", "checkout", "occupancy"],
+					"properties": {
+						"checkin": {
+							"type": "string",
+							"description": "Check-in date (YYYY-MM-DD)"
+						},
+						"checkout": {
+							"type": "string",
+							"description": "Check-out date (YYYY-MM-DD)"
+						},
+						"region_id": {
+							"type": "string",
+							"description": "Expedia region ID to search in"
+						},
+						"latitude": {
+							"type": "number",
+							"description": "Latitude for location-based search"
+						},
+						"longitude": {
+							"type": "number",
+							"description": "Longitude for location-based search"
+						},
+						"occupancy": {
+							"type": "string",
+							"description": "Occupancy string (e.g. '2' for 2 adults, '2-0,4' for 2 adults + 1 child age 4)"
+						},
+						"currency": {
+							"type": "string",
+							"description": "Currency code (e.g. USD, EUR)"
+						},
+						"language": {
+							"type": "string",
+							"description": "Language code (e.g. en-US)"
+						},
+						"sort_by": {
+							"type": "string",
+							"enum": ["price", "distance", "rating"],
+							"description": "Sort results by price, distance, or rating"
+						},
+						"star_rating": {
+							"type": "array",
+							"items": {"type": "integer"},
+							"description": "Filter by star rating(s)"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 20,
+							"description": "Maximum number of results to return"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "expedia.get_hotel",
+				Name:        "Get Hotel Details",
+				Description: "Get full hotel details: photos, amenities, room types, policies, reviews summary",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["property_id"],
+					"properties": {
+						"property_id": {
+							"type": "string",
+							"description": "Expedia property ID"
+						},
+						"checkin": {
+							"type": "string",
+							"description": "Check-in date (YYYY-MM-DD) for rate information"
+						},
+						"checkout": {
+							"type": "string",
+							"description": "Check-out date (YYYY-MM-DD) for rate information"
+						},
+						"occupancy": {
+							"type": "string",
+							"description": "Occupancy string for rate information"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "expedia.price_check",
+				Name:        "Price Check",
+				Description: "Confirm real-time pricing and availability before booking",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["room_id"],
+					"properties": {
+						"room_id": {
+							"type": "string",
+							"description": "Room ID from search results"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "expedia.create_booking",
+				Name:        "Create Booking",
+				Description: "Book a hotel room. High risk — creates a real reservation and may charge payment.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["room_id", "given_name", "family_name", "email", "phone", "payment_method_id"],
+					"properties": {
+						"room_id": {
+							"type": "string",
+							"description": "Room ID from a successful price check"
+						},
+						"given_name": {
+							"type": "string",
+							"description": "Guest first name"
+						},
+						"family_name": {
+							"type": "string",
+							"description": "Guest last name"
+						},
+						"email": {
+							"type": "string",
+							"description": "Guest email address"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Guest phone number"
+						},
+						"payment_method_id": {
+							"type": "string",
+							"description": "Stored payment method ID (resolved server-side)"
+						},
+						"special_request": {
+							"type": "string",
+							"description": "Special requests for the hotel"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "expedia.cancel_booking",
+				Name:        "Cancel Booking",
+				Description: "Cancel a hotel booking — may incur cancellation fees depending on policy",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["itinerary_id", "room_id"],
+					"properties": {
+						"itinerary_id": {
+							"type": "string",
+							"description": "Itinerary ID from the booking"
+						},
+						"room_id": {
+							"type": "string",
+							"description": "Room ID within the itinerary to cancel"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "expedia.get_booking",
+				Name:        "Get Booking",
+				Description: "Retrieve booking details and current status",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["itinerary_id", "email"],
+					"properties": {
+						"itinerary_id": {
+							"type": "string",
+							"description": "Itinerary ID from the booking"
+						},
+						"email": {
+							"type": "string",
+							"description": "Email address used for the booking"
+						}
+					}
+				}`)),
+			},
+		},
+		RequiredCredentials: []connectors.ManifestCredential{
+			{Service: "expedia", AuthType: "api_key", InstructionsURL: "https://developers.expediagroup.com/docs/products/rapid/setup/getting-started"},
+		},
+		Templates: []connectors.ManifestTemplate{
+			{
+				ID:          "tpl_expedia_search_read_only",
+				ActionType:  "expedia.search_hotels",
+				Name:        "Search hotels (read-only)",
+				Description: "Agent can search hotels for any dates, location, and occupancy. No booking capability.",
+				Parameters:  json.RawMessage(`{"checkin":"*","checkout":"*","occupancy":"*","region_id":"*","latitude":"*","longitude":"*","currency":"*","language":"*","sort_by":"*","star_rating":"*","limit":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_get_hotel",
+				ActionType:  "expedia.get_hotel",
+				Name:        "View hotel details",
+				Description: "Agent can view full details for any hotel property.",
+				Parameters:  json.RawMessage(`{"property_id":"*","checkin":"*","checkout":"*","occupancy":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_price_check",
+				ActionType:  "expedia.price_check",
+				Name:        "Check room pricing",
+				Description: "Agent can confirm pricing and availability for any room.",
+				Parameters:  json.RawMessage(`{"room_id":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_create_booking",
+				ActionType:  "expedia.create_booking",
+				Name:        "Book hotel rooms",
+				Description: "Agent can create hotel bookings. Requires human approval per booking.",
+				Parameters:  json.RawMessage(`{"room_id":"*","given_name":"*","family_name":"*","email":"*","phone":"*","payment_method_id":"*","special_request":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_cancel_booking",
+				ActionType:  "expedia.cancel_booking",
+				Name:        "Cancel bookings",
+				Description: "Agent can cancel hotel bookings. Requires human approval per cancellation.",
+				Parameters:  json.RawMessage(`{"itinerary_id":"*","room_id":"*"}`),
+			},
+			{
+				ID:          "tpl_expedia_get_booking",
+				ActionType:  "expedia.get_booking",
+				Name:        "View booking details",
+				Description: "Agent can retrieve booking details and status.",
+				Parameters:  json.RawMessage(`{"itinerary_id":"*","email":"*"}`),
+			},
+		},
+	}
+}
