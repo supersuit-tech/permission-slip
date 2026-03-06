@@ -112,6 +112,30 @@ func TestUpdateContact_EmptyProperties(t *testing.T) {
 	}
 }
 
+func TestUpdateContact_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateContactAction{conn: conn}
+
+	params, _ := json.Marshal(updateContactParams{
+		ContactID:  "../../admin",
+		Properties: map[string]string{"phone": "555-1234"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.update_contact",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric contact_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestUpdateContact_NotFound(t *testing.T) {
 	t.Parallel()
 

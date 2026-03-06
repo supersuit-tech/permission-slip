@@ -36,6 +36,14 @@ func (p *createDealParams) validate() error {
 	if p.DealStage == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: dealstage"}
 	}
+	if len(p.AssociatedContacts) > maxAssociations {
+		return &connectors.ValidationError{Message: fmt.Sprintf("associated_contacts exceeds maximum of %d", maxAssociations)}
+	}
+	for i, id := range p.AssociatedContacts {
+		if !isValidHubSpotID(id) {
+			return &connectors.ValidationError{Message: fmt.Sprintf("associated_contacts[%d]: must be a numeric HubSpot ID", i)}
+		}
+	}
 	return nil
 }
 

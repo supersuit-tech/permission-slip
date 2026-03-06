@@ -39,6 +39,9 @@ func (p *addNoteParams) validate() error {
 	if p.ObjectID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: object_id"}
 	}
+	if !isValidHubSpotID(p.ObjectID) {
+		return &connectors.ValidationError{Message: "object_id must be a numeric HubSpot ID"}
+	}
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}
 	}

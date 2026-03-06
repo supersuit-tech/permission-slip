@@ -326,6 +326,26 @@ func (c *HubSpotConnector) ValidateCredentials(_ context.Context, creds connecto
 	return nil
 }
 
+// maxAssociations limits the number of associations per request to prevent
+// excessive API calls against HubSpot's rate limit (100 req / 10s).
+const maxAssociations = 50
+
+// isValidHubSpotID checks that an ID string is safe to interpolate into a
+// URL path. HubSpot object IDs are always numeric strings. Rejecting
+// non-numeric values prevents path traversal (e.g., "../../admin/endpoint")
+// from redirecting requests to unintended API endpoints.
+func isValidHubSpotID(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // do is the shared request lifecycle for all HubSpot actions. It marshals
 // reqBody as JSON, sends the request with auth headers, checks the response
 // status, and unmarshals the response into respBody. Either reqBody or

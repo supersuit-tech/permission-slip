@@ -24,6 +24,9 @@ func (p *updateContactParams) validate() error {
 	if p.ContactID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: contact_id"}
 	}
+	if !isValidHubSpotID(p.ContactID) {
+		return &connectors.ValidationError{Message: "contact_id must be a numeric HubSpot ID"}
+	}
 	if len(p.Properties) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: properties"}
 	}

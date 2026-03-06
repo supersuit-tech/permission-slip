@@ -2,6 +2,7 @@ package hubspot
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -166,6 +167,63 @@ func TestCreateDeal_MissingPipeline(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing pipeline")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateDeal_InvalidContactID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createDealAction{conn: conn}
+
+	params, _ := json.Marshal(createDealParams{
+		DealName:           "Big Deal",
+		Pipeline:           "default",
+		DealStage:          "appointmentscheduled",
+		AssociatedContacts: []string{"501", "../../../admin"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.create_deal",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric contact ID")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateDeal_TooManyAssociations(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createDealAction{conn: conn}
+
+	contacts := make([]string, 51)
+	for i := range contacts {
+		contacts[i] = fmt.Sprintf("%d", 100+i)
+	}
+
+	params, _ := json.Marshal(createDealParams{
+		DealName:           "Big Deal",
+		Pipeline:           "default",
+		DealStage:          "appointmentscheduled",
+		AssociatedContacts: contacts,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.create_deal",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for too many associations")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

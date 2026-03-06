@@ -179,6 +179,31 @@ func TestAddNote_InvalidObjectType(t *testing.T) {
 	}
 }
 
+func TestAddNote_NonNumericObjectID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &addNoteAction{conn: conn}
+
+	params, _ := json.Marshal(addNoteParams{
+		ObjectType: "contact",
+		ObjectID:   "../../../admin",
+		Body:       "Note",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.add_note",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric object_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestAddNote_MissingBody(t *testing.T) {
 	t.Parallel()
 
