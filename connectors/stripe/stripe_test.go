@@ -625,6 +625,52 @@ func TestCheckResponse_IncludesErrorCode(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Response body size limit
+// ---------------------------------------------------------------------------
+
+func TestDo_LargeResponseTruncated(t *testing.T) {
+	t.Parallel()
+
+	// Return a response larger than maxResponseBytes. The connector should
+	// still succeed (it reads up to the limit) and parse what it can.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		// Write a valid JSON object followed by padding.
+		w.Write([]byte(`{"id":"ok"}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/v1/balance", nil, &resp, "")
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+	if resp["id"] != "ok" {
+		t.Errorf("id = %q, want ok", resp["id"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Error message truncation
+// ---------------------------------------------------------------------------
+
+func TestCheckResponse_LargeBodyTruncated(t *testing.T) {
+	t.Parallel()
+
+	// Simulate a non-JSON error response larger than maxErrorMessageBytes.
+	largeBody := strings.Repeat("x", 1024)
+	err := checkResponse(500, http.Header{}, []byte(largeBody))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	// The error message should not contain the full 1024-byte body.
+	if len(err.Error()) > 700 {
+		t.Errorf("error message too large (%d bytes), should be truncated", len(err.Error()))
+	}
+}
+
+// ---------------------------------------------------------------------------
 // deriveIdempotencyKey
 // ---------------------------------------------------------------------------
 

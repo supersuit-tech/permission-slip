@@ -39,6 +39,17 @@ const (
 	// without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 30 * time.Second
 
+	// maxResponseBytes limits how much of a Stripe API response we'll read
+	// into memory. 4 MB is generous for any Stripe response (list endpoints
+	// return at most 100 objects). Prevents memory exhaustion from a
+	// malicious or misconfigured upstream.
+	maxResponseBytes = 4 << 20 // 4 MB
+
+	// maxErrorMessageBytes caps the raw response body included in error
+	// messages when Stripe returns non-JSON errors. Prevents oversized
+	// log entries and potential data leakage.
+	maxErrorMessageBytes = 512
+
 	// apiVersion pins the Stripe API version. This prevents breaking changes
 	// when Stripe releases new API versions. Update this deliberately when
 	// you're ready to handle the new response shapes.
@@ -157,7 +168,7 @@ func (c *StripeConnector) do(ctx context.Context, creds connectors.Credentials, 
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
@@ -211,7 +222,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 
 	// Try to extract Stripe's structured error.
 	var se stripeError
-	msg := string(body)
+	msg := truncate(string(body), maxErrorMessageBytes)
 	if json.Unmarshal(body, &se) == nil && se.Error.Message != "" {
 		msg = se.Error.Message
 		// Include the error code when available (e.g., "card_declined",
@@ -312,6 +323,14 @@ func encodeParams(params map[string]string) string {
 		vals.Set(k, params[k])
 	}
 	return vals.Encode()
+}
+
+// truncate caps s at maxLen bytes, appending "..." if truncated.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // deriveIdempotencyKey produces a deterministic idempotency key from the
