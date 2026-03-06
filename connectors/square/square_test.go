@@ -144,6 +144,19 @@ func TestSquareConnector_Manifest(t *testing.T) {
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v", err)
 	}
+
+	// Verify each action's ParametersSchema is valid JSON. This catches
+	// broken fmt.Sprintf interpolation (e.g. moneySchema) that would
+	// only surface at runtime otherwise.
+	for _, a := range m.Actions {
+		if len(a.ParametersSchema) == 0 {
+			continue
+		}
+		var schema map[string]interface{}
+		if err := json.Unmarshal(a.ParametersSchema, &schema); err != nil {
+			t.Errorf("action %q has invalid ParametersSchema JSON: %v", a.ActionType, err)
+		}
+	}
 }
 
 func TestSquareConnector_ImplementsInterface(t *testing.T) {
@@ -429,8 +442,17 @@ func TestNewIdempotencyKey(t *testing.T) {
 	if key1 == key2 {
 		t.Errorf("newIdempotencyKey() returned duplicate keys: %q", key1)
 	}
-	// UUID v4 format: 8-4-4-4-12 hex digits
+	// UUID v4 format: 8-4-4-4-12 hex digits (xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx)
 	if len(key1) != 36 {
 		t.Errorf("newIdempotencyKey() length = %d, want 36", len(key1))
+	}
+	// Verify version nibble (position 14) is '4' per RFC 4122 §4.4.
+	if key1[14] != '4' {
+		t.Errorf("newIdempotencyKey() version nibble = %c, want '4'", key1[14])
+	}
+	// Verify variant bits (position 19) are one of '8', '9', 'a', 'b' per RFC 4122 §4.1.1.
+	variant := key1[19]
+	if variant != '8' && variant != '9' && variant != 'a' && variant != 'b' {
+		t.Errorf("newIdempotencyKey() variant nibble = %c, want one of '8','9','a','b'", variant)
 	}
 }

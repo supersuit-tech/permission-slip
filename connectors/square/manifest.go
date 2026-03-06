@@ -10,7 +10,7 @@ import (
 // moneySchema is the reusable JSON schema fragment for Square's Money object.
 // Square represents all monetary amounts in the smallest currency unit
 // (e.g., cents for USD). This is shared across create_order and create_payment.
-var moneySchema = fmt.Sprintf(`{
+var moneySchema = `{
 	"type": "object",
 	"required": ["amount", "currency"],
 	"additionalProperties": false,
@@ -21,10 +21,10 @@ var moneySchema = fmt.Sprintf(`{
 		},
 		"currency": {
 			"type": "string",
-			"description": "ISO 4217 currency code (e.g. %q, %q, %q)"
+			"description": "ISO 4217 currency code (e.g. USD, EUR, GBP)"
 		}
 	}
-}`, "USD", "EUR", "GBP")
+}`
 
 // Manifest returns the connector's metadata manifest. Action metadata is
 // declared here for DB seeding; the actual Action handlers are wired in
