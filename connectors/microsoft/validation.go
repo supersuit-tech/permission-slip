@@ -81,3 +81,21 @@ func escapePathSegments(path string) string {
 	}
 	return strings.Join(segments, "/")
 }
+
+// validateValuesGrid checks that a 2D values array has consistent column counts
+// across all rows. Inconsistent dimensions cause cryptic Graph API errors, so
+// catching them early provides a better developer experience.
+func validateValuesGrid(values [][]any) error {
+	if len(values) == 0 {
+		return nil
+	}
+	cols := len(values[0])
+	for i, row := range values[1:] {
+		if len(row) != cols {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("values row %d has %d columns, but row 0 has %d — all rows must have the same number of columns", i+1, len(row), cols),
+			}
+		}
+	}
+	return nil
+}
