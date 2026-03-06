@@ -93,6 +93,12 @@ const (
 	ExecStatusSkipped = "skipped"
 )
 
+// Payment audit event constants.
+const (
+	OutcomeCharged                = "charged"
+	SourceTypePaymentMethodTx     = "payment_method_transaction"
+)
+
 // InsertAuditEventParams holds the parameters for inserting an audit event.
 type InsertAuditEventParams struct {
 	UserID          string

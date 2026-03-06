@@ -445,9 +445,9 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 			UserID:      uid,
 			AgentID:     agentID,
 			EventType:   db.AuditEventPaymentMethodCharged,
-			Outcome:     "charged",
+			Outcome:     db.OutcomeCharged,
 			SourceID:    testhelper.GenerateID(t, "pmtx_"),
-			SourceType:  "payment_method_transaction",
+			SourceType:  db.SourceTypePaymentMethodTx,
 			AgentMeta:   []byte(`{"name":"travel-agent"}`),
 			Action:      actionJSON,
 			ConnectorID: &connectorID,
@@ -467,7 +467,7 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 		if e.EventType != db.AuditEventPaymentMethodCharged {
 			t.Errorf("expected payment_method.charged, got %s", e.EventType)
 		}
-		if e.Outcome != "charged" {
+		if e.Outcome != db.OutcomeCharged {
 			t.Errorf("expected outcome charged, got %q", e.Outcome)
 		}
 		if e.ConnectorID == nil || *e.ConnectorID != "expedia" {
@@ -488,9 +488,9 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 			UserID:      uid,
 			AgentID:     agentID,
 			EventType:   db.AuditEventPaymentMethodCharged,
-			Outcome:     "charged",
+			Outcome:     db.OutcomeCharged,
 			SourceID:    testhelper.GenerateID(t, "pmtx_"),
-			SourceType:  "payment_method_transaction",
+			SourceType:  db.SourceTypePaymentMethodTx,
 			AgentMeta:   []byte(`{"name":"test"}`),
 			Action:      actionJSON,
 			ConnectorID: &connectorID,
@@ -538,7 +538,7 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 		connectorID := "expedia"
 		// Insert a payment event and an approval event.
 		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID,
-			"payment_method.charged", "charged",
+			string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
 			testhelper.GenerateID(t, "pmtx_"), &connectorID)
 		testhelper.InsertAuditEvent(t, tx, uid, agentID,
 			"approval.approved", "approved",
@@ -567,13 +567,13 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 
 		connectorID := "expedia"
 		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID,
-			"payment_method.charged", "charged",
+			string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
 			testhelper.GenerateID(t, "pmtx_"), &connectorID)
 		testhelper.InsertAuditEvent(t, tx, uid, agentID,
 			"approval.approved", "approved",
 			testhelper.GenerateID(t, "appr_"))
 
-		filter := &db.AuditEventFilter{Outcome: "charged"}
+		filter := &db.AuditEventFilter{Outcome: db.OutcomeCharged}
 		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -581,7 +581,7 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 		if len(page.Events) != 1 {
 			t.Fatalf("expected 1 charged event, got %d", len(page.Events))
 		}
-		if page.Events[0].Outcome != "charged" {
+		if page.Events[0].Outcome != db.OutcomeCharged {
 			t.Errorf("expected outcome charged, got %q", page.Events[0].Outcome)
 		}
 	})
@@ -594,7 +594,7 @@ func TestPaymentMethodChargedAuditEvent(t *testing.T) {
 
 		connectorID := "expedia"
 		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID,
-			"payment_method.charged", "charged",
+			string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
 			testhelper.GenerateID(t, "pmtx_"), &connectorID)
 
 		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)

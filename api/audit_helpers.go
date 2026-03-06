@@ -140,6 +140,13 @@ type PaymentChargeParams struct {
 // Both the transaction and audit event are best-effort: errors are logged but
 // not propagated so they don't block the request path.
 func RecordPaymentMethodUsage(ctx context.Context, d db.DBTX, p PaymentChargeParams) {
+	// Sanitise inputs to prevent accidental logging of sensitive data.
+	last4 := sanitiseLast4(p.Last4)
+	if p.AmountCents < 0 {
+		log.Printf("audit: refusing to record negative amount_cents=%d for payment method %s", p.AmountCents, p.PaymentMethodID)
+		return
+	}
+
 	// Record the payment method transaction.
 	pmTx, err := db.CreatePaymentMethodTransaction(ctx, d, &db.PaymentMethodTransaction{
 		PaymentMethodID: p.PaymentMethodID,
@@ -154,23 +161,7 @@ func RecordPaymentMethodUsage(ctx context.Context, d db.DBTX, p PaymentChargePar
 		return
 	}
 
-	// Build the action JSON with safe metadata only.
-	currency := p.Currency
-	if currency == "" {
-		currency = "usd"
-	}
-	actionData := map[string]any{
-		"type":              p.ActionType,
-		"payment_method_id": p.PaymentMethodID,
-		"brand":             p.Brand,
-		"last4":             p.Last4,
-		"amount_cents":      p.AmountCents,
-		"currency":          currency,
-	}
-	if p.Description != "" {
-		actionData["description"] = p.Description
-	}
-	actionPayload, _ := json.Marshal(actionData)
+	actionPayload := buildPaymentActionJSON(p, last4)
 
 	connectorID := connectorIDFromActionType(p.ActionType)
 	if connectorID == nil && p.ConnectorID != "" {
@@ -186,13 +177,45 @@ func RecordPaymentMethodUsage(ctx context.Context, d db.DBTX, p PaymentChargePar
 		UserID:      p.UserID,
 		AgentID:     p.AgentID,
 		EventType:   db.AuditEventPaymentMethodCharged,
-		Outcome:     "charged",
+		Outcome:     db.OutcomeCharged,
 		SourceID:    sourceID,
-		SourceType:  "payment_method_transaction",
+		SourceType:  db.SourceTypePaymentMethodTx,
 		AgentMeta:   p.AgentMeta,
 		Action:      actionPayload,
 		ConnectorID: connectorID,
 	}, false) // not billable — the triggering action already counted
+}
+
+// sanitiseLast4 ensures the last4 value is at most 4 characters to prevent
+// accidental logging of full card numbers. If the input is longer than 4
+// characters, only the last 4 are retained.
+func sanitiseLast4(raw string) string {
+	if len(raw) > 4 {
+		return raw[len(raw)-4:]
+	}
+	return raw
+}
+
+// buildPaymentActionJSON constructs the action JSON for a payment_method.charged
+// audit event containing only safe metadata.
+func buildPaymentActionJSON(p PaymentChargeParams, last4 string) []byte {
+	currency := p.Currency
+	if currency == "" {
+		currency = "usd"
+	}
+	actionData := map[string]any{
+		"type":              p.ActionType,
+		"payment_method_id": p.PaymentMethodID,
+		"brand":             p.Brand,
+		"last4":             last4,
+		"amount_cents":      p.AmountCents,
+		"currency":          currency,
+	}
+	if p.Description != "" {
+		actionData["description"] = p.Description
+	}
+	payload, _ := json.Marshal(actionData)
+	return payload
 }
 
 // redactActionToType extracts only the "type" field from an action JSON blob,

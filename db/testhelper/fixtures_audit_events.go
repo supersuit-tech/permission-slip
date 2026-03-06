@@ -15,8 +15,8 @@ func SourceTypeForEvent(eventType string) string {
 		return "agent"
 	case eventType == "standing_approval.executed":
 		return "standing_approval"
-	case eventType == "payment_method.charged":
-		return "payment_method_transaction"
+	case eventType == string(db.AuditEventPaymentMethodCharged):
+		return db.SourceTypePaymentMethodTx
 	default:
 		return "approval"
 	}
@@ -92,6 +92,7 @@ func InsertPaymentChargedEvent(t *testing.T, d db.DBTX, userID string, agentID i
 	connectorID := &p.ConnectorID
 	mustExec(t, d,
 		`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, action, connector_id)
-		 VALUES ($1, $2, 'payment_method.charged', 'charged', $3, 'payment_method_transaction', '{"name":"test"}', $4, $5)`,
-		userID, agentID, sourceID, action, connectorID)
+		 VALUES ($1, $2, $3, $4, $5, $6, '{"name":"test"}', $7, $8)`,
+		userID, agentID, string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
+		sourceID, db.SourceTypePaymentMethodTx, action, connectorID)
 }

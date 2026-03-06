@@ -227,7 +227,7 @@ func TestRecordPaymentMethodUsage(t *testing.T) {
 		if e.EventType != db.AuditEventPaymentMethodCharged {
 			t.Errorf("expected payment_method.charged, got %s", e.EventType)
 		}
-		if e.Outcome != "charged" {
+		if e.Outcome != db.OutcomeCharged {
 			t.Errorf("expected outcome charged, got %q", e.Outcome)
 		}
 		if e.ConnectorID == nil || *e.ConnectorID != "expedia" {
@@ -383,6 +383,70 @@ func TestRecordPaymentMethodUsage(t *testing.T) {
 			t.Error("expected brand in action")
 		}
 	})
+}
+
+func TestSanitiseLast4(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"4242", "4242"},
+		{"42", "42"},
+		{"", ""},
+		{"4242424242424242", "4242"}, // full card number → only last 4
+		{"12345", "2345"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := sanitiseLast4(tt.input); got != tt.want {
+				t.Errorf("sanitiseLast4(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRecordPaymentMethodUsageRejectsNegativeAmount(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_neg_" + uid[:8],
+		Label:                 "Test Card",
+		Brand:                 "visa",
+		Last4:                 "9999",
+		ExpMonth:              12,
+		ExpYear:               2027,
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod: %v", err)
+	}
+
+	// Negative amount should be rejected — no transaction or audit event created.
+	RecordPaymentMethodUsage(ctx, tx, PaymentChargeParams{
+		UserID:          uid,
+		AgentID:         agentID,
+		AgentMeta:       []byte(`{"name":"test"}`),
+		PaymentMethodID: pm.ID,
+		Brand:           "visa",
+		Last4:           "9999",
+		ConnectorID:     "test",
+		ActionType:      "test.action",
+		AmountCents:     -100,
+		Currency:        "usd",
+	})
+
+	page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+	if err != nil {
+		t.Fatalf("ListAuditEvents: %v", err)
+	}
+	if len(page.Events) != 0 {
+		t.Errorf("expected 0 audit events for negative amount, got %d", len(page.Events))
+	}
 }
 
 func strPtr(s string) *string { return &s }
