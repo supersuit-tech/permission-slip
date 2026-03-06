@@ -26,3 +26,21 @@ func detectContentType(body string) string {
 	}
 	return "Text"
 }
+
+// validateFolderPath checks a OneDrive folder path for path traversal sequences.
+func validateFolderPath(folderPath string) error {
+	if strings.Contains(folderPath, "..") {
+		return &connectors.ValidationError{
+			Message: "invalid folder_path: must not contain '..' traversal sequences (e.g. use 'Documents/Presentations' instead)",
+		}
+	}
+	return nil
+}
+
+// normalizeFolderPath strips leading/trailing slashes from a folder path
+// for consistent use in OneDrive API paths.
+func normalizeFolderPath(folderPath string) string {
+	folderPath = strings.TrimPrefix(folderPath, "/")
+	folderPath = strings.TrimSuffix(folderPath, "/")
+	return folderPath
+}

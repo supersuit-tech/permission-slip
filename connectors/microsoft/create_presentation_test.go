@@ -70,6 +70,9 @@ func TestCreatePresentation_Success(t *testing.T) {
 	if data["web_url"] != "https://onedrive.live.com/edit.aspx?id=item-abc-123" {
 		t.Errorf("expected web_url, got %q", data["web_url"])
 	}
+	if data["folder_path"] != "/" {
+		t.Errorf("expected folder_path '/', got %q", data["folder_path"])
+	}
 }
 
 func TestCreatePresentation_WithFolderPath(t *testing.T) {

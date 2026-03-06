@@ -33,12 +33,15 @@ const minimalPPTXBase64 = "" +
 	"ZXNlbnRhdGlvbi54bWxQSwECFAMUAAAACABCiGZcjA6F0H0AAACdAAAAHwAAAAAAAAAAAAAAgAEM" +
 	"AwAAcHB0L19yZWxzL3ByZXNlbnRhdGlvbi54bWwucmVsc1BLBQYAAAAABAAEAAkBAADGAwAAAAA="
 
-// minimalPPTXBytes returns the decoded minimal .pptx file content.
-// It panics if the embedded base64 is invalid (which would be a build-time bug).
-func minimalPPTXBytes() []byte {
-	b, err := base64.StdEncoding.DecodeString(minimalPPTXBase64)
+// minimalPPTX holds the decoded PPTX template bytes, computed once at init.
+// Decoding at init means any base64 corruption is caught immediately at startup
+// rather than on the first user request.
+var minimalPPTX []byte //nolint:gochecknoglobals // decoded once, read-only after init
+
+func init() {
+	var err error
+	minimalPPTX, err = base64.StdEncoding.DecodeString(minimalPPTXBase64)
 	if err != nil {
 		panic("microsoft: invalid embedded PPTX template: " + err.Error())
 	}
-	return b
 }

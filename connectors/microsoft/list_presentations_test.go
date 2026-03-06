@@ -24,16 +24,18 @@ func TestListPresentations_Success(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"value": []map[string]any{
 				{
-					"id":                    "item-1",
-					"name":                  "Q4 Review.pptx",
-					"webUrl":                "https://onedrive.live.com/edit.aspx?id=item-1",
-					"lastModifiedDateTime":  "2024-03-15T14:30:00Z",
+					"id":                   "item-1",
+					"name":                 "Q4 Review.pptx",
+					"webUrl":               "https://onedrive.live.com/edit.aspx?id=item-1",
+					"size":                 1048576,
+					"lastModifiedDateTime": "2024-03-15T14:30:00Z",
 				},
 				{
-					"id":                    "item-2",
-					"name":                  "Strategy.pptx",
-					"webUrl":                "https://onedrive.live.com/edit.aspx?id=item-2",
-					"lastModifiedDateTime":  "2024-03-10T09:00:00Z",
+					"id":                   "item-2",
+					"name":                 "Strategy.pptx",
+					"webUrl":               "https://onedrive.live.com/edit.aspx?id=item-2",
+					"size":                 524288,
+					"lastModifiedDateTime": "2024-03-10T09:00:00Z",
 				},
 			},
 		})
@@ -66,6 +68,9 @@ func TestListPresentations_Success(t *testing.T) {
 	}
 	if summaries[0].Name != "Q4 Review.pptx" {
 		t.Errorf("expected name 'Q4 Review.pptx', got %q", summaries[0].Name)
+	}
+	if summaries[0].Size != 1048576 {
+		t.Errorf("expected size 1048576, got %d", summaries[0].Size)
 	}
 }
 

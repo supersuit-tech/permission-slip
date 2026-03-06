@@ -32,10 +32,7 @@ func (p *listPresentationsParams) defaults() {
 }
 
 func (p *listPresentationsParams) validate() error {
-	if strings.Contains(p.FolderPath, "..") {
-		return &connectors.ValidationError{Message: "invalid folder_path: must not contain traversal sequences"}
-	}
-	return nil
+	return validateFolderPath(p.FolderPath)
 }
 
 // graphDriveSearchResponse is the Microsoft Graph API response for drive searches.
@@ -48,6 +45,7 @@ type presentationSummary struct {
 	ItemID       string `json:"item_id"`
 	Name         string `json:"name"`
 	WebURL       string `json:"web_url"`
+	Size         int64  `json:"size"`
 	LastModified string `json:"last_modified"`
 }
 
@@ -64,11 +62,10 @@ func (a *listPresentationsAction) Execute(ctx context.Context, req connectors.Ac
 
 	var path string
 	if params.FolderPath == "" || params.FolderPath == "/" {
-		path = fmt.Sprintf("/me/drive/root/search(q='.pptx')?$top=%d&$select=id,name,webUrl,lastModifiedDateTime", params.Top)
+		path = fmt.Sprintf("/me/drive/root/search(q='.pptx')?$top=%d&$select=id,name,webUrl,size,lastModifiedDateTime", params.Top)
 	} else {
-		folder := strings.TrimPrefix(params.FolderPath, "/")
-		folder = strings.TrimSuffix(folder, "/")
-		path = fmt.Sprintf("/me/drive/root:/%s:/search(q='.pptx')?$top=%d&$select=id,name,webUrl,lastModifiedDateTime", folder, params.Top)
+		folder := normalizeFolderPath(params.FolderPath)
+		path = fmt.Sprintf("/me/drive/root:/%s:/search(q='.pptx')?$top=%d&$select=id,name,webUrl,size,lastModifiedDateTime", folder, params.Top)
 	}
 
 	var resp graphDriveSearchResponse
@@ -86,6 +83,7 @@ func (a *listPresentationsAction) Execute(ctx context.Context, req connectors.Ac
 			ItemID:       item.ID,
 			Name:         item.Name,
 			WebURL:       item.WebURL,
+			Size:         item.Size,
 			LastModified: item.LastModified,
 		})
 	}

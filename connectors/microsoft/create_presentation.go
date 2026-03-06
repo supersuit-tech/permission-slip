@@ -23,17 +23,13 @@ type createPresentationParams struct {
 
 func (p *createPresentationParams) validate() error {
 	if p.Filename == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: filename"}
+		return &connectors.ValidationError{Message: "missing required parameter: filename (e.g. 'Quarterly Report')"}
 	}
 	// Reject path traversal or directory separators in filename.
 	if strings.Contains(p.Filename, "/") || strings.Contains(p.Filename, "\\") || strings.Contains(p.Filename, "..") {
-		return &connectors.ValidationError{Message: "invalid filename: must not contain path separators or traversal sequences"}
+		return &connectors.ValidationError{Message: "invalid filename: must be a simple name without path separators (e.g. 'My Deck' not 'folder/My Deck')"}
 	}
-	// Reject path traversal in folder_path.
-	if strings.Contains(p.FolderPath, "..") {
-		return &connectors.ValidationError{Message: "invalid folder_path: must not contain traversal sequences"}
-	}
-	return nil
+	return validateFolderPath(p.FolderPath)
 }
 
 // graphDriveItemResponse is the Microsoft Graph API response for a DriveItem.
@@ -70,22 +66,24 @@ func (a *createPresentationAction) Execute(ctx context.Context, req connectors.A
 
 	// Build the upload path.
 	var path string
+	folderDisplay := "/"
 	if params.FolderPath == "" || params.FolderPath == "/" {
 		path = fmt.Sprintf("/me/drive/root:/%s:/content", filename)
 	} else {
-		folder := strings.TrimPrefix(params.FolderPath, "/")
-		folder = strings.TrimSuffix(folder, "/")
+		folder := normalizeFolderPath(params.FolderPath)
+		folderDisplay = "/" + folder
 		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", folder, filename)
 	}
 
 	var resp graphDriveItemResponse
-	if err := a.conn.doPutFileRequest(ctx, path, req.Credentials, minimalPPTXBytes(), &resp); err != nil {
+	if err := a.conn.doPutFileRequest(ctx, path, req.Credentials, minimalPPTX, &resp); err != nil {
 		return nil, err
 	}
 
 	return connectors.JSONResult(map[string]string{
-		"item_id": resp.ID,
-		"name":    resp.Name,
-		"web_url": resp.WebURL,
+		"item_id":     resp.ID,
+		"name":        resp.Name,
+		"web_url":     resp.WebURL,
+		"folder_path": folderDisplay,
 	})
 }
