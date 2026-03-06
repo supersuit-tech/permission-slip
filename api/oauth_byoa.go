@@ -9,6 +9,14 @@
 // BYOA credentials are merged into the existing provider config (preserving
 // endpoints and scopes from built-in or manifest sources).
 //
+// Multi-tenancy note: BYOA credentials are stored per-user in the database,
+// but the in-memory provider registry is global (shared across all users).
+// When a user registers BYOA credentials, those credentials become the active
+// provider config for ALL users' OAuth flows on this server instance. This is
+// acceptable for single-tenant and self-hosted deployments. Multi-tenant
+// deployments should use platform-level built-in credentials (env vars) instead,
+// reserving BYOA for admin-level provider configuration.
+//
 // Client ID and secret are encrypted in Supabase Vault — never stored in plaintext.
 package api
 
@@ -21,6 +29,11 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 )
+
+// oauthClientCredentialMaxLen is the maximum length for OAuth client ID and
+// client secret values. OAuth providers typically use credentials well under
+// this limit. The cap prevents storage abuse via the vault.
+const oauthClientCredentialMaxLen = 2048
 
 // --- Request/Response types ---
 
@@ -62,6 +75,22 @@ func RegisterOAuthBYOARoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("DELETE /v1/oauth/provider-configs/{provider}", requireProfile(handleDeleteOAuthProviderConfig(deps)))
 }
 
+// --- Helpers ---
+
+// validateClientCredentialLengths checks that client_id and client_secret do
+// not exceed the maximum allowed length. Returns true if valid.
+func validateClientCredentialLengths(w http.ResponseWriter, r *http.Request, clientID, clientSecret string) bool {
+	if len(clientID) > oauthClientCredentialMaxLen {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "client_id exceeds maximum length"))
+		return false
+	}
+	if len(clientSecret) > oauthClientCredentialMaxLen {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "client_secret exceeds maximum length"))
+		return false
+	}
+	return true
+}
+
 // --- Handlers ---
 
 // handleCreateOAuthProviderConfig stores user-provided OAuth client credentials
@@ -79,6 +108,9 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if !ValidateRequest(w, r, &req) {
+			return
+		}
+		if !validateClientCredentialLengths(w, r, req.ClientID, req.ClientSecret) {
 			return
 		}
 
@@ -202,6 +234,9 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if !ValidateRequest(w, r, &req) {
+			return
+		}
+		if !validateClientCredentialLengths(w, r, req.ClientID, req.ClientSecret) {
 			return
 		}
 
