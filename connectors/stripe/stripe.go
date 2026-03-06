@@ -254,12 +254,23 @@ func encodeParams(params map[string]string) string {
 	return vals.Encode()
 }
 
-// truncate caps s at maxLen bytes, appending "..." if truncated.
+// truncate caps s at approximately maxLen bytes, appending "..." if
+// truncated. It avoids splitting multi-byte UTF-8 characters by
+// counting runes instead of raw bytes.
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	// Walk runes to find the last complete rune boundary within maxLen bytes.
+	byteCount := 0
+	for _, r := range s {
+		runeLen := len(string(r))
+		if byteCount+runeLen > maxLen {
+			break
+		}
+		byteCount += runeLen
+	}
+	return s[:byteCount] + "..."
 }
 
 // deriveIdempotencyKey produces a deterministic idempotency key from the

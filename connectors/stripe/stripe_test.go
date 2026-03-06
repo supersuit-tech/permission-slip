@@ -650,6 +650,30 @@ func TestDo_ResponseLimitReaderDoesNotBreakNormalResponses(t *testing.T) {
 	}
 }
 
+func TestDo_LargeResponseCappedByLimitReader(t *testing.T) {
+	t.Parallel()
+
+	// Return a response body larger than maxResponseBytes (4 MB).
+	// The LimitReader should cap the read, and since the truncated body
+	// won't be valid JSON, we expect an ExternalError from unmarshal.
+	oversized := strings.Repeat("x", maxResponseBytes+1024)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(oversized))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	err := conn.do(t.Context(), validCreds(), http.MethodGet, "/v1/test", nil, &resp, "")
+	if err == nil {
+		t.Fatal("expected error from oversized response unmarshal, got nil")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Error message truncation
 // ---------------------------------------------------------------------------
@@ -666,6 +690,22 @@ func TestCheckResponse_LargeBodyTruncated(t *testing.T) {
 	// The error message should not contain the full 1024-byte body.
 	if len(err.Error()) > 700 {
 		t.Errorf("error message too large (%d bytes), should be truncated", len(err.Error()))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// truncate (UTF-8 safety)
+// ---------------------------------------------------------------------------
+
+func TestTruncate_UTF8Safe(t *testing.T) {
+	t.Parallel()
+
+	// Each '日' is 3 bytes. With maxLen=5, naively slicing would cut the
+	// second character in half, producing invalid UTF-8.
+	result := truncate("日本語テスト", 5)
+	// Should only include '日' (3 bytes) since '日本' (6 bytes) exceeds 5.
+	if result != "日..." {
+		t.Errorf("truncate = %q, want %q", result, "日...")
 	}
 }
 
@@ -703,6 +743,9 @@ func TestDeriveIdempotencyKey_DifferentInputs(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Connector interface compliance
 // ---------------------------------------------------------------------------
+
+// Compile-time interface checks (matches GitHub/Slack connector pattern).
+var _ connectors.Connector = (*StripeConnector)(nil)
 
 func TestID(t *testing.T) {
 	t.Parallel()
