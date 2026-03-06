@@ -1,0 +1,121 @@
+package google
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+// listDriveFilesAction implements connectors.Action for google.list_drive_files.
+// It lists files via the Google Drive API GET /drive/v3/files.
+type listDriveFilesAction struct {
+	conn *GoogleConnector
+}
+
+// listDriveFilesParams is the user-facing parameter schema.
+type listDriveFilesParams struct {
+	Query      string `json:"query"`
+	MaxResults int    `json:"max_results"`
+	FolderID   string `json:"folder_id"`
+}
+
+func (p *listDriveFilesParams) validate() error {
+	if p.FolderID != "" && containsPathSeparator(p.FolderID) {
+		return &connectors.ValidationError{Message: "folder_id contains invalid characters"}
+	}
+	return nil
+}
+
+func (p *listDriveFilesParams) normalize() {
+	if p.MaxResults <= 0 {
+		p.MaxResults = 10
+	}
+	if p.MaxResults > 100 {
+		p.MaxResults = 100
+	}
+}
+
+// containsPathSeparator returns true if s contains path separators or
+// other characters that should not appear in a Google Drive file ID.
+func containsPathSeparator(s string) bool {
+	return strings.ContainsAny(s, "/\\")
+}
+
+// driveListResponse is the Google Drive API response from files.list.
+type driveListResponse struct {
+	Files []driveFileEntry `json:"files"`
+}
+
+// driveFileEntry is a single file entry from the Google Drive API (camelCase fields).
+type driveFileEntry struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	MimeType     string `json:"mimeType"`
+	ModifiedTime string `json:"modifiedTime"`
+	Size         string `json:"size"`
+}
+
+// driveFileSummary is the shape returned to the agent for file listings (snake_case).
+type driveFileSummary struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	MimeType     string `json:"mime_type"`
+	ModifiedTime string `json:"modified_time,omitempty"`
+	Size         string `json:"size,omitempty"`
+}
+
+// Execute lists files from Google Drive and returns their metadata.
+func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params listDriveFilesParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := params.validate(); err != nil {
+		return nil, err
+	}
+	params.normalize()
+
+	q := url.Values{}
+	q.Set("pageSize", strconv.Itoa(params.MaxResults))
+	q.Set("fields", "files(id,name,mimeType,modifiedTime,size)")
+
+	// Build the search query.
+	var queryParts []string
+	if params.Query != "" {
+		queryParts = append(queryParts, params.Query)
+	}
+	if params.FolderID != "" {
+		queryParts = append(queryParts, fmt.Sprintf("'%s' in parents", params.FolderID))
+	}
+	// Exclude trashed files by default.
+	queryParts = append(queryParts, "trashed = false")
+	q.Set("q", strings.Join(queryParts, " and "))
+
+	var listResp driveListResponse
+	listURL := a.conn.driveBaseURL + "/drive/v3/files?" + q.Encode()
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, listURL, nil, &listResp); err != nil {
+		return nil, err
+	}
+
+	summaries := make([]driveFileSummary, len(listResp.Files))
+	for i, f := range listResp.Files {
+		summaries[i] = driveFileSummary{
+			ID:           f.ID,
+			Name:         f.Name,
+			MimeType:     f.MimeType,
+			ModifiedTime: f.ModifiedTime,
+			Size:         f.Size,
+		}
+	}
+
+	return connectors.JSONResult(map[string]any{
+		"files": summaries,
+		"count": len(summaries),
+	})
+}

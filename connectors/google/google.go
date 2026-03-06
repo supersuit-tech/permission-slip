@@ -19,6 +19,7 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultDriveBaseURL    = "https://www.googleapis.com"
 	defaultTimeout         = 30 * time.Second
 	credKeyAccessToken     = "access_token"
 
@@ -38,6 +39,7 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	driveBaseURL    string
 }
 
 // New creates a GoogleConnector with sensible defaults.
@@ -46,6 +48,7 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		driveBaseURL:    defaultDriveBaseURL,
 	}
 }
 
@@ -55,6 +58,15 @@ func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL string) *Goog
 		client:          client,
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
+		driveBaseURL:    gmailBaseURL, // reuse the test server URL
+	}
+}
+
+// newDriveForTest creates a GoogleConnector with only driveBaseURL set, for Drive action tests.
+func newDriveForTest(client *http.Client, driveBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		driveBaseURL: driveBaseURL,
 	}
 }
 
@@ -67,7 +79,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail and Calendar",
+		Description: "Google integration for Gmail, Calendar, and Drive",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -184,6 +196,98 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.list_drive_files",
+				Name:        "List Drive Files",
+				Description: "List or search files in Google Drive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Google Drive search query (e.g. \"name contains 'report'\")"
+						},
+						"max_results": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Maximum number of files to return (1-100, default 10)"
+						},
+						"folder_id": {
+							"type": "string",
+							"description": "Folder ID to list files from (defaults to all accessible files)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.get_drive_file",
+				Name:        "Get Drive File",
+				Description: "Get file metadata and optionally download content from Google Drive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_id"],
+					"properties": {
+						"file_id": {
+							"type": "string",
+							"description": "The ID of the file to retrieve"
+						},
+						"include_content": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether to include file content (exports Google Docs/Sheets/Slides as plain text)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.upload_drive_file",
+				Name:        "Upload Drive File",
+				Description: "Create and upload a text file to Google Drive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name", "content"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "File name"
+						},
+						"content": {
+							"type": "string",
+							"description": "File content (text)"
+						},
+						"mime_type": {
+							"type": "string",
+							"default": "text/plain",
+							"description": "MIME type of the file (default: text/plain)"
+						},
+						"folder_id": {
+							"type": "string",
+							"description": "Parent folder ID (optional)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.delete_drive_file",
+				Name:        "Delete Drive File",
+				Description: "Move a file to trash in Google Drive (soft delete)",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_id"],
+					"properties": {
+						"file_id": {
+							"type": "string",
+							"description": "The ID of the file to move to trash"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -194,6 +298,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/drive",
 				},
 			},
 		},
@@ -247,6 +352,48 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can list upcoming events from any calendar.",
 				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
 			},
+			{
+				ID:          "tpl_google_list_drive_files",
+				ActionType:  "google.list_drive_files",
+				Name:        "Browse Drive files",
+				Description: "Agent can list and search files in Google Drive.",
+				Parameters:  json.RawMessage(`{"query":"*","max_results":"*","folder_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_drive_file",
+				ActionType:  "google.get_drive_file",
+				Name:        "Read Drive files",
+				Description: "Agent can read file metadata and content from Google Drive.",
+				Parameters:  json.RawMessage(`{"file_id":"*","include_content":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_drive_file_metadata",
+				ActionType:  "google.get_drive_file",
+				Name:        "View Drive file metadata",
+				Description: "Agent can view file metadata only (no content download).",
+				Parameters:  json.RawMessage(`{"file_id":"*","include_content":"false"}`),
+			},
+			{
+				ID:          "tpl_google_upload_drive_file",
+				ActionType:  "google.upload_drive_file",
+				Name:        "Upload files to Drive",
+				Description: "Agent can upload text files to Google Drive.",
+				Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_upload_drive_file_to_folder",
+				ActionType:  "google.upload_drive_file",
+				Name:        "Upload files to specific folder",
+				Description: "Agent can upload text files to a specific locked folder in Google Drive.",
+				Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"folder-id-here"}`),
+			},
+			{
+				ID:          "tpl_google_delete_drive_file",
+				ActionType:  "google.delete_drive_file",
+				Name:        "Trash Drive files",
+				Description: "Agent can move files to trash in Google Drive.",
+				Parameters:  json.RawMessage(`{"file_id":"*"}`),
+			},
 		},
 	}
 }
@@ -258,6 +405,10 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.list_drive_files":      &listDriveFilesAction{conn: c},
+		"google.get_drive_file":        &getDriveFileAction{conn: c},
+		"google.upload_drive_file":     &uploadDriveFileAction{conn: c},
+		"google.delete_drive_file":     &deleteDriveFileAction{conn: c},
 	}
 }
 
