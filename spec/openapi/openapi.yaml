@@ -292,6 +292,12 @@ paths:
   /v1/oauth/connections/{provider}:
     $ref: './components/paths/oauth.yaml#/oauthDisconnect'
 
+  /v1/oauth/provider-configs:
+    $ref: './components/paths/oauth.yaml#/oauthProviderConfigs'
+
+  /v1/oauth/provider-configs/{provider}:
+    $ref: './components/paths/oauth.yaml#/oauthProviderConfigByProvider'
+
   /v1/payment-methods:
     $ref: './components/paths/payment_methods.yaml#/paymentMethods'
 
@@ -577,6 +583,16 @@ components:
       $ref: './components/schemas/oauth.yaml#/OAuthConnectionListResponse'
     OAuthDisconnectResponse:
       $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
+    CreateOAuthProviderConfigRequest:
+      $ref: './components/schemas/oauth.yaml#/CreateOAuthProviderConfigRequest'
+    UpdateOAuthProviderConfigRequest:
+      $ref: './components/schemas/oauth.yaml#/UpdateOAuthProviderConfigRequest'
+    OAuthProviderConfig:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfig'
+    OAuthProviderConfigListResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfigListResponse'
+    OAuthProviderConfigDeleteResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfigDeleteResponse'
 
     # Payment Methods
     PaymentMethod:

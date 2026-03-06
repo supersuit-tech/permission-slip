@@ -90,10 +90,11 @@ type TokenSet struct {
 	Scopes []string
 }
 
-// tokenExpiryBuffer is the time before actual expiry at which a token is
+// TokenExpiryBuffer is the time before actual expiry at which a token is
 // considered expired. This allows pre-emptive refresh so actions don't fail
-// mid-execution due to an expired token.
-const tokenExpiryBuffer = 5 * time.Minute
+// mid-execution due to an expired token. Used by both the background refresh
+// job and synchronous execution-time refresh.
+const TokenExpiryBuffer = 5 * time.Minute
 
 // IsExpired reports whether the access token has expired or is within the
 // pre-emptive refresh buffer (5 minutes before actual expiry).
@@ -101,7 +102,7 @@ func (ts TokenSet) IsExpired() bool {
 	if ts.Expiry.IsZero() {
 		return false
 	}
-	return time.Now().After(ts.Expiry.Add(-tokenExpiryBuffer))
+	return time.Now().After(ts.Expiry.Add(-TokenExpiryBuffer))
 }
 
 // HasClientCredentials reports whether the provider has both a client ID and

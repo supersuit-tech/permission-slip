@@ -78,6 +78,7 @@ func NewRouter(deps *Deps) http.Handler {
 	RegisterStandingApprovalRoutes(mux, deps)
 	RegisterApprovalEventRoutes(mux, deps)
 	RegisterOAuthRoutes(mux, deps)
+	RegisterOAuthBYOARoutes(mux, deps)
 
 	RegisterPaymentMethodRoutes(mux, deps)
 

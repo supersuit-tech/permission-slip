@@ -229,6 +229,37 @@ func DeleteOAuthConnection(ctx context.Context, db DBTX, userID, provider string
 	return &result, nil
 }
 
+// ListExpiringOAuthConnections returns all active OAuth connections whose
+// token_expiry is within the given horizon from now. Used by the background
+// refresh job to proactively refresh tokens before they expire.
+// Only returns connections that have a refresh token (refresh_token_vault_id IS NOT NULL).
+func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Duration) ([]OAuthConnection, error) {
+	rows, err := db.Query(ctx, `
+		SELECT `+oauthConnectionColumns+`
+		FROM oauth_connections
+		WHERE status = $1
+		  AND refresh_token_vault_id IS NOT NULL
+		  AND token_expiry IS NOT NULL
+		  AND token_expiry <= now() + $2::interval
+		ORDER BY token_expiry ASC`,
+		OAuthStatusActive, fmt.Sprintf("%d seconds", int(horizon.Seconds())),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conns []OAuthConnection
+	for rows.Next() {
+		c, err := scanOAuthConnection(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		conns = append(conns, c)
+	}
+	return conns, rows.Err()
+}
+
 // GetRequiredCredentialByActionType returns the required credential for the connector
 // that owns the given action type. Used to determine auth_type at execution time.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
