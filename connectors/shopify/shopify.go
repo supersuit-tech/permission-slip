@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -171,6 +172,9 @@ func (c *ShopifyConnector) do(ctx context.Context, creds connectors.Credentials,
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Shopify API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Shopify API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Shopify API request failed: %v", err)}
 	}

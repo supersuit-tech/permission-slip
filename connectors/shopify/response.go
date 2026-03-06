@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -61,9 +62,16 @@ func extractErrorMessage(body []byte) string {
 		// Try as object of arrays: {"errors": {"title": ["can't be blank"]}}
 		var fields map[string][]string
 		if json.Unmarshal(errorsEnvelope.Errors, &fields) == nil && len(fields) > 0 {
+			// Sort field names for deterministic error messages.
+			sortedFields := make([]string, 0, len(fields))
+			for field := range fields {
+				sortedFields = append(sortedFields, field)
+			}
+			sort.Strings(sortedFields)
+
 			var parts []string
-			for field, msgs := range fields {
-				for _, m := range msgs {
+			for _, field := range sortedFields {
+				for _, m := range fields[field] {
 					parts = append(parts, fmt.Sprintf("%s %s", field, m))
 				}
 			}
