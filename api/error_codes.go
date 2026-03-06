@@ -63,6 +63,9 @@ const (
 	ErrOAuthRefreshFailed          ErrorCode = "oauth_refresh_failed"
 	ErrOAuthProviderConfigExists   ErrorCode = "oauth_provider_config_exists"
 	ErrOAuthProviderConfigNotFound ErrorCode = "oauth_provider_config_not_found"
+	// Payment Methods
+	ErrPaymentMethodNotFound ErrorCode = "payment_method_not_found"
+
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )
