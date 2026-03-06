@@ -29,10 +29,7 @@ func (p *excelWriteRangeParams) validate() error {
 	if err := validateItemID(p.ItemID); err != nil {
 		return err
 	}
-	if p.SheetName == "" {
-		return &connectors.ValidationError{Message: "sheet_name is required"}
-	}
-	if err := validatePathSegment("sheet_name", p.SheetName); err != nil {
+	if err := validateGraphID("sheet_name", p.SheetName); err != nil {
 		return err
 	}
 	if p.Range == "" {

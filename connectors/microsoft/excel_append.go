@@ -28,10 +28,7 @@ func (p *excelAppendRowsParams) validate() error {
 	if err := validateItemID(p.ItemID); err != nil {
 		return err
 	}
-	if p.TableName == "" {
-		return &connectors.ValidationError{Message: "table_name is required"}
-	}
-	if err := validatePathSegment("table_name", p.TableName); err != nil {
+	if err := validateGraphID("table_name", p.TableName); err != nil {
 		return err
 	}
 	if len(p.Values) == 0 {

@@ -3,8 +3,6 @@ package microsoft
 import (
 	"fmt"
 	"net/url"
-
-	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 // excelWorkbookPath returns the Graph API path prefix for a workbook,
@@ -30,11 +28,8 @@ func newRangeResult(resp graphRangeResponse) rangeResult {
 	}
 }
 
-// validateItemID validates and sanitizes an item_id parameter. This
-// centralizes the common validation pattern used by all Excel actions.
+// validateItemID validates an item_id parameter using the shared validateGraphID
+// check. This centralizes the common validation pattern used by all Excel actions.
 func validateItemID(itemID string) error {
-	if itemID == "" {
-		return &connectors.ValidationError{Message: "item_id is required"}
-	}
-	return validatePathSegment("item_id", itemID)
+	return validateGraphID("item_id", itemID)
 }
