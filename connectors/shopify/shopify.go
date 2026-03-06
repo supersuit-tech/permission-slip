@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,7 +28,15 @@ const (
 	// defaultRetryAfter is used when the Shopify API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 2 * time.Second
+
+	// maxResponseBodySize limits how much data we read from Shopify responses
+	// to prevent memory exhaustion from unexpectedly large payloads.
+	maxResponseBodySize = 10 * 1024 * 1024 // 10 MB
 )
+
+// validSubdomain matches valid Shopify store subdomains: lowercase alphanumeric
+// and hyphens, not starting or ending with a hyphen.
+var validSubdomain = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // ShopifyConnector owns the shared HTTP client used by all Shopify actions.
 // Unlike GitHub/Slack, the base URL is dynamic — it's derived from the
@@ -79,6 +88,14 @@ func shopBaseURL(creds connectors.Credentials) (string, error) {
 
 	if shop == "" {
 		return "", &connectors.ValidationError{Message: "shop_domain resolved to an empty subdomain"}
+	}
+
+	// Validate the subdomain contains only safe hostname characters to prevent
+	// URL injection or SSRF via crafted shop_domain values.
+	if !validSubdomain.MatchString(strings.ToLower(shop)) {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("shop_domain contains invalid characters: %q (expected lowercase alphanumeric and hyphens)", shop),
+		}
 	}
 
 	return fmt.Sprintf("https://%s.myshopify.com/admin/api/%s", shop, apiVersion), nil
@@ -180,7 +197,7 @@ func (c *ShopifyConnector) do(ctx context.Context, creds connectors.Credentials,
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

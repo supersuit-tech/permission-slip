@@ -392,6 +392,11 @@ func TestShopBaseURL(t *testing.T) {
 			want:   "https://mystore.myshopify.com/admin/api/2024-10",
 		},
 		{
+			name:   "subdomain with hyphen",
+			domain: "my-store",
+			want:   "https://my-store.myshopify.com/admin/api/2024-10",
+		},
+		{
 			name:    "custom domain rejected",
 			domain:  "shop.example.com",
 			wantErr: true,
@@ -399,6 +404,21 @@ func TestShopBaseURL(t *testing.T) {
 		{
 			name:    "empty domain",
 			domain:  "",
+			wantErr: true,
+		},
+		{
+			name:    "subdomain with path traversal",
+			domain:  "evil/../../../etc/passwd",
+			wantErr: true,
+		},
+		{
+			name:    "subdomain with newline",
+			domain:  "evil\nHost: attacker.com",
+			wantErr: true,
+		},
+		{
+			name:    "subdomain with special chars",
+			domain:  "store@evil",
 			wantErr: true,
 		},
 	}
