@@ -110,6 +110,42 @@ func TestCreateDocument_WithFolderPath(t *testing.T) {
 	}
 }
 
+func TestCreateDocument_FilenameWithSpecialChars(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The filename is percent-encoded at the wire level; Go's URL parser
+		// decodes it in r.URL.Path. Seeing the decoded form here confirms
+		// the correct endpoint was reached.
+		if r.URL.Path != "/me/drive/root:/Q&A Notes.docx:/content" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":              "item-789",
+			"name":            "Q&A Notes.docx",
+			"webUrl":          "https://onedrive.live.com/qanda.docx",
+			"createdDateTime": "2024-01-15T09:00:00Z",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(createDocumentParams{Filename: "Q&A Notes.docx"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestCreateDocument_MissingFilename(t *testing.T) {
 	t.Parallel()
 

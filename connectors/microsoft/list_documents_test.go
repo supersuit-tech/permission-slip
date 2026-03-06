@@ -104,6 +104,37 @@ func TestListDocuments_WithFolderPath(t *testing.T) {
 	}
 }
 
+func TestListDocuments_FolderPathWithSpaces(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The folder name is percent-encoded at the wire level; Go's URL
+		// parser decodes it in r.URL.Path. Seeing the decoded form here
+		// confirms the correct endpoint was reached.
+		if r.URL.Path != "/me/drive/root:/My Documents:/children" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"value": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listDocumentsAction{conn: conn}
+
+	params, _ := json.Marshal(listDocumentsParams{FolderPath: "My Documents"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.list_documents",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestListDocuments_DefaultParams(t *testing.T) {
 	t.Parallel()
 
