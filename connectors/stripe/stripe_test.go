@@ -746,6 +746,58 @@ func TestDeriveIdempotencyKey_DifferentInputs(t *testing.T) {
 
 // Compile-time interface checks (matches GitHub/Slack connector pattern).
 var _ connectors.Connector = (*StripeConnector)(nil)
+var _ connectors.ManifestProvider = (*StripeConnector)(nil)
+
+func TestManifest_Valid(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	m := conn.Manifest()
+	if err := m.Validate(); err != nil {
+		t.Fatalf("Manifest().Validate() error: %v", err)
+	}
+	if m.ID != "stripe" {
+		t.Errorf("Manifest().ID = %q, want %q", m.ID, "stripe")
+	}
+	if len(m.Actions) != 6 {
+		t.Errorf("Manifest().Actions has %d entries, want 6", len(m.Actions))
+	}
+	if len(m.RequiredCredentials) != 1 {
+		t.Errorf("Manifest().RequiredCredentials has %d entries, want 1", len(m.RequiredCredentials))
+	}
+	if m.RequiredCredentials[0].AuthType != "api_key" {
+		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "api_key")
+	}
+	if len(m.Templates) != 6 {
+		t.Errorf("Manifest().Templates has %d entries, want 6", len(m.Templates))
+	}
+}
+
+func TestManifest_ActionsMatchRegistered(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	m := conn.Manifest()
+	actions := conn.Actions()
+
+	for _, ma := range m.Actions {
+		if _, ok := actions[ma.ActionType]; !ok {
+			t.Errorf("Manifest action %q not found in Actions() map", ma.ActionType)
+		}
+	}
+	for actionType := range actions {
+		found := false
+		for _, ma := range m.Actions {
+			if ma.ActionType == actionType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Actions() has %q but it's not in the Manifest", actionType)
+		}
+	}
+}
 
 func TestID(t *testing.T) {
 	t.Parallel()

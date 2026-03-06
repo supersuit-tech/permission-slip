@@ -30,6 +30,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
+	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
@@ -324,6 +325,7 @@ func main() {
 	registry.Register(slack.New())
 	registry.Register(redisconnector.New())
 	registry.Register(square.New())
+	registry.Register(stripeconnector.New())
 	registry.Register(amadeus.New())
 
 	// Auto-seed built-in connectors from their manifests.
