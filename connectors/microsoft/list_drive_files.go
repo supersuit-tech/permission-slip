@@ -50,7 +50,7 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 	}
 	params.defaults()
 
-	if err := validateFolderPath(params.FolderPath); err != nil {
+	if err := validateFolderPathStrict(params.FolderPath); err != nil {
 		return nil, err
 	}
 
@@ -102,8 +102,9 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 	})
 }
 
-// validateFolderPath rejects paths with traversal sequences, absolute paths, or backslashes.
-func validateFolderPath(p string) error {
+// validateFolderPathStrict rejects paths with traversal sequences, absolute paths, or backslashes.
+// Used by list_drive_files where folder_path must be relative (no leading slash).
+func validateFolderPathStrict(p string) error {
 	if p == "" {
 		return nil
 	}

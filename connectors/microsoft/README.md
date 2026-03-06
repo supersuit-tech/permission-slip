@@ -282,6 +282,94 @@ Moves a file to the OneDrive recycle bin (recoverable — not permanent deletion
 
 **Security:** `item_id` is validated to reject path separators, traversal sequences, and URL-special characters. The delete operation moves the item to the recycle bin — it is recoverable and not a permanent deletion.
 
+---
+
+### `microsoft.create_presentation`
+
+Creates a new empty PowerPoint (.pptx) file in the user's OneDrive. The file is created using a minimal embedded PPTX template (~1.2 KB) uploaded via the OneDrive file upload endpoint.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `filename` | string | Yes | — | Name for the presentation (`.pptx` extension added if missing) |
+| `folder_path` | string | No | `"/"` (root) | OneDrive folder path (e.g., `Documents/Presentations`) |
+
+**Response:**
+
+```json
+{
+  "item_id": "01NBRZAA...",
+  "name": "Quarterly Report.pptx",
+  "web_url": "https://onedrive.live.com/edit.aspx?id=...",
+  "folder_path": "/Documents/Presentations"
+}
+```
+
+**Graph API:** `PUT /me/drive/root:/{path}/{filename}.pptx:/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+---
+
+### `microsoft.list_presentations`
+
+Searches for PowerPoint files (.pptx) in the user's OneDrive, optionally scoped to a folder.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `folder_path` | string | No | — | OneDrive folder path to search in (searches all files if omitted) |
+| `top` | integer | No | `10` | Number of presentations to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "item_id": "01NBRZAA...",
+    "name": "Q4 Review.pptx",
+    "web_url": "https://onedrive.live.com/edit.aspx?id=...",
+    "size": 1048576,
+    "last_modified": "2024-03-15T14:30:00Z"
+  }
+]
+```
+
+**Graph API:** `GET /me/drive/root/search(q='.pptx')` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-search))
+
+---
+
+### `microsoft.get_presentation`
+
+Gets metadata about a specific PowerPoint file by its OneDrive item ID.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the presentation |
+
+**Response:**
+
+```json
+{
+  "item_id": "01NBRZAA...",
+  "name": "Q4 Review.pptx",
+  "web_url": "https://onedrive.live.com/edit.aspx?id=...",
+  "size": 2048576,
+  "last_modified_by": "Jane Smith",
+  "last_modified": "2024-03-15T14:30:00Z"
+}
+```
+
+**Graph API:** `GET /me/drive/items/{itemId}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
+
 ## Error Handling
 
 The connector maps Microsoft Graph API responses to typed connector errors:
@@ -301,19 +389,25 @@ Rate limit responses include the `Retry-After` header value so callers know how 
 Each action lives in its own file. To add one (e.g., `microsoft.list_contacts`):
 
 1. Create `connectors/microsoft/list_contacts.go` with a params struct, `validate()` / `defaults()`, and an `Execute` method.
-2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for the HTTP lifecycle — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection.
+2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON API calls — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection. For binary file uploads, use `a.conn.doPutFileRequest(ctx, path, creds, fileBytes, &resp)`.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `microsoft.go`.
-5. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema`.
+5. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema` and a template.
 6. Add tests in `list_contacts_test.go` using `httptest.NewServer` and `newForTest()`.
 
-Three request helpers are available depending on the content type:
+Four request helpers are available depending on the content type:
 
 - `doRequest` — JSON request/response (most actions)
 - `doRequestRaw` — Returns raw string response (file content download)
 - `doPutRaw` — Sends raw bytes, returns raw bytes (file upload)
+- `doPutFileRequest` — Sends typed file bytes (e.g. PPTX), JSON-unmarshals response (presentation creation)
 
-All three share a common `executeRequest` lifecycle handler for auth, rate limiting, error mapping, and timeout detection. Each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape.
+All four share a common `executeRequest` lifecycle handler for auth, rate limiting, error mapping, and timeout detection. Each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape.
+
+**Security notes for user-supplied path segments:**
+- Use `validateGraphID()` for opaque IDs interpolated into URL paths (rejects `/`, `\`, `?`, `#`, `%`, `..`)
+- Use `validateFolderPath()` for folder paths (allows `/` for directory separators, rejects `..`, `?`, `#`, `%`, `\`)
+- URL-encode path segments with `url.PathEscape()` or `escapePathSegments()` as defense-in-depth
 
 ## Manifest
 
@@ -325,26 +419,30 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/microsoft/
-├── microsoft.go                  # MicrosoftConnector struct, Manifest(), request helpers, ValidateCredentials()
-├── types.go                      # Shared Microsoft Graph API types (email, calendar, drive, Teams)
-├── response.go                   # Graph API error response → typed connector error mapping
-├── validation.go                 # Shared validation helpers (validateEmail, detectContentType)
-├── send_email.go                 # microsoft.send_email action
-├── list_emails.go                # microsoft.list_emails action + path validation helpers
-├── create_calendar_event.go      # microsoft.create_calendar_event action
-├── list_calendar_events.go       # microsoft.list_calendar_events action
-├── list_drive_files.go           # microsoft.list_drive_files action
-├── get_drive_file.go             # microsoft.get_drive_file action + item ID validation
-├── upload_drive_file.go          # microsoft.upload_drive_file action
-├── delete_drive_file.go          # microsoft.delete_drive_file action
-├── list_teams.go                 # microsoft.list_teams action
-├── list_channels.go              # microsoft.list_channels action
-├── send_channel_message.go       # microsoft.send_channel_message action
-├── list_channel_messages.go      # microsoft.list_channel_messages action
-├── microsoft_test.go             # Connector-level tests
-├── helpers_test.go               # Shared test helpers (validCreds)
-├── *_test.go                     # Per-action test files
-└── README.md                     # This file
+├── microsoft.go                    # MicrosoftConnector struct, Manifest(), request helpers, ValidateCredentials()
+├── types.go                        # Shared Microsoft Graph API types (email, calendar, drive, Teams)
+├── response.go                     # Graph API error response → typed connector error mapping
+├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, escapePathSegments, etc.)
+├── pptx_template.go                # Minimal embedded .pptx template for create_presentation
+├── send_email.go                   # microsoft.send_email action
+├── list_emails.go                  # microsoft.list_emails action + path validation helpers
+├── create_calendar_event.go        # microsoft.create_calendar_event action
+├── list_calendar_events.go         # microsoft.list_calendar_events action
+├── list_drive_files.go             # microsoft.list_drive_files action
+├── get_drive_file.go               # microsoft.get_drive_file action + item ID validation
+├── upload_drive_file.go            # microsoft.upload_drive_file action
+├── delete_drive_file.go            # microsoft.delete_drive_file action
+├── list_teams.go                   # microsoft.list_teams action
+├── list_channels.go                # microsoft.list_channels action
+├── send_channel_message.go         # microsoft.send_channel_message action
+├── list_channel_messages.go        # microsoft.list_channel_messages action
+├── create_presentation.go          # microsoft.create_presentation action
+├── list_presentations.go           # microsoft.list_presentations action
+├── get_presentation.go             # microsoft.get_presentation action
+├── microsoft_test.go               # Connector-level tests
+├── helpers_test.go                 # Shared test helpers (validCreds)
+├── *_test.go                       # Per-action test files
+└── README.md                       # This file
 ```
 
 ## Testing

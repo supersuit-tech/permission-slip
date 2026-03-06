@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email, calendar, OneDrive, and Teams via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, OneDrive, Teams, and presentations via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -354,6 +354,64 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create Presentation",
+				Description: "Create a new PowerPoint presentation in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the presentation file (.pptx extension added if missing)"
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (e.g. Documents/Presentations). Defaults to root."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List Presentations",
+				Description: "Search for PowerPoint presentations in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path to search in. Defaults to searching all files."
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of presentations to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_presentation",
+				Name:        "Get Presentation",
+				Description: "Get metadata about a specific PowerPoint presentation",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the presentation"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -464,6 +522,27 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can read messages from any Teams channel.",
 				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_create_presentation",
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create presentations",
+				Description: "Agent can create new PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_presentations",
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List presentations",
+				Description: "Agent can search for PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_presentation",
+				ActionType:  "microsoft.get_presentation",
+				Name:        "View presentation details",
+				Description: "Agent can view metadata about PowerPoint presentations.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
 		},
 	}
 }
@@ -483,6 +562,9 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_channels":         &listChannelsAction{conn: c},
 		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
 		"microsoft.list_channel_messages": &listChannelMessagesAction{conn: c},
+		"microsoft.create_presentation":   &createPresentationAction{conn: c},
+		"microsoft.list_presentations":    &listPresentationsAction{conn: c},
+		"microsoft.get_presentation":      &getPresentationAction{conn: c},
 	}
 }
 
@@ -581,6 +663,38 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	}
 
 	// Some endpoints return 204 No Content (e.g. sendMail).
+	if dest != nil && len(respBody) > 0 {
+		if err := json.Unmarshal(respBody, dest); err != nil {
+			return &connectors.ExternalError{
+				Message: "failed to decode Microsoft Graph API response",
+			}
+		}
+	}
+
+	return nil
+}
+
+// doPutFileRequest uploads raw file bytes via PUT to a Microsoft Graph endpoint
+// with a specific content type. Used for creating files like PPTX presentations.
+// Delegates to executeRequest for the HTTP lifecycle and JSON-unmarshals the response.
+func (c *MicrosoftConnector) doPutFileRequest(ctx context.Context, path string, creds connectors.Credentials, fileBytes []byte, dest any) error {
+	token, err := extractToken(creds)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(fileBytes))
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+	respBody, err := c.executeRequest(req)
+	if err != nil {
+		return err
+	}
+
 	if dest != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, dest); err != nil {
 			return &connectors.ExternalError{

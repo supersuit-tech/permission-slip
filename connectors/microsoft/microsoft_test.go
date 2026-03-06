@@ -32,6 +32,9 @@ func TestMicrosoftConnector_Actions(t *testing.T) {
 		"microsoft.list_channels",
 		"microsoft.send_channel_message",
 		"microsoft.list_channel_messages",
+		"microsoft.create_presentation",
+		"microsoft.list_presentations",
+		"microsoft.get_presentation",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -99,8 +102,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	if m.Name != "Microsoft" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Microsoft")
 	}
-	if len(m.Actions) != 12 {
-		t.Fatalf("Manifest().Actions has %d items, want 12", len(m.Actions))
+	if len(m.Actions) != 15 {
+		t.Fatalf("Manifest().Actions has %d items, want 15", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -119,6 +122,9 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 		"microsoft.list_channels",
 		"microsoft.send_channel_message",
 		"microsoft.list_channel_messages",
+		"microsoft.create_presentation",
+		"microsoft.list_presentations",
+		"microsoft.get_presentation",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
@@ -142,8 +148,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	}
 
 	// Validate templates.
-	if len(m.Templates) != 13 {
-		t.Errorf("Manifest().Templates has %d items, want 13", len(m.Templates))
+	if len(m.Templates) != 16 {
+		t.Errorf("Manifest().Templates has %d items, want 16", len(m.Templates))
 	}
 
 	// Validate the manifest passes validation.

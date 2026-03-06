@@ -2,6 +2,7 @@ package microsoft
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -20,16 +21,18 @@ func validateEmail(field string, idx int, addr string) error {
 }
 
 // validateGraphID rejects Graph API resource identifiers (team IDs, channel IDs,
-// message IDs, etc.) that contain path traversal sequences or path separators.
-// These values are interpolated into URL paths, so we must ensure they cannot
-// manipulate the request target. Microsoft Graph IDs are opaque strings (typically
-// UUIDs or base64-encoded values) that never contain slashes or dot-dot sequences.
+// message IDs, item IDs, etc.) that contain characters which could manipulate
+// the request URL when interpolated into API paths. These IDs are opaque strings
+// (typically UUIDs or base64-encoded values) from Microsoft Graph that never
+// contain slashes, query parameters, or traversal sequences.
 func validateGraphID(field, value string) error {
 	if value == "" {
 		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", field)}
 	}
-	if strings.Contains(value, "..") || strings.Contains(value, "/") || strings.Contains(value, "\\") {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain path separators or traversal sequences", field)}
+	if strings.ContainsAny(value, "/\\?#%") || strings.Contains(value, "..") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: must not contain path separators or URL-special characters (/, \\, ?, #, %%)", field),
+		}
 	}
 	return nil
 }
@@ -40,4 +43,41 @@ func detectContentType(body string) string {
 		return "HTML"
 	}
 	return "Text"
+}
+
+// validateFolderPath checks a OneDrive folder path for traversal sequences and
+// URL-significant characters that could manipulate the Graph API request.
+// Slashes are allowed since folder paths are naturally slash-separated.
+func validateFolderPath(folderPath string) error {
+	if strings.Contains(folderPath, "..") {
+		return &connectors.ValidationError{
+			Message: "invalid folder_path: must not contain '..' traversal sequences (e.g. use 'Documents/Presentations' instead)",
+		}
+	}
+	if strings.ContainsAny(folderPath, "?#%\\") {
+		return &connectors.ValidationError{
+			Message: "invalid folder_path: must not contain special characters (?, #, %, \\)",
+		}
+	}
+	return nil
+}
+
+// normalizeFolderPath strips leading/trailing slashes from a folder path
+// for consistent use in OneDrive API paths.
+func normalizeFolderPath(folderPath string) string {
+	folderPath = strings.TrimPrefix(folderPath, "/")
+	folderPath = strings.TrimSuffix(folderPath, "/")
+	return folderPath
+}
+
+// escapePathSegments URL-encodes each segment of a slash-separated path
+// individually. This preserves the directory structure (slashes are kept)
+// while encoding special characters within each segment name that could
+// otherwise manipulate the Graph API URL.
+func escapePathSegments(path string) string {
+	segments := strings.Split(path, "/")
+	for i, seg := range segments {
+		segments[i] = url.PathEscape(seg)
+	}
+	return strings.Join(segments, "/")
 }
