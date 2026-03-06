@@ -24,17 +24,14 @@ type excelReadRangeParams struct {
 }
 
 func (p *excelReadRangeParams) validate() error {
-	if p.ItemID == "" {
-		return &connectors.ValidationError{Message: "item_id is required"}
+	if err := validateItemID(p.ItemID); err != nil {
+		return err
 	}
 	if p.SheetName == "" {
 		return &connectors.ValidationError{Message: "sheet_name is required"}
 	}
 	if p.Range == "" {
 		return &connectors.ValidationError{Message: "range is required"}
-	}
-	if err := validatePathSegment("item_id", p.ItemID); err != nil {
-		return err
 	}
 	return nil
 }
@@ -65,8 +62,8 @@ func (a *excelReadRangeAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s/workbook/worksheets/%s/range(address='%s')",
-		url.PathEscape(params.ItemID),
+	path := fmt.Sprintf("%s/worksheets/%s/range(address='%s')",
+		excelWorkbookPath(params.ItemID),
 		url.PathEscape(params.SheetName),
 		url.QueryEscape(params.Range),
 	)
@@ -76,15 +73,5 @@ func (a *excelReadRangeAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	colCount := 0
-	if len(resp.Values) > 0 {
-		colCount = len(resp.Values[0])
-	}
-
-	return connectors.JSONResult(rangeResult{
-		Address:     resp.Address,
-		Values:      resp.Values,
-		RowCount:    len(resp.Values),
-		ColumnCount: colCount,
-	})
+	return connectors.JSONResult(newRangeResult(resp))
 }

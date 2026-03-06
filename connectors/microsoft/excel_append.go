@@ -24,25 +24,19 @@ type excelAppendRowsParams struct {
 }
 
 func (p *excelAppendRowsParams) validate() error {
-	if p.ItemID == "" {
-		return &connectors.ValidationError{Message: "item_id is required"}
+	if err := validateItemID(p.ItemID); err != nil {
+		return err
 	}
 	if p.TableName == "" {
 		return &connectors.ValidationError{Message: "table_name is required"}
 	}
-	if len(p.Values) == 0 {
-		return &connectors.ValidationError{Message: "values is required and must not be empty"}
-	}
-	if err := validatePathSegment("item_id", p.ItemID); err != nil {
-		return err
-	}
 	if err := validatePathSegment("table_name", p.TableName); err != nil {
 		return err
 	}
-	if err := validateValuesGrid(p.Values); err != nil {
-		return err
+	if len(p.Values) == 0 {
+		return &connectors.ValidationError{Message: "values is required and must not be empty"}
 	}
-	return nil
+	return validateValuesGrid(p.Values)
 }
 
 // graphAddRowsRequest is the request body for the Graph API table row add.
@@ -73,7 +67,7 @@ func (a *excelAppendRowsAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s/workbook/tables/%s/rows", url.PathEscape(params.ItemID), url.PathEscape(params.TableName))
+	path := fmt.Sprintf("%s/tables/%s/rows", excelWorkbookPath(params.ItemID), url.PathEscape(params.TableName))
 
 	body := graphAddRowsRequest{Values: params.Values}
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -21,13 +20,7 @@ type excelListWorksheetsParams struct {
 }
 
 func (p *excelListWorksheetsParams) validate() error {
-	if p.ItemID == "" {
-		return &connectors.ValidationError{Message: "item_id is required"}
-	}
-	if err := validatePathSegment("item_id", p.ItemID); err != nil {
-		return err
-	}
-	return nil
+	return validateItemID(p.ItemID)
 }
 
 // graphWorksheetsResponse is the Microsoft Graph API response for listing worksheets.
@@ -60,7 +53,7 @@ func (a *excelListWorksheetsAction) Execute(ctx context.Context, req connectors.
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s/workbook/worksheets", url.PathEscape(params.ItemID))
+	path := excelWorkbookPath(params.ItemID) + "/worksheets"
 
 	var resp graphWorksheetsResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {

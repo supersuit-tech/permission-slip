@@ -306,7 +306,8 @@ connectors/microsoft/
 ├── microsoft.go                  # MicrosoftConnector struct, New(), Manifest(), doRequest(), ValidateCredentials()
 ├── types.go                      # Shared Microsoft Graph API types (graphEmailBody, graphMailAddress, etc.)
 ├── response.go                   # Graph API error response → typed connector error mapping
-├── validation.go                 # Shared validation helpers (validateEmail, detectContentType)
+├── validation.go                 # Shared validation helpers (validateEmail, detectContentType, validatePathSegment, validateValuesGrid)
+├── excel_helpers.go              # Shared Excel helpers (excelWorkbookPath, newRangeResult, validateItemID)
 ├── send_email.go                 # microsoft.send_email action
 ├── list_emails.go                # microsoft.list_emails action
 ├── create_calendar_event.go      # microsoft.create_calendar_event action
