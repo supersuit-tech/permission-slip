@@ -11,8 +11,8 @@ import (
 )
 
 // checkResponse inspects the HTTP status code and returns an appropriate
-// typed error for non-success responses. Shopify returns errors in two
-// formats: {"errors": "string"} or {"errors": {"field": ["msg"]}}.
+// typed error for non-success responses. See extractErrorMessage for the
+// three Shopify error formats that are parsed.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil
@@ -87,7 +87,12 @@ func extractErrorMessage(body []byte) string {
 		return singleError.Error
 	}
 
-	// Fallback to raw body.
+	// Fallback to raw body, truncated to avoid leaking large payloads
+	// (e.g. HTML error pages) into error messages.
+	const maxFallbackLen = 500
+	if len(body) > maxFallbackLen {
+		return string(body[:maxFallbackLen]) + "... (truncated)"
+	}
 	if len(body) > 0 {
 		return string(body)
 	}
