@@ -628,14 +628,13 @@ func TestCheckResponse_IncludesErrorCode(t *testing.T) {
 // Response body size limit
 // ---------------------------------------------------------------------------
 
-func TestDo_LargeResponseTruncated(t *testing.T) {
+func TestDo_ResponseLimitReaderDoesNotBreakNormalResponses(t *testing.T) {
 	t.Parallel()
 
-	// Return a response larger than maxResponseBytes. The connector should
-	// still succeed (it reads up to the limit) and parse what it can.
+	// Verify that the LimitReader doesn't interfere with normal-sized
+	// responses (well under the 4 MB cap).
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		// Write a valid JSON object followed by padding.
 		w.Write([]byte(`{"id":"ok"}`))
 	}))
 	defer srv.Close()
