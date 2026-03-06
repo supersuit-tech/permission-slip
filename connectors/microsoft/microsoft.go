@@ -330,9 +330,8 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 }
 
 // doPutFileRequest uploads raw file bytes via PUT to a Microsoft Graph endpoint.
-// It handles the same lifecycle as doRequest (auth, rate limiting, error mapping,
-// response parsing) but sends raw bytes with the appropriate content type instead
-// of JSON-marshaling a request body. Used for OneDrive file upload endpoints.
+// Used for OneDrive file upload endpoints. Delegates to executeAndHandleResponse
+// for shared response handling.
 func (c *MicrosoftConnector) doPutFileRequest(ctx context.Context, path string, creds connectors.Credentials, fileBytes []byte, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -346,59 +345,12 @@ func (c *MicrosoftConnector) doPutFileRequest(ctx context.Context, path string, 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
-			Message:    "Microsoft Graph API rate limit exceeded",
-			RetryAfter: retryAfter,
-		}
-	}
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return mapGraphError(resp.StatusCode, respBody)
-	}
-
-	if dest != nil && len(respBody) > 0 {
-		if err := json.Unmarshal(respBody, dest); err != nil {
-			return &connectors.ExternalError{
-				StatusCode: resp.StatusCode,
-				Message:    "failed to decode Microsoft Graph API response",
-			}
-		}
-	}
-
-	return nil
+	return c.executeAndHandleResponse(req, dest)
 }
 
-// doRequest is the shared request lifecycle for all Microsoft Graph actions.
-// It handles:
-//   - JSON marshaling of the request body (if non-nil)
-//   - Authorization header with the OAuth access token
-//   - Rate limit detection (HTTP 429 → RateLimitError with Retry-After)
-//   - Response body size limiting (maxResponseBodySize) to prevent OOM
-//   - Error response mapping via mapGraphError (see response.go)
-//   - JSON unmarshaling of successful responses into dest (if non-nil)
-//   - 204 No Content handling (e.g. sendMail returns no body)
-//
-// Callers provide the HTTP method, Graph API path (e.g. "/me/sendMail"),
-// credentials, optional request body, and optional response destination.
+// doRequest is the shared request lifecycle for JSON-based Microsoft Graph actions.
+// It handles JSON marshaling of the request body, auth, and delegates to
+// executeAndHandleResponse for rate limiting, error mapping, and response parsing.
 func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -423,6 +375,13 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	return c.executeAndHandleResponse(req, dest)
+}
+
+// executeAndHandleResponse executes an HTTP request and handles the response
+// lifecycle shared by all Graph API calls: transport errors, rate limiting,
+// response body reading with size limits, error mapping, and JSON decoding.
+func (c *MicrosoftConnector) executeAndHandleResponse(req *http.Request, dest any) error {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
@@ -435,7 +394,6 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	}
 	defer resp.Body.Close()
 
-	// Microsoft Graph returns 429 for rate limiting.
 	if resp.StatusCode == http.StatusTooManyRequests {
 		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
 		return &connectors.RateLimitError{
