@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -64,15 +65,17 @@ func (a *createPresentationAction) Execute(ctx context.Context, req connectors.A
 		filename += ".pptx"
 	}
 
-	// Build the upload path.
+	// Build the upload path. URL-encode user-supplied segments to prevent
+	// path manipulation via special characters (?, #, etc.).
+	escapedFilename := url.PathEscape(filename)
 	var path string
 	folderDisplay := "/"
 	if params.FolderPath == "" || params.FolderPath == "/" {
-		path = fmt.Sprintf("/me/drive/root:/%s:/content", filename)
+		path = fmt.Sprintf("/me/drive/root:/%s:/content", escapedFilename)
 	} else {
 		folder := normalizeFolderPath(params.FolderPath)
 		folderDisplay = "/" + folder
-		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", folder, filename)
+		path = fmt.Sprintf("/me/drive/root:/%s/%s:/content", escapePathSegments(folder), escapedFilename)
 	}
 
 	var resp graphDriveItemResponse

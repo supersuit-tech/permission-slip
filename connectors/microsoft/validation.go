@@ -2,6 +2,7 @@ package microsoft
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -27,11 +28,39 @@ func detectContentType(body string) string {
 	return "Text"
 }
 
-// validateFolderPath checks a OneDrive folder path for path traversal sequences.
+// validatePathSegment rejects values that contain URL-significant characters
+// which could alter the request path or query when interpolated into a Graph
+// API URL. This prevents a crafted item_id like "foo/../me/messages" or
+// "foo?$select=body" from hitting unintended endpoints.
+func validatePathSegment(field, value string) error {
+	for _, ch := range value {
+		switch ch {
+		case '/', '\\', '?', '#', '%':
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("invalid %s: must not contain URL-special characters (/, \\, ?, #, %%)", field),
+			}
+		}
+	}
+	if strings.Contains(value, "..") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: must not contain traversal sequences", field),
+		}
+	}
+	return nil
+}
+
+// validateFolderPath checks a OneDrive folder path for traversal sequences and
+// URL-significant characters that could manipulate the Graph API request.
+// Slashes are allowed since folder paths are naturally slash-separated.
 func validateFolderPath(folderPath string) error {
 	if strings.Contains(folderPath, "..") {
 		return &connectors.ValidationError{
 			Message: "invalid folder_path: must not contain '..' traversal sequences (e.g. use 'Documents/Presentations' instead)",
+		}
+	}
+	if strings.ContainsAny(folderPath, "?#%\\") {
+		return &connectors.ValidationError{
+			Message: "invalid folder_path: must not contain special characters (?, #, %, \\)",
 		}
 	}
 	return nil
@@ -43,4 +72,16 @@ func normalizeFolderPath(folderPath string) string {
 	folderPath = strings.TrimPrefix(folderPath, "/")
 	folderPath = strings.TrimSuffix(folderPath, "/")
 	return folderPath
+}
+
+// escapePathSegments URL-encodes each segment of a slash-separated path
+// individually. This preserves the directory structure (slashes are kept)
+// while encoding special characters within each segment name that could
+// otherwise manipulate the Graph API URL.
+func escapePathSegments(path string) string {
+	segments := strings.Split(path, "/")
+	for i, seg := range segments {
+		segments[i] = url.PathEscape(seg)
+	}
+	return strings.Join(segments, "/")
 }

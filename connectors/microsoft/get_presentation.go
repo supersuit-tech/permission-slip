@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -24,6 +25,9 @@ func (p *getPresentationParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
 	}
+	if err := validatePathSegment("item_id", p.ItemID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -37,7 +41,7 @@ func (a *getPresentationAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/me/drive/items/%s?$select=id,name,webUrl,size,lastModifiedBy,lastModifiedDateTime", params.ItemID)
+	path := fmt.Sprintf("/me/drive/items/%s?$select=id,name,webUrl,size,lastModifiedBy,lastModifiedDateTime", url.PathEscape(params.ItemID))
 
 	var resp graphDriveItemResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {

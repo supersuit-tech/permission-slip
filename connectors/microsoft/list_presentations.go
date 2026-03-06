@@ -65,7 +65,7 @@ func (a *listPresentationsAction) Execute(ctx context.Context, req connectors.Ac
 		path = fmt.Sprintf("/me/drive/root/search(q='.pptx')?$top=%d&$select=id,name,webUrl,size,lastModifiedDateTime", params.Top)
 	} else {
 		folder := normalizeFolderPath(params.FolderPath)
-		path = fmt.Sprintf("/me/drive/root:/%s:/search(q='.pptx')?$top=%d&$select=id,name,webUrl,size,lastModifiedDateTime", folder, params.Top)
+		path = fmt.Sprintf("/me/drive/root:/%s:/search(q='.pptx')?$top=%d&$select=id,name,webUrl,size,lastModifiedDateTime", escapePathSegments(folder), params.Top)
 	}
 
 	var resp graphDriveSearchResponse

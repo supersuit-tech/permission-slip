@@ -171,6 +171,54 @@ func TestGetPresentation_AuthFailure(t *testing.T) {
 	}
 }
 
+func TestGetPresentation_ItemIDPathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &getPresentationAction{conn: conn}
+
+	// A crafted item_id with path traversal could hit a different Graph endpoint.
+	params, _ := json.Marshal(getPresentationParams{
+		ItemID: "foo/../me/messages",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.get_presentation",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for item_id with path traversal")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestGetPresentation_ItemIDQueryInjection(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &getPresentationAction{conn: conn}
+
+	// A crafted item_id with ? could alter the query string.
+	params, _ := json.Marshal(getPresentationParams{
+		ItemID: "item123?$select=content",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.get_presentation",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for item_id with query injection")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestGetPresentation_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

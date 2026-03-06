@@ -212,6 +212,30 @@ func TestCreatePresentation_FolderPathTraversal(t *testing.T) {
 	}
 }
 
+func TestCreatePresentation_FolderPathSpecialChars(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPresentationAction{conn: conn}
+
+	params, _ := json.Marshal(createPresentationParams{
+		Filename:   "deck.pptx",
+		FolderPath: "folder?query=inject",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_presentation",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for special chars in folder_path")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreatePresentation_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
