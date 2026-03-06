@@ -174,6 +174,8 @@ func TestSearchOrders_MissingParams(t *testing.T) {
 	}{
 		{name: "missing location_ids", params: `{}`},
 		{name: "empty location_ids", params: `{"location_ids": []}`},
+		{name: "query not an object", params: `{"location_ids": ["L123"], "query": "OPEN"}`},
+		{name: "query is array", params: `{"location_ids": ["L123"], "query": [1,2,3]}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 
@@ -191,6 +193,34 @@ func TestSearchOrders_MissingParams(t *testing.T) {
 				t.Errorf("expected ValidationError, got %T: %v", err, err)
 			}
 		})
+	}
+}
+
+func TestSearchOrders_NullOrdersNormalized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"orders": null}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["square.search_orders"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "square.search_orders",
+		Parameters:  json.RawMessage(`{"location_ids": ["L123"]}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]json.RawMessage
+	json.Unmarshal(result.Data, &data)
+	if string(data["orders"]) != "[]" {
+		t.Errorf("orders = %s, want [] (null should be normalized to empty array)", string(data["orders"]))
 	}
 }
 

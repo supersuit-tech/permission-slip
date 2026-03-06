@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -30,6 +31,9 @@ func (p *createBookingParams) validate() error {
 	}
 	if p.StartAt == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: start_at"}
+	}
+	if _, err := time.Parse(time.RFC3339, p.StartAt); err != nil {
+		return &connectors.ValidationError{Message: "start_at must be RFC 3339 format (e.g. \"2024-03-15T14:30:00Z\")"}
 	}
 	if p.ServiceVariationID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: service_variation_id"}

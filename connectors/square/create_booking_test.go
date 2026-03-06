@@ -173,6 +173,7 @@ func TestCreateBooking_MissingParams(t *testing.T) {
 	}{
 		{name: "missing location_id", params: `{"start_at": "2024-03-15T14:30:00Z", "service_variation_id": "SVC123"}`},
 		{name: "missing start_at", params: `{"location_id": "L123", "service_variation_id": "SVC123"}`},
+		{name: "invalid start_at format", params: `{"location_id": "L123", "start_at": "next tuesday", "service_variation_id": "SVC123"}`},
 		{name: "missing service_variation_id", params: `{"location_id": "L123", "start_at": "2024-03-15T14:30:00Z"}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}

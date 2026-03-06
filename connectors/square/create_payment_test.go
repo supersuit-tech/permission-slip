@@ -158,6 +158,8 @@ func TestCreatePayment_MissingParams(t *testing.T) {
 		{name: "missing source_id", params: `{"amount_money": {"amount": 1000, "currency": "USD"}}`},
 		{name: "missing amount_money", params: `{"source_id": "CASH"}`},
 		{name: "missing currency", params: `{"source_id": "CASH", "amount_money": {"amount": 1000}}`},
+		{name: "zero amount", params: `{"source_id": "CASH", "amount_money": {"amount": 0, "currency": "USD"}}`},
+		{name: "negative amount", params: `{"source_id": "CASH", "amount_money": {"amount": -500, "currency": "USD"}}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

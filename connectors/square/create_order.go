@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -47,8 +48,14 @@ func (p *createOrderParams) validate() error {
 		if item.Quantity == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: missing required field: quantity", i)}
 		}
+		if qty, err := strconv.Atoi(item.Quantity); err != nil || qty <= 0 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: quantity must be a positive integer string (e.g. \"1\")", i)}
+		}
 		if item.BasePriceMoney.Currency == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: missing required field: base_price_money.currency", i)}
+		}
+		if item.BasePriceMoney.Amount < 0 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: base_price_money.amount must not be negative", i)}
 		}
 	}
 	return nil

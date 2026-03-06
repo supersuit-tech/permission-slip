@@ -134,6 +134,35 @@ func TestListCatalog_WithPagination(t *testing.T) {
 	}
 }
 
+func TestListCatalog_NullObjectsNormalized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Square returns null objects when catalog is empty.
+		w.Write([]byte(`{"objects": null}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["square.list_catalog"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "square.list_catalog",
+		Parameters:  json.RawMessage(`{}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]json.RawMessage
+	json.Unmarshal(result.Data, &data)
+	if string(data["objects"]) != "[]" {
+		t.Errorf("objects = %s, want [] (null should be normalized to empty array)", string(data["objects"]))
+	}
+}
+
 func TestListCatalog_APIError(t *testing.T) {
 	t.Parallel()
 

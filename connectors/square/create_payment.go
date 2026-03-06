@@ -28,11 +28,11 @@ func (p *createPaymentParams) validate() error {
 	if p.SourceID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: source_id"}
 	}
-	if p.AmountMoney.Amount == 0 && p.AmountMoney.Currency == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: amount_money"}
-	}
 	if p.AmountMoney.Currency == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: amount_money.currency"}
+	}
+	if p.AmountMoney.Amount <= 0 {
+		return &connectors.ValidationError{Message: "amount_money.amount must be greater than 0 (in smallest currency unit, e.g. cents)"}
 	}
 	return nil
 }

@@ -149,7 +149,11 @@ func TestCreateOrder_MissingParams(t *testing.T) {
 		{name: "empty line_items", params: `{"location_id": "L123", "line_items": []}`},
 		{name: "line_item missing name", params: `{"location_id": "L123", "line_items": [{"quantity": "1", "base_price_money": {"amount": 100, "currency": "USD"}}]}`},
 		{name: "line_item missing quantity", params: `{"location_id": "L123", "line_items": [{"name": "X", "base_price_money": {"amount": 100, "currency": "USD"}}]}`},
+		{name: "line_item invalid quantity", params: `{"location_id": "L123", "line_items": [{"name": "X", "quantity": "abc", "base_price_money": {"amount": 100, "currency": "USD"}}]}`},
+		{name: "line_item zero quantity", params: `{"location_id": "L123", "line_items": [{"name": "X", "quantity": "0", "base_price_money": {"amount": 100, "currency": "USD"}}]}`},
+		{name: "line_item negative quantity", params: `{"location_id": "L123", "line_items": [{"name": "X", "quantity": "-1", "base_price_money": {"amount": 100, "currency": "USD"}}]}`},
 		{name: "line_item missing currency", params: `{"location_id": "L123", "line_items": [{"name": "X", "quantity": "1", "base_price_money": {"amount": 100}}]}`},
+		{name: "line_item negative amount", params: `{"location_id": "L123", "line_items": [{"name": "X", "quantity": "1", "base_price_money": {"amount": -100, "currency": "USD"}}]}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

@@ -49,8 +49,12 @@ func (a *listCatalogAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
+	objects := json.RawMessage(resp.Objects)
+	if len(objects) == 0 || string(objects) == "null" {
+		objects = json.RawMessage("[]")
+	}
 	result := map[string]interface{}{
-		"objects": json.RawMessage(resp.Objects),
+		"objects": objects,
 	}
 	if resp.Cursor != "" {
 		result["cursor"] = resp.Cursor

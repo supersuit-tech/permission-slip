@@ -26,6 +26,12 @@ func (p *searchOrdersParams) validate() error {
 	if len(p.LocationIDs) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: location_ids (must have at least one)"}
 	}
+	if len(p.Query) > 0 {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(p.Query, &obj); err != nil {
+			return &connectors.ValidationError{Message: "query must be a JSON object (e.g. {\"filter\": {\"state_filter\": {\"states\": [\"OPEN\"]}}})"}
+		}
+	}
 	return nil
 }
 
@@ -60,8 +66,12 @@ func (a *searchOrdersAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	orders := json.RawMessage(resp.Orders)
+	if len(orders) == 0 || string(orders) == "null" {
+		orders = json.RawMessage("[]")
+	}
 	result := map[string]interface{}{
-		"orders": json.RawMessage(resp.Orders),
+		"orders": orders,
 	}
 	if resp.Cursor != "" {
 		result["cursor"] = resp.Cursor
