@@ -44,7 +44,9 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		log.Printf("[%s] OAuth refresh error: %v", traceID, err)
 		var oauthErr *connectors.OAuthRefreshError
 		msg := "OAuth authorization required — user must re-connect the provider in Settings"
-		details := map[string]any{}
+		details := map[string]any{
+			"action_required": "reauthorize",
+		}
 		if errors.As(err, &oauthErr) {
 			details["provider"] = oauthErr.Provider
 		}
