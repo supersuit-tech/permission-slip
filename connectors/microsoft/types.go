@@ -1,6 +1,13 @@
 package microsoft
 
 // Shared Microsoft Graph API types used across multiple actions.
+//
+// These types mirror the JSON structures expected by the Microsoft Graph v1.0 API.
+// See: https://learn.microsoft.com/en-us/graph/api/overview
+//
+// Types are defined here rather than in individual action files to avoid
+// duplication — for example, graphMailAddress is used by both list_emails
+// and create_calendar_event.
 
 // graphEmailBody represents the body of an email or event in Graph API format.
 type graphEmailBody struct {

@@ -246,8 +246,17 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 }
 
 // doRequest is the shared request lifecycle for all Microsoft Graph actions.
-// It sends the request with auth headers, handles rate limiting and errors,
-// and unmarshals the response into dest.
+// It handles:
+//   - JSON marshaling of the request body (if non-nil)
+//   - Authorization header with the OAuth access token
+//   - Rate limit detection (HTTP 429 → RateLimitError with Retry-After)
+//   - Response body size limiting (maxResponseBodySize) to prevent OOM
+//   - Error response mapping via mapGraphError (see response.go)
+//   - JSON unmarshaling of successful responses into dest (if non-nil)
+//   - 204 No Content handling (e.g. sendMail returns no body)
+//
+// Callers provide the HTTP method, Graph API path (e.g. "/me/sendMail"),
+// credentials, optional request body, and optional response destination.
 func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {

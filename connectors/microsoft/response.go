@@ -9,6 +9,7 @@ import (
 )
 
 // graphError represents a Microsoft Graph API error response.
+// See: https://learn.microsoft.com/en-us/graph/errors
 type graphError struct {
 	Error struct {
 		Code    string `json:"code"`
@@ -18,6 +19,14 @@ type graphError struct {
 
 // mapGraphError converts a Microsoft Graph API error response to the
 // appropriate connector error type with actionable messages.
+//
+// Mapping:
+//
+//	401 → AuthError (token expired/invalid — suggest reconnecting)
+//	403 → AuthError (insufficient scopes — suggest re-authorizing)
+//	400 → ValidationError (bad request — surface the Graph error message)
+//	404 → ExternalError (resource not found)
+//	other → ExternalError (generic Graph API failure)
 func mapGraphError(statusCode int, body []byte) error {
 	var ge graphError
 	if json.Unmarshal(body, &ge) != nil || ge.Error.Message == "" {
