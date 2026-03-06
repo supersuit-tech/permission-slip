@@ -768,8 +768,8 @@ func TestManifest_Valid(t *testing.T) {
 	if m.RequiredCredentials[0].AuthType != "api_key" {
 		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "api_key")
 	}
-	if len(m.Templates) != 6 {
-		t.Errorf("Manifest().Templates has %d entries, want 6", len(m.Templates))
+	if len(m.Templates) != 8 {
+		t.Errorf("Manifest().Templates has %d entries, want 8", len(m.Templates))
 	}
 }
 
