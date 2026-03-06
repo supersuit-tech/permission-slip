@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -70,7 +70,12 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 	params.defaults()
 
-	path := fmt.Sprintf("/me/mailFolders/%s/messages?$top=%d&$orderby=receivedDateTime%%20desc&$select=id,subject,from,toRecipients,receivedDateTime,isRead,bodyPreview,hasAttachments", url.PathEscape(params.Folder), params.Top)
+	// Reject folder names containing path traversal or slash characters.
+	if strings.Contains(params.Folder, "..") || strings.Contains(params.Folder, "/") || strings.Contains(params.Folder, "\\") {
+		return nil, &connectors.ValidationError{Message: "invalid folder name: must not contain path separators or traversal sequences"}
+	}
+
+	path := fmt.Sprintf("/me/mailFolders/%s/messages?$top=%d&$orderby=receivedDateTime%%20desc&$select=id,subject,from,toRecipients,receivedDateTime,isRead,bodyPreview,hasAttachments", params.Folder, params.Top)
 
 	var resp graphMessagesResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {

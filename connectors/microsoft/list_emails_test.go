@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -109,22 +108,10 @@ func TestListEmails_TopClamped(t *testing.T) {
 	}
 }
 
-func TestListEmails_FolderPathEscaping(t *testing.T) {
+func TestListEmails_FolderPathTraversalRejected(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// A path-traversal attempt like "../../admin" should be URL-encoded,
-		// not interpreted as literal path segments.
-		if strings.Contains(r.URL.Path, "..") {
-			t.Errorf("path traversal not escaped: %s", r.URL.Path)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"value": []any{}})
-	}))
-	defer srv.Close()
-
-	conn := newForTest(srv.Client(), srv.URL)
+	conn := New()
 	action := &listEmailsAction{conn: conn}
 
 	params, _ := json.Marshal(listEmailsParams{Folder: "../../admin"})
@@ -134,8 +121,11 @@ func TestListEmails_FolderPathEscaping(t *testing.T) {
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for path traversal folder name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 
