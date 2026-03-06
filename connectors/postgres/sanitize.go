@@ -3,10 +3,10 @@ package postgres
 import (
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
 
 // identifierPattern matches valid PostgreSQL identifiers:
@@ -40,16 +40,6 @@ func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
-// sortedKeys returns the keys of a map in a stable order for deterministic SQL generation.
-func sortedKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 // validateWhereCols validates all column names in a WHERE map.
 func validateWhereCols(where map[string]interface{}) error {
 	for col := range where {
@@ -76,7 +66,7 @@ func validateReturningCols(cols []string) error {
 // NULL values produce IS NULL conditions; non-null values use $N placeholders.
 // startIdx is the first placeholder index to use.
 func buildWhereClause(where map[string]interface{}, startIdx int) (string, []interface{}) {
-	cols := sortedKeys(where)
+	cols := sqldb.SortedKeys(where)
 	var clauses []string
 	var args []interface{}
 	paramIdx := startIdx

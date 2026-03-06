@@ -55,12 +55,3 @@ func TestQuoteIdentifier(t *testing.T) {
 		})
 	}
 }
-
-func TestSortedKeys(t *testing.T) {
-	t.Parallel()
-	m := map[string]interface{}{"c": 3, "a": 1, "b": 2}
-	keys := sortedKeys(m)
-	if len(keys) != 3 || keys[0] != "a" || keys[1] != "b" || keys[2] != "c" {
-		t.Errorf("sortedKeys() = %v, want [a b c]", keys)
-	}
-}
