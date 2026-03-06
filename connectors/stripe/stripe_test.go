@@ -400,7 +400,9 @@ func TestDo_POST_FormEncoded(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("ParseForm: %v", err)
+			t.Errorf("ParseForm: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
 		}
 		if r.Form.Get("email") != "test@example.com" {
 			t.Errorf("email = %q, want test@example.com", r.Form.Get("email"))
