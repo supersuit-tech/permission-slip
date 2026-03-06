@@ -110,6 +110,7 @@ func TestCheckResponse_StatusCodeFallback(t *testing.T) {
 		{"bad_request", 400, connectors.IsValidationError},
 		{"unprocessable", 422, connectors.IsValidationError},
 		{"not_found", 404, connectors.IsValidationError},
+		{"conflict", 409, connectors.IsValidationError},
 		{"server_error", 500, connectors.IsExternalError},
 	}
 

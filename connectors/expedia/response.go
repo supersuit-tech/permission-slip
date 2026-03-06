@@ -16,6 +16,7 @@ import (
 //   - 400 → ValidationError: Expedia uses 400 for invalid parameters (unlike
 //     GitHub which uses 422), so we map it to ValidationError.
 //   - 401/403 → AuthError: Invalid or expired API key/signature.
+//   - 404 → ValidationError: Resource not found (property, room, or itinerary).
 //   - 429 → RateLimitError: With Retry-After header when available.
 //   - Other 4xx/5xx → ExternalError: Includes HTTP status code for debugging.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
@@ -44,6 +45,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return &connectors.AuthError{Message: fmt.Sprintf("Expedia Rapid API auth error (%d): %s", statusCode, msg)}
 	case statusCode == http.StatusBadRequest:
 		return &connectors.ValidationError{Message: fmt.Sprintf("Expedia Rapid API validation error: %s", msg)}
+	case statusCode == http.StatusNotFound:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Expedia Rapid API resource not found: %s — verify the property, room, or itinerary ID", msg)}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Expedia Rapid API error: %s", msg)}
 	}
