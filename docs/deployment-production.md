@@ -53,7 +53,7 @@ Quick reference of every service in the production stack. See detailed sections 
 | 9 | [**GitHub Actions**](#cicd-pipeline) | CI (tests, build, audit) + planned CD | Live |
 | 10 | [**PostHog**](#posthog-product-analytics) | Product analytics + session replay | Planned |
 | 11 | [**UptimeRobot**](#uptimerobot-uptime-monitoring) | Uptime monitoring + public status page | Planned |
-| 12 | [**Stripe**](#stripe-billing--payments) | Billing, subscriptions, usage-based payments | Planned |
+| 12 | [**Stripe**](#stripe-billing--payments) | Billing, subscriptions, usage-based payments | Live |
 
 ## Services
 
@@ -311,12 +311,11 @@ External uptime monitoring — catches issues that Fly's internal health checks 
 
 ### Stripe (Billing & Payments)
 
-> **Status:** Planned — see [#341](https://github.com/supersuit-tech/permission-slip-web/issues/341), [#364](https://github.com/supersuit-tech/permission-slip-web/issues/364)
-
 Payment processing for the paid tier: payment method collection, subscription management, and usage-based billing.
 
 - **Service:** [Stripe](https://stripe.com)
 - **Gated by:** `BILLING_ENABLED` env var (default `false`). When disabled, all users get unlimited plan and Stripe is skipped entirely
+- **Full setup guide:** [Stripe Setup Guide](stripe-setup.md) — covers production setup, local development testing, webhook configuration, and verification steps
 
 **Env vars (runtime secrets):**
 
@@ -344,17 +343,9 @@ fly secrets set \
   STRIPE_PUBLISHABLE_KEY="pk_live_xxxx" \
   STRIPE_WEBHOOK_SECRET="whsec_xxxx" \
   STRIPE_PRICE_ID_REQUEST="price_xxxx"
-
-# Build-time arg (inlined into frontend JS bundle for Stripe Checkout)
-fly deploy --build-arg VITE_STRIPE_PUBLISHABLE_KEY="pk_live_xxxx"
 ```
 
-**Setup steps:**
-1. Create Stripe account and get API keys
-2. Create a metered Price for per-request billing ($0.005/request after 1,000 free)
-3. Set up a webhook endpoint at `https://app.permissionslip.dev/api/webhooks/stripe`
-4. Configure webhook to send: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`
-5. Set all env vars via `fly secrets set` (see commands above)
+`VITE_STRIPE_PUBLISHABLE_KEY` is configured in `fly.toml` under `[build.args]` — no manual `--build-arg` flag needed on deploy.
 
 **When `BILLING_ENABLED=false`:**
 - New users get `pay_as_you_go` plan (unlimited)
@@ -499,12 +490,12 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `VITE_POSTHOG_KEY` | Build arg | **Planned** ([#352]) | PostHog project API key |
 | `VITE_POSTHOG_HOST` | Build arg | **Planned** ([#352]) | PostHog API host (default: `us.i.posthog.com`) |
 | `POSTHOG_HOST` | Runtime secret | **Planned** ([#352]) | PostHog API host for backend CSP |
-| `BILLING_ENABLED` | Runtime secret | **Planned** ([#364]) | `true` to enable billing (default: `false`) |
-| `STRIPE_SECRET_KEY` | Runtime secret | **Planned** ([#341]) | Stripe API secret key |
-| `STRIPE_PUBLISHABLE_KEY` | Runtime secret | **Planned** ([#341]) | Stripe publishable key |
-| `STRIPE_WEBHOOK_SECRET` | Runtime secret | **Planned** ([#341]) | Stripe webhook signing secret |
-| `STRIPE_PRICE_ID_REQUEST` | Runtime secret | **Planned** ([#341]) | Metered Stripe Price ID |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Build arg | **Planned** ([#341]) | Stripe publishable key (frontend) |
+| `BILLING_ENABLED` | Runtime secret | **Set if billing** | `true` to enable billing (default: `false`) |
+| `STRIPE_SECRET_KEY` | Runtime secret | **Set if billing** | Stripe API secret key |
+| `STRIPE_PUBLISHABLE_KEY` | Runtime secret | **Set if billing** | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | Runtime secret | **Set if billing** | Stripe webhook signing secret |
+| `STRIPE_PRICE_ID_REQUEST` | Runtime secret | **Set if billing** | Metered Stripe Price ID |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Build arg | **Set if billing** | Stripe publishable key (frontend) |
 
 [#352]: https://github.com/supersuit-tech/permission-slip-web/issues/352
 [#364]: https://github.com/supersuit-tech/permission-slip-web/issues/364
@@ -832,7 +823,7 @@ Quick reference for what's live vs. planned.
 | **Expo Push Service** | Mobile push notifications (iOS + Android) | Live | — |
 | **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352) |
 | **UptimeRobot** | Uptime monitoring + status page | Planned | [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332) |
-| **Stripe** | Billing + payments | Planned | [#341](https://github.com/supersuit-tech/permission-slip-web/issues/341) |
+| **Stripe** | Billing + payments | Live | [#168](https://github.com/supersuit-tech/permission-slip/issues/168) |
 | **GitHub Actions CD** | Auto-deploy on push to main | Planned | [#328](https://github.com/supersuit-tech/permission-slip-web/issues/328) |
 
 ### Future Hardening (Phase 3)
