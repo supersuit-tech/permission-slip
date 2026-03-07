@@ -324,9 +324,22 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 		return zero, fmt.Errorf("read access token from vault: %w", err)
 	}
 
-	return connectors.NewCredentials(map[string]string{
+	creds := map[string]string{
 		"access_token": string(accessTokenBytes),
-	}), nil
+	}
+
+	// Merge provider-specific extra data (e.g. instance_url) into credentials
+	// so connectors can access them alongside the access token.
+	if len(conn.ExtraData) > 0 {
+		var extra map[string]string
+		if err := json.Unmarshal(conn.ExtraData, &extra); err == nil {
+			for k, v := range extra {
+				creds[k] = v
+			}
+		}
+	}
+
+	return connectors.NewCredentials(creds), nil
 }
 
 // refreshOAuthConnection performs a token refresh for the given OAuth connection.

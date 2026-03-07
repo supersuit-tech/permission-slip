@@ -62,7 +62,9 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		return nil, err
 	}
 
-	apiURL := baseURL + "/query/?q=" + neturl.QueryEscape(params.SOQL)
+	query := neturl.Values{}
+	query.Set("q", params.SOQL)
+	apiURL := baseURL + "/query/?" + query.Encode()
 
 	var resp sfQueryResponse
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, apiURL, nil, &resp); err != nil {

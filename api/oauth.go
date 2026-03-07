@@ -20,6 +20,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -428,6 +429,11 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		tokenExpiry = &token.Expiry
 	}
 
+	// Extract provider-specific extra data from the token response.
+	// For example, Salesforce includes instance_url which connectors
+	// need to construct API base URLs.
+	extraData := extractTokenExtraData(token)
+
 	_, err = db.CreateOAuthConnection(ctx, tx, db.CreateOAuthConnectionParams{
 		ID:                  connID,
 		UserID:              userID,
@@ -436,6 +442,7 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		RefreshTokenVaultID: refreshVaultID,
 		Scopes:              scopes,
 		TokenExpiry:         tokenExpiry,
+		ExtraData:           extraData,
 	})
 	if err != nil {
 		return fmt.Errorf("create connection: %w", err)
@@ -447,6 +454,33 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		}
 	}
 	return nil
+}
+
+// tokenExtraKeys lists the extra fields from OAuth token responses that should
+// be persisted in extra_data. These are provider-specific fields that connectors
+// need at execution time (e.g. Salesforce's instance_url).
+var tokenExtraKeys = []string{"instance_url"}
+
+// extractTokenExtraData pulls known extra fields from an OAuth token response
+// and marshals them as JSON for storage. Returns nil if no relevant extra data
+// is present (keeps the column NULL for most providers).
+func extractTokenExtraData(token *oauth2.Token) json.RawMessage {
+	extra := make(map[string]string)
+	for _, key := range tokenExtraKeys {
+		if val := token.Extra(key); val != nil {
+			if s, ok := val.(string); ok && s != "" {
+				extra[key] = s
+			}
+		}
+	}
+	if len(extra) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(extra)
+	if err != nil {
+		return nil
+	}
+	return data
 }
 
 // handleListOAuthConnections returns all OAuth connections for the authenticated user.
