@@ -22,9 +22,20 @@ func TestNotionConnector_Actions(t *testing.T) {
 	c := New()
 	actions := c.Actions()
 
-	// Phase 1: no actions registered yet.
-	if len(actions) != 0 {
-		t.Errorf("expected 0 actions in Phase 1, got %d", len(actions))
+	expected := []string{
+		"notion.create_page",
+		"notion.update_page",
+		"notion.append_blocks",
+		"notion.query_database",
+		"notion.search",
+	}
+	for _, name := range expected {
+		if _, ok := actions[name]; !ok {
+			t.Errorf("expected action %q to be registered", name)
+		}
+	}
+	if len(actions) != len(expected) {
+		t.Errorf("expected %d actions, got %d", len(expected), len(actions))
 	}
 }
 
@@ -97,8 +108,48 @@ func TestNotionConnector_Manifest(t *testing.T) {
 		t.Error("credential instructions_url is empty, want a URL")
 	}
 
-	// Manifest validation requires actions, which are added in Phase 2.
-	// Full Validate() call will be added alongside the action manifests.
+	if len(m.Actions) != 5 {
+		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
+	}
+	actionTypes := make(map[string]bool)
+	for _, a := range m.Actions {
+		actionTypes[a.ActionType] = true
+	}
+	for _, want := range []string{
+		"notion.create_page", "notion.update_page", "notion.append_blocks",
+		"notion.query_database", "notion.search",
+	} {
+		if !actionTypes[want] {
+			t.Errorf("Manifest().Actions missing %q", want)
+		}
+	}
+
+	if err := m.Validate(); err != nil {
+		t.Errorf("Manifest().Validate() = %v", err)
+	}
+}
+
+func TestNotionConnector_ActionsMatchManifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	actions := c.Actions()
+	manifest := c.Manifest()
+
+	manifestTypes := make(map[string]bool, len(manifest.Actions))
+	for _, a := range manifest.Actions {
+		manifestTypes[a.ActionType] = true
+	}
+
+	for actionType := range actions {
+		if !manifestTypes[actionType] {
+			t.Errorf("Actions() has %q but Manifest() does not", actionType)
+		}
+	}
+	for _, a := range manifest.Actions {
+		if _, ok := actions[a.ActionType]; !ok {
+			t.Errorf("Manifest() has %q but Actions() does not", a.ActionType)
+		}
+	}
 }
 
 func TestNotionConnector_ImplementsInterface(t *testing.T) {

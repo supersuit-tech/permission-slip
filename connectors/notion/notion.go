@@ -56,24 +56,196 @@ func newForTest(client *http.Client, baseURL string) *NotionConnector {
 func (c *NotionConnector) ID() string { return "notion" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup. Actions are stubbed here for Phase 1;
-// full parameter schemas will be added in Phase 3.
+// auto-seed DB rows on startup.
 func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "notion",
 		Name:        "Notion",
 		Description: "Notion integration for pages, databases, and content management",
-		Actions:     []connectors.ManifestAction{},
+		Actions: []connectors.ManifestAction{
+			{
+				ActionType:  "notion.create_page",
+				Name:        "Create Page",
+				Description: "Create a new page or database entry",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["parent_id", "title"],
+					"properties": {
+						"parent_id": {
+							"type": "string",
+							"description": "Parent page or database ID"
+						},
+						"title": {
+							"type": "string",
+							"description": "Page title"
+						},
+						"properties": {
+							"type": "object",
+							"description": "Database properties (overrides default title property when creating database entries)"
+						},
+						"content": {
+							"type": "array",
+							"description": "Array of Notion block objects to add as page content",
+							"items": {"type": "object"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "notion.update_page",
+				Name:        "Update Page",
+				Description: "Update properties on an existing page",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["page_id"],
+					"properties": {
+						"page_id": {
+							"type": "string",
+							"description": "The ID of the page to update"
+						},
+						"properties": {
+							"type": "object",
+							"description": "Partial property updates (Notion property objects)"
+						},
+						"archived": {
+							"type": "boolean",
+							"description": "Set to true to archive (soft-delete) the page"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "notion.append_blocks",
+				Name:        "Append Content",
+				Description: "Append blocks to the end of a page — useful for logs, journals, and running notes",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["page_id"],
+					"properties": {
+						"page_id": {
+							"type": "string",
+							"description": "The ID of the page to append content to"
+						},
+						"children": {
+							"type": "array",
+							"description": "Array of Notion block objects (paragraph, heading, to_do, code, etc.)",
+							"items": {"type": "object"}
+						},
+						"text": {
+							"type": "string",
+							"description": "Plain text to append (auto-wrapped as a paragraph block if children is not provided)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "notion.query_database",
+				Name:        "Query Database",
+				Description: "Query a database with filters and sorts",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["database_id"],
+					"properties": {
+						"database_id": {
+							"type": "string",
+							"description": "The ID of the database to query"
+						},
+						"filter": {
+							"type": "object",
+							"description": "Notion filter object (see Notion API docs for filter syntax)"
+						},
+						"sorts": {
+							"type": "array",
+							"description": "Array of sort objects with property and direction",
+							"items": {"type": "object"}
+						},
+						"page_size": {
+							"type": "integer",
+							"default": 100,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Number of results to return (max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "notion.search",
+				Name:        "Search",
+				Description: "Full-text search across all shared pages and databases",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["query"],
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Search query text"
+						},
+						"filter": {
+							"type": "object",
+							"description": "Filter by object type: {\"property\": \"object\", \"value\": \"page\"} or \"database\""
+						},
+						"page_size": {
+							"type": "integer",
+							"default": 100,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Number of results to return (max 100)"
+						}
+					}
+				}`)),
+			},
+		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{Service: "notion", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
+		},
+		Templates: []connectors.ManifestTemplate{
+			{
+				ID:          "tpl_notion_append_to_page",
+				ActionType:  "notion.append_blocks",
+				Name:        "Append to daily log page",
+				Description: "Agent can append content to a specific page (e.g., daily log, journal).",
+				Parameters:  json.RawMessage(`{"page_id":"*","text":"*"}`),
+			},
+			{
+				ID:          "tpl_notion_query_database",
+				ActionType:  "notion.query_database",
+				Name:        "Query project database",
+				Description: "Agent can query a specific database with any filters and sorts.",
+				Parameters:  json.RawMessage(`{"database_id":"*","filter":"*","sorts":"*","page_size":"*"}`),
+			},
+			{
+				ID:          "tpl_notion_search",
+				ActionType:  "notion.search",
+				Name:        "Search all pages",
+				Description: "Agent can search across all shared pages and databases.",
+				Parameters:  json.RawMessage(`{"query":"*","filter":"*","page_size":"*"}`),
+			},
+			{
+				ID:          "tpl_notion_create_page",
+				ActionType:  "notion.create_page",
+				Name:        "Create pages freely",
+				Description: "Agent can create pages under any parent with any content.",
+				Parameters:  json.RawMessage(`{"parent_id":"*","title":"*","properties":"*","content":"*"}`),
+			},
 		},
 	}
 }
 
 // Actions returns the registered action handlers keyed by action_type.
-// Phase 1 returns an empty map; actions are added in Phase 2.
 func (c *NotionConnector) Actions() map[string]connectors.Action {
-	return map[string]connectors.Action{}
+	return map[string]connectors.Action{
+		"notion.create_page":    &createPageAction{conn: c},
+		"notion.update_page":    &updatePageAction{conn: c},
+		"notion.append_blocks":  &appendBlocksAction{conn: c},
+		"notion.query_database": &queryDatabaseAction{conn: c},
+		"notion.search":         &searchAction{conn: c},
+	}
 }
 
 // ValidateCredentials checks that the provided credentials contain a
