@@ -105,10 +105,11 @@ func getQuoteManifest() connectors.ManifestAction {
 
 func createDeliveryManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
-		ActionType:  "doordash.create_delivery",
-		Name:        "Create Delivery",
-		Description: "Create a delivery request that dispatches a Dasher. WARNING: This is a high-risk action — it dispatches a real courier and charges money. Always use get_quote first so the user can approve the cost before creating the delivery.",
-		RiskLevel:   "high",
+		ActionType:            "doordash.create_delivery",
+		Name:                  "Create Delivery",
+		Description:           "Create a delivery request that dispatches a Dasher. WARNING: This is a high-risk action — it dispatches a real courier and charges money. Always use get_quote first so the user can approve the cost before creating the delivery.",
+		RiskLevel:             "high",
+		RequiresPaymentMethod: true,
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 			"type": "object",
 			"required": ["pickup_address", "pickup_phone", "dropoff_address", "dropoff_phone", "dropoff_contact_given_name"],
