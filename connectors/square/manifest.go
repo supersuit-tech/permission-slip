@@ -33,7 +33,7 @@ func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "square",
 		Name:        "Square",
-		Description: "Square integration for orders, payments, catalog, customers, and bookings",
+		Description: "Square integration for orders, payments, catalog, customers, bookings, refunds, invoices, and inventory",
 		Actions: []connectors.ManifestAction{
 			createOrderManifest(),
 			createPaymentManifest(),
@@ -41,6 +41,11 @@ func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 			createCustomerManifest(),
 			createBookingManifest(),
 			searchOrdersManifest(),
+			issueRefundManifest(),
+			updateCatalogItemManifest(),
+			sendInvoiceManifest(),
+			getInventoryManifest(),
+			adjustInventoryManifest(),
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -98,6 +103,41 @@ func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search orders (read-only)",
 				Description: "Agent can search and filter orders across locations.",
 				Parameters:  json.RawMessage(`{"location_ids":"*","query":"*","limit":"*","cursor":"*"}`),
+			},
+			{
+				ID:          "tpl_square_issue_refund",
+				ActionType:  "square.issue_refund",
+				Name:        "Issue refunds",
+				Description: "Agent can refund payments. WARNING: returns real money and is irreversible. Requires human approval per refund.",
+				Parameters:  json.RawMessage(`{"payment_id":"*","amount_money":"*","reason":"*"}`),
+			},
+			{
+				ID:          "tpl_square_update_catalog_item",
+				ActionType:  "square.update_catalog_item",
+				Name:        "Update catalog items",
+				Description: "Agent can update product names, descriptions, and prices in the catalog.",
+				Parameters:  json.RawMessage(`{"object_id":"*","name":"*","description":"*","variations":"*","version":"*"}`),
+			},
+			{
+				ID:          "tpl_square_send_invoice",
+				ActionType:  "square.send_invoice",
+				Name:        "Send invoices",
+				Description: "Agent can create and send invoices to customers. Sends real payment requests via email or SMS.",
+				Parameters:  json.RawMessage(`{"customer_id":"*","location_id":"*","line_items":"*","due_date":"*","delivery_method":"*","title":"*","note":"*"}`),
+			},
+			{
+				ID:          "tpl_square_get_inventory",
+				ActionType:  "square.get_inventory",
+				Name:        "View inventory (read-only)",
+				Description: "Agent can check inventory counts for catalog items across locations.",
+				Parameters:  json.RawMessage(`{"catalog_object_ids":"*","location_ids":"*"}`),
+			},
+			{
+				ID:          "tpl_square_adjust_inventory",
+				ActionType:  "square.adjust_inventory",
+				Name:        "Adjust inventory counts",
+				Description: "Agent can adjust inventory quantities (e.g. receive stock, mark as sold). Changes are recoverable.",
+				Parameters:  json.RawMessage(`{"catalog_object_id":"*","location_id":"*","quantity":"*","from_state":"*","to_state":"*"}`),
 			},
 		},
 	}
@@ -324,6 +364,217 @@ func searchOrdersManifest() connectors.ManifestAction {
 				"cursor": {
 					"type": "string",
 					"description": "Pagination cursor from a previous search_orders response"
+				}
+			}
+		}`)),
+	}
+}
+
+func issueRefundManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.issue_refund",
+		Name:        "Issue Refund",
+		Description: "Refund a payment in full or partially. WARNING: returns real money and is irreversible. Omit amount_money for a full refund. Always double-check the payment ID and amount before submitting.",
+		RiskLevel:   "high",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(fmt.Sprintf(`{
+			"type": "object",
+			"required": ["payment_id"],
+			"additionalProperties": false,
+			"properties": {
+				"payment_id": {
+					"type": "string",
+					"description": "ID of the payment to refund (from square.create_payment or square.search_orders)"
+				},
+				"amount_money": %s,
+				"reason": {
+					"type": "string",
+					"description": "Reason for the refund (shown on the receipt)"
+				}
+			}
+		}`, moneySchema))),
+	}
+}
+
+func updateCatalogItemManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.update_catalog_item",
+		Name:        "Update Catalog Item",
+		Description: "Update a catalog item's name, description, or pricing. Uses Square's upsert endpoint. Include the version field to prevent conflicting updates.",
+		RiskLevel:   "medium",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(fmt.Sprintf(`{
+			"type": "object",
+			"required": ["object_id"],
+			"additionalProperties": false,
+			"properties": {
+				"object_id": {
+					"type": "string",
+					"description": "ID of the catalog item to update (from square.list_catalog)"
+				},
+				"name": {
+					"type": "string",
+					"description": "New display name for the item"
+				},
+				"description": {
+					"type": "string",
+					"description": "New description for the item"
+				},
+				"variations": {
+					"type": "array",
+					"description": "Item variations (sizes, colors, etc.) with pricing",
+					"items": {
+						"type": "object",
+						"required": ["id"],
+						"additionalProperties": false,
+						"properties": {
+							"id": {
+								"type": "string",
+								"description": "Variation ID (use existing ID to update, or #new-variation-id for new)"
+							},
+							"name": {
+								"type": "string",
+								"description": "Variation name (e.g. \"Small\", \"Regular\", \"Large\")"
+							},
+							"pricing_type": {
+								"type": "string",
+								"enum": ["FIXED_PRICING", "VARIABLE_PRICING"],
+								"description": "FIXED_PRICING for set price, VARIABLE_PRICING for open amount"
+							},
+							"price_money": %s,
+							"version": {
+								"type": "integer",
+								"description": "Current version of this variation (for conflict detection)"
+							}
+						}
+					}
+				},
+				"version": {
+					"type": "integer",
+					"description": "Current version of the catalog object (for conflict detection). Get from list_catalog."
+				}
+			}
+		}`, moneySchema))),
+	}
+}
+
+func sendInvoiceManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.send_invoice",
+		Name:        "Send Invoice",
+		Description: "Create and send an invoice to a customer. Creates an order, generates the invoice, and publishes it in one step. The customer receives a payment request via the specified delivery method.",
+		RiskLevel:   "medium",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(fmt.Sprintf(`{
+			"type": "object",
+			"required": ["customer_id", "location_id", "line_items", "due_date"],
+			"additionalProperties": false,
+			"properties": {
+				"customer_id": {
+					"type": "string",
+					"description": "Square customer ID for the invoice recipient (from square.create_customer)"
+				},
+				"location_id": {
+					"type": "string",
+					"description": "Square location ID the invoice is issued from"
+				},
+				"line_items": {
+					"type": "array",
+					"minItems": 1,
+					"description": "Items to include on the invoice",
+					"items": {
+						"type": "object",
+						"required": ["description", "quantity", "base_price_money"],
+						"additionalProperties": false,
+						"properties": {
+							"description": {
+								"type": "string",
+								"description": "Line item description (e.g. \"Web Design Services\")"
+							},
+							"quantity": {
+								"type": "string",
+								"description": "Quantity as a string (Square API requirement). Example: \"1\", \"2\""
+							},
+							"base_price_money": %s
+						}
+					}
+				},
+				"due_date": {
+					"type": "string",
+					"description": "Payment due date in YYYY-MM-DD format (e.g. \"2024-12-31\")"
+				},
+				"delivery_method": {
+					"type": "string",
+					"enum": ["EMAIL", "SMS", "SHARE_MANUALLY"],
+					"description": "How to deliver the invoice. Default: EMAIL"
+				},
+				"title": {
+					"type": "string",
+					"description": "Invoice title (e.g. \"March 2024 Services\")"
+				},
+				"note": {
+					"type": "string",
+					"description": "Additional note included on the invoice"
+				}
+			}
+		}`, moneySchema))),
+	}
+}
+
+func getInventoryManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.get_inventory",
+		Name:        "Get Inventory",
+		Description: "Retrieve current inventory counts for one or more catalog items. Read-only — does not modify any data. Use this to check stock levels before adjusting inventory.",
+		RiskLevel:   "low",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+			"type": "object",
+			"required": ["catalog_object_ids"],
+			"additionalProperties": false,
+			"properties": {
+				"catalog_object_ids": {
+					"type": "array",
+					"minItems": 1,
+					"items": {"type": "string"},
+					"description": "One or more catalog object IDs to retrieve inventory counts for"
+				},
+				"location_ids": {
+					"type": "array",
+					"items": {"type": "string"},
+					"description": "Filter counts to specific locations. Omit to get counts across all locations."
+				}
+			}
+		}`)),
+	}
+}
+
+func adjustInventoryManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.adjust_inventory",
+		Name:        "Adjust Inventory",
+		Description: "Adjust inventory counts for a catalog item at a location. Use to receive stock (NONE → IN_STOCK), record sales (IN_STOCK → SOLD), process returns (SOLD → RETURNED_BY_CUSTOMER), or any other state transition.",
+		RiskLevel:   "medium",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+			"type": "object",
+			"required": ["catalog_object_id", "location_id", "quantity", "from_state", "to_state"],
+			"additionalProperties": false,
+			"properties": {
+				"catalog_object_id": {
+					"type": "string",
+					"description": "ID of the catalog item to adjust inventory for"
+				},
+				"location_id": {
+					"type": "string",
+					"description": "Square location ID where the inventory change occurs"
+				},
+				"quantity": {
+					"type": "string",
+					"description": "Quantity to adjust as a string (e.g. \"10\", \"5\")"
+				},
+				"from_state": {
+					"type": "string",
+					"description": "Current inventory state (e.g. NONE, IN_STOCK, SOLD, RETURNED_BY_CUSTOMER)"
+				},
+				"to_state": {
+					"type": "string",
+					"description": "Target inventory state (e.g. IN_STOCK, SOLD, WASTE)"
 				}
 			}
 		}`)),

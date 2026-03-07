@@ -68,12 +68,17 @@ func (c *SquareConnector) ID() string { return "square" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *SquareConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"square.create_order":    &createOrderAction{conn: c},
-		"square.create_payment":  &createPaymentAction{conn: c},
-		"square.list_catalog":    &listCatalogAction{conn: c},
-		"square.create_customer": &createCustomerAction{conn: c},
-		"square.create_booking":  &createBookingAction{conn: c},
-		"square.search_orders":   &searchOrdersAction{conn: c},
+		"square.create_order":        &createOrderAction{conn: c},
+		"square.create_payment":      &createPaymentAction{conn: c},
+		"square.list_catalog":        &listCatalogAction{conn: c},
+		"square.create_customer":     &createCustomerAction{conn: c},
+		"square.create_booking":      &createBookingAction{conn: c},
+		"square.search_orders":       &searchOrdersAction{conn: c},
+		"square.issue_refund":        &issueRefundAction{conn: c},
+		"square.update_catalog_item": &updateCatalogItemAction{conn: c},
+		"square.send_invoice":        &sendInvoiceAction{conn: c},
+		"square.get_inventory":       &getInventoryAction{conn: c},
+		"square.adjust_inventory":    &adjustInventoryAction{conn: c},
 	}
 }
 
