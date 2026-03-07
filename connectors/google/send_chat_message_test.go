@@ -178,21 +178,36 @@ func TestSendChatMessage_PathTraversal(t *testing.T) {
 	conn := New()
 	action := &sendChatMessageAction{conn: conn}
 
-	params, _ := json.Marshal(sendChatMessageParams{
-		SpaceName: "spaces/../admin",
-		Text:      "Hello",
-	})
-
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_chat_message",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error for path traversal in space_name")
+	cases := []struct {
+		name      string
+		spaceName string
+	}{
+		{"dot-dot traversal", "spaces/.."},
+		{"slash in space ID", "spaces/foo/bar"},
+		{"query string injection", "spaces/foo?admin=true"},
+		{"fragment injection", "spaces/foo#admin"},
+		{"empty space ID", "spaces/"},
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			params, _ := json.Marshal(sendChatMessageParams{
+				SpaceName: tc.spaceName,
+				Text:      "Hello",
+			})
+
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "google.send_chat_message",
+				Parameters:  params,
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatalf("expected error for space_name %q", tc.spaceName)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got: %T (%v)", err, err)
+			}
+		})
 	}
 }
 

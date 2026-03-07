@@ -26,13 +26,19 @@ func (p *sendChatMessageParams) validate() error {
 	if p.SpaceName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: space_name"}
 	}
-	// Validate the space_name format to prevent path traversal.
-	// Google Chat space names always follow the pattern "spaces/{spaceId}".
+	// Validate the space_name format to prevent path traversal and URL injection.
+	// Google Chat space names follow the pattern "spaces/{spaceId}" where
+	// spaceId is an alphanumeric identifier (e.g. "spaces/AAAAMpdlehY").
 	if !strings.HasPrefix(p.SpaceName, "spaces/") {
 		return &connectors.ValidationError{Message: "space_name must start with 'spaces/' (e.g. 'spaces/AAAA1234')"}
 	}
-	if strings.Contains(p.SpaceName, "..") {
-		return &connectors.ValidationError{Message: "space_name contains invalid path segments"}
+	spaceID := strings.TrimPrefix(p.SpaceName, "spaces/")
+	if spaceID == "" {
+		return &connectors.ValidationError{Message: "space_name must include a space ID after 'spaces/'"}
+	}
+	// Reject characters that could alter URL path or query (/  ?  #  ..)
+	if strings.ContainsAny(spaceID, "/?#") || strings.Contains(spaceID, "..") {
+		return &connectors.ValidationError{Message: "space_name contains invalid characters"}
 	}
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}
