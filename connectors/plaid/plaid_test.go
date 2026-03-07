@@ -95,6 +95,21 @@ func TestPlaidConnector_ValidateCredentials(t *testing.T) {
 			creds:   connectors.NewCredentials(map[string]string{"client_id": testClientID, "secret": "short"}),
 			wantErr: true,
 		},
+		{
+			name:    "valid with sandbox environment",
+			creds:   connectors.NewCredentials(map[string]string{"client_id": testClientID, "secret": testSecret, "environment": "sandbox"}),
+			wantErr: false,
+		},
+		{
+			name:    "valid with production environment",
+			creds:   connectors.NewCredentials(map[string]string{"client_id": testClientID, "secret": testSecret, "environment": "production"}),
+			wantErr: false,
+		},
+		{
+			name:    "invalid environment",
+			creds:   connectors.NewCredentials(map[string]string{"client_id": testClientID, "secret": testSecret, "environment": "staging"}),
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -104,5 +119,58 @@ func TestPlaidConnector_ValidateCredentials(t *testing.T) {
 				t.Errorf("ValidateCredentials() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestPlaidConnector_BaseURLForCreds(t *testing.T) {
+	t.Parallel()
+	conn := New()
+
+	tests := []struct {
+		name    string
+		creds   connectors.Credentials
+		wantURL string
+	}{
+		{
+			name:    "defaults to sandbox",
+			creds:   validCreds(),
+			wantURL: sandboxBaseURL,
+		},
+		{
+			name:    "sandbox environment",
+			creds:   connectors.NewCredentials(map[string]string{"client_id": testClientID, "secret": testSecret, "environment": "sandbox"}),
+			wantURL: sandboxBaseURL,
+		},
+		{
+			name:    "production environment",
+			creds:   connectors.NewCredentials(map[string]string{"client_id": testClientID, "secret": testSecret, "environment": "production"}),
+			wantURL: productionBaseURL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := conn.baseURLForCreds(tt.creds)
+			if got != tt.wantURL {
+				t.Errorf("baseURLForCreds() = %q, want %q", got, tt.wantURL)
+			}
+		})
+	}
+}
+
+func TestPlaidConnector_BaseURLForCreds_TestOverride(t *testing.T) {
+	t.Parallel()
+	testURL := "http://localhost:9999"
+	conn := newForTest(nil, testURL)
+
+	// Even with production creds, test override takes precedence.
+	creds := connectors.NewCredentials(map[string]string{
+		"client_id":   testClientID,
+		"secret":      testSecret,
+		"environment": "production",
+	})
+	got := conn.baseURLForCreds(creds)
+	if got != testURL {
+		t.Errorf("baseURLForCreds() = %q, want test override %q", got, testURL)
 	}
 }

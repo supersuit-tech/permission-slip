@@ -10,7 +10,7 @@ import (
 
 // checkResponse inspects the HTTP status code and returns an appropriate
 // typed error for non-success responses.
-func checkResponse(statusCode int, body []byte) error {
+func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil
 	}
@@ -29,13 +29,17 @@ func checkResponse(statusCode int, body []byte) error {
 		msg = msg[:maxErrBody] + "...(truncated)"
 	}
 	if json.Unmarshal(body, &plaidErr) == nil && plaidErr.ErrorMessage != "" {
-		msg = fmt.Sprintf("[%s/%s] %s", plaidErr.ErrorType, plaidErr.ErrorCode, plaidErr.ErrorMessage)
+		// Put the human-readable message first, then include the error code
+		// for debugging — matches the Stripe connector pattern.
+		msg = fmt.Sprintf("%s (code: %s, type: %s)", plaidErr.ErrorMessage, plaidErr.ErrorCode, plaidErr.ErrorType)
 	}
 
 	switch {
 	case statusCode == http.StatusTooManyRequests:
+		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
 		return &connectors.RateLimitError{
-			Message: fmt.Sprintf("Plaid API rate limit exceeded: %s", msg),
+			Message:    fmt.Sprintf("Plaid API rate limit exceeded: %s", msg),
+			RetryAfter: retryAfter,
 		}
 	case statusCode == http.StatusUnauthorized:
 		return &connectors.AuthError{Message: fmt.Sprintf("Plaid API auth error: %s", msg)}
