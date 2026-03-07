@@ -30,6 +30,11 @@ func TestShopifyConnector_Actions(t *testing.T) {
 		"shopify.create_product",
 		"shopify.update_inventory",
 		"shopify.create_discount",
+		"shopify.fulfill_order",
+		"shopify.cancel_order",
+		"shopify.update_product",
+		"shopify.create_collection",
+		"shopify.get_analytics",
 	}
 
 	if len(actions) != len(wantActions) {
@@ -136,8 +141,8 @@ func TestShopifyConnector_Manifest(t *testing.T) {
 		t.Error("credential instructions_url is empty, want a URL")
 	}
 
-	if len(m.Actions) != 6 {
-		t.Errorf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 11 {
+		t.Errorf("Manifest().Actions has %d items, want 11", len(m.Actions))
 	}
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v, want nil", err)
