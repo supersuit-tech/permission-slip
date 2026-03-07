@@ -12,6 +12,8 @@ import (
 
 // sendChatMessageAction implements connectors.Action for google.send_chat_message.
 // It sends a message via the Google Chat API POST /v1/{parent}/messages.
+// API docs: https://developers.google.com/chat/api/reference/rest/v1/spaces.messages/create
+// Required scope: chat.messages.create
 type sendChatMessageAction struct {
 	conn *GoogleConnector
 }

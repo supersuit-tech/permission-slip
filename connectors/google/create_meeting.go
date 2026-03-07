@@ -15,6 +15,9 @@ import (
 // createMeetingAction implements connectors.Action for google.create_meeting.
 // It creates a Google Calendar event with an auto-generated Google Meet
 // conference link via POST /calendars/{calendarId}/events?conferenceDataVersion=1.
+// API docs: https://developers.google.com/calendar/api/v3/reference/events/insert
+// Meet integration: https://developers.google.com/calendar/api/guides/create-events#conferencing
+// Required scope: calendar.events
 type createMeetingAction struct {
 	conn *GoogleConnector
 }

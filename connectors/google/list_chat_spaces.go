@@ -13,6 +13,8 @@ import (
 
 // listChatSpacesAction implements connectors.Action for google.list_chat_spaces.
 // It lists spaces via the Google Chat API GET /v1/spaces.
+// API docs: https://developers.google.com/chat/api/reference/rest/v1/spaces/list
+// Required scope: chat.spaces.readonly
 type listChatSpacesAction struct {
 	conn *GoogleConnector
 }
