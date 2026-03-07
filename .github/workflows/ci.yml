@@ -87,7 +87,25 @@ jobs:
 
       - name: Run backend tests
         if: steps.gobuild.outcome == 'success' && steps.govet.outcome == 'success'
-        run: make test-backend
+        id: gotest
+        run: |
+          go test ./... 2>&1 | tee /tmp/gotest.log
+        continue-on-error: true
+
+      - name: Post test error
+        if: steps.gotest.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('/tmp/gotest.log', 'utf8').slice(0, 10000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 321,
+              body: `## Test Failed (exit code from go test)\n\`\`\`\n${log}\n\`\`\``
+            });
+            core.setFailed('go test failed');
 
   frontend:
     name: Frontend Tests
