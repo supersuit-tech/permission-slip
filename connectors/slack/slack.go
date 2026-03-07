@@ -25,6 +25,12 @@ const (
 	// defaultRetryAfter is used when the Slack API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 30 * time.Second
+
+	// maxResponseBytes caps the Slack API response body at 10 MB to prevent
+	// memory exhaustion from unexpectedly large payloads (e.g., 1000 messages
+	// with rich content). Slack's largest documented payloads are well under
+	// this limit.
+	maxResponseBytes = 10 << 20 // 10 MB
 )
 
 // SlackConnector owns the shared HTTP client and base URL used by all
@@ -354,7 +360,7 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 		}
 	}
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
@@ -373,7 +379,7 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 // connector error type.
 func mapSlackError(slackErr string) error {
 	switch slackErr {
-	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive":
+	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive", "missing_scope":
 		return &connectors.AuthError{Message: fmt.Sprintf("Slack auth error: %s", slackErr)}
 	case "ratelimited":
 		return &connectors.RateLimitError{Message: "Slack API rate limit exceeded"}
