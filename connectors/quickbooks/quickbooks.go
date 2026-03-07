@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -174,6 +175,25 @@ func (c *QuickBooksConnector) doGet(ctx context.Context, creds connectors.Creden
 // doPost is a convenience wrapper around doJSON for POST requests.
 func (c *QuickBooksConnector) doPost(ctx context.Context, creds connectors.Credentials, path string, reqBody any, respBody any) error {
 	return c.doJSON(ctx, creds, http.MethodPost, path, reqBody, respBody)
+}
+
+// dateRe matches YYYY-MM-DD date format. Used to validate user-supplied dates
+// before sending to the QuickBooks API so users get clear validation errors
+// instead of confusing QBO responses.
+var dateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// validateDate checks that a date string matches YYYY-MM-DD format.
+// Returns nil for empty strings (optional dates).
+func validateDate(field, value string) error {
+	if value == "" {
+		return nil
+	}
+	if !dateRe.MatchString(value) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s must be in YYYY-MM-DD format (got %q)", field, value),
+		}
+	}
+	return nil
 }
 
 // truncate caps s at approximately maxLen bytes, appending "..." if truncated.

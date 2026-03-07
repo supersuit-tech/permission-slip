@@ -26,6 +26,13 @@ func (a *getBalanceSheetAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 
+	if err := validateDate("start_date", params.StartDate); err != nil {
+		return nil, err
+	}
+	if err := validateDate("end_date", params.EndDate); err != nil {
+		return nil, err
+	}
+
 	path := companyPath(req.Credentials) + "/reports/BalanceSheet"
 	q := url.Values{}
 	if params.StartDate != "" {

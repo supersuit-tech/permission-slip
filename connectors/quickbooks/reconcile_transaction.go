@@ -29,6 +29,9 @@ func (p *reconcileTransactionParams) validate() error {
 	if p.Amount <= 0 {
 		return &connectors.ValidationError{Message: "amount must be positive"}
 	}
+	if err := validateDate("txn_date", p.TxnDate); err != nil {
+		return err
+	}
 	return nil
 }
 

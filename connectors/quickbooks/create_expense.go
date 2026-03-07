@@ -47,6 +47,9 @@ func (p *createExpenseParams) validate() error {
 			Message: fmt.Sprintf("invalid payment_type %q; valid types: Cash, Check, CreditCard", p.PaymentType),
 		}
 	}
+	if err := validateDate("txn_date", p.TxnDate); err != nil {
+		return err
+	}
 	if len(p.Lines) == 0 {
 		return &connectors.ValidationError{Message: "at least one line is required"}
 	}

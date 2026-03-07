@@ -33,6 +33,9 @@ func (p *createInvoiceParams) validate() error {
 	if p.CustomerID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: customer_id"}
 	}
+	if err := validateDate("due_date", p.DueDate); err != nil {
+		return err
+	}
 	if len(p.LineItems) == 0 {
 		return &connectors.ValidationError{Message: "at least one line item is required"}
 	}

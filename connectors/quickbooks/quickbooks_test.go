@@ -281,6 +281,22 @@ func TestCheckResponse_FaultErrorIncludesCode(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_404NotFound(t *testing.T) {
+	t.Parallel()
+
+	body := `{"Fault":{"Error":[{"Message":"Object Not Found","Detail":"Customer 99999 not found","code":"610"}],"type":"ValidationFault"}}`
+	err := checkResponse(404, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for 404, got %T: %v", err, err)
+	}
+	if got := err.Error(); !strings.Contains(got, "resource not found") {
+		t.Errorf("error should mention 'resource not found', got: %s", got)
+	}
+}
+
 func TestCheckResponse_LargeBodyTruncated(t *testing.T) {
 	t.Parallel()
 
@@ -291,6 +307,35 @@ func TestCheckResponse_LargeBodyTruncated(t *testing.T) {
 	}
 	if len(err.Error()) > 700 {
 		t.Errorf("error message too large (%d bytes), should be truncated", len(err.Error()))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// validateDate
+// ---------------------------------------------------------------------------
+
+func TestValidateDate_Valid(t *testing.T) {
+	t.Parallel()
+
+	for _, date := range []string{"", "2025-01-15", "2026-12-31"} {
+		if err := validateDate("test_date", date); err != nil {
+			t.Errorf("validateDate(%q) unexpected error: %v", date, err)
+		}
+	}
+}
+
+func TestValidateDate_Invalid(t *testing.T) {
+	t.Parallel()
+
+	for _, date := range []string{"yesterday", "12/31/2025", "2025/01/15", "Jan 15, 2025", "20250115"} {
+		err := validateDate("test_date", date)
+		if err == nil {
+			t.Errorf("validateDate(%q) expected error, got nil", date)
+			continue
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("validateDate(%q) expected ValidationError, got %T: %v", date, err, err)
+		}
 	}
 }
 
