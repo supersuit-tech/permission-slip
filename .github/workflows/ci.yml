@@ -41,7 +41,7 @@ jobs:
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
       - name: Run backend tests
-        run: make test-backend
+        run: go test -v -count=1 ./... 2>&1 | tee /tmp/test-output.txt; TEST_EXIT=$?; grep -E "^(--- FAIL:|FAIL\t)" /tmp/test-output.txt | while read -r line; do echo "::error::$line"; done; grep -B5 "^--- FAIL:" /tmp/test-output.txt | while read -r line; do echo "::warning::$line"; done; exit $TEST_EXIT
 
   frontend:
     name: Frontend Tests
