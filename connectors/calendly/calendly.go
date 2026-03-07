@@ -1,0 +1,220 @@
+// Package calendly implements the Calendly connector for the Permission Slip
+// connector execution layer. It uses the Calendly REST API v2 with personal
+// access tokens (API key auth).
+package calendly
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+const (
+	defaultBaseURL = "https://api.calendly.com"
+	defaultTimeout = 30 * time.Second
+	credKeyAPIKey  = "api_key"
+
+	// defaultRetryAfter is used when Calendly returns a 429 without a
+	// Retry-After header (or an unparseable one).
+	defaultRetryAfter = 60 * time.Second
+
+	// maxResponseBytes caps the response body we'll read from Calendly APIs.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
+)
+
+// CalendlyConnector owns the shared HTTP client and base URL used by all
+// Calendly actions. Actions hold a pointer back to the connector to access
+// these shared resources.
+type CalendlyConnector struct {
+	client  *http.Client
+	baseURL string
+}
+
+// New creates a CalendlyConnector with sensible defaults.
+func New() *CalendlyConnector {
+	return &CalendlyConnector{
+		client:  &http.Client{Timeout: defaultTimeout},
+		baseURL: defaultBaseURL,
+	}
+}
+
+// newForTest creates a CalendlyConnector that points at a test server.
+func newForTest(client *http.Client, baseURL string) *CalendlyConnector {
+	return &CalendlyConnector{
+		client:  client,
+		baseURL: baseURL,
+	}
+}
+
+// ID returns "calendly", matching the connectors.id in the database.
+func (c *CalendlyConnector) ID() string { return "calendly" }
+
+// Actions returns the registered action handlers keyed by action_type.
+func (c *CalendlyConnector) Actions() map[string]connectors.Action {
+	return map[string]connectors.Action{
+		"calendly.list_event_types":      &listEventTypesAction{conn: c},
+		"calendly.create_scheduling_link": &createSchedulingLinkAction{conn: c},
+		"calendly.list_scheduled_events":  &listScheduledEventsAction{conn: c},
+		"calendly.cancel_event":           &cancelEventAction{conn: c},
+		"calendly.get_event":              &getEventAction{conn: c},
+		"calendly.list_available_times":   &listAvailableTimesAction{conn: c},
+	}
+}
+
+// ValidateCredentials checks that the provided credentials contain a non-empty
+// api_key and tests it against GET /users/me.
+func (c *CalendlyConnector) ValidateCredentials(ctx context.Context, creds connectors.Credentials) error {
+	key, ok := creds.Get(credKeyAPIKey)
+	if !ok || key == "" {
+		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	}
+
+	// Test the key against /users/me to verify it's valid.
+	var resp usersmeResponse
+	if err := c.doJSON(ctx, creds, http.MethodGet, c.baseURL+"/users/me", nil, &resp); err != nil {
+		return err
+	}
+
+	if resp.Resource.URI == "" {
+		return &connectors.ValidationError{Message: "Calendly API returned empty user URI"}
+	}
+
+	return nil
+}
+
+// usersmeResponse is the Calendly API response from GET /users/me.
+type usersmeResponse struct {
+	Resource struct {
+		URI  string `json:"uri"`
+		Name string `json:"name"`
+	} `json:"resource"`
+}
+
+// getUserURI calls GET /users/me and returns the authenticated user's URI.
+// Most Calendly list endpoints require this URI as a filter parameter.
+func (c *CalendlyConnector) getUserURI(ctx context.Context, creds connectors.Credentials) (string, error) {
+	var resp usersmeResponse
+	if err := c.doJSON(ctx, creds, http.MethodGet, c.baseURL+"/users/me", nil, &resp); err != nil {
+		return "", err
+	}
+	if resp.Resource.URI == "" {
+		return "", &connectors.ExternalError{Message: "Calendly API returned empty user URI from /users/me"}
+	}
+	return resp.Resource.URI, nil
+}
+
+// doJSON is the shared request lifecycle for Calendly API calls that send and
+// receive JSON. It marshals reqBody as JSON, sends the request with Bearer
+// token auth, handles rate limiting and timeouts, and unmarshals the
+// response into respBody.
+func (c *CalendlyConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, url string, reqBody, respBody any) error {
+	token, ok := creds.Get(credKeyAPIKey)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	}
+
+	var body io.Reader
+	if reqBody != nil {
+		payload, err := json.Marshal(reqBody)
+		if err != nil {
+			return &connectors.ExternalError{Message: fmt.Sprintf("marshaling request body: %v", err)}
+		}
+		body = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("Calendly API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Calendly API request canceled"}
+		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Calendly API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
+		return err
+	}
+
+	if respBody != nil && len(respBytes) > 0 {
+		if err := json.Unmarshal(respBytes, respBody); err != nil {
+			return &connectors.ExternalError{
+				StatusCode: resp.StatusCode,
+				Message:    "failed to decode Calendly API response",
+			}
+		}
+	}
+
+	return nil
+}
+
+// calendlyAPIError represents the error response format from the Calendly API.
+// Calendly returns {"title": "<string>", "message": "<string>"} on errors.
+type calendlyAPIError struct {
+	Title   string `json:"title"`
+	Message string `json:"message"`
+}
+
+// checkResponse maps HTTP status codes to typed connector errors.
+func checkResponse(statusCode int, header http.Header, body []byte) error {
+	if statusCode >= 200 && statusCode < 300 {
+		return nil
+	}
+
+	var apiErr calendlyAPIError
+	msg := "Calendly API error"
+	if err := json.Unmarshal(body, &apiErr); err == nil {
+		if apiErr.Message != "" {
+			msg = apiErr.Message
+		} else if apiErr.Title != "" {
+			msg = apiErr.Title
+		}
+	}
+
+	switch {
+	case statusCode == http.StatusUnauthorized:
+		return &connectors.AuthError{Message: fmt.Sprintf("Calendly auth error: %s", msg)}
+	case statusCode == http.StatusForbidden:
+		return &connectors.AuthError{Message: fmt.Sprintf("Calendly permission denied: %s", msg)}
+	case statusCode == http.StatusTooManyRequests:
+		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
+		return &connectors.RateLimitError{
+			Message:    fmt.Sprintf("Calendly API rate limit exceeded: %s", msg),
+			RetryAfter: retryAfter,
+		}
+	case statusCode == http.StatusBadRequest:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Calendly API bad request: %s", msg)}
+	case statusCode == http.StatusUnprocessableEntity:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Calendly API validation error: %s", msg)}
+	case statusCode == http.StatusNotFound:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Calendly API not found: %s", msg)}
+	case statusCode == http.StatusConflict:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Calendly API conflict: %s", msg)}
+	default:
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("Calendly API error (HTTP %d): %s", statusCode, msg),
+		}
+	}
+}
