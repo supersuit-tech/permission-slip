@@ -28,8 +28,11 @@ type readChannelMessagesParams struct {
 }
 
 func (p *readChannelMessagesParams) validate() error {
-	if p.Channel == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: channel"}
+	if err := validateChannelID(p.Channel); err != nil {
+		return err
+	}
+	if err := validateLimit(p.Limit); err != nil {
+		return err
 	}
 	return nil
 }
@@ -47,7 +50,7 @@ type readChannelMessagesResponse struct {
 	slackResponse
 	Messages []slackMessage                 `json:"messages,omitempty"`
 	HasMore  bool                           `json:"has_more,omitempty"`
-	Meta     *readChannelMessagesPageMeta   `json:"response_metadata,omitempty"`
+	Meta     *paginationMeta   `json:"response_metadata,omitempty"`
 }
 
 type slackMessage struct {
@@ -58,10 +61,6 @@ type slackMessage struct {
 	TS        string `json:"ts"`
 	ThreadTS  string `json:"thread_ts,omitempty"`
 	ReplyCount int   `json:"reply_count,omitempty"`
-}
-
-type readChannelMessagesPageMeta struct {
-	NextCursor string `json:"next_cursor"`
 }
 
 // readChannelMessagesResult is the action output.

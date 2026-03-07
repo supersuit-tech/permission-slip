@@ -273,6 +273,44 @@ type slackResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
+// paginationMeta is the shared response_metadata shape for paginated endpoints.
+type paginationMeta struct {
+	NextCursor string `json:"next_cursor"`
+}
+
+// validateChannelID checks that a channel parameter looks like a valid Slack
+// channel ID (starts with C, G, or D). This catches common mistakes like
+// passing a channel name instead of an ID before hitting the Slack API.
+func validateChannelID(channel string) error {
+	if channel == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: channel"}
+	}
+	if len(channel) < 2 {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid channel ID %q: expected a Slack channel ID starting with C, G, or D (e.g. C01234567)", channel),
+		}
+	}
+	switch channel[0] {
+	case 'C', 'G', 'D':
+		return nil
+	default:
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid channel ID %q: expected a Slack channel ID starting with C, G, or D — did you pass a channel name instead?", channel),
+		}
+	}
+}
+
+// validateLimit checks that a pagination limit is within the Slack API range (1-1000).
+// A zero value means "use default" and is always valid.
+func validateLimit(limit int) error {
+	if limit != 0 && (limit < 1 || limit > 1000) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("limit must be between 1 and 1000, got %d", limit),
+		}
+	}
+	return nil
+}
+
 // doPost is the shared request lifecycle for all Slack actions. It marshals
 // body as JSON, sends a POST to the given Slack API method with auth headers,
 // handles rate limiting and timeouts, and unmarshals the response into dest.

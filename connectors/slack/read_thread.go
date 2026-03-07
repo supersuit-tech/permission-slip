@@ -25,11 +25,14 @@ type readThreadParams struct {
 }
 
 func (p *readThreadParams) validate() error {
-	if p.Channel == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: channel"}
+	if err := validateChannelID(p.Channel); err != nil {
+		return err
 	}
 	if p.ThreadTS == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: thread_ts"}
+	}
+	if err := validateLimit(p.Limit); err != nil {
+		return err
 	}
 	return nil
 }
@@ -46,12 +49,9 @@ type readThreadResponse struct {
 	slackResponse
 	Messages []slackMessage       `json:"messages,omitempty"`
 	HasMore  bool                 `json:"has_more,omitempty"`
-	Meta     *readThreadPageMeta  `json:"response_metadata,omitempty"`
+	Meta     *paginationMeta  `json:"response_metadata,omitempty"`
 }
 
-type readThreadPageMeta struct {
-	NextCursor string `json:"next_cursor"`
-}
 
 // readThreadResult is the action output.
 type readThreadResult struct {

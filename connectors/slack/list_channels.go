@@ -36,7 +36,7 @@ type listChannelsRequest struct {
 type listChannelsResponse struct {
 	slackResponse
 	Channels []listChannelEntry   `json:"channels,omitempty"`
-	Meta     *listChannelsPageMeta `json:"response_metadata,omitempty"`
+	Meta     *paginationMeta `json:"response_metadata,omitempty"`
 }
 
 type listChannelEntry struct {
@@ -53,9 +53,6 @@ type listChannelEntry struct {
 	} `json:"purpose"`
 }
 
-type listChannelsPageMeta struct {
-	NextCursor string `json:"next_cursor"`
-}
 
 // listChannelsResult is the action output.
 type listChannelsResult struct {
@@ -77,6 +74,9 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	var params listChannelsParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := validateLimit(params.Limit); err != nil {
+		return nil, err
 	}
 
 	body := listChannelsRequest{

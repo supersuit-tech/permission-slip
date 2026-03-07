@@ -208,6 +208,53 @@ func TestReadChannelMessages_ChannelNotFound(t *testing.T) {
 	}
 }
 
+func TestReadChannelMessages_InvalidChannelName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readChannelMessagesAction{conn: conn}
+
+	params, _ := json.Marshal(readChannelMessagesParams{
+		Channel: "#general",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_channel_messages",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for channel name instead of ID")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestReadChannelMessages_LimitOutOfRange(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readChannelMessagesAction{conn: conn}
+
+	params, _ := json.Marshal(readChannelMessagesParams{
+		Channel: "C01234567",
+		Limit:   5000,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_channel_messages",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for limit out of range")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestReadChannelMessages_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

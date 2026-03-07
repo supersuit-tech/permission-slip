@@ -184,6 +184,27 @@ func TestListChannels_SlackAPIError(t *testing.T) {
 	}
 }
 
+func TestListChannels_LimitOutOfRange(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &listChannelsAction{conn: conn}
+
+	params, _ := json.Marshal(listChannelsParams{Limit: 2000})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for limit out of range")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestListChannels_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

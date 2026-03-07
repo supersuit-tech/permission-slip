@@ -128,6 +128,30 @@ func TestReadThread_MissingChannel(t *testing.T) {
 	}
 }
 
+func TestReadThread_InvalidChannelName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readThreadAction{conn: conn}
+
+	params, _ := json.Marshal(readThreadParams{
+		Channel:  "general",
+		ThreadTS: "1678900001.000200",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_thread",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for channel name instead of ID")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestReadThread_MissingThreadTS(t *testing.T) {
 	t.Parallel()
 
