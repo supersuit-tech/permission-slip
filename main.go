@@ -30,6 +30,7 @@ import (
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
+	"github.com/supersuit-tech/permission-slip-web/connectors/monday"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
@@ -337,6 +338,7 @@ func main() {
 	registry.Register(jira.New())
 	registry.Register(linear.New())
 	registry.Register(microsoft.New())
+	registry.Register(monday.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
 	registry.Register(notionconnector.New())
