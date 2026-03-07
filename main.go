@@ -38,6 +38,7 @@ import (
 	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
 	metaconnector "github.com/supersuit-tech/permission-slip-web/connectors/meta"
 	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
+	quickbooksconnector "github.com/supersuit-tech/permission-slip-web/connectors/quickbooks"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
@@ -367,6 +368,7 @@ func main() {
 	if v := os.Getenv("ENABLE_PROTONMAIL_CONNECTOR"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") {
 		registry.Register(protonmail.New())
 	}
+	registry.Register(quickbooksconnector.New())
 	registry.Register(redisconnector.New())
 	registry.Register(salesforce.New())
 	registry.Register(sendgrid.New())
