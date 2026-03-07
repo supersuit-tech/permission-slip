@@ -90,6 +90,7 @@ deploy:
 test: test-backend test-frontend mobile-test
 
 test-backend:
+	go test -v -count=1 ./connectors/zendesk/... ./connectors/intercom/... 2>&1 || true
 	go test ./...
 	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
 		echo "Supabase detected — also running integration tests..."; \
