@@ -172,6 +172,42 @@ func TestUpdateProduct_NoFieldsProvided(t *testing.T) {
 	}
 }
 
+func TestUpdateProduct_EmptyVariantsArray(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["shopify.update_product"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "shopify.update_product",
+		Parameters:  json.RawMessage(`{"product_id":5001,"variants":[]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for empty variants array, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestUpdateProduct_EmptyStatus(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["shopify.update_product"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "shopify.update_product",
+		Parameters:  json.RawMessage(`{"product_id":5001,"status":""}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for empty status, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestUpdateProduct_InvalidStatus(t *testing.T) {
 	t.Parallel()
 

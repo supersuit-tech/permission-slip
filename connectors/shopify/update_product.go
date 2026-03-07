@@ -31,12 +31,20 @@ func (p *updateProductParams) validate() error {
 	if p.ProductID <= 0 {
 		return &connectors.ValidationError{Message: "product_id must be a positive integer"}
 	}
-	if p.Title == nil && p.BodyHTML == nil && p.Vendor == nil && p.Tags == nil && p.Status == nil && p.Variants == nil {
+	// Treat an empty variants slice the same as not provided — sending an
+	// empty array to Shopify is almost certainly unintended.
+	hasVariants := len(p.Variants) > 0
+	if p.Title == nil && p.BodyHTML == nil && p.Vendor == nil && p.Tags == nil && p.Status == nil && !hasVariants {
 		return &connectors.ValidationError{Message: "at least one field to update must be provided"}
 	}
-	if p.Status != nil && *p.Status != "" && !validProductStatuses[*p.Status] {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid status %q: must be active, draft, or archived", *p.Status),
+	if p.Status != nil {
+		if *p.Status == "" {
+			return &connectors.ValidationError{Message: "status cannot be empty: must be active, draft, or archived"}
+		}
+		if !validProductStatuses[*p.Status] {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("invalid status %q: must be active, draft, or archived", *p.Status),
+			}
 		}
 	}
 	return nil
