@@ -30,6 +30,7 @@ type exportImagesParams struct {
 }
 
 func (p *exportImagesParams) validate() error {
+	p.FileKey = extractFileKey(p.FileKey)
 	if err := validateFileKey(p.FileKey); err != nil {
 		return err
 	}

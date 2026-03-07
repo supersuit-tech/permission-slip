@@ -19,6 +19,7 @@ type getVersionsParams struct {
 }
 
 func (p *getVersionsParams) validate() error {
+	p.FileKey = extractFileKey(p.FileKey)
 	return validateFileKey(p.FileKey)
 }
 

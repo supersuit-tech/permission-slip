@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,7 +105,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_key": {
 							"type": "string",
-							"description": "The file key (from the Figma URL, e.g. abc123DEF in figma.com/design/abc123DEF/...)"
+							"description": "The file key or full Figma URL. You can paste a URL like https://www.figma.com/design/abc123DEF/... and the key will be extracted automatically."
 						},
 						"depth": {
 							"type": "integer",
@@ -128,7 +129,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_key": {
 							"type": "string",
-							"description": "The file key (from the Figma URL)"
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
 						}
 					}
 				}`)),
@@ -144,7 +145,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_key": {
 							"type": "string",
-							"description": "The file key (from the Figma URL)"
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
 						},
 						"node_ids": {
 							"type": "string",
@@ -176,7 +177,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_key": {
 							"type": "string",
-							"description": "The file key (from the Figma URL)"
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
 						},
 						"as_md": {
 							"type": "boolean",
@@ -197,7 +198,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_key": {
 							"type": "string",
-							"description": "The file key (from the Figma URL)"
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
 						},
 						"message": {
 							"type": "string",
@@ -221,7 +222,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_key": {
 							"type": "string",
-							"description": "The file key (from the Figma URL)"
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
 						}
 					}
 				}`)),
@@ -306,20 +307,46 @@ type figmaErrorResponse struct {
 	Err    string `json:"err"`
 }
 
+// figmaURLPattern matches Figma file URLs in various formats:
+//   - https://www.figma.com/design/FILEKEY/...
+//   - https://www.figma.com/file/FILEKEY/...
+//   - https://figma.com/design/FILEKEY/...
+//   - https://figma.com/file/FILEKEY/...
+//
+// The file key is captured in the first submatch group.
+var figmaURLPattern = regexp.MustCompile(`^https?://(?:www\.)?figma\.com/(?:design|file)/([A-Za-z0-9]+)`)
+
+// nodeIDPattern matches a single Figma node ID in X:Y format where X and Y
+// are non-negative integers.
+var nodeIDPattern = regexp.MustCompile(`^\d+:\d+$`)
+
+// extractFileKey normalises a file_key parameter: if the value looks like a
+// Figma URL it extracts the key portion; otherwise it returns the value as-is.
+// This lets callers paste a browser URL directly into the file_key field.
+func extractFileKey(raw string) string {
+	if m := figmaURLPattern.FindStringSubmatch(raw); len(m) > 1 {
+		return m[1]
+	}
+	return raw
+}
+
 // validateFileKey checks that a file_key parameter is non-empty and doesn't
-// contain path traversal sequences.
+// contain path traversal sequences. It should be called after extractFileKey.
 func validateFileKey(fileKey string) error {
 	if fileKey == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: file_key"}
 	}
 	if strings.Contains(fileKey, "/") || strings.Contains(fileKey, "..") || strings.Contains(fileKey, "\\") {
-		return &connectors.ValidationError{Message: "invalid file_key: must not contain path separators or traversal sequences"}
+		return &connectors.ValidationError{
+			Message: "invalid file_key: must not contain path separators or traversal sequences. " +
+				"Provide a raw file key (e.g. \"abc123DEF\") or a full Figma URL (e.g. \"https://www.figma.com/design/abc123DEF/...\").",
+		}
 	}
 	return nil
 }
 
-// validateNodeIDs checks that a node_ids string is non-empty and contains
-// valid Figma node ID format (X:Y separated by commas).
+// validateNodeIDs checks that a node_ids string is non-empty and each ID
+// matches the Figma node ID format (X:Y where X and Y are integers).
 func validateNodeIDs(nodeIDs string) error {
 	if nodeIDs == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: node_ids"}
@@ -329,13 +356,16 @@ func validateNodeIDs(nodeIDs string) error {
 		if id == "" {
 			return &connectors.ValidationError{Message: "node_ids contains empty ID"}
 		}
+		if !nodeIDPattern.MatchString(id) {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("invalid node ID %q: must be in X:Y format (e.g. \"1:2\")", id),
+			}
+		}
 	}
 	return nil
 }
 
-// doGet is the shared request lifecycle for read-only Figma API calls. It
-// sends a GET request to the given path with auth headers, handles rate
-// limiting and timeouts, and unmarshals the response into dest.
+// doGet is the shared request lifecycle for read-only Figma API calls.
 func (c *FigmaConnector) doGet(ctx context.Context, path string, creds connectors.Credentials, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -348,48 +378,10 @@ func (c *FigmaConnector) doGet(ctx context.Context, path string, creds connector
 	}
 	req.Header.Set("X-Figma-Token", token)
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Figma API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Figma API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Figma API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
-			Message:    "Figma API rate limit exceeded",
-			RetryAfter: retryAfter,
-		}
-	}
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return mapFigmaHTTPError(resp.StatusCode, respBody)
-	}
-
-	if err := json.Unmarshal(respBody, dest); err != nil {
-		return &connectors.ExternalError{
-			StatusCode: resp.StatusCode,
-			Message:    "failed to decode Figma API response",
-		}
-	}
-
-	return nil
+	return c.doRequest(req, dest)
 }
 
-// doPost is the shared request lifecycle for write Figma API calls. It marshals
-// body as JSON, sends a POST request with auth headers, handles rate limiting
-// and timeouts, and unmarshals the response into dest.
+// doPost is the shared request lifecycle for write Figma API calls.
 func (c *FigmaConnector) doPost(ctx context.Context, path string, creds connectors.Credentials, body any, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -414,6 +406,13 @@ func (c *FigmaConnector) doPost(ctx context.Context, path string, creds connecto
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	return c.doRequest(req, dest)
+}
+
+// doRequest executes an HTTP request and handles the Figma API response
+// lifecycle: timeouts, rate limiting, error mapping, and JSON decoding.
+// Shared by doGet and doPost to eliminate duplicated response handling.
+func (c *FigmaConnector) doRequest(req *http.Request, dest any) error {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
@@ -468,9 +467,9 @@ func mapFigmaHTTPError(statusCode int, body []byte) error {
 
 	switch statusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return &connectors.AuthError{Message: detail}
+		return &connectors.AuthError{Message: detail + " — check that your personal access token is valid and has access to this resource"}
 	case http.StatusNotFound:
-		return &connectors.AuthError{Message: detail}
+		return &connectors.AuthError{Message: detail + " — the file key may be incorrect, or your token may not have access to this file"}
 	case http.StatusTooManyRequests:
 		return &connectors.RateLimitError{Message: detail, RetryAfter: defaultRetryAfter}
 	case http.StatusBadRequest:

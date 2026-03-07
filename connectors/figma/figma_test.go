@@ -340,6 +340,34 @@ func TestMapFigmaHTTPError_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestExtractFileKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"raw key", "abc123DEF", "abc123DEF"},
+		{"design URL", "https://www.figma.com/design/abc123DEF/My-Design", "abc123DEF"},
+		{"file URL", "https://www.figma.com/file/xyz789/Untitled", "xyz789"},
+		{"no www", "https://figma.com/design/abc123DEF/My-Design", "abc123DEF"},
+		{"http URL", "http://www.figma.com/design/abc123DEF/Test", "abc123DEF"},
+		{"URL with query", "https://www.figma.com/design/abc123DEF/Test?node-id=1:2", "abc123DEF"},
+		{"not a figma URL", "https://example.com/design/abc123", "https://example.com/design/abc123"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractFileKey(tt.raw)
+			if got != tt.want {
+				t.Errorf("extractFileKey(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateFileKey(t *testing.T) {
 	t.Parallel()
 
@@ -378,8 +406,12 @@ func TestValidateNodeIDs(t *testing.T) {
 	}{
 		{"single", "1:2", false},
 		{"multiple", "1:2,3:4", false},
+		{"with spaces", "1:2, 3:4", false},
 		{"empty", "", true},
 		{"empty element", "1:2,,3:4", true},
+		{"invalid format no colon", "abc", true},
+		{"invalid format letters", "a:b", true},
+		{"missing part", "1:", true},
 	}
 
 	for _, tt := range tests {

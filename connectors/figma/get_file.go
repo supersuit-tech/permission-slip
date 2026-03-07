@@ -21,6 +21,7 @@ type getFileParams struct {
 }
 
 func (p *getFileParams) validate() error {
+	p.FileKey = extractFileKey(p.FileKey)
 	if err := validateFileKey(p.FileKey); err != nil {
 		return err
 	}

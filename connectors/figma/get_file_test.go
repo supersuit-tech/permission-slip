@@ -118,6 +118,42 @@ func TestGetFile_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestGetFile_WithFigmaURL(t *testing.T) {
+	t.Parallel()
+
+	_, conn := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		// The URL should have been extracted to just the file key.
+		if r.URL.Path != "/files/abc123DEF" {
+			t.Errorf("expected path /files/abc123DEF, got %s", r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"name": "URL Test"})
+	})
+
+	action := &getFileAction{conn: conn}
+	params, _ := json.Marshal(map[string]any{
+		"file_key": "https://www.figma.com/design/abc123DEF/My-Design-File",
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "figma.get_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["name"] != "URL Test" {
+		t.Errorf("expected name 'URL Test', got %v", data["name"])
+	}
+}
+
 func TestGetFile_NegativeDepth(t *testing.T) {
 	t.Parallel()
 

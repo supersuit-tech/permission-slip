@@ -20,6 +20,7 @@ type listCommentsParams struct {
 }
 
 func (p *listCommentsParams) validate() error {
+	p.FileKey = extractFileKey(p.FileKey)
 	return validateFileKey(p.FileKey)
 }
 

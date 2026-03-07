@@ -19,6 +19,7 @@ type getComponentsParams struct {
 }
 
 func (p *getComponentsParams) validate() error {
+	p.FileKey = extractFileKey(p.FileKey)
 	return validateFileKey(p.FileKey)
 }
 

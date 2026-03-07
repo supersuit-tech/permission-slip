@@ -21,6 +21,7 @@ type postCommentParams struct {
 }
 
 func (p *postCommentParams) validate() error {
+	p.FileKey = extractFileKey(p.FileKey)
 	if err := validateFileKey(p.FileKey); err != nil {
 		return err
 	}
