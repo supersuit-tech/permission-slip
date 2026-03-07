@@ -52,26 +52,17 @@ type calendlyScheduledEventsResponse struct {
 }
 
 type calendlyScheduledEvent struct {
-	URI       string `json:"uri"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	StartTime string `json:"start_time"`
-	EndTime   string `json:"end_time"`
-	EventType string `json:"event_type"`
-	Location  struct {
-		Type     string `json:"type"`
-		Location string `json:"location"`
-	} `json:"location"`
-	CreatedAt        string                   `json:"created_at"`
-	UpdatedAt        string                   `json:"updated_at"`
-	EventMemberships []map[string]any         `json:"event_memberships"`
-	EventGuests      []calendlyScheduledGuest `json:"event_guests"`
-}
-
-type calendlyScheduledGuest struct {
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	URI              string           `json:"uri"`
+	Name             string           `json:"name"`
+	Status           string           `json:"status"`
+	StartTime        string           `json:"start_time"`
+	EndTime          string           `json:"end_time"`
+	EventType        string           `json:"event_type"`
+	Location         calendlyLocation `json:"location"`
+	CreatedAt        string           `json:"created_at"`
+	UpdatedAt        string           `json:"updated_at"`
+	EventMemberships []map[string]any `json:"event_memberships"`
+	EventGuests      []calendlyGuest  `json:"event_guests"`
 }
 
 type scheduledEventItem struct {

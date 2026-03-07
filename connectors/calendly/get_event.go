@@ -32,21 +32,17 @@ func (p *getEventParams) validate() error {
 
 type calendlyGetEventResponse struct {
 	Resource struct {
-		URI       string `json:"uri"`
-		Name      string `json:"name"`
-		Status    string `json:"status"`
-		StartTime string `json:"start_time"`
-		EndTime   string `json:"end_time"`
-		EventType string `json:"event_type"`
-		Location  struct {
-			Type     string `json:"type"`
-			Location string `json:"location"`
-			JoinURL  string `json:"join_url"`
-		} `json:"location"`
-		CreatedAt        string                   `json:"created_at"`
-		UpdatedAt        string                   `json:"updated_at"`
-		EventMemberships []map[string]any         `json:"event_memberships"`
-		EventGuests      []calendlyScheduledGuest `json:"event_guests"`
+		URI              string           `json:"uri"`
+		Name             string           `json:"name"`
+		Status           string           `json:"status"`
+		StartTime        string           `json:"start_time"`
+		EndTime          string           `json:"end_time"`
+		EventType        string           `json:"event_type"`
+		Location         calendlyLocation `json:"location"`
+		CreatedAt        string           `json:"created_at"`
+		UpdatedAt        string           `json:"updated_at"`
+		EventMemberships []map[string]any `json:"event_memberships"`
+		EventGuests      []calendlyGuest  `json:"event_guests"`
 	} `json:"resource"`
 }
 

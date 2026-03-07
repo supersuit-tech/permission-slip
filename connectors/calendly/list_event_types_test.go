@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,10 +13,10 @@ import (
 func TestListEventTypes_Success(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	callCount := int32(0)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
+		c := atomic.AddInt32(&callCount, 1)
+		if c == 1 {
 			// First call is /users/me
 			if r.URL.Path != "/users/me" {
 				t.Errorf("expected path /users/me, got %s", r.URL.Path)
@@ -93,10 +94,10 @@ func TestListEventTypes_Success(t *testing.T) {
 func TestListEventTypes_EmptyResult(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	callCount := int32(0)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
+		c := atomic.AddInt32(&callCount, 1)
+		if c == 1 {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(usersmeResponse{
 				Resource: struct {

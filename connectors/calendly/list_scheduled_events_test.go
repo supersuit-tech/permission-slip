@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,10 +13,10 @@ import (
 func TestListScheduledEvents_Success(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	callCount := int32(0)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
+		c := atomic.AddInt32(&callCount, 1)
+		if c == 1 {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(usersmeResponse{
 				Resource: struct {
@@ -46,7 +47,7 @@ func TestListScheduledEvents_Success(t *testing.T) {
 					StartTime: "2024-01-15T09:00:00.000000Z",
 					EndTime:   "2024-01-15T09:30:00.000000Z",
 					EventType: "https://api.calendly.com/event_types/et1",
-					EventGuests: []calendlyScheduledGuest{
+					EventGuests: []calendlyGuest{
 						{Email: "guest@example.com"},
 					},
 				},
