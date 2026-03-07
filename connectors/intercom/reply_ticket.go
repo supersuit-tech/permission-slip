@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -62,7 +63,7 @@ func (a *replyTicketAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	var resp intercomTicket
-	path := fmt.Sprintf("/tickets/%s/reply", params.TicketID)
+	path := "/tickets/" + url.PathEscape(params.TicketID) + "/reply"
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &resp); err != nil {
 		return nil, err
 	}

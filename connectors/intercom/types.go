@@ -9,7 +9,7 @@ type intercomTicket struct {
 	State           string          `json:"state,omitempty"`
 	TicketType      *ticketType     `json:"ticket_type,omitempty"`
 	TicketParts     *ticketParts    `json:"ticket_parts,omitempty"`
-	TicketAttribute []ticketAttr    `json:"ticket_attributes,omitempty"`
+	TicketAttributes []ticketAttr   `json:"ticket_attributes,omitempty"`
 	Contacts        *contactList    `json:"contacts,omitempty"`
 	Assignee        *assignee       `json:"assignee,omitempty"`
 	Tags            *tagList        `json:"tags,omitempty"`

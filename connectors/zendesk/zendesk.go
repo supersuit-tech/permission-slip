@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -127,7 +128,7 @@ func (c *ZendeskConnector) do(ctx context.Context, creds connectors.Credentials,
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Zendesk API request timed out: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Zendesk API request failed: %v", err)}

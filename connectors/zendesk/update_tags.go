@@ -27,8 +27,8 @@ func (p *updateTagsParams) validate() error {
 	if !isValidZendeskID(p.TicketID) {
 		return &connectors.ValidationError{Message: "missing or invalid required parameter: ticket_id"}
 	}
-	if len(p.Tags) == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: tags"}
+	if p.Tags == nil {
+		return &connectors.ValidationError{Message: "missing required parameter: tags (use an empty array to clear all tags)"}
 	}
 	if len(p.Tags) > maxTags {
 		return &connectors.ValidationError{Message: fmt.Sprintf("tags cannot exceed %d items", maxTags)}

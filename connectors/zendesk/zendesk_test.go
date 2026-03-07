@@ -227,4 +227,7 @@ func TestZendeskConnector_Do_Timeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("do() with cancelled context expected error, got nil")
 	}
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("do() with cancelled context should return TimeoutError, got: %T", err)
+	}
 }

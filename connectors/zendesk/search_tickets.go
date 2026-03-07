@@ -20,7 +20,7 @@ type searchTicketsAction struct {
 type searchTicketsParams struct {
 	Query   string `json:"query"`
 	SortBy  string `json:"sort_by"`
-	SortDir string `json:"sort_order"`
+	SortOrder string `json:"sort_order"`
 	Page    int    `json:"page"`
 	PerPage int    `json:"per_page"`
 }
@@ -29,7 +29,7 @@ var validSortBy = map[string]bool{
 	"updated_at": true, "created_at": true, "priority": true, "status": true, "relevance": true,
 }
 
-var validSortDir = map[string]bool{
+var validSortOrder = map[string]bool{
 	"asc": true, "desc": true,
 }
 
@@ -40,8 +40,8 @@ func (p *searchTicketsParams) validate() error {
 	if p.SortBy != "" && !validSortBy[p.SortBy] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_by %q: must be updated_at, created_at, priority, status, or relevance", p.SortBy)}
 	}
-	if p.SortDir != "" && !validSortDir[p.SortDir] {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_order %q: must be asc or desc", p.SortDir)}
+	if p.SortOrder != "" && !validSortOrder[p.SortOrder] {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_order %q: must be asc or desc", p.SortOrder)}
 	}
 	if p.Page < 0 {
 		return &connectors.ValidationError{Message: "page must be a positive integer"}
@@ -66,8 +66,8 @@ func (a *searchTicketsAction) Execute(ctx context.Context, req connectors.Action
 	if params.SortBy != "" {
 		q.Set("sort_by", params.SortBy)
 	}
-	if params.SortDir != "" {
-		q.Set("sort_order", params.SortDir)
+	if params.SortOrder != "" {
+		q.Set("sort_order", params.SortOrder)
 	}
 	if params.Page > 0 {
 		q.Set("page", strconv.Itoa(params.Page))

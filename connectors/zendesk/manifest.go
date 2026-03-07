@@ -224,7 +224,7 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "zendesk.update_tags",
 				Name:        "Update Ticket Tags",
-				Description: "Replace all tags on a ticket with a new set. To add tags without removing existing ones, first list the current tags and include them in the new set.",
+				Description: "Replace all tags on a ticket with a new set. Pass an empty array to clear all tags. To add tags without removing existing ones, first list the current tags and include them in the new set.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -238,8 +238,7 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 						"tags": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "New set of tags — replaces all existing tags (e.g. ['billing', 'escalated'])",
-							"minItems": 1,
+							"description": "New set of tags — replaces all existing tags. Pass an empty array [] to clear all tags.",
 							"maxItems": 100
 						}
 					}
