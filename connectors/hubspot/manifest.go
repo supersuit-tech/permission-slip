@@ -12,7 +12,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "hubspot",
 		Name:        "HubSpot",
-		Description: "HubSpot CRM integration for contacts, deals, tickets, and notes",
+		Description: "HubSpot CRM integration for contacts, deals, tickets, notes, marketing, and analytics",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "hubspot.create_contact",
@@ -211,6 +211,160 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "hubspot.list_deals",
+				Name:        "List Deals",
+				Description: "Search and list deals in the sales pipeline with optional filtering, sorting, and property selection. Returns dealname, amount, stage, and dates by default.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"filters": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["propertyName", "operator", "value"],
+								"properties": {
+									"propertyName": {"type": "string", "description": "Property to filter on"},
+									"operator": {"type": "string", "enum": ["EQ", "NEQ", "LT", "LTE", "GT", "GTE", "CONTAINS_TOKEN", "NOT_CONTAINS_TOKEN"], "description": "Filter operator"},
+									"value": {"type": "string", "description": "Value to compare against"}
+								}
+							},
+							"description": "Array of filter conditions"
+						},
+						"sorts": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["propertyName"],
+								"properties": {
+									"propertyName": {"type": "string", "description": "Property to sort by"},
+									"direction": {"type": "string", "enum": ["ASCENDING", "DESCENDING"], "description": "Sort direction (default ASCENDING)"}
+								}
+							},
+							"description": "Array of sort conditions"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 10,
+							"description": "Maximum number of results (default 10, max 200)"
+						},
+						"properties": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Deal properties to include in the response (defaults to dealname, amount, dealstage, pipeline, closedate, createdate, hs_lastmodifieddate)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.update_deal_stage",
+				Name:        "Update Deal Stage",
+				Description: "Move a deal to a different pipeline stage. Use this to advance deals through the sales process (e.g., from qualified to closed-won).",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["deal_id", "pipeline_stage"],
+					"properties": {
+						"deal_id": {
+							"type": "string",
+							"description": "HubSpot deal ID to update"
+						},
+						"pipeline_stage": {
+							"type": "string",
+							"description": "Target pipeline stage ID"
+						},
+						"close_date": {
+							"type": "string",
+							"description": "Updated expected close date (ISO 8601)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.enroll_in_workflow",
+				Name:        "Enroll in Workflow",
+				Description: "Enroll a contact in an automation workflow. Workflows may trigger emails, delays, and branching logic — verify the workflow ID before enrolling.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["flow_id", "contact_id"],
+					"properties": {
+						"flow_id": {
+							"type": "string",
+							"description": "Workflow (flow) ID to enroll the contact in"
+						},
+						"contact_id": {
+							"type": "string",
+							"description": "Contact ID to enroll"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.create_email_campaign",
+				Name:        "Create Email Campaign",
+				Description: "Create a marketing email campaign and optionally send it immediately. When send_now is true, the email is sent to all contacts in the specified lists — use with caution.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name", "subject", "content"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Internal campaign name"
+						},
+						"subject": {
+							"type": "string",
+							"description": "Email subject line"
+						},
+						"content": {
+							"type": "string",
+							"description": "Email body content (HTML supported)"
+						},
+						"list_ids": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Contact list IDs to send to"
+						},
+						"send_now": {
+							"type": "boolean",
+							"default": false,
+							"description": "If true, send immediately; if false, create as draft"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.get_analytics",
+				Name:        "Get Analytics",
+				Description: "Get marketing and sales analytics reports with configurable time periods. Use for dashboards, reporting, and performance tracking.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["object_type", "time_period"],
+					"properties": {
+						"object_type": {
+							"type": "string",
+							"enum": ["contacts", "deals", "companies", "tickets"],
+							"description": "Object type to get analytics for"
+						},
+						"time_period": {
+							"type": "string",
+							"enum": ["total", "daily", "weekly", "monthly"],
+							"description": "Time period granularity"
+						},
+						"start": {
+							"type": "string",
+							"description": "Start date/time (ISO 8601 or epoch milliseconds)"
+						},
+						"end": {
+							"type": "string",
+							"description": "End date/time (ISO 8601 or epoch milliseconds)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -240,6 +394,48 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Log notes on any object",
 				Description: "Add engagement notes to contacts, deals, or tickets.",
 				Parameters:  json.RawMessage(`{"object_type":"*","object_id":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_sales_pipeline",
+				ActionType:  "hubspot.update_deal_stage",
+				Name:        "Sales pipeline management",
+				Description: "Allow the agent to move deals between pipeline stages.",
+				Parameters:  json.RawMessage(`{"deal_id":"*","pipeline_stage":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_list_deals",
+				ActionType:  "hubspot.list_deals",
+				Name:        "List and filter deals",
+				Description: "Allow the agent to search and list deals with filters.",
+				Parameters:  json.RawMessage(`{"filters":"*","sorts":"*","limit":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_marketing_readonly",
+				ActionType:  "hubspot.get_analytics",
+				Name:        "Marketing read-only",
+				Description: "Allow the agent to view marketing and sales analytics.",
+				Parameters:  json.RawMessage(`{"object_type":"*","time_period":"*","start":"*","end":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_workflow_enrollment",
+				ActionType:  "hubspot.enroll_in_workflow",
+				Name:        "Workflow enrollment",
+				Description: "Allow the agent to enroll contacts in automation workflows.",
+				Parameters:  json.RawMessage(`{"flow_id":"*","contact_id":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_email_drafts",
+				ActionType:  "hubspot.create_email_campaign",
+				Name:        "Create email drafts",
+				Description: "Allow the agent to create draft email campaigns (no sending).",
+				Parameters:  json.RawMessage(`{"name":"*","subject":"*","content":"*","list_ids":"*","send_now":false}`),
+			},
+			{
+				ID:          "tpl_hubspot_full_marketing",
+				ActionType:  "hubspot.create_email_campaign",
+				Name:        "Full marketing admin",
+				Description: "Allow the agent to create and send email campaigns.",
+				Parameters:  json.RawMessage(`{"name":"*","subject":"*","content":"*","list_ids":"*","send_now":"*"}`),
 			},
 		},
 	}
