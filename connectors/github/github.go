@@ -340,7 +340,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"from_ref": {
 							"type": "string",
-							"description": "Source ref to branch from (e.g. heads/main)"
+							"description": "Branch or ref to create from (e.g. \"main\", \"develop\", or \"tags/v1.0\")"
 						}
 					}
 				}`)),
@@ -371,6 +371,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can merge any PR. Owner, repo, and PR number are agent-controlled.",
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*","merge_method":"squash"}`),
 			},
+			// --- PR lifecycle templates ---
 			{
 				ID:          "tpl_github_create_pr",
 				ActionType:  "github.create_pr",
@@ -379,12 +380,20 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","title":"*","body":"*","head":"*","base":"*","draft":"*"}`),
 			},
 			{
+				ID:          "tpl_github_create_pr_org",
+				ActionType:  "github.create_pr",
+				Name:        "Create PRs in your org",
+				Description: "Agent can create PRs only in repos owned by your organization.",
+				Parameters:  json.RawMessage(`{"owner":{"$pattern":"your-org-*"},"repo":"*","title":"*","body":"*","head":"*","base":"*","draft":"*"}`),
+			},
+			{
 				ID:          "tpl_github_add_reviewer",
 				ActionType:  "github.add_reviewer",
 				Name:        "Add reviewers to PRs",
 				Description: "Agent can request reviewers on any PR.",
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*","reviewers":"*"}`),
 			},
+			// --- Release management templates ---
 			{
 				ID:          "tpl_github_create_release",
 				ActionType:  "github.create_release",
@@ -393,11 +402,26 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","tag_name":"*","name":"*","body":"*","draft":"*","prerelease":"*"}`),
 			},
 			{
+				ID:          "tpl_github_create_release_draft",
+				ActionType:  "github.create_release",
+				Name:        "Create draft releases only",
+				Description: "Agent can create draft releases — they won't be published until manually reviewed.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","tag_name":"*","name":"*","body":"*","draft":true,"prerelease":"*"}`),
+			},
+			// --- Issue lifecycle templates ---
+			{
 				ID:          "tpl_github_close_issue",
 				ActionType:  "github.close_issue",
 				Name:        "Close issues",
 				Description: "Agent can close issues in any repo with an optional comment.",
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","state_reason":"*","comment":"*"}`),
+			},
+			{
+				ID:          "tpl_github_close_issue_completed",
+				ActionType:  "github.close_issue",
+				Name:        "Close issues as completed",
+				Description: "Agent can close issues as completed (not as not_planned). Useful for bots that resolve issues.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","state_reason":"completed","comment":"*"}`),
 			},
 			{
 				ID:          "tpl_github_add_label",
@@ -413,6 +437,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can comment on any issue or PR.",
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","body":"*"}`),
 			},
+			// --- Branch management templates ---
 			{
 				ID:          "tpl_github_create_branch",
 				ActionType:  "github.create_branch",

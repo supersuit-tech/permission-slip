@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -50,6 +51,14 @@ func (a *createBranchAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	// Normalize from_ref: accept bare branch names like "main" and
+	// expand to "heads/main" for the Git refs API. Tags can be specified
+	// as "tags/v1.0". Full refs like "heads/main" pass through unchanged.
+	fromRef := params.FromRef
+	if !strings.Contains(fromRef, "/") {
+		fromRef = "heads/" + fromRef
+	}
+
 	// Resolve the source ref to a SHA.
 	var refResp struct {
 		Object struct {
@@ -58,7 +67,7 @@ func (a *createBranchAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	refPath := fmt.Sprintf("/repos/%s/%s/git/ref/%s",
-		url.PathEscape(params.Owner), url.PathEscape(params.Repo), params.FromRef)
+		url.PathEscape(params.Owner), url.PathEscape(params.Repo), fromRef)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, refPath, nil, &refResp); err != nil {
 		return nil, err
 	}

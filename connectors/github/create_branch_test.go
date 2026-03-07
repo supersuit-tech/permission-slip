@@ -73,7 +73,7 @@ func TestCreateBranch_Success(t *testing.T) {
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "github.create_branch",
-		Parameters:  json.RawMessage(`{"owner":"octocat","repo":"hello-world","branch_name":"feature-branch","from_ref":"heads/main"}`),
+		Parameters:  json.RawMessage(`{"owner":"octocat","repo":"hello-world","branch_name":"feature-branch","from_ref":"main"}`),
 		Credentials: validCreds(),
 	})
 
@@ -94,6 +94,49 @@ func TestCreateBranch_Success(t *testing.T) {
 	}
 }
 
+func TestCreateBranch_FromTag(t *testing.T) {
+	t.Parallel()
+
+	var callCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+
+		if n == 1 {
+			// Verify full ref path is used as-is (not prefixed with heads/)
+			if r.URL.Path != "/repos/octocat/hello-world/git/ref/tags/v1.0" {
+				t.Errorf("ref path = %s, want /repos/octocat/hello-world/git/ref/tags/v1.0", r.URL.Path)
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"ref":    "refs/tags/v1.0",
+				"object": map[string]string{"sha": "abc123"},
+			})
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"ref":    "refs/heads/hotfix",
+			"object": map[string]string{"sha": "abc123"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.create_branch"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.create_branch",
+		Parameters:  json.RawMessage(`{"owner":"octocat","repo":"hello-world","branch_name":"hotfix","from_ref":"tags/v1.0"}`),
+		Credentials: validCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestCreateBranch_MissingParams(t *testing.T) {
 	t.Parallel()
 
@@ -104,9 +147,9 @@ func TestCreateBranch_MissingParams(t *testing.T) {
 		name   string
 		params string
 	}{
-		{"missing owner", `{"repo":"r","branch_name":"b","from_ref":"heads/main"}`},
-		{"missing repo", `{"owner":"o","branch_name":"b","from_ref":"heads/main"}`},
-		{"missing branch_name", `{"owner":"o","repo":"r","from_ref":"heads/main"}`},
+		{"missing owner", `{"repo":"r","branch_name":"b","from_ref":"main"}`},
+		{"missing repo", `{"owner":"o","branch_name":"b","from_ref":"main"}`},
+		{"missing branch_name", `{"owner":"o","repo":"r","from_ref":"main"}`},
 		{"missing from_ref", `{"owner":"o","repo":"r","branch_name":"b"}`},
 		{"invalid JSON", `{invalid}`},
 	}
