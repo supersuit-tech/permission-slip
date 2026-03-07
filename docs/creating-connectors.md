@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), custom auth (Slack), HTTP Basic Auth with form-encoded POSTs (Twilio), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 ```go
 // Example: OAuth2 credential in a manifest
@@ -363,7 +363,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google` or `microsoft`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `google`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
@@ -951,13 +951,31 @@ connectors/
 │   ├── helpers_test.go       # validCreds(), newTestConnector() with sqlmock
 │   ├── mysql_test.go         # Connector-level tests
 │   └── *_test.go             # Per-action tests
+├── jira/
+│   ├── jira.go              # JiraConnector struct, New(), do(), apiBase(), ValidateCredentials()
+│   ├── manifest.go           # Manifest() with 6 action schemas and templates
+│   ├── response.go           # HTTP status → typed error mapping
+│   ├── adf.go                # plainTextToADF() — shared ADF conversion
+│   ├── create_issue.go       # jira.create_issue action
+│   ├── update_issue.go       # jira.update_issue action
+│   ├── transition_issue.go   # jira.transition_issue action
+│   ├── add_comment.go        # jira.add_comment action
+│   ├── assign_issue.go       # jira.assign_issue action
+│   ├── search.go             # jira.search action (JQL)
+│   ├── README.md             # Connector documentation
+│   ├── helpers_test.go       # validCreds() test helper
+│   └── *_test.go             # Per-action + connector + response tests
 ├── google/
 │   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
-│   ├── manifest.go           # Manifest() with 19 action schemas and 28 templates
+│   ├── manifest.go           # Manifest() with 22 action schemas and 31+ templates
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── create_presentation.go    # google.create_presentation action (Slides API)
+│   ├── get_presentation.go       # google.get_presentation action (Slides API)
+│   ├── add_slide.go              # google.add_slide action (batchUpdate)
+│   ├── slides_helpers.go         # Shared helpers for Slides actions
 │   ├── sheets_read.go        # google.sheets_read_range action
 │   ├── sheets_write.go       # google.sheets_write_range action
 │   ├── sheets_append.go      # google.sheets_append_rows action
@@ -973,6 +991,17 @@ connectors/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
+│   └── ...tests...
+├── zoom/
+│   ├── zoom.go                # ZoomConnector struct, New(), doJSON(), OAuth2 auth, error mapping
+│   ├── manifest.go            # Manifest() with 7 action schemas and 8 templates
+│   ├── list_meetings.go       # zoom.list_meetings action
+│   ├── create_meeting.go      # zoom.create_meeting action
+│   ├── get_meeting.go         # zoom.get_meeting action
+│   ├── update_meeting.go      # zoom.update_meeting action
+│   ├── delete_meeting.go      # zoom.delete_meeting action
+│   ├── list_recordings.go     # zoom.list_recordings action
+│   ├── get_meeting_participants.go  # zoom.get_meeting_participants action
 │   └── ...tests...
 ├── shopify/
 │   ├── shopify.go            # ShopifyConnector struct, New(), do(), dynamic base URL from shop_domain
