@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), JWT-based auth (DoorDash), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks). The DoorDash connector (`connectors/doordash/`) is a good reference for self-signed JWT auth (HS256 with base64-decoded secret), status enum validation, and `RequiresPaymentMethod` for financial actions.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 ```go
 // Example: OAuth2 credential in a manifest
@@ -363,7 +363,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `google`, `kroger`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
@@ -992,6 +992,16 @@ connectors/
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
 │   └── ...tests...
+├── kroger/
+│   ├── kroger.go              # KrogerConnector struct, New(), do(), OAuth2 bearer auth
+│   ├── manifest.go            # Manifest() with 4 action schemas and 6 templates
+│   ├── response.go            # HTTP status → typed error mapping (truncates large bodies)
+│   ├── search_products.go     # kroger.search_products — search by keyword with location pricing
+│   ├── get_product.go         # kroger.get_product — product details by UPC
+│   ├── search_locations.go    # kroger.search_locations — find stores by zip/coordinates
+│   ├── add_to_cart.go         # kroger.add_to_cart — add items to user's cart
+│   ├── README.md              # Connector documentation
+│   └── ...tests...
 ├── zoom/
 │   ├── zoom.go                # ZoomConnector struct, New(), doJSON(), OAuth2 auth, error mapping
 │   ├── manifest.go            # Manifest() with 7 action schemas and 8 templates
@@ -1025,6 +1035,18 @@ connectors/
 │   ├── get_message.go        # twilio.get_message action (SM/MM SID validation)
 │   ├── get_call.go           # twilio.get_call action (CA SID validation)
 │   ├── lookup_phone.go       # twilio.lookup_phone action (Lookup API v2)
+│   ├── README.md             # Connector documentation
+│   ├── helpers_test.go       # validCreds() test helper
+│   └── *_test.go             # Per-action + connector + response tests
+├── doordash/
+│   ├── doordash.go           # DoorDashConnector struct, New(), JWT auth (HS256 + base64 secret), do()
+│   ├── manifest.go           # Manifest() with 5 action schemas and templates
+│   ├── response.go           # HTTP status → typed error mapping
+│   ├── create_delivery.go    # doordash.create_delivery action (high risk, RequiresPaymentMethod)
+│   ├── get_quote.go          # doordash.get_quote action
+│   ├── get_delivery.go       # doordash.get_delivery action
+│   ├── cancel_delivery.go    # doordash.cancel_delivery action
+│   ├── list_deliveries.go    # doordash.list_deliveries action (status enum validation)
 │   ├── README.md             # Connector documentation
 │   ├── helpers_test.go       # validCreds() test helper
 │   └── *_test.go             # Per-action + connector + response tests
