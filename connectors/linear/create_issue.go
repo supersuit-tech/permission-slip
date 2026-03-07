@@ -31,8 +31,8 @@ func (p *createIssueParams) validate() error {
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
 	}
-	if p.Priority != nil && (*p.Priority < 0 || *p.Priority > 4) {
-		return &connectors.ValidationError{Message: "priority must be 0 (none), 1 (urgent), 2 (high), 3 (medium), or 4 (low)"}
+	if err := validatePriority(p.Priority); err != nil {
+		return err
 	}
 	return nil
 }
