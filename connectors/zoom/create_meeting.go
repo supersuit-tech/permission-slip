@@ -22,7 +22,7 @@ type createMeetingParams struct {
 	Duration  int                    `json:"duration,omitempty"`
 	Timezone  string                 `json:"timezone,omitempty"`
 	Agenda    string                 `json:"agenda,omitempty"`
-	Settings  map[string]interface{} `json:"settings,omitempty"`
+	Settings  map[string]any `json:"settings,omitempty"`
 }
 
 func (p *createMeetingParams) validate() error {
@@ -49,7 +49,7 @@ type zoomCreateMeetingRequest struct {
 	Duration  int                    `json:"duration,omitempty"`
 	Timezone  string                 `json:"timezone,omitempty"`
 	Agenda    string                 `json:"agenda,omitempty"`
-	Settings  map[string]interface{} `json:"settings,omitempty"`
+	Settings  map[string]any `json:"settings,omitempty"`
 }
 
 // zoomCreateMeetingResponse is the Zoom API response from POST /users/me/meetings.

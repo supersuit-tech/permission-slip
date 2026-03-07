@@ -23,7 +23,7 @@ type updateMeetingParams struct {
 	Duration  int                    `json:"duration,omitempty"`
 	Timezone  string                 `json:"timezone,omitempty"`
 	Agenda    string                 `json:"agenda,omitempty"`
-	Settings  map[string]interface{} `json:"settings,omitempty"`
+	Settings  map[string]any `json:"settings,omitempty"`
 }
 
 func (p *updateMeetingParams) validate() error {
@@ -40,7 +40,7 @@ type zoomUpdateMeetingRequest struct {
 	Duration  int                    `json:"duration,omitempty"`
 	Timezone  string                 `json:"timezone,omitempty"`
 	Agenda    string                 `json:"agenda,omitempty"`
-	Settings  map[string]interface{} `json:"settings,omitempty"`
+	Settings  map[string]any `json:"settings,omitempty"`
 }
 
 func (a *updateMeetingAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
