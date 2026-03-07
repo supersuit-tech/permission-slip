@@ -111,198 +111,6 @@ func newForTest(client *http.Client, baseURL string) *FigmaConnector {
 // ID returns "figma", matching the connectors.id in the database.
 func (c *FigmaConnector) ID() string { return "figma" }
 
-// Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup.
-func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "figma",
-		Name:        "Figma",
-		Description: "Figma integration for design file access and collaboration",
-		Actions: []connectors.ManifestAction{
-			{
-				ActionType:  "figma.get_file",
-				Name:        "Get File",
-				Description: "Get a full design file tree with metadata",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_key"],
-					"properties": {
-						"file_key": {
-							"type": "string",
-							"description": "The file key or full Figma URL. You can paste a URL like https://www.figma.com/design/abc123DEF/... and the key will be extracted automatically."
-						},
-						"depth": {
-							"type": "integer",
-							"description": "Positive integer specifying how deep to traverse the document tree. Omit for full depth."
-						},
-						"node_ids": {
-							"type": "string",
-							"description": "Comma-separated list of node IDs to retrieve (e.g. \"1:2,3:4\"). Returns only those subtrees."
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "figma.get_components",
-				Name:        "Get Components",
-				Description: "Get design system components from a file",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_key"],
-					"properties": {
-						"file_key": {
-							"type": "string",
-							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "figma.export_images",
-				Name:        "Export Images",
-				Description: "Export PNG, SVG, or PDF from specific nodes in a file",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_key", "node_ids", "format"],
-					"properties": {
-						"file_key": {
-							"type": "string",
-							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
-						},
-						"node_ids": {
-							"type": "string",
-							"description": "Comma-separated list of node IDs to export (e.g. \"1:2,3:4\")"
-						},
-						"format": {
-							"type": "string",
-							"enum": ["png", "svg", "pdf", "jpg"],
-							"description": "Image export format"
-						},
-						"scale": {
-							"type": "number",
-							"minimum": 0.01,
-							"maximum": 4,
-							"default": 1,
-							"description": "Image scale factor (0.01–4, default 1). Only applies to png/jpg."
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "figma.list_comments",
-				Name:        "List Comments",
-				Description: "List comments on a Figma file",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_key"],
-					"properties": {
-						"file_key": {
-							"type": "string",
-							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
-						},
-						"as_md": {
-							"type": "boolean",
-							"default": false,
-							"description": "If true, return comment messages as markdown"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "figma.post_comment",
-				Name:        "Post Comment",
-				Description: "Post a comment on a Figma file",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_key", "message"],
-					"properties": {
-						"file_key": {
-							"type": "string",
-							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
-						},
-						"message": {
-							"type": "string",
-							"description": "Comment message text"
-						},
-						"comment_id": {
-							"type": "string",
-							"description": "ID of the comment to reply to (for threaded replies)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "figma.get_versions",
-				Name:        "Get Versions",
-				Description: "Get the version history for a Figma file",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_key"],
-					"properties": {
-						"file_key": {
-							"type": "string",
-							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
-						}
-					}
-				}`)),
-			},
-		},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "figma", AuthType: "custom", InstructionsURL: "https://www.figma.com/developers/api#authentication"},
-		},
-		Templates: []connectors.ManifestTemplate{
-			{
-				ID:          "tpl_figma_get_file",
-				ActionType:  "figma.get_file",
-				Name:        "Read design file",
-				Description: "Agent can read any Figma file's design tree and metadata.",
-				Parameters:  json.RawMessage(`{"file_key":"*","depth":"*","node_ids":"*"}`),
-			},
-			{
-				ID:          "tpl_figma_get_components",
-				ActionType:  "figma.get_components",
-				Name:        "Get design components",
-				Description: "Agent can list components from any Figma file.",
-				Parameters:  json.RawMessage(`{"file_key":"*"}`),
-			},
-			{
-				ID:          "tpl_figma_export_images",
-				ActionType:  "figma.export_images",
-				Name:        "Export images from designs",
-				Description: "Agent can export images from any Figma file nodes.",
-				Parameters:  json.RawMessage(`{"file_key":"*","node_ids":"*","format":"*","scale":"*"}`),
-			},
-			{
-				ID:          "tpl_figma_list_comments",
-				ActionType:  "figma.list_comments",
-				Name:        "Read file comments",
-				Description: "Agent can list comments on any Figma file.",
-				Parameters:  json.RawMessage(`{"file_key":"*","as_md":"*"}`),
-			},
-			{
-				ID:          "tpl_figma_post_comment",
-				ActionType:  "figma.post_comment",
-				Name:        "Post comments on designs",
-				Description: "Agent can post comments on any Figma file.",
-				Parameters:  json.RawMessage(`{"file_key":"*","message":"*","comment_id":"*"}`),
-			},
-			{
-				ID:          "tpl_figma_get_versions",
-				ActionType:  "figma.get_versions",
-				Name:        "View version history",
-				Description: "Agent can view version history of any Figma file.",
-				Parameters:  json.RawMessage(`{"file_key":"*"}`),
-			},
-		},
-	}
-}
-
 // Actions returns the registered action handlers keyed by action_type.
 func (c *FigmaConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
@@ -318,11 +126,20 @@ func (c *FigmaConnector) Actions() map[string]connectors.Action {
 // ValidateCredentials checks that the provided credentials contain a
 // non-empty personal_access_token.
 func (c *FigmaConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+	_, err := requireToken(creds)
+	return err
+}
+
+// requireToken extracts and validates the personal access token from
+// credentials. Returns the token or a ValidationError. Used by
+// ValidateCredentials, doGet, and doPost to avoid repeating the same
+// extraction logic.
+func requireToken(creds connectors.Credentials) (string, error) {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: personal_access_token"}
+		return "", &connectors.ValidationError{Message: "personal_access_token credential is missing or empty"}
 	}
-	return nil
+	return token, nil
 }
 
 // figmaErrorResponse is the error envelope returned by the Figma API.
@@ -392,9 +209,9 @@ func validateNodeIDs(nodeIDs string) error {
 
 // doGet is the shared request lifecycle for read-only Figma API calls.
 func (c *FigmaConnector) doGet(ctx context.Context, path string, creds connectors.Credentials, dest any) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "personal_access_token credential is missing or empty"}
+	token, err := requireToken(creds)
+	if err != nil {
+		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
@@ -408,9 +225,9 @@ func (c *FigmaConnector) doGet(ctx context.Context, path string, creds connector
 
 // doPost is the shared request lifecycle for write Figma API calls.
 func (c *FigmaConnector) doPost(ctx context.Context, path string, creds connectors.Credentials, body any, dest any) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "personal_access_token credential is missing or empty"}
+	token, err := requireToken(creds)
+	if err != nil {
+		return err
 	}
 
 	var bodyReader io.Reader

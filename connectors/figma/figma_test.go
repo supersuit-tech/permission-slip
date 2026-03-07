@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -163,33 +164,36 @@ func TestFigmaConnector_ImplementsInterface(t *testing.T) {
 func TestFigmaConnector_RedirectStripsToken(t *testing.T) {
 	t.Parallel()
 
-	// evil server that captures headers from redirected requests
-	var capturedToken string
+	// tokenLeaked is set atomically by the evil server's handler goroutine
+	// and read by the test goroutine to avoid a data race.
+	var tokenLeaked atomic.Bool
 	evil := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedToken = r.Header.Get("X-Figma-Token")
+		if r.Header.Get("X-Figma-Token") != "" {
+			tokenLeaked.Store(true)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"ok":true}`)
 	}))
 	t.Cleanup(evil.Close)
 
 	// "figma" server that redirects to the evil server
-	figma := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	figmaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, evil.URL+"/stolen", http.StatusFound)
 	}))
-	t.Cleanup(figma.Close)
+	t.Cleanup(figmaSrv.Close)
 
 	conn := &FigmaConnector{
 		client: &http.Client{
-			CheckRedirect: safeRedirectPolicy(figma.URL),
+			CheckRedirect: safeRedirectPolicy(figmaSrv.URL),
 		},
-		baseURL: figma.URL,
+		baseURL: figmaSrv.URL,
 	}
 
 	var dest map[string]any
 	_ = conn.doGet(t.Context(), "/files/abc", validCreds(), &dest)
 
-	if capturedToken != "" {
-		t.Errorf("X-Figma-Token was leaked to cross-origin redirect target: %q", capturedToken)
+	if tokenLeaked.Load() {
+		t.Error("X-Figma-Token was leaked to cross-origin redirect target")
 	}
 }
 
