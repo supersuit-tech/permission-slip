@@ -76,6 +76,25 @@ func TestUpdateIssue_MissingIssueKey(t *testing.T) {
 	}
 }
 
+func TestUpdateIssue_NoFields(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["jira.update_issue"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "jira.update_issue",
+		Parameters:  json.RawMessage(`{"issue_key":"PROJ-1"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for empty update, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestUpdateIssue_WithLabels(t *testing.T) {
 	t.Parallel()
 

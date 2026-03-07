@@ -55,6 +55,45 @@ func TestAssignIssue_Success(t *testing.T) {
 	}
 }
 
+func TestAssignIssue_Unassign(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody map[string]interface{}
+		json.Unmarshal(body, &reqBody)
+
+		// Jira expects {"accountId": null} to unassign.
+		if _, exists := reqBody["accountId"]; !exists {
+			t.Error("expected accountId key in request body")
+		}
+		if reqBody["accountId"] != nil {
+			t.Errorf("accountId = %v, want nil", reqBody["accountId"])
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["jira.assign_issue"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "jira.assign_issue",
+		Parameters:  json.RawMessage(`{"issue_key":"PROJ-1"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]string
+	json.Unmarshal(result.Data, &data)
+	if data["status"] != "unassigned" {
+		t.Errorf("status = %q, want %q", data["status"], "unassigned")
+	}
+}
+
 func TestAssignIssue_MissingParams(t *testing.T) {
 	t.Parallel()
 
@@ -66,7 +105,6 @@ func TestAssignIssue_MissingParams(t *testing.T) {
 		params string
 	}{
 		{"missing issue_key", `{"account_id":"abc123"}`},
-		{"missing account_id", `{"issue_key":"PROJ-1"}`},
 		{"invalid JSON", `{invalid}`},
 	}
 

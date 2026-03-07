@@ -28,9 +28,7 @@ func (p *assignIssueParams) validate() error {
 	if p.IssueKey == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: issue_key (e.g. PROJ-123)"}
 	}
-	if p.AccountID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: account_id (Atlassian account ID)"}
-	}
+	// AccountID may be empty to unassign the issue.
 	return nil
 }
 
@@ -43,16 +41,26 @@ func (a *assignIssueAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	body := map[string]string{"accountId": params.AccountID}
+	// Jira accepts {"accountId": null} to unassign and {"accountId": "id"} to assign.
+	var body map[string]interface{}
+	if params.AccountID == "" {
+		body = map[string]interface{}{"accountId": nil}
+	} else {
+		body = map[string]interface{}{"accountId": params.AccountID}
+	}
 	path := "/issue/" + url.PathEscape(params.IssueKey) + "/assignee"
 
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, body, nil); err != nil {
 		return nil, err
 	}
 
+	status := "assigned"
+	if params.AccountID == "" {
+		status = "unassigned"
+	}
 	return connectors.JSONResult(map[string]string{
 		"issue_key":  params.IssueKey,
 		"account_id": params.AccountID,
-		"status":     "assigned",
+		"status":     status,
 	})
 }

@@ -31,6 +31,9 @@ func (p *updateIssueParams) validate() error {
 	if p.IssueKey == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: issue_key (e.g. PROJ-123)"}
 	}
+	if p.Summary == "" && p.Description == "" && p.Assignee == "" && p.Priority == "" && p.Labels == nil {
+		return &connectors.ValidationError{Message: "at least one field to update is required (summary, description, assignee, priority, or labels)"}
+	}
 	return nil
 }
 
