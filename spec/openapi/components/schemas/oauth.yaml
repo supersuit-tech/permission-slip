@@ -8,7 +8,7 @@ OAuthProvider:
   properties:
     id:
       type: string
-      description: The OAuth provider ID (e.g. "google", "microsoft")
+      description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
       example: "google"
     scopes:
       type: array
@@ -47,7 +47,7 @@ OAuthConnection:
   properties:
     provider:
       type: string
-      description: The OAuth provider ID (e.g. "google", "microsoft")
+      description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
       example: "google"
     scopes:
       type: array
