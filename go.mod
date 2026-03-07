@@ -1,8 +1,6 @@
 module github.com/supersuit-tech/permission-slip-web
 
-go 1.24.7
-
-toolchain go1.24.13
+go 1.24.0
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
