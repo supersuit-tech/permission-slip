@@ -31,6 +31,11 @@ func TestSquareConnector_Actions(t *testing.T) {
 		"square.create_customer",
 		"square.create_booking",
 		"square.search_orders",
+		"square.issue_refund",
+		"square.update_catalog_item",
+		"square.send_invoice",
+		"square.get_inventory",
+		"square.adjust_inventory",
 	}
 	if len(actions) != len(wantActions) {
 		t.Fatalf("Actions() returned %d actions, want %d", len(actions), len(wantActions))
@@ -117,8 +122,8 @@ func TestSquareConnector_Manifest(t *testing.T) {
 	if m.Name != "Square" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Square")
 	}
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 11 {
+		t.Fatalf("Manifest().Actions has %d items, want 11", len(m.Actions))
 	}
 	wantActions := []string{
 		"square.create_order",
@@ -127,6 +132,11 @@ func TestSquareConnector_Manifest(t *testing.T) {
 		"square.create_customer",
 		"square.create_booking",
 		"square.search_orders",
+		"square.issue_refund",
+		"square.update_catalog_item",
+		"square.send_invoice",
+		"square.get_inventory",
+		"square.adjust_inventory",
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
