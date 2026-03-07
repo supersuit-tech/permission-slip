@@ -27,11 +27,12 @@ type ConnectorManifest struct {
 
 // ManifestAction describes a single action exposed by an external connector.
 type ManifestAction struct {
-	ActionType       string          `json:"action_type"`
-	Name             string          `json:"name"`
-	Description      string          `json:"description"`
-	RiskLevel        string          `json:"risk_level"`
-	ParametersSchema json.RawMessage `json:"parameters_schema,omitempty"`
+	ActionType            string          `json:"action_type"`
+	Name                  string          `json:"name"`
+	Description           string          `json:"description"`
+	RiskLevel             string          `json:"risk_level"`
+	ParametersSchema      json.RawMessage `json:"parameters_schema,omitempty"`
+	RequiresPaymentMethod bool            `json:"requires_payment_method,omitempty"`
 }
 
 // ManifestCredential describes a credential requirement for an external connector.
@@ -303,11 +304,12 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 	}
 	for _, a := range m.Actions {
 		out.Actions = append(out.Actions, db.ExternalConnectorAction{
-			ActionType:       a.ActionType,
-			Name:             a.Name,
-			Description:      a.Description,
-			RiskLevel:        a.RiskLevel,
-			ParametersSchema: a.ParametersSchema,
+			ActionType:            a.ActionType,
+			Name:                  a.Name,
+			Description:           a.Description,
+			RiskLevel:             a.RiskLevel,
+			ParametersSchema:      a.ParametersSchema,
+			RequiresPaymentMethod: a.RequiresPaymentMethod,
 		})
 	}
 	for _, c := range m.RequiredCredentials {
