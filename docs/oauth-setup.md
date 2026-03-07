@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google and Microsoft services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -114,6 +114,38 @@ MICROSOFT_CLIENT_ID=your-application-client-id
 MICROSOFT_CLIENT_SECRET=your-client-secret-value
 ```
 
+## X (Twitter) OAuth Setup
+
+The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
+
+### 1. Create an X Developer App
+
+1. Go to the [X Developer Portal](https://developer.x.com/en/portal/dashboard)
+2. Create a new project and app (or use an existing one)
+3. In the app settings, enable **OAuth 2.0**
+4. Set the **Type of App** to "Web App, Automated App or Bot"
+5. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/x/callback
+   ```
+
+### 2. Configure OAuth Scopes
+
+The X connector requires these scopes:
+- `tweet.read` — read tweets and timelines
+- `tweet.write` — post and delete tweets
+- `users.read` — read user profiles
+- `dm.read` — read direct messages
+- `dm.write` — send direct messages
+- `offline.access` — refresh tokens (required for long-lived access)
+
+### 3. Configure in Permission Slip
+
+1. In Permission Slip, go to **Settings > OAuth App Credentials**
+2. Click **Configure** next to the X provider
+3. Enter your **Client ID** and **Client Secret** from the X Developer Portal
+4. Connect your X account via **Settings > Connected Accounts**
+
 ## Self-Hosted BYOA Setup
 
 For self-hosted deployments without platform-level OAuth credentials, users configure their own OAuth apps through the Settings UI:
@@ -172,6 +204,7 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 Ensure the redirect URI in your OAuth app matches exactly:
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
+- X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
 
