@@ -3,7 +3,6 @@ package discord
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,24 +11,11 @@ import (
 func TestBanUser_Success(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut {
-			t.Errorf("expected PUT, got %s", r.Method)
-		}
-		if r.URL.Path != "/guilds/111/bans/222" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
+	conn, cleanup := mockServer(t, http.MethodPut, "/guilds/111/bans/222", http.StatusNoContent, nil)
+	defer cleanup()
 
-	conn := newForTest(srv.Client(), srv.URL)
 	action := &banUserAction{conn: conn}
-
-	params, _ := json.Marshal(banUserParams{
-		GuildID: "111",
-		UserID:  "222",
-	})
+	params, _ := json.Marshal(banUserParams{GuildID: "111", UserID: "222"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "discord.ban_user",
@@ -76,24 +62,11 @@ func TestBanUser_InvalidDeleteMessageSeconds(t *testing.T) {
 func TestKickUser_Success(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			t.Errorf("expected DELETE, got %s", r.Method)
-		}
-		if r.URL.Path != "/guilds/111/members/222" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
+	conn, cleanup := mockServer(t, http.MethodDelete, "/guilds/111/members/222", http.StatusNoContent, nil)
+	defer cleanup()
 
-	conn := newForTest(srv.Client(), srv.URL)
 	action := &kickUserAction{conn: conn}
-
-	params, _ := json.Marshal(kickUserParams{
-		GuildID: "111",
-		UserID:  "222",
-	})
+	params, _ := json.Marshal(kickUserParams{GuildID: "111", UserID: "222"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "discord.kick_user",

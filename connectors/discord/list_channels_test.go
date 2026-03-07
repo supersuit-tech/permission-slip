@@ -3,7 +3,6 @@ package discord
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,25 +11,13 @@ import (
 func TestListChannels_Success(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Errorf("expected GET, got %s", r.Method)
-		}
-		if r.URL.Path != "/guilds/111/channels" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
+	conn, cleanup := mockServer(t, http.MethodGet, "/guilds/111/channels", http.StatusOK, []map[string]any{
+		{"id": "100", "name": "general", "type": 0, "position": 0},
+		{"id": "200", "name": "voice", "type": 2, "position": 1},
+	})
+	defer cleanup()
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]any{
-			{"id": "100", "name": "general", "type": 0, "position": 0},
-			{"id": "200", "name": "voice", "type": 2, "position": 1},
-		})
-	}))
-	defer srv.Close()
-
-	conn := newForTest(srv.Client(), srv.URL)
 	action := &listChannelsAction{conn: conn}
-
 	params, _ := json.Marshal(listChannelsParams{GuildID: "111"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{

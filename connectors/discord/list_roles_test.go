@@ -3,7 +3,6 @@ package discord
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,26 +11,14 @@ import (
 func TestListRoles_Success(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Errorf("expected GET, got %s", r.Method)
-		}
-		if r.URL.Path != "/guilds/111/roles" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
+	conn, cleanup := mockServer(t, http.MethodGet, "/guilds/111/roles", http.StatusOK, []map[string]any{
+		{"id": "100", "name": "@everyone", "color": 0, "position": 0, "managed": false, "mentionable": false},
+		{"id": "200", "name": "Moderator", "color": 3447003, "position": 1, "managed": false, "mentionable": true},
+		{"id": "300", "name": "Bot Role", "color": 0, "position": 2, "managed": true, "mentionable": false},
+	})
+	defer cleanup()
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]any{
-			{"id": "100", "name": "@everyone", "color": 0, "position": 0, "managed": false, "mentionable": false},
-			{"id": "200", "name": "Moderator", "color": 3447003, "position": 1, "managed": false, "mentionable": true},
-			{"id": "300", "name": "Bot Role", "color": 0, "position": 2, "managed": true, "mentionable": false},
-		})
-	}))
-	defer srv.Close()
-
-	conn := newForTest(srv.Client(), srv.URL)
 	action := &listRolesAction{conn: conn}
-
 	params, _ := json.Marshal(listRolesParams{GuildID: "111"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{

@@ -3,7 +3,6 @@ package discord
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,24 +11,11 @@ import (
 func TestPinMessage_Success(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut {
-			t.Errorf("expected PUT, got %s", r.Method)
-		}
-		if r.URL.Path != "/channels/111/pins/222" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
+	conn, cleanup := mockServer(t, http.MethodPut, "/channels/111/pins/222", http.StatusNoContent, nil)
+	defer cleanup()
 
-	conn := newForTest(srv.Client(), srv.URL)
 	action := &pinMessageAction{conn: conn}
-
-	params, _ := json.Marshal(pinMessageParams{
-		ChannelID: "111",
-		MessageID: "222",
-	})
+	params, _ := json.Marshal(pinMessageParams{ChannelID: "111", MessageID: "222"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "discord.pin_message",
@@ -52,24 +38,11 @@ func TestPinMessage_Success(t *testing.T) {
 func TestUnpinMessage_Success(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			t.Errorf("expected DELETE, got %s", r.Method)
-		}
-		if r.URL.Path != "/channels/111/pins/222" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
+	conn, cleanup := mockServer(t, http.MethodDelete, "/channels/111/pins/222", http.StatusNoContent, nil)
+	defer cleanup()
 
-	conn := newForTest(srv.Client(), srv.URL)
 	action := &unpinMessageAction{conn: conn}
-
-	params, _ := json.Marshal(pinMessageParams{
-		ChannelID: "111",
-		MessageID: "222",
-	})
+	params, _ := json.Marshal(pinMessageParams{ChannelID: "111", MessageID: "222"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "discord.unpin_message",
