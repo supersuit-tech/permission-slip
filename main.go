@@ -21,6 +21,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
@@ -30,6 +31,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
+	linkedinconnector "github.com/supersuit-tech/permission-slip-web/connectors/linkedin"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
@@ -42,6 +44,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
+	"github.com/supersuit-tech/permission-slip-web/connectors/trello"
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
@@ -338,6 +341,7 @@ func main() {
 	registry.Register(hubspot.New())
 	registry.Register(jira.New())
 	registry.Register(linear.New())
+	registry.Register(linkedinconnector.New())
 	registry.Register(microsoft.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
@@ -353,6 +357,7 @@ func main() {
 	registry.Register(redisconnector.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
+	registry.Register(trello.New())
 	registry.Register(twilio.New())
 	registry.Register(walmart.New())
 	registry.Register(xconnector.New())
@@ -363,6 +368,7 @@ func main() {
 	registry.Register(expedia.New())
 	registry.Register(pagerduty.New())
 	registry.Register(zoom.New())
+	registry.Register(calendly.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
