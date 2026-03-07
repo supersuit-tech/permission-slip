@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -24,6 +24,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `MICROSOFT_CLIENT_ID` | Application (client) ID from Azure Portal |
 | `MICROSOFT_CLIENT_SECRET` | Client secret value from Azure Portal |
+
+### Meta OAuth
+
+| Variable | Description |
+|---|---|
+| `META_CLIENT_ID` | App ID from Meta Developer Dashboard |
+| `META_CLIENT_SECRET` | App Secret from Meta Developer Dashboard |
 
 ### OAuth Infrastructure
 
@@ -113,6 +120,45 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 MICROSOFT_CLIENT_ID=your-application-client-id
 MICROSOFT_CLIENT_SECRET=your-client-secret-value
 ```
+
+## Meta (Facebook/Instagram) OAuth Setup
+
+### 1. Create a Meta App
+
+1. Go to [Meta for Developers](https://developers.facebook.com/apps/)
+2. Click **Create App** and choose **Business** type
+3. Fill in the app name and contact email
+4. In the app dashboard, add the **Facebook Login for Business** product
+
+### 2. Configure Facebook Login Settings
+
+1. Navigate to **Facebook Login > Settings**
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/meta/callback
+   ```
+3. Enable **Client OAuth Login** and **Web OAuth Login**
+
+### 3. Request Permissions
+
+The Meta connector requires these permissions (scopes):
+- `pages_manage_posts` — create, edit, and delete Page posts
+- `pages_read_engagement` — read Page post engagement (likes, comments, shares)
+- `pages_read_user_content` — read user-generated content on Pages
+- `instagram_basic` — read Instagram account info
+- `instagram_content_publish` — publish photos to Instagram
+- `instagram_manage_insights` — read Instagram account insights
+
+For production use, submit your app for [App Review](https://developers.facebook.com/docs/app-review) to request these permissions. During development, permissions work for users with roles on the app (admin, developer, tester).
+
+### 4. Configure Environment
+
+```bash
+META_CLIENT_ID=your-meta-app-id
+META_CLIENT_SECRET=your-meta-app-secret
+```
+
+Find these under **App Settings > Basic** in the Meta Developer Dashboard.
 
 ## X (Twitter) OAuth Setup
 
@@ -204,6 +250,7 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 Ensure the redirect URI in your OAuth app matches exactly:
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
+- Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
