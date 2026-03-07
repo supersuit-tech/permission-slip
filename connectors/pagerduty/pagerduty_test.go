@@ -1,4 +1,4 @@
-package github
+package pagerduty
 
 import (
 	"testing"
@@ -6,29 +6,26 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func TestGitHubConnector_ID(t *testing.T) {
+func TestPagerDutyConnector_ID(t *testing.T) {
 	t.Parallel()
 	c := New()
-	if got := c.ID(); got != "github" {
-		t.Errorf("ID() = %q, want %q", got, "github")
+	if got := c.ID(); got != "pagerduty" {
+		t.Errorf("ID() = %q, want %q", got, "pagerduty")
 	}
 }
 
-func TestGitHubConnector_Actions(t *testing.T) {
+func TestPagerDutyConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
 
 	want := []string{
-		"github.create_issue",
-		"github.merge_pr",
-		"github.create_pr",
-		"github.add_reviewer",
-		"github.create_release",
-		"github.close_issue",
-		"github.add_label",
-		"github.add_comment",
-		"github.create_branch",
+		"pagerduty.create_incident",
+		"pagerduty.acknowledge_alert",
+		"pagerduty.resolve_incident",
+		"pagerduty.escalate_incident",
+		"pagerduty.list_on_call",
+		"pagerduty.add_note",
 	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
@@ -40,7 +37,7 @@ func TestGitHubConnector_Actions(t *testing.T) {
 	}
 }
 
-func TestGitHubConnector_ValidateCredentials(t *testing.T) {
+func TestPagerDutyConnector_ValidateCredentials(t *testing.T) {
 	t.Parallel()
 	c := New()
 
@@ -51,7 +48,7 @@ func TestGitHubConnector_ValidateCredentials(t *testing.T) {
 	}{
 		{
 			name:    "valid api_key",
-			creds:   connectors.NewCredentials(map[string]string{"api_key": "ghp_test123"}),
+			creds:   validCreds(),
 			wantErr: false,
 		},
 		{
@@ -66,7 +63,7 @@ func TestGitHubConnector_ValidateCredentials(t *testing.T) {
 		},
 		{
 			name:    "wrong key name",
-			creds:   connectors.NewCredentials(map[string]string{"token": "ghp_test123"}),
+			creds:   connectors.NewCredentials(map[string]string{"token": "pd_test"}),
 			wantErr: true,
 		},
 		{
@@ -89,39 +86,44 @@ func TestGitHubConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
-func TestGitHubConnector_Manifest(t *testing.T) {
+func TestPagerDutyConnector_Manifest(t *testing.T) {
 	t.Parallel()
 	c := New()
 	m := c.Manifest()
 
-	if m.ID != "github" {
-		t.Errorf("Manifest().ID = %q, want %q", m.ID, "github")
+	if m.ID != "pagerduty" {
+		t.Errorf("Manifest().ID = %q, want %q", m.ID, "pagerduty")
 	}
-	if m.Name != "GitHub" {
-		t.Errorf("Manifest().Name = %q, want %q", m.Name, "GitHub")
+	if m.Name != "PagerDuty" {
+		t.Errorf("Manifest().Name = %q, want %q", m.Name, "PagerDuty")
 	}
-	if len(m.Actions) != 9 {
-		t.Fatalf("Manifest().Actions has %d items, want 9", len(m.Actions))
+	if len(m.Actions) != 6 {
+		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
 	}
+
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
 		actionTypes[a.ActionType] = true
 	}
 	for _, want := range []string{
-		"github.create_issue", "github.merge_pr", "github.create_pr",
-		"github.add_reviewer", "github.create_release", "github.close_issue",
-		"github.add_label", "github.add_comment", "github.create_branch",
+		"pagerduty.create_incident",
+		"pagerduty.acknowledge_alert",
+		"pagerduty.resolve_incident",
+		"pagerduty.escalate_incident",
+		"pagerduty.list_on_call",
+		"pagerduty.add_note",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
+
 	if len(m.RequiredCredentials) != 1 {
 		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
 	}
 	cred := m.RequiredCredentials[0]
-	if cred.Service != "github" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "github")
+	if cred.Service != "pagerduty" {
+		t.Errorf("credential service = %q, want %q", cred.Service, "pagerduty")
 	}
 	if cred.AuthType != "api_key" {
 		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
@@ -130,13 +132,12 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 		t.Error("credential instructions_url is empty, want a URL")
 	}
 
-	// Validate the manifest passes validation.
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v", err)
 	}
 }
 
-func TestGitHubConnector_ActionsMatchManifest(t *testing.T) {
+func TestPagerDutyConnector_ActionsMatchManifest(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
@@ -159,8 +160,8 @@ func TestGitHubConnector_ActionsMatchManifest(t *testing.T) {
 	}
 }
 
-func TestGitHubConnector_ImplementsInterface(t *testing.T) {
+func TestPagerDutyConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
-	var _ connectors.Connector = (*GitHubConnector)(nil)
-	var _ connectors.ManifestProvider = (*GitHubConnector)(nil)
+	var _ connectors.Connector = (*PagerDutyConnector)(nil)
+	var _ connectors.ManifestProvider = (*PagerDutyConnector)(nil)
 }
