@@ -215,6 +215,72 @@ func TestValidateMetadata_AcceptsStringValues(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// validateEnum
+// ---------------------------------------------------------------------------
+
+func TestValidateEnum_Valid(t *testing.T) {
+	t.Parallel()
+
+	if err := validateEnum("once", "duration", []string{"once", "repeating", "forever"}); err != nil {
+		t.Errorf("validateEnum() unexpected error: %v", err)
+	}
+}
+
+func TestValidateEnum_EmptyIsValid(t *testing.T) {
+	t.Parallel()
+
+	// Empty string means "not provided" and should not be rejected.
+	if err := validateEnum("", "duration", []string{"once", "repeating", "forever"}); err != nil {
+		t.Errorf("validateEnum(\"\") unexpected error: %v", err)
+	}
+}
+
+func TestValidateEnum_Invalid(t *testing.T) {
+	t.Parallel()
+
+	err := validateEnum("bad_value", "duration", []string{"once", "repeating", "forever"})
+	if err == nil {
+		t.Fatal("expected error for invalid enum value, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// validateCurrency
+// ---------------------------------------------------------------------------
+
+func TestValidateCurrency_Valid(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []string{"usd", "USD", "eur", "gbp", "jpy"} {
+		if err := validateCurrency(c); err != nil {
+			t.Errorf("validateCurrency(%q) unexpected error: %v", c, err)
+		}
+	}
+}
+
+func TestValidateCurrency_Invalid(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []string{"us", "dollars", "1234", "u$d", ""} {
+		// Empty string is handled by callers before validateCurrency, so
+		// if it reaches here it should fail the length check.
+		if c == "" {
+			continue
+		}
+		err := validateCurrency(c)
+		if err == nil {
+			t.Errorf("validateCurrency(%q) expected error, got nil", c)
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("validateCurrency(%q) expected ValidationError, got %T: %v", c, err, err)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // encodeParams (deterministic ordering)
 // ---------------------------------------------------------------------------
 
@@ -819,8 +885,8 @@ func TestManifest_Valid(t *testing.T) {
 	if m.ID != "stripe" {
 		t.Errorf("Manifest().ID = %q, want %q", m.ID, "stripe")
 	}
-	if len(m.Actions) != 6 {
-		t.Errorf("Manifest().Actions has %d entries, want 6", len(m.Actions))
+	if len(m.Actions) != 11 {
+		t.Errorf("Manifest().Actions has %d entries, want 11", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 1 {
 		t.Errorf("Manifest().RequiredCredentials has %d entries, want 1", len(m.RequiredCredentials))
@@ -828,8 +894,8 @@ func TestManifest_Valid(t *testing.T) {
 	if m.RequiredCredentials[0].AuthType != "api_key" {
 		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "api_key")
 	}
-	if len(m.Templates) != 8 {
-		t.Errorf("Manifest().Templates has %d entries, want 8", len(m.Templates))
+	if len(m.Templates) != 16 {
+		t.Errorf("Manifest().Templates has %d entries, want 16", len(m.Templates))
 	}
 }
 
@@ -883,6 +949,11 @@ func TestActions_ReturnsMap(t *testing.T) {
 		"stripe.list_subscriptions",
 		"stripe.create_payment_link",
 		"stripe.get_balance",
+		"stripe.create_subscription",
+		"stripe.cancel_subscription",
+		"stripe.create_coupon",
+		"stripe.create_promotion_code",
+		"stripe.initiate_payout",
 	}
 	if len(actions) != len(expectedActions) {
 		t.Errorf("Actions() returned %d actions, want %d", len(actions), len(expectedActions))

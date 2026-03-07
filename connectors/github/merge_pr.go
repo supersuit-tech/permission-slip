@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -31,14 +30,11 @@ var validMergeMethods = map[string]bool{
 }
 
 func (p *mergePRParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
-	}
-	if p.PullNumber <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: pull_number"}
+	if err := requirePositiveInt(p.PullNumber, "pull_number"); err != nil {
+		return err
 	}
 	if p.MergeMethod == "" {
 		p.MergeMethod = "merge"
@@ -51,11 +47,8 @@ func (p *mergePRParams) validate() error {
 
 // Execute merges a GitHub pull request and returns the merge result.
 func (a *mergePRAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params mergePRParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[mergePRParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

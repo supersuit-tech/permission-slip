@@ -259,6 +259,191 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"additionalProperties": false
 				}`)),
 			},
+			{
+				ActionType:  "shopify.fulfill_order",
+				Name:        "Fulfill Order",
+				Description: "Create a fulfillment for an order with optional tracking information. When notify_customer is true, Shopify sends a shipment notification email.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"order_id": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "The Shopify order ID to fulfill"
+						},
+						"tracking_number": {
+							"type": "string",
+							"description": "Shipment tracking number"
+						},
+						"tracking_company": {
+							"type": "string",
+							"description": "Shipping carrier name (e.g. UPS, FedEx, USPS)"
+						},
+						"tracking_url": {
+							"type": "string",
+							"format": "uri",
+							"description": "URL for tracking the shipment"
+						},
+						"notify_customer": {
+							"type": "boolean",
+							"description": "Whether to send a shipment notification email to the customer"
+						}
+					},
+					"required": ["order_id"],
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.cancel_order",
+				Name:        "Cancel Order",
+				Description: "Cancel an order. This action is irreversible and affects the customer experience. Use with caution.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"order_id": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "The Shopify order ID to cancel"
+						},
+						"reason": {
+							"type": "string",
+							"enum": ["customer", "fraud", "inventory", "declined", "other"],
+							"description": "Reason for cancellation"
+						},
+						"restock": {
+							"type": "boolean",
+							"description": "Whether to restock the order's line items"
+						},
+						"email": {
+							"type": "boolean",
+							"description": "Whether to send a cancellation email to the customer"
+						}
+					},
+					"required": ["order_id"],
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.update_product",
+				Name:        "Update Product",
+				Description: "Update an existing product's attributes such as title, description, vendor, tags, status, or variants",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"product_id": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "The Shopify product ID to update"
+						},
+						"title": {
+							"type": "string",
+							"description": "Product title"
+						},
+						"body_html": {
+							"type": "string",
+							"description": "Product description in HTML"
+						},
+						"vendor": {
+							"type": "string",
+							"description": "Product vendor"
+						},
+						"tags": {
+							"type": "string",
+							"description": "Comma-separated list of tags"
+						},
+						"status": {
+							"type": "string",
+							"enum": ["active", "draft", "archived"],
+							"description": "Product status"
+						},
+						"variants": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"id": {"type": "integer", "description": "Variant ID (required for updating existing variants)"},
+									"price": {"type": "string", "description": "Variant price as decimal string"},
+									"sku": {"type": "string", "description": "Unique SKU code"},
+									"inventory_quantity": {"type": "integer", "description": "Inventory count"},
+									"option1": {"type": "string", "description": "First option value"},
+									"option2": {"type": "string", "description": "Second option value"},
+									"option3": {"type": "string", "description": "Third option value"}
+								}
+							},
+							"description": "Product variants to update or add"
+						}
+					},
+					"required": ["product_id"],
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.create_collection",
+				Name:        "Create Collection",
+				Description: "Create a custom product collection for organizing products in the storefront",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"title": {
+							"type": "string",
+							"description": "Collection title"
+						},
+						"body_html": {
+							"type": "string",
+							"description": "Collection description in HTML"
+						},
+						"published": {
+							"type": "boolean",
+							"description": "Whether the collection is published to the storefront"
+						},
+						"sort_order": {
+							"type": "string",
+							"enum": ["alpha-asc", "alpha-desc", "best-selling", "created", "created-desc", "manual", "price-asc", "price-desc"],
+							"description": "Default sort order for products in the collection"
+						},
+						"image": {
+							"type": "object",
+							"properties": {
+								"src": {"type": "string", "format": "uri", "description": "Image URL"},
+								"alt": {"type": "string", "description": "Image alt text"}
+							},
+							"description": "Collection image"
+						}
+					},
+					"required": ["title"],
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.get_analytics",
+				Name:        "Get Analytics",
+				Description: "Retrieve shop analytics reports. Note: Analytics API access varies by Shopify plan — not all plans support it.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"since": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Show reports created at or after this date (ISO 8601)"
+						},
+						"until": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Show reports created at or before this date (ISO 8601)"
+						},
+						"fields": {
+							"type": "string",
+							"description": "Comma-separated list of fields to return (e.g. id,name,shopify_ql)"
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -316,6 +501,62 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create $5 off discount code",
 				Description: "Create a fixed-amount discount code",
 				Parameters:  json.RawMessage(`{"code":"SAVE5","value_type":"fixed_amount","value":"-5.00","starts_at":"2024-01-01T00:00:00Z"}`),
+			},
+			{
+				ID:          "shopify-fulfill-order-with-tracking",
+				ActionType:  "shopify.fulfill_order",
+				Name:        "Fulfill order with tracking",
+				Description: "Create a fulfillment with tracking info and notify the customer",
+				Parameters:  json.RawMessage(`{"order_id":0,"tracking_number":"1Z999AA10123456784","tracking_company":"UPS","notify_customer":true}`),
+			},
+			{
+				ID:          "shopify-fulfill-order-silent",
+				ActionType:  "shopify.fulfill_order",
+				Name:        "Fulfill order (no notification)",
+				Description: "Create a fulfillment without sending a notification email to the customer",
+				Parameters:  json.RawMessage(`{"order_id":0,"notify_customer":false}`),
+			},
+			{
+				ID:          "shopify-cancel-order-customer-request",
+				ActionType:  "shopify.cancel_order",
+				Name:        "Cancel order (customer request)",
+				Description: "Cancel an order due to customer request, restock items, and notify the customer",
+				Parameters:  json.RawMessage(`{"order_id":0,"reason":"customer","restock":true,"email":true}`),
+			},
+			{
+				ID:          "shopify-cancel-order-fraud",
+				ActionType:  "shopify.cancel_order",
+				Name:        "Cancel order (fraud)",
+				Description: "Cancel a fraudulent order, restock items, and suppress notification to the customer",
+				Parameters:  json.RawMessage(`{"order_id":0,"reason":"fraud","restock":true,"email":false}`),
+			},
+			{
+				ID:          "shopify-update-product-status",
+				ActionType:  "shopify.update_product",
+				Name:        "Update product status",
+				Description: "Change a product's status (e.g. draft to active, or active to archived)",
+				Parameters:  json.RawMessage(`{"product_id":0,"status":"active"}`),
+			},
+			{
+				ID:          "shopify-update-product-details",
+				ActionType:  "shopify.update_product",
+				Name:        "Update product details",
+				Description: "Update a product's title, description, and tags",
+				Parameters:  json.RawMessage(`{"product_id":0,"title":"","body_html":"","tags":""}`),
+			},
+			{
+				ID:          "shopify-create-collection",
+				ActionType:  "shopify.create_collection",
+				Name:        "Create product collection",
+				Description: "Create a new published collection with alphabetical sorting",
+				Parameters:  json.RawMessage(`{"title":"New Collection","published":true,"sort_order":"alpha-asc"}`),
+			},
+			{
+				ID:          "shopify-get-analytics",
+				ActionType:  "shopify.get_analytics",
+				Name:        "Get shop reports",
+				Description: "Retrieve all available analytics reports",
+				Parameters:  json.RawMessage(`{}`),
 			},
 		},
 	}

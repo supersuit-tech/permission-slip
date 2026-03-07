@@ -61,206 +61,19 @@ func newForTest(client *http.Client, baseURL string) *SlackConnector {
 // ID returns "slack", matching the connectors.id in the database.
 func (c *SlackConnector) ID() string { return "slack" }
 
-// Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup, replacing manual seed.go files.
-func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "slack",
-		Name:        "Slack",
-		Description: "Slack integration for team communication",
-		Actions: []connectors.ManifestAction{
-			{
-				ActionType:  "slack.send_message",
-				Name:        "Send Message",
-				Description: "Send a message to a Slack channel",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["channel", "message"],
-					"properties": {
-						"channel": {
-							"type": "string",
-							"description": "Channel name (e.g. #general) or ID (e.g. C01234567)"
-						},
-						"message": {
-							"type": "string",
-							"description": "Message text (supports Slack mrkdwn formatting)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "slack.create_channel",
-				Name:        "Create Channel",
-				Description: "Create a new Slack channel",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["name"],
-					"properties": {
-						"name": {
-							"type": "string",
-							"description": "Channel name (lowercase, no spaces, max 80 chars)"
-						},
-						"is_private": {
-							"type": "boolean",
-							"default": false,
-							"description": "Create as a private channel"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "slack.list_channels",
-				Name:        "List Channels",
-				Description: "List Slack channels visible to the bot",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"properties": {
-						"types": {
-							"type": "string",
-							"default": "public_channel",
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im"
-						},
-						"limit": {
-							"type": "integer",
-							"default": 100,
-							"description": "Max channels to return (1-1000)"
-						},
-						"cursor": {
-							"type": "string",
-							"description": "Pagination cursor from a previous response"
-						},
-						"exclude_archived": {
-							"type": "boolean",
-							"default": true,
-							"description": "Exclude archived channels from results"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "slack.read_channel_messages",
-				Name:        "Read Channel Messages",
-				Description: "Read recent messages from a Slack channel",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["channel"],
-					"properties": {
-						"channel": {
-							"type": "string",
-							"description": "Channel ID (e.g. C01234567)"
-						},
-						"limit": {
-							"type": "integer",
-							"default": 20,
-							"description": "Max messages to return (1-1000)"
-						},
-						"oldest": {
-							"type": "string",
-							"description": "Only messages after this Unix timestamp"
-						},
-						"latest": {
-							"type": "string",
-							"description": "Only messages before this Unix timestamp"
-						},
-						"cursor": {
-							"type": "string",
-							"description": "Pagination cursor from a previous response"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "slack.read_thread",
-				Name:        "Read Thread",
-				Description: "Read replies in a Slack thread",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["channel", "thread_ts"],
-					"properties": {
-						"channel": {
-							"type": "string",
-							"description": "Channel ID containing the thread (e.g. C01234567)"
-						},
-						"thread_ts": {
-							"type": "string",
-							"description": "Timestamp of the parent message (e.g. 1234567890.123456)"
-						},
-						"limit": {
-							"type": "integer",
-							"default": 50,
-							"description": "Max replies to return (1-1000)"
-						},
-						"cursor": {
-							"type": "string",
-							"description": "Pagination cursor from a previous response"
-						}
-					}
-				}`)),
-			},
-		},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "slack", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
-		},
-		Templates: []connectors.ManifestTemplate{
-			{
-				ID:          "tpl_slack_send_to_channel",
-				ActionType:  "slack.send_message",
-				Name:        "Post to a channel",
-				Description: "Locks the channel and lets the agent choose the message content.",
-				Parameters:  json.RawMessage(`{"channel":"#general","message":"*"}`),
-			},
-			{
-				ID:          "tpl_slack_send_any",
-				ActionType:  "slack.send_message",
-				Name:        "Send messages freely",
-				Description: "Agent can send any message to any channel.",
-				Parameters:  json.RawMessage(`{"channel":"*","message":"*"}`),
-			},
-			{
-				ID:          "tpl_slack_create_channel",
-				ActionType:  "slack.create_channel",
-				Name:        "Create channels",
-				Description: "Agent can create public channels with any name.",
-				Parameters:  json.RawMessage(`{"name":"*","is_private":false}`),
-			},
-			{
-				ID:          "tpl_slack_list_channels",
-				ActionType:  "slack.list_channels",
-				Name:        "List channels",
-				Description: "Agent can list channels visible to the bot.",
-				Parameters:  json.RawMessage(`{"types":"*","limit":"*","cursor":"*"}`),
-			},
-			{
-				ID:          "tpl_slack_read_channel",
-				ActionType:  "slack.read_channel_messages",
-				Name:        "Read channel messages",
-				Description: "Agent can read messages from any channel.",
-				Parameters:  json.RawMessage(`{"channel":"*","limit":"*","oldest":"*","latest":"*","cursor":"*"}`),
-			},
-			{
-				ID:          "tpl_slack_read_thread",
-				ActionType:  "slack.read_thread",
-				Name:        "Read thread replies",
-				Description: "Agent can read thread replies from any channel.",
-				Parameters:  json.RawMessage(`{"channel":"*","thread_ts":"*","limit":"*","cursor":"*"}`),
-			},
-		},
-	}
-}
-
 // Actions returns the registered action handlers keyed by action_type.
 func (c *SlackConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"slack.send_message":           &sendMessageAction{conn: c},
-		"slack.create_channel":         &createChannelAction{conn: c},
-		"slack.list_channels":          &listChannelsAction{conn: c},
-		"slack.read_channel_messages":  &readChannelMessagesAction{conn: c},
-		"slack.read_thread":            &readThreadAction{conn: c},
+		"slack.send_message":          &sendMessageAction{conn: c},
+		"slack.create_channel":        &createChannelAction{conn: c},
+		"slack.list_channels":         &listChannelsAction{conn: c},
+		"slack.read_channel_messages": &readChannelMessagesAction{conn: c},
+		"slack.read_thread":           &readThreadAction{conn: c},
+		"slack.schedule_message":      &scheduleMessageAction{conn: c},
+		"slack.set_topic":             &setTopicAction{conn: c},
+		"slack.invite_to_channel":     &inviteToChannelAction{conn: c},
+		"slack.upload_file":           &uploadFileAction{conn: c},
+		"slack.add_reaction":          &addReactionAction{conn: c},
 	}
 }
 
@@ -282,6 +95,21 @@ func (c *SlackConnector) ValidateCredentials(_ context.Context, creds connectors
 type slackResponse struct {
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
+}
+
+// validatable is implemented by action param structs to validate their fields.
+type validatable interface {
+	validate() error
+}
+
+// parseAndValidate unmarshals JSON parameters into a validatable struct and
+// runs its validation. This eliminates the repeated unmarshal + validate
+// boilerplate in every action's Execute method.
+func parseAndValidate(raw json.RawMessage, params validatable) error {
+	if err := json.Unmarshal(raw, params); err != nil {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	return params.validate()
 }
 
 // paginationMeta is the shared response_metadata shape for paginated endpoints.
@@ -381,13 +209,47 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 }
 
 // mapSlackError converts a Slack API error string to the appropriate
-// connector error type.
+// connector error type with user-friendly messages for common errors.
 func mapSlackError(slackErr string) error {
 	switch slackErr {
-	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive", "missing_scope":
+	// Auth errors
+	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive":
 		return &connectors.AuthError{Message: fmt.Sprintf("Slack auth error: %s", slackErr)}
+	case "missing_scope":
+		return &connectors.AuthError{Message: "Slack bot token is missing a required OAuth scope — check your app's permissions at https://api.slack.com/apps"}
+
+	// Rate limiting
 	case "ratelimited":
 		return &connectors.RateLimitError{Message: "Slack API rate limit exceeded"}
+
+	// Channel errors
+	case "channel_not_found":
+		return &connectors.ExternalError{StatusCode: 200, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
+	case "not_in_channel":
+		return &connectors.ExternalError{StatusCode: 200, Message: "bot is not a member of this channel — invite the bot first"}
+	case "is_archived":
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot perform this action on an archived channel"}
+
+	// Reaction errors
+	case "already_reacted":
+		return &connectors.ExternalError{StatusCode: 200, Message: "this emoji reaction has already been added to this message"}
+	case "too_many_emoji":
+		return &connectors.ExternalError{StatusCode: 200, Message: "too many emoji reactions on this message"}
+
+	// Invite errors
+	case "already_in_channel":
+		return &connectors.ExternalError{StatusCode: 200, Message: "one or more users are already members of this channel"}
+	case "cant_invite_self":
+		return &connectors.ExternalError{StatusCode: 200, Message: "the bot cannot invite itself to a channel"}
+	case "user_not_found":
+		return &connectors.ExternalError{StatusCode: 200, Message: "one or more user IDs were not found — verify the user IDs are correct"}
+
+	// Message errors
+	case "time_in_past":
+		return &connectors.ExternalError{StatusCode: 200, Message: "scheduled message time is in the past — post_at must be a future Unix timestamp"}
+	case "message_too_long":
+		return &connectors.ExternalError{StatusCode: 200, Message: "message exceeds Slack's maximum length"}
+
 	default:
 		return &connectors.ExternalError{
 			StatusCode: 200,
