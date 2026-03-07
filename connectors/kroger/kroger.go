@@ -149,12 +149,20 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	// Try to extract Kroger API error message.
-	var kErr krogerErrorResponse
+	// Truncate raw body to prevent leaking large or sensitive payloads in
+	// error messages (the body could be up to maxResponseBytes).
+	const maxErrBody = 512
 	msg := string(body)
+	if len(msg) > maxErrBody {
+		msg = msg[:maxErrBody] + "...(truncated)"
+	}
+
+	// Try to extract a structured Kroger API error message.
+	var kErr krogerErrorResponse
 	if json.Unmarshal(body, &kErr) == nil && len(kErr.Errors) > 0 {
-		msg = kErr.Errors[0].Message
-		if msg == "" {
+		if kErr.Errors[0].Message != "" {
+			msg = kErr.Errors[0].Message
+		} else if kErr.Errors[0].Reason != "" {
 			msg = kErr.Errors[0].Reason
 		}
 	}
