@@ -156,6 +156,27 @@ func TestConfluenceConnector_Do_Timeout(t *testing.T) {
 	}
 }
 
+func TestConfluenceConnector_Do_ContextCanceled(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // cancel immediately
+
+	conn := newForTest(srv.Client(), srv.URL)
+	err := conn.do(ctx, validCreds(), http.MethodGet, "/test", nil, nil)
+	if err == nil {
+		t.Fatal("do() expected error, got nil")
+	}
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("expected TimeoutError for canceled context, got %T: %v", err, err)
+	}
+}
+
 func TestConfluenceConnector_Do_MissingCredentials(t *testing.T) {
 	t.Parallel()
 

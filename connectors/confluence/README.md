@@ -88,6 +88,7 @@ connectors/confluence/
 ├── confluence.go            # ConfluenceConnector struct, New(), Actions(), ValidateCredentials(), apiBase(), do()
 ├── manifest.go              # Manifest() with action schemas, credentials, templates
 ├── response.go              # Shared HTTP response → typed error mapping
+├── types.go                 # Shared pageResponse struct and toResult() helper
 ├── create_page.go           # confluence.create_page action
 ├── update_page.go           # confluence.update_page action (optimistic locking)
 ├── get_page.go              # confluence.get_page action

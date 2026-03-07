@@ -86,6 +86,31 @@ func TestGetPage_CustomBodyFormat(t *testing.T) {
 	}
 }
 
+func TestGetPage_WhitespacePaddedBodyFormat(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("body-format"); got != "view" {
+			t.Errorf("body-format = %q, want view", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": "98765", "title": "Page"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["confluence.get_page"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "confluence.get_page",
+		Parameters:  json.RawMessage(`{"page_id":"98765","body_format":" view "}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestGetPage_MissingParams(t *testing.T) {
 	t.Parallel()
 

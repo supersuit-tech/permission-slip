@@ -117,6 +117,8 @@ func TestUpdatePage_MissingParams(t *testing.T) {
 		{"missing version_number", `{"page_id":"123","title":"Test"}`},
 		{"zero version_number", `{"page_id":"123","title":"Test","version_number":0}`},
 		{"no fields to update", `{"page_id":"123","version_number":2}`},
+		{"whitespace-only title and body", `{"page_id":"123","version_number":2,"title":"  ","body":"  "}`},
+		{"invalid status", `{"page_id":"123","title":"Test","version_number":2,"status":"archived"}`},
 		{"invalid JSON", `{invalid}`},
 	}
 
