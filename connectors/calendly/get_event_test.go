@@ -72,6 +72,9 @@ func TestGetEvent_Success(t *testing.T) {
 	if data["join_url"] != "https://zoom.us/j/123" {
 		t.Errorf("unexpected join_url: %v", data["join_url"])
 	}
+	if data["location_type"] != "zoom" {
+		t.Errorf("unexpected location_type: %v", data["location_type"])
+	}
 
 	guests, ok := data["guests"].([]any)
 	if !ok {
@@ -97,6 +100,27 @@ func TestGetEvent_MissingEventUUID(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing event_uuid")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestGetEvent_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &getEventAction{conn: conn}
+
+	params, _ := json.Marshal(getEventParams{EventUUID: "../../../users/me"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "calendly.get_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal UUID")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

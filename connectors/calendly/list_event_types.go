@@ -17,7 +17,8 @@ type listEventTypesAction struct {
 }
 
 type listEventTypesParams struct {
-	Active *bool `json:"active,omitempty"`
+	UserURI string `json:"user_uri,omitempty"`
+	Active  *bool  `json:"active,omitempty"`
 }
 
 // calendlyEventTypesResponse is the Calendly API response from GET /event_types.
@@ -58,7 +59,7 @@ func (a *listEventTypesAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 
-	userURI, err := a.conn.getUserURI(ctx, req.Credentials)
+	userURI, err := a.conn.resolveUserURI(ctx, req.Credentials, params.UserURI)
 	if err != nil {
 		return nil, err
 	}

@@ -89,6 +89,27 @@ func TestCancelEvent_MissingEventUUID(t *testing.T) {
 	}
 }
 
+func TestCancelEvent_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &cancelEventAction{conn: conn}
+
+	params, _ := json.Marshal(cancelEventParams{EventUUID: "../../users/me"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "calendly.cancel_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal UUID")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCancelEvent_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

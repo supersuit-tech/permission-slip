@@ -46,6 +46,9 @@ func TestListScheduledEvents_Success(t *testing.T) {
 					StartTime: "2024-01-15T09:00:00.000000Z",
 					EndTime:   "2024-01-15T09:30:00.000000Z",
 					EventType: "https://api.calendly.com/event_types/et1",
+					EventGuests: []calendlyScheduledGuest{
+						{Email: "guest@example.com"},
+					},
 				},
 			},
 		})
@@ -81,6 +84,12 @@ func TestListScheduledEvents_Success(t *testing.T) {
 	}
 	if data.Events[0].Status != "active" {
 		t.Errorf("expected status 'active', got %q", data.Events[0].Status)
+	}
+	if data.Events[0].GuestCount != 1 {
+		t.Errorf("expected guest_count 1, got %d", data.Events[0].GuestCount)
+	}
+	if len(data.Events[0].Guests) != 1 || data.Events[0].Guests[0] != "guest@example.com" {
+		t.Errorf("expected guests [guest@example.com], got %v", data.Events[0].Guests)
 	}
 }
 

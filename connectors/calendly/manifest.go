@@ -22,6 +22,10 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
+						"user_uri": {
+							"type": "string",
+							"description": "The user URI to list event types for. If omitted, fetches automatically from /users/me. Pass this to avoid an extra API call if you already have the URI."
+						},
 						"active": {
 							"type": "boolean",
 							"description": "Filter by active status. If omitted, returns all event types."
@@ -65,6 +69,10 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
+						"user_uri": {
+							"type": "string",
+							"description": "The user URI to list events for. If omitted, fetches automatically from /users/me. Pass this to avoid an extra API call if you already have the URI."
+						},
 						"min_start_time": {
 							"type": "string",
 							"description": "Only return events starting at or after this time (ISO 8601 format)"
@@ -162,7 +170,7 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "calendly.list_event_types",
 				Name:        "List active event types",
 				Description: "Agent can list active scheduling event types.",
-				Parameters:  json.RawMessage(`{"active":"*"}`),
+				Parameters:  json.RawMessage(`{"user_uri":"*","active":"*"}`),
 			},
 			{
 				ID:          "tpl_calendly_create_scheduling_link",
@@ -176,7 +184,7 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "calendly.list_scheduled_events",
 				Name:        "List upcoming events",
 				Description: "Agent can list upcoming scheduled events.",
-				Parameters:  json.RawMessage(`{"min_start_time":"*","max_start_time":"*","status":"*","count":"*"}`),
+				Parameters:  json.RawMessage(`{"user_uri":"*","min_start_time":"*","max_start_time":"*","status":"*","count":"*"}`),
 			},
 			{
 				ID:          "tpl_calendly_cancel_event",

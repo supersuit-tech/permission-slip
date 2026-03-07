@@ -18,6 +18,7 @@ type listScheduledEventsAction struct {
 }
 
 type listScheduledEventsParams struct {
+	UserURI      string `json:"user_uri,omitempty"`
 	MinStartTime string `json:"min_start_time"`
 	MaxStartTime string `json:"max_start_time"`
 	Status       string `json:"status"`
@@ -74,13 +75,15 @@ type calendlyScheduledGuest struct {
 }
 
 type scheduledEventItem struct {
-	URI       string `json:"uri"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	StartTime string `json:"start_time"`
-	EndTime   string `json:"end_time"`
-	EventType string `json:"event_type"`
-	Location  string `json:"location,omitempty"`
+	URI        string   `json:"uri"`
+	Name       string   `json:"name"`
+	Status     string   `json:"status"`
+	StartTime  string   `json:"start_time"`
+	EndTime    string   `json:"end_time"`
+	EventType  string   `json:"event_type"`
+	Location   string   `json:"location,omitempty"`
+	GuestCount int      `json:"guest_count"`
+	Guests     []string `json:"guests,omitempty"`
 }
 
 func (a *listScheduledEventsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -93,7 +96,7 @@ func (a *listScheduledEventsAction) Execute(ctx context.Context, req connectors.
 	}
 	params.normalize()
 
-	userURI, err := a.conn.getUserURI(ctx, req.Credentials)
+	userURI, err := a.conn.resolveUserURI(ctx, req.Credentials, params.UserURI)
 	if err != nil {
 		return nil, err
 	}
@@ -120,13 +123,17 @@ func (a *listScheduledEventsAction) Execute(ctx context.Context, req connectors.
 	items := make([]scheduledEventItem, 0, len(resp.Collection))
 	for _, ev := range resp.Collection {
 		item := scheduledEventItem{
-			URI:       ev.URI,
-			Name:      ev.Name,
-			Status:    ev.Status,
-			StartTime: ev.StartTime,
-			EndTime:   ev.EndTime,
-			EventType: ev.EventType,
-			Location:  ev.Location.Location,
+			URI:        ev.URI,
+			Name:       ev.Name,
+			Status:     ev.Status,
+			StartTime:  ev.StartTime,
+			EndTime:    ev.EndTime,
+			EventType:  ev.EventType,
+			Location:   ev.Location.Location,
+			GuestCount: len(ev.EventGuests),
+		}
+		for _, g := range ev.EventGuests {
+			item.Guests = append(item.Guests, g.Email)
 		}
 		items = append(items, item)
 	}

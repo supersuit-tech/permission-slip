@@ -24,6 +24,9 @@ func (p *cancelEventParams) validate() error {
 	if p.EventUUID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: event_uuid"}
 	}
+	if err := validateUUID(p.EventUUID); err != nil {
+		return err
+	}
 	return nil
 }
 

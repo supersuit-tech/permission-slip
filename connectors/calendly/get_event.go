@@ -23,6 +23,9 @@ func (p *getEventParams) validate() error {
 	if p.EventUUID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: event_uuid"}
 	}
+	if err := validateUUID(p.EventUUID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -70,6 +73,9 @@ func (a *getEventAction) Execute(ctx context.Context, req connectors.ActionReque
 		"event_type": resp.Resource.EventType,
 		"created_at": resp.Resource.CreatedAt,
 		"updated_at": resp.Resource.UpdatedAt,
+	}
+	if resp.Resource.Location.Type != "" {
+		result["location_type"] = resp.Resource.Location.Type
 	}
 	if resp.Resource.Location.Location != "" {
 		result["location"] = resp.Resource.Location.Location

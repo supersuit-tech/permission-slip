@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -134,7 +135,9 @@ func (c *CalendlyConnector) doJSON(ctx context.Context, creds connectors.Credent
 		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -167,6 +170,32 @@ func (c *CalendlyConnector) doJSON(ctx context.Context, creds connectors.Credent
 	}
 
 	return nil
+}
+
+// uuidPattern validates that an event UUID contains only safe characters.
+// Calendly UUIDs are alphanumeric with hyphens (e.g., "abc-123-def-456").
+var uuidPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// validateUUID checks that the given string is a safe UUID for use in URL paths.
+// This prevents path traversal attacks (e.g., "../../other-endpoint").
+func validateUUID(uuid string) error {
+	if !uuidPattern.MatchString(uuid) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid event_uuid format: must contain only alphanumeric characters, hyphens, and underscores; got %q", uuid),
+		}
+	}
+	return nil
+}
+
+// resolveUserURI returns the user URI to use for API calls. If userURI is
+// provided (non-empty), it is returned directly — this allows callers to
+// skip the extra GET /users/me round-trip when they already have the URI.
+// Otherwise, it fetches the URI from the API.
+func (c *CalendlyConnector) resolveUserURI(ctx context.Context, creds connectors.Credentials, userURI string) (string, error) {
+	if userURI != "" {
+		return userURI, nil
+	}
+	return c.getUserURI(ctx, creds)
 }
 
 // calendlyAPIError represents the error response format from the Calendly API.
