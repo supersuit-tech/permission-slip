@@ -25,6 +25,10 @@ const (
 	credKeyAccountSID = "account_sid"
 	credKeyAuthToken  = "auth_token"
 
+	// maxResponseBody is the maximum response body size we'll read from Twilio.
+	// Prevents memory exhaustion from unexpectedly large responses.
+	maxResponseBody = 1 << 20 // 1 MiB
+
 	// Twilio Account SIDs start with "AC" and are 34 characters long.
 	accountSIDPrefix = "AC"
 	accountSIDLen    = 34
@@ -333,7 +337,7 @@ func (c *TwilioConnector) doForm(ctx context.Context, creds connectors.Credentia
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
@@ -370,7 +374,7 @@ func (c *TwilioConnector) doGet(ctx context.Context, creds connectors.Credential
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

@@ -21,7 +21,12 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		Message string `json:"message"`
 		MoreInfo string `json:"more_info"`
 	}
+	// Truncate raw body to avoid leaking large/sensitive payloads into error messages.
+	const maxErrBody = 512
 	msg := string(body)
+	if len(msg) > maxErrBody {
+		msg = msg[:maxErrBody] + "...(truncated)"
+	}
 	if json.Unmarshal(body, &twilioErr) == nil && twilioErr.Message != "" {
 		if twilioErr.Code > 0 {
 			msg = fmt.Sprintf("[%d] %s", twilioErr.Code, twilioErr.Message)
