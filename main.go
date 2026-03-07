@@ -27,6 +27,7 @@ import (
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
+	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
@@ -345,6 +346,7 @@ func main() {
 	registry.Register(stripeconnector.New())
 	registry.Register(twilio.New())
 	registry.Register(xconnector.New())
+	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
