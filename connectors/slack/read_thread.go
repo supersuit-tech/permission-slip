@@ -39,25 +39,10 @@ func (p *readThreadParams) validate() error {
 
 // readThreadRequest is the Slack API request body for conversations.replies.
 type readThreadRequest struct {
-	Channel  string `json:"channel"`
-	TS       string `json:"ts"`
-	Limit    int    `json:"limit,omitempty"`
-	Cursor   string `json:"cursor,omitempty"`
-}
-
-type readThreadResponse struct {
-	slackResponse
-	Messages []slackMessage       `json:"messages,omitempty"`
-	HasMore  bool                 `json:"has_more,omitempty"`
-	Meta     *paginationMeta  `json:"response_metadata,omitempty"`
-}
-
-
-// readThreadResult is the action output.
-type readThreadResult struct {
-	Messages   []messageSummary `json:"messages"`
-	HasMore    bool             `json:"has_more"`
-	NextCursor string           `json:"next_cursor,omitempty"`
+	Channel string `json:"channel"`
+	TS      string `json:"ts"`
+	Limit   int    `json:"limit,omitempty"`
+	Cursor  string `json:"cursor,omitempty"`
 }
 
 // Execute fetches replies in a Slack thread.
@@ -80,7 +65,7 @@ func (a *readThreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		body.Limit = 50
 	}
 
-	var resp readThreadResponse
+	var resp messagesResponse
 	if err := a.conn.doPost(ctx, "conversations.replies", req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}
@@ -89,23 +74,5 @@ func (a *readThreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, mapSlackError(resp.Error)
 	}
 
-	result := readThreadResult{
-		Messages: make([]messageSummary, 0, len(resp.Messages)),
-		HasMore:  resp.HasMore,
-	}
-	for _, msg := range resp.Messages {
-		result.Messages = append(result.Messages, messageSummary{
-			User:       msg.User,
-			BotID:      msg.BotID,
-			Text:       msg.Text,
-			TS:         msg.TS,
-			ThreadTS:   msg.ThreadTS,
-			ReplyCount: msg.ReplyCount,
-		})
-	}
-	if resp.Meta != nil {
-		result.NextCursor = resp.Meta.NextCursor
-	}
-
-	return connectors.JSONResult(result)
+	return connectors.JSONResult(toMessagesResult(&resp))
 }

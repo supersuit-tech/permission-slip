@@ -76,7 +76,7 @@ func TestReadChannelMessages_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data readChannelMessagesResult
+	var data messagesResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestReadChannelMessages_WithTimeRange(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data readChannelMessagesResult
+	var data messagesResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}

@@ -46,39 +46,6 @@ type readChannelMessagesRequest struct {
 	Cursor  string `json:"cursor,omitempty"`
 }
 
-type readChannelMessagesResponse struct {
-	slackResponse
-	Messages []slackMessage                 `json:"messages,omitempty"`
-	HasMore  bool                           `json:"has_more,omitempty"`
-	Meta     *paginationMeta   `json:"response_metadata,omitempty"`
-}
-
-type slackMessage struct {
-	Type      string `json:"type"`
-	User      string `json:"user,omitempty"`
-	BotID     string `json:"bot_id,omitempty"`
-	Text      string `json:"text"`
-	TS        string `json:"ts"`
-	ThreadTS  string `json:"thread_ts,omitempty"`
-	ReplyCount int   `json:"reply_count,omitempty"`
-}
-
-// readChannelMessagesResult is the action output.
-type readChannelMessagesResult struct {
-	Messages   []messageSummary `json:"messages"`
-	HasMore    bool             `json:"has_more"`
-	NextCursor string           `json:"next_cursor,omitempty"`
-}
-
-type messageSummary struct {
-	User       string `json:"user,omitempty"`
-	BotID      string `json:"bot_id,omitempty"`
-	Text       string `json:"text"`
-	TS         string `json:"ts"`
-	ThreadTS   string `json:"thread_ts,omitempty"`
-	ReplyCount int    `json:"reply_count,omitempty"`
-}
-
 // Execute fetches recent messages from a Slack channel.
 func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params readChannelMessagesParams
@@ -100,7 +67,7 @@ func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.
 		body.Limit = 20
 	}
 
-	var resp readChannelMessagesResponse
+	var resp messagesResponse
 	if err := a.conn.doPost(ctx, "conversations.history", req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}
@@ -109,23 +76,5 @@ func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.
 		return nil, mapSlackError(resp.Error)
 	}
 
-	result := readChannelMessagesResult{
-		Messages: make([]messageSummary, 0, len(resp.Messages)),
-		HasMore:  resp.HasMore,
-	}
-	for _, msg := range resp.Messages {
-		result.Messages = append(result.Messages, messageSummary{
-			User:       msg.User,
-			BotID:      msg.BotID,
-			Text:       msg.Text,
-			TS:         msg.TS,
-			ThreadTS:   msg.ThreadTS,
-			ReplyCount: msg.ReplyCount,
-		})
-	}
-	if resp.Meta != nil {
-		result.NextCursor = resp.Meta.NextCursor
-	}
-
-	return connectors.JSONResult(result)
+	return connectors.JSONResult(toMessagesResult(&resp))
 }
