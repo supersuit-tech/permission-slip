@@ -106,8 +106,8 @@ The connector ships with 16 pre-built templates at different permission levels. 
 | Cancel subscriptions (immediate) | `cancel_subscription` | **High** | Both immediate and period-end cancellation |
 | Initiate payouts (default destination) | `initiate_payout` | **High** | Cannot override bank destination |
 | Initiate payouts (any destination) | `initiate_payout` | **High** | Can specify any bank account or card |
-| Issue refunds up to $99.99 | `issue_refund` | **High** | Amount capped via `$pattern` (max 9999 cents) |
-| Issue refunds (any amount) | `issue_refund` | **High** | Uncapped — for trusted agents only |
+| Issue partial refunds only | `issue_refund` | **High** | Amount required (blocks full refunds by omission) |
+| Issue refunds (any amount) | `issue_refund` | **High** | Uncapped, full refunds allowed — for trusted agents only |
 
 Templates are defined in `manifest.go` and auto-seeded into the database on startup.
 

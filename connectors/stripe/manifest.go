@@ -490,7 +490,7 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ActionType:  "stripe.create_customer",
 			Name:        "Create customers",
 			Description: "Agent can create new Stripe customer records with any details.",
-			Parameters:  json.RawMessage(`{"email":"*","name":"*","description":"*","phone":"*"}`),
+			Parameters:  json.RawMessage(`{"email":"*","name":"*","description":"*","phone":"*","metadata":"*"}`),
 		},
 		// --- Write (medium risk) ---
 		{
@@ -498,14 +498,14 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ActionType:  "stripe.create_invoice",
 			Name:        "Create invoices",
 			Description: "Agent can create and send invoices for any customer with any line items.",
-			Parameters:  json.RawMessage(`{"customer_id":"*","description":"*","line_items":"*","currency":"*"}`),
+			Parameters:  json.RawMessage(`{"customer_id":"*","description":"*","line_items":"*","currency":"*","auto_advance":"*","due_date":"*","metadata":"*"}`),
 		},
 		{
 			ID:          "tpl_stripe_create_payment_links",
 			ActionType:  "stripe.create_payment_link",
 			Name:        "Create payment links",
 			Description: "Agent can create shareable payment links for any products.",
-			Parameters:  json.RawMessage(`{"line_items":"*","after_completion":"*","allow_promotion_codes":"*"}`),
+			Parameters:  json.RawMessage(`{"line_items":"*","after_completion":"*","allow_promotion_codes":"*","metadata":"*"}`),
 		},
 		// --- Write (medium risk — subscriptions & promotions) ---
 		{
@@ -566,18 +566,18 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			Parameters:  json.RawMessage(`{"amount":"*","currency":"*","description":"*","destination":"*","metadata":"*"}`),
 		},
 		{
-			ID:          "tpl_stripe_issue_refund_capped",
+			ID:          "tpl_stripe_issue_refund_partial_only",
 			ActionType:  "stripe.issue_refund",
-			Name:        "Issue refunds up to $99.99",
-			Description: "Agent can issue refunds capped at 9999 cents ($99.99). The amount is constrained by a regex pattern to prevent large refunds — requires human approval for anything $100+.",
-			Parameters:  json.RawMessage(`{"payment_intent_id":"*","charge_id":"*","amount":{"$pattern":"^[1-9]\\d{0,3}$"},"reason":"*"}`),
+			Name:        "Issue partial refunds only",
+			Description: "Agent can issue partial refunds (amount is required). Full refunds are blocked because amount cannot be omitted. Use the uncapped template for full refund capability.",
+			Parameters:  json.RawMessage(`{"payment_intent_id":"*","charge_id":"*","amount":"*","reason":"*","metadata":"*"}`),
 		},
 		{
 			ID:          "tpl_stripe_issue_refund_full",
 			ActionType:  "stripe.issue_refund",
 			Name:        "Issue refunds (any amount)",
-			Description: "Agent can issue refunds of any amount, including full refunds. High risk — use only for trusted agents with oversight.",
-			Parameters:  json.RawMessage(`{"payment_intent_id":"*","charge_id":"*","amount":"*","reason":"*"}`),
+			Description: "Agent can issue refunds of any amount, including full refunds (by omitting amount). High risk — use only for trusted agents with oversight.",
+			Parameters:  json.RawMessage(`{"payment_intent_id":"*","charge_id":"*","amount":"*","reason":"*","metadata":"*"}`),
 		},
 	}
 }
