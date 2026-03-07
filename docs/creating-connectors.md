@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), custom auth (Slack), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), custom auth (Slack), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -951,6 +951,20 @@ connectors/
 │   ├── helpers_test.go       # validCreds(), newTestConnector() with sqlmock
 │   ├── mysql_test.go         # Connector-level tests
 │   └── *_test.go             # Per-action tests
+├── jira/
+│   ├── jira.go              # JiraConnector struct, New(), do(), apiBase(), ValidateCredentials()
+│   ├── manifest.go           # Manifest() with 6 action schemas and templates
+│   ├── response.go           # HTTP status → typed error mapping
+│   ├── adf.go                # plainTextToADF() — shared ADF conversion
+│   ├── create_issue.go       # jira.create_issue action
+│   ├── update_issue.go       # jira.update_issue action
+│   ├── transition_issue.go   # jira.transition_issue action
+│   ├── add_comment.go        # jira.add_comment action
+│   ├── assign_issue.go       # jira.assign_issue action
+│   ├── search.go             # jira.search action (JQL)
+│   ├── README.md             # Connector documentation
+│   ├── helpers_test.go       # validCreds() test helper
+│   └── *_test.go             # Per-action + connector + response tests
 ├── google/
 │   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
 │   ├── manifest.go           # Manifest() with 19 action schemas and 28 templates

@@ -25,6 +25,7 @@ import (
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
@@ -327,6 +328,7 @@ func main() {
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
 	registry.Register(hubspot.New())
+	registry.Register(jira.New())
 	registry.Register(linear.New())
 	registry.Register(microsoft.New())
 	registry.Register(mongodb.New())
