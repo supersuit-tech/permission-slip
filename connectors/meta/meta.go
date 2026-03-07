@@ -94,9 +94,9 @@ func (c *MetaConnector) ValidateCredentials(_ context.Context, creds connectors.
 }
 
 // doJSON is the shared request lifecycle for Meta Graph API calls. It marshals
-// reqBody as JSON, sends the request with the access token as a query parameter
-// (Meta convention), handles rate limiting and timeouts, and unmarshals the
-// response into respBody.
+// reqBody as JSON, sends the request with a Bearer token in the Authorization
+// header, handles rate limiting and timeouts, and unmarshals the response into
+// respBody.
 func (c *MetaConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, rawURL string, reqBody, respBody any) error {
 	token, ok := creds.Get(credKeyAccessToken)
 	if !ok || token == "" {

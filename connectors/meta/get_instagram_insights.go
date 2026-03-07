@@ -86,11 +86,11 @@ func (a *getInstagramInsightsAction) Execute(ctx context.Context, req connectors
 		period = "day"
 	}
 
-	url := fmt.Sprintf("%s/%s/insights?metric=%s&period=%s",
+	reqURL := fmt.Sprintf("%s/%s/insights?metric=%s&period=%s",
 		a.conn.baseURL, params.InstagramAccountID, metric, period)
 
 	var resp insightsResponse
-	if err := a.conn.doGet(ctx, req.Credentials, url, &resp); err != nil {
+	if err := a.conn.doGet(ctx, req.Credentials, reqURL, &resp); err != nil {
 		return nil, err
 	}
 

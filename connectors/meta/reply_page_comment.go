@@ -53,8 +53,8 @@ func (a *replyPageCommentAction) Execute(ctx context.Context, req connectors.Act
 	body := replyPageCommentRequest{Message: params.Message}
 	var resp replyPageCommentResponse
 
-	url := fmt.Sprintf("%s/%s/comments", a.conn.baseURL, params.CommentID)
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, url, body, &resp); err != nil {
+	reqURL := fmt.Sprintf("%s/%s/comments", a.conn.baseURL, params.CommentID)
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, reqURL, body, &resp); err != nil {
 		return nil, err
 	}
 

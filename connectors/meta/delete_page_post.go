@@ -37,8 +37,8 @@ func (a *deletePagePostAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/%s", a.conn.baseURL, params.PostID)
-	if err := a.conn.doDelete(ctx, req.Credentials, url); err != nil {
+	reqURL := fmt.Sprintf("%s/%s", a.conn.baseURL, params.PostID)
+	if err := a.conn.doDelete(ctx, req.Credentials, reqURL); err != nil {
 		return nil, err
 	}
 

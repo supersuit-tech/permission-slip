@@ -68,8 +68,8 @@ func (a *createPagePostAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	var resp createPagePostResponse
-	url := fmt.Sprintf("%s/%s/feed", a.conn.baseURL, params.PageID)
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, url, body, &resp); err != nil {
+	reqURL := fmt.Sprintf("%s/%s/feed", a.conn.baseURL, params.PageID)
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, reqURL, body, &resp); err != nil {
 		return nil, err
 	}
 

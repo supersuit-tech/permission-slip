@@ -77,18 +77,18 @@ func (a *listPagePostsAction) Execute(ctx context.Context, req connectors.Action
 		limit = 10
 	}
 
-	url := fmt.Sprintf("%s/%s/posts?fields=id,message,created_time,shares,likes.summary(true),comments.summary(true)&limit=%d",
+	reqURL := fmt.Sprintf("%s/%s/posts?fields=id,message,created_time,shares,likes.summary(true),comments.summary(true)&limit=%d",
 		a.conn.baseURL, params.PageID, limit)
 
 	if params.Since > 0 {
-		url += "&since=" + strconv.FormatInt(params.Since, 10)
+		reqURL += "&since=" + strconv.FormatInt(params.Since, 10)
 	}
 	if params.Until > 0 {
-		url += "&until=" + strconv.FormatInt(params.Until, 10)
+		reqURL += "&until=" + strconv.FormatInt(params.Until, 10)
 	}
 
 	var resp listPagePostsResponse
-	if err := a.conn.doGet(ctx, req.Credentials, url, &resp); err != nil {
+	if err := a.conn.doGet(ctx, req.Credentials, reqURL, &resp); err != nil {
 		return nil, err
 	}
 
