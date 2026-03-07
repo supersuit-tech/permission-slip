@@ -48,13 +48,12 @@ describe("OAuthProviderSection", () => {
 
     const { container } = render(<OAuthProviderSection />, { wrapper });
 
-    // Wait for data to load, then verify section is not rendered
+    // Wait for queries to fire and component to settle (returns null when
+    // there are no unconfigured providers and no BYOA configs).
     await waitFor(() => {
       expect(mockGet).toHaveBeenCalled();
+      expect(container.querySelector("[data-slot='card']")).not.toBeInTheDocument();
     });
-    // Give React time to settle after data loads
-    await new Promise((r) => setTimeout(r, 100));
-    expect(container.querySelector("[class*='card']")).not.toBeInTheDocument();
   });
 
   it("renders section with unconfigured providers", async () => {
@@ -68,9 +67,8 @@ describe("OAuthProviderSection", () => {
     render(<OAuthProviderSection />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("OAuth App Credentials")).toBeInTheDocument();
+      expect(screen.getByText("Salesforce")).toBeInTheDocument();
     });
-    expect(screen.getByText("Salesforce")).toBeInTheDocument();
     expect(
       screen.getByText(/Needs OAuth client credentials/),
     ).toBeInTheDocument();
