@@ -22,7 +22,8 @@ func TestCreateSchedulingLink_Success(t *testing.T) {
 
 		var body calendlySchedulingLinkRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decoding request body: %v", err)
+			t.Errorf("decoding request body: %v", err)
+			return
 		}
 		if body.Owner != "https://api.calendly.com/event_types/et1" {
 			t.Errorf("expected owner to be event type URI, got %q", body.Owner)

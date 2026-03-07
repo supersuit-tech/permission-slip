@@ -22,7 +22,8 @@ func TestCancelEvent_Success(t *testing.T) {
 
 		var body calendlyCancelRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decoding request body: %v", err)
+			t.Errorf("decoding request body: %v", err)
+			return
 		}
 		if body.Reason != "Meeting no longer needed" {
 			t.Errorf("expected reason 'Meeting no longer needed', got %q", body.Reason)

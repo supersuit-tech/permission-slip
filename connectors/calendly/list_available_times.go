@@ -46,13 +46,6 @@ type calendlyAvailableTime struct {
 	SchedulingURL string `json:"scheduling_url"`
 }
 
-type availableTimeItem struct {
-	Status            string `json:"status"`
-	InviteesRemaining int    `json:"invitees_remaining"`
-	StartTime         string `json:"start_time"`
-	SchedulingURL     string `json:"scheduling_url"`
-}
-
 func (a *listAvailableTimesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listAvailableTimesParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
@@ -73,18 +66,8 @@ func (a *listAvailableTimesAction) Execute(ctx context.Context, req connectors.A
 		return nil, err
 	}
 
-	items := make([]availableTimeItem, 0, len(resp.Collection))
-	for _, at := range resp.Collection {
-		items = append(items, availableTimeItem{
-			Status:            at.Status,
-			InviteesRemaining: at.InviteesRemaining,
-			StartTime:         at.StartTime,
-			SchedulingURL:     at.SchedulingURL,
-		})
-	}
-
 	return connectors.JSONResult(map[string]any{
-		"total_available_times": len(items),
-		"available_times":       items,
+		"total_available_times": len(resp.Collection),
+		"available_times":       resp.Collection,
 	})
 }

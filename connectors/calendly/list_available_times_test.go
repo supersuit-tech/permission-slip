@@ -63,7 +63,7 @@ func TestListAvailableTimes_Success(t *testing.T) {
 
 	var data struct {
 		TotalAvailableTimes int                 `json:"total_available_times"`
-		AvailableTimes      []availableTimeItem `json:"available_times"`
+		AvailableTimes      []calendlyAvailableTime `json:"available_times"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)

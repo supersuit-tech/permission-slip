@@ -219,7 +219,8 @@ func TestDoJSON_PostWithBody(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decoding request body: %v", err)
+			t.Errorf("decoding request body: %v", err)
+			return
 		}
 		if body["owner_type"] != "EventType" {
 			t.Errorf("body owner_type = %q, want %q", body["owner_type"], "EventType")

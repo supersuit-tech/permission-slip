@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -67,11 +68,7 @@ func (a *listEventTypesAction) Execute(ctx context.Context, req connectors.Actio
 	q := url.Values{}
 	q.Set("user", userURI)
 	if params.Active != nil {
-		if *params.Active {
-			q.Set("active", "true")
-		} else {
-			q.Set("active", "false")
-		}
+		q.Set("active", strconv.FormatBool(*params.Active))
 	}
 
 	var resp calendlyEventTypesResponse
