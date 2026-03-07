@@ -920,6 +920,8 @@ Action types follow the pattern `<connector_id>.<action_name>`:
 - `github.merge_pr`
 - `slack.send_message`
 - `slack.create_channel`
+- `slack.schedule_message`
+- `slack.upload_file`
 
 The registry uses the part before the first `.` to route to the correct connector.
 
@@ -988,13 +990,19 @@ connectors/
 │   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
-│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), shared validators
+│   ├── slack.go              # SlackConnector struct, New(), Actions(), doPost(), shared validators
+│   ├── manifest.go           # Manifest() — action schemas, templates, credentials
 │   ├── messages.go           # Shared message types (slackMessage, messageSummary, messagesResponse)
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
 │   ├── list_channels.go      # slack.list_channels action
 │   ├── read_channel_messages.go  # slack.read_channel_messages action
 │   ├── read_thread.go        # slack.read_thread action
+│   ├── schedule_message.go   # slack.schedule_message action
+│   ├── set_topic.go          # slack.set_topic action
+│   ├── invite_to_channel.go  # slack.invite_to_channel action
+│   ├── upload_file.go        # slack.upload_file action (v2 upload flow)
+│   ├── add_reaction.go       # slack.add_reaction action
 │   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── kroger/
