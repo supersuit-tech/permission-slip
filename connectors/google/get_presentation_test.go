@@ -203,8 +203,8 @@ func TestGetPresentation_PresentationIDURLEncoded(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wantPath := "/v1/presentations/pres%2Fwith%2Fslashes"
-		if r.URL.RawPath != wantPath {
-			t.Errorf("expected raw path %q, got %q", wantPath, r.URL.RawPath)
+		if got := r.URL.EscapedPath(); got != wantPath {
+			t.Errorf("expected escaped path %q, got %q", wantPath, got)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

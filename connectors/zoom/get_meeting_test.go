@@ -81,10 +81,12 @@ func TestGetMeeting_URLEncodesSpecialChars(t *testing.T) {
 	const uuidWithSlash = "abc123==//def456"
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The path should have the UUID properly escaped.
+		// The path should have the UUID properly escaped. Use EscapedPath()
+		// instead of RawPath because RawPath may be empty depending on how
+		// Go's URL parser normalizes the request URL.
 		expectedPath := "/meetings/abc123%3D%3D%2F%2Fdef456"
-		if r.URL.RawPath != expectedPath {
-			t.Errorf("expected raw path %q, got %q", expectedPath, r.URL.RawPath)
+		if got := r.URL.EscapedPath(); got != expectedPath {
+			t.Errorf("expected escaped path %q, got %q", expectedPath, got)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
