@@ -25,6 +25,11 @@ func TestSlackConnector_Actions(t *testing.T) {
 		"slack.list_channels",
 		"slack.read_channel_messages",
 		"slack.read_thread",
+		"slack.schedule_message",
+		"slack.set_topic",
+		"slack.invite_to_channel",
+		"slack.upload_file",
+		"slack.add_reaction",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -112,14 +117,19 @@ func TestSlackConnector_Manifest(t *testing.T) {
 	if m.Name != "Slack" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Slack")
 	}
-	if len(m.Actions) != 5 {
-		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
+	if len(m.Actions) != 10 {
+		t.Fatalf("Manifest().Actions has %d items, want 10", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
 		actionTypes[a.ActionType] = true
 	}
-	for _, want := range []string{"slack.send_message", "slack.create_channel", "slack.list_channels", "slack.read_channel_messages", "slack.read_thread"} {
+	for _, want := range []string{
+		"slack.send_message", "slack.create_channel", "slack.list_channels",
+		"slack.read_channel_messages", "slack.read_thread",
+		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
+		"slack.upload_file", "slack.add_reaction",
+	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}

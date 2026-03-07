@@ -2,8 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -48,10 +46,7 @@ type readThreadRequest struct {
 // Execute fetches replies in a Slack thread.
 func (a *readThreadAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params readThreadParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
