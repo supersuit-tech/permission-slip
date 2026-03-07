@@ -5,8 +5,8 @@
 - When asked a question, just answer it. Do not write or modify code unless explicitly asked.
 - Always ask for permission before writing any code.
 - Do not git push without confirming first
-- After making the first commit on a branch, create a pull request by default (no need to ask first). For subsequent commits, push to the existing PR branch.
-- Always include the pull request URL at the end of every message where a PR exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
+- After making the first commit on a branch, do NOT automatically create a pull request. Instead, provide a pre-filled GitHub PR creation link so the user can create it themselves. Format: `Click here to create PR: https://github.com/supersuit-tech/permission-slip/compare/main...BRANCH?expand=1&title=URL_ENCODED_TITLE&body=URL_ENCODED_BODY` — include a suggested title and body with a summary of changes. For subsequent commits, push to the existing PR branch.
+- Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
 - If a file is getting large enough that splitting it would improve maintainability, just go ahead and split it — don't ask first.
@@ -123,6 +123,14 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
+
+## Go Toolchain Setup
+
+At the start of each session, set this so Go uses the locally installed toolchain instead of trying to download a newer one (which is blocked by the sandbox network):
+
+```bash
+export GOTOOLCHAIN=local
+```
 
 ## PostgreSQL Setup
 

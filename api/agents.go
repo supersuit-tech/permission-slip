@@ -43,7 +43,7 @@ func RegisterAgentRoutes(mux *http.ServeMux, deps *Deps) {
 
 	// Agent-authenticated endpoint: lets a registered agent check its own status.
 	requireAgentSig := RequireAgentSignature(deps)
-	mux.Handle("GET /agents/me", requireAgentSig(handleGetAgentMe()))
+	mux.Handle("GET /agents/me", requireAgentSig(handleGetAgentMe(deps)))
 }
 
 func handleListAgents(deps *Deps) http.HandlerFunc {
@@ -382,16 +382,17 @@ func toAgentListItemResponse(item db.AgentListItem) agentResponse {
 // fields an agent needs to know about itself — no confirmation_code, no
 // approver_id, no request_count.
 type agentSelfResponse struct {
-	AgentID       int64      `json:"agent_id"`
-	Status        string     `json:"status"`
-	Metadata      any        `json:"metadata,omitempty"`
-	RegisteredAt  *time.Time `json:"registered_at,omitempty"`
-	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"`
-	LastActiveAt  *time.Time `json:"last_active_at,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
+	AgentID       int64         `json:"agent_id"`
+	Status        string        `json:"status"`
+	Approver      *approverInfo `json:"approver,omitempty"`
+	Metadata      any           `json:"metadata,omitempty"`
+	RegisteredAt  *time.Time    `json:"registered_at,omitempty"`
+	DeactivatedAt *time.Time    `json:"deactivated_at,omitempty"`
+	LastActiveAt  *time.Time    `json:"last_active_at,omitempty"`
+	CreatedAt     time.Time     `json:"created_at"`
 }
 
-func handleGetAgentMe() http.HandlerFunc {
+func handleGetAgentMe(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		agent := AuthenticatedAgent(r.Context())
 		if agent == nil {
@@ -413,6 +414,14 @@ func handleGetAgentMe() http.HandlerFunc {
 			if err := json.Unmarshal(agent.Metadata, &meta); err == nil {
 				resp.Metadata = meta
 			}
+		}
+
+		// Look up the approver's profile to include their username.
+		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, agent.ApproverID)
+		if err != nil {
+			log.Printf("[%s] GetAgentMe: lookup approver profile: %v", TraceID(r.Context()), err)
+		} else if profile != nil {
+			resp.Approver = &approverInfo{Username: profile.Username}
 		}
 
 		RespondJSON(w, http.StatusOK, resp)

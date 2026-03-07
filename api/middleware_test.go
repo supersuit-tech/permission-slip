@@ -144,9 +144,9 @@ func TestSecurityHeadersMiddleware_InvalidExtraConnectSrc(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	// connect-src should only contain 'self' + Sentry — all malicious entries rejected.
-	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io; ") {
-		t.Errorf("CSP connect-src should be only 'self' + sentry; full CSP: %s", csp)
+	// connect-src should only contain 'self' + Sentry + Stripe — all malicious entries rejected.
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.stripe.com; ") {
+		t.Errorf("CSP connect-src should be only 'self' + sentry + stripe; full CSP: %s", csp)
 	}
 	for _, m := range malicious {
 		if strings.Contains(csp, m) {
@@ -177,9 +177,9 @@ func TestSecurityHeadersMiddleware_InvalidExtraScriptSrc(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	// script-src should only contain 'self' — all malicious entries rejected.
-	if !strings.Contains(csp, "script-src 'self'; ") {
-		t.Errorf("CSP script-src should be only 'self'; full CSP: %s", csp)
+	// script-src should only contain 'self' + Stripe — all malicious entries rejected.
+	if !strings.Contains(csp, "script-src 'self' https://js.stripe.com; ") {
+		t.Errorf("CSP script-src should be only 'self' + stripe; full CSP: %s", csp)
 	}
 	for _, m := range malicious {
 		if strings.Contains(csp, m) {
@@ -231,11 +231,11 @@ func TestSecurityHeadersMiddleware_EmptyExtraConnectSrc(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	csp := rec.Header().Get("Content-Security-Policy")
-	// connect-src should be "'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io" with no trailing spaces from empty inputs.
-	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io; ") {
+	// connect-src should be "'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.stripe.com" with no trailing spaces from empty inputs.
+	if !strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.stripe.com; ") {
 		t.Errorf("CSP connect-src has incorrect base formatting; full CSP: %s", csp)
 	}
-	if strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io  ") {
+	if strings.Contains(csp, "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.stripe.com  ") {
 		t.Errorf("CSP connect-src has trailing whitespace from empty extra sources; full CSP: %s", csp)
 	}
 }
