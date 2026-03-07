@@ -41,8 +41,7 @@ func (a *getMessageAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
-	sid, _ := req.Credentials.Get(credKeyAccountSID)
-	reqURL := a.conn.baseURL + "/Accounts/" + url.PathEscape(sid) + "/Messages/" + url.PathEscape(params.MessageSID) + ".json"
+	reqURL := a.conn.accountURL(req.Credentials) + "/Messages/" + url.PathEscape(params.MessageSID) + ".json"
 
 	var resp struct {
 		SID       string `json:"sid"`

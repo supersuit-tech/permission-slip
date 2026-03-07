@@ -18,7 +18,8 @@ func TestSendWhatsApp_Success(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			return
 		}
 		if got := r.PostFormValue("To"); got != "whatsapp:+15551234567" {
 			t.Errorf("To = %q, want %q", got, "whatsapp:+15551234567")

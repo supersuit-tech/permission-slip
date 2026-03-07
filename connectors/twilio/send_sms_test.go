@@ -29,7 +29,8 @@ func TestSendSMS_Success(t *testing.T) {
 		}
 
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			return
 		}
 		if got := r.PostFormValue("To"); got != "+15551234567" {
 			t.Errorf("To = %q, want %q", got, "+15551234567")
@@ -81,7 +82,8 @@ func TestSendSMS_WithMediaURL(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parsing form: %v", err)
+			t.Errorf("parsing form: %v", err)
+			return
 		}
 		if got := r.PostFormValue("MediaUrl"); got != "https://example.com/image.jpg" {
 			t.Errorf("MediaUrl = %q, want %q", got, "https://example.com/image.jpg")

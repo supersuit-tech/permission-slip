@@ -313,13 +313,28 @@ func (c *TwilioConnector) ValidateCredentials(_ context.Context, creds connector
 	return nil
 }
 
+// messageResponse is the common response shape for SMS, WhatsApp, and call
+// creation endpoints. Extracted to avoid repeating the same struct in each action.
+type messageResponse struct {
+	SID    string `json:"sid"`
+	Status string `json:"status"`
+	To     string `json:"to"`
+	From   string `json:"from"`
+}
+
+// accountURL returns the base URL for account-scoped API calls.
+func (c *TwilioConnector) accountURL(creds connectors.Credentials) string {
+	sid, _ := creds.Get(credKeyAccountSID)
+	return c.baseURL + "/Accounts/" + url.PathEscape(sid)
+}
+
 // doForm sends a form-encoded POST request to the Twilio REST API.
 // Twilio's API uses application/x-www-form-urlencoded for write operations.
 func (c *TwilioConnector) doForm(ctx context.Context, creds connectors.Credentials, path string, formData url.Values, respBody any) error {
 	sid, _ := creds.Get(credKeyAccountSID)
 	token, _ := creds.Get(credKeyAuthToken)
 
-	reqURL := c.baseURL + "/Accounts/" + url.PathEscape(sid) + path
+	reqURL := c.accountURL(creds) + path
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(formData.Encode()))
 	if err != nil {

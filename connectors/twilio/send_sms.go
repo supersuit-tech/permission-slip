@@ -65,13 +65,7 @@ func (a *sendSMSAction) Execute(ctx context.Context, req connectors.ActionReques
 		form.Set("MediaUrl", params.MediaURL)
 	}
 
-	var resp struct {
-		SID    string `json:"sid"`
-		Status string `json:"status"`
-		To     string `json:"to"`
-		From   string `json:"from"`
-	}
-
+	var resp messageResponse
 	if err := a.conn.doForm(ctx, req.Credentials, "/Messages.json", form, &resp); err != nil {
 		return nil, err
 	}

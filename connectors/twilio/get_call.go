@@ -41,8 +41,7 @@ func (a *getCallAction) Execute(ctx context.Context, req connectors.ActionReques
 		return nil, err
 	}
 
-	sid, _ := req.Credentials.Get(credKeyAccountSID)
-	reqURL := a.conn.baseURL + "/Accounts/" + url.PathEscape(sid) + "/Calls/" + url.PathEscape(params.CallSID) + ".json"
+	reqURL := a.conn.accountURL(req.Credentials) + "/Calls/" + url.PathEscape(params.CallSID) + ".json"
 
 	var resp struct {
 		SID       string `json:"sid"`
