@@ -41,6 +41,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
+	"github.com/supersuit-tech/permission-slip-web/connectors/netlify"
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	"github.com/supersuit-tech/permission-slip-web/connectors/pagerduty"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
@@ -53,6 +54,7 @@ import (
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	"github.com/supersuit-tech/permission-slip-web/connectors/trello"
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
+	vercelconnector "github.com/supersuit-tech/permission-slip-web/connectors/vercel"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
@@ -380,7 +382,9 @@ func main() {
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
 	registry.Register(figma.New())
+	registry.Register(netlify.New())
 	registry.Register(pagerduty.New())
+	registry.Register(vercelconnector.New())
 	registry.Register(zoom.New())
 	registry.Register(zapier.New())
 	registry.Register(makeconnector.New())
