@@ -82,34 +82,11 @@ func (a *updatePageAction) Execute(ctx context.Context, req connectors.ActionReq
 		}
 	}
 
-	var resp struct {
-		ID      string `json:"id"`
-		Title   string `json:"title"`
-		Status  string `json:"status"`
-		Version struct {
-			Number  int    `json:"number"`
-			Message string `json:"message"`
-		} `json:"version"`
-		Links struct {
-			WebUI string `json:"webui"`
-		} `json:"_links"`
-	}
-
+	var resp pageResponse
 	path := "/pages/" + url.PathEscape(params.PageID)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, reqBody, &resp); err != nil {
 		return nil, err
 	}
 
-	result := map[string]interface{}{
-		"id":      resp.ID,
-		"title":   resp.Title,
-		"status":  resp.Status,
-		"version": resp.Version,
-	}
-	if resp.Links.WebUI != "" {
-		site, _ := req.Credentials.Get("site")
-		result["web_url"] = "https://" + site + ".atlassian.net/wiki" + resp.Links.WebUI
-	}
-
-	return connectors.JSONResult(result)
+	return resp.toResult(req.Credentials)
 }
