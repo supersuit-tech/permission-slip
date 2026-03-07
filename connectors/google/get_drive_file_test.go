@@ -21,7 +21,7 @@ func TestGetDriveFile_MetadataOnly(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(driveFileMetadata{
+		json.NewEncoder(w).Encode(driveFileEntry{
 			ID:           "file-abc",
 			Name:         "report.docx",
 			MimeType:     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -69,7 +69,7 @@ func TestGetDriveFile_WithGoogleDocsContent(t *testing.T) {
 		case "/drive/v3/files/doc-123":
 			// Metadata request.
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(driveFileMetadata{
+			json.NewEncoder(w).Encode(driveFileEntry{
 				ID:       "doc-123",
 				Name:     "My Document",
 				MimeType: "application/vnd.google-apps.document",
@@ -124,7 +124,7 @@ func TestGetDriveFile_WithTextFileContent(t *testing.T) {
 		case r.URL.Path == "/drive/v3/files/txt-456":
 			// Metadata request.
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(driveFileMetadata{
+			json.NewEncoder(w).Encode(driveFileEntry{
 				ID:       "txt-456",
 				Name:     "notes.txt",
 				MimeType: "text/plain",
@@ -170,7 +170,7 @@ func TestGetDriveFile_BinaryFileNoContent(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(driveFileMetadata{
+		json.NewEncoder(w).Encode(driveFileEntry{
 			ID:       "img-789",
 			Name:     "photo.png",
 			MimeType: "image/png",

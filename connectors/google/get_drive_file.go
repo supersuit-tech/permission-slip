@@ -33,16 +33,6 @@ func (p *getDriveFileParams) validate() error {
 	return nil
 }
 
-// driveFileMetadata is the Google Drive API response from files.get.
-type driveFileMetadata struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	MimeType     string `json:"mimeType"`
-	ModifiedTime string `json:"modifiedTime"`
-	Size         string `json:"size"`
-	WebViewLink  string `json:"webViewLink"`
-}
-
 // driveFileResult is the shape returned to the agent.
 type driveFileResult struct {
 	ID                   string `json:"id"`
@@ -77,7 +67,7 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 	fields := "id,name,mimeType,modifiedTime,size,webViewLink"
 	metaURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(params.FileID) + "?fields=" + url.QueryEscape(fields)
 
-	var meta driveFileMetadata
+	var meta driveFileEntry
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, metaURL, nil, &meta); err != nil {
 		return nil, err
 	}
