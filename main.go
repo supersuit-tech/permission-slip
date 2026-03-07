@@ -29,6 +29,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
+	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
@@ -341,6 +342,7 @@ func main() {
 	registry.Register(mysqlconnector.New())
 	registry.Register(notionconnector.New())
 	registry.Register(pgconnector.New())
+	registry.Register(plaidconnector.New())
 	registry.Register(shopify.New())
 	registry.Register(slack.New())
 	// Proton Mail connector depends on a local Proton Mail Bridge daemon and is
