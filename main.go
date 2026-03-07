@@ -32,6 +32,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
+	"github.com/supersuit-tech/permission-slip-web/connectors/netlify"
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
@@ -41,6 +42,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
+	vercelconnector "github.com/supersuit-tech/permission-slip-web/connectors/vercel"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
@@ -358,6 +360,8 @@ func main() {
 	registry.Register(amadeus.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
+	registry.Register(netlify.New())
+	registry.Register(vercelconnector.New())
 	registry.Register(zoom.New())
 
 	// Auto-seed built-in connectors from their manifests.
