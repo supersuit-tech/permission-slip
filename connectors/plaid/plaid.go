@@ -76,10 +76,10 @@ func (c *PlaidConnector) ID() string { return "plaid" }
 func (c *PlaidConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
 		"plaid.create_link_token":  &createLinkTokenAction{conn: c},
-		"plaid.get_balances":       &getBalancesAction{conn: c},
+		"plaid.get_balances":       &accessTokenAction{conn: c, path: "/accounts/balance/get"},
 		"plaid.list_transactions":  &listTransactionsAction{conn: c},
-		"plaid.get_accounts":       &getAccountsAction{conn: c},
-		"plaid.get_identity":       &getIdentityAction{conn: c},
+		"plaid.get_accounts":       &accessTokenAction{conn: c, path: "/accounts/get"},
+		"plaid.get_identity":       &accessTokenAction{conn: c, path: "/identity/get"},
 		"plaid.get_institution":    &getInstitutionAction{conn: c},
 	}
 }
@@ -132,11 +132,17 @@ func (c *PlaidConnector) doPost(ctx context.Context, creds connectors.Credential
 	clientID, _ := creds.Get(credKeyClientID)
 	secret, _ := creds.Get(credKeySecret)
 
-	// Plaid requires client_id and secret in the request body.
-	body["client_id"] = clientID
-	body["secret"] = secret
+	// Copy the body map before injecting credentials so the caller's map
+	// is never mutated with sensitive values (prevents accidental credential
+	// leakage if the caller logs or reuses the map).
+	reqBody := make(map[string]any, len(body)+2)
+	for k, v := range body {
+		reqBody[k] = v
+	}
+	reqBody["client_id"] = clientID
+	reqBody["secret"] = secret
 
-	jsonBody, err := json.Marshal(body)
+	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("marshaling request body: %w", err)
 	}
