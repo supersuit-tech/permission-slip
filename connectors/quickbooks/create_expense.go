@@ -8,6 +8,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+// maxExpenseLineItems is the QuickBooks API limit for line items per purchase.
 const maxExpenseLineItems = 250
 
 // validPaymentTypes are the QuickBooks purchase payment types.

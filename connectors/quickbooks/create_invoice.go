@@ -8,6 +8,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+// maxInvoiceLineItems is the QuickBooks API limit for line items per invoice.
 const maxInvoiceLineItems = 250
 
 // createInvoiceAction implements connectors.Action for quickbooks.create_invoice.
@@ -61,6 +62,8 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	// Build QuickBooks invoice request body.
+	// QBO requires both the total line Amount (UnitPrice × Qty) and the
+	// individual UnitPrice/Qty breakdown; omitting either causes a 400.
 	lines := make([]map[string]any, 0, len(params.LineItems))
 	for _, item := range params.LineItems {
 		qty := item.Quantity
@@ -102,7 +105,9 @@ func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	// Extract the Invoice object from the response wrapper.
+	// QBO wraps entity responses as {"Invoice": {...}}; extract the inner
+	// object for a cleaner result. Fall back to the full response if the
+	// wrapper key is absent (defensive against API version changes).
 	invoice, ok := resp["Invoice"]
 	if !ok {
 		invoice = resp

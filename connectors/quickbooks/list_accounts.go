@@ -11,7 +11,9 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// validAccountTypes are the QuickBooks account types accepted for filtering.
+// validAccountTypes is an allowlist of QuickBooks account types accepted for
+// filtering. This prevents query injection since account_type values are
+// interpolated into the raw QBO query string.
 var validAccountTypes = map[string]bool{
 	"Bank":                true,
 	"Accounts Receivable": true,
