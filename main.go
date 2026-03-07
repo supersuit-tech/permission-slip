@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/airtable"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
@@ -331,6 +332,7 @@ func main() {
 
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
+	registry.Register(airtable.New())
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
 	registry.Register(hubspot.New())
