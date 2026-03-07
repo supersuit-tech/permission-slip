@@ -47,13 +47,14 @@ type driveFileMetadata struct {
 
 // driveFileResult is the shape returned to the agent.
 type driveFileResult struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	MimeType     string `json:"mime_type"`
-	ModifiedTime string `json:"modified_time,omitempty"`
-	Size         string `json:"size,omitempty"`
-	WebViewLink  string `json:"web_view_link,omitempty"`
-	Content      string `json:"content,omitempty"`
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	MimeType             string `json:"mime_type"`
+	ModifiedTime         string `json:"modified_time,omitempty"`
+	Size                 string `json:"size,omitempty"`
+	WebViewLink          string `json:"web_view_link,omitempty"`
+	Content              string `json:"content,omitempty"`
+	ContentSkippedReason string `json:"content_skipped_reason,omitempty"`
 }
 
 // googleWorkspaceMimeTypes maps Google Workspace MIME types to their
@@ -108,8 +109,10 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 				return nil, err
 			}
 			result.Content = content
+		} else {
+			// Binary files can't be exported as text.
+			result.ContentSkippedReason = "binary file type — content export is only supported for text files and Google Workspace documents"
 		}
-		// Binary files are silently skipped — no content field set.
 	}
 
 	return connectors.JSONResult(result)

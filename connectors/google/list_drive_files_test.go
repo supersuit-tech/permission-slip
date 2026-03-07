@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -109,7 +110,7 @@ func TestListDriveFiles_WithFolderID(t *testing.T) {
 			t.Error("expected non-empty q parameter")
 		}
 		// Verify folder filter is present.
-		if !contains(q, "'folder-123' in parents") {
+		if !strings.Contains(q, "'folder-123' in parents") {
 			t.Errorf("expected folder filter in query, got %q", q)
 		}
 
@@ -216,16 +217,3 @@ func TestListDriveFiles_InvalidJSON(t *testing.T) {
 	}
 }
 
-// contains checks if s contains substr (used to avoid importing strings in test).
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
-}
-
-func containsSubstr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

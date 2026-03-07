@@ -23,11 +23,32 @@ type listDriveFilesParams struct {
 	Query      string `json:"query"`
 	MaxResults int    `json:"max_results"`
 	FolderID   string `json:"folder_id"`
+	OrderBy    string `json:"order_by"`
+}
+
+// validOrderByValues lists the allowed order_by values for Drive files.list.
+var validOrderByValues = map[string]bool{
+	"":                     true,
+	"modifiedTime":         true,
+	"modifiedTime desc":    true,
+	"name":                 true,
+	"name desc":            true,
+	"createdTime":          true,
+	"createdTime desc":     true,
+	"folder":               true,
+	"recency":              true,
+	"viewedByMeTime":       true,
+	"viewedByMeTime desc":  true,
+	"sharedWithMeTime":     true,
+	"sharedWithMeTime desc": true,
 }
 
 func (p *listDriveFilesParams) validate() error {
 	if p.FolderID != "" && containsPathSeparator(p.FolderID) {
 		return &connectors.ValidationError{Message: "folder_id contains invalid characters"}
+	}
+	if !validOrderByValues[p.OrderBy] {
+		return &connectors.ValidationError{Message: "invalid order_by value; valid options: modifiedTime, modifiedTime desc, name, name desc, createdTime, createdTime desc, folder, recency, viewedByMeTime, viewedByMeTime desc, sharedWithMeTime, sharedWithMeTime desc"}
 	}
 	return nil
 }
@@ -59,6 +80,7 @@ type driveFileEntry struct {
 	MimeType     string `json:"mimeType"`
 	ModifiedTime string `json:"modifiedTime"`
 	Size         string `json:"size"`
+	WebViewLink  string `json:"webViewLink"`
 }
 
 // driveFileSummary is the shape returned to the agent for file listings (snake_case).
@@ -68,6 +90,7 @@ type driveFileSummary struct {
 	MimeType     string `json:"mime_type"`
 	ModifiedTime string `json:"modified_time,omitempty"`
 	Size         string `json:"size,omitempty"`
+	WebViewLink  string `json:"web_view_link,omitempty"`
 }
 
 // Execute lists files from Google Drive and returns their metadata.
@@ -83,7 +106,11 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 
 	q := url.Values{}
 	q.Set("pageSize", strconv.Itoa(params.MaxResults))
-	q.Set("fields", "files(id,name,mimeType,modifiedTime,size)")
+	q.Set("fields", "files(id,name,mimeType,modifiedTime,size,webViewLink)")
+
+	if params.OrderBy != "" {
+		q.Set("orderBy", params.OrderBy)
+	}
 
 	// Build the search query.
 	var queryParts []string
@@ -111,6 +138,7 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 			MimeType:     f.MimeType,
 			ModifiedTime: f.ModifiedTime,
 			Size:         f.Size,
+			WebViewLink:  f.WebViewLink,
 		}
 	}
 

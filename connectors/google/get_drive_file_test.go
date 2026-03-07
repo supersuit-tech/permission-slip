@@ -200,6 +200,9 @@ func TestGetDriveFile_BinaryFileNoContent(t *testing.T) {
 	if data.Content != "" {
 		t.Error("expected empty content for binary file")
 	}
+	if data.ContentSkippedReason == "" {
+		t.Error("expected content_skipped_reason for binary file with include_content=true")
+	}
 }
 
 func TestGetDriveFile_MissingFileID(t *testing.T) {

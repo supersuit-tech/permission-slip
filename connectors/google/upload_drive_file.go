@@ -40,7 +40,7 @@ func (p *uploadDriveFileParams) validate() error {
 	}
 	if len(p.Content) > maxUploadBytes {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("content exceeds maximum size of %d bytes", maxUploadBytes),
+			Message: "content exceeds maximum upload size of 4 MB",
 		}
 	}
 	if p.FolderID != "" && containsPathSeparator(p.FolderID) {
@@ -63,8 +63,9 @@ type driveUploadMetadata struct {
 
 // driveUploadResponse is the Google Drive API response from files.create.
 type driveUploadResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	WebViewLink string `json:"webViewLink"`
 }
 
 // Execute uploads a text file to Google Drive and returns the created file metadata.
@@ -118,7 +119,7 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	// Send the multipart upload request.
-	uploadURL := a.conn.driveBaseURL + "/upload/drive/v3/files?uploadType=multipart&fields=id,name"
+	uploadURL := a.conn.driveBaseURL + "/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, &buf)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -155,8 +156,12 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 		}
 	}
 
-	return connectors.JSONResult(map[string]string{
+	result := map[string]string{
 		"id":   uploadResp.ID,
 		"name": uploadResp.Name,
-	})
+	}
+	if uploadResp.WebViewLink != "" {
+		result["web_view_link"] = uploadResp.WebViewLink
+	}
+	return connectors.JSONResult(result)
 }
