@@ -83,6 +83,77 @@ func TestCheckResponse_ServerError(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_FieldLevelDetails(t *testing.T) {
+	t.Parallel()
+	body := `{"error":"RecordInvalid","description":"Record validation errors","details":{"base":[{"description":"Subject cannot be blank","error":"BlankError"}]}}`
+	err := checkResponse(422, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for 422 with details")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+	// Verify that the field-level details are included in the error message.
+	errMsg := err.Error()
+	if !contains(errMsg, "base: Subject cannot be blank") {
+		t.Errorf("expected field-level detail in error, got: %s", errMsg)
+	}
+}
+
+func TestMapZendeskAPIError_InvalidCredentials(t *testing.T) {
+	t.Parallel()
+	body := `{"error":"InvalidCredentials","description":"invalid credentials"}`
+	err := checkResponse(401, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for InvalidCredentials")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got: %T", err)
+	}
+	errMsg := err.Error()
+	if !contains(errMsg, "verify your email and API token") {
+		t.Errorf("expected actionable guidance in error, got: %s", errMsg)
+	}
+}
+
+func TestMapZendeskAPIError_RecordNotFound(t *testing.T) {
+	t.Parallel()
+	body := `{"error":"RecordNotFound","description":"not found"}`
+	err := checkResponse(404, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for RecordNotFound")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestMapZendeskAPIError_UnknownCode(t *testing.T) {
+	t.Parallel()
+	body := `{"error":"SomeFutureError","description":"something new"}`
+	err := checkResponse(400, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for unknown error code")
+	}
+	// Should fall through to mapStatusCodeError, not mapZendeskAPIError.
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for 400, got: %T", err)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestTruncateBody(t *testing.T) {
 	t.Parallel()
 

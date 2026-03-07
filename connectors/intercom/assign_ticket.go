@@ -21,11 +21,11 @@ type assignTicketParams struct {
 }
 
 func (p *assignTicketParams) validate() error {
-	if p.TicketID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: ticket_id"}
+	if !isValidIntercomID(p.TicketID) {
+		return &connectors.ValidationError{Message: "missing or invalid required parameter: ticket_id"}
 	}
-	if p.AssigneeID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: assignee_id"}
+	if !isValidIntercomID(p.AssigneeID) {
+		return &connectors.ValidationError{Message: "missing or invalid required parameter: assignee_id"}
 	}
 	return nil
 }

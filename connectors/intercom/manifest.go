@@ -17,7 +17,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.create_ticket",
 				Name:        "Create Ticket",
-				Description: "Create a new ticket in Intercom",
+				Description: "Create a new ticket in Intercom. Requires a ticket type and contact — find these IDs via the Intercom admin or API.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -25,19 +25,19 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
-							"description": "Ticket title"
+							"description": "Ticket title (e.g. 'Password reset request')"
 						},
 						"description": {
 							"type": "string",
-							"description": "Ticket description"
+							"description": "Ticket description with details about the issue"
 						},
 						"ticket_type_id": {
 							"type": "string",
-							"description": "Intercom ticket type ID"
+							"description": "Intercom ticket type ID — find via Settings > Tickets > Ticket types, or the API"
 						},
 						"contact_id": {
 							"type": "string",
-							"description": "Intercom contact ID of the requester"
+							"description": "Intercom contact ID of the requester (the user or lead who submitted the request)"
 						},
 						"attributes": {
 							"type": "array",
@@ -45,11 +45,11 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "object",
 								"required": ["name", "value"],
 								"properties": {
-									"name": {"type": "string", "description": "Attribute name"},
+									"name": {"type": "string", "description": "Attribute name (must match a defined ticket attribute)"},
 									"value": {"type": "string", "description": "Attribute value"}
 								}
 							},
-							"description": "Custom ticket attributes"
+							"description": "Custom ticket attributes defined in your ticket type (e.g. [{'name': 'severity', 'value': 'high'}])"
 						}
 					}
 				}`)),
@@ -57,7 +57,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.reply_ticket",
 				Name:        "Reply to Ticket",
-				Description: "Add a public reply or internal note to a ticket",
+				Description: "Add a public reply or internal note to a ticket. Public comments are visible to the customer; notes are only visible to teammates.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -69,17 +69,17 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Reply body text (HTML supported)"
+							"description": "Reply body text — HTML is supported (e.g. '<b>bold</b>', '<a href=\"...\">link</a>')"
 						},
 						"message_type": {
 							"type": "string",
 							"enum": ["comment", "note"],
-							"description": "Whether the reply is a public comment or internal note (default: comment)",
+							"description": "Message type — 'comment' for customer-visible replies, 'note' for internal-only notes",
 							"default": "comment"
 						},
 						"admin_id": {
 							"type": "string",
-							"description": "Intercom admin ID of the replying agent"
+							"description": "Intercom admin ID of the replying agent (find via Settings > Teammates, or the API)"
 						}
 					}
 				}`)),
@@ -87,7 +87,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.update_ticket",
 				Name:        "Update Ticket",
-				Description: "Update ticket state, title, or attributes",
+				Description: "Update ticket state, title, or custom attributes. At least one field must be provided.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -100,7 +100,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 						"state": {
 							"type": "string",
 							"enum": ["submitted", "in_progress", "waiting_on_customer", "resolved"],
-							"description": "New ticket state"
+							"description": "New ticket state — not all transitions are valid (e.g. resolved tickets cannot go back to submitted)"
 						},
 						"title": {
 							"type": "string",
@@ -124,7 +124,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.assign_ticket",
 				Name:        "Assign Ticket",
-				Description: "Assign a ticket to an admin or team",
+				Description: "Assign a ticket to an admin or team. The assignee must have access to the ticket's workspace.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -136,7 +136,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"assignee_id": {
 							"type": "string",
-							"description": "Intercom admin or team ID to assign the ticket to"
+							"description": "Intercom admin or team ID to assign the ticket to (find via Settings > Teammates or Teams)"
 						}
 					}
 				}`)),
@@ -144,7 +144,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.search_tickets",
 				Name:        "Search Tickets",
-				Description: "Search tickets using Intercom search query",
+				Description: "Search tickets using a single-field filter. Use '=' for exact match, '~' for contains, 'IN' for multiple values.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -152,16 +152,16 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"field": {
 							"type": "string",
-							"description": "Field to search on (e.g. 'state', 'title', 'ticket_type_id')"
+							"description": "Field to search on (e.g. 'state', 'title', 'ticket_type_id', 'created_at', 'updated_at')"
 						},
 						"operator": {
 							"type": "string",
 							"enum": ["=", "!=", ">", "<", "~", "IN", "NIN"],
-							"description": "Search operator"
+							"description": "Search operator — '=' exact match, '!=' not equal, '>' / '<' for dates, '~' contains, 'IN' / 'NIN' for lists"
 						},
 						"value": {
 							"type": "string",
-							"description": "Value to search for"
+							"description": "Value to search for (e.g. 'submitted', 'billing issue')"
 						}
 					}
 				}`)),
@@ -169,7 +169,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.list_tags",
 				Name:        "List Tags",
-				Description: "List all available tags in Intercom",
+				Description: "List all available tags in the Intercom workspace. Use these tag names with the Tag Ticket action.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -179,7 +179,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.tag_ticket",
 				Name:        "Tag Ticket",
-				Description: "Apply a tag to a ticket",
+				Description: "Apply a tag to a ticket. The tag will be created if it doesn't already exist.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -187,7 +187,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"tag_name": {
 							"type": "string",
-							"description": "Name of the tag to apply"
+							"description": "Name of the tag to apply (e.g. 'vip', 'billing')"
 						},
 						"ticket_id": {
 							"type": "string",
@@ -209,22 +209,29 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_intercom_search_open",
 				ActionType:  "intercom.search_tickets",
 				Name:        "Search open tickets",
-				Description: "Find all tickets in submitted or in_progress state.",
+				Description: "Find all tickets in submitted state. Agent can see the queue of new tickets waiting for triage.",
 				Parameters:  json.RawMessage(`{"field":"state","operator":"=","value":"submitted"}`),
 			},
 			{
 				ID:          "tpl_intercom_reply_with_approval",
 				ActionType:  "intercom.reply_ticket",
 				Name:        "Reply to customer (with approval)",
-				Description: "Send a public reply to a customer. Requires approval before sending.",
+				Description: "Send a public reply to a customer on any ticket. Agent chooses the ticket and writes the message; each reply requires approval before sending.",
 				Parameters:  json.RawMessage(`{"ticket_id":"*","body":"*","admin_id":"*","message_type":"comment"}`),
 			},
 			{
 				ID:          "tpl_intercom_add_note",
 				ActionType:  "intercom.reply_ticket",
 				Name:        "Add internal note",
-				Description: "Add an internal note to a ticket (not visible to customer).",
+				Description: "Add an internal note to any ticket. Notes are only visible to teammates, never to the customer. Agent can write freely without customer-facing risk.",
 				Parameters:  json.RawMessage(`{"ticket_id":"*","body":"*","admin_id":"*","message_type":"note"}`),
+			},
+			{
+				ID:          "tpl_intercom_resolve_ticket",
+				ActionType:  "intercom.update_ticket",
+				Name:        "Resolve ticket",
+				Description: "Mark a ticket as resolved. Agent chooses which ticket to resolve; the state is locked to 'resolved' to prevent accidental state changes.",
+				Parameters:  json.RawMessage(`{"ticket_id":"*","state":"resolved"}`),
 			},
 		},
 	}

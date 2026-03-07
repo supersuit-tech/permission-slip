@@ -27,8 +27,8 @@ var validStates = map[string]bool{
 }
 
 func (p *updateTicketParams) validate() error {
-	if p.TicketID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: ticket_id"}
+	if !isValidIntercomID(p.TicketID) {
+		return &connectors.ValidationError{Message: "missing or invalid required parameter: ticket_id"}
 	}
 	if p.State == "" && p.Title == "" && len(p.Attributes) == 0 {
 		return &connectors.ValidationError{Message: "at least one of state, title, or attributes must be provided"}

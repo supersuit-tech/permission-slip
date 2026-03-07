@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -20,6 +21,8 @@ type searchTicketsParams struct {
 	Query   string `json:"query"`
 	SortBy  string `json:"sort_by"`
 	SortDir string `json:"sort_order"`
+	Page    int    `json:"page"`
+	PerPage int    `json:"per_page"`
 }
 
 var validSortBy = map[string]bool{
@@ -40,6 +43,12 @@ func (p *searchTicketsParams) validate() error {
 	if p.SortDir != "" && !validSortDir[p.SortDir] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_order %q: must be asc or desc", p.SortDir)}
 	}
+	if p.Page < 0 {
+		return &connectors.ValidationError{Message: "page must be a positive integer"}
+	}
+	if p.PerPage < 0 || p.PerPage > 100 {
+		return &connectors.ValidationError{Message: "per_page must be between 1 and 100"}
+	}
 	return nil
 }
 
@@ -59,6 +68,12 @@ func (a *searchTicketsAction) Execute(ctx context.Context, req connectors.Action
 	}
 	if params.SortDir != "" {
 		q.Set("sort_order", params.SortDir)
+	}
+	if params.Page > 0 {
+		q.Set("page", strconv.Itoa(params.Page))
+	}
+	if params.PerPage > 0 {
+		q.Set("per_page", strconv.Itoa(params.PerPage))
 	}
 
 	var resp searchResponse

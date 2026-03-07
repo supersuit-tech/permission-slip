@@ -224,6 +224,30 @@ func TestIntercomConnector_Do_MissingCredentials(t *testing.T) {
 	}
 }
 
+func TestIsValidIntercomID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		id    string
+		valid bool
+	}{
+		{"123", true},
+		{"abc-def", true},
+		{"ticket_42", true},
+		{"", false},
+		{"foo/bar", false},
+		{"../admin", false},
+		{"id?query=1", false},
+		{"id#fragment", false},
+		{"path\\traversal", false},
+	}
+	for _, tt := range tests {
+		if got := isValidIntercomID(tt.id); got != tt.valid {
+			t.Errorf("isValidIntercomID(%q) = %v, want %v", tt.id, got, tt.valid)
+		}
+	}
+}
+
 func TestIntercomConnector_Do_Timeout(t *testing.T) {
 	t.Parallel()
 

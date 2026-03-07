@@ -78,3 +78,18 @@ type tagsListResponse struct {
 	Type string `json:"type"`
 	Data []tag  `json:"data"`
 }
+
+// isValidIntercomID checks that an Intercom string ID is safe to embed in a
+// URL path — it must be non-empty and not contain path separators or query
+// characters that could cause path traversal or injection.
+func isValidIntercomID(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, c := range id {
+		if c == '/' || c == '?' || c == '#' || c == '\\' {
+			return false
+		}
+	}
+	return true
+}

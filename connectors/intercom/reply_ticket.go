@@ -27,8 +27,8 @@ var validMessageTypes = map[string]bool{
 }
 
 func (p *replyTicketParams) validate() error {
-	if p.TicketID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: ticket_id"}
+	if !isValidIntercomID(p.TicketID) {
+		return &connectors.ValidationError{Message: "missing or invalid required parameter: ticket_id"}
 	}
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}

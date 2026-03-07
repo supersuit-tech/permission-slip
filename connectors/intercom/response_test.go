@@ -61,6 +61,59 @@ func TestCheckResponse_ServerError(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_TokenUnauthorized(t *testing.T) {
+	t.Parallel()
+	body := `{"type":"error.list","request_id":"req-123","errors":[{"code":"token_unauthorized","message":"token is invalid"}]}`
+	err := checkResponse(401, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for token_unauthorized")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got: %T", err)
+	}
+	errMsg := err.Error()
+	if !containsSubstr(errMsg, "generate a new token") {
+		t.Errorf("expected actionable guidance in error, got: %s", errMsg)
+	}
+	if !containsSubstr(errMsg, "req-123") {
+		t.Errorf("expected request_id in error, got: %s", errMsg)
+	}
+}
+
+func TestCheckResponse_ParameterNotFound(t *testing.T) {
+	t.Parallel()
+	body := `{"type":"error.list","errors":[{"code":"parameter_not_found","message":"contact not found"}]}`
+	err := checkResponse(404, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for parameter_not_found")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCheckResponse_UnknownErrorCode(t *testing.T) {
+	t.Parallel()
+	body := `{"type":"error.list","errors":[{"code":"some_future_code","message":"something"}]}`
+	err := checkResponse(400, http.Header{}, []byte(body))
+	if err == nil {
+		t.Fatal("expected error for unknown code")
+	}
+	// Should fall through to mapStatusCodeError.
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for 400, got: %T", err)
+	}
+}
+
+func containsSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestTruncateBody(t *testing.T) {
 	t.Parallel()
 
