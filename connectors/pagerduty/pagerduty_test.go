@@ -52,13 +52,23 @@ func TestPagerDutyConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   validOAuthCreds(),
+			wantErr: false,
+		},
+		{
+			name:    "missing both api_key and access_token",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
-			name:    "empty api_key",
+			name:    "empty api_key and no access_token",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token and no api_key",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -118,18 +128,32 @@ func TestPagerDutyConnector_Manifest(t *testing.T) {
 		}
 	}
 
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "pagerduty" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "pagerduty")
+
+	// First credential should be OAuth (default/recommended).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "pagerduty" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "pagerduty")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "pagerduty" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "pagerduty")
+	}
+
+	// Second credential should be API key (alternative).
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "pagerduty" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "pagerduty")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {

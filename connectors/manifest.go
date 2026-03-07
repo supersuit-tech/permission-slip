@@ -99,6 +99,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"microsoft":  true,
 	"salesforce": true,
 	"zoom":       true,
+	"pagerduty":  true,
 }
 
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies
@@ -215,21 +216,25 @@ func (m *ConnectorManifest) Validate() error {
 		}
 	}
 
-	services := make(map[string]bool, len(m.RequiredCredentials))
+	// Track (service, auth_type) pairs to detect duplicates. A connector may
+	// declare the same service with different auth types (e.g. oauth2 + api_key).
+	type serviceAuth struct{ service, authType string }
+	seen := make(map[serviceAuth]bool, len(m.RequiredCredentials))
 	for i, c := range m.RequiredCredentials {
 		if c.Service == "" {
 			return fmt.Errorf("manifest validation: required_credentials[%d].service is required", i)
 		}
-		if services[c.Service] {
-			return fmt.Errorf("manifest validation: duplicate credential service %q", c.Service)
-		}
-		services[c.Service] = true
 		if c.AuthType == "" {
 			return fmt.Errorf("manifest validation: required_credentials[%d].auth_type is required", i)
 		}
 		if !validAuthTypes[c.AuthType] {
 			return fmt.Errorf("manifest validation: required_credentials[%d].auth_type %q must be api_key, basic, custom, or oauth2", i, c.AuthType)
 		}
+		key := serviceAuth{c.Service, c.AuthType}
+		if seen[key] {
+			return fmt.Errorf("manifest validation: duplicate credential (service=%q, auth_type=%q)", c.Service, c.AuthType)
+		}
+		seen[key] = true
 		// OAuth2-specific validation.
 		if c.AuthType == "oauth2" {
 			if c.OAuthProvider == "" {

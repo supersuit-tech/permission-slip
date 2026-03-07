@@ -41,22 +41,23 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		return nil, nil
 	}
 
-	// Check auth_type for this connector's required credentials.
-	reqCred, err := db.GetRequiredCredentialByActionType(ctx, deps.DB, actionType)
+	// Look up all required credentials for this action type.
+	// A connector may support multiple auth methods (e.g. oauth2 + api_key).
+	// We try them in order (OAuth2 first), using the first that succeeds.
+	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return nil, fmt.Errorf("look up required credential: %w", err)
+		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
 
 	var creds connectors.Credentials
-	if reqCred != nil && reqCred.AuthType == "oauth2" {
-		// OAuth2 path: resolve access token from oauth_connections.
-		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
+	if len(reqCreds) == 0 {
+		// No required credentials — resolve static (existing behavior).
+		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		// Static credential path (api_key, basic, custom): existing behavior.
-		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
+		creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, reqCreds)
 		if err != nil {
 			return nil, err
 		}
@@ -223,6 +224,30 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 		last4:                 pm.Last4,
 		amount:                amount,
 	}, nil
+}
+
+// resolveCredentialsWithFallback tries each required credential in order (OAuth2
+// first) and returns the first one that resolves successfully. This allows
+// connectors that support multiple auth methods (e.g. PagerDuty with oauth2 +
+// api_key) to gracefully fall back: if the user has an OAuth connection, use
+// it; otherwise try their stored API key.
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	var lastErr error
+	for _, rc := range reqCreds {
+		rc := rc
+		var creds connectors.Credentials
+		var err error
+		if rc.AuthType == "oauth2" {
+			creds, err = resolveOAuthCredentials(ctx, deps, userID, &rc)
+		} else {
+			creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
+		}
+		if err == nil {
+			return creds, nil
+		}
+		lastErr = err
+	}
+	return connectors.Credentials{}, lastErr
 }
 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)

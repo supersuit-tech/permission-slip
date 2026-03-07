@@ -199,6 +199,29 @@ describe("ConnectorCredentialsSection", () => {
     });
   });
 
+  it("shows OAuth connect button for oauth2 auth type", async () => {
+    mockGet.mockResolvedValue({ data: { connections: [] } });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "pagerduty",
+            auth_type: "oauth2" as const,
+            oauth_provider: "pagerduty",
+            oauth_scopes: ["read", "write"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Pagerduty (OAuth)")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Not connected")).toBeInTheDocument();
+    expect(screen.getByText("Connect")).toBeInTheDocument();
+  });
+
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
     mockGet.mockResolvedValue({ data: { credentials: [] } });

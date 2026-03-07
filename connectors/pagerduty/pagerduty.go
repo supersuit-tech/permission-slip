@@ -197,6 +197,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
+			{Service: "pagerduty", AuthType: "oauth2", OAuthProvider: "pagerduty", OAuthScopes: []string{"read", "write"}},
 			{Service: "pagerduty", AuthType: "api_key", InstructionsURL: "https://support.pagerduty.com/main/docs/api-access-keys"},
 		},
 		Templates: []connectors.ManifestTemplate{
@@ -258,13 +259,15 @@ func (c *PagerDutyConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key. The optional "email" credential is used as the From
-// header on write operations (required by PagerDuty for audit trails).
+// ValidateCredentials checks that the provided credentials contain either a
+// non-empty api_key (for API key auth) or access_token (for OAuth). The
+// optional "email" credential is used as the From header on write operations
+// (required by PagerDuty for audit trails).
 func (c *PagerDutyConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	apiKey, hasAPIKey := creds.Get("api_key")
+	accessToken, hasAccessToken := creds.Get("access_token")
+	if (!hasAPIKey || apiKey == "") && (!hasAccessToken || accessToken == "") {
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
 	}
 	return nil
 }
@@ -289,8 +292,13 @@ func (c *PagerDutyConnector) do(ctx context.Context, creds connectors.Credential
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	apiKey, _ := creds.Get("api_key")
-	req.Header.Set("Authorization", "Token token="+apiKey)
+	// Use OAuth access_token (Bearer) if available, otherwise fall back to API key.
+	if accessToken, ok := creds.Get("access_token"); ok && accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	} else {
+		apiKey, _ := creds.Get("api_key")
+		req.Header.Set("Authorization", "Token token="+apiKey)
+	}
 
 	// PagerDuty requires a From header with a valid user email for write
 	// operations. This provides an audit trail of who (or what agent)

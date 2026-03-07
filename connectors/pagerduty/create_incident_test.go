@@ -64,6 +64,42 @@ func TestCreateIncident_Success(t *testing.T) {
 	}
 }
 
+func TestCreateIncident_OAuthBearerAuth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer pd_test_oauth_token_456" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer pd_test_oauth_token_456")
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"incident": map[string]any{
+				"id":     "P1234567",
+				"status": "triggered",
+				"title":  "Database down",
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["pagerduty.create_incident"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "pagerduty.create_incident",
+		Parameters:  json.RawMessage(`{"service_id":"PSERVICE1","title":"Database down","urgency":"high"}`),
+		Credentials: validOAuthCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if result == nil || result.Data == nil {
+		t.Fatal("Execute() returned nil result")
+	}
+}
+
 func TestCreateIncident_MissingParams(t *testing.T) {
 	t.Parallel()
 
