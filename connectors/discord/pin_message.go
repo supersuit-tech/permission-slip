@@ -10,11 +10,15 @@ import (
 )
 
 // pinMessageAction implements connectors.Action for discord.pin_message.
+// Discord API: PUT /channels/{channel.id}/pins/{message.id}
+// See: https://discord.com/developers/docs/resources/channel#pin-message
 type pinMessageAction struct {
 	conn *DiscordConnector
 }
 
 // unpinMessageAction implements connectors.Action for discord.unpin_message.
+// Discord API: DELETE /channels/{channel.id}/pins/{message.id}
+// See: https://discord.com/developers/docs/resources/channel#unpin-message
 type unpinMessageAction struct {
 	conn *DiscordConnector
 }

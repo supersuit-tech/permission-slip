@@ -9,6 +9,8 @@ import (
 )
 
 // listRolesAction implements connectors.Action for discord.list_roles.
+// Discord API: GET /guilds/{guild.id}/roles
+// See: https://discord.com/developers/docs/resources/guild#get-guild-roles
 type listRolesAction struct {
 	conn *DiscordConnector
 }

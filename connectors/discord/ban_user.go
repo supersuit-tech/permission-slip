@@ -9,6 +9,8 @@ import (
 )
 
 // banUserAction implements connectors.Action for discord.ban_user.
+// Discord API: PUT /guilds/{guild.id}/bans/{user.id}
+// See: https://discord.com/developers/docs/resources/guild#create-guild-ban
 type banUserAction struct {
 	conn *DiscordConnector
 }

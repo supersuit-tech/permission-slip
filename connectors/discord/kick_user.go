@@ -9,6 +9,8 @@ import (
 )
 
 // kickUserAction implements connectors.Action for discord.kick_user.
+// Discord API: DELETE /guilds/{guild.id}/members/{user.id}
+// See: https://discord.com/developers/docs/resources/guild#remove-guild-member
 type kickUserAction struct {
 	conn *DiscordConnector
 }

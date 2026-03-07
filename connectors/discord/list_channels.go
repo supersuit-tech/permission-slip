@@ -9,6 +9,8 @@ import (
 )
 
 // listChannelsAction implements connectors.Action for discord.list_channels.
+// Discord API: GET /guilds/{guild.id}/channels
+// See: https://discord.com/developers/docs/resources/guild#get-guild-channels
 type listChannelsAction struct {
 	conn *DiscordConnector
 }

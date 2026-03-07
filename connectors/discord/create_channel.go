@@ -12,6 +12,8 @@ import (
 var channelNameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 // createChannelAction implements connectors.Action for discord.create_channel.
+// Discord API: POST /guilds/{guild.id}/channels
+// See: https://discord.com/developers/docs/resources/guild#create-guild-channel
 type createChannelAction struct {
 	conn *DiscordConnector
 }

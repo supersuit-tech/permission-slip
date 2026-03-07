@@ -11,6 +11,9 @@ import (
 )
 
 // listMembersAction implements connectors.Action for discord.list_members.
+// Discord API: GET /guilds/{guild.id}/members
+// See: https://discord.com/developers/docs/resources/guild#list-guild-members
+// Note: Requires the Server Members Intent to be enabled on the bot.
 type listMembersAction struct {
 	conn *DiscordConnector
 }

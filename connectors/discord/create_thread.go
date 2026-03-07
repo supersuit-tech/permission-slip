@@ -9,6 +9,8 @@ import (
 )
 
 // createThreadAction implements connectors.Action for discord.create_thread.
+// Discord API: POST /channels/{channel.id}/threads (or /channels/{channel.id}/messages/{message.id}/threads)
+// See: https://discord.com/developers/docs/resources/channel#start-thread-without-message
 type createThreadAction struct {
 	conn *DiscordConnector
 }

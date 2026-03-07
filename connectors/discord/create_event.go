@@ -9,6 +9,8 @@ import (
 )
 
 // createEventAction implements connectors.Action for discord.create_event.
+// Discord API: POST /guilds/{guild.id}/scheduled-events
+// See: https://discord.com/developers/docs/resources/guild-scheduled-event#create-guild-scheduled-event
 type createEventAction struct {
 	conn *DiscordConnector
 }

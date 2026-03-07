@@ -10,6 +10,8 @@ import (
 )
 
 // manageRolesAction implements connectors.Action for discord.manage_roles.
+// Discord API: PUT/DELETE /guilds/{guild.id}/members/{user.id}/roles/{role.id}
+// See: https://discord.com/developers/docs/resources/guild#add-guild-member-role
 type manageRolesAction struct {
 	conn *DiscordConnector
 }
