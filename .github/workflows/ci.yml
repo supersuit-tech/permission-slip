@@ -40,7 +40,53 @@ jobs:
       - name: Ensure frontend/dist exists for go:embed
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
+      - name: Run go build
+        id: gobuild
+        run: |
+          go build ./... 2>&1 | tee /tmp/gobuild.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Post build error
+        if: steps.gobuild.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('/tmp/gobuild.log', 'utf8').slice(0, 5000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number || 321,
+              body: `## Build Failed\n\`\`\`\n${log}\n\`\`\``
+            });
+            core.setFailed('go build failed');
+
+      - name: Run go vet
+        if: steps.gobuild.outcome == 'success'
+        id: govet
+        run: |
+          go vet ./... 2>&1 | tee /tmp/govet.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Post vet error
+        if: steps.govet.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('/tmp/govet.log', 'utf8').slice(0, 5000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number || 321,
+              body: `## Vet Failed\n\`\`\`\n${log}\n\`\`\``
+            });
+            core.setFailed('go vet failed');
+
       - name: Run backend tests
+        if: steps.gobuild.outcome == 'success' && steps.govet.outcome == 'success'
         run: make test-backend
 
   frontend:

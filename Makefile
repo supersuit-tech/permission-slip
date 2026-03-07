@@ -90,12 +90,7 @@ deploy:
 test: test-backend test-frontend mobile-test
 
 test-backend:
-	@echo "=== Step 1: go build ==="
-	go build ./... > /tmp/gobuild.log 2>&1; if [ $$? -ne 0 ]; then echo "BUILD FAILED:"; cat /tmp/gobuild.log; if command -v gh >/dev/null 2>&1 && [ -n "$$GITHUB_REPOSITORY" ]; then gh pr comment 321 --repo "$$GITHUB_REPOSITORY" --body "$$(printf '## Build Failed\n```\n'; head -100 /tmp/gobuild.log; printf '\n```')"; fi; exit 2; fi
-	@echo "=== Step 2: go vet ==="
-	go vet ./... > /tmp/govet.log 2>&1; if [ $$? -ne 0 ]; then echo "VET FAILED:"; cat /tmp/govet.log; if command -v gh >/dev/null 2>&1 && [ -n "$$GITHUB_REPOSITORY" ]; then gh pr comment 321 --repo "$$GITHUB_REPOSITORY" --body "$$(printf '## Vet Failed\n```\n'; head -100 /tmp/govet.log; printf '\n```')"; fi; exit 2; fi
-	@echo "=== Step 3: go test ==="
-	go test -vet=off ./...
+	go test ./...
 	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
 		echo "Supabase detected — also running integration tests..."; \
 		DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
