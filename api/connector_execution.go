@@ -253,16 +253,38 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 		}
 	}
 
-	// No OAuth connection available — try static credentials.
-	// Find the first non-OAuth credential for service-based resolution.
+	// No OAuth connection available — fall back to static credentials.
 	for _, rc := range reqCreds {
 		if rc.AuthType != "oauth2" {
-			return resolveStaticCredentialsByService(ctx, deps, userID, rc.Service)
+			creds, err := resolveStaticCredentialsByService(ctx, deps, userID, rc.Service)
+			if err == nil {
+				return creds, nil
+			}
+			// If the specific static credential isn't found either, continue
+			// to try others or fall through to the final error.
+			var valErr *connectors.ValidationError
+			if errors.As(err, &valErr) {
+				continue
+			}
+			return connectors.Credentials{}, err
 		}
 	}
 
+	// Build a helpful message listing which credential options are available.
+	var methods []string
+	for _, rc := range reqCreds {
+		if rc.AuthType == "oauth2" {
+			provider := "OAuth"
+			if rc.OAuthProvider != nil {
+				provider = *rc.OAuthProvider + " OAuth"
+			}
+			methods = append(methods, provider+" (Settings → Connected Accounts)")
+		} else {
+			methods = append(methods, rc.Service+" "+rc.AuthType)
+		}
+	}
 	return connectors.Credentials{}, &connectors.ValidationError{
-		Message: "no credentials available — connect via OAuth or provide an API key",
+		Message: fmt.Sprintf("no credentials available — configure one of: %s", strings.Join(methods, ", ")),
 	}
 }
 

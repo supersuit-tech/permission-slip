@@ -276,5 +276,9 @@ describe("ConnectorCredentialsSection", () => {
     });
     expect(screen.getByText("OAuth")).toBeInTheDocument();
     expect(screen.getByText("Alternative")).toBeInTheDocument();
+    // Service name should be human-readable, not raw ID
+    expect(
+      screen.getByText("GitHub Personal Access Token"),
+    ).toBeInTheDocument();
   });
 });

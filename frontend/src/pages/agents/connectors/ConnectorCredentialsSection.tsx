@@ -27,6 +27,7 @@ import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
+import { providerLabel, serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
@@ -271,7 +272,7 @@ function StaticCredentialRow({
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium">
-                  {requiredCredential.service}
+                  {serviceLabel(requiredCredential.service)}
                 </p>
                 {isAlternative && (
                   <Badge variant="outline" className="text-xs">
@@ -280,7 +281,7 @@ function StaticCredentialRow({
                 )}
               </div>
               <p className="text-muted-foreground text-xs">
-                Auth type: {requiredCredential.auth_type}
+                {authTypeLabel(requiredCredential.auth_type)}
               </p>
               {requiredCredential.instructions_url && (
                 <a
@@ -369,15 +370,3 @@ function StaticCredentialRow({
   );
 }
 
-function providerLabel(id: string): string {
-  const labels: Record<string, string> = {
-    github: "GitHub",
-    google: "Google",
-    microsoft: "Microsoft",
-    meta: "Meta",
-    linkedin: "LinkedIn",
-    salesforce: "Salesforce",
-    zoom: "Zoom",
-  };
-  return labels[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
