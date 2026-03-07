@@ -104,6 +104,7 @@ func TestCreateEmailCampaign_SendNow(t *testing.T) {
 		Name:    "Urgent Update",
 		Subject: "Action Required",
 		Content: "<p>Please read</p>",
+		ListIDs: []string{"10"},
 		SendNow: true,
 	})
 
@@ -153,6 +154,32 @@ func TestCreateEmailCampaign_MissingSubject(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing subject")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateEmailCampaign_SendNowWithoutListIDs(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createEmailCampaignAction{conn: conn}
+
+	params, _ := json.Marshal(createEmailCampaignParams{
+		Name:    "Test",
+		Subject: "Hi",
+		Content: "Hello",
+		SendNow: true,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.create_email_campaign",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when send_now is true without list_ids")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

@@ -33,6 +33,9 @@ func (p *createEmailCampaignParams) validate() error {
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
 	}
+	if p.SendNow && len(p.ListIDs) == 0 {
+		return &connectors.ValidationError{Message: "list_ids is required when send_now is true — specify at least one contact list to send to"}
+	}
 	for i, id := range p.ListIDs {
 		if !isValidHubSpotID(id) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("list_ids[%d]: must be a numeric HubSpot ID", i)}

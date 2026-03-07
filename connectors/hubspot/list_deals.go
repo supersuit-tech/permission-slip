@@ -15,22 +15,24 @@ type listDealsAction struct {
 	conn *HubSpotConnector
 }
 
-type listDealsFilter struct {
-	PropertyName string `json:"propertyName"`
-	Operator     string `json:"operator"`
-	Value        string `json:"value"`
-}
-
 type listDealsSort struct {
 	PropertyName string `json:"propertyName"`
 	Direction    string `json:"direction"`
 }
 
 type listDealsParams struct {
-	Filters    []listDealsFilter `json:"filters"`
-	Sorts      []listDealsSort   `json:"sorts"`
-	Limit      int               `json:"limit"`
-	Properties []string          `json:"properties"`
+	Filters    []searchFilter  `json:"filters"`
+	Sorts      []listDealsSort `json:"sorts"`
+	Limit      int             `json:"limit"`
+	Properties []string        `json:"properties"`
+}
+
+// defaultDealProperties are returned when no properties are specified,
+// so callers always get a useful response without needing to know
+// HubSpot's internal property names.
+var defaultDealProperties = []string{
+	"dealname", "amount", "dealstage", "pipeline",
+	"closedate", "createdate", "hs_lastmodifieddate",
 }
 
 const (
@@ -52,7 +54,7 @@ func (p *listDealsParams) validate() error {
 			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: missing operator", i)}
 		}
 		if !validSearchOperators[f.Operator] {
-			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: unsupported operator %q", i, f.Operator)}
+			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: unsupported operator %q (supported: EQ, NEQ, LT, LTE, GT, GTE, BETWEEN, CONTAINS_TOKEN, NOT_CONTAINS_TOKEN, HAS_PROPERTY, NOT_HAS_PROPERTY)", i, f.Operator)}
 		}
 	}
 	for i, s := range p.Sorts {
@@ -90,22 +92,19 @@ func (a *listDealsAction) Execute(ctx context.Context, req connectors.ActionRequ
 		limit = maxListDealsLimit
 	}
 
+	props := params.Properties
+	if len(props) == 0 {
+		props = defaultDealProperties
+	}
+
 	body := listDealsRequest{
 		Limit:      limit,
 		Sorts:      params.Sorts,
-		Properties: params.Properties,
+		Properties: props,
 	}
 
 	if len(params.Filters) > 0 {
-		filters := make([]searchFilter, len(params.Filters))
-		for i, f := range params.Filters {
-			filters[i] = searchFilter{
-				PropertyName: f.PropertyName,
-				Operator:     f.Operator,
-				Value:        f.Value,
-			}
-		}
-		body.FilterGroups = []filterGroup{{Filters: filters}}
+		body.FilterGroups = []filterGroup{{Filters: params.Filters}}
 	}
 
 	var resp searchResponse

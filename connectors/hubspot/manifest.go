@@ -214,7 +214,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "hubspot.list_deals",
 				Name:        "List Deals",
-				Description: "List deals with optional filtering and sorting",
+				Description: "Search and list deals in the sales pipeline with optional filtering, sorting, and property selection. Returns dealname, amount, stage, and dates by default.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -252,7 +252,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 						"properties": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Deal properties to include in the response"
+							"description": "Deal properties to include in the response (defaults to dealname, amount, dealstage, pipeline, closedate, createdate, hs_lastmodifieddate)"
 						}
 					}
 				}`)),
@@ -260,7 +260,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "hubspot.update_deal_stage",
 				Name:        "Update Deal Stage",
-				Description: "Move a deal to a different pipeline stage",
+				Description: "Move a deal to a different pipeline stage. Use this to advance deals through the sales process (e.g., from qualified to closed-won).",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -284,7 +284,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "hubspot.enroll_in_workflow",
 				Name:        "Enroll in Workflow",
-				Description: "Enroll a contact in an automation workflow",
+				Description: "Enroll a contact in an automation workflow. Workflows may trigger emails, delays, and branching logic — verify the workflow ID before enrolling.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -304,7 +304,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "hubspot.create_email_campaign",
 				Name:        "Create Email Campaign",
-				Description: "Create and optionally send a marketing email campaign",
+				Description: "Create a marketing email campaign and optionally send it immediately. When send_now is true, the email is sent to all contacts in the specified lists — use with caution.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -338,7 +338,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "hubspot.get_analytics",
 				Name:        "Get Analytics",
-				Description: "Get marketing and sales analytics reports",
+				Description: "Get marketing and sales analytics reports with configurable time periods. Use for dashboards, reporting, and performance tracking.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

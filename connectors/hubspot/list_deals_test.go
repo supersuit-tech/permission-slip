@@ -48,7 +48,7 @@ func TestListDeals_Success(t *testing.T) {
 	action := &listDealsAction{conn: conn}
 
 	params, _ := json.Marshal(listDealsParams{
-		Filters: []listDealsFilter{{PropertyName: "dealstage", Operator: "EQ", Value: "closedwon"}},
+		Filters: []searchFilter{{PropertyName: "dealstage", Operator: "EQ", Value: "closedwon"}},
 		Limit:   5,
 	})
 
@@ -83,6 +83,10 @@ func TestListDeals_NoFilters(t *testing.T) {
 		}
 		if len(body.FilterGroups) != 0 {
 			t.Errorf("expected no filter groups, got %d", len(body.FilterGroups))
+		}
+		// Should include default properties when none specified
+		if len(body.Properties) != len(defaultDealProperties) {
+			t.Errorf("expected %d default properties, got %d", len(defaultDealProperties), len(body.Properties))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -120,7 +124,7 @@ func TestListDeals_InvalidFilterOperator(t *testing.T) {
 	action := &listDealsAction{conn: conn}
 
 	params, _ := json.Marshal(listDealsParams{
-		Filters: []listDealsFilter{{PropertyName: "dealstage", Operator: "INVALID", Value: "x"}},
+		Filters: []searchFilter{{PropertyName: "dealstage", Operator: "INVALID", Value: "x"}},
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
