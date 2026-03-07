@@ -28,6 +28,9 @@ func (p *addCommentParams) validate() error {
 	if p.PostURN == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: post_urn"}
 	}
+	if err := validatePostURN(p.PostURN); err != nil {
+		return err
+	}
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}
 	}

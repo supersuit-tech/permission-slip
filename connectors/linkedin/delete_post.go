@@ -25,6 +25,9 @@ func (p *deletePostParams) validate() error {
 	if p.PostURN == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: post_urn"}
 	}
+	if err := validatePostURN(p.PostURN); err != nil {
+		return err
+	}
 	return nil
 }
 
