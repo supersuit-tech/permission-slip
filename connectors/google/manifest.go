@@ -12,7 +12,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail, Calendar, Docs, Chat, Meet, and Drive",
+		Description: "Google integration for Gmail, Calendar, Sheets, Docs, Chat, Meet, and Drive",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -129,6 +129,100 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			// Sheets actions
+			{
+				ActionType:  "google.sheets_read_range",
+				Name:        "Read Spreadsheet Range",
+				Description: "Read cell values from a specified range in a Google Sheets spreadsheet",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id", "range"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+						},
+						"range": {
+							"type": "string",
+							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:D10'). Use sheet name alone to read all data (e.g. 'Sheet1')."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.sheets_write_range",
+				Name:        "Write Spreadsheet Range",
+				Description: "Write cell values to a specified range in a Google Sheets spreadsheet",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id", "range", "values"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+						},
+						"range": {
+							"type": "string",
+							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:C3'). Defines the top-left starting cell for the write."
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of cell values (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI (formulas and formats applied)."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.sheets_append_rows",
+				Name:        "Append Spreadsheet Rows",
+				Description: "Append rows to a sheet or table in a Google Sheets spreadsheet",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id", "range", "values"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+						},
+						"range": {
+							"type": "string",
+							"description": "Sheet name or starting cell (e.g. 'Sheet1' or 'Sheet1!A1'). Rows are appended after the last row with data in this range."
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of row values to append (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.sheets_list_sheets",
+				Name:        "List Worksheets",
+				Description: "List all worksheets (tabs) in a Google Sheets spreadsheet",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id"],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+						}
+					}
+				}`)),
+			},
+			// Docs actions
 			{
 				ActionType:  "google.create_document",
 				Name:        "Create Document",
@@ -212,6 +306,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			// Chat actions
 			{
 				ActionType:  "google.send_chat_message",
 				Name:        "Send Chat Message",
@@ -254,6 +349,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			// Meet action
 			{
 				ActionType:  "google.create_meeting",
 				Name:        "Create Meeting",
@@ -292,6 +388,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			// Drive actions
 			{
 				ActionType:  "google.list_drive_files",
 				Name:        "List Drive Files",
@@ -398,6 +495,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/spreadsheets",
 					"https://www.googleapis.com/auth/documents",
 					"https://www.googleapis.com/auth/chat.spaces.readonly",
 					"https://www.googleapis.com/auth/chat.messages.create",
@@ -455,6 +553,43 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can list upcoming events from any calendar.",
 				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
 			},
+			// Sheets templates
+			{
+				ID:          "tpl_google_sheets_read_range",
+				ActionType:  "google.sheets_read_range",
+				Name:        "Read from specific spreadsheet",
+				Description: "Locks the spreadsheet; agent chooses the range to read.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"SPREADSHEET_ID","range":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_write_range",
+				ActionType:  "google.sheets_write_range",
+				Name:        "Write to specific spreadsheet",
+				Description: "Locks the spreadsheet; agent chooses the range and values to write.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"SPREADSHEET_ID","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_append_rows",
+				ActionType:  "google.sheets_append_rows",
+				Name:        "Append to specific spreadsheet",
+				Description: "Locks the spreadsheet; agent chooses the range and rows to append.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"SPREADSHEET_ID","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_read_any",
+				ActionType:  "google.sheets_read_range",
+				Name:        "Read from any spreadsheet",
+				Description: "Agent can read from any spreadsheet and any range.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*","range":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_list",
+				ActionType:  "google.sheets_list_sheets",
+				Name:        "List worksheets in any spreadsheet",
+				Description: "Agent can list worksheets in any spreadsheet.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*"}`),
+			},
+			// Docs templates
 			{
 				ID:          "tpl_google_create_document",
 				ActionType:  "google.create_document",
@@ -490,6 +625,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can search and list Google Docs from Drive.",
 				Parameters:  json.RawMessage(`{"query":"*","max_results":"*"}`),
 			},
+			// Chat templates
 			{
 				ID:          "tpl_google_send_chat_message",
 				ActionType:  "google.send_chat_message",
@@ -511,6 +647,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can list Google Chat spaces accessible to the user.",
 				Parameters:  json.RawMessage(`{"page_size":"*","filter":"*"}`),
 			},
+			// Meet templates
 			{
 				ID:          "tpl_google_create_meeting",
 				ActionType:  "google.create_meeting",
@@ -525,6 +662,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can create meetings on the primary calendar without inviting attendees.",
 				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
 			},
+			// Drive templates
 			{
 				ID:          "tpl_google_list_drive_files",
 				ActionType:  "google.list_drive_files",

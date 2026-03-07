@@ -952,15 +952,22 @@ connectors/
 │   ├── mysql_test.go         # Connector-level tests
 │   └── *_test.go             # Per-action tests
 ├── google/
-│   ├── google.go             # GoogleConnector struct, New(), Manifest(), doJSON(), OAuth2 auth
+│   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
+│   ├── manifest.go           # Manifest() with 19 action schemas and 28 templates
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── sheets_read.go        # google.sheets_read_range action
+│   ├── sheets_write.go       # google.sheets_write_range action
+│   ├── sheets_append.go      # google.sheets_append_rows action
+│   ├── sheets_list.go        # google.sheets_list_sheets action
+│   ├── sheets_helpers.go     # Shared validation (row/cell limits, ragged row check)
 │   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
 │   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
 │   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
 │   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
+│   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
