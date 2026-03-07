@@ -34,7 +34,7 @@ func (p *sheetsWriteRangeParams) validate() error {
 	if len(p.Values) == 0 {
 		return &connectors.ValidationError{Message: "values must contain at least one row of data"}
 	}
-	if err := validateRowLengths(p.Values); err != nil {
+	if err := validateValues(p.Values); err != nil {
 		return err
 	}
 	return nil
