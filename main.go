@@ -23,6 +23,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/airtable"
 	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	asanaconnector "github.com/supersuit-tech/permission-slip-web/connectors/asana"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/confluence"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
@@ -389,6 +390,7 @@ func main() {
 	registry.Register(xconnector.New())
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
+	registry.Register(asanaconnector.New())
 	registry.Register(docusign.New())
 	registry.Register(awsconnector.New())
 	registry.Register(discord.New())
