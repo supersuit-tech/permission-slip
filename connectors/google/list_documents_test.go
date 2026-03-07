@@ -67,12 +67,16 @@ func TestListDocuments_Success(t *testing.T) {
 
 	var data struct {
 		Documents []documentSummary `json:"documents"`
+		Count     int               `json:"count"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 	if len(data.Documents) != 2 {
 		t.Fatalf("expected 2 documents, got %d", len(data.Documents))
+	}
+	if data.Count != 2 {
+		t.Errorf("expected count 2, got %d", data.Count)
 	}
 	if data.Documents[0].Name != "Meeting Notes" {
 		t.Errorf("expected first doc name 'Meeting Notes', got %q", data.Documents[0].Name)

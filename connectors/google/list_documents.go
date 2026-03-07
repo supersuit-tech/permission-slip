@@ -93,6 +93,7 @@ func (a *listDocumentsAction) Execute(ctx context.Context, req connectors.Action
 
 	return connectors.JSONResult(map[string]any{
 		"documents": documents,
+		"count":     len(documents),
 	})
 }
 

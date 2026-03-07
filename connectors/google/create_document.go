@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -53,8 +54,8 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	body := docsCreateRequest{Title: params.Title}
 	var resp docsCreateResponse
 
-	url := a.conn.docsBaseURL + "/v1/documents"
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, url, body, &resp); err != nil {
+	createURL := a.conn.docsBaseURL + "/v1/documents"
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, createURL, body, &resp); err != nil {
 		return nil, err
 	}
 
@@ -70,7 +71,7 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 				},
 			},
 		}
-		updateURL := a.conn.docsBaseURL + "/v1/documents/" + resp.DocumentID + ":batchUpdate"
+		updateURL := a.conn.docsBaseURL + "/v1/documents/" + url.PathEscape(resp.DocumentID) + ":batchUpdate"
 		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, updateURL, batchReq, nil); err != nil {
 			return nil, err
 		}

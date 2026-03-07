@@ -64,7 +64,7 @@ func TestGetDocument_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data map[string]string
+	var data map[string]any
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
@@ -76,6 +76,13 @@ func TestGetDocument_Success(t *testing.T) {
 	}
 	if data["body_text"] != "Hello, world!\nSecond paragraph.\n" {
 		t.Errorf("unexpected body_text: %q", data["body_text"])
+	}
+	if data["document_url"] != "https://docs.google.com/document/d/doc-abc-123/edit" {
+		t.Errorf("unexpected document_url: %q", data["document_url"])
+	}
+	// word_count: "Hello," "world!" "Second" "paragraph." = 4 words
+	if wc, ok := data["word_count"].(float64); !ok || int(wc) != 4 {
+		t.Errorf("expected word_count 4, got %v", data["word_count"])
 	}
 }
 
@@ -106,12 +113,15 @@ func TestGetDocument_EmptyDocument(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data map[string]string
+	var data map[string]any
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 	if data["body_text"] != "" {
 		t.Errorf("expected empty body_text, got %q", data["body_text"])
+	}
+	if wc, ok := data["word_count"].(float64); !ok || int(wc) != 0 {
+		t.Errorf("expected word_count 0, got %v", data["word_count"])
 	}
 }
 

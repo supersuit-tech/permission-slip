@@ -223,7 +223,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "google.get_document",
 				Name:        "Get Document",
-				Description: "Retrieve the content and metadata of a Google Doc by document ID",
+				Description: "Retrieve the content and metadata of a Google Doc by document ID. Returns plain text content, word count, and a direct link to the document.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -231,7 +231,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"document_id": {
 							"type": "string",
-							"description": "The ID of the Google Doc to retrieve"
+							"description": "The ID of the Google Doc to retrieve (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')"
 						}
 					}
 				}`)),
@@ -239,7 +239,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "google.update_document",
 				Name:        "Update Document",
-				Description: "Append or insert text into an existing Google Doc",
+				Description: "Append or insert text into an existing Google Doc. By default text is appended to the end; specify an index to insert at a specific position.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -247,7 +247,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"document_id": {
 							"type": "string",
-							"description": "The ID of the Google Doc to update"
+							"description": "The ID of the Google Doc to update (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')"
 						},
 						"text": {
 							"type": "string",
@@ -375,6 +375,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search documents",
 				Description: "Agent can search and list Google Docs from Drive.",
 				Parameters:  json.RawMessage(`{"query":"*","max_results":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_document_title_only",
+				ActionType:  "google.create_document",
+				Name:        "Create empty documents",
+				Description: "Agent can create new Google Docs with any title but no initial body content.",
+				Parameters:  json.RawMessage(`{"title":"*"}`),
 			},
 		},
 	}

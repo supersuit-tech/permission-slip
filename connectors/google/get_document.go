@@ -72,6 +72,11 @@ func extractPlainText(content []docsStructuralElement) string {
 	return sb.String()
 }
 
+// wordCount counts the number of whitespace-separated words in s.
+func wordCount(s string) int {
+	return len(strings.Fields(s))
+}
+
 // Execute retrieves a Google Doc and returns its metadata and plain text content.
 func (a *getDocumentAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params getDocumentParams
@@ -89,10 +94,13 @@ func (a *getDocumentAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	bodyText := extractPlainText(resp.Body.Content)
+	documentURL := "https://docs.google.com/document/d/" + resp.DocumentID + "/edit"
 
-	return connectors.JSONResult(map[string]string{
-		"document_id": resp.DocumentID,
-		"title":       resp.Title,
-		"body_text":   bodyText,
+	return connectors.JSONResult(map[string]any{
+		"document_id":  resp.DocumentID,
+		"title":        resp.Title,
+		"body_text":    bodyText,
+		"document_url": documentURL,
+		"word_count":   wordCount(bodyText),
 	})
 }
