@@ -21,6 +21,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
@@ -345,6 +346,7 @@ func main() {
 	registry.Register(twilio.New())
 	registry.Register(xconnector.New())
 	registry.Register(amadeus.New())
+	registry.Register(doordash.New())
 	registry.Register(expedia.New())
 	registry.Register(zoom.New())
 
