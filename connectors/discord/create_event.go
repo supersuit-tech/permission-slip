@@ -38,6 +38,11 @@ func (p *createEventParams) validate() error {
 	if p.EntityType < 1 || p.EntityType > 3 {
 		return &connectors.ValidationError{Message: "entity_type must be 1 (stage), 2 (voice), or 3 (external)"}
 	}
+	if p.ChannelID != "" {
+		if err := validateSnowflake(p.ChannelID, "channel_id"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+var channelNameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 // createChannelAction implements connectors.Action for discord.create_channel.
 type createChannelAction struct {
@@ -30,6 +33,17 @@ func (p *createChannelParams) validate() error {
 	}
 	if len(p.Name) < 2 || len(p.Name) > 100 {
 		return &connectors.ValidationError{Message: "name must be between 2 and 100 characters"}
+	}
+	if !channelNameRe.MatchString(p.Name) {
+		return &connectors.ValidationError{Message: "name must be lowercase alphanumeric with hyphens or underscores only (no spaces)"}
+	}
+	if p.ParentID != "" {
+		if err := validateSnowflake(p.ParentID, "parent_id"); err != nil {
+			return err
+		}
+	}
+	if len(p.Topic) > 1024 {
+		return &connectors.ValidationError{Message: "topic must be 1024 characters or fewer"}
 	}
 	return nil
 }

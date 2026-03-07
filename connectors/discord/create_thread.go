@@ -30,9 +30,14 @@ func (p *createThreadParams) validate() error {
 	if len(p.Name) > 100 {
 		return &connectors.ValidationError{Message: "name must be 100 characters or fewer"}
 	}
+	if p.MessageID != "" {
+		if err := validateSnowflake(p.MessageID, "message_id"); err != nil {
+			return err
+		}
+	}
 	validDurations := map[int]bool{0: true, 60: true, 1440: true, 4320: true, 10080: true}
 	if !validDurations[p.AutoArchiveDuration] {
-		return &connectors.ValidationError{Message: "auto_archive_duration must be 60, 1440, 4320, or 10080"}
+		return &connectors.ValidationError{Message: "auto_archive_duration must be one of 0 (use default), 60, 1440, 4320, or 10080"}
 	}
 	return nil
 }

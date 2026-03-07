@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -25,6 +27,11 @@ func (p *listMembersParams) validate() error {
 	}
 	if p.Limit != 0 && (p.Limit < 1 || p.Limit > 1000) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("limit must be between 1 and 1000, got %d", p.Limit)}
+	}
+	if p.After != "" {
+		if err := validateSnowflake(p.After, "after"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -65,10 +72,12 @@ func (a *listMembersAction) Execute(ctx context.Context, req connectors.ActionRe
 		limit = 100
 	}
 
-	path := fmt.Sprintf("/guilds/%s/members?limit=%d", params.GuildID, limit)
+	qv := url.Values{}
+	qv.Set("limit", strconv.Itoa(limit))
 	if params.After != "" {
-		path += "&after=" + params.After
+		qv.Set("after", params.After)
 	}
+	path := fmt.Sprintf("/guilds/%s/members?%s", params.GuildID, qv.Encode())
 
 	var members []discordMember
 	if err := a.conn.doRequest(ctx, "GET", path, req.Credentials, nil, &members); err != nil {
