@@ -47,6 +47,7 @@ func TestDiscordConnector_Actions(t *testing.T) {
 		"discord.list_channels",
 		"discord.list_members",
 		"discord.create_thread",
+		"discord.list_roles",
 	}
 
 	for _, actionType := range expectedActions {
@@ -130,9 +131,111 @@ func TestManifestToDBConversion(t *testing.T) {
 	if dbManifest.ID != "discord" {
 		t.Errorf("expected DB manifest ID 'discord', got %q", dbManifest.ID)
 	}
-	if len(dbManifest.Actions) != 11 {
-		t.Errorf("expected 11 DB actions, got %d", len(dbManifest.Actions))
+	if len(dbManifest.Actions) != 12 {
+		t.Errorf("expected 12 DB actions, got %d", len(dbManifest.Actions))
 	}
+}
+
+func TestMapDiscordError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		code       int
+		message    string
+		wantType   string
+		wantSubstr string
+	}{
+		{
+			name:       "unknown channel",
+			statusCode: 404,
+			code:       10003,
+			message:    "Unknown Channel",
+			wantType:   "external",
+			wantSubstr: "channel not found",
+		},
+		{
+			name:       "missing permissions",
+			statusCode: 403,
+			code:       50013,
+			message:    "Missing Permissions",
+			wantType:   "auth",
+			wantSubstr: "missing a required permission",
+		},
+		{
+			name:       "unknown role",
+			statusCode: 404,
+			code:       10011,
+			message:    "Unknown Role",
+			wantType:   "external",
+			wantSubstr: "list_roles",
+		},
+		{
+			name:       "max pins",
+			statusCode: 400,
+			code:       30003,
+			message:    "Maximum number of pins reached",
+			wantType:   "external",
+			wantSubstr: "50 pinned messages",
+		},
+		{
+			name:       "unauthorized fallback",
+			statusCode: 401,
+			code:       0,
+			message:    "",
+			wantType:   "auth",
+			wantSubstr: "invalid bot token",
+		},
+		{
+			name:       "generic error",
+			statusCode: 500,
+			code:       0,
+			message:    "Internal Server Error",
+			wantType:   "external",
+			wantSubstr: "Internal Server Error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := mapDiscordError(tt.statusCode, discordErrorResponse{Code: tt.code, Message: tt.message})
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			switch tt.wantType {
+			case "auth":
+				if !connectors.IsAuthError(err) {
+					t.Errorf("expected AuthError, got %T: %v", err, err)
+				}
+			case "external":
+				if !connectors.IsExternalError(err) {
+					t.Errorf("expected ExternalError, got %T: %v", err, err)
+				}
+			case "validation":
+				if !connectors.IsValidationError(err) {
+					t.Errorf("expected ValidationError, got %T: %v", err, err)
+				}
+			}
+			if got := err.Error(); !containsSubstring(got, tt.wantSubstr) {
+				t.Errorf("error %q should contain %q", got, tt.wantSubstr)
+			}
+		})
+	}
+}
+
+func containsSubstring(s, sub string) bool {
+	return len(s) >= len(sub) && (sub == "" || contains(s, sub))
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }
 
 func TestManifestTemplateParametersAreValidJSON(t *testing.T) {
