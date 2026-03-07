@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -55,7 +56,7 @@ func (a *cancelEventAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	var resp calendlyCancelResponse
-	reqURL := fmt.Sprintf("%s/scheduled_events/%s/cancellation", a.conn.baseURL, params.EventUUID)
+	reqURL := a.conn.baseURL + "/scheduled_events/" + url.PathEscape(params.EventUUID) + "/cancellation"
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, reqURL, body, &resp); err != nil {
 		return nil, err
 	}
