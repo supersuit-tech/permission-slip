@@ -135,28 +135,74 @@ func validateTrelloID(value, paramName string) error {
 	return nil
 }
 
-// do is the shared request lifecycle for all Trello actions. It appends
-// key/token query parameters to all requests (Trello uses query-param auth,
-// not headers), marshals reqBody as JSON for POST/PUT, sends the request,
-// checks the response status, and unmarshals the response into respBody.
-func (c *TrelloConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody any) error {
+// authQuery extracts api_key and token from credentials and returns them
+// as URL query parameters. This is the single point where credentials are
+// read, reducing duplication across do() and doGet().
+func authQuery(creds connectors.Credentials) (url.Values, error) {
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+		return nil, &connectors.ValidationError{Message: "api_key credential is missing or empty"}
 	}
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "token credential is missing or empty"}
+		return nil, &connectors.ValidationError{Message: "token credential is missing or empty"}
+	}
+	q := url.Values{}
+	q.Set("key", key)
+	q.Set("token", token)
+	return q, nil
+}
+
+// sendAndDecode executes an HTTP request, reads the response, checks for
+// errors, and unmarshals the result into respBody. Shared by do() and doGet()
+// to eliminate duplicated response-handling logic.
+func (c *TrelloConnector) sendAndDecode(req *http.Request, respBody any) error {
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("Trello API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Trello API request canceled"}
+		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Trello API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
-	// Build the full URL with auth query params.
+	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
+		return err
+	}
+
+	if respBody != nil {
+		if err := json.Unmarshal(respBytes, respBody); err != nil {
+			return &connectors.ExternalError{
+				StatusCode: resp.StatusCode,
+				Message:    fmt.Sprintf("failed to decode Trello API response: %v", err),
+			}
+		}
+	}
+
+	return nil
+}
+
+// do is the shared request lifecycle for Trello write actions (POST/PUT).
+// It appends key/token query parameters, marshals reqBody as JSON, and
+// unmarshals the response into respBody.
+func (c *TrelloConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody any) error {
+	q, err := authQuery(creds)
+	if err != nil {
+		return err
+	}
+
 	u, err := url.Parse(c.baseURL + path)
 	if err != nil {
 		return fmt.Errorf("parsing URL: %w", err)
 	}
-	q := u.Query()
-	q.Set("key", key)
-	q.Set("token", token)
 	u.RawQuery = q.Encode()
 
 	var body io.Reader
@@ -176,60 +222,23 @@ func (c *TrelloConnector) do(ctx context.Context, creds connectors.Credentials, 
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Trello API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Trello API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Trello API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
-		return err
-	}
-
-	if respBody != nil {
-		if err := json.Unmarshal(respBytes, respBody); err != nil {
-			return &connectors.ExternalError{
-				StatusCode: resp.StatusCode,
-				Message:    fmt.Sprintf("failed to decode Trello API response: %v", err),
-			}
-		}
-	}
-
-	return nil
+	return c.sendAndDecode(req, respBody)
 }
 
 // doGet is a convenience wrapper for GET requests. It builds query parameters
 // from the params map and appends them alongside the auth params.
 func (c *TrelloConnector) doGet(ctx context.Context, creds connectors.Credentials, path string, params map[string]string, respBody any) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	q, err := authQuery(creds)
+	if err != nil {
+		return err
 	}
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "token credential is missing or empty"}
+	for k, v := range params {
+		q.Set(k, v)
 	}
 
 	u, err := url.Parse(c.baseURL + path)
 	if err != nil {
 		return fmt.Errorf("parsing URL: %w", err)
-	}
-	q := u.Query()
-	q.Set("key", key)
-	q.Set("token", token)
-	for k, v := range params {
-		q.Set(k, v)
 	}
 	u.RawQuery = q.Encode()
 
@@ -238,71 +247,5 @@ func (c *TrelloConnector) doGet(ctx context.Context, creds connectors.Credential
 		return fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Trello API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Trello API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Trello API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
-		return err
-	}
-
-	if respBody != nil {
-		if err := json.Unmarshal(respBytes, respBody); err != nil {
-			return &connectors.ExternalError{
-				StatusCode: resp.StatusCode,
-				Message:    fmt.Sprintf("failed to decode Trello API response: %v", err),
-			}
-		}
-	}
-
-	return nil
-}
-
-// checkResponse maps Trello HTTP status codes to connector error types.
-// Trello returns plain text error messages in the response body.
-func checkResponse(statusCode int, header http.Header, body []byte) error {
-	if statusCode >= 200 && statusCode < 300 {
-		return nil
-	}
-
-	// Trello error messages are typically plain text.
-	msg := string(body)
-	if msg == "" {
-		msg = http.StatusText(statusCode)
-	}
-
-	switch {
-	case statusCode == http.StatusTooManyRequests:
-		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
-			Message:    fmt.Sprintf("Trello API rate limit exceeded: %s", msg),
-			RetryAfter: retryAfter,
-		}
-	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: fmt.Sprintf("Trello API auth error: %s", msg)}
-	case statusCode == http.StatusForbidden:
-		return &connectors.AuthError{Message: fmt.Sprintf("Trello API forbidden: %s", msg)}
-	case statusCode == http.StatusBadRequest:
-		return &connectors.ValidationError{Message: fmt.Sprintf("Trello API validation error: %s", msg)}
-	case statusCode == http.StatusNotFound:
-		return &connectors.ValidationError{Message: fmt.Sprintf("Trello API resource not found: %s", msg)}
-	default:
-		return &connectors.ExternalError{
-			StatusCode: statusCode,
-			Message:    fmt.Sprintf("Trello API error: %s", msg),
-		}
-	}
+	return c.sendAndDecode(req, respBody)
 }
