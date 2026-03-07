@@ -26,6 +26,11 @@ The credential `auth_type` in the database is `api_key`. Tokens are stored encry
 | `hubspot.create_ticket` | low | Create a support ticket in a pipeline |
 | `hubspot.add_note` | low | Add an engagement note to a contact, deal, or ticket (two-step: create + associate) |
 | `hubspot.search` | low | Search contacts, deals, tickets, or companies with property filters |
+| `hubspot.list_deals` | low | Search and list deals with filtering, sorting, and property selection |
+| `hubspot.update_deal_stage` | medium | Move a deal to a different pipeline stage |
+| `hubspot.enroll_in_workflow` | medium | Enroll a contact in an automation workflow |
+| `hubspot.create_email_campaign` | high | Create and optionally send a marketing email campaign |
+| `hubspot.get_analytics` | low | Get marketing and sales analytics reports |
 
 ### `hubspot.create_contact`
 
@@ -72,6 +77,43 @@ Searches CRM objects with filters. Supports contacts, deals, tickets, and compan
 **Supported operators:** `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `CONTAINS_TOKEN`, `NOT_CONTAINS_TOKEN`, `HAS_PROPERTY`, `NOT_HAS_PROPERTY`, `BETWEEN`
 
 **Limit:** Defaults to 10, capped at HubSpot's API maximum of 200.
+
+### `hubspot.list_deals`
+
+Searches and lists deals in the sales pipeline. Supports filtering, sorting, and property selection. Returns default properties (dealname, amount, dealstage, pipeline, closedate, createdate, hs_lastmodifieddate) when none are specified.
+
+**HubSpot API:** `POST /crm/v3/objects/deals/search`
+**Required scopes:** `crm.objects.deals.read`
+
+**Supported operators:** `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `CONTAINS_TOKEN`, `NOT_CONTAINS_TOKEN` (a subset of HubSpot's full operator set — `BETWEEN`, `HAS_PROPERTY`, and `NOT_HAS_PROPERTY` are not supported by this action's single-value filter model; use `hubspot.search` for those).
+
+### `hubspot.update_deal_stage`
+
+Moves a deal to a different pipeline stage, with an optional close date update.
+
+**HubSpot API:** `PATCH /crm/v3/objects/deals/{deal_id}`
+**Required scopes:** `crm.objects.deals.write`
+
+### `hubspot.enroll_in_workflow`
+
+Enrolls a contact in an automation workflow. Workflows may trigger emails, delays, and branching logic — verify the workflow ID before enrolling.
+
+**HubSpot API:** `POST /automation/v4/flows/{flow_id}/enrollments`
+**Required scopes:** `automation`
+
+### `hubspot.create_email_campaign`
+
+Creates a marketing email campaign and optionally sends it immediately. When `send_now` is true, the email is sent to all contacts in the specified lists — `list_ids` is required in that case. When `send_now` is false (or omitted), a draft is created.
+
+**HubSpot API:** `POST /marketing/v3/emails`
+**Required scopes:** `content`
+
+### `hubspot.get_analytics`
+
+Fetches marketing and sales analytics reports with configurable time period granularity. Optional date range filtering via `start` and `end` parameters.
+
+**HubSpot API:** `GET /analytics/v2/reports/{object_type}/{time_period}`
+**Required scopes:** `analytics.read`
 
 ### Key patterns
 
@@ -150,6 +192,11 @@ connectors/hubspot/
 ├── create_ticket.go        # hubspot.create_ticket
 ├── add_note.go             # hubspot.add_note (two-step create + associate)
 ├── search.go               # hubspot.search
+├── list_deals.go           # hubspot.list_deals
+├── update_deal_stage.go    # hubspot.update_deal_stage
+├── enroll_in_workflow.go   # hubspot.enroll_in_workflow
+├── create_email_campaign.go # hubspot.create_email_campaign
+├── get_analytics.go        # hubspot.get_analytics
 ├── hubspot_test.go         # Connector-level tests
 ├── response_test.go        # Error mapping tests
 ├── helpers_test.go         # Shared test helpers (validCreds)
