@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/airtable"
 	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
@@ -33,6 +34,7 @@ import (
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	"github.com/supersuit-tech/permission-slip-web/connectors/intercom"
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
@@ -62,6 +64,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zendesk"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -350,6 +353,7 @@ func main() {
 
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
+	registry.Register(airtable.New())
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
 	registry.Register(confluence.New())
@@ -393,6 +397,8 @@ func main() {
 	registry.Register(netlify.New())
 	registry.Register(pagerduty.New())
 	registry.Register(vercelconnector.New())
+	registry.Register(zendesk.New())
+	registry.Register(intercom.New())
 	registry.Register(zoom.New())
 	registry.Register(zapier.New())
 	registry.Register(makeconnector.New())
