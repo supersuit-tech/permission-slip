@@ -73,7 +73,7 @@ func (a *describeInstancesAction) Execute(ctx context.Context, req connectors.Ac
 		queryParams.Set(fmt.Sprintf("InstanceId.%d", i+1), id)
 	}
 
-	host := fmt.Sprintf("ec2.%s.amazonaws.com", params.Region)
+	host := ec2Host(params.Region)
 	body := []byte(queryParams.Encode())
 
 	respBody, err := a.conn.do(ctx, req.Credentials, "POST", host, "/", "", body)
@@ -127,6 +127,69 @@ func buildEC2InstanceActionBody(action, instanceID string) []byte {
 // ec2Host returns the EC2 API hostname for the given region.
 func ec2Host(region string) string {
 	return fmt.Sprintf("ec2.%s.amazonaws.com", region)
+}
+
+// s3Host returns the S3 API hostname for the given region.
+func s3Host(region string) string {
+	return fmt.Sprintf("s3.%s.amazonaws.com", region)
+}
+
+// monitoringHost returns the CloudWatch API hostname for the given region.
+func monitoringHost(region string) string {
+	return fmt.Sprintf("monitoring.%s.amazonaws.com", region)
+}
+
+// rdsHost returns the RDS API hostname for the given region.
+func rdsHost(region string) string {
+	return fmt.Sprintf("rds.%s.amazonaws.com", region)
+}
+
+// instanceStateChangeResponse is the shared XML structure for EC2 Start/Stop
+// instance responses. Both have identical shapes — only the root element differs,
+// but Go's xml.Unmarshal ignores the root tag when the struct uses `xml:",any"`.
+type instanceStateChangeResponse struct {
+	InstancesSet []struct {
+		InstanceID   string `xml:"instanceId"`
+		CurrentState struct {
+			Code int    `xml:"code"`
+			Name string `xml:"name"`
+		} `xml:"currentState"`
+		PreviousState struct {
+			Code int    `xml:"code"`
+			Name string `xml:"name"`
+		} `xml:"previousState"`
+	} `xml:"instancesSet>item"`
+}
+
+// executeInstanceStateChange runs a start/stop EC2 action and returns the
+// state transition result. Shared by start_instance and stop_instance.
+func executeInstanceStateChange(ctx context.Context, conn *AWSConnector, req connectors.ActionRequest, apiAction string) (*connectors.ActionResult, error) {
+	params, err := parseAndValidate[instanceIDParams](req.Parameters)
+	if err != nil {
+		return nil, err
+	}
+
+	body := buildEC2InstanceActionBody(apiAction, params.InstanceID)
+	respBody, err := conn.do(ctx, req.Credentials, "POST", ec2Host(params.Region), "/", "", body)
+	if err != nil {
+		return nil, err
+	}
+
+	var xmlResp instanceStateChangeResponse
+	if err := xml.Unmarshal(respBody, &xmlResp); err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("parsing EC2 response: %v", err)}
+	}
+
+	if len(xmlResp.InstancesSet) == 0 {
+		return nil, &connectors.ExternalError{Message: "no instance state change returned"}
+	}
+
+	inst := xmlResp.InstancesSet[0]
+	return connectors.JSONResult(map[string]any{
+		"instance_id":    inst.InstanceID,
+		"current_state":  inst.CurrentState.Name,
+		"previous_state": inst.PreviousState.Name,
+	})
 }
 
 // instanceIDParams is shared by start/stop/restart instance actions.

@@ -106,7 +106,7 @@ func (a *getMetricsAction) Execute(ctx context.Context, req connectors.ActionReq
 		queryParams.Set(fmt.Sprintf("Dimensions.member.%d.Value", i+1), dim.Value)
 	}
 
-	host := fmt.Sprintf("monitoring.%s.amazonaws.com", params.Region)
+	host := monitoringHost(params.Region)
 	body := []byte(queryParams.Encode())
 
 	respBody, err := a.conn.do(ctx, req.Credentials, "POST", host, "/", "", body)

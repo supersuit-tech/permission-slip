@@ -29,8 +29,8 @@ func (p *createPresignedURLParams) validate() error {
 	if err := validateRegion(p.Region); err != nil {
 		return err
 	}
-	if p.Bucket == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: bucket"}
+	if err := validateBucketName(p.Bucket); err != nil {
+		return err
 	}
 	if p.Key == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: key"}
@@ -66,7 +66,7 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 	datestamp := now.Format("20060102")
 	amzdate := now.Format("20060102T150405Z")
 
-	host := fmt.Sprintf("s3.%s.amazonaws.com", params.Region)
+	host := s3Host(params.Region)
 	// URI-encode each path segment per SigV4 rules, preserving "/" separators.
 	// S3 object keys can contain spaces, +, ?, # and other reserved characters.
 	objectPath := "/" + uriEncodePath(params.Bucket+"/"+params.Key)
@@ -102,13 +102,8 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 		sha256Hex([]byte(canonicalRequest)),
 	}, "\n")
 
-	// Derive signing key and compute signature. Reuses the shared crypto
-	// helpers from aws.go (hmacSHA256, deriveSigningKey is for general use;
-	// here we derive the S3-specific key inline).
-	kDate := hmacSHA256([]byte("AWS4"+secretKey), []byte(datestamp))
-	kRegion := hmacSHA256(kDate, []byte(params.Region))
-	kService := hmacSHA256(kRegion, []byte("s3"))
-	signingKey := hmacSHA256(kService, []byte("aws4_request"))
+	// Derive signing key using the shared helper from aws.go.
+	signingKey := deriveSigningKey(secretKey, datestamp, params.Region, "s3")
 	signature := hex.EncodeToString(hmacSHA256(signingKey, []byte(stringToSign)))
 
 	presignedURL := fmt.Sprintf("https://%s%s?%s&X-Amz-Signature=%s",

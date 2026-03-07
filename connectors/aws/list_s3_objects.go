@@ -26,8 +26,8 @@ func (p *listS3ObjectsParams) validate() error {
 	if err := validateRegion(p.Region); err != nil {
 		return err
 	}
-	if p.Bucket == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: bucket"}
+	if err := validateBucketName(p.Bucket); err != nil {
+		return err
 	}
 	if p.MaxKeys == 0 {
 		p.MaxKeys = 1000
@@ -74,7 +74,7 @@ func (a *listS3ObjectsAction) Execute(ctx context.Context, req connectors.Action
 	}
 	query := qp.Encode()
 
-	host := fmt.Sprintf("s3.%s.amazonaws.com", params.Region)
+	host := s3Host(params.Region)
 	path := "/" + params.Bucket
 
 	respBody, err := a.conn.do(ctx, req.Credentials, "GET", host, path, query, nil)

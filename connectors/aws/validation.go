@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// validBucketName matches S3 bucket naming rules: 3-63 lowercase alphanumeric
+// characters and hyphens, starting and ending with alphanumeric.
+var validBucketName = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 
 // ptrValidatable constrains PT to be a pointer to T that implements validate().
 type ptrValidatable[T any] interface {
@@ -69,6 +74,20 @@ func uriEncodePath(path string) string {
 		segments[i] = url.PathEscape(seg)
 	}
 	return strings.Join(segments, "/")
+}
+
+// validateBucketName checks that an S3 bucket name follows AWS naming rules:
+// 3-63 characters, lowercase alphanumeric, hyphens, and periods.
+func validateBucketName(bucket string) error {
+	if bucket == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: bucket"}
+	}
+	if !validBucketName.MatchString(bucket) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid bucket name %q: must be 3-63 lowercase alphanumeric characters, hyphens, or periods", bucket),
+		}
+	}
+	return nil
 }
 
 // validateRFC3339 checks that a timestamp string is valid RFC 3339 format.

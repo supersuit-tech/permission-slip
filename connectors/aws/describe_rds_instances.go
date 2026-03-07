@@ -80,7 +80,7 @@ func (a *describeRDSInstancesAction) Execute(ctx context.Context, req connectors
 		queryParams.Set("DBInstanceIdentifier", params.DBInstanceID)
 	}
 
-	host := fmt.Sprintf("rds.%s.amazonaws.com", params.Region)
+	host := rdsHost(params.Region)
 	body := []byte(queryParams.Encode())
 
 	respBody, err := a.conn.do(ctx, req.Credentials, "POST", host, "/", "", body)
