@@ -8,6 +8,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +23,17 @@ import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
+
+/** Derive a human-friendly label from a service identifier.
+ *  e.g. "notion_api_key" → "API Key", "github" → "github" */
+function serviceDisplayName(service: string, authType: string): string {
+  // If the service name ends with "_api_key", show "API Key (alternative)"
+  // to distinguish from the primary OAuth credential.
+  if (service.endsWith("_api_key") && authType === "api_key") {
+    return "API Key (alternative)";
+  }
+  return service;
+}
 
 interface ConnectorCredentialsSectionProps {
   requiredCredentials: RequiredCredential[];
@@ -126,11 +138,16 @@ function OAuthCredentialRow({
             <Circle className="text-muted-foreground size-5 shrink-0" />
           )}
           <div>
-            <p className="text-sm font-medium">{label} (OAuth)</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">{label} (OAuth)</p>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                Recommended
+              </Badge>
+            </div>
             <p className="text-muted-foreground text-xs">
               {isConnected
-                ? "Connected via OAuth"
-                : "Connect your account to authorize access"}
+                ? "Connected via OAuth — tokens refresh automatically"
+                : "Connect your account for automatic token management"}
             </p>
           </div>
         </div>
@@ -181,9 +198,13 @@ function StaticCredentialRow({
               <Circle className="text-muted-foreground size-5 shrink-0" />
             )}
             <div>
-              <p className="text-sm font-medium">{requiredCredential.service}</p>
+              <p className="text-sm font-medium">
+                {serviceDisplayName(requiredCredential.service, requiredCredential.auth_type)}
+              </p>
               <p className="text-muted-foreground text-xs">
-                Auth type: {requiredCredential.auth_type}
+                {requiredCredential.auth_type === "api_key"
+                  ? "Manual token — paste your API key or integration token"
+                  : `Auth type: ${requiredCredential.auth_type}`}
               </p>
               {requiredCredential.instructions_url && (
                 <a

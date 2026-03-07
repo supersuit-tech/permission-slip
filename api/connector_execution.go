@@ -62,7 +62,7 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 					return nil, fmt.Errorf("look up fallback credential: %w", fbErr)
 				}
 				if fallbackCred != nil {
-					creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
+					creds, err = resolveStaticCredentialsForService(ctx, deps, userID, fallbackCred.Service)
 					if err != nil {
 						// Static fallback also failed — return the original OAuth error
 						// since that's the preferred auth method.
@@ -285,6 +285,42 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 		}
 	}
 
+	return connectors.NewCredentials(credMap), nil
+}
+
+// resolveStaticCredentialsForService fetches and decrypts static credentials for
+// a single specific service. Used by the OAuth-to-API-key fallback path where we
+// know the exact service name (e.g. "notion_api_key") and don't want to resolve
+// all services for the connector (which would include the OAuth service that has
+// no static credentials).
+func resolveStaticCredentialsForService(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+	if deps.Vault == nil {
+		return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
+	}
+	decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
+	if err != nil {
+		var credErr *db.CredentialError
+		if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
+			return zero, &connectors.ValidationError{
+				Message: fmt.Sprintf("no credentials stored for service %q", service),
+			}
+		}
+		return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
+	}
+	credMap := make(map[string]string, len(decrypted))
+	for k, v := range decrypted {
+		switch vv := v.(type) {
+		case string:
+			credMap[k] = vv
+		default:
+			b, err := json.Marshal(v)
+			if err != nil {
+				return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
+			}
+			credMap[k] = string(b)
+		}
+	}
 	return connectors.NewCredentials(credMap), nil
 }
 

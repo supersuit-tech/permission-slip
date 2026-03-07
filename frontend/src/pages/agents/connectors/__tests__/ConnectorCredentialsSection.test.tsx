@@ -296,7 +296,9 @@ describe("ConnectorCredentialsSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
-    expect(screen.getByText("Connected via OAuth")).toBeInTheDocument();
+    expect(
+      screen.getByText("Connected via OAuth — tokens refresh automatically"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Connect Notion")).not.toBeInTheDocument();
   });
 
@@ -324,7 +326,7 @@ describe("ConnectorCredentialsSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Notion (OAuth)")).toBeInTheDocument();
     });
-    expect(screen.getByText("notion_api_key")).toBeInTheDocument();
+    expect(screen.getByText("API Key (alternative)")).toBeInTheDocument();
     expect(screen.getByText("Connect Notion")).toBeInTheDocument();
   });
 });
