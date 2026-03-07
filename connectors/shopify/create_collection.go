@@ -43,7 +43,7 @@ func (p *createCollectionParams) validate() error {
 	}
 	if p.SortOrder != "" && !validSortOrders[p.SortOrder] {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid sort_order %q: must be one of alpha-asc, alpha-desc, best-selling, created, created-desc, manual, price-asc, price-desc", p.SortOrder),
+			Message: fmt.Sprintf("invalid sort_order %q: must be one of %s", p.SortOrder, sortedKeys(validSortOrders)),
 		}
 	}
 	return nil

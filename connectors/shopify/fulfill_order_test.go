@@ -125,6 +125,24 @@ func TestFulfillOrder_InvalidOrderID(t *testing.T) {
 	}
 }
 
+func TestFulfillOrder_TrackingURLWithoutNumber(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["shopify.fulfill_order"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "shopify.fulfill_order",
+		Parameters:  json.RawMessage(`{"order_id":1001,"tracking_url":"https://track.example.com/123"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestFulfillOrder_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

@@ -28,6 +28,11 @@ func (p *fulfillOrderParams) validate() error {
 	if p.OrderID <= 0 {
 		return &connectors.ValidationError{Message: "order_id must be a positive integer"}
 	}
+	// Warn if tracking URL is provided without a tracking number — the URL
+	// alone isn't very useful for customers.
+	if p.TrackingURL != "" && p.TrackingNumber == "" {
+		return &connectors.ValidationError{Message: "tracking_url requires tracking_number to be set"}
+	}
 	return nil
 }
 

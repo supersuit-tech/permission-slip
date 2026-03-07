@@ -507,7 +507,14 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "shopify.fulfill_order",
 				Name:        "Fulfill order with tracking",
 				Description: "Create a fulfillment with tracking info and notify the customer",
-				Parameters:  json.RawMessage(`{"order_id":0,"tracking_number":"","tracking_company":"","notify_customer":true}`),
+				Parameters:  json.RawMessage(`{"order_id":0,"tracking_number":"1Z999AA10123456784","tracking_company":"UPS","notify_customer":true}`),
+			},
+			{
+				ID:          "shopify-fulfill-order-silent",
+				ActionType:  "shopify.fulfill_order",
+				Name:        "Fulfill order (no notification)",
+				Description: "Create a fulfillment without sending a notification email to the customer",
+				Parameters:  json.RawMessage(`{"order_id":0,"notify_customer":false}`),
 			},
 			{
 				ID:          "shopify-cancel-order-customer-request",
@@ -517,11 +524,25 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"order_id":0,"reason":"customer","restock":true,"email":true}`),
 			},
 			{
+				ID:          "shopify-cancel-order-fraud",
+				ActionType:  "shopify.cancel_order",
+				Name:        "Cancel order (fraud)",
+				Description: "Cancel a fraudulent order, restock items, and suppress notification to the customer",
+				Parameters:  json.RawMessage(`{"order_id":0,"reason":"fraud","restock":true,"email":false}`),
+			},
+			{
 				ID:          "shopify-update-product-status",
 				ActionType:  "shopify.update_product",
 				Name:        "Update product status",
 				Description: "Change a product's status (e.g. draft to active, or active to archived)",
 				Parameters:  json.RawMessage(`{"product_id":0,"status":"active"}`),
+			},
+			{
+				ID:          "shopify-update-product-details",
+				ActionType:  "shopify.update_product",
+				Name:        "Update product details",
+				Description: "Update a product's title, description, and tags",
+				Parameters:  json.RawMessage(`{"product_id":0,"title":"","body_html":"","tags":""}`),
 			},
 			{
 				ID:          "shopify-create-collection",
