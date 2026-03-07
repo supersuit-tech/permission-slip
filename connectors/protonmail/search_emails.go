@@ -58,7 +58,7 @@ func (a *searchEmailsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	session, err := connectIMAP(ctx, req.Credentials, a.conn.timeout)
+	session, err := connectIMAP(req.Credentials, a.conn.timeout)
 	if err != nil {
 		return nil, err
 	}

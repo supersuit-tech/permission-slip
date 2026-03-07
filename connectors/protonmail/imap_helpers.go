@@ -1,7 +1,7 @@
 package protonmail
 
 import (
-	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"strings"
@@ -13,8 +13,37 @@ import (
 )
 
 // imapDial is a package-level variable so tests can replace it.
-var imapDial = func(addr string, _ *imapclient.Options) (*imapclient.Client, error) {
-	return imapclient.DialInsecure(addr, nil)
+// It dials with a timeout and uses TLS for non-localhost hosts.
+var imapDial = func(addr string, timeout time.Duration) (*imapclient.Client, error) {
+	host, _, _ := net.SplitHostPort(addr)
+	dialer := &net.Dialer{Timeout: timeout}
+
+	if isLocalhost(host) {
+		// Proton Mail Bridge on localhost uses plain IMAP (no TLS).
+		conn, err := dialer.Dial("tcp", addr)
+		if err != nil {
+			return nil, err
+		}
+		return imapclient.New(conn, nil), nil
+	}
+
+	// For remote hosts, use TLS to protect credentials in transit.
+	tlsConn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{
+		ServerName: host,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return imapclient.New(tlsConn, nil), nil
+}
+
+// isLocalhost returns true for loopback addresses.
+func isLocalhost(host string) bool {
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // imapSession holds an authenticated IMAP session with a selected mailbox.
@@ -22,15 +51,12 @@ type imapSession struct {
 	client *imapclient.Client
 }
 
-// connectIMAP creates an authenticated IMAP connection.
-func connectIMAP(ctx context.Context, creds connectors.Credentials, timeout time.Duration) (*imapSession, error) {
+// connectIMAP creates an authenticated IMAP connection with a timeout.
+func connectIMAP(creds connectors.Credentials, timeout time.Duration) (*imapSession, error) {
 	host, port, username, password := imapConfig(creds)
 	addr := net.JoinHostPort(host, port)
 
-	_ = timeout // dial timeout is handled by imapclient defaults
-	_ = ctx     // context not supported by imapclient.Dial*
-
-	client, err := imapDial(addr, nil)
+	client, err := imapDial(addr, timeout)
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("IMAP connection timed out: %v", err)}

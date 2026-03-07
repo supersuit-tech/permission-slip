@@ -65,7 +65,7 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
-	session, err := connectIMAP(ctx, req.Credentials, a.conn.timeout)
+	session, err := connectIMAP(req.Credentials, a.conn.timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -191,20 +191,25 @@ func parseBody(rawBody []byte) (body, contentType string) {
 			h := part.Header.(*mail.InlineHeader)
 			ct, _, _ := h.ContentType()
 			if strings.HasPrefix(ct, "text/plain") || strings.HasPrefix(ct, "text/html") {
-				b, err := io.ReadAll(io.LimitReader(part.Body, maxBodySize))
+				// Read maxBodySize+1 to detect if content was truncated.
+				b, err := io.ReadAll(io.LimitReader(part.Body, maxBodySize+1))
 				if err == nil {
-					body = string(b)
+					if len(b) > maxBodySize {
+						body = string(b[:maxBodySize]) + "\n[truncated]"
+					} else {
+						body = string(b)
+					}
 					contentType = ct
 				}
 				if strings.HasPrefix(ct, "text/plain") {
 					// Prefer text/plain; if found, stop looking.
-					return truncateBody(body), contentType
+					return body, contentType
 				}
 			}
 		}
 	}
 
-	return truncateBody(body), contentType
+	return body, contentType
 }
 
 func truncateBody(s string) string {

@@ -340,7 +340,11 @@ func main() {
 	registry.Register(pgconnector.New())
 	registry.Register(shopify.New())
 	registry.Register(slack.New())
-	registry.Register(protonmail.New())
+	// Proton Mail connector depends on a local Proton Mail Bridge daemon and is
+	// not cloud-safe. Only register when explicitly enabled.
+	if v := os.Getenv("ENABLE_PROTONMAIL_CONNECTOR"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") {
+		registry.Register(protonmail.New())
+	}
 	registry.Register(redisconnector.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())

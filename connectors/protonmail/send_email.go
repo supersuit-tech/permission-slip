@@ -93,11 +93,13 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	host, port, username, password := smtpConfig(req.Credentials)
 	addr := net.JoinHostPort(host, port)
 
-	// Build all recipients for the SMTP envelope.
+	// Build all recipients for the SMTP envelope using bare addresses.
+	// ParseAddress was already called in validate(), so errors here are impossible.
 	allRecipients := make([]string, 0, len(params.To)+len(params.Cc)+len(params.Bcc))
-	allRecipients = append(allRecipients, params.To...)
-	allRecipients = append(allRecipients, params.Cc...)
-	allRecipients = append(allRecipients, params.Bcc...)
+	for _, raw := range append(append(params.To, params.Cc...), params.Bcc...) {
+		parsed, _ := netmail.ParseAddress(raw)
+		allRecipients = append(allRecipients, parsed.Address)
+	}
 
 	// Build the email message.
 	msg := buildMessage(username, params)

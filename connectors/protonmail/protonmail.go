@@ -224,7 +224,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "protonmail.read_email",
 				Name:        "Read a specific email",
 				Description: "Agent can read the full content of a specific email.",
-				Parameters:  json.RawMessage(`{"message_id":0,"folder":"INBOX"}`),
+				Parameters:  json.RawMessage(`{"folder":"INBOX"}`),
 			},
 		},
 	}
