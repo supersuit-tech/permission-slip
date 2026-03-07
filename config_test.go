@@ -63,6 +63,10 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
 		"INVITE_HMAC_KEY":            "test-key",
 		"BASE_URL":                   "https://example.com",
+		"GOOGLE_CLIENT_ID":           "test-google-id",
+		"GOOGLE_CLIENT_SECRET":       "test-google-secret",
+		"MICROSOFT_CLIENT_ID":        "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -206,6 +210,10 @@ func TestValidateConfig_AllValid(t *testing.T) {
 		"VAPID_PUBLIC_KEY":          "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY":         "examplePrivateKey",
 		"VAPID_SUBJECT":             "mailto:test@example.com",
+		"GOOGLE_CLIENT_ID":          "test-google-id",
+		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
+		"MICROSOFT_CLIENT_ID":       "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -413,6 +421,10 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 		"VAPID_PUBLIC_KEY":          "",
 		"VAPID_PRIVATE_KEY":         "",
 		"VAPID_SUBJECT":             "",
+		"GOOGLE_CLIENT_ID":          "test-google-id",
+		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
+		"MICROSOFT_CLIENT_ID":       "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -512,6 +524,10 @@ func TestValidateConfig_StripeTestMode_NoWarningsWhenTestKeysSet(t *testing.T) {
 		"SUPABASE_SERVICE_ROLE_KEY":    "test-key",
 		"INVITE_HMAC_KEY":              "test-key",
 		"BASE_URL":                     "https://example.com",
+		"GOOGLE_CLIENT_ID":             "test-google-id",
+		"GOOGLE_CLIENT_SECRET":         "test-google-secret",
+		"MICROSOFT_CLIENT_ID":          "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":      "test-msft-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -520,5 +536,71 @@ func TestValidateConfig_StripeTestMode_NoWarningsWhenTestKeysSet(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("expected no warnings, got %d: %v", len(warnings), warnings)
+	}
+}
+
+func TestValidateConfig_OAuthWarnings_MissingGoogleCredentials(t *testing.T) {
+	setEnvForTest(t, map[string]string{
+		"MODE":                      "development",
+		"GOOGLE_CLIENT_ID":          "",
+		"GOOGLE_CLIENT_SECRET":      "",
+		"MICROSOFT_CLIENT_ID":       "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
+		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
+		"INVITE_HMAC_KEY":           "test-key",
+		"BASE_URL":                  "https://example.com",
+	})
+
+	_, warnings := validateConfig()
+
+	found := false
+	for _, w := range warnings {
+		if w.envVar == "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected warning for missing Google OAuth credentials")
+	}
+
+	// Microsoft should NOT have a warning.
+	for _, w := range warnings {
+		if w.envVar == "MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET" {
+			t.Error("unexpected warning for Microsoft OAuth when credentials are set")
+		}
+	}
+}
+
+func TestValidateConfig_OAuthWarnings_MissingMicrosoftCredentials(t *testing.T) {
+	setEnvForTest(t, map[string]string{
+		"MODE":                      "development",
+		"GOOGLE_CLIENT_ID":          "test-google-id",
+		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
+		"MICROSOFT_CLIENT_ID":       "",
+		"MICROSOFT_CLIENT_SECRET":   "",
+		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
+		"INVITE_HMAC_KEY":           "test-key",
+		"BASE_URL":                  "https://example.com",
+	})
+
+	_, warnings := validateConfig()
+
+	found := false
+	for _, w := range warnings {
+		if w.envVar == "MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected warning for missing Microsoft OAuth credentials")
+	}
+
+	// Google should NOT have a warning.
+	for _, w := range warnings {
+		if w.envVar == "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET" {
+			t.Error("unexpected warning for Google OAuth when credentials are set")
+		}
 	}
 }
