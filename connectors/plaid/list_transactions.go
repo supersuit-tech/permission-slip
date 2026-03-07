@@ -20,8 +20,8 @@ type listTransactionsParams struct {
 	StartDate   string   `json:"start_date"`
 	EndDate     string   `json:"end_date"`
 	AccountIDs  []string `json:"account_ids"`
-	Count       int      `json:"count"`
-	Offset      int      `json:"offset"`
+	Count       *int     `json:"count,omitempty"`
+	Offset      *int     `json:"offset,omitempty"`
 }
 
 // datePattern matches YYYY-MM-DD date format.
@@ -48,10 +48,10 @@ func (p *listTransactionsParams) validate() error {
 	if p.StartDate > p.EndDate {
 		return &connectors.ValidationError{Message: "start_date must be before or equal to end_date"}
 	}
-	if p.Count < 0 || p.Count > maxTransactionCount {
+	if p.Count != nil && (*p.Count < 1 || *p.Count > maxTransactionCount) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("count must be between 1 and %d", maxTransactionCount)}
 	}
-	if p.Offset < 0 {
+	if p.Offset != nil && *p.Offset < 0 {
 		return &connectors.ValidationError{Message: "offset must be non-negative"}
 	}
 	return nil
@@ -77,11 +77,11 @@ func (a *listTransactionsAction) Execute(ctx context.Context, req connectors.Act
 	if len(params.AccountIDs) > 0 {
 		options["account_ids"] = params.AccountIDs
 	}
-	if params.Count > 0 {
-		options["count"] = params.Count
+	if params.Count != nil {
+		options["count"] = *params.Count
 	}
-	if params.Offset > 0 {
-		options["offset"] = params.Offset
+	if params.Offset != nil {
+		options["offset"] = *params.Offset
 	}
 	if len(options) > 0 {
 		body["options"] = options

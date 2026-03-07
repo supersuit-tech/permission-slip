@@ -88,6 +88,9 @@ func TestListTransactions_MissingParams(t *testing.T) {
 		{name: "invalid start_date format", params: `{"access_token":"tok","start_date":"01-01-2026","end_date":"2026-03-01"}`},
 		{name: "invalid end_date format", params: `{"access_token":"tok","start_date":"2026-01-01","end_date":"03-01-2026"}`},
 		{name: "start after end", params: `{"access_token":"tok","start_date":"2026-06-01","end_date":"2026-01-01"}`},
+		{name: "count zero", params: `{"access_token":"tok","start_date":"2026-01-01","end_date":"2026-03-01","count":0}`},
+		{name: "count too large", params: `{"access_token":"tok","start_date":"2026-01-01","end_date":"2026-03-01","count":501}`},
+		{name: "negative offset", params: `{"access_token":"tok","start_date":"2026-01-01","end_date":"2026-03-01","offset":-1}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

@@ -24,6 +24,9 @@ func TestCreateLinkToken_Success(t *testing.T) {
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
 			t.Errorf("Content-Type = %q, want application/json", ct)
 		}
+		if v := r.Header.Get("Plaid-Version"); v != plaidAPIVersion {
+			t.Errorf("Plaid-Version = %q, want %q", v, plaidAPIVersion)
+		}
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -200,7 +203,7 @@ func TestCreateLinkToken_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 
 	conn := newForTest(srv.Client(), srv.URL)
