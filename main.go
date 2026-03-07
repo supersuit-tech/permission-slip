@@ -33,6 +33,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	linkedinconnector "github.com/supersuit-tech/permission-slip-web/connectors/linkedin"
 	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
+	metaconnector "github.com/supersuit-tech/permission-slip-web/connectors/meta"
 	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
@@ -346,6 +347,7 @@ func main() {
 	registry.Register(jira.New())
 	registry.Register(linear.New())
 	registry.Register(linkedinconnector.New())
+	registry.Register(metaconnector.New())
 	registry.Register(microsoft.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
