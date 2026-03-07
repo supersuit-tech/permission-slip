@@ -93,6 +93,8 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
+	// Note: start_url is intentionally excluded — it contains a token that
+	// grants host privileges and should not be exposed to agents.
 	result := map[string]any{
 		"id":         resp.ID,
 		"uuid":       resp.UUID,
@@ -102,7 +104,6 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 		"duration":   resp.Duration,
 		"timezone":   resp.Timezone,
 		"join_url":   resp.JoinURL,
-		"start_url":  resp.StartURL,
 		"password":   resp.Password,
 	}
 	if resp.Agenda != "" {
