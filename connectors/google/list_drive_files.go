@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -44,8 +45,8 @@ var validOrderByValues = map[string]bool{
 }
 
 func (p *listDriveFilesParams) validate() error {
-	if p.FolderID != "" && containsPathSeparator(p.FolderID) {
-		return &connectors.ValidationError{Message: "folder_id contains invalid characters"}
+	if p.FolderID != "" && !isValidDriveID(p.FolderID) {
+		return &connectors.ValidationError{Message: "folder_id contains invalid characters; expected alphanumeric ID"}
 	}
 	if !validOrderByValues[p.OrderBy] {
 		return &connectors.ValidationError{Message: "invalid order_by value; valid options: modifiedTime, modifiedTime desc, name, name desc, createdTime, createdTime desc, folder, recency, viewedByMeTime, viewedByMeTime desc, sharedWithMeTime, sharedWithMeTime desc"}
@@ -62,10 +63,14 @@ func (p *listDriveFilesParams) normalize() {
 	}
 }
 
-// containsPathSeparator returns true if s contains path separators or
-// other characters that should not appear in a Google Drive file ID.
-func containsPathSeparator(s string) bool {
-	return strings.ContainsAny(s, "/\\")
+// driveIDPattern matches valid Google Drive file/folder IDs.
+// Drive IDs are alphanumeric strings with hyphens and underscores, typically
+// 20-60 characters. This rejects injection attempts (quotes, slashes, spaces).
+var driveIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// isValidDriveID returns true if s looks like a valid Google Drive file or folder ID.
+func isValidDriveID(s string) bool {
+	return driveIDPattern.MatchString(s)
 }
 
 // driveListResponse is the Google Drive API response from files.list.

@@ -25,8 +25,8 @@ func (p *deleteDriveFileParams) validate() error {
 	if p.FileID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: file_id"}
 	}
-	if containsPathSeparator(p.FileID) {
-		return &connectors.ValidationError{Message: "file_id contains invalid characters"}
+	if !isValidDriveID(p.FileID) {
+		return &connectors.ValidationError{Message: "file_id contains invalid characters; expected alphanumeric ID"}
 	}
 	return nil
 }

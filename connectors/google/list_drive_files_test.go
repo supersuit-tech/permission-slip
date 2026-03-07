@@ -154,15 +154,29 @@ func TestListDriveFiles_InvalidFolderID(t *testing.T) {
 	conn := New()
 	action := &listDriveFilesAction{conn: conn}
 
+	// Test path traversal.
 	params, _ := json.Marshal(listDriveFilesParams{FolderID: "../etc/passwd"})
-
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "google.list_drive_files",
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
 	if err == nil {
-		t.Fatal("expected error for invalid folder_id")
+		t.Fatal("expected error for path traversal folder_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+
+	// Test query injection via single quotes in folder_id.
+	params, _ = json.Marshal(listDriveFilesParams{FolderID: "foo' or name contains 'secret"})
+	_, err = action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.list_drive_files",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for query injection folder_id")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

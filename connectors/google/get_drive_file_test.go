@@ -232,18 +232,25 @@ func TestGetDriveFile_InvalidFileID(t *testing.T) {
 	conn := New()
 	action := &getDriveFileAction{conn: conn}
 
-	params, _ := json.Marshal(getDriveFileParams{FileID: "../../etc/passwd"})
-
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.get_drive_file",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error for invalid file_id")
+	invalidIDs := []string{
+		"../../etc/passwd",               // path traversal
+		"file id with spaces",            // spaces
+		"file'--injection",               // quote injection
+		"<script>alert('xss')</script>",  // special characters
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+	for _, id := range invalidIDs {
+		params, _ := json.Marshal(getDriveFileParams{FileID: id})
+		_, err := action.Execute(t.Context(), connectors.ActionRequest{
+			ActionType:  "google.get_drive_file",
+			Parameters:  params,
+			Credentials: validCreds(),
+		})
+		if err == nil {
+			t.Fatalf("expected error for invalid file_id %q", id)
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("expected ValidationError for %q, got: %T", id, err)
+		}
 	}
 }
 

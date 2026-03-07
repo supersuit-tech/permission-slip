@@ -43,8 +43,8 @@ func (p *uploadDriveFileParams) validate() error {
 			Message: "content exceeds maximum upload size of 4 MB",
 		}
 	}
-	if p.FolderID != "" && containsPathSeparator(p.FolderID) {
-		return &connectors.ValidationError{Message: "folder_id contains invalid characters"}
+	if p.FolderID != "" && !isValidDriveID(p.FolderID) {
+		return &connectors.ValidationError{Message: "folder_id contains invalid characters; expected alphanumeric ID"}
 	}
 	return nil
 }
