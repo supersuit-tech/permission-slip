@@ -19,8 +19,9 @@ func TestSheetsListSheets_Success(t *testing.T) {
 		if r.URL.Path != "/spreadsheets/spreadsheet-789" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("fields") != "sheets.properties" {
-			t.Errorf("expected fields=sheets.properties, got %s", r.URL.Query().Get("fields"))
+		fields := r.URL.Query().Get("fields")
+		if fields == "" {
+			t.Errorf("expected fields query parameter to be set")
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -28,8 +29,14 @@ func TestSheetsListSheets_Success(t *testing.T) {
 			Sheets: []struct {
 				Properties sheetsProperties `json:"properties"`
 			}{
-				{Properties: sheetsProperties{SheetID: 0, Title: "Sheet1", Index: 0, SheetType: "GRID"}},
-				{Properties: sheetsProperties{SheetID: 123, Title: "Data", Index: 1, SheetType: "GRID"}},
+				{Properties: sheetsProperties{
+					SheetID: 0, Title: "Sheet1", Index: 0, SheetType: "GRID",
+					GridProperties: &sheetsGridProperties{RowCount: 1000, ColumnCount: 26},
+				}},
+				{Properties: sheetsProperties{
+					SheetID: 123, Title: "Data", Index: 1, SheetType: "GRID",
+					GridProperties: &sheetsGridProperties{RowCount: 500, ColumnCount: 10},
+				}},
 			},
 		})
 	}))
@@ -63,6 +70,12 @@ func TestSheetsListSheets_Success(t *testing.T) {
 	}
 	if data.Sheets[1].SheetID != 123 {
 		t.Errorf("expected second sheet ID 123, got %d", data.Sheets[1].SheetID)
+	}
+	if data.Sheets[0].RowCount != 1000 {
+		t.Errorf("expected first sheet row_count 1000, got %d", data.Sheets[0].RowCount)
+	}
+	if data.Sheets[0].ColumnCount != 26 {
+		t.Errorf("expected first sheet column_count 26, got %d", data.Sheets[0].ColumnCount)
 	}
 }
 

@@ -37,20 +37,26 @@ type sheetsSpreadsheetResponse struct {
 }
 
 type sheetsProperties struct {
-	SheetID    int    `json:"sheetId"`
-	Title      string `json:"title"`
-	Index      int    `json:"index"`
-	SheetType  string `json:"sheetType"`
-	RowCount   int    `json:"rowCount,omitempty"`
-	ColumnCount int   `json:"columnCount,omitempty"`
+	SheetID        int                 `json:"sheetId"`
+	Title          string              `json:"title"`
+	Index          int                 `json:"index"`
+	SheetType      string              `json:"sheetType"`
+	GridProperties *sheetsGridProperties `json:"gridProperties,omitempty"`
+}
+
+type sheetsGridProperties struct {
+	RowCount    int `json:"rowCount"`
+	ColumnCount int `json:"columnCount"`
 }
 
 // sheetSummary is the shape returned to the agent.
 type sheetSummary struct {
-	SheetID   int    `json:"sheet_id"`
-	Title     string `json:"title"`
-	Index     int    `json:"index"`
-	SheetType string `json:"sheet_type"`
+	SheetID     int    `json:"sheet_id"`
+	Title       string `json:"title"`
+	Index       int    `json:"index"`
+	SheetType   string `json:"sheet_type"`
+	RowCount    int    `json:"row_count,omitempty"`
+	ColumnCount int    `json:"column_count,omitempty"`
 }
 
 // Execute lists all worksheets in a Google Sheets spreadsheet.
@@ -64,7 +70,8 @@ func (a *sheetsListSheetsAction) Execute(ctx context.Context, req connectors.Act
 	}
 
 	listURL := a.conn.sheetsBaseURL + "/spreadsheets/" +
-		url.PathEscape(params.SpreadsheetID) + "?fields=sheets.properties"
+		url.PathEscape(params.SpreadsheetID) +
+		"?fields=sheets.properties(sheetId,title,index,sheetType,gridProperties(rowCount,columnCount))"
 
 	var resp sheetsSpreadsheetResponse
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, listURL, nil, &resp); err != nil {
@@ -73,12 +80,17 @@ func (a *sheetsListSheetsAction) Execute(ctx context.Context, req connectors.Act
 
 	sheets := make([]sheetSummary, 0, len(resp.Sheets))
 	for _, s := range resp.Sheets {
-		sheets = append(sheets, sheetSummary{
+		summary := sheetSummary{
 			SheetID:   s.Properties.SheetID,
 			Title:     s.Properties.Title,
 			Index:     s.Properties.Index,
 			SheetType: s.Properties.SheetType,
-		})
+		}
+		if gp := s.Properties.GridProperties; gp != nil {
+			summary.RowCount = gp.RowCount
+			summary.ColumnCount = gp.ColumnCount
+		}
+		sheets = append(sheets, summary)
 	}
 
 	return connectors.JSONResult(map[string]any{

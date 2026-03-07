@@ -283,19 +283,25 @@ Lists all worksheets (tabs) in a Google Sheets spreadsheet.
       "sheet_id": 0,
       "title": "Sheet1",
       "index": 0,
-      "sheet_type": "GRID"
+      "sheet_type": "GRID",
+      "row_count": 1000,
+      "column_count": 26
     },
     {
       "sheet_id": 123456,
       "title": "Data",
       "index": 1,
-      "sheet_type": "GRID"
+      "sheet_type": "GRID",
+      "row_count": 500,
+      "column_count": 10
     }
   ]
 }
 ```
 
 **Sheets API:** `GET /v4/spreadsheets/{id}?fields=sheets.properties` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get))
+
+The response includes `row_count` and `column_count` from the sheet's grid properties, which can be used to determine sheet dimensions before read/write operations.
 
 ## Error Handling
 
@@ -328,6 +334,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Write spreadsheet range | `sheets_write_range` | Nothing — agent controls all parameters |
 | Append spreadsheet rows | `sheets_append_rows` | Nothing — agent controls all parameters |
 | Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
+| List worksheets in any spreadsheet | `sheets_list_sheets` | Nothing — agent controls spreadsheet |
 
 ## Adding a New Action
 
@@ -354,6 +361,7 @@ connectors/google/
 ├── sheets_write.go                 # google.sheets_write_range action
 ├── sheets_append.go                # google.sheets_append_rows action
 ├── sheets_list.go                  # google.sheets_list_sheets action
+├── sheets_helpers.go               # Shared validation helpers for Sheets actions
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)

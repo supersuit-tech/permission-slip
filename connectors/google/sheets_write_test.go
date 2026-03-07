@@ -178,6 +178,34 @@ func TestSheetsWriteRange_AuthFailure(t *testing.T) {
 	}
 }
 
+func TestSheetsWriteRange_RaggedRows(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sheetsWriteRangeAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsWriteRangeParams{
+		SpreadsheetID: "abc",
+		Range:         "Sheet1!A1",
+		Values: [][]any{
+			{"A", "B", "C"},
+			{"D", "E"}, // different length
+		},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_write_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for ragged rows")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSheetsWriteRange_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

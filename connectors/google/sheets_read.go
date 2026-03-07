@@ -28,7 +28,7 @@ func (p *sheetsReadRangeParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: spreadsheet_id"}
 	}
 	if p.Range == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: range"}
+		return &connectors.ValidationError{Message: "missing required parameter: range (e.g. 'Sheet1!A1:D10')"}
 	}
 	return nil
 }

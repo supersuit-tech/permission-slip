@@ -199,11 +199,11 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet to read from"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
 						},
 						"range": {
 							"type": "string",
-							"description": "The A1 notation range to read (e.g. 'Sheet1!A1:D10')"
+							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:D10'). Use sheet name alone to read all data (e.g. 'Sheet1')."
 						}
 					}
 				}`)),
@@ -219,11 +219,11 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet to write to"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
 						},
 						"range": {
 							"type": "string",
-							"description": "The A1 notation range to write (e.g. 'Sheet1!A1:D3')"
+							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:C3'). Defines the top-left starting cell for the write."
 						},
 						"values": {
 							"type": "array",
@@ -231,7 +231,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "array",
 								"items": {}
 							},
-							"description": "2D array of cell values to write (rows of columns)"
+							"description": "2D array of cell values (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI (formulas and formats applied)."
 						}
 					}
 				}`)),
@@ -247,11 +247,11 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet to append to"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
 						},
 						"range": {
 							"type": "string",
-							"description": "The A1 notation of the range to search for a table to append to (e.g. 'Sheet1')"
+							"description": "Sheet name or starting cell (e.g. 'Sheet1' or 'Sheet1!A1'). Rows are appended after the last row with data in this range."
 						},
 						"values": {
 							"type": "array",
@@ -259,7 +259,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "array",
 								"items": {}
 							},
-							"description": "2D array of row values to append (rows of columns)"
+							"description": "2D array of row values to append (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI."
 						}
 					}
 				}`)),
@@ -275,7 +275,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
 						}
 					}
 				}`)),
@@ -371,6 +371,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Read from any spreadsheet",
 				Description: "Agent can read from any spreadsheet and any range.",
 				Parameters:  json.RawMessage(`{"spreadsheet_id":"*","range":"*"}`),
+			},
+			{
+				ID:          "tpl_google_sheets_list",
+				ActionType:  "google.sheets_list_sheets",
+				Name:        "List worksheets in any spreadsheet",
+				Description: "Agent can list worksheets in any spreadsheet.",
+				Parameters:  json.RawMessage(`{"spreadsheet_id":"*"}`),
 			},
 		},
 	}

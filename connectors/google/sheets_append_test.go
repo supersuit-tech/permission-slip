@@ -162,6 +162,34 @@ func TestSheetsAppendRows_RateLimit(t *testing.T) {
 	}
 }
 
+func TestSheetsAppendRows_RaggedRows(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sheetsAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsAppendRowsParams{
+		SpreadsheetID: "abc",
+		Range:         "Sheet1",
+		Values: [][]any{
+			{"A", "B"},
+			{"C"},
+		},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for ragged rows")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSheetsAppendRows_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

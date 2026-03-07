@@ -29,10 +29,13 @@ func (p *sheetsWriteRangeParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: spreadsheet_id"}
 	}
 	if p.Range == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: range"}
+		return &connectors.ValidationError{Message: "missing required parameter: range (e.g. 'Sheet1!A1:C3')"}
 	}
 	if len(p.Values) == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: values"}
+		return &connectors.ValidationError{Message: "values must contain at least one row of data"}
+	}
+	if err := validateRowLengths(p.Values); err != nil {
+		return err
 	}
 	return nil
 }
