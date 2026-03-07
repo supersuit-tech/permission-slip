@@ -21,6 +21,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	"github.com/supersuit-tech/permission-slip-web/connectors/confluence"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
@@ -333,6 +334,7 @@ func main() {
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
+	registry.Register(confluence.New())
 	registry.Register(hubspot.New())
 	registry.Register(jira.New())
 	registry.Register(linear.New())
