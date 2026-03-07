@@ -2,7 +2,6 @@ package airtable
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -52,21 +51,13 @@ type deleteRecordEntry struct {
 }
 
 type deleteRecordsResult struct {
-	Deleted []deleteRecordSummary `json:"deleted"`
-}
-
-type deleteRecordSummary struct {
-	ID      string `json:"id"`
-	Deleted bool   `json:"deleted"`
+	Deleted []deleteRecordEntry `json:"deleted"`
 }
 
 // Execute deletes one or more records from an Airtable table.
 func (a *deleteRecordsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params deleteRecordsParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
@@ -85,13 +76,7 @@ func (a *deleteRecordsAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	result := deleteRecordsResult{
-		Deleted: make([]deleteRecordSummary, 0, len(resp.Records)),
-	}
-	for _, r := range resp.Records {
-		result.Deleted = append(result.Deleted, deleteRecordSummary{
-			ID:      r.ID,
-			Deleted: r.Deleted,
-		})
+		Deleted: resp.Records,
 	}
 
 	return connectors.JSONResult(result)

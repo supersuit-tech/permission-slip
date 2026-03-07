@@ -2,8 +2,7 @@ package airtable
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -16,6 +15,8 @@ type listBasesAction struct {
 type listBasesParams struct {
 	Offset string `json:"offset,omitempty"`
 }
+
+func (p *listBasesParams) validate() error { return nil }
 
 type listBasesResponse struct {
 	Bases  []baseEntry `json:"bases"`
@@ -42,17 +43,19 @@ type baseSummary struct {
 // Execute lists all bases accessible to the authenticated user.
 func (a *listBasesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listBasesParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
+		return nil, err
 	}
 
-	url := a.conn.metaURL + "/bases"
+	reqURL := a.conn.metaURL + "/bases"
 	if params.Offset != "" {
-		url += "?offset=" + params.Offset
+		q := url.Values{}
+		q.Set("offset", params.Offset)
+		reqURL += "?" + q.Encode()
 	}
 
 	var resp listBasesResponse
-	if err := a.conn.doRequest(ctx, "GET", url, req.Credentials, nil, &resp); err != nil {
+	if err := a.conn.doRequest(ctx, "GET", reqURL, req.Credentials, nil, &resp); err != nil {
 		return nil, err
 	}
 

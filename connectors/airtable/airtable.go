@@ -59,315 +59,6 @@ func newForTest(client *http.Client, baseURL string) *AirtableConnector {
 // ID returns "airtable", matching the connectors.id in the database.
 func (c *AirtableConnector) ID() string { return "airtable" }
 
-// Manifest returns the connector's metadata manifest.
-func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "airtable",
-		Name:        "Airtable",
-		Description: "Airtable integration for structured data and no-code databases",
-		Actions: []connectors.ManifestAction{
-			{
-				ActionType:  "airtable.list_bases",
-				Name:        "List Bases",
-				Description: "List all bases accessible to the authenticated user",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"properties": {
-						"offset": {
-							"type": "string",
-							"description": "Pagination offset from a previous response"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "airtable.list_records",
-				Name:        "List Records",
-				Description: "List records from an Airtable table with optional filtering, sorting, and pagination",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["base_id", "table"],
-					"properties": {
-						"base_id": {
-							"type": "string",
-							"description": "Airtable base ID (starts with 'app')"
-						},
-						"table": {
-							"type": "string",
-							"description": "Table name or ID"
-						},
-						"fields": {
-							"type": "array",
-							"items": {"type": "string"},
-							"description": "Only return these fields (column names)"
-						},
-						"filter_by_formula": {
-							"type": "string",
-							"description": "Airtable formula to filter records (e.g. \"{Status} = 'Active'\")"
-						},
-						"max_records": {
-							"type": "integer",
-							"description": "Maximum total records to return"
-						},
-						"page_size": {
-							"type": "integer",
-							"description": "Records per page (max 100, default 100)"
-						},
-						"sort": {
-							"type": "array",
-							"items": {
-								"type": "object",
-								"required": ["field"],
-								"properties": {
-									"field": {"type": "string", "description": "Field name to sort by"},
-									"direction": {"type": "string", "enum": ["asc", "desc"], "description": "Sort direction (default: asc)"}
-								}
-							},
-							"description": "Sort order for records"
-						},
-						"view": {
-							"type": "string",
-							"description": "Name or ID of a view to filter/sort by"
-						},
-						"offset": {
-							"type": "string",
-							"description": "Pagination offset from a previous response"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "airtable.get_record",
-				Name:        "Get Record",
-				Description: "Get a single record by its ID",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["base_id", "table", "record_id"],
-					"properties": {
-						"base_id": {
-							"type": "string",
-							"description": "Airtable base ID (starts with 'app')"
-						},
-						"table": {
-							"type": "string",
-							"description": "Table name or ID"
-						},
-						"record_id": {
-							"type": "string",
-							"description": "Record ID (starts with 'rec')"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "airtable.create_records",
-				Name:        "Create Records",
-				Description: "Create one or more records in an Airtable table (batch up to 10)",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["base_id", "table", "records"],
-					"properties": {
-						"base_id": {
-							"type": "string",
-							"description": "Airtable base ID (starts with 'app')"
-						},
-						"table": {
-							"type": "string",
-							"description": "Table name or ID"
-						},
-						"records": {
-							"type": "array",
-							"minItems": 1,
-							"maxItems": 10,
-							"items": {
-								"type": "object",
-								"required": ["fields"],
-								"properties": {
-									"fields": {
-										"type": "object",
-										"description": "Field name-value pairs for the record"
-									}
-								}
-							},
-							"description": "Records to create (1-10)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "airtable.update_records",
-				Name:        "Update Records",
-				Description: "Update one or more existing records with partial updates (batch up to 10)",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["base_id", "table", "records"],
-					"properties": {
-						"base_id": {
-							"type": "string",
-							"description": "Airtable base ID (starts with 'app')"
-						},
-						"table": {
-							"type": "string",
-							"description": "Table name or ID"
-						},
-						"records": {
-							"type": "array",
-							"minItems": 1,
-							"maxItems": 10,
-							"items": {
-								"type": "object",
-								"required": ["id", "fields"],
-								"properties": {
-									"id": {
-										"type": "string",
-										"description": "Record ID to update (starts with 'rec')"
-									},
-									"fields": {
-										"type": "object",
-										"description": "Field name-value pairs to update"
-									}
-								}
-							},
-							"description": "Records to update (1-10)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "airtable.delete_records",
-				Name:        "Delete Records",
-				Description: "Delete one or more records from an Airtable table (batch up to 10)",
-				RiskLevel:   "high",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["base_id", "table", "record_ids"],
-					"properties": {
-						"base_id": {
-							"type": "string",
-							"description": "Airtable base ID (starts with 'app')"
-						},
-						"table": {
-							"type": "string",
-							"description": "Table name or ID"
-						},
-						"record_ids": {
-							"type": "array",
-							"minItems": 1,
-							"maxItems": 10,
-							"items": {"type": "string"},
-							"description": "Record IDs to delete (each starts with 'rec')"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "airtable.search_records",
-				Name:        "Search Records",
-				Description: "Search records using an Airtable formula filter",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["base_id", "table", "formula"],
-					"properties": {
-						"base_id": {
-							"type": "string",
-							"description": "Airtable base ID (starts with 'app')"
-						},
-						"table": {
-							"type": "string",
-							"description": "Table name or ID"
-						},
-						"formula": {
-							"type": "string",
-							"description": "Airtable formula to filter records (e.g. \"SEARCH('John', {Name})\" or \"{Status} = 'Active'\")"
-						},
-						"fields": {
-							"type": "array",
-							"items": {"type": "string"},
-							"description": "Only return these fields (column names)"
-						},
-						"max_records": {
-							"type": "integer",
-							"description": "Maximum total records to return (default: 100)"
-						},
-						"sort": {
-							"type": "array",
-							"items": {
-								"type": "object",
-								"required": ["field"],
-								"properties": {
-									"field": {"type": "string", "description": "Field name to sort by"},
-									"direction": {"type": "string", "enum": ["asc", "desc"], "description": "Sort direction (default: asc)"}
-								}
-							},
-							"description": "Sort order for results"
-						}
-					}
-				}`)),
-			},
-		},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "airtable", AuthType: "api_key", InstructionsURL: "https://airtable.com/create/tokens"},
-		},
-		Templates: []connectors.ManifestTemplate{
-			{
-				ID:          "tpl_airtable_list_bases",
-				ActionType:  "airtable.list_bases",
-				Name:        "List all bases",
-				Description: "Agent can list all accessible Airtable bases.",
-				Parameters:  json.RawMessage(`{"offset":"*"}`),
-			},
-			{
-				ID:          "tpl_airtable_read_records",
-				ActionType:  "airtable.list_records",
-				Name:        "Read records from any table",
-				Description: "Agent can read records from any table in any base.",
-				Parameters:  json.RawMessage(`{"base_id":"*","table":"*","fields":"*","filter_by_formula":"*","max_records":"*","page_size":"*","sort":"*","view":"*","offset":"*"}`),
-			},
-			{
-				ID:          "tpl_airtable_get_record",
-				ActionType:  "airtable.get_record",
-				Name:        "Get any record",
-				Description: "Agent can get any record by ID from any table.",
-				Parameters:  json.RawMessage(`{"base_id":"*","table":"*","record_id":"*"}`),
-			},
-			{
-				ID:          "tpl_airtable_create_records",
-				ActionType:  "airtable.create_records",
-				Name:        "Create records",
-				Description: "Agent can create records in any table.",
-				Parameters:  json.RawMessage(`{"base_id":"*","table":"*","records":"*"}`),
-			},
-			{
-				ID:          "tpl_airtable_update_records",
-				ActionType:  "airtable.update_records",
-				Name:        "Update records",
-				Description: "Agent can update records in any table.",
-				Parameters:  json.RawMessage(`{"base_id":"*","table":"*","records":"*"}`),
-			},
-			{
-				ID:          "tpl_airtable_delete_records",
-				ActionType:  "airtable.delete_records",
-				Name:        "Delete records",
-				Description: "Agent can delete records from any table.",
-				Parameters:  json.RawMessage(`{"base_id":"*","table":"*","record_ids":"*"}`),
-			},
-			{
-				ID:          "tpl_airtable_search_records",
-				ActionType:  "airtable.search_records",
-				Name:        "Search records",
-				Description: "Agent can search records in any table using formulas.",
-				Parameters:  json.RawMessage(`{"base_id":"*","table":"*","formula":"*","fields":"*","max_records":"*","sort":"*"}`),
-			},
-		},
-	}
-}
-
 // Actions returns the registered action handlers keyed by action_type.
 func (c *AirtableConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
@@ -420,6 +111,14 @@ func validateRecordID(recordID string) error {
 	return nil
 }
 
+// parseAndValidate unmarshals JSON parameters and validates them.
+func parseAndValidate[T interface{ validate() error }](raw json.RawMessage, dest *T) error {
+	if err := json.Unmarshal(raw, dest); err != nil {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	return (*dest).validate()
+}
+
 // doRequest executes an HTTP request against the Airtable API with auth headers,
 // handles rate limiting and timeouts, and unmarshals the response into dest.
 func (c *AirtableConnector) doRequest(ctx context.Context, method, url string, creds connectors.Credentials, body io.Reader, dest any) error {
@@ -462,8 +161,15 @@ func (c *AirtableConnector) doRequest(ctx context.Context, method, url string, c
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return &connectors.AuthError{Message: fmt.Sprintf("Airtable auth error (HTTP %d): %s", resp.StatusCode, string(respBody))}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return &connectors.AuthError{
+			Message: "Airtable authentication failed — check that your personal access token is valid and not expired",
+		}
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		return &connectors.AuthError{
+			Message: "Airtable permission denied — your token may lack the required scopes for this base or table",
+		}
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -503,15 +209,26 @@ func mapAirtableError(statusCode int, body []byte) error {
 		}
 	}
 
-	msg := fmt.Sprintf("Airtable API error: %s - %s", errResp.Error.Type, errResp.Error.Message)
+	msg := fmt.Sprintf("Airtable API error: %s — %s", errResp.Error.Type, errResp.Error.Message)
 
 	switch errResp.Error.Type {
-	case "AUTHENTICATION_REQUIRED", "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND":
-		return &connectors.AuthError{Message: msg}
-	case "NOT_FOUND":
+	case "AUTHENTICATION_REQUIRED":
+		return &connectors.AuthError{Message: "Airtable authentication required — check that your personal access token is valid"}
+	case "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND":
+		return &connectors.AuthError{
+			Message: "Airtable permission denied or resource not found — verify the base ID exists and your token has access to it",
+		}
+	case "NOT_FOUND", "TABLE_NOT_FOUND", "ROW_DOES_NOT_EXIST":
 		return &connectors.ExternalError{StatusCode: 404, Message: msg}
-	case "INVALID_REQUEST_UNKNOWN", "INVALID_VALUE_FOR_COLUMN", "CANNOT_UPDATE_COMPUTED_FIELD":
+	case "VIEW_NOT_FOUND":
+		return &connectors.ExternalError{StatusCode: 404, Message: "Airtable view not found — check the view name or ID"}
+	case "INVALID_REQUEST_UNKNOWN", "INVALID_VALUE_FOR_COLUMN", "CANNOT_UPDATE_COMPUTED_FIELD",
+		"FIELD_NOT_FOUND", "UNKNOWN_FIELD_NAME", "CANNOT_CREATE_DUPLICATE_RECORD":
 		return &connectors.ValidationError{Message: msg}
+	case "INVALID_FILTER_BY_FORMULA":
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("Airtable formula syntax error — %s. See https://support.airtable.com/docs/formula-field-reference", errResp.Error.Message),
+		}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: msg}
 	}
