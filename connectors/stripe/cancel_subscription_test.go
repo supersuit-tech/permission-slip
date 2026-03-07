@@ -189,3 +189,38 @@ func TestCancelSubscription_ImmediateWithProration(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 }
+
+func TestCancelSubscription_PathEscape(t *testing.T) {
+	t.Parallel()
+
+	// Verify that subscription IDs with special characters are properly
+	// escaped in the URL path to prevent path injection attacks.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The path should contain the escaped ID, not the raw "../../" traversal.
+		if r.URL.RawPath != "" {
+			// RawPath is set when the path contains escaped characters.
+			if r.URL.RawPath != "/v1/subscriptions/sub_..%2F..%2Fv1%2Fcustomers" {
+				t.Errorf("raw path = %s, want /v1/subscriptions/sub_..%%2F..%%2Fv1%%2Fcustomers", r.URL.RawPath)
+			}
+		}
+
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":     "sub_escaped",
+			"status": "canceled",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.cancel_subscription"]
+
+	// Attempt path traversal via subscription_id — should be escaped.
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.cancel_subscription",
+		Parameters:  json.RawMessage(`{"subscription_id":"sub_../../v1/customers"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}

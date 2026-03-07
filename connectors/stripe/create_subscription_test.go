@@ -162,6 +162,68 @@ func TestCreateSubscription_NegativeTrialDays(t *testing.T) {
 	}
 }
 
+func TestCreateSubscription_NegativeQuantity(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_subscription"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_subscription",
+		Parameters:  json.RawMessage(`{"customer":"cus_abc123","items":[{"price":"price_xyz","quantity":-1}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestCreateSubscription_MultipleItemsWithQuantity(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("parsing form: %v", err)
+			http.Error(w, "bad request", http.StatusInternalServerError)
+			return
+		}
+		if got := r.FormValue("items[0][price]"); got != "price_a" {
+			t.Errorf("items[0][price] = %q, want price_a", got)
+		}
+		if got := r.FormValue("items[0][quantity]"); got != "2" {
+			t.Errorf("items[0][quantity] = %q, want 2", got)
+		}
+		if got := r.FormValue("items[1][price]"); got != "price_b" {
+			t.Errorf("items[1][price] = %q, want price_b", got)
+		}
+		if got := r.FormValue("items[1][quantity]"); got != "5" {
+			t.Errorf("items[1][quantity] = %q, want 5", got)
+		}
+
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":       "sub_multi",
+			"status":   "active",
+			"customer": "cus_abc123",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.create_subscription"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_subscription",
+		Parameters:  json.RawMessage(`{"customer":"cus_abc123","items":[{"price":"price_a","quantity":2},{"price":"price_b","quantity":5}]}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestCreateSubscription_TooManyItems(t *testing.T) {
 	t.Parallel()
 

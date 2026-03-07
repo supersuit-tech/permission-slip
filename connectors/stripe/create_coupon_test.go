@@ -266,3 +266,22 @@ func TestCreateCoupon_PercentOffOutOfRange(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestCreateCoupon_InvalidCurrency(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_coupon"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_coupon",
+		Parameters:  json.RawMessage(`{"amount_off":500,"currency":"dollars","duration":"once"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
