@@ -104,6 +104,7 @@ func TestGetMessage_MissingParams(t *testing.T) {
 	}{
 		{name: "missing message_sid", params: `{}`},
 		{name: "empty message_sid", params: `{"message_sid":""}`},
+		{name: "invalid prefix", params: `{"message_sid":"CA1234567890abcdef1234567890abcdef"}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

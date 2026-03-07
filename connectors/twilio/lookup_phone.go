@@ -23,6 +23,9 @@ func (p *lookupPhoneParams) validate() error {
 	if p.PhoneNumber == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: phone_number"}
 	}
+	if err := validateE164("phone_number", p.PhoneNumber); err != nil {
+		return err
+	}
 	return nil
 }
 

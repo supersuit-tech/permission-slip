@@ -23,6 +23,11 @@ func (p *getMessageParams) validate() error {
 	if p.MessageSID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message_sid"}
 	}
+	if len(p.MessageSID) < 2 || (p.MessageSID[:2] != "SM" && p.MessageSID[:2] != "MM") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("message_sid must start with \"SM\" or \"MM\", got %q", p.MessageSID),
+		}
+	}
 	return nil
 }
 

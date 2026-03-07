@@ -26,11 +26,22 @@ func (p *sendSMSParams) validate() error {
 	if p.To == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: to"}
 	}
+	if err := validateE164("to", p.To); err != nil {
+		return err
+	}
 	if p.From == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: from"}
 	}
+	if err := validateE164("from", p.From); err != nil {
+		return err
+	}
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}
+	}
+	if len(p.Body) > maxSMSBodyLen {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("body exceeds maximum length of %d characters (got %d)", maxSMSBodyLen, len(p.Body)),
+		}
 	}
 	return nil
 }

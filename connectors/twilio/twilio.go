@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,7 +28,24 @@ const (
 	// Twilio Account SIDs start with "AC" and are 34 characters long.
 	accountSIDPrefix = "AC"
 	accountSIDLen    = 34
+
+	// maxSMSBodyLen is the maximum length for an SMS message body.
+	maxSMSBodyLen = 1600
 )
+
+// e164Pattern matches phone numbers in E.164 format: + followed by 1-15 digits.
+var e164Pattern = regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
+
+// validateE164 validates that a phone number is in E.164 format and returns
+// a clear error message for common mistakes.
+func validateE164(field, value string) error {
+	if !e164Pattern.MatchString(value) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s must be in E.164 format (e.g. +15551234567), got %q", field, value),
+		}
+	}
+	return nil
+}
 
 // TwilioConnector owns the shared HTTP client and base URLs used by all
 // Twilio actions. Actions hold a pointer back to the connector to access
@@ -79,18 +97,22 @@ func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"to": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Destination phone number in E.164 format (e.g. +15551234567)"
 						},
 						"from": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Twilio phone number to send from in E.164 format"
 						},
 						"body": {
 							"type": "string",
+							"maxLength": 1600,
 							"description": "Message text (max 1600 characters)"
 						},
 						"media_url": {
 							"type": "string",
+							"format": "uri",
 							"description": "URL of media to include (MMS, US/Canada only)"
 						}
 					}
@@ -107,10 +129,12 @@ func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"to": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Destination phone number in E.164 format (e.g. +15551234567)"
 						},
 						"from": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Twilio WhatsApp-enabled number in E.164 format"
 						},
 						"body": {
@@ -131,10 +155,12 @@ func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"to": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Destination phone number in E.164 format"
 						},
 						"from": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Twilio phone number to call from in E.164 format"
 						},
 						"twiml": {
@@ -155,6 +181,7 @@ func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"message_sid": {
 							"type": "string",
+							"pattern": "^(SM|MM)[0-9a-f]{32}$",
 							"description": "The SID of the message to check (starts with SM or MM)"
 						}
 					}
@@ -171,6 +198,7 @@ func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"call_sid": {
 							"type": "string",
+							"pattern": "^CA[0-9a-f]{32}$",
 							"description": "The SID of the call to check (starts with CA)"
 						}
 					}
@@ -187,6 +215,7 @@ func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"phone_number": {
 							"type": "string",
+							"pattern": "^\\+[1-9]\\d{1,14}$",
 							"description": "Phone number to look up in E.164 format (e.g. +15551234567)"
 						}
 					}

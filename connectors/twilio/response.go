@@ -19,10 +19,18 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	var twilioErr struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
+		MoreInfo string `json:"more_info"`
 	}
 	msg := string(body)
 	if json.Unmarshal(body, &twilioErr) == nil && twilioErr.Message != "" {
-		msg = twilioErr.Message
+		if twilioErr.Code > 0 {
+			msg = fmt.Sprintf("[%d] %s", twilioErr.Code, twilioErr.Message)
+			if twilioErr.MoreInfo != "" {
+				msg += " (see " + twilioErr.MoreInfo + ")"
+			}
+		} else {
+			msg = twilioErr.Message
+		}
 	}
 
 	switch {

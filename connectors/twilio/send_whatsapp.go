@@ -26,8 +26,14 @@ func (p *sendWhatsAppParams) validate() error {
 	if p.To == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: to"}
 	}
+	if err := validateE164("to", p.To); err != nil {
+		return err
+	}
 	if p.From == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: from"}
+	}
+	if err := validateE164("from", p.From); err != nil {
+		return err
 	}
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}

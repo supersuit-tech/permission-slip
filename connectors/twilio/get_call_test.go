@@ -71,6 +71,7 @@ func TestGetCall_MissingParams(t *testing.T) {
 	}{
 		{name: "missing call_sid", params: `{}`},
 		{name: "empty call_sid", params: `{"call_sid":""}`},
+		{name: "invalid prefix", params: `{"call_sid":"SM1234567890abcdef1234567890abcdef"}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -265,27 +266,52 @@ func TestSendSMS_Timeout(t *testing.T) {
 	}
 }
 
-func TestSendSMS_ValidationError(t *testing.T) {
+func TestSendSMS_InvalidPhoneFormat(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{
-			"code":    21211,
-			"message": "Invalid 'To' Phone Number",
-		})
-	}))
-	defer srv.Close()
-
-	conn := newForTest(srv.Client(), srv.URL)
+	conn := New()
 	action := conn.Actions()["twilio.send_sms"]
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{name: "to missing plus", params: `{"to":"15551234567","from":"+15559876543","body":"Hello"}`},
+		{name: "to has letters", params: `{"to":"+1555ABC4567","from":"+15559876543","body":"Hello"}`},
+		{name: "from invalid", params: `{"to":"+15551234567","from":"not-a-number","body":"Hello"}`},
+		{name: "to starts with +0", params: `{"to":"+05551234567","from":"+15559876543","body":"Hello"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "twilio.send_sms",
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestSendSMS_BodyTooLong(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["twilio.send_sms"]
+
+	params := `{"to":"+15551234567","from":"+15559876543","body":"` + strings.Repeat("a", 1601) + `"}`
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "twilio.send_sms",
-		Parameters:  json.RawMessage(`{"to":"invalid","from":"+15559876543","body":"Hello"}`),
+		Parameters:  json.RawMessage(params),
 		Credentials: validCreds(),
 	})
-
 	if err == nil {
 		t.Fatal("Execute() expected error, got nil")
 	}

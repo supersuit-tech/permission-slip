@@ -73,6 +73,7 @@ func TestLookupPhone_MissingParams(t *testing.T) {
 	}{
 		{name: "missing phone_number", params: `{}`},
 		{name: "empty phone_number", params: `{"phone_number":""}`},
+		{name: "invalid format", params: `{"phone_number":"5551234567"}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

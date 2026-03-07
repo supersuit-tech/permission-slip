@@ -23,6 +23,11 @@ func (p *getCallParams) validate() error {
 	if p.CallSID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: call_sid"}
 	}
+	if len(p.CallSID) < 2 || p.CallSID[:2] != "CA" {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("call_sid must start with \"CA\", got %q", p.CallSID),
+		}
+	}
 	return nil
 }
 
