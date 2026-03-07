@@ -29,7 +29,7 @@ func (p *queryDatabaseParams) validate() error {
 		return err
 	}
 	if p.PageSize < 0 || p.PageSize > 100 {
-		return &connectors.ValidationError{Message: "page_size must be between 1 and 100"}
+		return &connectors.ValidationError{Message: "page_size must be between 1 and 100 (or 0 for default)"}
 	}
 	return nil
 }

@@ -159,7 +159,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "The page ID to update (UUID format)"
+							"description": "The page ID to update (UUID, e.g. 8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c)"
 						},
 						"properties": {
 							"type": "object",
@@ -183,7 +183,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "The page ID to append content to (UUID format)"
+							"description": "The page ID to append content to (UUID, e.g. 8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c)"
 						},
 						"children": {
 							"type": "array",
@@ -208,7 +208,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"database_id": {
 							"type": "string",
-							"description": "The database ID to query (UUID format)"
+							"description": "The database ID to query (UUID, e.g. 8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c)"
 						},
 						"filter": {
 							"type": "object",
