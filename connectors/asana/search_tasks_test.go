@@ -96,16 +96,46 @@ func TestSearchTasks_MissingWorkspaceID(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["asana.search_tasks"]
 
+	// No workspace_id in params or credentials → should fail.
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "asana.search_tasks",
 		Parameters:  json.RawMessage(`{"text":"test"}`),
-		Credentials: validCreds(),
+		Credentials: connectors.NewCredentials(map[string]string{"api_key": "tok"}),
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchTasks_WorkspaceIDFromCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Path; got != "/workspaces/cred-ws-id/tasks/search" {
+			t.Errorf("path = %s, want /workspaces/cred-ws-id/tasks/search", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["asana.search_tasks"]
+
+	// workspace_id not in params, but present in credentials.
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType: "asana.search_tasks",
+		Parameters: json.RawMessage(`{}`),
+		Credentials: connectors.NewCredentials(map[string]string{
+			"api_key":      "0/abc123test",
+			"workspace_id": "cred-ws-id",
+		}),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -59,7 +60,7 @@ func (a *createSubtaskAction) Execute(ctx context.Context, req connectors.Action
 		PermalinkURL string `json:"permalink_url"`
 	}
 
-	path := fmt.Sprintf("/tasks/%s/subtasks", params.ParentTaskID)
+	path := fmt.Sprintf("/tasks/%s/subtasks", url.PathEscape(params.ParentTaskID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &resp); err != nil {
 		return nil, err
 	}

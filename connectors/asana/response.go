@@ -26,6 +26,9 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	msg := string(body)
 	if json.Unmarshal(body, &asanaErr) == nil && len(asanaErr.Errors) > 0 {
 		msg = asanaErr.Errors[0].Message
+		if asanaErr.Errors[0].Help != "" {
+			msg += " (hint: " + asanaErr.Errors[0].Help + ")"
+		}
 	}
 
 	switch {

@@ -4,10 +4,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
+}
 
 func TestAsanaConnector_ID(t *testing.T) {
 	t.Parallel()
@@ -247,6 +252,20 @@ func TestAsanaConnector_ErrorMapping(t *testing.T) {
 			checkErr: func(t *testing.T, err error) {
 				if !connectors.IsExternalError(err) {
 					t.Errorf("expected ExternalError, got %T: %v", err, err)
+				}
+			},
+		},
+		{
+			name:       "error includes help hint when present",
+			statusCode: 400,
+			body:       `{"errors":[{"message":"Bad field","help":"Check the API docs for valid fields"}]}`,
+			checkErr: func(t *testing.T, err error) {
+				if !connectors.IsValidationError(err) {
+					t.Errorf("expected ValidationError, got %T: %v", err, err)
+				}
+				errMsg := err.Error()
+				if !contains(errMsg, "hint:") {
+					t.Errorf("error should include hint, got: %s", errMsg)
 				}
 			},
 		},

@@ -38,6 +38,12 @@ func (a *searchTasksAction) Execute(ctx context.Context, req connectors.ActionRe
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
+	// Fall back to workspace_id from credentials if not provided in parameters.
+	if params.WorkspaceID == "" {
+		if wsID, ok := req.Credentials.Get("workspace_id"); ok && wsID != "" {
+			params.WorkspaceID = wsID
+		}
+	}
 	if err := params.validate(); err != nil {
 		return nil, err
 	}
@@ -67,7 +73,7 @@ func (a *searchTasksAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 	q.Set("limit", strconv.Itoa(limit))
 
-	fullURL := fmt.Sprintf("%s/workspaces/%s/tasks/search?%s", a.conn.baseURL, params.WorkspaceID, q.Encode())
+	fullURL := fmt.Sprintf("%s/workspaces/%s/tasks/search?%s", a.conn.baseURL, url.PathEscape(params.WorkspaceID), q.Encode())
 
 	// Search returns {"data": [...]} — use doRaw to avoid the request body envelope.
 	var envelope struct {

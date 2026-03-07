@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -44,7 +45,7 @@ func (a *completeTaskAction) Execute(ctx context.Context, req connectors.ActionR
 		PermalinkURL string `json:"permalink_url"`
 	}
 
-	path := fmt.Sprintf("/tasks/%s", params.TaskID)
+	path := fmt.Sprintf("/tasks/%s", url.PathEscape(params.TaskID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, body, &resp); err != nil {
 		return nil, err
 	}
