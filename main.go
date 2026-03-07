@@ -29,6 +29,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
+	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
@@ -43,6 +44,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -359,6 +361,8 @@ func main() {
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
 	registry.Register(zoom.New())
+	registry.Register(zapier.New())
+	registry.Register(makeconnector.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
