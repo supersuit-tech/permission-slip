@@ -27,6 +27,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
+	"github.com/supersuit-tech/permission-slip-web/connectors/figma"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
@@ -378,6 +379,7 @@ func main() {
 	registry.Register(datadog.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
+	registry.Register(figma.New())
 	registry.Register(pagerduty.New())
 	registry.Register(zoom.New())
 	registry.Register(zapier.New())
