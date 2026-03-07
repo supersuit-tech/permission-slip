@@ -21,7 +21,8 @@ type cartItem struct {
 }
 
 type addToCartParams struct {
-	Items []cartItem `json:"items"`
+	Items    []cartItem `json:"items"`
+	Modality string     `json:"modality"`
 }
 
 func (p *addToCartParams) validate() error {
@@ -30,6 +31,9 @@ func (p *addToCartParams) validate() error {
 	}
 	if len(p.Items) > 25 {
 		return &connectors.ValidationError{Message: "items cannot exceed 25 entries"}
+	}
+	if p.Modality != "" && p.Modality != "PICKUP" && p.Modality != "DELIVERY" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("modality must be PICKUP or DELIVERY (got %q)", p.Modality)}
 	}
 	for i, item := range p.Items {
 		if item.UPC == "" {
@@ -54,6 +58,9 @@ func (a *addToCartAction) Execute(ctx context.Context, req connectors.ActionRequ
 
 	body := map[string]any{
 		"items": params.Items,
+	}
+	if params.Modality != "" {
+		body["modality"] = params.Modality
 	}
 
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, "/cart/add", body, nil); err != nil {

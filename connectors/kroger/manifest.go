@@ -140,6 +140,11 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 								}
 							},
 							"description": "Items to add to the cart (max 25 per request)"
+						},
+						"modality": {
+							"type": "string",
+							"enum": ["PICKUP", "DELIVERY"],
+							"description": "Fulfillment method — PICKUP for in-store pickup, DELIVERY for home delivery. Omit to use the user's default"
 						}
 					}
 				}`)),

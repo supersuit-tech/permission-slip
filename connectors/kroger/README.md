@@ -34,7 +34,7 @@ Create an OAuth app at the [Kroger Developer Portal](https://developer.kroger.co
 | `kroger.search_products` | Search Products | low | Search products by keyword with optional location-specific pricing |
 | `kroger.get_product` | Get Product Details | low | Get product details by ID (UPC) including nutrition, price, availability |
 | `kroger.search_locations` | Search Locations | low | Find stores by zip code, coordinates, or chain banner |
-| `kroger.add_to_cart` | Add to Cart | medium | Add items to the authenticated user's Kroger cart |
+| `kroger.add_to_cart` | Add to Cart | medium | Add items to the authenticated user's Kroger cart with optional fulfillment modality |
 
 ### Location IDs
 

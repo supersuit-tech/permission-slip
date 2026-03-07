@@ -121,3 +121,79 @@ func TestGetProduct_InvalidJSON(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestGetProduct_AuthError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]any{
+			"errors": []map[string]string{{"message": "Unauthorized"}},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.get_product"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.get_product",
+		Parameters:  json.RawMessage(`{"product_id":"0001111041700"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got %T: %v", err, err)
+	}
+}
+
+func TestGetProduct_ServerError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write([]byte(`{"errors":[{"message":"Bad Gateway"}]}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.get_product"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.get_product",
+		Parameters:  json.RawMessage(`{"product_id":"0001111041700"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	}
+}
+
+func TestGetProduct_MissingCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("should not reach server with missing credentials")
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.get_product"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.get_product",
+		Parameters:  json.RawMessage(`{"product_id":"0001111041700"}`),
+		Credentials: connectors.NewCredentials(map[string]string{}),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

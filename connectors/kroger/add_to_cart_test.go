@@ -193,3 +193,114 @@ func TestAddToCart_AuthError(t *testing.T) {
 		t.Errorf("expected AuthError, got %T: %v", err, err)
 	}
 }
+
+func TestAddToCart_MissingCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("should not reach server with missing credentials")
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.add_to_cart"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.add_to_cart",
+		Parameters:  json.RawMessage(`{"items":[{"upc":"0001111041700","quantity":1}]}`),
+		Credentials: connectors.NewCredentials(map[string]string{}),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestAddToCart_WithModality(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody map[string]any
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshaling request body: %v", err)
+		}
+		if got, ok := reqBody["modality"].(string); !ok || got != "PICKUP" {
+			t.Errorf("modality = %v, want PICKUP", reqBody["modality"])
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.add_to_cart"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.add_to_cart",
+		Parameters:  json.RawMessage(`{"items":[{"upc":"0001111041700","quantity":1}],"modality":"PICKUP"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["status"] != "added" {
+		t.Errorf("status = %v, want added", data["status"])
+	}
+}
+
+func TestAddToCart_InvalidModality(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["kroger.add_to_cart"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.add_to_cart",
+		Parameters:  json.RawMessage(`{"items":[{"upc":"0001111041700","quantity":1}],"modality":"INVALID"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestAddToCart_ModalityOmitted(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody map[string]any
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshaling request body: %v", err)
+		}
+		if _, ok := reqBody["modality"]; ok {
+			t.Error("modality should not be present when omitted")
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.add_to_cart"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.add_to_cart",
+		Parameters:  json.RawMessage(`{"items":[{"upc":"0001111041700","quantity":1}]}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}

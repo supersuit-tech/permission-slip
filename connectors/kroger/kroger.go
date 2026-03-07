@@ -96,6 +96,7 @@ func (c *KrogerConnector) do(ctx context.Context, creds connectors.Credentials, 
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
