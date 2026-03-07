@@ -203,6 +203,122 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 		},
+		{
+			ActionType:  "slack.schedule_message",
+			Name:        "Schedule Message",
+			Description: "Schedule a message for future delivery to a Slack channel",
+			RiskLevel:   "low",
+			ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["channel", "message", "post_at"],
+				"properties": {
+					"channel": {
+						"type": "string",
+						"description": "Channel name (e.g. #general) or ID (e.g. C01234567)"
+					},
+					"message": {
+						"type": "string",
+						"description": "Message text (supports Slack mrkdwn formatting)"
+					},
+					"post_at": {
+						"type": "integer",
+						"description": "Unix timestamp for when the message should be sent (must be in the future)"
+					}
+				}
+			}`)),
+		},
+		{
+			ActionType:  "slack.set_topic",
+			Name:        "Set Topic",
+			Description: "Update a Slack channel's topic",
+			RiskLevel:   "medium",
+			ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["channel", "topic"],
+				"properties": {
+					"channel": {
+						"type": "string",
+						"description": "Channel ID (e.g. C01234567)"
+					},
+					"topic": {
+						"type": "string",
+						"description": "New channel topic (max 250 characters)"
+					}
+				}
+			}`)),
+		},
+		{
+			ActionType:  "slack.invite_to_channel",
+			Name:        "Invite to Channel",
+			Description: "Invite one or more users to a Slack channel",
+			RiskLevel:   "medium",
+			ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["channel", "users"],
+				"properties": {
+					"channel": {
+						"type": "string",
+						"description": "Channel ID (e.g. C01234567)"
+					},
+					"users": {
+						"type": "string",
+						"description": "Comma-separated list of user IDs to invite (e.g. U01234567,U09876543)"
+					}
+				}
+			}`)),
+		},
+		{
+			ActionType:  "slack.upload_file",
+			Name:        "Upload File",
+			Description: "Upload a file to a Slack channel",
+			RiskLevel:   "low",
+			ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["channel", "filename", "content"],
+				"properties": {
+					"channel": {
+						"type": "string",
+						"description": "Channel ID (e.g. C01234567)"
+					},
+					"filename": {
+						"type": "string",
+						"description": "Name of the file (e.g. report.csv)"
+					},
+					"content": {
+						"type": "string",
+						"description": "File content as text"
+					},
+					"title": {
+						"type": "string",
+						"description": "Display title for the file (defaults to filename)"
+					}
+				}
+			}`)),
+		},
+		{
+			ActionType:  "slack.add_reaction",
+			Name:        "Add Reaction",
+			Description: "Add an emoji reaction to a Slack message",
+			RiskLevel:   "low",
+			ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["channel", "timestamp", "name"],
+				"properties": {
+					"channel": {
+						"type": "string",
+						"description": "Channel ID containing the message (e.g. C01234567)"
+					},
+					"timestamp": {
+						"type": "string",
+						"description": "Timestamp of the message to react to (e.g. 1234567890.123456)"
+					},
+					"name": {
+						"type": "string",
+						"description": "Emoji name without colons (e.g. thumbsup, white_check_mark)"
+					}
+				}
+			}`)),
+		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{Service: "slack", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
 		},
@@ -249,6 +365,41 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can read thread replies from any channel.",
 				Parameters:  json.RawMessage(`{"channel":"*","thread_ts":"*","limit":"*","cursor":"*"}`),
 			},
+			{
+				ID:          "tpl_slack_schedule_message",
+				ActionType:  "slack.schedule_message",
+				Name:        "Schedule messages",
+				Description: "Agent can schedule messages to any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","message":"*","post_at":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_set_topic",
+				ActionType:  "slack.set_topic",
+				Name:        "Set channel topics",
+				Description: "Agent can update the topic on any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","topic":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_invite_to_channel",
+				ActionType:  "slack.invite_to_channel",
+				Name:        "Invite users to channels",
+				Description: "Agent can invite users to any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","users":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_upload_file",
+				ActionType:  "slack.upload_file",
+				Name:        "Upload files",
+				Description: "Agent can upload files to any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","filename":"*","content":"*","title":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_add_reaction",
+				ActionType:  "slack.add_reaction",
+				Name:        "Add reactions",
+				Description: "Agent can add emoji reactions to messages.",
+				Parameters:  json.RawMessage(`{"channel":"*","timestamp":"*","name":"*"}`),
+			},
 		},
 	}
 }
@@ -256,11 +407,16 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 // Actions returns the registered action handlers keyed by action_type.
 func (c *SlackConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"slack.send_message":           &sendMessageAction{conn: c},
-		"slack.create_channel":         &createChannelAction{conn: c},
-		"slack.list_channels":          &listChannelsAction{conn: c},
-		"slack.read_channel_messages":  &readChannelMessagesAction{conn: c},
-		"slack.read_thread":            &readThreadAction{conn: c},
+		"slack.send_message":          &sendMessageAction{conn: c},
+		"slack.create_channel":        &createChannelAction{conn: c},
+		"slack.list_channels":         &listChannelsAction{conn: c},
+		"slack.read_channel_messages": &readChannelMessagesAction{conn: c},
+		"slack.read_thread":           &readThreadAction{conn: c},
+		"slack.schedule_message":      &scheduleMessageAction{conn: c},
+		"slack.set_topic":             &setTopicAction{conn: c},
+		"slack.invite_to_channel":     &inviteToChannelAction{conn: c},
+		"slack.upload_file":           &uploadFileAction{conn: c},
+		"slack.add_reaction":          &addReactionAction{conn: c},
 	}
 }
 
