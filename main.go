@@ -21,6 +21,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
@@ -363,6 +364,7 @@ func main() {
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
 	registry.Register(zoom.New())
+	registry.Register(calendly.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
