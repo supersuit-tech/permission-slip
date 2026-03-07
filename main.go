@@ -23,6 +23,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
+	"github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
@@ -371,6 +372,7 @@ func main() {
 	registry.Register(xconnector.New())
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
+	registry.Register(discord.New())
 	registry.Register(datadog.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
