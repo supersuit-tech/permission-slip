@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -109,9 +110,18 @@ func generateJWT(creds connectors.Credentials) (string, error) {
 	token.Header["dd-ver"] = "DD-JWT-V1"
 	token.Header["kid"] = keyID
 
-	signed, err := token.SignedString([]byte(signingSecret))
+	// DoorDash provides the signing secret as base64-encoded bytes.
+	// Decode before using as the HMAC-SHA256 key.
+	decodedSecret, err := base64.RawURLEncoding.DecodeString(signingSecret)
 	if err != nil {
-		return "", fmt.Errorf("signing JWT: %w", err)
+		return "", &connectors.AuthError{
+			Message: "signing_secret is not valid base64url — verify your credentials at https://developer.doordash.com/portal/integration/drive",
+		}
+	}
+
+	signed, signErr := token.SignedString(decodedSecret)
+	if signErr != nil {
+		return "", &connectors.AuthError{Message: "failed to sign JWT — verify that your signing_secret is valid"}
 	}
 	return signed, nil
 }
@@ -141,14 +151,14 @@ func (c *DoorDashConnector) do(ctx context.Context, creds connectors.Credentials
 	if reqBody != nil {
 		payload, err := json.Marshal(reqBody)
 		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
+			return &connectors.ValidationError{Message: fmt.Sprintf("marshaling request body: %v", err)}
 		}
 		body = bytes.NewReader(payload)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)

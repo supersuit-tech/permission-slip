@@ -389,6 +389,23 @@ func TestGenerateJWT_MissingCredentials(t *testing.T) {
 	}
 }
 
+func TestGenerateJWT_InvalidBase64Secret(t *testing.T) {
+	t.Parallel()
+
+	creds := connectors.NewCredentials(map[string]string{
+		"developer_id":   "dev-123",
+		"key_id":         "key-456",
+		"signing_secret": "not-valid-base64-!!!",
+	})
+	_, err := generateJWT(creds)
+	if err == nil {
+		t.Fatal("generateJWT() expected error, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got %T: %v", err, err)
+	}
+}
+
 func TestNewUUID(t *testing.T) {
 	t.Parallel()
 

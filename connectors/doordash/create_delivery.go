@@ -54,6 +54,10 @@ func (p *createDeliveryParams) validate() error {
 	if p.OrderValue != nil && *p.OrderValue < 0 {
 		return &connectors.ValidationError{Message: "order_value must not be negative"}
 	}
+	const maxItems = 100
+	if len(p.Items) > maxItems {
+		return &connectors.ValidationError{Message: fmt.Sprintf("items list too long: %d items, maximum is %d", len(p.Items), maxItems)}
+	}
 	for i, item := range p.Items {
 		if item.Name == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("items[%d]: missing required field: name", i)}

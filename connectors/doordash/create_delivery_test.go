@@ -143,6 +143,17 @@ func TestCreateDelivery_MissingParams(t *testing.T) {
 		{name: "negative order_value", params: `{"pickup_address":"x","pickup_phone":"+1","dropoff_address":"x","dropoff_phone":"+1","dropoff_contact_given_name":"J","order_value":-1}`},
 		{name: "item missing name", params: `{"pickup_address":"x","pickup_phone":"+1","dropoff_address":"x","dropoff_phone":"+1","dropoff_contact_given_name":"J","items":[{"quantity":1}]}`},
 		{name: "item zero quantity", params: `{"pickup_address":"x","pickup_phone":"+1","dropoff_address":"x","dropoff_phone":"+1","dropoff_contact_given_name":"J","items":[{"name":"X","quantity":0}]}`},
+		{name: "too many items", params: `{"pickup_address":"x","pickup_phone":"+1","dropoff_address":"x","dropoff_phone":"+1","dropoff_contact_given_name":"J","items":[` +
+			func() string {
+				s := ""
+				for i := 0; i < 101; i++ {
+					if i > 0 {
+						s += ","
+					}
+					s += `{"name":"item","quantity":1}`
+				}
+				return s
+			}() + `]}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 
