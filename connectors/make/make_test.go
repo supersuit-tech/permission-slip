@@ -67,18 +67,23 @@ func TestMakeConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "valid api_token with valid base_url",
-			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "base_url": "https://eu1.make.com/api/v2"}),
+			name:    "valid api_token with valid region",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "region": "eu1"}),
 			wantErr: false,
 		},
 		{
-			name:    "base_url with trailing slash",
-			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "base_url": "https://eu1.make.com/api/v2/"}),
+			name:    "valid api_token with us2 region",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "region": "us2"}),
+			wantErr: false,
+		},
+		{
+			name:    "invalid region",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "region": "ap1"}),
 			wantErr: true,
 		},
 		{
-			name:    "base_url without HTTPS",
-			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "base_url": "http://eu1.make.com/api/v2"}),
+			name:    "arbitrary URL in region rejected",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "region": "https://evil.com"}),
 			wantErr: true,
 		},
 	}

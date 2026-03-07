@@ -11,22 +11,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 const (
-	defaultBaseURL = "https://us1.make.com/api/v2"
+	defaultRegion  = "us1"
 	defaultTimeout = 30 * time.Second
 
 	// credKeyAPIToken is the Make API token credential key.
 	credKeyAPIToken = "api_token"
 
-	// credKeyBaseURL allows overriding the region-specific base URL.
-	credKeyBaseURL = "base_url"
+	// credKeyRegion selects the Make data center region.
+	credKeyRegion = "region"
 
 	// maxResponseBytes caps the response body at 5 MB.
 	maxResponseBytes = 5 << 20
@@ -35,22 +33,30 @@ const (
 	tokenPrefix = "Token "
 )
 
-// MakeConnector owns the shared HTTP client and base URL used by all
-// Make actions.
+// regionBaseURLs maps Make data center regions to their API base URLs.
+// This is an allowlist — only these regions are accepted, preventing SSRF.
+var regionBaseURLs = map[string]string{
+	"us1": "https://us1.make.com/api/v2",
+	"us2": "https://us2.make.com/api/v2",
+	"eu1": "https://eu1.make.com/api/v2",
+	"eu2": "https://eu2.make.com/api/v2",
+}
+
+// MakeConnector owns the shared HTTP client used by all Make actions.
 type MakeConnector struct {
 	client  *http.Client
-	baseURL string
+	baseURL string // overridden only in tests
 }
 
 // New creates a MakeConnector with sensible defaults.
 func New() *MakeConnector {
 	return &MakeConnector{
-		client:  &http.Client{Timeout: defaultTimeout},
-		baseURL: defaultBaseURL,
+		client: &http.Client{Timeout: defaultTimeout},
 	}
 }
 
-// newForTest creates a MakeConnector that points at a test server.
+// newForTest creates a MakeConnector that points at a test server,
+// bypassing the region allowlist.
 func newForTest(client *http.Client, baseURL string) *MakeConnector {
 	return &MakeConnector{
 		client:  client,
@@ -66,7 +72,7 @@ func (c *MakeConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "make",
 		Name:        "Make",
-		Description: "Make (formerly Integromat) integration for workflow automation — manage and run scenarios via the Make REST API. Supports all Make regions (us1, eu1, eu2, us2) via the base_url credential override.",
+		Description: "Make (formerly Integromat) integration for workflow automation — manage and run scenarios via the Make REST API. Supports all Make regions (us1, us2, eu1, eu2) via the region credential.",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "make.list_scenarios",
@@ -241,35 +247,39 @@ func (c *MakeConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain
-// a non-empty API token and a valid base_url if provided.
+// a non-empty API token and a valid region if provided.
 func (c *MakeConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	token, ok := creds.Get(credKeyAPIToken)
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "missing required credential: api_token"}
 	}
-	// Validate optional base_url override if provided.
-	if baseURL, ok := creds.Get(credKeyBaseURL); ok && baseURL != "" {
-		u, err := url.Parse(baseURL)
-		if err != nil {
-			return &connectors.ValidationError{Message: fmt.Sprintf("base_url is not a valid URL: %v", err)}
-		}
-		if u.Scheme != "https" {
-			return &connectors.ValidationError{Message: "base_url must use HTTPS"}
-		}
-		if strings.HasSuffix(baseURL, "/") {
-			return &connectors.ValidationError{Message: "base_url must not end with a trailing slash"}
+	// Validate optional region if provided.
+	if region, ok := creds.Get(credKeyRegion); ok && region != "" {
+		if _, valid := regionBaseURLs[region]; !valid {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("invalid region %q — must be one of: us1, us2, eu1, eu2", region),
+			}
 		}
 	}
 	return nil
 }
 
-// getBaseURL returns the base URL for API calls, using the credential override
-// if provided, otherwise the connector's default.
+// getBaseURL returns the base URL for API calls. In production, it uses
+// the region credential to select from the allowlist. In tests, it uses
+// the connector's baseURL override.
 func (c *MakeConnector) getBaseURL(creds connectors.Credentials) string {
-	if baseURL, ok := creds.Get(credKeyBaseURL); ok && baseURL != "" {
-		return baseURL
+	// Test override takes priority.
+	if c.baseURL != "" {
+		return c.baseURL
 	}
-	return c.baseURL
+	region := defaultRegion
+	if r, ok := creds.Get(credKeyRegion); ok && r != "" {
+		region = r
+	}
+	if u, ok := regionBaseURLs[region]; ok {
+		return u
+	}
+	return regionBaseURLs[defaultRegion]
 }
 
 // doRequest executes an HTTP request against the Make API and unmarshals the response.

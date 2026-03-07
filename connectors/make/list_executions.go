@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -47,7 +48,10 @@ func (a *listExecutionsAction) Execute(ctx context.Context, req connectors.Actio
 		limit = 20
 	}
 
-	path := fmt.Sprintf("/scenarios/%d/logs?pg[limit]=%d&pg[offset]=%d", params.ScenarioID, limit, params.Offset)
+	q := url.Values{}
+	q.Set("pg[limit]", fmt.Sprintf("%d", limit))
+	q.Set("pg[offset]", fmt.Sprintf("%d", params.Offset))
+	path := fmt.Sprintf("/scenarios/%d/logs", params.ScenarioID) + "?" + q.Encode()
 
 	var resp json.RawMessage
 	if err := a.conn.doRequest(ctx, "GET", path, req.Credentials, nil, &resp); err != nil {
