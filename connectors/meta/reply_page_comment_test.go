@@ -22,7 +22,8 @@ func TestReplyPageComment_Success(t *testing.T) {
 
 		var body replyPageCommentRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if body.Message != "Thanks for the feedback!" {
 			t.Errorf("expected message 'Thanks for the feedback!', got %q", body.Message)

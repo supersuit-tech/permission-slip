@@ -27,7 +27,8 @@ func TestCreateInstagramPost_Success(t *testing.T) {
 			}
 			var body createContainerRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("failed to decode request body: %v", err)
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 			if body.ImageURL != "https://example.com/photo.jpg" {
 				t.Errorf("expected image_url, got %q", body.ImageURL)
@@ -49,7 +50,8 @@ func TestCreateInstagramPost_Success(t *testing.T) {
 			}
 			var body publishRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("failed to decode publish body: %v", err)
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 			if body.CreationID != "container_456" {
 				t.Errorf("expected creation_id 'container_456', got %q", body.CreationID)

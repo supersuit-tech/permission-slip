@@ -25,7 +25,8 @@ func TestCreatePagePost_Success(t *testing.T) {
 
 		var body createPagePostRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if body.Message != "Hello from my Page!" {
 			t.Errorf("expected message 'Hello from my Page!', got %q", body.Message)
