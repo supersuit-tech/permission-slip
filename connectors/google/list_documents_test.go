@@ -33,8 +33,8 @@ func TestListDocuments_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(driveListResponse{
-			Files: []driveFile{
+		json.NewEncoder(w).Encode(docsListResponse{
+			Files: []docsFileEntry{
 				{
 					ID:           "doc-1",
 					Name:         "Meeting Notes",
@@ -99,8 +99,8 @@ func TestListDocuments_WithQuery(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(driveListResponse{
-			Files: []driveFile{
+		json.NewEncoder(w).Encode(docsListResponse{
+			Files: []docsFileEntry{
 				{ID: "doc-1", Name: "Meeting Notes"},
 			},
 		})
@@ -137,7 +137,7 @@ func TestListDocuments_EmptyResult(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(driveListResponse{Files: nil})
+		json.NewEncoder(w).Encode(docsListResponse{Files: nil})
 	}))
 	defer srv.Close()
 
@@ -177,7 +177,7 @@ func TestListDocuments_QueryEscaping(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(driveListResponse{Files: nil})
+		json.NewEncoder(w).Encode(docsListResponse{Files: nil})
 	}))
 	defer srv.Close()
 

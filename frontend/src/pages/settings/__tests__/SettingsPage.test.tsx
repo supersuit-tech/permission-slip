@@ -41,6 +41,15 @@ function mockApiFetch() {
     if (url === "/v1/credentials") {
       return Promise.resolve({ data: { credentials: [] } });
     }
+    if (url === "/v1/oauth/connections") {
+      return Promise.resolve({ data: { connections: [] } });
+    }
+    if (url === "/v1/oauth/providers") {
+      return Promise.resolve({ data: { providers: [] } });
+    }
+    if (url === "/v1/oauth/provider-configs") {
+      return Promise.resolve({ data: { configs: [] } });
+    }
     if (url === "/v1/profile/data-retention") {
       return Promise.resolve({
         data: {
@@ -86,6 +95,7 @@ describe("SettingsPage", () => {
     });
     expect(screen.getByText("Security")).toBeInTheDocument();
     expect(screen.getByText("Notifications")).toBeInTheDocument();
+    expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
     expect(screen.getByText("Credential Vault")).toBeInTheDocument();
     expect(screen.getByText("Data Retention")).toBeInTheDocument();
     expect(screen.getByText("Danger Zone")).toBeInTheDocument();

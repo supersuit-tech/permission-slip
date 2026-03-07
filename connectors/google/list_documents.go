@@ -33,12 +33,12 @@ func (p *listDocumentsParams) normalize() {
 	}
 }
 
-// driveListResponse is the Google Drive API response from files.list.
-type driveListResponse struct {
-	Files []driveFile `json:"files"`
+// docsListResponse is the Google Drive API response from files.list for Docs-only queries.
+type docsListResponse struct {
+	Files []docsFileEntry `json:"files"`
 }
 
-type driveFile struct {
+type docsFileEntry struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	CreatedTime  string `json:"createdTime"`
@@ -74,7 +74,7 @@ func (a *listDocumentsAction) Execute(ctx context.Context, req connectors.Action
 	queryParams.Set("fields", "files(id,name,createdTime,modifiedTime,webViewLink)")
 	queryParams.Set("orderBy", "modifiedTime desc")
 
-	var resp driveListResponse
+	var resp docsListResponse
 	listURL := a.conn.driveBaseURL + "/drive/v3/files?" + queryParams.Encode()
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, listURL, nil, &resp); err != nil {
 		return nil, err
