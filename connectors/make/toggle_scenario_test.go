@@ -85,7 +85,12 @@ func TestToggleScenario_Disable(t *testing.T) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		scheduling := body["scheduling"].(map[string]any)
+		scheduling, ok := body["scheduling"].(map[string]any)
+		if !ok {
+			t.Errorf("expected scheduling in request body")
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 		if scheduling["isEnabled"] != false {
 			t.Errorf("expected isEnabled false, got %v", scheduling["isEnabled"])
 		}

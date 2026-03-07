@@ -79,9 +79,19 @@ func (a *triggerWebhookAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	if statusCode < 200 || statusCode >= 300 {
+		msg := fmt.Sprintf("Zapier webhook returned HTTP %d", statusCode)
+		if len(respBody) > 0 {
+			// Include truncated body for debugging, capping at 512 bytes
+			// to avoid leaking large payloads.
+			body := string(respBody)
+			if len(body) > 512 {
+				body = body[:512] + "..."
+			}
+			msg += ": " + body
+		}
 		return nil, &connectors.ExternalError{
 			StatusCode: statusCode,
-			Message:    fmt.Sprintf("Zapier webhook returned HTTP %d", statusCode),
+			Message:    msg,
 		}
 	}
 
