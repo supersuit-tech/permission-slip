@@ -9,7 +9,13 @@ import (
 )
 
 // checkResponse inspects the HTTP status code and returns an appropriate
-// typed error for non-success responses.
+// typed error for non-success responses. The mapping follows the same
+// conventions as other connectors in the codebase:
+//   - 429 → RateLimitError (with Retry-After parsing)
+//   - 401/403 → AuthError (invalid or expired token)
+//   - 400/422 → ValidationError (malformed request)
+//   - 404 → ValidationError (resource not found)
+//   - Other → ExternalError (unexpected API failure)
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil

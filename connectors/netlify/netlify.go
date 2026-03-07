@@ -19,7 +19,8 @@ const (
 	defaultBaseURL = "https://api.netlify.com/api/v1"
 	defaultTimeout = 30 * time.Second
 
-	// maxResponseBytes caps the response body we'll read from Netlify APIs.
+	// maxResponseBytes caps the response body we'll read from Netlify APIs
+	// to prevent a misbehaving or malicious response from exhausting memory.
 	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
@@ -335,7 +336,12 @@ func (c *NetlifyConnector) ValidateCredentials(_ context.Context, creds connecto
 	return nil
 }
 
-// do is the shared request lifecycle for all Netlify actions.
+// do is the shared request lifecycle for all Netlify actions. It handles:
+// - JSON marshaling of request bodies
+// - Bearer token authentication via the api_key credential
+// - Response body size limiting (maxResponseBytes) to prevent memory exhaustion
+// - Typed error mapping via checkResponse() (auth, rate limit, validation, timeout)
+// - JSON unmarshaling of response bodies into the caller's target struct
 func (c *NetlifyConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
 	var body io.Reader
 	if reqBody != nil {

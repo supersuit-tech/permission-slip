@@ -19,7 +19,8 @@ const (
 	defaultBaseURL = "https://api.vercel.com"
 	defaultTimeout = 30 * time.Second
 
-	// maxResponseBytes caps the response body we'll read from Vercel APIs.
+	// maxResponseBytes caps the response body we'll read from Vercel APIs
+	// to prevent a misbehaving or malicious response from exhausting memory.
 	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
@@ -380,7 +381,15 @@ func (c *VercelConnector) ValidateCredentials(_ context.Context, creds connector
 	return nil
 }
 
-// do is the shared request lifecycle for all Vercel actions.
+// do is the shared request lifecycle for all Vercel actions. It handles:
+// - JSON marshaling of request bodies
+// - Bearer token authentication via the api_key credential
+// - Response body size limiting (maxResponseBytes) to prevent memory exhaustion
+// - Typed error mapping via checkResponse() (auth, rate limit, validation, timeout)
+// - JSON unmarshaling of response bodies into the caller's target struct
+//
+// Actions call do() with their specific method, path, and request/response types.
+// The path should include any query parameters (use url.Values for building).
 func (c *VercelConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
 	var body io.Reader
 	if reqBody != nil {
