@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"unicode/utf8"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -27,7 +28,7 @@ func (p *postTweetParams) validate() error {
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}
 	}
-	if len(p.Text) > 280 {
+	if utf8.RuneCountInString(p.Text) > 280 {
 		return &connectors.ValidationError{Message: "text exceeds 280 character limit"}
 	}
 	return nil

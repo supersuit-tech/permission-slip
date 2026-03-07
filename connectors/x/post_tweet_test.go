@@ -151,6 +151,39 @@ func TestPostTweet_TextTooLong(t *testing.T) {
 	}
 }
 
+func TestPostTweet_UnicodeCharacterCount(t *testing.T) {
+	t.Parallel()
+
+	// 280 emoji (each is 4 bytes = 1120 bytes total) should be accepted
+	// because character count is 280, not byte count.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{"id": "1", "text": "ok"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["x.post_tweet"]
+
+	// 280 emoji = 280 characters but 1120 bytes
+	text := ""
+	for i := 0; i < 280; i++ {
+		text += "\U0001F600" // 😀
+	}
+
+	params, _ := json.Marshal(map[string]string{"text": text})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.post_tweet",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() should accept 280 emoji (280 chars), got error: %v", err)
+	}
+}
+
 func TestPostTweet_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

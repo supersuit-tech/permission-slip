@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"unicode/utf8"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -29,7 +30,7 @@ func (p *sendDMParams) validate() error {
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}
 	}
-	if len(p.Text) > 10000 {
+	if utf8.RuneCountInString(p.Text) > 10000 {
 		return &connectors.ValidationError{Message: "text exceeds 10,000 character limit for direct messages"}
 	}
 	return nil
