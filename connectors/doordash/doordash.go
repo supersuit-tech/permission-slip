@@ -126,7 +126,6 @@ func generateJWT(creds connectors.Credentials) (string, error) {
 	claims := jwt.MapClaims{
 		"aud": "doordash",
 		"iss": developerID,
-		"kid": keyID,
 		"exp": jwt.NewNumericDate(now.Add(jwtLifetime)),
 		"iat": jwt.NewNumericDate(now),
 	}
@@ -187,7 +186,10 @@ func (c *DoorDashConnector) do(ctx context.Context, creds connectors.Credentials
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
