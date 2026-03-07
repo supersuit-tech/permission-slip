@@ -1,6 +1,6 @@
 # Google Connector
 
-The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), [Google Sheets](https://developers.google.com/sheets/api), [Google Docs](https://developers.google.com/docs/api), [Google Chat](https://developers.google.com/chat/api), and [Google Drive](https://developers.google.com/drive/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
+The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), [Google Slides](https://developers.google.com/slides/api), [Google Sheets](https://developers.google.com/sheets/api), [Google Docs](https://developers.google.com/docs/api), [Google Chat](https://developers.google.com/chat/api), and [Google Drive](https://developers.google.com/drive/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
 
 ## Connector ID
 
@@ -21,6 +21,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `gmail.send` | `google.send_email` |
 | `gmail.readonly` | `google.list_emails` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
+| `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
 | `spreadsheets` | `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
 | `documents` | `google.create_document`, `google.get_document`, `google.update_document` |
 | `chat.spaces.readonly` | `google.list_chat_spaces` |
@@ -172,6 +173,91 @@ Lists upcoming events from Google Calendar.
 **Calendar API:** `GET /calendars/{calendarId}/events` ([docs](https://developers.google.com/calendar/api/v3/reference/events/list))
 
 Events are returned as single instances (recurring events expanded) ordered by start time. All-day events use a date string (e.g., `2024-01-15`) instead of a full RFC 3339 timestamp.
+
+---
+
+### `google.create_presentation`
+
+Creates a new Google Slides presentation.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `title` | string | Yes | Title of the new presentation |
+
+**Response:**
+
+```json
+{
+  "presentation_id": "1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi",
+  "title": "Q1 Review",
+  "url": "https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi/edit"
+}
+```
+
+**Slides API:** `POST /v1/presentations` ([docs](https://developers.google.com/slides/api/reference/rest/v1/presentations/create))
+
+---
+
+### `google.get_presentation`
+
+Retrieves metadata about an existing Google Slides presentation, including slide count and individual slide IDs.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `presentation_id` | string | Yes | The ID of the presentation to retrieve |
+
+**Response:**
+
+```json
+{
+  "presentation_id": "1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi",
+  "title": "Q1 Review",
+  "url": "https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi/edit",
+  "slide_count": 3,
+  "slides": ["slide-001", "slide-002", "slide-003"]
+}
+```
+
+**Slides API:** `GET /v1/presentations/{presentationId}` ([docs](https://developers.google.com/slides/api/reference/rest/v1/presentations/get))
+
+---
+
+### `google.add_slide`
+
+Adds a new slide to an existing presentation using the Slides API's `batchUpdate` endpoint.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `presentation_id` | string | Yes | — | The ID of the presentation to add a slide to |
+| `layout` | string | No | `BLANK` | Predefined slide layout (see below) |
+| `insertion_index` | integer | No | end | Position to insert the slide at (0-indexed) |
+
+**Supported layouts:** `BLANK`, `TITLE`, `TITLE_AND_BODY`, `TITLE_ONLY`, `SECTION_HEADER`, `SECTION_TITLE_AND_DESCRIPTION`, `ONE_COLUMN_TEXT`, `MAIN_POINT`, `BIG_NUMBER`, `CAPTION_ONLY`, `TITLE_AND_TWO_COLUMNS`
+
+**Response:**
+
+```json
+{
+  "slide_id": "g123abc",
+  "presentation_id": "1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi"
+}
+```
+
+**Slides API:** `POST /v1/presentations/{presentationId}:batchUpdate` ([docs](https://developers.google.com/slides/api/reference/rest/v1/presentations/batchUpdate))
+
+The `batchUpdate` pattern is the standard Slides API approach for mutations and is extensible for future text/image insertion actions.
 
 ---
 
@@ -717,6 +803,9 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Create calendar events | `create_calendar_event` | Nothing — agent controls all parameters |
 | Create personal calendar events | `create_calendar_event` | `calendar_id` locked to `primary`, no attendees |
 | List calendar events | `list_calendar_events` | Nothing — agent controls all parameters |
+| Create presentations | `create_presentation` | Nothing — agent controls title |
+| View presentations | `get_presentation` | Nothing — agent controls presentation ID |
+| Add slides to presentations | `add_slide` | Nothing — agent controls all parameters |
 | Read from specific spreadsheet | `sheets_read_range` | `spreadsheet_id` locked; agent chooses range |
 | Write to specific spreadsheet | `sheets_write_range` | `spreadsheet_id` locked; agent chooses range and values |
 | Append to specific spreadsheet | `sheets_append_rows` | `spreadsheet_id` locked; agent chooses range and values |
@@ -750,7 +839,7 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 5. Validate user-provided IDs (file IDs, folder IDs) with `isValidDriveID()` to prevent injection attacks.
 6. Register the action in `Actions()` inside `google.go`.
 7. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
-8. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithChat()` / `newDriveForTest()` / `newForTestDocs()`.
+8. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithSlides()` / `newForTestWithChat()` / `newDriveForTest()` / `newForTestDocs()`.
 
 ## File Structure
 
@@ -763,6 +852,10 @@ connectors/google/
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
 ├── list_calendar_events.go         # google.list_calendar_events action
+├── create_presentation.go          # google.create_presentation action
+├── get_presentation.go             # google.get_presentation action
+├── add_slide.go                    # google.add_slide action (via batchUpdate)
+├── slides_helpers.go               # Shared helpers for Slides actions (presentationURL)
 ├── sheets_read.go                  # google.sheets_read_range action
 ├── sheets_write.go                 # google.sheets_write_range action
 ├── sheets_append.go                # google.sheets_append_rows action
@@ -775,6 +868,7 @@ connectors/google/
 ├── send_chat_message.go            # google.send_chat_message action
 ├── list_chat_spaces.go             # google.list_chat_spaces action
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
+├── calendar_helpers.go             # Shared calendar validation (time range, attendees)
 ├── list_drive_files.go             # google.list_drive_files action + shared Drive ID validation
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
 ├── upload_drive_file.go            # google.upload_drive_file action (multipart upload)
@@ -785,6 +879,9 @@ connectors/google/
 ├── list_emails_test.go             # List emails action tests
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests
+├── create_presentation_test.go     # Create presentation tests
+├── get_presentation_test.go        # Get presentation tests (including URL encoding)
+├── add_slide_test.go               # Add slide tests (layout validation, insertion index)
 ├── sheets_read_test.go             # Sheets read range tests
 ├── sheets_write_test.go            # Sheets write range tests
 ├── sheets_append_test.go           # Sheets append rows tests

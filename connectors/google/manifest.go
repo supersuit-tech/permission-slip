@@ -12,7 +12,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail, Calendar, Sheets, Docs, Chat, Meet, and Drive",
+		Description: "Google integration for Gmail, Calendar, Slides, Sheets, Docs, Chat, Meet, and Drive",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -308,6 +308,65 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			// Chat actions
 			{
+				ActionType:  "google.create_presentation",
+				Name:        "Create Presentation",
+				Description: "Create a new Google Slides presentation",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["title"],
+					"properties": {
+						"title": {
+							"type": "string",
+							"description": "Title of the new presentation"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.get_presentation",
+				Name:        "Get Presentation",
+				Description: "Retrieve metadata about a Google Slides presentation",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["presentation_id"],
+					"properties": {
+						"presentation_id": {
+							"type": "string",
+							"description": "The ID of the presentation to retrieve"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.add_slide",
+				Name:        "Add Slide",
+				Description: "Add a new slide to an existing Google Slides presentation",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["presentation_id"],
+					"properties": {
+						"presentation_id": {
+							"type": "string",
+							"description": "The ID of the presentation to add a slide to"
+						},
+						"layout": {
+							"type": "string",
+							"enum": ["BLANK", "TITLE", "TITLE_AND_BODY", "TITLE_ONLY", "SECTION_HEADER", "SECTION_TITLE_AND_DESCRIPTION", "ONE_COLUMN_TEXT", "MAIN_POINT", "BIG_NUMBER", "CAPTION_ONLY", "TITLE_AND_TWO_COLUMNS"],
+							"default": "BLANK",
+							"description": "Predefined slide layout (defaults to BLANK)"
+						},
+						"insertion_index": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Position to insert the slide at (defaults to end)"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "google.send_chat_message",
 				Name:        "Send Chat Message",
 				Description: "Send a message to a Google Chat space",
@@ -495,6 +554,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/presentations",
 					"https://www.googleapis.com/auth/spreadsheets",
 					"https://www.googleapis.com/auth/documents",
 					"https://www.googleapis.com/auth/chat.spaces.readonly",
@@ -626,6 +686,27 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"query":"*","max_results":"*"}`),
 			},
 			// Chat templates
+			{
+				ID:          "tpl_google_create_presentation",
+				ActionType:  "google.create_presentation",
+				Name:        "Create presentations",
+				Description: "Agent can create new Google Slides presentations with any title.",
+				Parameters:  json.RawMessage(`{"title":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_presentation",
+				ActionType:  "google.get_presentation",
+				Name:        "View presentations",
+				Description: "Agent can retrieve metadata about any Google Slides presentation.",
+				Parameters:  json.RawMessage(`{"presentation_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_add_slide",
+				ActionType:  "google.add_slide",
+				Name:        "Add slides to presentations",
+				Description: "Agent can add new slides to any Google Slides presentation.",
+				Parameters:  json.RawMessage(`{"presentation_id":"*","layout":"*","insertion_index":"*"}`),
+			},
 			{
 				ID:          "tpl_google_send_chat_message",
 				ActionType:  "google.send_chat_message",

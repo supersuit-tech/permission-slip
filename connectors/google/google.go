@@ -1,5 +1,5 @@
 // Package google implements the Google connector for the Permission Slip
-// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Sheets, Docs, Chat, Drive)
+// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Slides, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
 package google
 
@@ -19,6 +19,7 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultSlidesBaseURL   = "https://slides.googleapis.com"
 	defaultSheetsBaseURL   = "https://sheets.googleapis.com/v4"
 	defaultDocsBaseURL     = "https://docs.googleapis.com"
 	defaultDriveBaseURL    = "https://www.googleapis.com"
@@ -42,6 +43,7 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	slidesBaseURL   string
 	sheetsBaseURL   string
 	docsBaseURL     string
 	driveBaseURL    string
@@ -54,6 +56,7 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		slidesBaseURL:   defaultSlidesBaseURL,
 		sheetsBaseURL:   defaultSheetsBaseURL,
 		docsBaseURL:     defaultDocsBaseURL,
 		driveBaseURL:    defaultDriveBaseURL,
@@ -77,6 +80,15 @@ func newForTestWithChat(client *http.Client, gmailBaseURL, calendarBaseURL, chat
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
 		chatBaseURL:     chatBaseURL,
+	}
+}
+
+func newForTestWithSlides(client *http.Client, gmailBaseURL, calendarBaseURL, slidesBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:          client,
+		gmailBaseURL:    gmailBaseURL,
+		calendarBaseURL: calendarBaseURL,
+		slidesBaseURL:   slidesBaseURL,
 	}
 }
 
@@ -108,6 +120,9 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.create_presentation":   &createPresentationAction{conn: c},
+		"google.get_presentation":      &getPresentationAction{conn: c},
+		"google.add_slide":             &addSlideAction{conn: c},
 		"google.sheets_read_range":     &sheetsReadRangeAction{conn: c},
 		"google.sheets_write_range":    &sheetsWriteRangeAction{conn: c},
 		"google.sheets_append_rows":    &sheetsAppendRowsAction{conn: c},
