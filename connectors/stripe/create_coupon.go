@@ -105,13 +105,17 @@ func (a *createCouponAction) Execute(ctx context.Context, req connectors.ActionR
 	formParams := formEncode(body)
 
 	var resp struct {
-		ID             string  `json:"id"`
-		PercentOff     float64 `json:"percent_off"`
-		AmountOff      int64   `json:"amount_off"`
-		Currency       string  `json:"currency"`
-		Duration       string  `json:"duration"`
-		MaxRedemptions *int64  `json:"max_redemptions"`
-		Valid          bool    `json:"valid"`
+		ID               string  `json:"id"`
+		Name             string  `json:"name"`
+		PercentOff       float64 `json:"percent_off"`
+		AmountOff        int64   `json:"amount_off"`
+		Currency         string  `json:"currency"`
+		Duration         string  `json:"duration"`
+		DurationInMonths *int64  `json:"duration_in_months"`
+		MaxRedemptions   *int64  `json:"max_redemptions"`
+		TimesRedeemed    int64   `json:"times_redeemed"`
+		Valid            bool    `json:"valid"`
+		Created          int64   `json:"created"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/coupons", formParams, &resp, req.ActionType, req.Parameters); err != nil {

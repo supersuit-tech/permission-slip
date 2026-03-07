@@ -117,7 +117,10 @@ func (a *createSubscriptionAction) Execute(ctx context.Context, req connectors.A
 		Customer           string `json:"customer"`
 		CurrentPeriodStart int64  `json:"current_period_start"`
 		CurrentPeriodEnd   int64  `json:"current_period_end"`
+		TrialStart         *int64 `json:"trial_start"`
 		TrialEnd           *int64 `json:"trial_end"`
+		LatestInvoice      string `json:"latest_invoice"`
+		Created            int64  `json:"created"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/subscriptions", formParams, &resp, req.ActionType, req.Parameters); err != nil {

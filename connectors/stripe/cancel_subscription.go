@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -41,6 +42,18 @@ func (p *cancelSubscriptionParams) validate() error {
 	return nil
 }
 
+// cancelSubscriptionResponse is the common shape returned for both immediate
+// and period-end cancellation. Extracted to avoid duplication between the
+// two code paths.
+type cancelSubscriptionResponse struct {
+	ID                string `json:"id"`
+	Status            string `json:"status"`
+	CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
+	CanceledAt        *int64 `json:"canceled_at"`
+	CurrentPeriodEnd  int64  `json:"current_period_end"`
+	Customer          string `json:"customer"`
+}
+
 // Execute cancels a Stripe subscription and returns the canceled subscription data.
 func (a *cancelSubscriptionAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params cancelSubscriptionParams
@@ -50,6 +63,8 @@ func (a *cancelSubscriptionAction) Execute(ctx context.Context, req connectors.A
 	if err := params.validate(); err != nil {
 		return nil, err
 	}
+
+	escapedID := url.PathEscape(params.SubscriptionID)
 
 	// If cancel_at_period_end is true, we use POST to update the subscription
 	// with cancel_at_period_end=true instead of DELETE (which cancels immediately).
@@ -62,15 +77,8 @@ func (a *cancelSubscriptionAction) Execute(ctx context.Context, req connectors.A
 		}
 		formParams := formEncode(body)
 
-		var resp struct {
-			ID                string `json:"id"`
-			Status            string `json:"status"`
-			CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
-			CanceledAt        *int64 `json:"canceled_at"`
-			CurrentPeriodEnd  int64  `json:"current_period_end"`
-		}
-
-		if err := a.conn.doPost(ctx, req.Credentials, "/v1/subscriptions/"+params.SubscriptionID, formParams, &resp, req.ActionType, req.Parameters); err != nil {
+		var resp cancelSubscriptionResponse
+		if err := a.conn.doPost(ctx, req.Credentials, "/v1/subscriptions/"+escapedID, formParams, &resp, req.ActionType, req.Parameters); err != nil {
 			return nil, err
 		}
 		return connectors.JSONResult(resp)
@@ -82,15 +90,8 @@ func (a *cancelSubscriptionAction) Execute(ctx context.Context, req connectors.A
 		formParams["proration_behavior"] = params.ProrationBehavior
 	}
 
-	var resp struct {
-		ID                string `json:"id"`
-		Status            string `json:"status"`
-		CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
-		CanceledAt        *int64 `json:"canceled_at"`
-		CurrentPeriodEnd  int64  `json:"current_period_end"`
-	}
-
-	path := "/v1/subscriptions/" + params.SubscriptionID
+	var resp cancelSubscriptionResponse
+	path := "/v1/subscriptions/" + escapedID
 	idempotencyKey := deriveIdempotencyKey(req.ActionType, req.Parameters)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodDelete, path, formParams, &resp, idempotencyKey); err != nil {
 		return nil, err

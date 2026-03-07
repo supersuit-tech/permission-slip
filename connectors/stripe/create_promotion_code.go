@@ -64,12 +64,18 @@ func (a *createPromotionCodeAction) Execute(ctx context.Context, req connectors.
 	formParams := formEncode(body)
 
 	var resp struct {
-		ID             string `json:"id"`
-		Code           string `json:"code"`
-		Coupon         string `json:"coupon"`
-		Active         bool   `json:"active"`
+		ID     string `json:"id"`
+		Code   string `json:"code"`
+		Active bool   `json:"active"`
+		// Stripe returns coupon as an expanded object; we surface the ID
+		// so callers can reference it without parsing the nested object.
+		Coupon struct {
+			ID string `json:"id"`
+		} `json:"coupon"`
 		MaxRedemptions *int64 `json:"max_redemptions"`
 		ExpiresAt      *int64 `json:"expires_at"`
+		TimesRedeemed  int64  `json:"times_redeemed"`
+		Created        int64  `json:"created"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/promotion_codes", formParams, &resp, req.ActionType, req.Parameters); err != nil {

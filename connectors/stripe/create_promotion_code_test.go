@@ -36,7 +36,7 @@ func TestCreatePromotionCode_Success(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":              "promo_abc123",
 			"code":            "SUMMER25",
-			"coupon":          "coupon_abc",
+			"coupon":          map[string]any{"id": "coupon_abc"},
 			"active":          true,
 			"max_redemptions": 100,
 		})
@@ -68,6 +68,14 @@ func TestCreatePromotionCode_Success(t *testing.T) {
 	if data["active"] != true {
 		t.Errorf("active = %v, want true", data["active"])
 	}
+	// Verify coupon is returned as a nested object with an ID.
+	coupon, ok := data["coupon"].(map[string]any)
+	if !ok {
+		t.Fatal("coupon should be a nested object")
+	}
+	if coupon["id"] != "coupon_abc" {
+		t.Errorf("coupon.id = %v, want coupon_abc", coupon["id"])
+	}
 }
 
 func TestCreatePromotionCode_MinimalParams(t *testing.T) {
@@ -89,7 +97,7 @@ func TestCreatePromotionCode_MinimalParams(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":     "promo_auto",
 			"code":   "AUTO_GENERATED",
-			"coupon": "coupon_abc",
+			"coupon": map[string]any{"id": "coupon_abc"},
 			"active": true,
 		})
 	}))

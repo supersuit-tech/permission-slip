@@ -64,8 +64,11 @@ func (a *initiatePayoutAction) Execute(ctx context.Context, req connectors.Actio
 		Amount      int64  `json:"amount"`
 		Currency    string `json:"currency"`
 		Status      string `json:"status"`
+		Method      string `json:"method"`
 		ArrivalDate int64  `json:"arrival_date"`
 		Destination string `json:"destination"`
+		Description string `json:"description"`
+		Created     int64  `json:"created"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/payouts", formParams, &resp, req.ActionType, req.Parameters); err != nil {
