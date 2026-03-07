@@ -18,37 +18,13 @@ type scheduleCampaignAction struct {
 }
 
 type scheduleCampaignParams struct {
-	Name               string   `json:"name"`
-	Subject            string   `json:"subject"`
-	HTMLContent        string   `json:"html_content"`
-	PlainContent       string   `json:"plain_content"`
-	ListIDs            []string `json:"list_ids"`
-	SenderID           int      `json:"sender_id"`
-	SendAt             string   `json:"send_at"`
-	SuppressionGroupID int      `json:"suppression_group_id,omitempty"`
+	campaignFields
+	SendAt string `json:"send_at"`
 }
 
 func (p *scheduleCampaignParams) validate() error {
-	if p.Name == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: name"}
-	}
-	if len(p.Name) > 100 {
-		return &connectors.ValidationError{Message: fmt.Sprintf("name exceeds maximum length of 100 characters (got %d)", len(p.Name))}
-	}
-	if p.Subject == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: subject"}
-	}
-	if len(p.Subject) > 998 {
-		return &connectors.ValidationError{Message: fmt.Sprintf("subject exceeds maximum length of 998 characters (got %d)", len(p.Subject))}
-	}
-	if len(p.ListIDs) == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: list_ids (must contain at least one list ID)"}
-	}
-	if p.SenderID == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: sender_id"}
-	}
-	if p.HTMLContent == "" && p.PlainContent == "" {
-		return &connectors.ValidationError{Message: "at least one of html_content or plain_content must be provided"}
+	if err := p.campaignFields.validate(); err != nil {
+		return err
 	}
 	if p.SendAt == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: send_at"}
@@ -74,16 +50,7 @@ func (a *scheduleCampaignAction) Execute(ctx context.Context, req connectors.Act
 	}
 
 	// Step 1: Create the single send
-	campaignParams := &sendCampaignParams{
-		Name:               params.Name,
-		Subject:            params.Subject,
-		HTMLContent:        params.HTMLContent,
-		PlainContent:       params.PlainContent,
-		ListIDs:            params.ListIDs,
-		SenderID:           params.SenderID,
-		SuppressionGroupID: params.SuppressionGroupID,
-	}
-	createBody := buildSingleSendBody(campaignParams)
+	createBody := buildSingleSendBody(&params.campaignFields)
 	var createResp struct {
 		ID string `json:"id"`
 	}
