@@ -264,6 +264,33 @@ func TestUploadFile_MissingContent(t *testing.T) {
 	}
 }
 
+func TestValidateUploadURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"valid slack.com", "https://files.slack.com/upload/v1/abc", false},
+		{"valid slack-files.com", "https://files.slack-files.com/upload/abc", false},
+		{"http not https", "http://files.slack.com/upload/abc", true},
+		{"arbitrary domain", "https://evil.com/upload", true},
+		{"internal IP", "https://169.254.169.254/latest/meta-data/", true},
+		{"localhost", "https://localhost/upload", true},
+		{"empty", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateUploadURL(tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateUploadURL(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestUploadFile_GetURLError(t *testing.T) {
 	t.Parallel()
 

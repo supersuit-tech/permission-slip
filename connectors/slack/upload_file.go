@@ -9,8 +9,17 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+const (
+	// maxUploadContentBytes caps file content at 50 MB to prevent
+	// excessive memory allocation (the content is held in memory as a
+	// string, converted to []byte, then buffered in a multipart writer).
+	maxUploadContentBytes = 50 << 20 // 50 MB
 )
 
 // uploadFileAction implements connectors.Action for slack.upload_file.
@@ -39,6 +48,11 @@ func (p *uploadFileParams) validate() error {
 	}
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
+	}
+	if len(p.Content) > maxUploadContentBytes {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("file content exceeds maximum size of %d MB", maxUploadContentBytes>>20),
+		}
 	}
 	return nil
 }
@@ -102,6 +116,14 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	// Step 2: Upload file content to the upload URL (multipart/form-data, no auth).
+	// Validate the upload URL to prevent SSRF — only allow Slack-owned domains
+	// over HTTPS. Skip in test mode (non-default base URL) since httptest
+	// servers use localhost.
+	if a.conn.baseURL == defaultBaseURL {
+		if err := validateUploadURL(getURLResp.UploadURL); err != nil {
+			return nil, err
+		}
+	}
 	if err := a.uploadContent(ctx, getURLResp.UploadURL, params.Filename, contentBytes); err != nil {
 		return nil, err
 	}
@@ -130,6 +152,28 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 		"file_id": getURLResp.FileID,
 		"channel": params.Channel,
 	})
+}
+
+// validateUploadURL ensures the upload URL returned by Slack is safe to
+// send file content to. This prevents SSRF if the Slack API response were
+// tampered with or returned an unexpected URL (e.g., internal metadata
+// endpoints like http://169.254.169.254/).
+func validateUploadURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return &connectors.ValidationError{Message: "Slack returned an invalid upload URL"}
+	}
+	if parsed.Scheme != "https" {
+		return &connectors.ValidationError{Message: "upload URL must use HTTPS"}
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "slack.com" || strings.HasSuffix(host, ".slack.com") ||
+		host == "slack-files.com" || strings.HasSuffix(host, ".slack-files.com") {
+		return nil
+	}
+	return &connectors.ValidationError{
+		Message: fmt.Sprintf("upload URL host %q is not a recognized Slack domain", host),
+	}
 }
 
 // uploadContent sends the file content to the Slack-provided upload URL
