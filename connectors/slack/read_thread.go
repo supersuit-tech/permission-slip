@@ -1,0 +1,111 @@
+package slack
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+// readThreadAction implements connectors.Action for slack.read_thread.
+// It fetches replies in a thread via POST /conversations.replies.
+type readThreadAction struct {
+	conn *SlackConnector
+}
+
+// readThreadParams is the user-facing parameter schema.
+type readThreadParams struct {
+	Channel  string `json:"channel"`
+	ThreadTS string `json:"thread_ts"`
+	// Limit is the max number of replies to return (1-1000, default 50).
+	Limit int `json:"limit,omitempty"`
+	// Cursor is a pagination cursor from a previous response.
+	Cursor string `json:"cursor,omitempty"`
+}
+
+func (p *readThreadParams) validate() error {
+	if p.Channel == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: channel"}
+	}
+	if p.ThreadTS == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: thread_ts"}
+	}
+	return nil
+}
+
+// readThreadRequest is the Slack API request body for conversations.replies.
+type readThreadRequest struct {
+	Channel  string `json:"channel"`
+	TS       string `json:"ts"`
+	Limit    int    `json:"limit,omitempty"`
+	Cursor   string `json:"cursor,omitempty"`
+}
+
+type readThreadResponse struct {
+	slackResponse
+	Messages []slackMessage       `json:"messages,omitempty"`
+	HasMore  bool                 `json:"has_more,omitempty"`
+	Meta     *readThreadPageMeta  `json:"response_metadata,omitempty"`
+}
+
+type readThreadPageMeta struct {
+	NextCursor string `json:"next_cursor"`
+}
+
+// readThreadResult is the action output.
+type readThreadResult struct {
+	Messages   []messageSummary `json:"messages"`
+	HasMore    bool             `json:"has_more"`
+	NextCursor string           `json:"next_cursor,omitempty"`
+}
+
+// Execute fetches replies in a Slack thread.
+func (a *readThreadAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params readThreadParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := params.validate(); err != nil {
+		return nil, err
+	}
+
+	body := readThreadRequest{
+		Channel: params.Channel,
+		TS:      params.ThreadTS,
+		Limit:   params.Limit,
+		Cursor:  params.Cursor,
+	}
+	if body.Limit == 0 {
+		body.Limit = 50
+	}
+
+	var resp readThreadResponse
+	if err := a.conn.doPost(ctx, "conversations.replies", req.Credentials, body, &resp); err != nil {
+		return nil, err
+	}
+
+	if !resp.OK {
+		return nil, mapSlackError(resp.Error)
+	}
+
+	result := readThreadResult{
+		Messages: make([]messageSummary, 0, len(resp.Messages)),
+		HasMore:  resp.HasMore,
+	}
+	for _, msg := range resp.Messages {
+		result.Messages = append(result.Messages, messageSummary{
+			User:       msg.User,
+			BotID:      msg.BotID,
+			Text:       msg.Text,
+			TS:         msg.TS,
+			ThreadTS:   msg.ThreadTS,
+			ReplyCount: msg.ReplyCount,
+		})
+	}
+	if resp.Meta != nil {
+		result.NextCursor = resp.Meta.NextCursor
+	}
+
+	return connectors.JSONResult(result)
+}

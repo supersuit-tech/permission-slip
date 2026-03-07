@@ -104,6 +104,93 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "slack.list_channels",
+				Name:        "List Channels",
+				Description: "List Slack channels visible to the bot",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"types": {
+							"type": "string",
+							"default": "public_channel",
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 100,
+							"description": "Max channels to return (1-1000)"
+						},
+						"cursor": {
+							"type": "string",
+							"description": "Pagination cursor from a previous response"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "slack.read_channel_messages",
+				Name:        "Read Channel Messages",
+				Description: "Read recent messages from a Slack channel",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID (e.g. C01234567)"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 20,
+							"description": "Max messages to return (1-1000)"
+						},
+						"oldest": {
+							"type": "string",
+							"description": "Only messages after this Unix timestamp"
+						},
+						"latest": {
+							"type": "string",
+							"description": "Only messages before this Unix timestamp"
+						},
+						"cursor": {
+							"type": "string",
+							"description": "Pagination cursor from a previous response"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "slack.read_thread",
+				Name:        "Read Thread",
+				Description: "Read replies in a Slack thread",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "thread_ts"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID containing the thread (e.g. C01234567)"
+						},
+						"thread_ts": {
+							"type": "string",
+							"description": "Timestamp of the parent message (e.g. 1234567890.123456)"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 50,
+							"description": "Max replies to return (1-1000)"
+						},
+						"cursor": {
+							"type": "string",
+							"description": "Pagination cursor from a previous response"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{Service: "slack", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
@@ -130,6 +217,27 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can create public channels with any name.",
 				Parameters:  json.RawMessage(`{"name":"*","is_private":false}`),
 			},
+			{
+				ID:          "tpl_slack_list_channels",
+				ActionType:  "slack.list_channels",
+				Name:        "List channels",
+				Description: "Agent can list channels visible to the bot.",
+				Parameters:  json.RawMessage(`{"types":"*","limit":"*","cursor":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_read_channel",
+				ActionType:  "slack.read_channel_messages",
+				Name:        "Read channel messages",
+				Description: "Agent can read messages from any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","limit":"*","oldest":"*","latest":"*","cursor":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_read_thread",
+				ActionType:  "slack.read_thread",
+				Name:        "Read thread replies",
+				Description: "Agent can read thread replies from any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","thread_ts":"*","limit":"*","cursor":"*"}`),
+			},
 		},
 	}
 }
@@ -137,8 +245,11 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 // Actions returns the registered action handlers keyed by action_type.
 func (c *SlackConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"slack.send_message":   &sendMessageAction{conn: c},
-		"slack.create_channel": &createChannelAction{conn: c},
+		"slack.send_message":           &sendMessageAction{conn: c},
+		"slack.create_channel":         &createChannelAction{conn: c},
+		"slack.list_channels":          &listChannelsAction{conn: c},
+		"slack.read_channel_messages":  &readChannelMessagesAction{conn: c},
+		"slack.read_thread":            &readThreadAction{conn: c},
 	}
 }
 
