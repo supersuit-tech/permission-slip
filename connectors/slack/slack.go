@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://slack.com/api"
-	defaultTimeout = 30 * time.Second
-	credKeyToken   = "bot_token"
-	tokenPrefix    = "xoxb-"
+	defaultBaseURL        = "https://slack.com/api"
+	defaultTimeout        = 30 * time.Second
+	credKeyAccessToken    = "access_token"
+	credKeyBotToken       = "bot_token"
+	botTokenPrefix        = "xoxb-"
 
 	// defaultRetryAfter is used when the Slack API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -77,17 +78,23 @@ func (c *SlackConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty bot_token with the required xoxb- prefix.
+// ValidateCredentials checks that the provided credentials contain either a
+// non-empty access_token (OAuth) or a bot_token with the xoxb- prefix.
+// OAuth access tokens are accepted without format validation since they are
+// managed by the platform's OAuth infrastructure.
 func (c *SlackConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: bot_token"}
+	// Prefer access_token (OAuth path).
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return nil
 	}
-	if len(token) < len(tokenPrefix) || token[:len(tokenPrefix)] != tokenPrefix {
-		return &connectors.ValidationError{Message: "bot_token must start with \"xoxb-\""}
+	// Fall back to bot_token (legacy path).
+	if token, ok := creds.Get(credKeyBotToken); ok && token != "" {
+		if len(token) < len(botTokenPrefix) || token[:len(botTokenPrefix)] != botTokenPrefix {
+			return &connectors.ValidationError{Message: "bot_token must start with \"xoxb-\""}
+		}
+		return nil
 	}
-	return nil
+	return &connectors.ValidationError{Message: "missing required credential: access_token or bot_token"}
 }
 
 // slackResponse is the common envelope for Slack Web API responses.
@@ -150,14 +157,27 @@ func validateLimit(limit int) error {
 	return nil
 }
 
+// getToken extracts the auth token from credentials, preferring access_token
+// (OAuth) over bot_token (legacy). Both token types use Bearer auth with the
+// Slack API.
+func (c *SlackConnector) getToken(creds connectors.Credentials) (string, error) {
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return token, nil
+	}
+	if token, ok := creds.Get(credKeyBotToken); ok && token != "" {
+		return token, nil
+	}
+	return "", &connectors.ValidationError{Message: "credential is missing: access_token or bot_token"}
+}
+
 // doPost is the shared request lifecycle for all Slack actions. It marshals
 // body as JSON, sends a POST to the given Slack API method with auth headers,
 // handles rate limiting and timeouts, and unmarshals the response into dest.
 // Callers are responsible for checking the Slack-level ok/error fields in dest.
 func (c *SlackConnector) doPost(ctx context.Context, method string, creds connectors.Credentials, body any, dest any) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "bot_token credential is missing or empty"}
+	token, err := c.getToken(creds)
+	if err != nil {
+		return err
 	}
 
 	payload, err := json.Marshal(body)

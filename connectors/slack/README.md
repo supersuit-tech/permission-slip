@@ -8,11 +8,27 @@ The Slack connector integrates Permission Slip with the [Slack Web API](https://
 
 ## Credentials
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `bot_token` | Yes | A Slack OAuth bot token (`xoxb-...`) with appropriate scopes for the actions being executed. |
+The Slack connector supports two authentication methods. OAuth is the recommended default; bot tokens are supported as an alternative.
 
-The credential `auth_type` in the database is `custom`. Tokens are stored encrypted in Supabase Vault and decrypted only at execution time. The connector validates that the token starts with the `xoxb-` prefix.
+### OAuth (recommended)
+
+| Key | Source | Description |
+|-----|--------|-------------|
+| `access_token` | OAuth connection | Automatically managed via the platform's OAuth flow. |
+
+The credential `auth_type` is `oauth2` with provider `slack`. Users connect via **Settings > Connected Accounts > Connect Slack**. The platform handles token exchange, encrypted storage, and automatic refresh.
+
+### Bot Token (alternative)
+
+| Key | Source | Description |
+|-----|--------|-------------|
+| `bot_token` | Manual entry | A Slack bot token (`xoxb-...`) with appropriate scopes. |
+
+The credential `auth_type` is `custom` under service `slack_bot`. Tokens are stored encrypted in Supabase Vault and decrypted only at execution time. The connector validates that the token starts with the `xoxb-` prefix.
+
+### Credential Resolution
+
+At execution time, the connector accepts either `access_token` or `bot_token`. If the user has an OAuth connection, it takes priority. If not, the platform falls back to stored bot token credentials. Both token types use Bearer auth with the Slack API.
 
 ## Actions
 

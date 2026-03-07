@@ -265,6 +265,8 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 
 // GetRequiredCredentialByActionType returns the required credential for the connector
 // that owns the given action type. Used to determine auth_type at execution time.
+// When a connector has multiple credentials (e.g., both OAuth2 and bot token),
+// oauth2 is preferred so the execution engine tries the better auth path first.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
@@ -272,6 +274,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
+		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END
 		LIMIT 1`,
 		actionType,
 	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)
@@ -282,4 +285,32 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		return nil, err
 	}
 	return &rc, nil
+}
+
+// GetNonOAuthServicesByActionType returns the credential services for the connector
+// that owns the given action type, excluding oauth2 credentials. Used as a fallback
+// when the user hasn't connected via OAuth but has static credentials (e.g., bot token).
+func GetNonOAuthServicesByActionType(ctx context.Context, db DBTX, actionType string) ([]string, error) {
+	rows, err := db.Query(ctx, `
+		SELECT crc.service
+		FROM connector_actions ca
+		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
+		WHERE ca.action_type = $1 AND crc.auth_type != 'oauth2'
+		ORDER BY crc.service`,
+		actionType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		services = append(services, s)
+	}
+	return services, rows.Err()
 }

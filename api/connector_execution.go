@@ -52,7 +52,20 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			return nil, err
+			// If OAuth fails (e.g., user hasn't connected), fall back to
+			// non-OAuth static credentials. This supports connectors with
+			// dual auth such as Slack (OAuth + bot token).
+			var oauthErr *connectors.OAuthRefreshError
+			if errors.As(err, &oauthErr) {
+				fallbackCreds, fbErr := resolveNonOAuthCredentials(ctx, deps, userID, actionType)
+				if fbErr == nil {
+					creds = fallbackCreds
+					err = nil
+				}
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		// Static credential path (api_key, basic, custom): existing behavior.
@@ -225,14 +238,23 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 	}, nil
 }
 
-// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
-// for the given action type.
-func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
-	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
+// resolveNonOAuthCredentials fetches static credentials for only the non-OAuth
+// services of a connector. Used as a fallback when OAuth resolution fails but
+// the connector also supports static credentials (e.g., Slack bot token).
+func resolveNonOAuthCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	services, err := db.GetNonOAuthServicesByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
+		return connectors.Credentials{}, fmt.Errorf("look up non-OAuth services: %w", err)
 	}
+	if len(services) == 0 {
+		return connectors.Credentials{}, fmt.Errorf("no non-OAuth credentials available")
+	}
+	return resolveStaticCredentialsForServices(ctx, deps, userID, services)
+}
 
+// resolveStaticCredentialsForServices fetches and decrypts static credentials
+// for the given list of services.
+func resolveStaticCredentialsForServices(ctx context.Context, deps *Deps, userID string, services []string) (connectors.Credentials, error) {
 	var zero connectors.Credentials
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
@@ -249,7 +271,6 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 			}
 			return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
 		}
-		// Flatten decrypted JSON map into string values for the Credentials type.
 		for k, v := range decrypted {
 			switch vv := v.(type) {
 			case string:
@@ -263,8 +284,17 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 			}
 		}
 	}
-
 	return connectors.NewCredentials(credMap), nil
+}
+
+// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
+// for the given action type.
+func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
+	}
+	return resolveStaticCredentialsForServices(ctx, deps, userID, services)
 }
 
 // resolveOAuthCredentials looks up the user's OAuth connection for the required

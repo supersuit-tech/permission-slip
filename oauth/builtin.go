@@ -105,6 +105,28 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("KROGER_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "slack",
+			AuthorizeURL: "https://slack.com/oauth/v2/authorize",
+			TokenURL:     "https://slack.com/api/oauth.v2.access",
+			Scopes: []string{
+				"channels:history",
+				"channels:join",
+				"channels:manage",
+				"channels:read",
+				"chat:write",
+				"files:write",
+				"groups:history",
+				"groups:read",
+				"im:history",
+				"mpim:history",
+				"reactions:write",
+				"users:read",
+			},
+			ClientID:     os.Getenv("SLACK_CLIENT_ID"),
+			ClientSecret: os.Getenv("SLACK_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 

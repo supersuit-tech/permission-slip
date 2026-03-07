@@ -1,12 +1,15 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   CheckCircle2,
   Circle,
   ExternalLink,
   Loader2,
+  LogIn,
   Plus,
   Trash2,
 } from "lucide-react";
+import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,8 +17,10 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
+import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
@@ -28,9 +33,13 @@ export function ConnectorCredentialsSection({
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
   const hasRequiredCredentials = requiredCredentials.length > 0;
+  const hasStaticCredentials = requiredCredentials.some(
+    (c) => c.auth_type !== "oauth2",
+  );
   const { credentials, isLoading, error } = useCredentials({
-    enabled: hasRequiredCredentials,
+    enabled: hasStaticCredentials,
   });
+  const { connections, isLoading: oauthLoading } = useOAuthConnections();
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -38,6 +47,8 @@ export function ConnectorCredentialsSection({
     list.push(cred);
     storedByService.set(cred.service, list);
   }
+
+  const oauthByProvider = new Map(connections.map((c) => [c.provider, c]));
 
   return (
     <Card>
@@ -49,7 +60,7 @@ export function ConnectorCredentialsSection({
           <p className="text-muted-foreground py-4 text-center text-sm">
             This connector does not require any credentials.
           </p>
-        ) : isLoading ? (
+        ) : isLoading || oauthLoading ? (
           <div className="flex items-center justify-center py-4">
             <Loader2
               className="text-muted-foreground size-5 animate-spin"
@@ -60,17 +71,106 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred) => (
-              <CredentialRow
-                key={cred.service}
-                requiredCredential={cred}
-                storedCredentials={storedByService.get(cred.service) ?? []}
-              />
-            ))}
+            {requiredCredentials.map((cred) =>
+              cred.auth_type === "oauth2" ? (
+                <OAuthCredentialRow
+                  key={cred.service}
+                  requiredCredential={cred}
+                  connection={oauthByProvider.get(
+                    cred.oauth_provider ?? cred.service,
+                  )}
+                />
+              ) : (
+                <CredentialRow
+                  key={cred.service}
+                  requiredCredential={cred}
+                  storedCredentials={
+                    storedByService.get(cred.service) ?? []
+                  }
+                />
+              ),
+            )}
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function OAuthCredentialRow({
+  requiredCredential,
+  connection,
+}: {
+  requiredCredential: RequiredCredential;
+  connection?: { provider: string; status: string; connected_at: string };
+}) {
+  const { session } = useAuth();
+  const isConnected = connection?.status === "active";
+  const needsReauth = connection?.status === "needs_reauth";
+
+  function handleConnect() {
+    if (!session?.access_token) return;
+    const providerId = requiredCredential.oauth_provider ?? requiredCredential.service;
+    const baseUrl =
+      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
+    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
+    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+  }
+
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {isConnected ? (
+            <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : (
+            <Circle className="text-muted-foreground size-5 shrink-0" />
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">
+                {requiredCredential.service}
+              </p>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                OAuth
+              </Badge>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                Recommended
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {isConnected
+                ? `Connected ${new Date(connection.connected_at).toLocaleDateString()}`
+                : "Connect via OAuth for automatic token management"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <>
+              <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                Connected
+              </span>
+              <Link to="/settings">
+                <Button variant="ghost" size="sm">
+                  Manage
+                </Button>
+              </Link>
+            </>
+          ) : needsReauth ? (
+            <Button variant="outline" size="sm" onClick={handleConnect}>
+              <LogIn className="size-3" />
+              Re-authorize
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleConnect}>
+              <LogIn className="size-3" />
+              Connect
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

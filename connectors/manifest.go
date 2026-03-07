@@ -98,6 +98,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"meta":       true,
 	"microsoft":  true,
 	"salesforce": true,
+	"slack":      true,
 	"zoom":       true,
 }
 

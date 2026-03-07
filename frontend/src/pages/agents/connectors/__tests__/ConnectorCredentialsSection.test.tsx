@@ -29,6 +29,19 @@ const storedCredentials = {
   ],
 };
 
+/**
+ * Sets up mockGet to handle both /v1/credentials and /v1/oauth/connections.
+ * The component now fetches OAuth connections alongside static credentials.
+ */
+function setupMockGet(credentialsData: unknown) {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/v1/oauth/connections") {
+      return Promise.resolve({ data: { connections: [] } });
+    }
+    return Promise.resolve({ data: credentialsData });
+  });
+}
+
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -56,7 +69,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows connected status with stored credentials", async () => {
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet(storedCredentials);
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -72,7 +85,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet({ credentials: [] });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -88,7 +101,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Add Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet({ credentials: [] });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -108,7 +121,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("stores credential through Add dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet({ credentials: [] });
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
@@ -144,7 +157,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Remove Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet(storedCredentials);
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -168,7 +181,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("deletes credential through Remove dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet(storedCredentials);
     mockDelete.mockResolvedValue({
       data: { id: "cred_123", deleted_at: "2026-02-20T10:00:00Z" },
     });
@@ -201,7 +214,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet({ credentials: [] });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -219,5 +232,68 @@ describe("ConnectorCredentialsSection", () => {
 
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
+  });
+
+  it("shows OAuth credential row for oauth2 auth type", async () => {
+    setupMockGet({ credentials: [] });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2" as const,
+            oauth_provider: "slack",
+            oauth_scopes: ["chat:write", "channels:read"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("OAuth")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
+    expect(
+      screen.getByText("Connect via OAuth for automatic token management"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows OAuth connected status when user has connection", async () => {
+    mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/oauth/connections") {
+        return Promise.resolve({
+          data: {
+            connections: [
+              {
+                provider: "slack",
+                status: "active",
+                scopes: ["chat:write"],
+                connected_at: "2026-03-01T10:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { credentials: [] } });
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2" as const,
+            oauth_provider: "slack",
+            oauth_scopes: ["chat:write"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Manage")).toBeInTheDocument();
   });
 });
