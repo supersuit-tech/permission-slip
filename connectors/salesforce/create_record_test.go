@@ -19,6 +19,9 @@ func TestCreateRecord_Success(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer 00Dxx0000000000!test-access-token-123" {
 			t.Errorf("expected Bearer token, got %q", got)
 		}
+		if got := r.Header.Get("Accept"); got != "application/json" {
+			t.Errorf("expected Accept header 'application/json', got %q", got)
+		}
 		if r.URL.Path != "/services/data/v62.0/sobjects/Lead/" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -67,8 +70,14 @@ func TestCreateRecord_Success(t *testing.T) {
 	if data["id"] != "00Qxx0000000001" {
 		t.Errorf("expected id '00Qxx0000000001', got %v", data["id"])
 	}
+	if data["sobject_type"] != "Lead" {
+		t.Errorf("expected sobject_type 'Lead', got %v", data["sobject_type"])
+	}
 	if data["success"] != true {
 		t.Errorf("expected success true, got %v", data["success"])
+	}
+	if data["record_url"] != "https://myorg.salesforce.com/00Qxx0000000001" {
+		t.Errorf("expected record_url, got %v", data["record_url"])
 	}
 }
 

@@ -20,11 +20,19 @@ type queryParams struct {
 	MaxRecords int    `json:"max_records"`
 }
 
-const defaultMaxRecords = 200
+const (
+	defaultMaxRecords = 200
+	maxMaxRecords     = 2000
+)
 
 func (p *queryParams) validate() error {
 	if p.SOQL == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: soql"}
+	}
+	if p.MaxRecords > maxMaxRecords {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("max_records must be at most %d, got %d", maxMaxRecords, p.MaxRecords),
+		}
 	}
 	return nil
 }
@@ -61,9 +69,10 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		return nil, err
 	}
 
-	// Truncate records to max_records.
+	// Truncate records to max_records and indicate when results were cut.
 	records := resp.Records
-	if len(records) > params.MaxRecords {
+	truncated := len(records) > params.MaxRecords
+	if truncated {
 		records = records[:params.MaxRecords]
 	}
 
@@ -71,5 +80,6 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		"total_size": resp.TotalSize,
 		"done":       resp.Done,
 		"records":    records,
+		"truncated":  truncated,
 	})
 }

@@ -28,6 +28,9 @@ func (p *updateRecordParams) validate() error {
 	if p.RecordID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: record_id"}
 	}
+	if err := validateRecordID(p.RecordID, "record_id"); err != nil {
+		return err
+	}
 	if len(p.Fields) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: fields"}
 	}
@@ -55,8 +58,13 @@ func (a *updateRecordAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]any{
-		"record_id": params.RecordID,
-		"success":   true,
-	})
+	result := map[string]any{
+		"record_id":    params.RecordID,
+		"sobject_type": params.SObjectType,
+		"success":      true,
+	}
+	if url := recordURL(req.Credentials, params.RecordID); url != "" {
+		result["record_url"] = url
+	}
+	return connectors.JSONResult(result)
 }

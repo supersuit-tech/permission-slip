@@ -109,6 +109,7 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"priority": {
 							"type": "string",
+							"default": "Normal",
 							"description": "Task priority (e.g. High, Normal, Low)"
 						},
 						"due_date": {

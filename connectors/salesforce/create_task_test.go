@@ -71,6 +71,9 @@ func TestCreateTask_Success(t *testing.T) {
 	if data["id"] != "00Txx0000000001" {
 		t.Errorf("expected id '00Txx0000000001', got %v", data["id"])
 	}
+	if data["record_url"] != "https://myorg.salesforce.com/00Txx0000000001" {
+		t.Errorf("expected record_url, got %v", data["record_url"])
+	}
 }
 
 func TestCreateTask_CustomStatus(t *testing.T) {
@@ -124,6 +127,106 @@ func TestCreateTask_MissingSubject(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing subject")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateTask_DefaultPriority(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body["Priority"] != "Normal" {
+			t.Errorf("expected default Priority 'Normal', got %q", body["Priority"])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(sfCreateResponse{ID: "00Txx0000000004", Success: true})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createTaskAction{conn: conn}
+
+	params, _ := json.Marshal(createTaskParams{Subject: "No priority specified"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_task",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateTask_InvalidDueDate(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createTaskAction{conn: conn}
+
+	params, _ := json.Marshal(createTaskParams{
+		Subject: "Test",
+		DueDate: "next Tuesday",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_task",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid due_date format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateTask_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createTaskAction{conn: conn}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_task",
+		Parameters:  []byte(`{invalid`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateTask_InvalidWhoID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createTaskAction{conn: conn}
+
+	params, _ := json.Marshal(createTaskParams{
+		Subject: "Test",
+		WhoID:   "abc",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_task",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid who_id")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

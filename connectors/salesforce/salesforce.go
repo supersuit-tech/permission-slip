@@ -11,10 +11,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// sfIDPattern matches Salesforce 15 or 18-character alphanumeric record IDs.
+var sfIDPattern = regexp.MustCompile(`^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$`)
 
 const (
 	// apiVersion is the pinned Salesforce REST API version.
@@ -97,6 +101,27 @@ func (c *SalesforceConnector) apiBaseURL(creds connectors.Credentials) (string, 
 	return instanceURL + "/services/data/" + apiVersion, nil
 }
 
+// recordURL builds a user-facing Salesforce URL for a record. Returns empty
+// string if instance_url is not available (e.g. in tests with baseURLOverride).
+func recordURL(creds connectors.Credentials, recordID string) string {
+	instanceURL, ok := creds.Get(credKeyInstanceURL)
+	if !ok || instanceURL == "" {
+		return ""
+	}
+	return instanceURL + "/" + recordID
+}
+
+// validateRecordID checks that id looks like a valid Salesforce record ID
+// (15 or 18 alphanumeric characters). fieldName is used in the error message.
+func validateRecordID(id, fieldName string) error {
+	if !sfIDPattern.MatchString(id) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: expected 15 or 18 alphanumeric characters, got %q", fieldName, id),
+		}
+	}
+	return nil
+}
+
 // doJSON is the shared request lifecycle for Salesforce API calls that send
 // and receive JSON. It marshals reqBody, sends the request with OAuth bearer
 // auth, handles error mapping, and unmarshals the response into respBody.
@@ -121,6 +146,7 @@ func (c *SalesforceConnector) doJSON(ctx context.Context, creds connectors.Crede
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

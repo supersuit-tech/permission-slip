@@ -116,7 +116,7 @@ func TestAddNote_LinkingFailure(t *testing.T) {
 	action := &addNoteAction{conn: conn}
 
 	params, _ := json.Marshal(addNoteParams{
-		ParentID: "invalid-id",
+		ParentID: "001xx000000BAD1",
 		Title:    "Test Note",
 		Body:     "body",
 	})
@@ -173,7 +173,7 @@ func TestAddNote_MissingTitle(t *testing.T) {
 	conn := New()
 	action := &addNoteAction{conn: conn}
 
-	params, _ := json.Marshal(map[string]any{"parent_id": "001xx"})
+	params, _ := json.Marshal(map[string]any{"parent_id": "001xx0000000001"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "salesforce.add_note",
@@ -228,5 +228,48 @@ func TestAddNote_EmptyBody(t *testing.T) {
 	}
 	if data["success"] != true {
 		t.Errorf("expected success true, got %v", data["success"])
+	}
+}
+
+func TestAddNote_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &addNoteAction{conn: conn}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.add_note",
+		Parameters:  []byte(`{invalid`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestAddNote_InvalidParentID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &addNoteAction{conn: conn}
+
+	params, _ := json.Marshal(addNoteParams{
+		ParentID: "abc",
+		Title:    "Test",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.add_note",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid parent_id format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }

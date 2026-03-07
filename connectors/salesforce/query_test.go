@@ -58,6 +58,9 @@ func TestQuery_Success(t *testing.T) {
 	if data["done"] != true {
 		t.Errorf("expected done true, got %v", data["done"])
 	}
+	if data["truncated"] != false {
+		t.Errorf("expected truncated false, got %v", data["truncated"])
+	}
 	records, ok := data["records"].([]any)
 	if !ok || len(records) != 2 {
 		t.Errorf("expected 2 records, got %v", data["records"])
@@ -105,6 +108,9 @@ func TestQuery_MaxRecordsTruncation(t *testing.T) {
 	records, ok := data["records"].([]any)
 	if !ok || len(records) != 2 {
 		t.Errorf("expected 2 records after truncation, got %d", len(records))
+	}
+	if data["truncated"] != true {
+		t.Errorf("expected truncated true when results were cut, got %v", data["truncated"])
 	}
 }
 
@@ -170,6 +176,30 @@ func TestQuery_InvalidJSON(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestQuery_MaxRecordsExceedsLimit(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &queryAction{conn: conn}
+
+	params, _ := json.Marshal(queryParams{
+		SOQL:       "SELECT Id FROM Lead",
+		MaxRecords: 5000,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.query",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for max_records > 2000")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

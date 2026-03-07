@@ -26,6 +26,9 @@ func (p *addNoteParams) validate() error {
 	if p.ParentID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: parent_id"}
 	}
+	if err := validateRecordID(p.ParentID, "parent_id"); err != nil {
+		return err
+	}
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
 	}

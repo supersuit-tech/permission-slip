@@ -57,8 +57,13 @@ func (a *createRecordAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]any{
-		"id":      resp.ID,
-		"success": resp.Success,
-	})
+	result := map[string]any{
+		"id":           resp.ID,
+		"sobject_type": params.SObjectType,
+		"success":      resp.Success,
+	}
+	if url := recordURL(req.Credentials, resp.ID); url != "" {
+		result["record_url"] = url
+	}
+	return connectors.JSONResult(result)
 }

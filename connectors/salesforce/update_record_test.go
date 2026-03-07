@@ -57,8 +57,14 @@ func TestUpdateRecord_Success(t *testing.T) {
 	if data["record_id"] != "00Qxx0000000001" {
 		t.Errorf("expected record_id '00Qxx0000000001', got %v", data["record_id"])
 	}
+	if data["sobject_type"] != "Lead" {
+		t.Errorf("expected sobject_type 'Lead', got %v", data["sobject_type"])
+	}
 	if data["success"] != true {
 		t.Errorf("expected success true, got %v", data["success"])
+	}
+	if data["record_url"] != "https://myorg.salesforce.com/00Qxx0000000001" {
+		t.Errorf("expected record_url, got %v", data["record_url"])
 	}
 }
 
@@ -131,6 +137,79 @@ func TestUpdateRecord_InvalidJSON(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdateRecord_MissingSObjectType(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateRecordAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"record_id": "00Qxx0000000001",
+		"fields":    map[string]any{"Status": "Closed"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.update_record",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for missing sobject_type")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdateRecord_MissingFields(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateRecordAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"sobject_type": "Lead",
+		"record_id":    "00Qxx0000000001",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.update_record",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for missing fields")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdateRecord_InvalidRecordID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateRecordAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"sobject_type": "Lead",
+		"record_id":    "abc",
+		"fields":       map[string]any{"Status": "Closed"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.update_record",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid record_id")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

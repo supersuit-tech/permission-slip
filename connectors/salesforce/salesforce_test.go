@@ -1,6 +1,7 @@
 package salesforce
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -169,4 +170,167 @@ func TestSalesforceConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*SalesforceConnector)(nil)
 	var _ connectors.ManifestProvider = (*SalesforceConnector)(nil)
+}
+
+func TestCheckResponse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		header     http.Header
+		body       []byte
+		wantNil    bool
+		checkError func(t *testing.T, err error)
+	}{
+		{
+			name:       "200 OK",
+			statusCode: 200,
+			body:       nil,
+			wantNil:    true,
+		},
+		{
+			name:       "204 No Content",
+			statusCode: 204,
+			body:       nil,
+			wantNil:    true,
+		},
+		{
+			name:       "401 Unauthorized",
+			statusCode: 401,
+			body:       []byte(`[{"errorCode":"INVALID_SESSION_ID","message":"Session expired"}]`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsAuthError(err) {
+					t.Errorf("expected AuthError, got %T", err)
+				}
+			},
+		},
+		{
+			name:       "403 Forbidden",
+			statusCode: 403,
+			body:       []byte(`[{"errorCode":"FORBIDDEN","message":"No access"}]`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsAuthError(err) {
+					t.Errorf("expected AuthError for 403, got %T", err)
+				}
+			},
+		},
+		{
+			name:       "429 Too Many Requests",
+			statusCode: 429,
+			header:     http.Header{"Retry-After": []string{"120"}},
+			body:       []byte(`[]`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsRateLimitError(err) {
+					t.Errorf("expected RateLimitError for 429, got %T", err)
+				}
+			},
+		},
+		{
+			name:       "REQUEST_LIMIT_EXCEEDED error code",
+			statusCode: 403,
+			body:       []byte(`[{"errorCode":"REQUEST_LIMIT_EXCEEDED","message":"API limit hit"}]`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsRateLimitError(err) {
+					t.Errorf("expected RateLimitError for REQUEST_LIMIT_EXCEEDED, got %T", err)
+				}
+			},
+		},
+		{
+			name:       "MALFORMED_QUERY error code",
+			statusCode: 400,
+			body:       []byte(`[{"errorCode":"MALFORMED_QUERY","message":"bad query"}]`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsValidationError(err) {
+					t.Errorf("expected ValidationError for MALFORMED_QUERY, got %T", err)
+				}
+			},
+		},
+		{
+			name:       "500 Internal Server Error",
+			statusCode: 500,
+			body:       []byte(`[{"errorCode":"UNKNOWN","message":"something broke"}]`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsExternalError(err) {
+					t.Errorf("expected ExternalError for 500, got %T", err)
+				}
+			},
+		},
+		{
+			name:       "non-JSON error body",
+			statusCode: 502,
+			body:       []byte(`Bad Gateway`),
+			checkError: func(t *testing.T, err error) {
+				if !connectors.IsExternalError(err) {
+					t.Errorf("expected ExternalError for 502 with non-JSON body, got %T", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			header := tt.header
+			if header == nil {
+				header = http.Header{}
+			}
+			err := checkResponse(tt.statusCode, header, tt.body)
+			if tt.wantNil {
+				if err != nil {
+					t.Errorf("expected nil error, got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			tt.checkError(t, err)
+		})
+	}
+}
+
+func TestValidateRecordID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		id      string
+		wantErr bool
+	}{
+		{"001xx0000000001", false},    // 15-char ID
+		{"001xx0000000001AAA", false}, // 18-char ID
+		{"abc", true},                // too short
+		{"", true},                   // empty
+		{"001xx000000000!", true},     // invalid character
+		{"001xx00000000011234567890", true}, // too long
+	}
+	for _, tt := range tests {
+		t.Run(tt.id, func(t *testing.T) {
+			t.Parallel()
+			err := validateRecordID(tt.id, "test_field")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateRecordID(%q) error = %v, wantErr %v", tt.id, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRecordURL(t *testing.T) {
+	t.Parallel()
+
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token": "tok",
+		"instance_url": "https://myorg.salesforce.com",
+	})
+	got := recordURL(creds, "001xx0000000001")
+	want := "https://myorg.salesforce.com/001xx0000000001"
+	if got != want {
+		t.Errorf("recordURL() = %q, want %q", got, want)
+	}
+
+	// No instance_url → empty string.
+	emptyCreds := connectors.NewCredentials(map[string]string{"access_token": "tok"})
+	if url := recordURL(emptyCreds, "001xx0000000001"); url != "" {
+		t.Errorf("expected empty url for missing instance_url, got %q", url)
+	}
 }
