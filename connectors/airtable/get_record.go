@@ -19,7 +19,7 @@ type getRecordParams struct {
 	RecordID string `json:"record_id"`
 }
 
-func (p *getRecordParams) validate() error {
+func (p getRecordParams) validate() error {
 	if err := validateBaseID(p.BaseID); err != nil {
 		return err
 	}

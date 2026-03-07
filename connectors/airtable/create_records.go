@@ -25,7 +25,7 @@ type createRecordInput struct {
 	Fields map[string]any `json:"fields"`
 }
 
-func (p *createRecordsParams) validate() error {
+func (p createRecordsParams) validate() error {
 	if err := validateBaseID(p.BaseID); err != nil {
 		return err
 	}

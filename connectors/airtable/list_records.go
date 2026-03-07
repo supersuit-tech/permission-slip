@@ -31,7 +31,7 @@ type sortField struct {
 	Direction string `json:"direction,omitempty"`
 }
 
-func (p *listRecordsParams) validate() error {
+func (p listRecordsParams) validate() error {
 	if err := validateBaseID(p.BaseID); err != nil {
 		return err
 	}

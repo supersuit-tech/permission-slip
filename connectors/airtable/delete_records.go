@@ -20,7 +20,7 @@ type deleteRecordsParams struct {
 	RecordIDs []string `json:"record_ids"`
 }
 
-func (p *deleteRecordsParams) validate() error {
+func (p deleteRecordsParams) validate() error {
 	if err := validateBaseID(p.BaseID); err != nil {
 		return err
 	}

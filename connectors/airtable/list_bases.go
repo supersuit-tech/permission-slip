@@ -16,7 +16,7 @@ type listBasesParams struct {
 	Offset string `json:"offset,omitempty"`
 }
 
-func (p *listBasesParams) validate() error { return nil }
+func (p listBasesParams) validate() error { return nil }
 
 type listBasesResponse struct {
 	Bases  []baseEntry `json:"bases"`

@@ -24,7 +24,7 @@ type searchRecordsParams struct {
 	Sort       []sortField `json:"sort,omitempty"`
 }
 
-func (p *searchRecordsParams) validate() error {
+func (p searchRecordsParams) validate() error {
 	if err := validateBaseID(p.BaseID); err != nil {
 		return err
 	}
