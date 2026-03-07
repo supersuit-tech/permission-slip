@@ -17,6 +17,7 @@ type triggerDeploymentAction struct {
 type triggerDeploymentParams struct {
 	ProjectID string `json:"project_id"`
 	Ref       string `json:"ref"`
+	RefType   string `json:"ref_type"`
 	Target    string `json:"target"`
 	TeamID    string `json:"team_id"`
 }
@@ -45,12 +46,17 @@ func (a *triggerDeploymentAction) Execute(ctx context.Context, req connectors.Ac
 		target = "preview"
 	}
 
+	refType := params.RefType
+	if refType == "" {
+		refType = "branch"
+	}
+
 	body := map[string]interface{}{
 		"name":   params.ProjectID,
 		"target": target,
 		"gitSource": map[string]string{
 			"ref":  params.Ref,
-			"type": "branch",
+			"type": refType,
 		},
 	}
 

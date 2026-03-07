@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -24,14 +25,17 @@ func (a *listProjectsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 
-	path := "/v9/projects"
-	sep := "?"
+	q := url.Values{}
 	if params.TeamID != "" {
-		path += sep + "teamId=" + params.TeamID
-		sep = "&"
+		q.Set("teamId", params.TeamID)
 	}
 	if params.Limit > 0 {
-		path += fmt.Sprintf("%slimit=%d", sep, params.Limit)
+		q.Set("limit", fmt.Sprintf("%d", params.Limit))
+	}
+
+	path := "/v9/projects"
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
 	}
 
 	var resp json.RawMessage

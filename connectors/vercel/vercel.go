@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,9 @@ import (
 const (
 	defaultBaseURL = "https://api.vercel.com"
 	defaultTimeout = 30 * time.Second
+
+	// maxResponseBytes caps the response body we'll read from Vercel APIs.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // VercelConnector owns the shared HTTP client and base URL used by all
@@ -145,7 +149,13 @@ func (c *VercelConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"ref": {
 							"type": "string",
-							"description": "Git ref (branch name, tag, or commit SHA) to deploy"
+							"description": "Git ref to deploy (branch name, tag, or commit SHA)"
+						},
+						"ref_type": {
+							"type": "string",
+							"enum": ["branch", "commit", "tag"],
+							"default": "branch",
+							"description": "Type of the Git ref — must match the ref value"
 						},
 						"target": {
 							"type": "string",
@@ -398,14 +408,14 @@ func (c *VercelConnector) do(ctx context.Context, creds connectors.Credentials, 
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Vercel API request timed out: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Vercel API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

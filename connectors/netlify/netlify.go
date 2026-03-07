@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,9 @@ import (
 const (
 	defaultBaseURL = "https://api.netlify.com/api/v1"
 	defaultTimeout = 30 * time.Second
+
+	// maxResponseBytes caps the response body we'll read from Netlify APIs.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // NetlifyConnector owns the shared HTTP client and base URL used by all
@@ -359,14 +363,14 @@ func (c *NetlifyConnector) do(ctx context.Context, creds connectors.Credentials,
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Netlify API request timed out: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Netlify API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
