@@ -32,7 +32,7 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 			}
 			RespondError(w, r, http.StatusForbidden, resp)
 		case connectors.PaymentErrInvalidAmount:
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrPaymentMethodRequired, pe.Message))
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pe.Message))
 		default:
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pe.Message))
 		}

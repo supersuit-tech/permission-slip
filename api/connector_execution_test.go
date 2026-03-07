@@ -1037,3 +1037,31 @@ func TestHandleConnectorError_PaymentError_LimitExceeded(t *testing.T) {
 		t.Errorf("expected status 403, got %d", w.Code)
 	}
 }
+
+func TestHandleConnectorError_PaymentError_InvalidAmount(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm3"))
+
+	pe := &connectors.PaymentError{Code: connectors.PaymentErrInvalidAmount, Message: "amount_cents must be non-negative"}
+	handled := handleConnectorError(w, r, pe)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle PaymentError")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+	// Verify it uses ErrInvalidRequest, not ErrPaymentMethodRequired
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	errObj, ok := resp["error"].(map[string]any)
+	if !ok {
+		t.Fatal("expected error object in response")
+	}
+	if code, _ := errObj["code"].(string); code != string(ErrInvalidRequest) {
+		t.Errorf("expected error code %q, got %q", ErrInvalidRequest, code)
+	}
+}
