@@ -40,6 +40,21 @@ const (
 	maxListDealsLimit     = 200 // HubSpot API maximum
 )
 
+// validSingleValueOperators is the subset of HubSpot search operators that
+// work with a single "value" field. BETWEEN requires highValue (not supported
+// by this filter shape), and HAS_PROPERTY/NOT_HAS_PROPERTY don't take a value.
+// The generic hubspot.search action supports the full operator set.
+var validSingleValueOperators = map[string]bool{
+	"EQ":                 true,
+	"NEQ":                true,
+	"LT":                 true,
+	"LTE":                true,
+	"GT":                 true,
+	"GTE":                true,
+	"CONTAINS_TOKEN":     true,
+	"NOT_CONTAINS_TOKEN": true,
+}
+
 var validSortDirections = map[string]bool{
 	"ASCENDING":  true,
 	"DESCENDING": true,
@@ -53,8 +68,8 @@ func (p *listDealsParams) validate() error {
 		if f.Operator == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: missing operator", i)}
 		}
-		if !validSearchOperators[f.Operator] {
-			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: unsupported operator %q (supported: EQ, NEQ, LT, LTE, GT, GTE, BETWEEN, CONTAINS_TOKEN, NOT_CONTAINS_TOKEN, HAS_PROPERTY, NOT_HAS_PROPERTY)", i, f.Operator)}
+		if !validSingleValueOperators[f.Operator] {
+			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: unsupported operator %q (supported: EQ, NEQ, LT, LTE, GT, GTE, CONTAINS_TOKEN, NOT_CONTAINS_TOKEN)", i, f.Operator)}
 		}
 	}
 	for i, s := range p.Sorts {

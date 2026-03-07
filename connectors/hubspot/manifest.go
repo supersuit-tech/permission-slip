@@ -226,7 +226,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 								"required": ["propertyName", "operator", "value"],
 								"properties": {
 									"propertyName": {"type": "string", "description": "Property to filter on"},
-									"operator": {"type": "string", "description": "Filter operator (EQ, NEQ, LT, LTE, GT, GTE, CONTAINS_TOKEN, etc.)"},
+									"operator": {"type": "string", "enum": ["EQ", "NEQ", "LT", "LTE", "GT", "GTE", "CONTAINS_TOKEN", "NOT_CONTAINS_TOKEN"], "description": "Filter operator"},
 									"value": {"type": "string", "description": "Value to compare against"}
 								}
 							},
@@ -428,7 +428,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "hubspot.create_email_campaign",
 				Name:        "Create email drafts",
 				Description: "Allow the agent to create draft email campaigns (no sending).",
-				Parameters:  json.RawMessage(`{"name":"*","subject":"*","content":"*","list_ids":"*","send_now":"false"}`),
+				Parameters:  json.RawMessage(`{"name":"*","subject":"*","content":"*","list_ids":"*","send_now":false}`),
 			},
 			{
 				ID:          "tpl_hubspot_full_marketing",
