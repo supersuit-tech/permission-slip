@@ -16,10 +16,10 @@ type createTicketAction struct {
 }
 
 type createTicketParams struct {
-	Subject     string `json:"subject"`
-	Description string `json:"description"`
-	Priority    string `json:"priority"`
-	Type        string `json:"type"`
+	Subject     string   `json:"subject"`
+	Description string   `json:"description"`
+	Priority    string   `json:"priority"`
+	Type        string   `json:"type"`
 	Tags        []string `json:"tags"`
 	RequesterID *int64   `json:"requester_id"`
 }

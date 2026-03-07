@@ -18,11 +18,11 @@ type searchTicketsAction struct {
 }
 
 type searchTicketsParams struct {
-	Query   string `json:"query"`
-	SortBy  string `json:"sort_by"`
+	Query     string `json:"query"`
+	SortBy    string `json:"sort_by"`
 	SortOrder string `json:"sort_order"`
-	Page    int    `json:"page"`
-	PerPage int    `json:"per_page"`
+	Page      int    `json:"page"`
+	PerPage   int    `json:"per_page"`
 }
 
 var validSortBy = map[string]bool{

@@ -210,7 +210,7 @@ func TestIntercomConnector_Do_MissingCredentials(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("request should not have been made")
+		t.Error("request should not have been made")
 	}))
 	defer srv.Close()
 

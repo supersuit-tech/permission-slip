@@ -22,7 +22,8 @@ func TestCreateTicket_Success(t *testing.T) {
 
 		var body map[string]ticket
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			return
 		}
 		if body["ticket"].Subject != "Login broken" {
 			t.Errorf("expected subject 'Login broken', got %q", body["ticket"].Subject)

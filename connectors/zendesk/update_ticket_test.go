@@ -22,11 +22,13 @@ func TestUpdateTicket_Success(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			return
 		}
 		tkt, ok := body["ticket"].(map[string]any)
 		if !ok {
-			t.Fatal("expected ticket object in body")
+			t.Errorf("expected ticket object in body")
+			return
 		}
 		if tkt["status"] != "solved" {
 			t.Errorf("expected status 'solved', got %v", tkt["status"])

@@ -22,11 +22,13 @@ func TestAssignTicket_Success(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			return
 		}
 		assignment, ok := body["assignment"].(map[string]any)
 		if !ok {
-			t.Fatal("expected assignment object in body")
+			t.Errorf("expected assignment object in body")
+			return
 		}
 		if assignment["admin_id"] != "admin-99" {
 			t.Errorf("expected admin_id 'admin-99', got %v", assignment["admin_id"])
