@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,11 +24,8 @@ type createIssueParams struct {
 }
 
 func (p *createIssueParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
-	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
@@ -39,11 +35,8 @@ func (p *createIssueParams) validate() error {
 
 // Execute creates a GitHub issue and returns the created issue data.
 func (a *createIssueAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params createIssueParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[createIssueParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 
