@@ -37,6 +37,9 @@ func (p *updateCatalogItemParams) validate() error {
 	if p.ObjectID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: object_id"}
 	}
+	if p.Name == "" && p.Description == "" && len(p.Variations) == 0 {
+		return &connectors.ValidationError{Message: "at least one of name, description, or variations must be provided"}
+	}
 	for i, v := range p.Variations {
 		if v.ID == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("variations[%d].id is required", i)}

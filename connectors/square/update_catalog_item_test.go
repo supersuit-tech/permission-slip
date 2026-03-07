@@ -177,6 +177,7 @@ func TestUpdateCatalogItem_MissingParams(t *testing.T) {
 		params string
 	}{
 		{name: "missing object_id", params: `{"name": "Test"}`},
+		{name: "no fields to update", params: `{"object_id": "X"}`},
 		{name: "variation missing id", params: `{"object_id": "X", "variations": [{"name": "Small"}]}`},
 		{name: "variation negative price", params: `{"object_id": "X", "variations": [{"id": "V1", "price_money": {"amount": -100, "currency": "USD"}}]}`},
 		{name: "variation missing currency", params: `{"object_id": "X", "variations": [{"id": "V1", "price_money": {"amount": 100}}]}`},

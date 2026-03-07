@@ -122,7 +122,7 @@ func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_square_send_invoice",
 				ActionType:  "square.send_invoice",
 				Name:        "Send invoices",
-				Description: "Agent can create and send invoices to customers. Sends real payment requests via email or SMS.",
+				Description: "Agent can create and send invoices to customers. WARNING: sends real payment requests via email or SMS. Requires human approval per invoice.",
 				Parameters:  json.RawMessage(`{"customer_id":"*","location_id":"*","line_items":"*","due_date":"*","delivery_method":"*","title":"*","note":"*"}`),
 			},
 			{
@@ -399,7 +399,7 @@ func updateCatalogItemManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
 		ActionType:  "square.update_catalog_item",
 		Name:        "Update Catalog Item",
-		Description: "Update a catalog item's name, description, or pricing. Uses Square's upsert endpoint. Include the version field to prevent conflicting updates.",
+		Description: "Update a catalog item's name, description, or pricing. Uses Square's upsert endpoint. Always include the version field (from list_catalog) to prevent overwriting concurrent changes — omitting it risks silent data loss.",
 		RiskLevel:   "medium",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(fmt.Sprintf(`{
 			"type": "object",
@@ -460,8 +460,8 @@ func sendInvoiceManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
 		ActionType:  "square.send_invoice",
 		Name:        "Send Invoice",
-		Description: "Create and send an invoice to a customer. Creates an order, generates the invoice, and publishes it in one step. The customer receives a payment request via the specified delivery method.",
-		RiskLevel:   "medium",
+		Description: "Create and send an invoice to a customer. WARNING: sends a real payment request that the customer will receive immediately. Creates an order, generates the invoice, and publishes it in one step.",
+		RiskLevel:   "high",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(fmt.Sprintf(`{
 			"type": "object",
 			"required": ["customer_id", "location_id", "line_items", "due_date"],
@@ -570,11 +570,13 @@ func adjustInventoryManifest() connectors.ManifestAction {
 				},
 				"from_state": {
 					"type": "string",
-					"description": "Current inventory state (e.g. NONE, IN_STOCK, SOLD, RETURNED_BY_CUSTOMER)"
+					"enum": ["NONE", "IN_STOCK", "SOLD", "RETURNED_BY_CUSTOMER", "RESERVED_FOR_SALE", "SOLD_ONLINE", "ORDERED_FROM_VENDOR", "RECEIVED_FROM_VENDOR", "IN_TRANSIT_TO", "WASTE", "UNLINKED_RETURN", "COMPOSED", "DECOMPOSED", "SUPPORTED_BY_NEWER_VERSION"],
+					"description": "Current inventory state"
 				},
 				"to_state": {
 					"type": "string",
-					"description": "Target inventory state (e.g. IN_STOCK, SOLD, WASTE)"
+					"enum": ["NONE", "IN_STOCK", "SOLD", "RETURNED_BY_CUSTOMER", "RESERVED_FOR_SALE", "SOLD_ONLINE", "ORDERED_FROM_VENDOR", "RECEIVED_FROM_VENDOR", "IN_TRANSIT_TO", "WASTE", "UNLINKED_RETURN", "COMPOSED", "DECOMPOSED", "SUPPORTED_BY_NEWER_VERSION"],
+					"description": "Target inventory state"
 				}
 			}
 		}`)),

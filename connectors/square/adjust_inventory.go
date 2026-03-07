@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -52,6 +53,9 @@ func (p *adjustInventoryParams) validate() error {
 	if p.Quantity == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: quantity"}
 	}
+	if qty, err := strconv.ParseFloat(p.Quantity, 64); err != nil || qty <= 0 {
+		return &connectors.ValidationError{Message: "quantity must be a positive number string (e.g. \"10\")"}
+	}
 	if p.FromState == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: from_state"}
 	}
@@ -76,37 +80,39 @@ func (a *adjustInventoryAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	body := map[string]interface{}{
-		"idempotency_key": newIdempotencyKey(),
-		"changes": []map[string]interface{}{
-			{
-				"type": "PHYSICAL_COUNT",
-				"physical_count": map[string]interface{}{
-					"catalog_object_id": params.CatalogObjectID,
-					"location_id":      params.LocationID,
-					"quantity":          params.Quantity,
-					"state":             params.ToState,
-					"occurred_at":       time.Now().UTC().Format(time.RFC3339),
-				},
-			},
-		},
-	}
+	occurredAt := time.Now().UTC().Format(time.RFC3339)
 
-	// Square's batch-create uses "adjustment" type for state transitions.
-	if params.FromState != params.ToState {
-		body["changes"] = []map[string]interface{}{
-			{
-				"type": "ADJUSTMENT",
-				"adjustment": map[string]interface{}{
-					"catalog_object_id": params.CatalogObjectID,
-					"location_id":      params.LocationID,
-					"quantity":          params.Quantity,
-					"from_state":        params.FromState,
-					"to_state":          params.ToState,
-					"occurred_at":       time.Now().UTC().Format(time.RFC3339),
-				},
+	// Use PHYSICAL_COUNT for same-state (setting absolute count) and
+	// ADJUSTMENT for state transitions (moving between states).
+	var change map[string]interface{}
+	if params.FromState == params.ToState {
+		change = map[string]interface{}{
+			"type": "PHYSICAL_COUNT",
+			"physical_count": map[string]interface{}{
+				"catalog_object_id": params.CatalogObjectID,
+				"location_id":      params.LocationID,
+				"quantity":          params.Quantity,
+				"state":             params.ToState,
+				"occurred_at":       occurredAt,
 			},
 		}
+	} else {
+		change = map[string]interface{}{
+			"type": "ADJUSTMENT",
+			"adjustment": map[string]interface{}{
+				"catalog_object_id": params.CatalogObjectID,
+				"location_id":      params.LocationID,
+				"quantity":          params.Quantity,
+				"from_state":        params.FromState,
+				"to_state":          params.ToState,
+				"occurred_at":       occurredAt,
+			},
+		}
+	}
+
+	body := map[string]interface{}{
+		"idempotency_key": newIdempotencyKey(),
+		"changes":         []map[string]interface{}{change},
 	}
 
 	var resp struct {

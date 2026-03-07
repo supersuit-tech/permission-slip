@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -12,7 +14,7 @@ import (
 // sendInvoiceAction implements connectors.Action for square.send_invoice.
 // It creates and publishes an invoice as a single atomic operation via
 // POST /v2/invoices (create) then POST /v2/invoices/{id}/publish.
-// Medium risk — sends a real payment request to a customer.
+// High risk — sends a real payment request to a customer.
 type sendInvoiceAction struct {
 	conn *SquareConnector
 }
@@ -46,12 +48,18 @@ func (p *sendInvoiceParams) validate() error {
 	if p.DueDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: due_date"}
 	}
+	if _, err := time.Parse("2006-01-02", p.DueDate); err != nil {
+		return &connectors.ValidationError{Message: "due_date must be in YYYY-MM-DD format (e.g. \"2024-12-31\")"}
+	}
 	for i, item := range p.LineItems {
 		if item.Description == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d].description is required", i)}
 		}
 		if item.Quantity == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d].quantity is required", i)}
+		}
+		if qty, err := strconv.Atoi(item.Quantity); err != nil || qty <= 0 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d].quantity must be a positive integer string (e.g. \"1\")", i)}
 		}
 		if item.BasePriceMoney.Amount <= 0 {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d].base_price_money.amount must be greater than 0", i)}
@@ -156,7 +164,7 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/invoices", createBody, &createResp); err != nil {
-		return nil, fmt.Errorf("creating invoice: %w", err)
+		return nil, fmt.Errorf("creating invoice failed (orphaned order %s may need manual cleanup): %w", orderResp.Order.ID, err)
 	}
 
 	// Step 3: Publish the invoice to send it to the customer.
@@ -171,7 +179,7 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	publishPath := fmt.Sprintf("/invoices/%s/publish", createResp.Invoice.ID)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, publishPath, publishBody, &publishResp); err != nil {
-		return nil, fmt.Errorf("publishing invoice: %w", err)
+		return nil, fmt.Errorf("publishing invoice %s failed (draft invoice and order %s may need manual cleanup): %w", createResp.Invoice.ID, orderResp.Order.ID, err)
 	}
 
 	return connectors.JSONResult(json.RawMessage(publishResp.Invoice))
