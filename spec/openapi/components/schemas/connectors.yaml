@@ -232,11 +232,22 @@ ConnectorAction:
           body:
             type: "string"
 
+    requires_payment_method:
+      type: boolean
+      default: false
+      description: |
+        Whether this action requires a payment method to execute. When `true`, the
+        agent must include `payment_method_id` and `amount_cents` in the execute request.
+        The payment method is resolved to a Stripe token at execution time — raw card
+        details are never exposed to the agent.
+      example: false
+
   example:
     action_type: "github.create_issue"
     name: "Create Issue"
     description: "Create a new issue in a repository"
     risk_level: "low"
+    requires_payment_method: false
     parameters_schema:
       type: "object"
       required:
