@@ -24,6 +24,7 @@ import (
 	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
+	"github.com/supersuit-tech/permission-slip-web/connectors/confluence"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
 	"github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	"github.com/supersuit-tech/permission-slip-web/connectors/docusign"
@@ -356,6 +357,7 @@ func main() {
 	registry.Register(airtable.New())
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
+	registry.Register(confluence.New())
 	registry.Register(hubspot.New())
 	registry.Register(jira.New())
 	registry.Register(linear.New())
