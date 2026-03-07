@@ -32,6 +32,7 @@ import (
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	linkedinconnector "github.com/supersuit-tech/permission-slip-web/connectors/linkedin"
+	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
 	metaconnector "github.com/supersuit-tech/permission-slip-web/connectors/meta"
 	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
@@ -51,6 +52,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -374,6 +376,8 @@ func main() {
 	registry.Register(expedia.New())
 	registry.Register(pagerduty.New())
 	registry.Register(zoom.New())
+	registry.Register(zapier.New())
+	registry.Register(makeconnector.New())
 	registry.Register(calendly.New())
 
 	// Auto-seed built-in connectors from their manifests.
