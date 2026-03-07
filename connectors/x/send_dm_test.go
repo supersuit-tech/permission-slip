@@ -67,12 +67,18 @@ func TestSendDM_MissingParams(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["x.send_dm"]
 
+	longText := make([]byte, 10001)
+	for i := range longText {
+		longText[i] = 'a'
+	}
+
 	tests := []struct {
 		name   string
 		params string
 	}{
 		{"missing recipient_id", `{"text":"hello"}`},
 		{"missing text", `{"recipient_id":"user123"}`},
+		{"text too long", `{"recipient_id":"user123","text":"` + string(longText) + `"}`},
 		{"invalid JSON", `{invalid}`},
 	}
 

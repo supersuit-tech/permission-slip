@@ -59,12 +59,13 @@ func (a *searchTweetsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	path := "/tweets/search/recent?query=" + url.QueryEscape(params.Query) +
-		"&max_results=" + strconv.Itoa(maxResults)
+		"&max_results=" + strconv.Itoa(maxResults) +
+		"&tweet.fields=created_at,public_metrics,author_id"
 	if params.SinceID != "" {
-		path += "&since_id=" + params.SinceID
+		path += "&since_id=" + url.QueryEscape(params.SinceID)
 	}
 	if params.SortOrder != "" {
-		path += "&sort_order=" + params.SortOrder
+		path += "&sort_order=" + url.QueryEscape(params.SortOrder)
 	}
 
 	var xResp json.RawMessage

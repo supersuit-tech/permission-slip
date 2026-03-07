@@ -120,7 +120,8 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"text": {
 							"type": "string",
-							"description": "Message text"
+							"maxLength": 10000,
+							"description": "Message text (max 10,000 characters)"
 						}
 					}
 				}`)),
@@ -200,7 +201,20 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "x", AuthType: "custom", InstructionsURL: "https://developer.x.com/en/docs/authentication/oauth-2-0/authorization-code"},
+			{
+				Service:       "x",
+				AuthType:      "oauth2",
+				OAuthProvider: "x",
+				OAuthScopes:   []string{"tweet.read", "tweet.write", "users.read", "dm.read", "dm.write", "offline.access"},
+			},
+		},
+		OAuthProviders: []connectors.ManifestOAuthProvider{
+			{
+				ID:           "x",
+				AuthorizeURL: "https://x.com/i/oauth2/authorize",
+				TokenURL:     "https://api.x.com/2/oauth2/token",
+				Scopes:       []string{"tweet.read", "tweet.write", "users.read", "dm.read", "dm.write", "offline.access"},
+			},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

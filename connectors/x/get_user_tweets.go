@@ -54,10 +54,10 @@ func (a *getUserTweetsAction) Execute(ctx context.Context, req connectors.Action
 	path := "/users/" + url.PathEscape(params.UserID) + "/tweets?max_results=" + strconv.Itoa(maxResults) +
 		"&tweet.fields=created_at,public_metrics"
 	if params.SinceID != "" {
-		path += "&since_id=" + params.SinceID
+		path += "&since_id=" + url.QueryEscape(params.SinceID)
 	}
 	if params.UntilID != "" {
-		path += "&until_id=" + params.UntilID
+		path += "&until_id=" + url.QueryEscape(params.UntilID)
 	}
 
 	var xResp json.RawMessage

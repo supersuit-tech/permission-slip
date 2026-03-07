@@ -94,6 +94,25 @@ func TestSearchTweets_MissingQuery(t *testing.T) {
 	}
 }
 
+func TestSearchTweets_MaxResultsTooLow(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["x.search_tweets"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.search_tweets",
+		Parameters:  json.RawMessage(`{"query":"test","max_results":5}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for max_results=5, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestSearchTweets_InvalidSortOrder(t *testing.T) {
 	t.Parallel()
 

@@ -94,6 +94,16 @@ func TestXConnector_Manifest(t *testing.T) {
 	if len(m.Templates) != 7 {
 		t.Errorf("Manifest().Templates has %d templates, want 7", len(m.Templates))
 	}
+	if len(m.OAuthProviders) != 1 {
+		t.Errorf("Manifest().OAuthProviders has %d providers, want 1", len(m.OAuthProviders))
+	} else if m.OAuthProviders[0].ID != "x" {
+		t.Errorf("OAuthProviders[0].ID = %q, want %q", m.OAuthProviders[0].ID, "x")
+	}
+	if len(m.RequiredCredentials) != 1 {
+		t.Errorf("Manifest().RequiredCredentials has %d credentials, want 1", len(m.RequiredCredentials))
+	} else if m.RequiredCredentials[0].AuthType != "oauth2" {
+		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "oauth2")
+	}
 
 	// Validate the manifest is well-formed.
 	if err := m.Validate(); err != nil {
