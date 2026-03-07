@@ -240,6 +240,14 @@ The connector maps Meta Graph API error codes and HTTP status codes to typed con
 
 Response bodies are capped at 10 MB via `io.LimitReader` to prevent out-of-memory from unexpectedly large responses.
 
+## Security
+
+- **Authentication:** Access tokens are sent via the `Authorization: Bearer` header, not as query parameters — tokens won't leak into server access logs or browser history.
+- **ID validation:** All Graph API object IDs (`page_id`, `post_id`, `comment_id`, `instagram_account_id`) are validated against a strict regex (`^[a-zA-Z0-9_]+$`) before being interpolated into URL paths. This prevents path traversal (`../`) and query injection (`?param=value`) attacks.
+- **URL validation:** The `link` parameter in `create_page_post` is validated as a proper HTTP/HTTPS URL. The `image_url` in `create_instagram_post` requires HTTPS (Instagram's requirement).
+- **Input length limits:** Instagram captions are validated against the 2,200 character limit. `list_page_posts` limits are capped at 1-100.
+- **Metric/period allowlists:** `get_instagram_insights` validates `metric` and `period` against explicit allowlists rather than passing user input directly to the API.
+
 ## Templates
 
 | Template | Action | What's locked |
