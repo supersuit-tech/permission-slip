@@ -62,7 +62,7 @@ func (a *deleteRecordsAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	// Airtable DELETE uses query params: ?records[]=rec1&records[]=rec2
-	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, params.BaseID, url.PathEscape(params.Table))
+	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, url.PathEscape(params.BaseID), url.PathEscape(params.Table))
 
 	queryParts := make([]string, 0, len(params.RecordIDs))
 	for _, id := range params.RecordIDs {

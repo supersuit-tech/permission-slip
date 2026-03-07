@@ -44,7 +44,7 @@ func (a *searchRecordsAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, params.BaseID, url.PathEscape(params.Table))
+	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, url.PathEscape(params.BaseID), url.PathEscape(params.Table))
 
 	q := url.Values{}
 	q.Set("filterByFormula", params.Formula)

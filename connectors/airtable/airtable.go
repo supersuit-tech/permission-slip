@@ -85,27 +85,40 @@ func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connect
 	return nil
 }
 
+// isAlphanumeric checks that s contains only ASCII letters and digits.
+func isAlphanumeric(s string) bool {
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			return false
+		}
+	}
+	return true
+}
+
 // validateBaseID checks that a base_id looks like a valid Airtable base ID.
+// Airtable IDs are alphanumeric strings with a known prefix. We enforce this
+// strictly to prevent path/query injection when interpolating into URLs.
 func validateBaseID(baseID string) error {
 	if baseID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: base_id"}
 	}
-	if len(baseID) < 4 || baseID[:3] != "app" {
+	if len(baseID) < 4 || baseID[:3] != "app" || !isAlphanumeric(baseID) {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid base_id %q: expected an Airtable base ID starting with 'app'", baseID),
+			Message: fmt.Sprintf("invalid base_id %q: expected an alphanumeric Airtable base ID starting with 'app'", baseID),
 		}
 	}
 	return nil
 }
 
 // validateRecordID checks that a record_id looks like a valid Airtable record ID.
+// Airtable record IDs are alphanumeric strings prefixed with "rec".
 func validateRecordID(recordID string) error {
 	if recordID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: record_id"}
 	}
-	if len(recordID) < 4 || recordID[:3] != "rec" {
+	if len(recordID) < 4 || recordID[:3] != "rec" || !isAlphanumeric(recordID) {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid record_id %q: expected an Airtable record ID starting with 'rec'", recordID),
+			Message: fmt.Sprintf("invalid record_id %q: expected an alphanumeric Airtable record ID starting with 'rec'", recordID),
 		}
 	}
 	return nil
@@ -219,9 +232,9 @@ func mapAirtableError(statusCode int, body []byte) error {
 			Message: "Airtable permission denied or resource not found — verify the base ID exists and your token has access to it",
 		}
 	case "NOT_FOUND", "TABLE_NOT_FOUND", "ROW_DOES_NOT_EXIST":
-		return &connectors.ExternalError{StatusCode: 404, Message: msg}
+		return &connectors.ValidationError{Message: msg}
 	case "VIEW_NOT_FOUND":
-		return &connectors.ExternalError{StatusCode: 404, Message: "Airtable view not found — check the view name or ID"}
+		return &connectors.ValidationError{Message: "Airtable view not found — check the view name or ID"}
 	case "INVALID_REQUEST_UNKNOWN", "INVALID_VALUE_FOR_COLUMN", "CANNOT_UPDATE_COMPUTED_FIELD",
 		"FIELD_NOT_FOUND", "UNKNOWN_FIELD_NAME", "CANNOT_CREATE_DUPLICATE_RECORD":
 		return &connectors.ValidationError{Message: msg}

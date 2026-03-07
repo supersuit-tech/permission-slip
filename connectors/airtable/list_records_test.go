@@ -212,8 +212,8 @@ func TestListRecords_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API error")
 	}
-	if !connectors.IsExternalError(err) {
-		t.Errorf("expected ExternalError, got: %T", err)
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 

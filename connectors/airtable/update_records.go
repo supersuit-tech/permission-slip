@@ -65,7 +65,7 @@ func (a *updateRecordsAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, params.BaseID, url.PathEscape(params.Table))
+	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, url.PathEscape(params.BaseID), url.PathEscape(params.Table))
 
 	body, err := json.Marshal(updateRecordsRequest{Records: params.Records})
 	if err != nil {

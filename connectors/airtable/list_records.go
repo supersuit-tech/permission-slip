@@ -66,8 +66,8 @@ type recordSummary struct {
 	Fields      map[string]any `json:"fields"`
 }
 
-// Execute lists records from an Airtable table. Uses POST for the list endpoint
-// to support complex filter/sort parameters without URL length limits.
+// Execute lists records from an Airtable table using Airtable's standard GET
+// list endpoint with query parameters for filtering, sorting, and pagination.
 func (a *listRecordsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listRecordsParams
 	if err := parseAndValidate(req.Parameters, &params); err != nil {
@@ -75,7 +75,7 @@ func (a *listRecordsAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	// Use GET with query params for simple requests to match Airtable's standard API.
-	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, params.BaseID, url.PathEscape(params.Table))
+	reqURL := fmt.Sprintf("%s/%s/%s", a.conn.baseURL, url.PathEscape(params.BaseID), url.PathEscape(params.Table))
 
 	q := url.Values{}
 	if params.FilterByFormula != "" {

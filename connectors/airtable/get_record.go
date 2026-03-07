@@ -36,7 +36,7 @@ func (a *getRecordAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/%s/%s/%s", a.conn.baseURL, params.BaseID, url.PathEscape(params.Table), params.RecordID)
+	reqURL := fmt.Sprintf("%s/%s/%s/%s", a.conn.baseURL, url.PathEscape(params.BaseID), url.PathEscape(params.Table), url.PathEscape(params.RecordID))
 
 	var resp recordEntry
 	if err := a.conn.doRequest(ctx, "GET", reqURL, req.Credentials, nil, &resp); err != nil {
