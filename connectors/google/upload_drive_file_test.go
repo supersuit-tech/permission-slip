@@ -269,6 +269,36 @@ func TestUploadDriveFile_AuthFailure(t *testing.T) {
 	}
 }
 
+func TestUploadDriveFile_RateLimit(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "30")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:    "test.txt",
+		Content: "hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for rate limit")
+	}
+	if !connectors.IsRateLimitError(err) {
+		t.Errorf("expected RateLimitError, got: %T", err)
+	}
+}
+
 func TestUploadDriveFile_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
