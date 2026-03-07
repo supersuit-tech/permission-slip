@@ -70,6 +70,136 @@ Creates a new Slack channel.
 
 **Required bot token scopes:** `channels:manage` (public), `groups:write` (private)
 
+---
+
+### `slack.list_channels`
+
+Lists Slack channels visible to the bot.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `types` | string | No | `public_channel` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im` |
+| `limit` | integer | No | `100` | Max channels to return (1–1000) |
+| `cursor` | string | No | — | Pagination cursor from a previous response |
+
+**Response:**
+
+```json
+{
+  "channels": [
+    {
+      "id": "C01234567",
+      "name": "general",
+      "is_private": false,
+      "topic": "General discussion",
+      "purpose": "Company-wide announcements",
+      "num_members": 42
+    }
+  ],
+  "next_cursor": "dGVhbTpDMDI="
+}
+```
+
+**Slack API:** `POST /conversations.list` ([docs](https://api.slack.com/methods/conversations.list))
+
+**Required bot token scopes:** `channels:read` (public), `groups:read` (private)
+
+---
+
+### `slack.read_channel_messages`
+
+Reads recent messages from a Slack channel.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `channel` | string | Yes | — | Channel ID (e.g., `C01234567`) — must be an ID, not a name |
+| `limit` | integer | No | `20` | Max messages to return (1–1000) |
+| `oldest` | string | No | — | Only messages after this Unix timestamp |
+| `latest` | string | No | — | Only messages before this Unix timestamp |
+| `cursor` | string | No | — | Pagination cursor from a previous response |
+
+**Response:**
+
+```json
+{
+  "messages": [
+    {
+      "user": "U001",
+      "text": "Hello everyone!",
+      "ts": "1678900000.000100",
+      "thread_ts": "",
+      "reply_count": 0
+    }
+  ],
+  "has_more": true,
+  "next_cursor": "bmV4dA=="
+}
+```
+
+**Slack API:** `POST /conversations.history` ([docs](https://api.slack.com/methods/conversations.history))
+
+**Required bot token scopes:** `channels:history` (public), `groups:history` (private)
+
+---
+
+### `slack.read_thread`
+
+Reads replies in a Slack message thread.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `channel` | string | Yes | — | Channel ID containing the thread (e.g., `C01234567`) |
+| `thread_ts` | string | Yes | — | Timestamp of the parent message (e.g., `1234567890.123456`) |
+| `limit` | integer | No | `50` | Max replies to return (1–1000) |
+| `cursor` | string | No | — | Pagination cursor from a previous response |
+
+**Response:**
+
+```json
+{
+  "messages": [
+    {
+      "user": "U002",
+      "text": "Check out this thread",
+      "ts": "1678900001.000200",
+      "thread_ts": "1678900001.000200",
+      "reply_count": 2
+    },
+    {
+      "user": "U003",
+      "text": "Great idea!",
+      "ts": "1678900002.000300",
+      "thread_ts": "1678900001.000200"
+    }
+  ],
+  "has_more": false
+}
+```
+
+**Slack API:** `POST /conversations.replies` ([docs](https://api.slack.com/methods/conversations.replies))
+
+**Required bot token scopes:** `channels:history` (public), `groups:history` (private)
+
+### Channel ID Validation
+
+The `channel` parameter on `read_channel_messages` and `read_thread` must be a Slack channel ID — not a channel name. Valid IDs start with `C` (public channels), `G` (private channels / group DMs), or `D` (direct messages). Passing a name like `#general` or `general` returns a `ValidationError` with a helpful hint before hitting the Slack API.
+
+### Pagination Limits
+
+The `limit` parameter on all list/read actions must be between 1 and 1000. Values outside this range are rejected with a `ValidationError` before making the API call.
+
 ## Error Handling
 
 The Slack API returns HTTP 200 for most errors, with success/failure indicated by the `ok` field in the JSON response. The connector maps these to typed connector errors:
@@ -142,14 +272,21 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/slack/
-├── slack.go               # SlackConnector struct, New(), Manifest(), doPost(), ValidateCredentials()
-├── send_message.go        # slack.send_message action
-├── create_channel.go      # slack.create_channel action
-├── slack_test.go          # Connector-level tests
-├── helpers_test.go        # Shared test helpers (validCreds)
-├── send_message_test.go   # Send message action tests
-├── create_channel_test.go # Create channel action tests
-└── README.md              # This file
+├── slack.go                        # SlackConnector, New(), Manifest(), doPost(), shared validators
+├── messages.go                     # Shared types: slackMessage, messageSummary, messagesResponse, toMessagesResult()
+├── send_message.go                 # slack.send_message action
+├── create_channel.go               # slack.create_channel action
+├── list_channels.go                # slack.list_channels action
+├── read_channel_messages.go        # slack.read_channel_messages action
+├── read_thread.go                  # slack.read_thread action
+├── slack_test.go                   # Connector-level tests
+├── helpers_test.go                 # Shared test helpers (validCreds)
+├── send_message_test.go            # Send message action tests
+├── create_channel_test.go          # Create channel action tests
+├── list_channels_test.go           # List channels action tests
+├── read_channel_messages_test.go   # Read channel messages action tests
+├── read_thread_test.go             # Read thread action tests
+└── README.md                       # This file
 ```
 
 ## Testing
