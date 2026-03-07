@@ -3,6 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import { AccountSection } from "./AccountSection";
 import { NotificationSection } from "./NotificationSection";
 import { SecuritySection } from "./SecuritySection";
+import { ConnectedAccountsSection } from "./ConnectedAccountsSection";
+import { OAuthProviderSection } from "./OAuthProviderSection";
 import { CredentialSection } from "./CredentialSection";
 import { PaymentMethodSection } from "./PaymentMethodSection";
 import { DataRetentionSection } from "./DataRetentionSection";
@@ -25,6 +27,8 @@ export function SettingsPage() {
       <AccountSection />
       <SecuritySection />
       <NotificationSection />
+      <ConnectedAccountsSection />
+      <OAuthProviderSection />
       <CredentialSection />
       <PaymentMethodSection />
       <DataRetentionSection />
