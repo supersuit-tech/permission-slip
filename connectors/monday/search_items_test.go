@@ -92,7 +92,9 @@ func TestSearchItems_WithQuery(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body graphQLRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 
 		// Verify query variable is passed.

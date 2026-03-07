@@ -19,7 +19,9 @@ func TestCreateSubitem_Success(t *testing.T) {
 
 		var body graphQLRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -69,7 +71,9 @@ func TestCreateSubitem_WithColumnValues(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body graphQLRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 
 		cv, ok := body.Variables["column_values"]
