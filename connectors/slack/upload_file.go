@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -58,9 +59,8 @@ type getUploadURLResponse struct {
 // Step 3: Complete upload
 
 type completeUploadRequest struct {
-	Files          []completeUploadFile `json:"files"`
-	ChannelID      string               `json:"channel_id"`
-	InitialComment string               `json:"initial_comment,omitempty"`
+	Files     []completeUploadFile `json:"files"`
+	ChannelID string               `json:"channel_id"`
 }
 
 type completeUploadFile struct {
@@ -158,6 +158,9 @@ func (a *uploadFileAction) uploadContent(ctx context.Context, uploadURL, filenam
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("file upload timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("file upload canceled: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("file upload failed: %v", err)}
 	}

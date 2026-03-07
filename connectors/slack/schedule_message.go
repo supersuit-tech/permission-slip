@@ -30,7 +30,7 @@ func (p *scheduleMessageParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
 	}
 	if p.PostAt <= 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: post_at (must be a future Unix timestamp)"}
+		return &connectors.ValidationError{Message: "missing or invalid parameter: post_at (must be a positive Unix timestamp)"}
 	}
 	if p.PostAt <= time.Now().Unix() {
 		return &connectors.ValidationError{
