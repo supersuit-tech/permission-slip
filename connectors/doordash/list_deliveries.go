@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -38,7 +39,7 @@ func (p *listDeliveriesParams) validate() error {
 	}
 	if p.Status != "" && !validStatuses[p.Status] {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid status %q — valid values: created, confirmed, enroute_to_pickup, arrived_at_pickup, picked_up, enroute_to_dropoff, arrived_at_dropoff, delivered, cancelled, enroute_to_return, returned", p.Status),
+			Message: fmt.Sprintf("invalid status %q — valid values: %s", p.Status, strings.Join(deliveryStatuses, ", ")),
 		}
 	}
 	return nil
