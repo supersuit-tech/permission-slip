@@ -44,12 +44,24 @@ type TrelloConnector struct {
 }
 
 // New creates a TrelloConnector with sensible defaults (30s timeout,
-// https://api.trello.com/1 base URL).
+// https://api.trello.com/1 base URL). The HTTP client disables automatic
+// redirect following to prevent leaking credential query parameters
+// (key/token) to redirect targets.
 func New() *TrelloConnector {
 	return &TrelloConnector{
-		client:  &http.Client{Timeout: defaultTimeout},
+		client: &http.Client{
+			Timeout:       defaultTimeout,
+			CheckRedirect: noRedirect,
+		},
 		baseURL: defaultBaseURL,
 	}
+}
+
+// noRedirect prevents the HTTP client from following redirects. Trello
+// credentials are passed as query parameters, and following a redirect
+// would forward them to the redirect target, potentially leaking them.
+func noRedirect(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
 }
 
 // newForTest creates a TrelloConnector that points at a test server.

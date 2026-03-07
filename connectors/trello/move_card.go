@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -57,7 +58,7 @@ func (a *moveCardAction) Execute(ctx context.Context, req connectors.ActionReque
 		ShortURL string `json:"shortUrl"`
 		URL      string `json:"url"`
 	}
-	path := fmt.Sprintf("/cards/%s", params.CardID)
+	path := fmt.Sprintf("/cards/%s", url.PathEscape(params.CardID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, body, &resp); err != nil {
 		return nil, err
 	}

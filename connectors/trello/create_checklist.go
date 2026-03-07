@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -55,8 +56,9 @@ func (a *createChecklistAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	// Add items to the checklist.
-	var addedItems []map[string]string
+	// Add items to the checklist. Initialize to empty slice so JSON
+	// serialization produces [] instead of null when no items are provided.
+	addedItems := make([]map[string]string, 0, len(params.Items))
 	for _, item := range params.Items {
 		itemBody := map[string]string{
 			"name": item,
@@ -65,7 +67,7 @@ func (a *createChecklistAction) Execute(ctx context.Context, req connectors.Acti
 			ID   string `json:"id"`
 			Name string `json:"name"`
 		}
-		path := fmt.Sprintf("/checklists/%s/checkItems", checklistResp.ID)
+		path := fmt.Sprintf("/checklists/%s/checkItems", url.PathEscape(checklistResp.ID))
 		if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, itemBody, &itemResp); err != nil {
 			return nil, err
 		}

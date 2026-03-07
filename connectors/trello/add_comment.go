@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -50,7 +51,7 @@ func (a *addCommentAction) Execute(ctx context.Context, req connectors.ActionReq
 			Text string `json:"text"`
 		} `json:"data"`
 	}
-	path := fmt.Sprintf("/cards/%s/actions/comments", params.CardID)
+	path := fmt.Sprintf("/cards/%s/actions/comments", url.PathEscape(params.CardID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &resp); err != nil {
 		return nil, err
 	}
