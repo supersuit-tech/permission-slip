@@ -29,6 +29,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
+	linkedinconnector "github.com/supersuit-tech/permission-slip-web/connectors/linkedin"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
@@ -337,6 +338,7 @@ func main() {
 	registry.Register(hubspot.New())
 	registry.Register(jira.New())
 	registry.Register(linear.New())
+	registry.Register(linkedinconnector.New())
 	registry.Register(microsoft.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
