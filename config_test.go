@@ -67,6 +67,8 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 		"GOOGLE_CLIENT_SECRET":       "test-google-secret",
 		"MICROSOFT_CLIENT_ID":        "test-msft-id",
 		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":       "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -201,19 +203,21 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 
 func TestValidateConfig_AllValid(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "",
-		"DATABASE_URL":              "postgres://localhost/test",
-		"SUPABASE_URL":              "http://localhost:54321",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
-		"INVITE_HMAC_KEY":           "test-key",
-		"BASE_URL":                  "https://example.com",
-		"VAPID_PUBLIC_KEY":          "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":         "examplePrivateKey",
-		"VAPID_SUBJECT":             "mailto:test@example.com",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
+		"MODE":                       "",
+		"DATABASE_URL":               "postgres://localhost/test",
+		"SUPABASE_URL":               "http://localhost:54321",
+		"SUPABASE_SERVICE_ROLE_KEY":  "test-service-role-key",
+		"INVITE_HMAC_KEY":            "test-key",
+		"BASE_URL":                   "https://example.com",
+		"VAPID_PUBLIC_KEY":           "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":          "examplePrivateKey",
+		"VAPID_SUBJECT":              "mailto:test@example.com",
+		"GOOGLE_CLIENT_ID":           "test-google-id",
+		"GOOGLE_CLIENT_SECRET":       "test-google-secret",
+		"MICROSOFT_CLIENT_ID":        "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":       "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -407,24 +411,26 @@ func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
 
 func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "",
-		"DATABASE_URL":              "postgres://localhost/test",
-		"SUPABASE_URL":              "http://localhost:54321",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"BILLING_ENABLED":           "true",
-		"STRIPE_SECRET_KEY":         "sk_test_xxx",
-		"STRIPE_WEBHOOK_SECRET":     "whsec_xxx",
-		"STRIPE_PRICE_ID_REQUEST":   "price_xxx",
-		"STRIPE_TEST_MODE":          "",
-		"BASE_URL":                  "https://example.com",
-		"INVITE_HMAC_KEY":           "test-key",
-		"VAPID_PUBLIC_KEY":          "",
-		"VAPID_PRIVATE_KEY":         "",
-		"VAPID_SUBJECT":             "",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
+		"MODE":                       "",
+		"DATABASE_URL":               "postgres://localhost/test",
+		"SUPABASE_URL":               "http://localhost:54321",
+		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
+		"BILLING_ENABLED":            "true",
+		"STRIPE_SECRET_KEY":          "sk_test_xxx",
+		"STRIPE_WEBHOOK_SECRET":      "whsec_xxx",
+		"STRIPE_PRICE_ID_REQUEST":    "price_xxx",
+		"STRIPE_TEST_MODE":           "",
+		"BASE_URL":                   "https://example.com",
+		"INVITE_HMAC_KEY":            "test-key",
+		"VAPID_PUBLIC_KEY":           "",
+		"VAPID_PRIVATE_KEY":          "",
+		"VAPID_SUBJECT":              "",
+		"GOOGLE_CLIENT_ID":           "test-google-id",
+		"GOOGLE_CLIENT_SECRET":       "test-google-secret",
+		"MICROSOFT_CLIENT_ID":        "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":       "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -528,6 +534,8 @@ func TestValidateConfig_StripeTestMode_NoWarningsWhenTestKeysSet(t *testing.T) {
 		"GOOGLE_CLIENT_SECRET":         "test-google-secret",
 		"MICROSOFT_CLIENT_ID":          "test-msft-id",
 		"MICROSOFT_CLIENT_SECRET":      "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":         "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET":     "test-sf-secret",
 	})
 
 	errs, warnings := validateConfig()
@@ -541,14 +549,16 @@ func TestValidateConfig_StripeTestMode_NoWarningsWhenTestKeysSet(t *testing.T) {
 
 func TestValidateConfig_OAuthWarnings_MissingGoogleCredentials(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "development",
-		"GOOGLE_CLIENT_ID":          "",
-		"GOOGLE_CLIENT_SECRET":      "",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-key",
-		"BASE_URL":                  "https://example.com",
+		"MODE":                       "development",
+		"GOOGLE_CLIENT_ID":           "",
+		"GOOGLE_CLIENT_SECRET":       "",
+		"MICROSOFT_CLIENT_ID":        "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":       "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
+		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
+		"INVITE_HMAC_KEY":            "test-key",
+		"BASE_URL":                   "https://example.com",
 	})
 
 	_, warnings := validateConfig()
@@ -574,14 +584,16 @@ func TestValidateConfig_OAuthWarnings_MissingGoogleCredentials(t *testing.T) {
 
 func TestValidateConfig_OAuthWarnings_MissingMicrosoftCredentials(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "development",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "",
-		"MICROSOFT_CLIENT_SECRET":   "",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-key",
-		"BASE_URL":                  "https://example.com",
+		"MODE":                       "development",
+		"GOOGLE_CLIENT_ID":           "test-google-id",
+		"GOOGLE_CLIENT_SECRET":       "test-google-secret",
+		"MICROSOFT_CLIENT_ID":        "",
+		"MICROSOFT_CLIENT_SECRET":    "",
+		"SALESFORCE_CLIENT_ID":       "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
+		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
+		"INVITE_HMAC_KEY":            "test-key",
+		"BASE_URL":                   "https://example.com",
 	})
 
 	_, warnings := validateConfig()

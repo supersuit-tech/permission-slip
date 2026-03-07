@@ -121,7 +121,7 @@ Internally, connectors use a two-level interface: the **Connector** owns shared 
 
 **Examples:**
 - GitHub connector: defines and executes `github.create_issue`, `github.merge_pr` actions via the GitHub API
-- Slack connector: defines and executes `slack.send_message`, `slack.create_channel` actions via the Slack API
+- Slack connector: defines and executes `slack.send_message`, `slack.create_channel`, `slack.schedule_message`, `slack.upload_file`, and 6 more actions via the Slack API
 
 **Relationship to actions:** Connectors are the bridge between the abstract action definition and the concrete API call. A connector registers the action types it supports, provides parameter schemas for validation, and contains the execution logic that runs when an action is approved.
 
