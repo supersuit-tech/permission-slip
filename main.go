@@ -40,6 +40,7 @@ import (
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
+	"github.com/supersuit-tech/permission-slip-web/connectors/salesforce"
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
@@ -355,6 +356,7 @@ func main() {
 		registry.Register(protonmail.New())
 	}
 	registry.Register(redisconnector.New())
+	registry.Register(salesforce.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
 	registry.Register(trello.New())
