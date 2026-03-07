@@ -24,6 +24,7 @@ type sheetsWriteRangeParams struct {
 	Values        [][]any `json:"values"`
 }
 
+// validate checks that required fields are present and values are well-formed.
 func (p *sheetsWriteRangeParams) validate() error {
 	if p.SpreadsheetID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: spreadsheet_id"}

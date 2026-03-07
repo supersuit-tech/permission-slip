@@ -23,6 +23,7 @@ type sheetsReadRangeParams struct {
 	Range         string `json:"range"`
 }
 
+// validate checks that required fields are present.
 func (p *sheetsReadRangeParams) validate() error {
 	if p.SpreadsheetID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: spreadsheet_id"}

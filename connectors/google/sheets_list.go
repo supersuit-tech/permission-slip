@@ -22,6 +22,7 @@ type sheetsListSheetsParams struct {
 	SpreadsheetID string `json:"spreadsheet_id"`
 }
 
+// validate checks that required fields are present.
 func (p *sheetsListSheetsParams) validate() error {
 	if p.SpreadsheetID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: spreadsheet_id"}
@@ -36,6 +37,7 @@ type sheetsSpreadsheetResponse struct {
 	} `json:"sheets"`
 }
 
+// sheetsProperties maps to the Google Sheets API SheetProperties resource.
 type sheetsProperties struct {
 	SheetID        int                 `json:"sheetId"`
 	Title          string              `json:"title"`
@@ -44,6 +46,7 @@ type sheetsProperties struct {
 	GridProperties *sheetsGridProperties `json:"gridProperties,omitempty"`
 }
 
+// sheetsGridProperties holds the row and column dimensions of a sheet.
 type sheetsGridProperties struct {
 	RowCount    int `json:"rowCount"`
 	ColumnCount int `json:"columnCount"`
