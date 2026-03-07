@@ -94,6 +94,18 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "figma",
+			AuthorizeURL: "https://www.figma.com/oauth",
+			TokenURL:     "https://api.figma.com/v1/oauth/token",
+			Scopes: []string{
+				"files:read",
+				"file_comments:write",
+			},
+			ClientID:     os.Getenv("FIGMA_CLIENT_ID"),
+			ClientSecret: os.Getenv("FIGMA_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "kroger",
 			AuthorizeURL: "https://api.kroger.com/v1/connect/oauth2/authorize",
 			TokenURL:     "https://api.kroger.com/v1/connect/oauth2/token",

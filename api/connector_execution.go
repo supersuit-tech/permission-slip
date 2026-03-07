@@ -52,7 +52,23 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			return nil, err
+			// If the user has no OAuth connection, fall back to static
+			// credentials (e.g. a personal access token stored manually).
+			// This supports connectors like Figma that offer both OAuth and
+			// PAT authentication.
+			var oauthErr *connectors.OAuthRefreshError
+			if errors.As(err, &oauthErr) {
+				staticCreds, staticErr := resolveStaticCredentials(ctx, deps, userID, actionType)
+				if staticErr == nil {
+					creds = staticCreds
+					err = nil
+				}
+				// If static also fails, return the original OAuth error
+				// so the user sees a clear "connect via Settings" message.
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		// Static credential path (api_key, basic, custom): existing behavior.

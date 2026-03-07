@@ -149,7 +149,12 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "figma", AuthType: "custom", InstructionsURL: "https://www.figma.com/developers/api#authentication"},
+			{
+				Service:       "figma",
+				AuthType:      "oauth2",
+				OAuthProvider: "figma",
+				OAuthScopes:   []string{"files:read", "file_comments:write"},
+			},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

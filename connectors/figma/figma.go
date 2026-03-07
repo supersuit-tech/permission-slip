@@ -10,7 +10,7 @@
 //   - figma.post_comment     — post a comment on a file
 //   - figma.get_versions     — get version history for a file
 //
-// Auth: Personal access token (custom credential).
+// Auth: OAuth2 (primary) or personal access token (fallback).
 // Base URL: https://api.figma.com/v1/
 package figma
 
@@ -48,7 +48,14 @@ func parseParams(data json.RawMessage, dest validatable) error {
 const (
 	defaultBaseURL = "https://api.figma.com/v1"
 	defaultTimeout = 30 * time.Second
-	credKeyToken   = "personal_access_token"
+
+	// credKeyOAuth is the credential key set by the OAuth flow (access_token).
+	credKeyOAuth = "access_token"
+	// credKeyPAT is the credential key for personal access tokens (custom auth).
+	credKeyPAT = "personal_access_token"
+	// credKeyAPIKey is the generic credential key used by the UI's credential
+	// dialog (which stores all custom tokens under "api_key").
+	credKeyAPIKey = "api_key"
 
 	// defaultRetryAfter is used when the Figma API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -95,6 +102,7 @@ func safeRedirectPolicy(baseURL string) func(*http.Request, []*http.Request) err
 		}
 		if req.URL.Host != allowedHost {
 			req.Header.Del("X-Figma-Token")
+			req.Header.Del("Authorization")
 		}
 		return nil
 	}
@@ -123,23 +131,38 @@ func (c *FigmaConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty personal_access_token.
+// ValidateCredentials checks that the provided credentials contain either
+// an OAuth access_token or a personal_access_token.
 func (c *FigmaConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	_, err := requireToken(creds)
+	_, _, err := requireToken(creds)
 	return err
 }
 
-// requireToken extracts and validates the personal access token from
-// credentials. Returns the token or a ValidationError. Used by
-// ValidateCredentials, doGet, and doPost to avoid repeating the same
-// extraction logic.
-func requireToken(creds connectors.Credentials) (string, error) {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return "", &connectors.ValidationError{Message: "personal_access_token credential is missing or empty"}
+// tokenSource indicates which authentication method is in use.
+type tokenSource int
+
+const (
+	tokenSourceOAuth tokenSource = iota
+	tokenSourcePAT
+)
+
+// requireToken extracts a token from credentials. It checks for an OAuth
+// access_token first (primary), then falls back to a personal_access_token
+// or api_key (PAT stored via the UI). Returns the token value, its source,
+// or a ValidationError.
+func requireToken(creds connectors.Credentials) (string, tokenSource, error) {
+	if token, ok := creds.Get(credKeyOAuth); ok && token != "" {
+		return token, tokenSourceOAuth, nil
 	}
-	return token, nil
+	if token, ok := creds.Get(credKeyPAT); ok && token != "" {
+		return token, tokenSourcePAT, nil
+	}
+	if token, ok := creds.Get(credKeyAPIKey); ok && token != "" {
+		return token, tokenSourcePAT, nil
+	}
+	return "", 0, &connectors.ValidationError{
+		Message: "no Figma credentials found — connect via OAuth or provide a personal access token",
+	}
 }
 
 // figmaErrorResponse is the error envelope returned by the Figma API.
@@ -207,9 +230,21 @@ func validateNodeIDs(nodeIDs string) error {
 	return nil
 }
 
+// setAuthHeader sets the appropriate authentication header on the request
+// based on the token source. OAuth tokens use the standard Authorization
+// header; personal access tokens use the Figma-specific X-Figma-Token header.
+func setAuthHeader(req *http.Request, token string, src tokenSource) {
+	switch src {
+	case tokenSourceOAuth:
+		req.Header.Set("Authorization", "Bearer "+token)
+	default:
+		req.Header.Set("X-Figma-Token", token)
+	}
+}
+
 // doGet is the shared request lifecycle for read-only Figma API calls.
 func (c *FigmaConnector) doGet(ctx context.Context, path string, creds connectors.Credentials, dest any) error {
-	token, err := requireToken(creds)
+	token, src, err := requireToken(creds)
 	if err != nil {
 		return err
 	}
@@ -218,14 +253,14 @@ func (c *FigmaConnector) doGet(ctx context.Context, path string, creds connector
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
-	req.Header.Set("X-Figma-Token", token)
+	setAuthHeader(req, token, src)
 
 	return c.doRequest(req, dest)
 }
 
 // doPost is the shared request lifecycle for write Figma API calls.
 func (c *FigmaConnector) doPost(ctx context.Context, path string, creds connectors.Credentials, body any, dest any) error {
-	token, err := requireToken(creds)
+	token, src, err := requireToken(creds)
 	if err != nil {
 		return err
 	}
@@ -243,7 +278,7 @@ func (c *FigmaConnector) doPost(ctx context.Context, path string, creds connecto
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
-	req.Header.Set("X-Figma-Token", token)
+	setAuthHeader(req, token, src)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -309,7 +344,7 @@ func mapFigmaHTTPError(statusCode int, body []byte) error {
 
 	switch statusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return &connectors.AuthError{Message: detail + " — check that your personal access token is valid and has access to this resource"}
+		return &connectors.AuthError{Message: detail + " — check that your OAuth connection or personal access token is valid and has access to this resource"}
 	case http.StatusNotFound:
 		// 404 indicates the requested resource (file, node, etc.) was not found
 		// or is invalid. Mapped to ValidationError for consistency with other

@@ -52,8 +52,18 @@ func TestFigmaConnector_ValidateCredentials(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid token",
+			name:    "valid PAT",
 			creds:   connectors.NewCredentials(map[string]string{"personal_access_token": "figd_1234567890abcdef"}),
+			wantErr: false,
+		},
+		{
+			name:    "valid OAuth access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "ya29.oauth_token_abc"}),
+			wantErr: false,
+		},
+		{
+			name:    "valid api_key (generic UI key)",
+			creds:   connectors.NewCredentials(map[string]string{"api_key": "figd_1234567890abcdef"}),
 			wantErr: false,
 		},
 		{
@@ -104,11 +114,14 @@ func TestFigmaConnector_Manifest(t *testing.T) {
 	if cred.Service != "figma" {
 		t.Errorf("credential service = %q, want %q", cred.Service, "figma")
 	}
-	if cred.AuthType != "custom" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "custom")
+	if cred.AuthType != "oauth2" {
+		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if cred.OAuthProvider != "figma" {
+		t.Errorf("credential oauth_provider = %q, want %q", cred.OAuthProvider, "figma")
+	}
+	if len(cred.OAuthScopes) == 0 {
+		t.Error("credential oauth_scopes is empty, want at least one scope")
 	}
 
 	if len(m.Actions) != 6 {
@@ -168,7 +181,7 @@ func TestFigmaConnector_RedirectStripsToken(t *testing.T) {
 	// and read by the test goroutine to avoid a data race.
 	var tokenLeaked atomic.Bool
 	evil := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Figma-Token") != "" {
+		if r.Header.Get("X-Figma-Token") != "" || r.Header.Get("Authorization") != "" {
 			tokenLeaked.Store(true)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -189,11 +202,19 @@ func TestFigmaConnector_RedirectStripsToken(t *testing.T) {
 		baseURL: figmaSrv.URL,
 	}
 
+	// Test PAT redirect stripping
 	var dest map[string]any
 	_ = conn.doGet(t.Context(), "/files/abc", validCreds(), &dest)
-
 	if tokenLeaked.Load() {
 		t.Error("X-Figma-Token was leaked to cross-origin redirect target")
+	}
+
+	// Test OAuth redirect stripping
+	tokenLeaked.Store(false)
+	oauthCreds := connectors.NewCredentials(map[string]string{"access_token": "oauth_test"})
+	_ = conn.doGet(t.Context(), "/files/abc", oauthCreds, &dest)
+	if tokenLeaked.Load() {
+		t.Error("Authorization header was leaked to cross-origin redirect target")
 	}
 }
 
@@ -219,6 +240,51 @@ func TestFigmaConnector_DoGet_Success(t *testing.T) {
 	}
 	if dest["name"] != "Test File" {
 		t.Errorf("expected name 'Test File', got %v", dest["name"])
+	}
+}
+
+func TestFigmaConnector_DoGet_OAuthBearerHeader(t *testing.T) {
+	t.Parallel()
+
+	_, conn := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer oauth_token_xyz" {
+			t.Errorf("expected Authorization Bearer header, got %q", got)
+		}
+		if got := r.Header.Get("X-Figma-Token"); got != "" {
+			t.Errorf("expected no X-Figma-Token header for OAuth, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"name":"Test File"}`)
+	})
+
+	oauthCreds := connectors.NewCredentials(map[string]string{"access_token": "oauth_token_xyz"})
+	var dest map[string]any
+	err := conn.doGet(t.Context(), "/files/abc123", oauthCreds, &dest)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFigmaConnector_DoGet_OAuthTakesPrecedence(t *testing.T) {
+	t.Parallel()
+
+	_, conn := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		// When both OAuth and PAT are present, OAuth takes precedence
+		if got := r.Header.Get("Authorization"); got != "Bearer oauth_token" {
+			t.Errorf("expected OAuth Bearer header, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"name":"Test File"}`)
+	})
+
+	bothCreds := connectors.NewCredentials(map[string]string{
+		"access_token":          "oauth_token",
+		"personal_access_token": "pat_token",
+	})
+	var dest map[string]any
+	err := conn.doGet(t.Context(), "/files/abc123", bothCreds, &dest)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
