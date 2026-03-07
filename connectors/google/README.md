@@ -330,9 +330,9 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Create calendar events | `create_calendar_event` | Nothing — agent controls all parameters |
 | Create personal calendar events | `create_calendar_event` | `calendar_id` locked to `primary`, no attendees |
 | List calendar events | `list_calendar_events` | Nothing — agent controls all parameters |
-| Read spreadsheet range | `sheets_read_range` | Nothing — agent controls spreadsheet and range |
-| Write spreadsheet range | `sheets_write_range` | Nothing — agent controls all parameters |
-| Append spreadsheet rows | `sheets_append_rows` | Nothing — agent controls all parameters |
+| Read from specific spreadsheet | `sheets_read_range` | `spreadsheet_id` locked; agent chooses range |
+| Write to specific spreadsheet | `sheets_write_range` | `spreadsheet_id` locked; agent chooses range and values |
+| Append to specific spreadsheet | `sheets_append_rows` | `spreadsheet_id` locked; agent chooses range and values |
 | Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
 | List worksheets in any spreadsheet | `sheets_list_sheets` | Nothing — agent controls spreadsheet |
 
@@ -345,14 +345,15 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 3. Use `checkResponse()` (called automatically by `doJSON`) to map HTTP errors to typed connector errors.
 4. Return `connectors.JSONResult(respBody)` to wrap the response into an `ActionResult`.
 5. Register the action in `Actions()` inside `google.go`.
-6. Add the action to the `Manifest()` return value inside `google.go` with a `ParametersSchema`.
+6. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
 7. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()`.
 
 ## File Structure
 
 ```
 connectors/google/
-├── google.go                       # GoogleConnector struct, New(), Manifest(), doJSON(), ValidateCredentials()
+├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), ValidateCredentials()
+├── manifest.go                     # Manifest() — connector metadata, action schemas, templates
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
