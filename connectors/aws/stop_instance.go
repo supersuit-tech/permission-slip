@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 
@@ -31,11 +30,8 @@ type stopInstancesResponse struct {
 
 // Execute stops a running EC2 instance.
 func (a *stopInstanceAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params instanceIDParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[instanceIDParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/url"
@@ -21,10 +20,7 @@ type describeRDSParams struct {
 }
 
 func (p *describeRDSParams) validate() error {
-	if p.Region == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: region"}
-	}
-	return nil
+	return validateRegion(p.Region)
 }
 
 type describeDBInstancesResponse struct {
@@ -72,11 +68,8 @@ type rdsInstanceInfo struct {
 
 // Execute describes RDS instances via the RDS Query API.
 func (a *describeRDSInstancesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params describeRDSParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[describeRDSParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

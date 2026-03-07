@@ -170,20 +170,24 @@ func (c *AWSConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
-							"description": "Start time in RFC 3339 format"
+							"format": "date-time",
+							"description": "Start time in RFC 3339 format (e.g. 2024-01-15T00:00:00Z)"
 						},
 						"end_time": {
 							"type": "string",
-							"description": "End time in RFC 3339 format"
+							"format": "date-time",
+							"description": "End time in RFC 3339 format (e.g. 2024-01-15T01:00:00Z)"
 						},
 						"period": {
 							"type": "integer",
-							"description": "Period in seconds for metric aggregation (e.g. 300 for 5 minutes)"
+							"minimum": 1,
+							"description": "Aggregation period in seconds (e.g. 60, 300, 3600)"
 						},
 						"stat": {
 							"type": "string",
+							"default": "Average",
 							"enum": ["Average", "Sum", "Minimum", "Maximum", "SampleCount"],
-							"description": "Statistic to retrieve (default: Average)"
+							"description": "Statistic to retrieve"
 						}
 					}
 				}`)),
@@ -211,7 +215,10 @@ func (c *AWSConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"max_keys": {
 							"type": "integer",
-							"description": "Maximum number of keys to return (default: 1000)"
+							"default": 1000,
+							"minimum": 1,
+							"maximum": 1000,
+							"description": "Maximum number of keys to return"
 						}
 					}
 				}`)),
@@ -244,7 +251,10 @@ func (c *AWSConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"expires_in": {
 							"type": "integer",
-							"description": "URL expiration time in seconds (default: 3600, max: 604800)"
+							"default": 3600,
+							"minimum": 1,
+							"maximum": 604800,
+							"description": "URL expiration time in seconds (max 7 days)"
 						}
 					}
 				}`)),

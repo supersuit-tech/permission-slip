@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/url"
@@ -33,8 +32,8 @@ type getMetricsParams struct {
 }
 
 func (p *getMetricsParams) validate() error {
-	if p.Region == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: region"}
+	if err := validateRegion(p.Region); err != nil {
+		return err
 	}
 	if p.Namespace == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: namespace"}
@@ -42,14 +41,14 @@ func (p *getMetricsParams) validate() error {
 	if p.MetricName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: metric_name"}
 	}
-	if p.StartTime == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: start_time"}
+	if err := validateRFC3339(p.StartTime, "start_time"); err != nil {
+		return err
 	}
-	if p.EndTime == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: end_time"}
+	if err := validateRFC3339(p.EndTime, "end_time"); err != nil {
+		return err
 	}
 	if p.Period <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: period"}
+		return &connectors.ValidationError{Message: "period must be a positive integer (seconds)"}
 	}
 	if p.Stat == "" {
 		p.Stat = "Average"
@@ -87,11 +86,8 @@ type datapointInfo struct {
 
 // Execute retrieves CloudWatch metrics via the CloudWatch Query API.
 func (a *getMetricsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params getMetricsParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[getMetricsParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"strconv"
@@ -23,8 +22,8 @@ type listS3ObjectsParams struct {
 }
 
 func (p *listS3ObjectsParams) validate() error {
-	if p.Region == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: region"}
+	if err := validateRegion(p.Region); err != nil {
+		return err
 	}
 	if p.Bucket == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: bucket"}
@@ -61,11 +60,8 @@ type s3ObjectInfo struct {
 
 // Execute lists objects in an S3 bucket using the S3 REST API (path-style).
 func (a *listS3ObjectsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params listS3ObjectsParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[listS3ObjectsParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

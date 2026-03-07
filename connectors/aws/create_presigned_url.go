@@ -2,10 +2,7 @@ package aws
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -29,8 +26,8 @@ type createPresignedURLParams struct {
 }
 
 func (p *createPresignedURLParams) validate() error {
-	if p.Region == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: region"}
+	if err := validateRegion(p.Region); err != nil {
+		return err
 	}
 	if p.Bucket == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: bucket"}
@@ -56,11 +53,8 @@ func (p *createPresignedURLParams) validate() error {
 // Execute generates a presigned S3 URL for GET or PUT operations.
 // This does not make an API call — it constructs the signed URL locally.
 func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params createPresignedURLParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[createPresignedURLParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 
@@ -103,12 +97,17 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 		"AWS4-HMAC-SHA256",
 		amzdate,
 		credentialScope,
-		sha256HexStr([]byte(canonicalRequest)),
+		sha256Hex([]byte(canonicalRequest)),
 	}, "\n")
 
-	// Signing key and signature.
-	signingKey := derivePresignKey(secretKey, datestamp, params.Region)
-	signature := hex.EncodeToString(hmacSHA256Presign(signingKey, []byte(stringToSign)))
+	// Derive signing key and compute signature. Reuses the shared crypto
+	// helpers from aws.go (hmacSHA256, deriveSigningKey is for general use;
+	// here we derive the S3-specific key inline).
+	kDate := hmacSHA256([]byte("AWS4"+secretKey), []byte(datestamp))
+	kRegion := hmacSHA256(kDate, []byte(params.Region))
+	kService := hmacSHA256(kRegion, []byte("s3"))
+	signingKey := hmacSHA256(kService, []byte("aws4_request"))
+	signature := hex.EncodeToString(hmacSHA256(signingKey, []byte(stringToSign)))
 
 	presignedURL := fmt.Sprintf("https://%s%s?%s&X-Amz-Signature=%s",
 		host, objectPath, canonicalQuerystring, signature)
@@ -120,22 +119,4 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 		"key":        params.Key,
 		"expires_in": params.ExpiresIn,
 	})
-}
-
-func sha256HexStr(data []byte) string {
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:])
-}
-
-func hmacSHA256Presign(key, data []byte) []byte {
-	h := hmac.New(sha256.New, key)
-	h.Write(data)
-	return h.Sum(nil)
-}
-
-func derivePresignKey(secret, datestamp, region string) []byte {
-	kDate := hmacSHA256Presign([]byte("AWS4"+secret), []byte(datestamp))
-	kRegion := hmacSHA256Presign(kDate, []byte(region))
-	kService := hmacSHA256Presign(kRegion, []byte("s3"))
-	return hmacSHA256Presign(kService, []byte("aws4_request"))
 }

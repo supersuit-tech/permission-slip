@@ -2,11 +2,9 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -22,10 +20,7 @@ type describeInstancesParams struct {
 }
 
 func (p *describeInstancesParams) validate() error {
-	if p.Region == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: region"}
-	}
-	return nil
+	return validateRegion(p.Region)
 }
 
 // describeInstancesResponse represents the EC2 DescribeInstances XML response.
@@ -66,11 +61,8 @@ type instanceInfo struct {
 
 // Execute describes EC2 instances via the EC2 Query API.
 func (a *describeInstancesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params describeInstancesParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[describeInstancesParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 
@@ -144,14 +136,8 @@ type instanceIDParams struct {
 }
 
 func (p *instanceIDParams) validate() error {
-	if p.Region == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: region"}
+	if err := validateRegion(p.Region); err != nil {
+		return err
 	}
-	if p.InstanceID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: instance_id"}
-	}
-	if !strings.HasPrefix(p.InstanceID, "i-") {
-		return &connectors.ValidationError{Message: "instance_id must start with 'i-'"}
-	}
-	return nil
+	return validateInstanceID(p.InstanceID)
 }
