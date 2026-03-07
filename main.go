@@ -34,6 +34,7 @@ import (
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
+	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
@@ -341,6 +342,11 @@ func main() {
 	registry.Register(pgconnector.New())
 	registry.Register(shopify.New())
 	registry.Register(slack.New())
+	// Proton Mail connector depends on a local Proton Mail Bridge daemon and is
+	// not cloud-safe. Only register when explicitly enabled.
+	if v := os.Getenv("ENABLE_PROTONMAIL_CONNECTOR"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") {
+		registry.Register(protonmail.New())
+	}
 	registry.Register(redisconnector.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
