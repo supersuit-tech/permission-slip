@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -114,6 +115,9 @@ func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credent
 	if err != nil {
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("SendGrid API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "SendGrid API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("SendGrid API request failed: %v", err)}
 	}
