@@ -17,20 +17,14 @@ type listDeliveriesAction struct {
 	conn *DoorDashConnector
 }
 
-// validStatuses is the set of delivery statuses accepted by the DoorDash API.
-var validStatuses = map[string]bool{
-	"created":              true,
-	"confirmed":            true,
-	"enroute_to_pickup":    true,
-	"arrived_at_pickup":    true,
-	"picked_up":            true,
-	"enroute_to_dropoff":   true,
-	"arrived_at_dropoff":   true,
-	"delivered":            true,
-	"cancelled":            true,
-	"enroute_to_return":    true,
-	"returned":             true,
-}
+// validStatuses is built from deliveryStatuses for O(1) lookup.
+var validStatuses = func() map[string]bool {
+	m := make(map[string]bool, len(deliveryStatuses))
+	for _, s := range deliveryStatuses {
+		m[s] = true
+	}
+	return m
+}()
 
 type listDeliveriesParams struct {
 	Limit         *int   `json:"limit,omitempty"`

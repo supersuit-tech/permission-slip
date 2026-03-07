@@ -2,9 +2,20 @@ package doordash
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// statusEnumJSON builds the JSON enum array from deliveryStatuses so the
+// manifest schema and Go validation always stay in sync.
+func statusEnumJSON() string {
+	quoted := make([]string, len(deliveryStatuses))
+	for i, s := range deliveryStatuses {
+		quoted[i] = `"` + s + `"`
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
+}
 
 // Manifest returns the connector's metadata manifest for DB auto-seeding.
 func (c *DoorDashConnector) Manifest() *connectors.ConnectorManifest {
@@ -222,30 +233,34 @@ func cancelDeliveryManifest() connectors.ManifestAction {
 }
 
 func listDeliveriesManifest() connectors.ManifestAction {
-	return connectors.ManifestAction{
-		ActionType:  "doordash.list_deliveries",
-		Name:        "List Deliveries",
-		Description: "List recent deliveries with optional status filter. Supports cursor-based pagination for large result sets.",
-		RiskLevel:   "low",
-		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-			"type": "object",
-			"additionalProperties": false,
-			"properties": {
-				"limit": {
-					"type": "integer",
-					"minimum": 1,
-					"description": "Maximum number of deliveries to return (default 20)"
-				},
-				"starting_after": {
-					"type": "string",
-					"description": "Pagination cursor from a previous list_deliveries response"
-				},
-				"status": {
-					"type": "string",
-					"enum": ["created", "confirmed", "enroute_to_pickup", "arrived_at_pickup", "picked_up", "enroute_to_dropoff", "arrived_at_dropoff", "delivered", "cancelled", "enroute_to_return", "returned"],
-					"description": "Filter by delivery status"
-				}
+	// Build the status enum from the shared deliveryStatuses slice so
+	// validation and schema can never drift apart.
+	schema := `{
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+			"limit": {
+				"type": "integer",
+				"minimum": 1,
+				"description": "Maximum number of deliveries to return (default 20)"
+			},
+			"starting_after": {
+				"type": "string",
+				"description": "Pagination cursor from a previous list_deliveries response"
+			},
+			"status": {
+				"type": "string",
+				"enum": ` + statusEnumJSON() + `,
+				"description": "Filter by delivery status"
 			}
-		}`)),
+		}
+	}`
+
+	return connectors.ManifestAction{
+		ActionType:       "doordash.list_deliveries",
+		Name:             "List Deliveries",
+		Description:      "List recent deliveries with optional status filter. Supports cursor-based pagination for large result sets.",
+		RiskLevel:        "low",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(schema)),
 	}
 }

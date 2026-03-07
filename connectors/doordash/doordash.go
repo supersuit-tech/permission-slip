@@ -35,6 +35,23 @@ const (
 	credKeySigningSecret = "signing_secret"
 )
 
+// deliveryStatuses is the canonical list of DoorDash delivery statuses.
+// Used by both list_deliveries validation and the manifest JSON schema so
+// they can never drift apart.
+var deliveryStatuses = []string{
+	"created",
+	"confirmed",
+	"enroute_to_pickup",
+	"arrived_at_pickup",
+	"picked_up",
+	"enroute_to_dropoff",
+	"arrived_at_dropoff",
+	"delivered",
+	"cancelled",
+	"enroute_to_return",
+	"returned",
+}
+
 // DoorDashConnector owns the shared HTTP client and base URL used by all
 // DoorDash Drive actions.
 type DoorDashConnector struct {
