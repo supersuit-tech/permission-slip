@@ -54,13 +54,28 @@ func TestNotionConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "ntn_oauth_token_abc"}),
+			wantErr: false,
+		},
+		{
+			name:    "both credentials prefers access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth_tok", "api_key": "api_tok"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing credentials",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
 			name:    "empty api_key",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -94,18 +109,30 @@ func TestNotionConnector_Manifest(t *testing.T) {
 	if m.Name != "Notion" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Notion")
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "notion" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "notion")
+	// First credential: OAuth (preferred)
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "notion" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "notion")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "notion" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "notion")
+	}
+	// Second credential: API key (fallback)
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "notion_api_key" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "notion_api_key")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
 	}
 
 	if len(m.Actions) != 5 {
@@ -198,6 +225,56 @@ func TestNotionConnector_ImplementsInterface(t *testing.T) {
 	var _ connectors.ManifestProvider = (*NotionConnector)(nil)
 }
 
+func TestResolveToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		creds     connectors.Credentials
+		wantToken string
+		wantErr   bool
+	}{
+		{
+			name:      "access_token preferred over api_key",
+			creds:     connectors.NewCredentials(map[string]string{"access_token": "oauth_tok", "api_key": "api_tok"}),
+			wantToken: "oauth_tok",
+		},
+		{
+			name:      "api_key used when no access_token",
+			creds:     connectors.NewCredentials(map[string]string{"api_key": "api_tok"}),
+			wantToken: "api_tok",
+		},
+		{
+			name:      "access_token only",
+			creds:     connectors.NewCredentials(map[string]string{"access_token": "oauth_tok"}),
+			wantToken: "oauth_tok",
+		},
+		{
+			name:    "no credentials",
+			creds:   connectors.NewCredentials(map[string]string{}),
+			wantErr: true,
+		},
+		{
+			name:    "empty values",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "", "api_key": ""}),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token, err := resolveToken(tt.creds)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("resolveToken() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if token != tt.wantToken {
+				t.Errorf("resolveToken() = %q, want %q", token, tt.wantToken)
+			}
+		})
+	}
+}
+
 func TestNotionConnector_Do_Success(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +303,27 @@ func TestNotionConnector_Do_Success(t *testing.T) {
 	}
 	if dest["id"] != "page-123" {
 		t.Errorf("expected id 'page-123', got %q", dest["id"])
+	}
+}
+
+func TestNotionConnector_Do_Success_OAuthCreds(t *testing.T) {
+	t.Parallel()
+
+	_, conn := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer ntn_test_token_123" {
+			t.Errorf("bad auth header: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"object":"page","id":"page-456"}`)
+	})
+
+	var dest map[string]string
+	err := conn.do(t.Context(), http.MethodPost, "/v1/pages", validOAuthCreds(), map[string]string{"title": "test"}, &dest)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dest["id"] != "page-456" {
+		t.Errorf("expected id 'page-456', got %q", dest["id"])
 	}
 }
 

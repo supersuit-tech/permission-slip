@@ -52,7 +52,28 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			return nil, err
+			// If OAuth resolution failed because the user has no connection,
+			// check for a fallback static credential (e.g. api_key) for
+			// connectors that support both auth methods.
+			var oauthErr *connectors.OAuthRefreshError
+			if errors.As(err, &oauthErr) {
+				fallbackCred, fbErr := db.GetFallbackCredentialByActionType(ctx, deps.DB, actionType)
+				if fbErr != nil {
+					return nil, fmt.Errorf("look up fallback credential: %w", fbErr)
+				}
+				if fallbackCred != nil {
+					creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
+					if err != nil {
+						// Static fallback also failed — return the original OAuth error
+						// since that's the preferred auth method.
+						return nil, oauthErr
+					}
+				} else {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
 		}
 	} else {
 		// Static credential path (api_key, basic, custom): existing behavior.

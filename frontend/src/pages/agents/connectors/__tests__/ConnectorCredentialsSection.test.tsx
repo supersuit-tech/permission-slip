@@ -29,6 +29,22 @@ const storedCredentials = {
   ],
 };
 
+const emptyOAuthConnections = { connections: [] };
+
+/** Route mockGet responses based on the API path. */
+function setupMockGet(overrides: Record<string, unknown> = {}) {
+  const routes: Record<string, unknown> = {
+    "/v1/credentials": { data: { credentials: [] } },
+    "/v1/oauth/connections": { data: emptyOAuthConnections },
+    ...overrides,
+  };
+  mockGet.mockImplementation((path: string) => {
+    const response = routes[path];
+    if (response) return Promise.resolve(response);
+    return Promise.resolve({ data: null });
+  });
+}
+
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -56,7 +72,9 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows connected status with stored credentials", async () => {
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -72,7 +90,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -88,7 +106,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Add Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -108,7 +126,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("stores credential through Add dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
@@ -144,7 +162,9 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Remove Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -168,7 +188,9 @@ describe("ConnectorCredentialsSection", () => {
 
   it("deletes credential through Remove dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
     mockDelete.mockResolvedValue({
       data: { id: "cred_123", deleted_at: "2026-02-20T10:00:00Z" },
     });
@@ -201,7 +223,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -219,5 +241,90 @@ describe("ConnectorCredentialsSection", () => {
 
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
+  });
+
+  it("renders OAuth connect button for oauth2 auth type", async () => {
+    setupMockGet();
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "notion",
+            auth_type: "oauth2" as const,
+            oauth_provider: "notion",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Notion (OAuth)")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Connect Notion")).toBeInTheDocument();
+    expect(screen.getByText("Not connected")).toBeInTheDocument();
+  });
+
+  it("shows connected status for active OAuth connection", async () => {
+    setupMockGet({
+      "/v1/oauth/connections": {
+        data: {
+          connections: [
+            {
+              provider: "notion",
+              status: "active",
+              scopes: [],
+              connected_at: "2026-03-01T10:00:00Z",
+            },
+          ],
+        },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "notion",
+            auth_type: "oauth2" as const,
+            oauth_provider: "notion",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Connected via OAuth")).toBeInTheDocument();
+    expect(screen.queryByText("Connect Notion")).not.toBeInTheDocument();
+  });
+
+  it("renders both OAuth and API key for dual-auth connectors", async () => {
+    setupMockGet();
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "notion",
+            auth_type: "oauth2" as const,
+            oauth_provider: "notion",
+          },
+          {
+            service: "notion_api_key",
+            auth_type: "api_key" as const,
+            instructions_url:
+              "https://developers.notion.com/docs/create-a-notion-integration",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Notion (OAuth)")).toBeInTheDocument();
+    });
+    expect(screen.getByText("notion_api_key")).toBeInTheDocument();
+    expect(screen.getByText("Connect Notion")).toBeInTheDocument();
   });
 });

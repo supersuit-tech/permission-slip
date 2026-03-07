@@ -9,7 +9,7 @@
 //   - notion.query_database — query a database with filters and sorts
 //   - notion.search        — full-text search across shared content
 //
-// Auth: Notion internal integration token (api_key credential).
+// Auth: OAuth 2.0 access token (preferred) or internal integration token (api_key).
 // API version: 2022-06-28 (set via Notion-Version header on every request).
 package notion
 
@@ -67,10 +67,11 @@ func validateNotionID(id, fieldName string) error {
 }
 
 const (
-	defaultBaseURL = "https://api.notion.com/v1"
-	defaultTimeout = 30 * time.Second
-	credKeyToken   = "api_key"
-	notionVersion  = "2022-06-28"
+	defaultBaseURL      = "https://api.notion.com/v1"
+	defaultTimeout      = 30 * time.Second
+	credKeyAccessToken  = "access_token"
+	credKeyAPIKey       = "api_key"
+	notionVersion       = "2022-06-28"
 
 	// defaultRetryAfter is used when the Notion API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -266,7 +267,8 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "notion", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
+			{Service: "notion", AuthType: "oauth2", OAuthProvider: "notion"},
+			{Service: "notion_api_key", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{
@@ -313,13 +315,27 @@ func (c *NotionConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key (Notion internal integration token).
+// non-empty access_token (from OAuth) or api_key (internal integration token).
 func (c *NotionConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return nil
 	}
-	return nil
+	if token, ok := creds.Get(credKeyAPIKey); ok && token != "" {
+		return nil
+	}
+	return &connectors.ValidationError{Message: "missing required credential: access_token or api_key"}
+}
+
+// resolveToken returns the bearer token from credentials, preferring
+// access_token (OAuth) over api_key (internal integration token).
+func resolveToken(creds connectors.Credentials) (string, error) {
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return token, nil
+	}
+	if token, ok := creds.Get(credKeyAPIKey); ok && token != "" {
+		return token, nil
+	}
+	return "", &connectors.ValidationError{Message: "access_token or api_key credential is missing or empty"}
 }
 
 // notionErrorResponse is the error envelope returned by the Notion API.
@@ -336,9 +352,9 @@ type notionErrorResponse struct {
 // the specified path with auth and versioning headers, handles rate limiting
 // and timeouts, and unmarshals the response into dest.
 func (c *NotionConnector) do(ctx context.Context, httpMethod, path string, creds connectors.Credentials, body any, dest any) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	token, err := resolveToken(creds)
+	if err != nil {
+		return err
 	}
 
 	var bodyReader io.Reader
