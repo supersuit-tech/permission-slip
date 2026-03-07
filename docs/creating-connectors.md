@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 ```go
 // Example: OAuth2 credential in a manifest
@@ -363,7 +363,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `google`, `kroger`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
@@ -991,6 +991,16 @@ connectors/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
+│   └── ...tests...
+├── kroger/
+│   ├── kroger.go              # KrogerConnector struct, New(), do(), OAuth2 bearer auth
+│   ├── manifest.go            # Manifest() with 4 action schemas and 6 templates
+│   ├── response.go            # HTTP status → typed error mapping (truncates large bodies)
+│   ├── search_products.go     # kroger.search_products — search by keyword with location pricing
+│   ├── get_product.go         # kroger.get_product — product details by UPC
+│   ├── search_locations.go    # kroger.search_locations — find stores by zip/coordinates
+│   ├── add_to_cart.go         # kroger.add_to_cart — add items to user's cart
+│   ├── README.md              # Connector documentation
 │   └── ...tests...
 ├── zoom/
 │   ├── zoom.go                # ZoomConnector struct, New(), doJSON(), OAuth2 auth, error mapping

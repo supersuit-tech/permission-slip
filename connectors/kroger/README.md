@@ -65,23 +65,28 @@ The connector maps Kroger API responses to typed connector errors:
 | Other 4xx/5xx | `ExternalError` | API-level error with message from response |
 | Client timeout | `TimeoutError` | Request exceeded 30-second deadline |
 
-Kroger API errors return a JSON body with an `errors` array. The connector extracts the first error's `message` (or `reason`) for inclusion in the typed error.
+Kroger API errors return a JSON body with an `errors` array. The connector extracts the first error's `message` (or `reason`) for inclusion in the typed error. Raw error bodies are truncated to 512 characters in error messages to prevent leaking large payloads.
 
 ### Response Size Limit
 
 All responses are capped at 10 MiB (`io.LimitReader`) to prevent memory exhaustion.
+
+### Coordinate Validation
+
+The `search_locations` action uses pointer types (`*float64`) for `lat` and `lon` to correctly distinguish "not provided" from the value `0`. Both `lat` and `lon` must be provided together — providing only one returns a `ValidationError`. Latitude must be in `[-90, 90]` and longitude in `[-180, 180]`.
 
 ## File Structure
 
 ```
 connectors/kroger/
 ├── kroger.go               # KrogerConnector struct, New(), Actions(), ValidateCredentials(), do()
-├── manifest.go             # Manifest() — metadata, actions, OAuth provider, templates
+├── manifest.go             # Manifest() — metadata, actions, templates, OAuth credentials
+├── response.go             # checkResponse() — HTTP status → typed error mapping
 ├── search_products.go      # kroger.search_products action
 ├── get_product.go          # kroger.get_product action
 ├── search_locations.go     # kroger.search_locations action
 ├── add_to_cart.go          # kroger.add_to_cart action
-├── *_test.go               # Tests for each action + connector
+├── *_test.go               # Tests for each action + connector + response
 ├── helpers_test.go         # Shared test helpers (validCreds)
 └── README.md               # This file
 ```
