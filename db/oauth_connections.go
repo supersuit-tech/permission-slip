@@ -265,6 +265,8 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 
 // GetRequiredCredentialByActionType returns the required credential for the connector
 // that owns the given action type. Used to determine auth_type at execution time.
+// When a connector supports multiple auth methods (e.g. OAuth2 + API key),
+// OAuth2 is preferred so the caller tries it first and can fall back to static credentials.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
@@ -272,6 +274,29 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
+		ORDER BY (crc.auth_type = 'oauth2') DESC
+		LIMIT 1`,
+		actionType,
+	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &rc, nil
+}
+
+// HasStaticCredentialByActionType checks whether the connector that owns the
+// given action type has a non-OAuth2 required credential (api_key, basic, custom).
+// Used to determine if a static credential fallback is available when OAuth fails.
+func HasStaticCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
+	var rc RequiredCredential
+	err := db.QueryRow(ctx, `
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
+		FROM connector_actions ca
+		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
+		WHERE ca.action_type = $1 AND crc.auth_type != 'oauth2'
 		LIMIT 1`,
 		actionType,
 	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)
