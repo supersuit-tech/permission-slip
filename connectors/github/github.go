@@ -114,6 +114,237 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "github.create_pr",
+				Name:        "Create Pull Request",
+				Description: "Create a pull request from a branch",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "title", "head", "base"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"title": {
+							"type": "string",
+							"description": "Pull request title"
+						},
+						"body": {
+							"type": "string",
+							"description": "Pull request body (Markdown supported)"
+						},
+						"head": {
+							"type": "string",
+							"description": "Branch containing the changes"
+						},
+						"base": {
+							"type": "string",
+							"description": "Branch to merge into"
+						},
+						"draft": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether to create the PR as a draft"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.add_reviewer",
+				Name:        "Add Reviewer",
+				Description: "Request reviews on a pull request",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "pull_number", "reviewers"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"pull_number": {
+							"type": "integer",
+							"description": "Pull request number"
+						},
+						"reviewers": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "GitHub usernames to request reviews from"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.create_release",
+				Name:        "Create Release",
+				Description: "Create a tagged release in a repository",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "tag_name"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"tag_name": {
+							"type": "string",
+							"description": "The name of the tag for this release"
+						},
+						"name": {
+							"type": "string",
+							"description": "The name of the release"
+						},
+						"body": {
+							"type": "string",
+							"description": "Release notes (Markdown supported)"
+						},
+						"draft": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether to create as a draft release"
+						},
+						"prerelease": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether to mark as a pre-release"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.close_issue",
+				Name:        "Close Issue",
+				Description: "Close an issue with an optional comment",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "issue_number"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"issue_number": {
+							"type": "integer",
+							"description": "Issue number to close"
+						},
+						"state_reason": {
+							"type": "string",
+							"enum": ["completed", "not_planned"],
+							"default": "completed",
+							"description": "Reason for closing the issue"
+						},
+						"comment": {
+							"type": "string",
+							"description": "Optional comment to add before closing"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.add_label",
+				Name:        "Add Label",
+				Description: "Add labels to an issue or pull request",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "issue_number", "labels"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"issue_number": {
+							"type": "integer",
+							"description": "Issue or pull request number"
+						},
+						"labels": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Labels to add"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.add_comment",
+				Name:        "Add Comment",
+				Description: "Add a comment to an issue or pull request",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "issue_number", "body"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"issue_number": {
+							"type": "integer",
+							"description": "Issue or pull request number"
+						},
+						"body": {
+							"type": "string",
+							"description": "Comment body (Markdown supported)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.create_branch",
+				Name:        "Create Branch",
+				Description: "Create a new branch from a ref",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "branch_name", "from_ref"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"branch_name": {
+							"type": "string",
+							"description": "Name for the new branch"
+						},
+						"from_ref": {
+							"type": "string",
+							"description": "Source ref to branch from (e.g. heads/main)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{Service: "github", AuthType: "api_key", InstructionsURL: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"},
@@ -140,6 +371,55 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can merge any PR. Owner, repo, and PR number are agent-controlled.",
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*","merge_method":"squash"}`),
 			},
+			{
+				ID:          "tpl_github_create_pr",
+				ActionType:  "github.create_pr",
+				Name:        "Create pull requests",
+				Description: "Agent can create PRs in any repo.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","title":"*","body":"*","head":"*","base":"*","draft":"*"}`),
+			},
+			{
+				ID:          "tpl_github_add_reviewer",
+				ActionType:  "github.add_reviewer",
+				Name:        "Add reviewers to PRs",
+				Description: "Agent can request reviewers on any PR.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*","reviewers":"*"}`),
+			},
+			{
+				ID:          "tpl_github_create_release",
+				ActionType:  "github.create_release",
+				Name:        "Create releases",
+				Description: "Agent can create releases in any repo.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","tag_name":"*","name":"*","body":"*","draft":"*","prerelease":"*"}`),
+			},
+			{
+				ID:          "tpl_github_close_issue",
+				ActionType:  "github.close_issue",
+				Name:        "Close issues",
+				Description: "Agent can close issues in any repo with an optional comment.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","state_reason":"*","comment":"*"}`),
+			},
+			{
+				ID:          "tpl_github_add_label",
+				ActionType:  "github.add_label",
+				Name:        "Add labels",
+				Description: "Agent can add labels to any issue or PR.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","labels":"*"}`),
+			},
+			{
+				ID:          "tpl_github_add_comment",
+				ActionType:  "github.add_comment",
+				Name:        "Add comments",
+				Description: "Agent can comment on any issue or PR.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_github_create_branch",
+				ActionType:  "github.create_branch",
+				Name:        "Create branches",
+				Description: "Agent can create branches in any repo.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","branch_name":"*","from_ref":"*"}`),
+			},
 		},
 	}
 }
@@ -147,8 +427,15 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 // Actions returns the registered action handlers keyed by action_type.
 func (c *GitHubConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"github.create_issue": &createIssueAction{conn: c},
-		"github.merge_pr":     &mergePRAction{conn: c},
+		"github.create_issue":   &createIssueAction{conn: c},
+		"github.merge_pr":       &mergePRAction{conn: c},
+		"github.create_pr":      &createPRAction{conn: c},
+		"github.add_reviewer":   &addReviewerAction{conn: c},
+		"github.create_release": &createReleaseAction{conn: c},
+		"github.close_issue":    &closeIssueAction{conn: c},
+		"github.add_label":      &addLabelAction{conn: c},
+		"github.add_comment":    &addCommentAction{conn: c},
+		"github.create_branch":  &createBranchAction{conn: c},
 	}
 }
 
