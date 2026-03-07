@@ -130,6 +130,11 @@ At the start of each session, set this so Go uses the locally installed toolchai
 
 ```bash
 export GOTOOLCHAIN=local
+
+# Patch go.mod to match the local Go version (sandbox can't download toolchains)
+GO_VERSION=$(go env GOVERSION | sed 's/^go//')
+sed -i "s/^go .*/go ${GO_VERSION}/" go.mod
+git update-index --assume-unchanged go.mod go.sum
 ```
 
 ## PostgreSQL Setup
