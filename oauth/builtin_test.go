@@ -36,6 +36,25 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("kroger", func(t *testing.T) {
+		k, ok := byID["kroger"]
+		if !ok {
+			t.Fatal("kroger provider not found")
+		}
+		if k.AuthorizeURL != "https://api.kroger.com/v1/connect/oauth2/authorize" {
+			t.Errorf("AuthorizeURL = %q", k.AuthorizeURL)
+		}
+		if k.TokenURL != "https://api.kroger.com/v1/connect/oauth2/token" {
+			t.Errorf("TokenURL = %q", k.TokenURL)
+		}
+		if k.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", k.Source, SourceBuiltIn)
+		}
+		if len(k.Scopes) == 0 {
+			t.Error("expected default scopes")
+		}
+	})
+
 	t.Run("microsoft", func(t *testing.T) {
 		m, ok := byID["microsoft"]
 		if !ok {
@@ -66,6 +85,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 
 	if _, ok := r.Get("google"); !ok {
 		t.Error("google not found in registry")
+	}
+	if _, ok := r.Get("kroger"); !ok {
+		t.Error("kroger not found in registry")
 	}
 	if _, ok := r.Get("microsoft"); !ok {
 		t.Error("microsoft not found in registry")
