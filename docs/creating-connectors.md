@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub), OAuth 2.0 (Google), custom auth (Slack), HTTP Basic Auth with form-encoded POSTs (Twilio), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API).
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), custom auth (Slack), HTTP Basic Auth with form-encoded POSTs (Twilio), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -952,15 +952,22 @@ connectors/
 │   ├── mysql_test.go         # Connector-level tests
 │   └── *_test.go             # Per-action tests
 ├── google/
-│   ├── google.go             # GoogleConnector struct, New(), Manifest(), doJSON(), OAuth2 auth
+│   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
+│   ├── manifest.go           # Manifest() with 19 action schemas and 28 templates
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── sheets_read.go        # google.sheets_read_range action
+│   ├── sheets_write.go       # google.sheets_write_range action
+│   ├── sheets_append.go      # google.sheets_append_rows action
+│   ├── sheets_list.go        # google.sheets_list_sheets action
+│   ├── sheets_helpers.go     # Shared validation (row/cell limits, ragged row check)
 │   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
 │   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
 │   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
 │   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
+│   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
