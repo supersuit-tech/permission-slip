@@ -47,5 +47,17 @@ func (a *toggleScenarioAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	return &connectors.ActionResult{Data: resp}, nil
+	// Wrap the raw API response with a clear confirmation of what changed,
+	// so users don't have to parse the full scenario object to verify.
+	action := "enabled"
+	if !params.Enabled {
+		action = "disabled"
+	}
+	result := map[string]any{
+		"status":      action,
+		"scenario_id": params.ScenarioID,
+		"scenario":    resp,
+	}
+
+	return connectors.JSONResult(result)
 }

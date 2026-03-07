@@ -57,6 +57,13 @@ func TestTriggerWebhook_Success(t *testing.T) {
 	if data["status"] != "triggered" {
 		t.Errorf("expected status 'triggered', got %v", data["status"])
 	}
+	if data["synchronous"] != false {
+		t.Errorf("expected synchronous=false, got %v", data["synchronous"])
+	}
+	// Even in fire-and-forget mode, response body is now included.
+	if data["response"] == nil {
+		t.Error("expected response data to be included even in fire-and-forget mode")
+	}
 }
 
 func TestTriggerWebhook_WithResponse(t *testing.T) {

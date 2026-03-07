@@ -55,6 +55,20 @@ func TestToggleScenario_Enable(t *testing.T) {
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["status"] != "enabled" {
+		t.Errorf("expected status 'enabled', got %v", data["status"])
+	}
+	if data["scenario_id"] != float64(42) {
+		t.Errorf("expected scenario_id 42, got %v", data["scenario_id"])
+	}
+	if data["scenario"] == nil {
+		t.Error("expected scenario data in response")
+	}
 }
 
 func TestToggleScenario_Disable(t *testing.T) {
@@ -92,6 +106,14 @@ func TestToggleScenario_Disable(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["status"] != "disabled" {
+		t.Errorf("expected status 'disabled', got %v", data["status"])
 	}
 }
 

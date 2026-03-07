@@ -73,9 +73,9 @@ func TestZapierConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "custom domain HTTPS is valid",
+			name:    "non-Zapier domain is rejected",
 			creds:   connectors.NewCredentials(map[string]string{"webhook_url": "https://custom-webhook.example.com/hook"}),
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 

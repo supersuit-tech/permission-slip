@@ -66,6 +66,21 @@ func TestMakeConnector_ValidateCredentials(t *testing.T) {
 			creds:   connectors.Credentials{},
 			wantErr: true,
 		},
+		{
+			name:    "valid api_token with valid base_url",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "base_url": "https://eu1.make.com/api/v2"}),
+			wantErr: false,
+		},
+		{
+			name:    "base_url with trailing slash",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "base_url": "https://eu1.make.com/api/v2/"}),
+			wantErr: true,
+		},
+		{
+			name:    "base_url without HTTPS",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "test-token", "base_url": "http://eu1.make.com/api/v2"}),
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

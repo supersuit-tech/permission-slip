@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -64,7 +66,7 @@ func (c *MakeConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "make",
 		Name:        "Make",
-		Description: "Make (formerly Integromat) integration for workflow automation — manage and run scenarios via the Make REST API",
+		Description: "Make (formerly Integromat) integration for workflow automation — manage and run scenarios via the Make REST API. Supports all Make regions (us1, eu1, eu2, us2) via the base_url credential override.",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "make.list_scenarios",
@@ -184,7 +186,7 @@ func (c *MakeConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				Service:         "make",
 				AuthType:        "api_key",
-				InstructionsURL: "https://www.make.com/en/api-documentation",
+				InstructionsURL: "https://www.make.com/en/help/apps/make/make#connecting-to-make-api",
 			},
 		},
 		Templates: []connectors.ManifestTemplate{
@@ -239,11 +241,24 @@ func (c *MakeConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain
-// a non-empty API token.
+// a non-empty API token and a valid base_url if provided.
 func (c *MakeConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	token, ok := creds.Get(credKeyAPIToken)
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "missing required credential: api_token"}
+	}
+	// Validate optional base_url override if provided.
+	if baseURL, ok := creds.Get(credKeyBaseURL); ok && baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil {
+			return &connectors.ValidationError{Message: fmt.Sprintf("base_url is not a valid URL: %v", err)}
+		}
+		if u.Scheme != "https" {
+			return &connectors.ValidationError{Message: "base_url must use HTTPS"}
+		}
+		if strings.HasSuffix(baseURL, "/") {
+			return &connectors.ValidationError{Message: "base_url must not end with a trailing slash"}
+		}
 	}
 	return nil
 }

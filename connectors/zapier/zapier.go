@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -132,6 +133,13 @@ func (c *ZapierConnector) ValidateCredentials(_ context.Context, creds connector
 	}
 	if u.Host == "" {
 		return &connectors.ValidationError{Message: "webhook_url must include a host"}
+	}
+	// Warn if the URL doesn't look like a standard Zapier webhook — this
+	// catches common mistakes like pasting a regular Zapier page URL.
+	if !strings.HasPrefix(webhookURL, webhookURLPrefix) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("webhook_url should start with %q — make sure you're using a Webhooks by Zapier trigger URL, not a regular Zapier page URL", webhookURLPrefix),
+		}
 	}
 	return nil
 }

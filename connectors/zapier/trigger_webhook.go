@@ -77,17 +77,19 @@ func (a *triggerWebhookAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	result := map[string]any{
-		"status":  "triggered",
+		"status":      "triggered",
 		"http_status": statusCode,
+		"synchronous": params.WaitForResponse,
 	}
 
-	// If waiting for response, try to include the response body.
-	if params.WaitForResponse && len(respBody) > 0 {
+	// Always include response body when present — even in fire-and-forget
+	// mode, Zapier returns a confirmation that helps users verify the
+	// webhook was received.
+	if len(respBody) > 0 {
 		var respData any
 		if err := json.Unmarshal(respBody, &respData); err == nil {
 			result["response"] = respData
 		} else {
-			// Non-JSON response — include as string.
 			result["response"] = string(respBody)
 		}
 	}
