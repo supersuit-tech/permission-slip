@@ -32,6 +32,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		}
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("Datadog API auth error (%d): %s", statusCode, msg)}
+	case statusCode == http.StatusNotFound:
+		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Datadog resource not found: %s", msg)}
 	case statusCode == http.StatusBadRequest:
 		return &connectors.ValidationError{Message: fmt.Sprintf("Datadog API validation error: %s", msg)}
 	default:

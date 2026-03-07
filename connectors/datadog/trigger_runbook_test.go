@@ -20,6 +20,23 @@ func TestTriggerRunbook_Success(t *testing.T) {
 			t.Errorf("path = %s, want /api/v2/workflows/wf-abc-123/instances", r.URL.Path)
 		}
 
+		// Verify the payload is nested correctly under meta.payload.
+		var reqBody map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			t.Fatalf("decoding request body: %v", err)
+		}
+		meta, ok := reqBody["meta"].(map[string]any)
+		if !ok {
+			t.Fatal("request body missing 'meta' object")
+		}
+		payload, ok := meta["payload"].(map[string]any)
+		if !ok {
+			t.Fatal("meta missing 'payload' object")
+		}
+		if payload["env"] != "production" {
+			t.Errorf("payload.env = %v, want production", payload["env"])
+		}
+
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]any{
 			"data": map[string]any{
@@ -44,6 +61,44 @@ func TestTriggerRunbook_Success(t *testing.T) {
 	}
 	if result == nil || result.Data == nil {
 		t.Fatal("Execute() returned nil result")
+	}
+}
+
+func TestTriggerRunbook_EmptyPayload(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reqBody map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			t.Fatalf("decoding request body: %v", err)
+		}
+		meta, ok := reqBody["meta"].(map[string]any)
+		if !ok {
+			t.Fatal("request body missing 'meta' object")
+		}
+		// When no payload is provided, meta should be empty (no null payload).
+		if _, hasPayload := meta["payload"]; hasPayload {
+			t.Error("meta should not contain 'payload' key when payload is empty")
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{"id": "instance-789"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["datadog.trigger_runbook"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "datadog.trigger_runbook",
+		Parameters:  json.RawMessage(`{"workflow_id":"wf-abc-123"}`),
+		Credentials: validCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 }
 

@@ -106,6 +106,7 @@ func TestEscalateIncident_MissingParams(t *testing.T) {
 	}{
 		{name: "missing incident_id", params: `{"escalation_level":2}`},
 		{name: "missing escalation_level", params: `{"incident_id":"P1234567"}`},
+		{name: "negative escalation_level", params: `{"incident_id":"P1234567","escalation_level":-1}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

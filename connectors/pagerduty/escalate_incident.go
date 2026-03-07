@@ -25,7 +25,7 @@ func (p *escalateIncidentParams) validate() error {
 	if p.IncidentID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: incident_id"}
 	}
-	if p.EscalationLevel == 0 {
+	if p.EscalationLevel <= 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: escalation_level"}
 	}
 	return nil

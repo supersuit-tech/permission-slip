@@ -21,7 +21,7 @@ type snoozeAlertParams struct {
 }
 
 func (p *snoozeAlertParams) validate() error {
-	if p.MonitorID == 0 {
+	if p.MonitorID <= 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: monitor_id"}
 	}
 	return nil
