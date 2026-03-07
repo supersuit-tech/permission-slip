@@ -82,6 +82,91 @@ func TestCreateChannel_MissingName(t *testing.T) {
 	}
 }
 
+func TestCreateChannel_NameInvalidFormat(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &createChannelAction{conn: conn}
+
+	tests := []struct {
+		name string
+		val  string
+	}{
+		{"uppercase", "General"},
+		{"spaces", "my channel"},
+		{"special chars", "hello!world"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(createChannelParams{
+				GuildID: "999888777666555444",
+				Name:    tt.val,
+			})
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "discord.create_channel",
+				Parameters:  params,
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatalf("expected error for name %q", tt.val)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError for name %q, got: %T", tt.val, err)
+			}
+		})
+	}
+}
+
+func TestCreateChannel_TopicTooLong(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &createChannelAction{conn: conn}
+
+	longTopic := make([]byte, 1025)
+	for i := range longTopic {
+		longTopic[i] = 'a'
+	}
+	params, _ := json.Marshal(createChannelParams{
+		GuildID: "999888777666555444",
+		Name:    "general",
+		Topic:   string(longTopic),
+	})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "discord.create_channel",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for topic too long")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateChannel_InvalidParentID(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &createChannelAction{conn: conn}
+
+	params, _ := json.Marshal(createChannelParams{
+		GuildID:  "999888777666555444",
+		Name:     "general",
+		ParentID: "not-a-snowflake",
+	})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "discord.create_channel",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid parent_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateChannel_NameTooShort(t *testing.T) {
 	t.Parallel()
 	conn := New()
