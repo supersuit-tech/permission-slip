@@ -37,6 +37,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
+	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -340,6 +341,7 @@ func main() {
 	registry.Register(redisconnector.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
+	registry.Register(xconnector.New())
 	registry.Register(amadeus.New())
 	registry.Register(expedia.New())
 	registry.Register(zoom.New())
