@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -86,11 +87,12 @@ func (a *listAccountsAction) Execute(ctx context.Context, req connectors.ActionR
 	return connectors.JSONResult(resp)
 }
 
-// accountTypeNames returns the valid account type names sorted for error messages.
+// accountTypeNames returns the valid account type names sorted for stable error messages.
 func accountTypeNames() []string {
 	names := make([]string, 0, len(validAccountTypes))
 	for name := range validAccountTypes {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }

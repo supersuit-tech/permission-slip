@@ -34,7 +34,8 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						"line_items": {
 							"type": "array",
 							"minItems": 1,
-							"description": "Invoice line items",
+							"maxItems": 750,
+							"description": "Invoice line items (max 750)",
 							"items": {
 								"type": "object",
 								"additionalProperties": false,
@@ -68,7 +69,7 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "quickbooks.record_payment",
 				Name:        "Record Payment",
-				Description: "Record a payment against an invoice — this records a financial transaction",
+				Description: "Record a customer payment against an open invoice — WARNING: this records a financial transaction that affects accounts receivable",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -94,7 +95,7 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "quickbooks.create_expense",
 				Name:        "Create Expense",
-				Description: "Create an expense entry (purchase) — this records a financial transaction",
+				Description: "Create an expense (purchase transaction) against a bank or credit card account — WARNING: this records a financial transaction that affects your bank balance",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -114,7 +115,8 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						"lines": {
 							"type": "array",
 							"minItems": 1,
-							"description": "Expense line items",
+							"maxItems": 750,
+							"description": "Expense line items (max 750)",
 							"items": {
 								"type": "object",
 								"additionalProperties": false,
@@ -189,7 +191,7 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "quickbooks.reconcile_transaction",
 				Name:        "Reconcile Transaction",
-				Description: "Create a bank deposit to reconcile a transaction — affects bank reconciliation state",
+				Description: "Create a bank deposit to reconcile a transaction — WARNING: this creates a deposit entry that affects bank reconciliation and account balances",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -265,7 +267,8 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"account_type": {
 							"type": "string",
-							"description": "Filter by account type (e.g. \"Bank\", \"Expense\", \"Income\", \"Accounts Receivable\")"
+							"enum": ["Bank", "Accounts Receivable", "Other Current Asset", "Fixed Asset", "Other Asset", "Accounts Payable", "Credit Card", "Other Current Liability", "Long Term Liability", "Equity", "Income", "Cost of Goods Sold", "Expense", "Other Income", "Other Expense"],
+							"description": "Filter by account type"
 						},
 						"max_results": {
 							"type": "integer",

@@ -59,6 +59,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return &connectors.AuthError{Message: fmt.Sprintf("QuickBooks auth error (%d): %s", statusCode, msg)}
 	case statusCode == http.StatusBadRequest:
 		return &connectors.ValidationError{Message: fmt.Sprintf("QuickBooks validation error: %s", msg)}
+	case statusCode == http.StatusNotFound:
+		return &connectors.ValidationError{Message: fmt.Sprintf("QuickBooks validation error (resource not found): %s", msg)}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("QuickBooks API error: %s", msg)}
 	}

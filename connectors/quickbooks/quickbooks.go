@@ -7,13 +7,14 @@
 package quickbooks
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -101,7 +102,7 @@ func realmID(creds connectors.Credentials) string {
 
 // companyPath returns the base API path for a company (realm).
 func companyPath(creds connectors.Credentials) string {
-	return "/v3/company/" + realmID(creds)
+	return "/v3/company/" + url.PathEscape(realmID(creds))
 }
 
 // doJSON is the shared request lifecycle for all QuickBooks actions. It sends a
@@ -118,7 +119,7 @@ func (c *QuickBooksConnector) doJSON(ctx context.Context, creds connectors.Crede
 		if err != nil {
 			return fmt.Errorf("marshaling request body: %w", err)
 		}
-		body = strings.NewReader(string(data))
+		body = bytes.NewReader(data)
 	}
 
 	fullURL := c.baseURL + path
