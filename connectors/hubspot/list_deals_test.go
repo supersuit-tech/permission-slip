@@ -140,6 +140,29 @@ func TestListDeals_InvalidFilterOperator(t *testing.T) {
 	}
 }
 
+func TestListDeals_BetweenOperatorRejected(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &listDealsAction{conn: conn}
+
+	params, _ := json.Marshal(listDealsParams{
+		Filters: []searchFilter{{PropertyName: "amount", Operator: "BETWEEN", Value: "100"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.list_deals",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for BETWEEN operator (requires highValue)")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestListDeals_InvalidSortDirection(t *testing.T) {
 	t.Parallel()
 
@@ -171,8 +194,8 @@ func TestListDeals_LimitClamped(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode: %v", err)
 		}
-		if body.Limit != maxListDealsLimit {
-			t.Errorf("expected limit clamped to %d, got %d", maxListDealsLimit, body.Limit)
+		if body.Limit != maxSearchLimit {
+			t.Errorf("expected limit clamped to %d, got %d", maxSearchLimit, body.Limit)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

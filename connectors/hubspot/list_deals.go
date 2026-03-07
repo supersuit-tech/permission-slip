@@ -35,10 +35,8 @@ var defaultDealProperties = []string{
 	"closedate", "createdate", "hs_lastmodifieddate",
 }
 
-const (
-	defaultListDealsLimit = 10
-	maxListDealsLimit     = 200 // HubSpot API maximum
-)
+// list_deals reuses defaultSearchLimit and maxSearchLimit from search.go
+// since both hit the same HubSpot search API with identical limits.
 
 // validSingleValueOperators is the subset of HubSpot search operators that
 // work with a single "value" field. BETWEEN requires highValue (not supported
@@ -101,10 +99,10 @@ func (a *listDealsAction) Execute(ctx context.Context, req connectors.ActionRequ
 
 	limit := params.Limit
 	if limit <= 0 {
-		limit = defaultListDealsLimit
+		limit = defaultSearchLimit
 	}
-	if limit > maxListDealsLimit {
-		limit = maxListDealsLimit
+	if limit > maxSearchLimit {
+		limit = maxSearchLimit
 	}
 
 	props := params.Properties
