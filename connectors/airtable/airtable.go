@@ -73,7 +73,8 @@ func (c *AirtableConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty personal access token with the required pat prefix.
+// non-empty personal access token with the required pat prefix and
+// only safe characters (alphanumeric, dots, underscores, hyphens).
 func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -82,7 +83,22 @@ func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connect
 	if len(token) < len(tokenPrefix) || token[:len(tokenPrefix)] != tokenPrefix {
 		return &connectors.ValidationError{Message: "api_token must be a personal access token starting with \"pat\""}
 	}
+	if !isTokenSafe(token) {
+		return &connectors.ValidationError{Message: "api_token contains invalid characters — expected alphanumeric, dots, underscores, or hyphens"}
+	}
 	return nil
+}
+
+// isTokenSafe checks that a token contains only safe characters for use in
+// HTTP headers: ASCII letters, digits, dots, underscores, and hyphens.
+func isTokenSafe(s string) bool {
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == '.' || c == '_' || c == '-') {
+			return false
+		}
+	}
+	return true
 }
 
 // isAlphanumeric checks that s is non-empty and contains only ASCII letters and digits.

@@ -74,6 +74,16 @@ func TestAirtableConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "token with unsafe characters",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "pat\x00injected"}),
+			wantErr: true,
+		},
+		{
+			name:    "token with spaces",
+			creds:   connectors.NewCredentials(map[string]string{"api_token": "pat token with spaces"}),
+			wantErr: true,
+		},
+		{
 			name:    "zero-value credentials",
 			creds:   connectors.Credentials{},
 			wantErr: true,
