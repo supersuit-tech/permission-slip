@@ -44,6 +44,8 @@ func BuiltInProviders() []Provider {
 				"openid",
 				"profile",
 				"w_member_social",
+				"r_organization_social",
+				"w_organization_social",
 			},
 			ClientID:     os.Getenv("LINKEDIN_CLIENT_ID"),
 			ClientSecret: os.Getenv("LINKEDIN_CLIENT_SECRET"),

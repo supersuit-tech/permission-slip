@@ -75,13 +75,14 @@ LinkedIn error responses include a `serviceErrorCode` for more specific diagnost
 
 ```
 connectors/linkedin/
-├── linkedin.go                  # Connector struct, HTTP client, error handling
+├── linkedin.go                  # Connector struct, HTTP client, error handling, validation helpers, getPersonURN
 ├── linkedin_test.go             # Connector-level tests (ID, actions, credentials, manifest)
 ├── manifest.go                  # Manifest with actions, schemas, templates
 ├── helpers_test.go              # Shared test credentials
+├── validation_test.go           # Security validation tests (URN, org ID, URL scheme)
 ├── get_profile.go               # linkedin.get_profile action
 ├── get_profile_test.go
-├── create_post.go               # linkedin.create_post action + getPersonURN helper
+├── create_post.go               # linkedin.create_post action + shared request types
 ├── create_post_test.go
 ├── delete_post.go               # linkedin.delete_post action
 ├── delete_post_test.go
