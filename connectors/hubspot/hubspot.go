@@ -68,12 +68,17 @@ func (c *HubSpotConnector) ID() string { return "hubspot" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *HubSpotConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"hubspot.create_contact": &createContactAction{conn: c},
-		"hubspot.update_contact": &updateContactAction{conn: c},
-		"hubspot.create_deal":    &createDealAction{conn: c},
-		"hubspot.create_ticket":  &createTicketAction{conn: c},
-		"hubspot.add_note":       &addNoteAction{conn: c},
-		"hubspot.search":         &searchAction{conn: c},
+		"hubspot.create_contact":       &createContactAction{conn: c},
+		"hubspot.update_contact":       &updateContactAction{conn: c},
+		"hubspot.create_deal":          &createDealAction{conn: c},
+		"hubspot.create_ticket":        &createTicketAction{conn: c},
+		"hubspot.add_note":             &addNoteAction{conn: c},
+		"hubspot.search":               &searchAction{conn: c},
+		"hubspot.list_deals":           &listDealsAction{conn: c},
+		"hubspot.update_deal_stage":    &updateDealStageAction{conn: c},
+		"hubspot.enroll_in_workflow":   &enrollInWorkflowAction{conn: c},
+		"hubspot.create_email_campaign": &createEmailCampaignAction{conn: c},
+		"hubspot.get_analytics":        &getAnalyticsAction{conn: c},
 	}
 }
 

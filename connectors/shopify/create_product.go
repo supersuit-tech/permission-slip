@@ -38,7 +38,7 @@ func (p *createProductParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
 	}
 	if p.Status != "" && !validProductStatuses[p.Status] {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid status %q: must be active, draft, or archived", p.Status)}
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid status %q: must be one of %s", p.Status, sortedKeys(validProductStatuses))}
 	}
 	return nil
 }
