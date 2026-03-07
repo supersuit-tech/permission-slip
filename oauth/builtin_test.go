@@ -73,6 +73,25 @@ func TestBuiltInProviders(t *testing.T) {
 			t.Error("expected default scopes")
 		}
 	})
+
+	t.Run("square", func(t *testing.T) {
+		s, ok := byID["square"]
+		if !ok {
+			t.Fatal("square provider not found")
+		}
+		if s.AuthorizeURL != "https://connect.squareup.com/oauth2/authorize" {
+			t.Errorf("AuthorizeURL = %q", s.AuthorizeURL)
+		}
+		if s.TokenURL != "https://connect.squareup.com/oauth2/token" {
+			t.Errorf("TokenURL = %q", s.TokenURL)
+		}
+		if s.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", s.Source, SourceBuiltIn)
+		}
+		if len(s.Scopes) == 0 {
+			t.Error("expected default scopes")
+		}
+	})
 }
 
 func TestNewRegistryWithBuiltIns(t *testing.T) {
@@ -91,6 +110,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 	}
 	if _, ok := r.Get("microsoft"); !ok {
 		t.Error("microsoft not found in registry")
+	}
+	if _, ok := r.Get("square"); !ok {
+		t.Error("square not found in registry")
 	}
 }
 

@@ -147,18 +147,35 @@ func TestSquareConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "square" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "square")
+
+	// First credential: OAuth (primary)
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "square" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "square")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "square" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "square")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want scopes")
+	}
+
+	// Second credential: API key (alternative)
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "square_api_key" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "square_api_key")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {

@@ -29,6 +29,23 @@ const storedCredentials = {
   ],
 };
 
+/**
+ * Helper to mock GET responses by endpoint path.
+ * Returns empty data for unrecognized paths.
+ */
+function setupMockGet(overrides: Record<string, unknown> = {}) {
+  const defaults: Record<string, unknown> = {
+    "/v1/credentials": { data: { credentials: [] } },
+    "/v1/oauth/connections": { data: { connections: [] } },
+    ...overrides,
+  };
+  mockGet.mockImplementation((path: string) => {
+    const match = defaults[path];
+    if (match) return Promise.resolve(match);
+    return Promise.resolve({ data: {} });
+  });
+}
+
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -56,7 +73,9 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows connected status with stored credentials", async () => {
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -72,7 +91,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -88,7 +107,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Add Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -108,7 +127,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("stores credential through Add dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
@@ -144,7 +163,9 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Remove Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -168,7 +189,9 @@ describe("ConnectorCredentialsSection", () => {
 
   it("deletes credential through Remove dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
     mockDelete.mockResolvedValue({
       data: { id: "cred_123", deleted_at: "2026-02-20T10:00:00Z" },
     });
@@ -201,7 +224,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -219,5 +242,146 @@ describe("ConnectorCredentialsSection", () => {
 
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
+  });
+
+  it("renders OAuth credential row with Connect button when not connected", async () => {
+    setupMockGet();
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "square",
+            auth_type: "oauth2" as const,
+            oauth_provider: "square",
+            oauth_scopes: ["ORDERS_READ", "PAYMENTS_READ"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Not configured")).toBeInTheDocument();
+    });
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("Connect Square")).toBeInTheDocument();
+  });
+
+  it("renders OAuth credential row as connected when OAuth connection is active", async () => {
+    setupMockGet({
+      "/v1/oauth/connections": {
+        data: {
+          connections: [
+            {
+              provider: "square",
+              status: "active",
+              scopes: ["ORDERS_READ", "PAYMENTS_READ"],
+              connected_at: "2026-03-01T12:00:00Z",
+            },
+          ],
+        },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "square",
+            auth_type: "oauth2" as const,
+            oauth_provider: "square",
+            oauth_scopes: ["ORDERS_READ", "PAYMENTS_READ"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText((content) => content.includes("2 scope")),
+    ).toBeInTheDocument();
+  });
+
+  it("shows re-authorize button when OAuth connection needs re-auth", async () => {
+    setupMockGet({
+      "/v1/oauth/connections": {
+        data: {
+          connections: [
+            {
+              provider: "square",
+              status: "needs_reauth",
+              scopes: ["ORDERS_READ"],
+              connected_at: "2026-03-01T12:00:00Z",
+            },
+          ],
+        },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "square",
+            auth_type: "oauth2" as const,
+            oauth_provider: "square",
+            oauth_scopes: ["ORDERS_READ"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Needs re-auth")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Re-authorize")).toBeInTheDocument();
+    expect(
+      screen.getByText("Connection expired — please re-authorize"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders both OAuth and API key credentials for dual-auth connectors", async () => {
+    setupMockGet();
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "square",
+            auth_type: "oauth2" as const,
+            oauth_provider: "square",
+            oauth_scopes: ["ORDERS_READ"],
+          },
+          {
+            service: "square_api_key",
+            auth_type: "api_key" as const,
+            instructions_url:
+              "https://developer.squareup.com/docs/build-basics/access-tokens",
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connect Square")).toBeInTheDocument();
+    });
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("API Key")).toBeInTheDocument();
+  });
+
+  it("displays auth type badges for credential rows", async () => {
+    setupMockGet();
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={requiredCredentials}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("API Key")).toBeInTheDocument();
+    });
   });
 });
