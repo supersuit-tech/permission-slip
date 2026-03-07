@@ -90,8 +90,12 @@ deploy:
 test: test-backend test-frontend mobile-test
 
 test-backend:
-	go test -v -count=1 ./connectors/zendesk/... ./connectors/intercom/... 2>&1 || true
-	go test ./...
+	@echo "=== Step 1: go build (compilation check) ==="
+	go build ./... 2>&1 || (echo "BUILD FAILED" && exit 1)
+	@echo "=== Step 2: go vet (static analysis) ==="
+	go vet ./... 2>&1 || (echo "VET FAILED" && exit 1)
+	@echo "=== Step 3: go test ==="
+	go test -vet=off ./...
 	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
 		echo "Supabase detected — also running integration tests..."; \
 		DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
