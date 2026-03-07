@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -40,18 +39,7 @@ func (p *createMeetingParams) validate() error {
 	if p.EndTime == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end_time"}
 	}
-	start, err := time.Parse(time.RFC3339, p.StartTime)
-	if err != nil {
-		return &connectors.ValidationError{Message: fmt.Sprintf("start_time must be RFC 3339 format: %v", err)}
-	}
-	end, err := time.Parse(time.RFC3339, p.EndTime)
-	if err != nil {
-		return &connectors.ValidationError{Message: fmt.Sprintf("end_time must be RFC 3339 format: %v", err)}
-	}
-	if !end.After(start) {
-		return &connectors.ValidationError{Message: "end_time must be after start_time"}
-	}
-	return nil
+	return validateTimeRange(p.StartTime, p.EndTime)
 }
 
 func (p *createMeetingParams) normalize() {
@@ -77,8 +65,8 @@ type meetingConferenceData struct {
 }
 
 type meetingCreateRequest struct {
-	RequestID             string                        `json:"requestId"`
-	ConferenceSolutionKey meetingConferenceSolutionKey   `json:"conferenceSolutionKey"`
+	RequestID             string                      `json:"requestId"`
+	ConferenceSolutionKey meetingConferenceSolutionKey `json:"conferenceSolutionKey"`
 }
 
 type meetingConferenceSolutionKey struct {
@@ -126,9 +114,7 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 			},
 		},
 	}
-	for _, email := range params.Attendees {
-		body.Attendees = append(body.Attendees, calendarAttendee{Email: email})
-	}
+	body.Attendees = buildAttendees(params.Attendees)
 
 	var resp meetingEventResponse
 	calURL := a.conn.calendarBaseURL + "/calendars/" + url.PathEscape(params.CalendarID) + "/events?conferenceDataVersion=1"
