@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -48,7 +49,7 @@ func (a *sendEnvelopeAction) Execute(ctx context.Context, req connectors.ActionR
 	body := sendEnvelopeRequest{Status: "sent"}
 
 	var resp sendEnvelopeResponse
-	path := accountPath(accountID) + "/envelopes/" + params.EnvelopeID
+	path := accountPath(accountID) + "/envelopes/" + url.PathEscape(params.EnvelopeID)
 	if err := a.conn.doJSON(ctx, "PUT", path, req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}

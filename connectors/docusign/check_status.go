@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -78,7 +79,7 @@ func (a *checkStatusAction) Execute(ctx context.Context, req connectors.ActionRe
 	accountID, _ := req.Credentials.Get(credKeyAccountID)
 
 	var resp checkStatusResponse
-	path := accountPath(accountID) + "/envelopes/" + params.EnvelopeID
+	path := accountPath(accountID) + "/envelopes/" + url.PathEscape(params.EnvelopeID)
 	if err := a.conn.doJSON(ctx, "GET", path, req.Credentials, nil, &resp); err != nil {
 		return nil, err
 	}
@@ -109,7 +110,7 @@ func (a *checkStatusAction) Execute(ctx context.Context, req connectors.ActionRe
 	// Fetch per-recipient signing status when requested (default: true).
 	if params.includeRecipients() {
 		var recipResp recipientsResponse
-		recipPath := accountPath(accountID) + "/envelopes/" + params.EnvelopeID + "/recipients"
+		recipPath := accountPath(accountID) + "/envelopes/" + url.PathEscape(params.EnvelopeID) + "/recipients"
 		if err := a.conn.doJSON(ctx, "GET", recipPath, req.Credentials, nil, &recipResp); err == nil {
 			type recipientResult struct {
 				RecipientID   string `json:"recipient_id"`

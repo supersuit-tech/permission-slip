@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -98,7 +99,7 @@ func (a *updateRecipientsAction) Execute(ctx context.Context, req connectors.Act
 	body := updateRecipientsRequest{Signers: signers}
 
 	var resp updateRecipientsResponse
-	path := accountPath(accountID) + "/envelopes/" + params.EnvelopeID + "/recipients"
+	path := accountPath(accountID) + "/envelopes/" + url.PathEscape(params.EnvelopeID) + "/recipients"
 	if err := a.conn.doJSON(ctx, "PUT", path, req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}

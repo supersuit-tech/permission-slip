@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -347,9 +348,9 @@ func (c *DocuSignConnector) ValidateCredentials(_ context.Context, creds connect
 	return nil
 }
 
-// accountPath builds the account-scoped API path prefix.
+// accountPath builds the account-scoped API path prefix with proper escaping.
 func accountPath(accountID string) string {
-	return "/accounts/" + accountID
+	return "/accounts/" + url.PathEscape(accountID)
 }
 
 // resolveBaseURL returns the base URL to use for API requests. If the user
@@ -418,6 +419,16 @@ func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, cre
 		return &connectors.AuthError{Message: "DocuSign auth error: invalid or expired access token"}
 	}
 
+	if resp.StatusCode == http.StatusNotFound {
+		var apiErr docuSignAPIError
+		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.ErrorCode != "" {
+			return mapDocuSignError(resp.StatusCode, apiErr)
+		}
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("DocuSign: resource not found (HTTP 404) — verify the envelope_id or document_id is correct"),
+		}
+	}
+
 	if resp.StatusCode >= 400 {
 		var apiErr docuSignAPIError
 		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.ErrorCode != "" {
@@ -425,7 +436,7 @@ func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, cre
 		}
 		return &connectors.ExternalError{
 			StatusCode: resp.StatusCode,
-			Message:    fmt.Sprintf("DocuSign API error (HTTP %d): %s", resp.StatusCode, string(respBody)),
+			Message:    fmt.Sprintf("DocuSign API error (HTTP %d): %s", resp.StatusCode, truncateBody(respBody)),
 		}
 	}
 
@@ -486,14 +497,33 @@ func (c *DocuSignConnector) doRaw(ctx context.Context, method, path string, cred
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, &connectors.ValidationError{
+			Message: "DocuSign: resource not found (HTTP 404) — verify the envelope_id or document_id is correct",
+		}
+	}
+
 	if resp.StatusCode >= 400 {
 		return nil, &connectors.ExternalError{
 			StatusCode: resp.StatusCode,
-			Message:    fmt.Sprintf("DocuSign API error (HTTP %d): %s", resp.StatusCode, string(body)),
+			Message:    fmt.Sprintf("DocuSign API error (HTTP %d): %s", resp.StatusCode, truncateBody(body)),
 		}
 	}
 
 	return body, nil
+}
+
+// maxErrorBodyLen is the maximum number of bytes from a response body to
+// include in an error message. Prevents log bloat from large responses.
+const maxErrorBodyLen = 512
+
+// truncateBody returns the response body as a string, truncated to
+// maxErrorBodyLen bytes to prevent oversized error messages.
+func truncateBody(body []byte) string {
+	if len(body) <= maxErrorBodyLen {
+		return string(body)
+	}
+	return string(body[:maxErrorBodyLen]) + "... (truncated)"
 }
 
 // docuSignAPIError represents the standard DocuSign API error response.
@@ -526,9 +556,8 @@ func mapDocuSignError(statusCode int, apiErr docuSignAPIError) error {
 
 	// Template errors
 	case "TEMPLATE_NOT_FOUND":
-		return &connectors.ExternalError{
-			StatusCode: statusCode,
-			Message:    "DocuSign: template not found. Use docusign.list_templates to browse available templates.",
+		return &connectors.ValidationError{
+			Message: "DocuSign: template not found. Use docusign.list_templates to browse available templates.",
 		}
 
 	// Recipient errors
@@ -544,9 +573,8 @@ func mapDocuSignError(statusCode int, apiErr docuSignAPIError) error {
 
 	// Resource not found
 	case "ENVELOPE_DOES_NOT_EXIST":
-		return &connectors.ExternalError{
-			StatusCode: statusCode,
-			Message:    "DocuSign: envelope not found. Verify the envelope_id is correct.",
+		return &connectors.ValidationError{
+			Message: "DocuSign: envelope not found. Verify the envelope_id is correct.",
 		}
 
 	default:

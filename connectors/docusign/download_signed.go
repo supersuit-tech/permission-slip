@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -44,7 +45,7 @@ func (a *downloadSignedAction) Execute(ctx context.Context, req connectors.Actio
 		documentID = "combined"
 	}
 
-	path := accountPath(accountID) + "/envelopes/" + params.EnvelopeID + "/documents/" + documentID
+	path := accountPath(accountID) + "/envelopes/" + url.PathEscape(params.EnvelopeID) + "/documents/" + url.PathEscape(documentID)
 	body, err := a.conn.doRaw(ctx, "GET", path, req.Credentials)
 	if err != nil {
 		return nil, err
