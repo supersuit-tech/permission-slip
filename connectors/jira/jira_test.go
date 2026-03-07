@@ -285,3 +285,58 @@ func TestJiraConnector_ImplementsInterface(t *testing.T) {
 	var _ connectors.Connector = (*JiraConnector)(nil)
 	var _ connectors.ManifestProvider = (*JiraConnector)(nil)
 }
+
+func TestJiraConnector_SiteValidation_SSRF(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	maliciousSites := []struct {
+		name string
+		site string
+	}{
+		{"path traversal", "evil.com/steal-creds#"},
+		{"slash in site", "my-site/../../admin"},
+		{"port injection", "evil.com:8080"},
+		{"dot notation", "evil.com."},
+		{"fragment", "site#fragment"},
+		{"query param", "site?foo=bar"},
+		{"at sign", "user@evil.com"},
+		{"space", "my site"},
+	}
+
+	for _, tt := range maliciousSites {
+		t.Run(tt.name, func(t *testing.T) {
+			creds := connectors.NewCredentials(map[string]string{
+				"site":      tt.site,
+				"email":     "user@example.com",
+				"api_token": "token",
+			})
+			err := conn.do(t.Context(), creds, http.MethodGet, "/test", nil, nil)
+			if err == nil {
+				t.Fatalf("expected error for malicious site %q, got nil", tt.site)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError for site %q, got %T: %v", tt.site, err, err)
+			}
+		})
+	}
+}
+
+func TestJiraConnector_SiteValidation_ValidSites(t *testing.T) {
+	t.Parallel()
+
+	validSites := []string{"mycompany", "my-company", "company123", "a"}
+
+	for _, site := range validSites {
+		conn := New()
+		creds := connectors.NewCredentials(map[string]string{
+			"site":      site,
+			"email":     "user@example.com",
+			"api_token": "token",
+		})
+		_, err := conn.apiBase(creds)
+		if err != nil {
+			t.Errorf("unexpected error for valid site %q: %v", site, err)
+		}
+	}
+}

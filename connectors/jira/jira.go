@@ -11,12 +11,23 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-const defaultTimeout = 30 * time.Second
+// validSite matches Atlassian site subdomains: alphanumeric with hyphens.
+// Prevents SSRF by ensuring the site value cannot contain path separators,
+// fragments, or other characters that would alter the target host.
+var validSite = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
+
+const (
+	defaultTimeout = 30 * time.Second
+	// maxResponseBody is the maximum response body size (10 MB) to prevent OOM
+	// from malicious or buggy API responses.
+	maxResponseBody = 10 << 20
+)
 
 // JiraConnector owns the shared HTTP client used by all Jira actions.
 // The base URL is constructed per-request from the site credential
@@ -303,6 +314,11 @@ func (c *JiraConnector) apiBase(creds connectors.Credentials) (string, error) {
 	if !ok || site == "" {
 		return "", &connectors.ValidationError{Message: "missing required credential: site"}
 	}
+	if !validSite.MatchString(site) {
+		return "", &connectors.ValidationError{
+			Message: "invalid site credential: must contain only alphanumeric characters and hyphens (e.g. \"my-company\")",
+		}
+	}
 	return "https://" + site + ".atlassian.net/rest/api/3", nil
 }
 
@@ -353,7 +369,7 @@ func (c *JiraConnector) do(ctx context.Context, creds connectors.Credentials, me
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
