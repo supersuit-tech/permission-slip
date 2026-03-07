@@ -26,6 +26,9 @@ func (p *listPagePostsParams) validate() error {
 	if p.PageID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: page_id"}
 	}
+	if !isValidGraphID(p.PageID) {
+		return &connectors.ValidationError{Message: "page_id contains invalid characters"}
+	}
 	if p.Limit < 0 || p.Limit > 100 {
 		return &connectors.ValidationError{Message: "limit must be between 1 and 100"}
 	}

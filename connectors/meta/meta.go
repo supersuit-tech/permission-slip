@@ -12,10 +12,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// graphIDPattern matches valid Meta Graph API object IDs. IDs are typically
+// numeric (e.g., "123456789012345") or compound (e.g., "123456_789012" for
+// page posts). This pattern prevents path traversal and query injection when
+// IDs are interpolated into URL paths.
+var graphIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+// isValidGraphID returns true if s looks like a valid Meta Graph API ID.
+func isValidGraphID(s string) bool {
+	return graphIDPattern.MatchString(s)
+}
 
 const (
 	defaultBaseURL = "https://graph.facebook.com/v19.0"

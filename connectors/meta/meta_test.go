@@ -171,6 +171,79 @@ func TestCheckResponse_Success(t *testing.T) {
 	}
 }
 
+func TestIsValidGraphID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		valid bool
+	}{
+		{"123456789", true},
+		{"123456_789012", true},
+		{"ig_123", true},
+		{"page123", true},
+		{"", false},
+		{"../etc/passwd", false},
+		{"123?inject=true", false},
+		{"123/456", false},
+		{"123\n456", false},
+		{"id with spaces", false},
+	}
+
+	for _, tc := range tests {
+		if got := isValidGraphID(tc.input); got != tc.valid {
+			t.Errorf("isValidGraphID(%q) = %v, want %v", tc.input, got, tc.valid)
+		}
+	}
+}
+
+func TestCreatePagePost_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPagePostAction{conn: conn}
+
+	params, _ := json.Marshal(createPagePostParams{
+		PageID:  "../other-endpoint",
+		Message: "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "meta.create_page_post",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in page_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestDeletePagePost_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &deletePagePostAction{conn: conn}
+
+	params, _ := json.Marshal(deletePagePostParams{
+		PostID: "123?delete_all=true",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "meta.delete_page_post",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for query injection in post_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestDoJSON_Timeout(t *testing.T) {
 	t.Parallel()
 

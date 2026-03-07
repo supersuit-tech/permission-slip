@@ -24,6 +24,9 @@ func (p *replyPageCommentParams) validate() error {
 	if p.CommentID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: comment_id"}
 	}
+	if !isValidGraphID(p.CommentID) {
+		return &connectors.ValidationError{Message: "comment_id contains invalid characters"}
+	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
 	}

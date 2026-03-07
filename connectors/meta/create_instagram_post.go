@@ -44,6 +44,9 @@ func (p *createInstagramPostParams) validate() error {
 	if p.InstagramAccountID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: instagram_account_id"}
 	}
+	if !isValidGraphID(p.InstagramAccountID) {
+		return &connectors.ValidationError{Message: "instagram_account_id contains invalid characters"}
+	}
 	if p.ImageURL == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: image_url"}
 	}

@@ -36,6 +36,9 @@ func (p *getInstagramInsightsParams) validate() error {
 	if p.InstagramAccountID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: instagram_account_id"}
 	}
+	if !isValidGraphID(p.InstagramAccountID) {
+		return &connectors.ValidationError{Message: "instagram_account_id contains invalid characters"}
+	}
 	if p.Metric != "" && !validMetrics[p.Metric] {
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("invalid metric %q: must be impressions, reach, or profile_views", p.Metric),

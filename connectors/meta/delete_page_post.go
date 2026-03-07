@@ -22,6 +22,9 @@ func (p *deletePagePostParams) validate() error {
 	if p.PostID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: post_id"}
 	}
+	if !isValidGraphID(p.PostID) {
+		return &connectors.ValidationError{Message: "post_id contains invalid characters"}
+	}
 	return nil
 }
 

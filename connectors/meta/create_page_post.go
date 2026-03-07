@@ -27,6 +27,9 @@ func (p *createPagePostParams) validate() error {
 	if p.PageID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: page_id"}
 	}
+	if !isValidGraphID(p.PageID) {
+		return &connectors.ValidationError{Message: "page_id contains invalid characters"}
+	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
 	}
