@@ -8,22 +8,26 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// validatable is implemented by all action parameter structs.
-type validatable interface {
+// ptrValidatable constrains PT to be a pointer to T that implements validate().
+// This allows parseAndValidate to work with pointer-receiver validate() methods.
+type ptrValidatable[T any] interface {
+	*T
 	validate() error
 }
 
 // parseAndValidate unmarshals req.Parameters into T and calls validate().
 // This eliminates the repeated unmarshal→validate boilerplate in every action.
-func parseAndValidate[T validatable](raw json.RawMessage) (*T, error) {
-	var params T
-	if err := json.Unmarshal(raw, &params); err != nil {
+// Usage: parseAndValidate[createIssueParams](req.Parameters)
+// Go infers the pointer type automatically from the constraint.
+func parseAndValidate[T any, PT ptrValidatable[T]](raw json.RawMessage) (PT, error) {
+	params := PT(new(T))
+	if err := json.Unmarshal(raw, params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
 	}
-	return &params, nil
+	return params, nil
 }
 
 // requireOwnerRepo validates the common owner+repo pair present in every action.
