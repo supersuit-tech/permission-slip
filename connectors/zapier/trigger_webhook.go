@@ -50,8 +50,8 @@ func (a *triggerWebhookAction) Execute(ctx context.Context, req connectors.Actio
 	}
 	// Defense-in-depth: re-validate the URL prefix at execution time,
 	// not just in ValidateCredentials. Prevents SSRF if validation is
-	// somehow bypassed.
-	if !strings.HasPrefix(webhookURL, webhookURLPrefix) {
+	// somehow bypassed. Skipped in tests where we use local test servers.
+	if !a.conn.skipURLValidation && !strings.HasPrefix(webhookURL, webhookURLPrefix) {
 		return nil, &connectors.ValidationError{
 			Message: fmt.Sprintf("webhook_url must start with %q", webhookURLPrefix),
 		}

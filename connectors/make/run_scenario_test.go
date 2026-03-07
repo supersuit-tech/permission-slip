@@ -22,7 +22,9 @@ func TestRunScenario_Success(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode body: %v", err)
+			t.Errorf("failed to decode body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -61,11 +63,15 @@ func TestRunScenario_WithData(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode body: %v", err)
+			t.Errorf("failed to decode body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		data, ok := body["data"].(map[string]any)
 		if !ok {
-			t.Fatal("expected data in request body")
+			t.Errorf("expected data in request body")
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		if data["input_field"] != "test_value" {
 			t.Errorf("expected input_field 'test_value', got %v", data["input_field"])

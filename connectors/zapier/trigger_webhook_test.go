@@ -22,7 +22,9 @@ func TestTriggerWebhook_Success(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		if body["name"] != "test" {
 			t.Errorf("expected name 'test', got %v", body["name"])

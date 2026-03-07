@@ -35,7 +35,8 @@ const (
 
 // ZapierConnector owns the shared HTTP client used by all Zapier actions.
 type ZapierConnector struct {
-	client *http.Client
+	client            *http.Client
+	skipURLValidation bool // only true in tests to allow test server URLs
 }
 
 // New creates a ZapierConnector with sensible defaults (30s timeout).
@@ -53,9 +54,11 @@ func New() *ZapierConnector {
 }
 
 // newForTest creates a ZapierConnector that uses a test HTTP client.
+// URL validation is skipped to allow test server URLs.
 func newForTest(client *http.Client) *ZapierConnector {
 	return &ZapierConnector{
-		client: client,
+		client:            client,
+		skipURLValidation: true,
 	}
 }
 

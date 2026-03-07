@@ -22,11 +22,15 @@ func TestToggleScenario_Enable(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode body: %v", err)
+			t.Errorf("failed to decode body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		scheduling, ok := body["scheduling"].(map[string]any)
 		if !ok {
-			t.Fatal("expected scheduling in request body")
+			t.Errorf("expected scheduling in request body")
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		if scheduling["isEnabled"] != true {
 			t.Errorf("expected isEnabled true, got %v", scheduling["isEnabled"])
@@ -77,7 +81,9 @@ func TestToggleScenario_Disable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode body: %v", err)
+			t.Errorf("failed to decode body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		scheduling := body["scheduling"].(map[string]any)
 		if scheduling["isEnabled"] != false {
