@@ -124,7 +124,13 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"parent_id": {
 							"type": "string",
-							"description": "Parent page or database ID (UUID, e.g. 8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c). Accepts both page IDs and database IDs."
+							"description": "Parent page or database ID (UUID, e.g. 8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c)"
+						},
+						"parent_type": {
+							"type": "string",
+							"enum": ["page_id", "database_id"],
+							"default": "page_id",
+							"description": "Whether parent_id is a page or database. Use \"database_id\" when creating database entries."
 						},
 						"title": {
 							"type": "string",

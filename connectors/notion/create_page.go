@@ -18,6 +18,7 @@ type createPageAction struct {
 // createPageParams is the user-facing parameter schema.
 type createPageParams struct {
 	ParentID   string          `json:"parent_id"`
+	ParentType string          `json:"parent_type,omitempty"`
 	Title      string          `json:"title"`
 	Properties json.RawMessage `json:"properties,omitempty"`
 	Content    json.RawMessage `json:"content,omitempty"`
@@ -26,6 +27,9 @@ type createPageParams struct {
 func (p *createPageParams) validate() error {
 	if err := validateNotionID(p.ParentID, "parent_id"); err != nil {
 		return err
+	}
+	if p.ParentType != "" && p.ParentType != "page_id" && p.ParentType != "database_id" {
+		return &connectors.ValidationError{Message: "parent_type must be \"page_id\" or \"database_id\""}
 	}
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
@@ -54,10 +58,16 @@ func (a *createPageAction) Execute(ctx context.Context, req connectors.ActionReq
 }
 
 // buildCreatePageBody constructs the Notion API request body for creating a page.
+// parent_type controls whether the parent is a page or database. When omitted,
+// it defaults to "page_id". Set to "database_id" when creating database entries.
 func buildCreatePageBody(params createPageParams) (map[string]any, error) {
+	parentType := params.ParentType
+	if parentType == "" {
+		parentType = "page_id"
+	}
 	body := map[string]any{
 		"parent": map[string]string{
-			"page_id": params.ParentID,
+			parentType: params.ParentID,
 		},
 		"properties": map[string]any{
 			"title": []map[string]any{

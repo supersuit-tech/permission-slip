@@ -107,6 +107,71 @@ func TestCreatePage_WithContent(t *testing.T) {
 	}
 }
 
+func TestCreatePage_DatabaseParentType(t *testing.T) {
+	t.Parallel()
+
+	_, conn := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		parent, ok := body["parent"].(map[string]any)
+		if !ok {
+			t.Fatal("missing parent in request body")
+		}
+		// When parent_type is "database_id", the parent key should be "database_id"
+		if parent["database_id"] != "db-456" {
+			t.Errorf("expected database_id 'db-456', got %v (parent=%v)", parent["database_id"], parent)
+		}
+		if parent["page_id"] != nil {
+			t.Errorf("expected no page_id key, but found %v", parent["page_id"])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": "entry-789"})
+	})
+
+	action := &createPageAction{conn: conn}
+	params, _ := json.Marshal(createPageParams{
+		ParentID:   "db-456",
+		ParentType: "database_id",
+		Title:      "New Entry",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "notion.create_page",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreatePage_InvalidParentType(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPageAction{conn: conn}
+	params, _ := json.Marshal(map[string]string{
+		"parent_id":   "parent-123",
+		"parent_type": "workspace",
+		"title":       "Test",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "notion.create_page",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid parent_type")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreatePage_MissingParentID(t *testing.T) {
 	t.Parallel()
 
