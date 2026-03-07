@@ -336,13 +336,13 @@ func (c *MakeConnector) doRequest(ctx context.Context, method, path string, cred
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return &connectors.AuthError{Message: fmt.Sprintf("Make API auth error (HTTP %d): %s", resp.StatusCode, string(respBody))}
+		return &connectors.AuthError{Message: fmt.Sprintf("Make API auth error (HTTP %d): %s", resp.StatusCode, truncateBody(respBody))}
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return &connectors.ExternalError{
 			StatusCode: resp.StatusCode,
-			Message:    fmt.Sprintf("Make API error (HTTP %d): %s", resp.StatusCode, string(respBody)),
+			Message:    fmt.Sprintf("Make API error (HTTP %d): %s", resp.StatusCode, truncateBody(respBody)),
 		}
 	}
 
@@ -356,4 +356,17 @@ func (c *MakeConnector) doRequest(ctx context.Context, method, path string, cred
 	}
 
 	return nil
+}
+
+// maxErrorBodyLen caps error message bodies to avoid leaking large/sensitive
+// payloads through error strings.
+const maxErrorBodyLen = 512
+
+// truncateBody returns the first maxErrorBodyLen bytes of body as a string,
+// appending "..." if truncated.
+func truncateBody(body []byte) string {
+	if len(body) <= maxErrorBodyLen {
+		return string(body)
+	}
+	return string(body[:maxErrorBodyLen]) + "..."
 }

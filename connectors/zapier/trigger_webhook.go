@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -46,6 +47,14 @@ func (a *triggerWebhookAction) Execute(ctx context.Context, req connectors.Actio
 	webhookURL, ok := req.Credentials.Get(credKeyWebhookURL)
 	if !ok || webhookURL == "" {
 		return nil, &connectors.ValidationError{Message: "webhook_url credential is missing or empty"}
+	}
+	// Defense-in-depth: re-validate the URL prefix at execution time,
+	// not just in ValidateCredentials. Prevents SSRF if validation is
+	// somehow bypassed.
+	if !strings.HasPrefix(webhookURL, webhookURLPrefix) {
+		return nil, &connectors.ValidationError{
+			Message: fmt.Sprintf("webhook_url must start with %q", webhookURLPrefix),
+		}
 	}
 
 	// Unmarshal the payload to send as the POST body.

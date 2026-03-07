@@ -39,9 +39,16 @@ type ZapierConnector struct {
 }
 
 // New creates a ZapierConnector with sensible defaults (30s timeout).
+// Redirects are disabled — webhook endpoints should not redirect, and
+// following redirects would allow SSRF via open redirect on Zapier's host.
 func New() *ZapierConnector {
 	return &ZapierConnector{
-		client: &http.Client{Timeout: defaultTimeout},
+		client: &http.Client{
+			Timeout: defaultTimeout,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 }
 
