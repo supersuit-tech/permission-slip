@@ -92,10 +92,12 @@ var validAuthTypes = map[string]bool{
 // natively. Connectors referencing these providers don't need to declare them
 // in their oauth_providers section. Add new built-in providers here.
 var BuiltInOAuthProviders = map[string]bool{
-	"google":    true,
-	"kroger":    true,
-	"microsoft": true,
-	"zoom":      true,
+	"google":     true,
+	"kroger":     true,
+	"linkedin":   true,
+	"microsoft":  true,
+	"salesforce": true,
+	"zoom":       true,
 }
 
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies

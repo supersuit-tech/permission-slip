@@ -118,12 +118,17 @@ func (c *ShopifyConnector) ID() string { return "shopify" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *ShopifyConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"shopify.get_orders":      &getOrdersAction{conn: c},
-		"shopify.get_order":       &getOrderAction{conn: c},
-		"shopify.update_order":    &updateOrderAction{conn: c},
-		"shopify.create_product":  &createProductAction{conn: c},
-		"shopify.update_inventory": &updateInventoryAction{conn: c},
-		"shopify.create_discount": &createDiscountAction{conn: c},
+		"shopify.get_orders":         &getOrdersAction{conn: c},
+		"shopify.get_order":          &getOrderAction{conn: c},
+		"shopify.update_order":       &updateOrderAction{conn: c},
+		"shopify.fulfill_order":      &fulfillOrderAction{conn: c},
+		"shopify.cancel_order":       &cancelOrderAction{conn: c},
+		"shopify.create_product":     &createProductAction{conn: c},
+		"shopify.update_product":     &updateProductAction{conn: c},
+		"shopify.update_inventory":   &updateInventoryAction{conn: c},
+		"shopify.create_discount":    &createDiscountAction{conn: c},
+		"shopify.create_collection":  &createCollectionAction{conn: c},
+		"shopify.get_analytics":      &getAnalyticsAction{conn: c},
 	}
 }
 

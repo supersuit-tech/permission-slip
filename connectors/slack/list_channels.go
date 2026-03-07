@@ -2,8 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -27,6 +25,10 @@ type listChannelsParams struct {
 	ExcludeArchived *bool `json:"exclude_archived,omitempty"`
 }
 
+func (p *listChannelsParams) validate() error {
+	return validateLimit(p.Limit)
+}
+
 // listChannelsRequest is the Slack API request body for conversations.list.
 type listChannelsRequest struct {
 	Types           string `json:"types,omitempty"`
@@ -37,8 +39,8 @@ type listChannelsRequest struct {
 
 type listChannelsResponse struct {
 	slackResponse
-	Channels []listChannelEntry   `json:"channels,omitempty"`
-	Meta     *paginationMeta `json:"response_metadata,omitempty"`
+	Channels []listChannelEntry `json:"channels,omitempty"`
+	Meta     *paginationMeta    `json:"response_metadata,omitempty"`
 }
 
 type listChannelEntry struct {
@@ -73,10 +75,7 @@ type listChannelSummary struct {
 // Execute lists Slack channels visible to the bot.
 func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listChannelsParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := validateLimit(params.Limit); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
