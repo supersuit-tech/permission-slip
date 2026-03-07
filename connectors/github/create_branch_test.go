@@ -151,6 +151,10 @@ func TestCreateBranch_MissingParams(t *testing.T) {
 		{"missing repo", `{"owner":"o","branch_name":"b","from_ref":"main"}`},
 		{"missing branch_name", `{"owner":"o","repo":"r","from_ref":"main"}`},
 		{"missing from_ref", `{"owner":"o","repo":"r","branch_name":"b"}`},
+		{"branch_name with path traversal", `{"owner":"o","repo":"r","branch_name":"../../main","from_ref":"main"}`},
+		{"branch_name starts with dot", `{"owner":"o","repo":"r","branch_name":".hidden","from_ref":"main"}`},
+		{"branch_name with tilde", `{"owner":"o","repo":"r","branch_name":"foo~1","from_ref":"main"}`},
+		{"from_ref with path traversal", `{"owner":"o","repo":"r","branch_name":"b","from_ref":"heads/../main"}`},
 		{"invalid JSON", `{invalid}`},
 	}
 

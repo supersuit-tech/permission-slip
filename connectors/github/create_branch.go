@@ -25,6 +25,35 @@ type createBranchParams struct {
 	FromRef    string `json:"from_ref"`
 }
 
+// invalidRefChars contains characters forbidden in git ref names.
+// See: https://git-scm.com/docs/git-check-ref-format
+var invalidRefChars = strings.NewReplacer(
+	"..", "",
+	"~", "",
+	"^", "",
+	":", "",
+	"?", "",
+	"*", "",
+	"[", "",
+	"\\", "",
+)
+
+func validateRefName(name, field string) error {
+	if name == "" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", field)}
+	}
+	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, ".") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not start with '/' or '.'", field)}
+	}
+	if strings.HasSuffix(name, ".lock") || strings.HasSuffix(name, ".") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not end with '.lock' or '.'", field)}
+	}
+	if invalidRefChars.Replace(name) != name {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: contains forbidden characters (.. ~ ^ : ? * [ \\)", field)}
+	}
+	return nil
+}
+
 func (p *createBranchParams) validate() error {
 	if p.Owner == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: owner"}
@@ -32,11 +61,11 @@ func (p *createBranchParams) validate() error {
 	if p.Repo == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: repo"}
 	}
-	if p.BranchName == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: branch_name"}
+	if err := validateRefName(p.BranchName, "branch_name"); err != nil {
+		return err
 	}
-	if p.FromRef == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: from_ref"}
+	if err := validateRefName(p.FromRef, "from_ref"); err != nil {
+		return err
 	}
 	return nil
 }

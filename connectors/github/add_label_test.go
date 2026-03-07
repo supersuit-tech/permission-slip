@@ -76,6 +76,7 @@ func TestAddLabel_MissingParams(t *testing.T) {
 		{"missing issue_number", `{"owner":"o","repo":"r","labels":["bug"]}`},
 		{"missing labels", `{"owner":"o","repo":"r","issue_number":1}`},
 		{"empty labels", `{"owner":"o","repo":"r","issue_number":1,"labels":[]}`},
+		{"empty string in labels", `{"owner":"o","repo":"r","issue_number":1,"labels":[""]}`},
 		{"invalid JSON", `{invalid}`},
 	}
 

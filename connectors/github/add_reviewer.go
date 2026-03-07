@@ -36,6 +36,11 @@ func (p *addReviewerParams) validate() error {
 	if len(p.Reviewers) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: reviewers"}
 	}
+	for _, r := range p.Reviewers {
+		if r == "" {
+			return &connectors.ValidationError{Message: "reviewers must not contain empty strings"}
+		}
+	}
 	return nil
 }
 

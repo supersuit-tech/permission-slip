@@ -77,6 +77,7 @@ func TestAddReviewer_MissingParams(t *testing.T) {
 		{"missing pull_number", `{"owner":"o","repo":"r","reviewers":["alice"]}`},
 		{"missing reviewers", `{"owner":"o","repo":"r","pull_number":1}`},
 		{"empty reviewers", `{"owner":"o","repo":"r","pull_number":1,"reviewers":[]}`},
+		{"empty string in reviewers", `{"owner":"o","repo":"r","pull_number":1,"reviewers":[""]}`},
 		{"invalid JSON", `{invalid}`},
 	}
 

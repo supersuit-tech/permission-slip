@@ -36,6 +36,11 @@ func (p *addLabelParams) validate() error {
 	if len(p.Labels) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: labels"}
 	}
+	for _, l := range p.Labels {
+		if l == "" {
+			return &connectors.ValidationError{Message: "labels must not contain empty strings"}
+		}
+	}
 	return nil
 }
 
