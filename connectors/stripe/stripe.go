@@ -120,12 +120,17 @@ func (c *StripeConnector) ID() string { return "stripe" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *StripeConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"stripe.create_customer":     &createCustomerAction{conn: c},
-		"stripe.create_invoice":      &createInvoiceAction{conn: c},
-		"stripe.issue_refund":        &issueRefundAction{conn: c},
-		"stripe.list_subscriptions":  &listSubscriptionsAction{conn: c},
-		"stripe.create_payment_link": &createPaymentLinkAction{conn: c},
-		"stripe.get_balance":         &getBalanceAction{conn: c},
+		"stripe.create_customer":       &createCustomerAction{conn: c},
+		"stripe.create_invoice":        &createInvoiceAction{conn: c},
+		"stripe.issue_refund":          &issueRefundAction{conn: c},
+		"stripe.list_subscriptions":    &listSubscriptionsAction{conn: c},
+		"stripe.create_payment_link":   &createPaymentLinkAction{conn: c},
+		"stripe.get_balance":           &getBalanceAction{conn: c},
+		"stripe.create_subscription":   &createSubscriptionAction{conn: c},
+		"stripe.cancel_subscription":   &cancelSubscriptionAction{conn: c},
+		"stripe.create_coupon":         &createCouponAction{conn: c},
+		"stripe.create_promotion_code": &createPromotionCodeAction{conn: c},
+		"stripe.initiate_payout":       &initiatePayoutAction{conn: c},
 	}
 }
 

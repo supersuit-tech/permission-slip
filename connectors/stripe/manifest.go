@@ -1,7 +1,6 @@
 // This file is split from stripe.go to keep the main connector file focused
-// on struct, auth, and HTTP lifecycle. The manifest contains 6 action schemas
-// and 8 templates (~270 lines of JSON Schema definitions) that would obscure
-// the business logic if inlined in the connector file.
+// on struct, auth, and HTTP lifecycle. The manifest contains action schemas
+// and templates that would obscure the business logic if inlined.
 package stripe
 
 import (
@@ -16,7 +15,7 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "stripe",
 		Name:        "Stripe",
-		Description: "Stripe integration for payments, invoicing, and billing management",
+		Description: "Stripe integration for payments, invoicing, billing, subscriptions, and payouts",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "stripe.create_customer",
@@ -244,6 +243,207 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {}
 				}`)),
 			},
+			{
+				ActionType:  "stripe.create_subscription",
+				Name:        "Create Subscription",
+				Description: "Create a recurring subscription for a customer — starts a billing cycle",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["customer", "items"],
+					"additionalProperties": false,
+					"properties": {
+						"customer": {
+							"type": "string",
+							"description": "Stripe customer ID (e.g. \"cus_ABC123\")"
+						},
+						"items": {
+							"type": "array",
+							"minItems": 1,
+							"description": "Subscription items — each references a price",
+							"items": {
+								"type": "object",
+								"required": ["price"],
+								"additionalProperties": false,
+								"properties": {
+									"price": {
+										"type": "string",
+										"description": "Stripe price ID (e.g. \"price_ABC123\")"
+									},
+									"quantity": {
+										"type": "integer",
+										"minimum": 1,
+										"description": "Quantity for this item (defaults to 1)"
+									}
+								}
+							}
+						},
+						"trial_period_days": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Number of trial days before billing starts"
+						},
+						"payment_behavior": {
+							"type": "string",
+							"enum": ["default_incomplete", "error_if_incomplete", "allow_incomplete", "pending_if_incomplete"],
+							"description": "How to handle payment failures (defaults to default_incomplete)"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.cancel_subscription",
+				Name:        "Cancel Subscription",
+				Description: "Cancel an active subscription — WARNING: causes revenue loss and may impact customer",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["subscription_id"],
+					"additionalProperties": false,
+					"properties": {
+						"subscription_id": {
+							"type": "string",
+							"description": "Stripe subscription ID (e.g. \"sub_ABC123\")"
+						},
+						"cancel_at_period_end": {
+							"type": "boolean",
+							"description": "When true, cancels at the end of the current billing period instead of immediately"
+						},
+						"proration_behavior": {
+							"type": "string",
+							"enum": ["create_prorations", "none", "always_invoice"],
+							"description": "How to handle prorations for immediate cancellation"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.create_coupon",
+				Name:        "Create Coupon",
+				Description: "Create a discount coupon — percent or fixed amount off, with duration controls",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["duration"],
+					"additionalProperties": false,
+					"properties": {
+						"percent_off": {
+							"type": "number",
+							"exclusiveMinimum": 0,
+							"maximum": 100,
+							"description": "Percentage discount (e.g. 25.5 for 25.5% off) — provide this or amount_off"
+						},
+						"amount_off": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Fixed discount in smallest currency unit (e.g. 500 = $5.00) — provide this or percent_off"
+						},
+						"currency": {
+							"type": "string",
+							"description": "Three-letter ISO 4217 currency code — required when using amount_off"
+						},
+						"duration": {
+							"type": "string",
+							"enum": ["once", "repeating", "forever"],
+							"description": "How long the discount applies: once, repeating (requires duration_in_months), or forever"
+						},
+						"duration_in_months": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Number of months the coupon applies — required when duration is \"repeating\""
+						},
+						"max_redemptions": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Maximum number of times the coupon can be redeemed"
+						},
+						"name": {
+							"type": "string",
+							"description": "Display name for the coupon (shown on invoices)"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.create_promotion_code",
+				Name:        "Create Promotion Code",
+				Description: "Create a shareable promotion code for an existing coupon",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["coupon"],
+					"additionalProperties": false,
+					"properties": {
+						"coupon": {
+							"type": "string",
+							"description": "Stripe coupon ID to attach this promotion code to"
+						},
+						"code": {
+							"type": "string",
+							"description": "Customer-facing code (e.g. \"SUMMER25\") — auto-generated if omitted"
+						},
+						"max_redemptions": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Maximum number of times this promotion code can be redeemed"
+						},
+						"expires_at": {
+							"type": "integer",
+							"description": "Expiration date as Unix timestamp (seconds since epoch)"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.initiate_payout",
+				Name:        "Initiate Payout",
+				Description: "Trigger payout to connected bank account — WARNING: moves real money and cannot be undone",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["amount", "currency"],
+					"additionalProperties": false,
+					"properties": {
+						"amount": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Payout amount in smallest currency unit (e.g. 10000 = $100.00)"
+						},
+						"currency": {
+							"type": "string",
+							"description": "Three-letter ISO 4217 currency code (e.g. \"usd\")"
+						},
+						"description": {
+							"type": "string",
+							"description": "Internal description for the payout"
+						},
+						"destination": {
+							"type": "string",
+							"description": "Bank account or card ID to send funds to (uses default if omitted)"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -307,7 +507,64 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can create shareable payment links for any products.",
 			Parameters:  json.RawMessage(`{"line_items":"*","after_completion":"*","allow_promotion_codes":"*"}`),
 		},
+		// --- Write (medium risk — subscriptions & promotions) ---
+		{
+			ID:          "tpl_stripe_create_subscriptions",
+			ActionType:  "stripe.create_subscription",
+			Name:        "Create subscriptions",
+			Description: "Agent can create recurring subscriptions for any customer and price.",
+			Parameters:  json.RawMessage(`{"customer":"*","items":"*","trial_period_days":"*","payment_behavior":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_create_subscriptions_no_trial",
+			ActionType:  "stripe.create_subscription",
+			Name:        "Create subscriptions (no trials)",
+			Description: "Agent can create subscriptions but cannot grant free trial periods — trial_period_days is locked to 0.",
+			Parameters:  json.RawMessage(`{"customer":"*","items":"*","trial_period_days":"0","payment_behavior":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_create_coupons",
+			ActionType:  "stripe.create_coupon",
+			Name:        "Create coupons",
+			Description: "Agent can create discount coupons with any parameters.",
+			Parameters:  json.RawMessage(`{"percent_off":"*","amount_off":"*","currency":"*","duration":"*","duration_in_months":"*","max_redemptions":"*","name":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_create_promotion_codes",
+			ActionType:  "stripe.create_promotion_code",
+			Name:        "Create promotion codes",
+			Description: "Agent can create shareable promotion codes for any coupon.",
+			Parameters:  json.RawMessage(`{"coupon":"*","code":"*","max_redemptions":"*","expires_at":"*"}`),
+		},
 		// --- Write (high risk) ---
+		{
+			ID:          "tpl_stripe_cancel_subscription_end_of_period",
+			ActionType:  "stripe.cancel_subscription",
+			Name:        "Cancel subscriptions (end of period)",
+			Description: "Agent can cancel subscriptions at the end of the current billing period only — safer than immediate cancellation.",
+			Parameters:  json.RawMessage(`{"subscription_id":"*","cancel_at_period_end":"true","proration_behavior":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_cancel_subscription_immediate",
+			ActionType:  "stripe.cancel_subscription",
+			Name:        "Cancel subscriptions (immediate)",
+			Description: "Agent can cancel subscriptions immediately or at period end. High risk — use only for trusted agents.",
+			Parameters:  json.RawMessage(`{"subscription_id":"*","cancel_at_period_end":"*","proration_behavior":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_initiate_payout_capped",
+			ActionType:  "stripe.initiate_payout",
+			Name:        "Initiate payouts up to $999.99",
+			Description: "Agent can trigger payouts capped at 99999 cents ($999.99). The amount is constrained by a regex pattern — requires human approval for anything $1000+.",
+			Parameters:  json.RawMessage(`{"amount":{"$pattern":"^[1-9]\\d{0,4}$"},"currency":"*","description":"*","destination":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_initiate_payout_full",
+			ActionType:  "stripe.initiate_payout",
+			Name:        "Initiate payouts (any amount)",
+			Description: "Agent can trigger payouts of any amount. Highest risk — moves real money to bank accounts. Use only with strong oversight.",
+			Parameters:  json.RawMessage(`{"amount":"*","currency":"*","description":"*","destination":"*"}`),
+		},
 		{
 			ID:          "tpl_stripe_issue_refund_capped",
 			ActionType:  "stripe.issue_refund",
