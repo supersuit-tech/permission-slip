@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -37,7 +38,7 @@ func (a *getCampaignStatsAction) Execute(ctx context.Context, req connectors.Act
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/marketing/singlesends/%s", params.SingleSendID)
+	path := "/marketing/singlesends/" + url.PathEscape(params.SingleSendID)
 
 	var resp struct {
 		ID     string `json:"id"`

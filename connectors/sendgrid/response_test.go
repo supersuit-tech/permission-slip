@@ -76,8 +76,8 @@ func TestCheckResponse_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !connectors.IsExternalError(err) {
-		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
 

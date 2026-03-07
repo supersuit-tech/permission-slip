@@ -404,14 +404,14 @@ func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credent
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
+			return &connectors.ExternalError{Message: fmt.Sprintf("marshaling request body: %v", err)}
 		}
 		reqBody = bytes.NewReader(data)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, reqBody)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	if body != nil {

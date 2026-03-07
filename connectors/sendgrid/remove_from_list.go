@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -41,7 +42,7 @@ func (a *removeFromListAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/marketing/lists/%s/contacts?contact_ids=%s", params.ListID, params.ContactID)
+	path := "/marketing/lists/" + url.PathEscape(params.ListID) + "/contacts?contact_ids=" + url.QueryEscape(params.ContactID)
 
 	// SendGrid returns 202 Accepted with a job_id for async deletion.
 	var resp struct {

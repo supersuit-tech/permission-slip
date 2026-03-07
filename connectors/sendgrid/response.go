@@ -53,7 +53,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	case statusCode == http.StatusBadRequest:
 		return &connectors.ValidationError{Message: fmt.Sprintf("SendGrid API validation error: %s", msg)}
 	case statusCode == http.StatusNotFound:
-		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("SendGrid API resource not found: %s", msg)}
+		return &connectors.ValidationError{Message: fmt.Sprintf("SendGrid API resource not found: %s", msg)}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("SendGrid API error: %s", msg)}
 	}

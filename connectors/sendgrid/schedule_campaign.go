@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -82,7 +83,7 @@ func (a *scheduleCampaignAction) Execute(ctx context.Context, req connectors.Act
 		SenderID:           params.SenderID,
 		SuppressionGroupID: params.SuppressionGroupID,
 	}
-	createBody := buildSingleSendBody(campaignParams, "")
+	createBody := buildSingleSendBody(campaignParams)
 	var createResp struct {
 		ID string `json:"id"`
 	}
@@ -95,7 +96,7 @@ func (a *scheduleCampaignAction) Execute(ctx context.Context, req connectors.Act
 		Status string `json:"status"`
 		SendAt string `json:"send_at"`
 	}
-	schedulePath := fmt.Sprintf("/marketing/singlesends/%s/schedule", createResp.ID)
+	schedulePath := "/marketing/singlesends/" + url.PathEscape(createResp.ID) + "/schedule"
 	scheduleBody := map[string]string{"send_at": params.SendAt}
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPut, schedulePath, scheduleBody, &scheduleResp); err != nil {
 		return nil, err

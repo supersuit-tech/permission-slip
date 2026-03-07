@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -62,7 +63,7 @@ func (a *sendCampaignAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	// Step 1: Create the single send
-	createBody := buildSingleSendBody(&params, "")
+	createBody := buildSingleSendBody(&params)
 	var createResp struct {
 		ID string `json:"id"`
 	}
@@ -74,7 +75,7 @@ func (a *sendCampaignAction) Execute(ctx context.Context, req connectors.ActionR
 	var sendResp struct {
 		Status string `json:"status"`
 	}
-	sendPath := fmt.Sprintf("/marketing/singlesends/%s/schedule", createResp.ID)
+	sendPath := "/marketing/singlesends/" + url.PathEscape(createResp.ID) + "/schedule"
 	sendBody := map[string]string{"send_at": "now"}
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPut, sendPath, sendBody, &sendResp); err != nil {
 		return nil, err
@@ -87,8 +88,8 @@ func (a *sendCampaignAction) Execute(ctx context.Context, req connectors.ActionR
 }
 
 // buildSingleSendBody constructs the JSON body for creating a single send.
-// If sendAt is non-empty, it's included for scheduling; otherwise it's omitted.
-func buildSingleSendBody(params *sendCampaignParams, sendAt string) map[string]any {
+// Scheduling is handled separately via the /schedule endpoint.
+func buildSingleSendBody(params *sendCampaignParams) map[string]any {
 	body := map[string]any{
 		"name": params.Name,
 		"email_config": map[string]any{
@@ -104,9 +105,6 @@ func buildSingleSendBody(params *sendCampaignParams, sendAt string) map[string]a
 	if params.SuppressionGroupID != 0 {
 		emailConfig := body["email_config"].(map[string]any)
 		emailConfig["suppression_group_id"] = params.SuppressionGroupID
-	}
-	if sendAt != "" {
-		body["send_at"] = sendAt
 	}
 	return body
 }
