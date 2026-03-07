@@ -1,6 +1,6 @@
 // Package google implements the Google connector for the Permission Slip
-// connector execution layer. It uses Google REST APIs (Gmail, Calendar) with
-// plain net/http and OAuth 2.0 access tokens provided by the platform.
+// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Chat)
+// with plain net/http and OAuth 2.0 access tokens provided by the platform.
 package google
 
 import (
@@ -20,6 +20,7 @@ const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
 	defaultDriveBaseURL    = "https://www.googleapis.com"
+	defaultChatBaseURL     = "https://chat.googleapis.com"
 	defaultTimeout         = 30 * time.Second
 	credKeyAccessToken     = "access_token"
 
@@ -40,6 +41,7 @@ type GoogleConnector struct {
 	gmailBaseURL    string
 	calendarBaseURL string
 	driveBaseURL    string
+	chatBaseURL     string
 }
 
 // New creates a GoogleConnector with sensible defaults.
@@ -49,16 +51,21 @@ func New() *GoogleConnector {
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
 		driveBaseURL:    defaultDriveBaseURL,
+		chatBaseURL:     defaultChatBaseURL,
 	}
 }
 
 // newForTest creates a GoogleConnector that points at a test server.
 func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL string) *GoogleConnector {
+	return newForTestWithChat(client, gmailBaseURL, calendarBaseURL, "")
+}
+
+func newForTestWithChat(client *http.Client, gmailBaseURL, calendarBaseURL, chatBaseURL string) *GoogleConnector {
 	return &GoogleConnector{
 		client:          client,
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
-		driveBaseURL:    gmailBaseURL, // reuse the test server URL
+		chatBaseURL:     chatBaseURL,
 	}
 }
 
@@ -73,335 +80,6 @@ func newDriveForTest(client *http.Client, driveBaseURL string) *GoogleConnector 
 // ID returns "google", matching the connectors.id in the database.
 func (c *GoogleConnector) ID() string { return "google" }
 
-// Manifest returns the connector's metadata manifest. Used by the server to
-// auto-seed DB rows on startup, replacing manual seed.go files.
-func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
-	return &connectors.ConnectorManifest{
-		ID:          "google",
-		Name:        "Google",
-		Description: "Google integration for Gmail, Calendar, and Drive",
-		Actions: []connectors.ManifestAction{
-			{
-				ActionType:  "google.send_email",
-				Name:        "Send Email",
-				Description: "Send an email via Gmail",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["to", "subject", "body"],
-					"properties": {
-						"to": {
-							"type": "string",
-							"description": "Recipient email address"
-						},
-						"subject": {
-							"type": "string",
-							"description": "Email subject line"
-						},
-						"body": {
-							"type": "string",
-							"description": "Email body (plain text)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.list_emails",
-				Name:        "List Emails",
-				Description: "List recent emails from Gmail inbox",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"properties": {
-						"query": {
-							"type": "string",
-							"description": "Gmail search query (e.g. 'from:user@example.com is:unread')"
-						},
-						"max_results": {
-							"type": "integer",
-							"default": 10,
-							"minimum": 1,
-							"maximum": 100,
-							"description": "Maximum number of emails to return (1-100, default 10)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.create_calendar_event",
-				Name:        "Create Calendar Event",
-				Description: "Create a new event on Google Calendar",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["summary", "start_time", "end_time"],
-					"properties": {
-						"summary": {
-							"type": "string",
-							"description": "Event title"
-						},
-						"description": {
-							"type": "string",
-							"description": "Event description"
-						},
-						"start_time": {
-							"type": "string",
-							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')"
-						},
-						"end_time": {
-							"type": "string",
-							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')"
-						},
-						"attendees": {
-							"type": "array",
-							"items": {"type": "string"},
-							"description": "List of attendee email addresses"
-						},
-						"calendar_id": {
-							"type": "string",
-							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.list_calendar_events",
-				Name:        "List Calendar Events",
-				Description: "List upcoming events from Google Calendar",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"properties": {
-						"calendar_id": {
-							"type": "string",
-							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
-						},
-						"max_results": {
-							"type": "integer",
-							"default": 10,
-							"minimum": 1,
-							"maximum": 250,
-							"description": "Maximum number of events to return (1-250, default 10)"
-						},
-						"time_min": {
-							"type": "string",
-							"description": "Lower bound (inclusive) for event start time in RFC 3339 format. Defaults to now."
-						},
-						"time_max": {
-							"type": "string",
-							"description": "Upper bound (exclusive) for event start time in RFC 3339 format"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.list_drive_files",
-				Name:        "List Drive Files",
-				Description: "List or search files in Google Drive",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"properties": {
-						"query": {
-							"type": "string",
-							"description": "Google Drive search query (e.g. \"name contains 'report'\")"
-						},
-						"max_results": {
-							"type": "integer",
-							"default": 10,
-							"minimum": 1,
-							"maximum": 100,
-							"description": "Maximum number of files to return (1-100, default 10)"
-						},
-						"folder_id": {
-							"type": "string",
-							"description": "Folder ID to list files from (defaults to all accessible files)"
-						},
-						"order_by": {
-							"type": "string",
-							"description": "Sort order (e.g. 'modifiedTime desc', 'name'). Defaults to Drive's relevance ordering."
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.get_drive_file",
-				Name:        "Get Drive File",
-				Description: "Get file metadata and optionally download content from Google Drive",
-				RiskLevel:   "low",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_id"],
-					"properties": {
-						"file_id": {
-							"type": "string",
-							"description": "The ID of the file to retrieve"
-						},
-						"include_content": {
-							"type": "boolean",
-							"default": false,
-							"description": "Whether to include file content (exports Google Docs/Sheets/Slides as plain text)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.upload_drive_file",
-				Name:        "Upload Drive File",
-				Description: "Create and upload a text file to Google Drive",
-				RiskLevel:   "medium",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["name", "content"],
-					"properties": {
-						"name": {
-							"type": "string",
-							"description": "File name"
-						},
-						"content": {
-							"type": "string",
-							"description": "File content (text)"
-						},
-						"mime_type": {
-							"type": "string",
-							"default": "text/plain",
-							"description": "MIME type of the file (default: text/plain)"
-						},
-						"folder_id": {
-							"type": "string",
-							"description": "Parent folder ID (optional)"
-						}
-					}
-				}`)),
-			},
-			{
-				ActionType:  "google.delete_drive_file",
-				Name:        "Delete Drive File",
-				Description: "Move a file to trash in Google Drive (soft delete)",
-				RiskLevel:   "high",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"required": ["file_id"],
-					"properties": {
-						"file_id": {
-							"type": "string",
-							"description": "The ID of the file to move to trash"
-						}
-					}
-				}`)),
-			},
-		},
-		RequiredCredentials: []connectors.ManifestCredential{
-			{
-				Service:       "google",
-				AuthType:      "oauth2",
-				OAuthProvider: "google",
-				OAuthScopes: []string{
-					"https://www.googleapis.com/auth/gmail.send",
-					"https://www.googleapis.com/auth/gmail.readonly",
-					"https://www.googleapis.com/auth/calendar.events",
-					"https://www.googleapis.com/auth/drive",
-				},
-			},
-		},
-		Templates: []connectors.ManifestTemplate{
-			{
-				ID:          "tpl_google_send_email",
-				ActionType:  "google.send_email",
-				Name:        "Send emails freely",
-				Description: "Agent can send emails to any recipient with any subject and body.",
-				Parameters:  json.RawMessage(`{"to":"*","subject":"*","body":"*"}`),
-			},
-			{
-				ID:          "tpl_google_send_email_to_recipient",
-				ActionType:  "google.send_email",
-				Name:        "Send email to specific recipient",
-				Description: "Locks the recipient; agent chooses the subject and body.",
-				Parameters:  json.RawMessage(`{"to":"recipient@example.com","subject":"*","body":"*"}`),
-			},
-			{
-				ID:          "tpl_google_list_emails",
-				ActionType:  "google.list_emails",
-				Name:        "Search emails",
-				Description: "Agent can search and list emails from the inbox.",
-				Parameters:  json.RawMessage(`{"query":"*","max_results":"*"}`),
-			},
-			{
-				ID:          "tpl_google_list_unread_emails",
-				ActionType:  "google.list_emails",
-				Name:        "List unread emails",
-				Description: "Agent can list unread emails only. Query is locked to is:unread.",
-				Parameters:  json.RawMessage(`{"query":"is:unread","max_results":"*"}`),
-			},
-			{
-				ID:          "tpl_google_create_calendar_event",
-				ActionType:  "google.create_calendar_event",
-				Name:        "Create calendar events",
-				Description: "Agent can create events on any calendar.",
-				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*"}`),
-			},
-			{
-				ID:          "tpl_google_create_calendar_event_no_attendees",
-				ActionType:  "google.create_calendar_event",
-				Name:        "Create personal calendar events",
-				Description: "Agent can create events on the primary calendar without inviting attendees.",
-				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
-			},
-			{
-				ID:          "tpl_google_list_calendar_events",
-				ActionType:  "google.list_calendar_events",
-				Name:        "List calendar events",
-				Description: "Agent can list upcoming events from any calendar.",
-				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
-			},
-			{
-				ID:          "tpl_google_list_drive_files",
-				ActionType:  "google.list_drive_files",
-				Name:        "Browse Drive files",
-				Description: "Agent can list and search files in Google Drive.",
-				Parameters:  json.RawMessage(`{"query":"*","max_results":"*","folder_id":"*","order_by":"*"}`),
-			},
-			{
-				ID:          "tpl_google_get_drive_file",
-				ActionType:  "google.get_drive_file",
-				Name:        "Read Drive files",
-				Description: "Agent can read file metadata and content from Google Drive.",
-				Parameters:  json.RawMessage(`{"file_id":"*","include_content":"*"}`),
-			},
-			{
-				ID:          "tpl_google_get_drive_file_metadata",
-				ActionType:  "google.get_drive_file",
-				Name:        "View Drive file metadata",
-				Description: "Agent can view file metadata only (no content download).",
-				Parameters:  json.RawMessage(`{"file_id":"*","include_content":"false"}`),
-			},
-			{
-				ID:          "tpl_google_upload_drive_file",
-				ActionType:  "google.upload_drive_file",
-				Name:        "Upload files to Drive",
-				Description: "Agent can upload text files to Google Drive.",
-				Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"*"}`),
-			},
-			{
-				ID:          "tpl_google_upload_drive_file_to_folder",
-				ActionType:  "google.upload_drive_file",
-				Name:        "Upload files to specific folder",
-				Description: "Agent can upload text files to a specific locked folder in Google Drive.",
-				Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"folder-id-here"}`),
-			},
-			{
-				ID:          "tpl_google_delete_drive_file",
-				ActionType:  "google.delete_drive_file",
-				Name:        "Trash Drive files",
-				Description: "Agent can move files to trash in Google Drive.",
-				Parameters:  json.RawMessage(`{"file_id":"*"}`),
-			},
-		},
-	}
-}
-
 // Actions returns the registered action handlers keyed by action_type.
 func (c *GoogleConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
@@ -413,6 +91,9 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.get_drive_file":        &getDriveFileAction{conn: c},
 		"google.upload_drive_file":     &uploadDriveFileAction{conn: c},
 		"google.delete_drive_file":     &deleteDriveFileAction{conn: c},
+		"google.send_chat_message":     &sendChatMessageAction{conn: c},
+		"google.list_chat_spaces":      &listChatSpacesAction{conn: c},
+		"google.create_meeting":        &createMeetingAction{conn: c},
 	}
 }
 
