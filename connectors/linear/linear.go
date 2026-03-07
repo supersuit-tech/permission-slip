@@ -24,6 +24,10 @@ const (
 	// defaultRetryAfter is used when Linear returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
 	defaultRetryAfter = 60 * time.Second
+
+	// maxResponseBytes limits how much data we read from the Linear API
+	// to prevent OOM from unexpectedly large responses.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // LinearConnector owns the shared HTTP client and base URL used by all
@@ -367,7 +371,7 @@ func (c *LinearConnector) doGraphQL(ctx context.Context, creds connectors.Creden
 		return &connectors.AuthError{Message: fmt.Sprintf("Linear API auth error (HTTP %d)", resp.StatusCode)}
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
