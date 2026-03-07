@@ -75,10 +75,15 @@ func (a *updateCardAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	var resp struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		ShortURL string `json:"shortUrl"`
-		URL      string `json:"url"`
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Desc        string `json:"desc"`
+		IDList      string `json:"idList"`
+		Due         string `json:"due"`
+		DueComplete bool   `json:"dueComplete"`
+		Closed      bool   `json:"closed"`
+		ShortURL    string `json:"shortUrl"`
+		URL         string `json:"url"`
 	}
 	path := fmt.Sprintf("/cards/%s", url.PathEscape(params.CardID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, body, &resp); err != nil {
