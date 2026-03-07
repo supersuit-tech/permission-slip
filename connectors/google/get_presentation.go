@@ -63,7 +63,7 @@ func (a *getPresentationAction) Execute(ctx context.Context, req connectors.Acti
 	return connectors.JSONResult(map[string]any{
 		"presentation_id": resp.PresentationID,
 		"title":           resp.Title,
-		"url":             "https://docs.google.com/presentation/d/" + resp.PresentationID + "/edit",
+		"url":             presentationURL(resp.PresentationID),
 		"slide_count":     len(slideIDs),
 		"slides":          slideIDs,
 	})
