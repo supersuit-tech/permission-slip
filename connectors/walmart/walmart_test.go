@@ -167,22 +167,21 @@ func TestManifest_Valid(t *testing.T) {
 	}
 }
 
-func TestActions_AllRegistered(t *testing.T) {
+// TestManifest_ActionsMatchRegistered ensures the manifest action schemas
+// stay in sync with the registered Action handlers. If you add a new action
+// to Actions() you must also add a schema in Manifest(), and vice versa.
+func TestManifest_ActionsMatchRegistered(t *testing.T) {
 	t.Parallel()
 	c := New()
+	manifest := c.Manifest()
 	actions := c.Actions()
-	expected := []string{
-		"walmart.search_products",
-		"walmart.get_product",
-		"walmart.get_taxonomy",
-		"walmart.get_trending",
-	}
-	for _, actionType := range expected {
-		if _, ok := actions[actionType]; !ok {
-			t.Errorf("missing action %q", actionType)
+
+	for _, a := range manifest.Actions {
+		if _, ok := actions[a.ActionType]; !ok {
+			t.Errorf("manifest action %q not registered in Actions()", a.ActionType)
 		}
 	}
-	if len(actions) != len(expected) {
-		t.Errorf("got %d actions, want %d", len(actions), len(expected))
+	if len(actions) != len(manifest.Actions) {
+		t.Errorf("Actions() has %d entries but Manifest() has %d", len(actions), len(manifest.Actions))
 	}
 }
