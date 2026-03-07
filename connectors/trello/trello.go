@@ -2,7 +2,11 @@
 // connector execution layer. It uses the Trello REST API with plain net/http
 // (no third-party SDK) to keep the dependency footprint minimal.
 //
-// Trello uses query-parameter auth (key + token), not header-based auth.
+// Authentication supports two methods:
+//   - OAuth 2.0: Bearer token in the Authorization header (preferred).
+//   - API key: key + token as query parameters (legacy, still supported).
+//
+// OAuth takes precedence when both credential types are present.
 package trello
 
 import (
@@ -23,8 +27,9 @@ const (
 	defaultBaseURL = "https://api.trello.com/1"
 	defaultTimeout = 30 * time.Second
 
-	credKeyAPIKey = "api_key"
-	credKeyToken  = "token"
+	credKeyAPIKey      = "api_key"
+	credKeyToken       = "token"
+	credKeyAccessToken = "access_token"
 
 	// defaultRetryAfter is used when Trello returns a rate limit response
 	// without a Retry-After header (or an unparseable one).
@@ -57,9 +62,11 @@ func New() *TrelloConnector {
 	}
 }
 
-// noRedirect prevents the HTTP client from following redirects. Trello
-// credentials are passed as query parameters, and following a redirect
-// would forward them to the redirect target, potentially leaking them.
+// noRedirect prevents the HTTP client from following redirects. When using
+// API key auth, credentials are passed as query parameters, and following a
+// redirect would forward them to the redirect target. With OAuth Bearer
+// tokens, most HTTP clients strip the Authorization header on cross-origin
+// redirects, but we block all redirects as a defense-in-depth measure.
 func noRedirect(_ *http.Request, _ []*http.Request) error {
 	return http.ErrUseLastResponse
 }
@@ -87,18 +94,16 @@ func (c *TrelloConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain non-empty
-// api_key and token fields, then verifies them against the Trello API by
-// calling GET /1/members/me. This catches invalid or revoked credentials
-// early instead of failing on the first action.
+// ValidateCredentials checks that the provided credentials contain either a
+// non-empty access_token (OAuth) or non-empty api_key + token (API key auth),
+// then verifies them against the Trello API by calling GET /1/members/me.
+// This catches invalid or revoked credentials early instead of failing on the
+// first action.
 func (c *TrelloConnector) ValidateCredentials(ctx context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key — get yours at https://trello.com/power-ups/admin"}
-	}
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: token — generate one at https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&key=YOUR_API_KEY"}
+	if !hasOAuthCreds(creds) && !hasAPIKeyCreds(creds) {
+		return &connectors.ValidationError{
+			Message: "missing credentials: provide either an OAuth access_token or an api_key + token pair",
+		}
 	}
 
 	// Verify credentials by hitting the members/me endpoint.
@@ -111,6 +116,22 @@ func (c *TrelloConnector) ValidateCredentials(ctx context.Context, creds connect
 	}
 
 	return nil
+}
+
+// hasOAuthCreds reports whether the credentials contain a non-empty OAuth access token.
+func hasOAuthCreds(creds connectors.Credentials) bool {
+	token, ok := creds.Get(credKeyAccessToken)
+	return ok && token != ""
+}
+
+// hasAPIKeyCreds reports whether the credentials contain non-empty API key and token.
+func hasAPIKeyCreds(creds connectors.Credentials) bool {
+	key, ok := creds.Get(credKeyAPIKey)
+	if !ok || key == "" {
+		return false
+	}
+	token, ok := creds.Get(credKeyToken)
+	return ok && token != ""
 }
 
 // validateTrelloID checks that a string looks like a valid Trello ID
@@ -135,13 +156,26 @@ func validateTrelloID(value, paramName string) error {
 	return nil
 }
 
-// authQuery extracts api_key and token from credentials and returns them
-// as URL query parameters. This is the single point where credentials are
-// read, reducing duplication across do() and doGet().
-func authQuery(creds connectors.Credentials) (url.Values, error) {
+// authMethod represents how a request should be authenticated.
+type authMethod struct {
+	// queryParams are appended to the URL (used for API key auth).
+	queryParams url.Values
+	// bearerToken, if non-empty, is sent as an Authorization: Bearer header (OAuth).
+	bearerToken string
+}
+
+// resolveAuth determines the auth method from the credentials.
+// OAuth (access_token) takes precedence over API key+token when both are present.
+func resolveAuth(creds connectors.Credentials) (*authMethod, error) {
+	// Prefer OAuth when available.
+	if accessToken, ok := creds.Get(credKeyAccessToken); ok && accessToken != "" {
+		return &authMethod{bearerToken: accessToken}, nil
+	}
+
+	// Fall back to API key + token query parameter auth.
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
-		return nil, &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+		return nil, &connectors.ValidationError{Message: "missing credentials: provide either an OAuth access_token or an api_key + token pair"}
 	}
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -150,7 +184,7 @@ func authQuery(creds connectors.Credentials) (url.Values, error) {
 	q := url.Values{}
 	q.Set("key", key)
 	q.Set("token", token)
-	return q, nil
+	return &authMethod{queryParams: q}, nil
 }
 
 // sendAndDecode executes an HTTP request, reads the response, checks for
@@ -191,10 +225,11 @@ func (c *TrelloConnector) sendAndDecode(req *http.Request, respBody any) error {
 }
 
 // do is the shared request lifecycle for Trello write actions (POST/PUT).
-// It appends key/token query parameters, marshals reqBody as JSON, and
-// unmarshals the response into respBody.
+// It authenticates via either Bearer token (OAuth) or query parameters
+// (API key+token), marshals reqBody as JSON, and unmarshals the response
+// into respBody.
 func (c *TrelloConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody any) error {
-	q, err := authQuery(creds)
+	auth, err := resolveAuth(creds)
 	if err != nil {
 		return err
 	}
@@ -203,7 +238,9 @@ func (c *TrelloConnector) do(ctx context.Context, creds connectors.Credentials, 
 	if err != nil {
 		return fmt.Errorf("parsing URL: %w", err)
 	}
-	u.RawQuery = q.Encode()
+	if auth.queryParams != nil {
+		u.RawQuery = auth.queryParams.Encode()
+	}
 
 	var body io.Reader
 	if reqBody != nil {
@@ -221,16 +258,25 @@ func (c *TrelloConnector) do(ctx context.Context, creds connectors.Credentials, 
 	if reqBody != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if auth.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+auth.bearerToken)
+	}
 
 	return c.sendAndDecode(req, respBody)
 }
 
 // doGet is a convenience wrapper for GET requests. It builds query parameters
-// from the params map and appends them alongside the auth params.
+// from the params map and authenticates via either Bearer token (OAuth) or
+// query parameters (API key+token).
 func (c *TrelloConnector) doGet(ctx context.Context, creds connectors.Credentials, path string, params map[string]string, respBody any) error {
-	q, err := authQuery(creds)
+	auth, err := resolveAuth(creds)
 	if err != nil {
 		return err
+	}
+
+	q := url.Values{}
+	if auth.queryParams != nil {
+		q = auth.queryParams
 	}
 	for k, v := range params {
 		q.Set(k, v)
@@ -245,6 +291,9 @@ func (c *TrelloConnector) doGet(ctx context.Context, creds connectors.Credential
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
+	}
+	if auth.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+auth.bearerToken)
 	}
 
 	return c.sendAndDecode(req, respBody)

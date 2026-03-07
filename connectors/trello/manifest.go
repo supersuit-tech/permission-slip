@@ -13,6 +13,14 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "trello",
 		Name:        "Trello",
 		Description: "Trello integration for project management and kanban boards",
+		OAuthProviders: []connectors.ManifestOAuthProvider{
+			{
+				ID:           "trello",
+				AuthorizeURL: "https://trello.com/1/authorize",
+				TokenURL:     "https://trello.com/1/OAuthGetAccessToken",
+				Scopes:       []string{"read", "write", "account"},
+			},
+		},
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "trello.create_card",
@@ -217,7 +225,13 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
-				Service:         "trello",
+				Service:       "trello",
+				AuthType:      "oauth2",
+				OAuthProvider: "trello",
+				OAuthScopes:   []string{"read", "write", "account"},
+			},
+			{
+				Service:         "trello_api_key",
 				AuthType:        "api_key",
 				InstructionsURL: "https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#authentication-and-authorization",
 			},

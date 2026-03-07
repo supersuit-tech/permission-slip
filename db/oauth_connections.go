@@ -265,6 +265,9 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 
 // GetRequiredCredentialByActionType returns the required credential for the connector
 // that owns the given action type. Used to determine auth_type at execution time.
+// When multiple credentials are registered (e.g. oauth2 + api_key), this returns
+// the oauth2 one by default. Use GetAllRequiredCredentialsByActionType for
+// fallback logic across auth types.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
@@ -272,6 +275,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
+		ORDER BY CASE crc.auth_type WHEN 'oauth2' THEN 0 ELSE 1 END
 		LIMIT 1`,
 		actionType,
 	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)
@@ -282,4 +286,32 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		return nil, err
 	}
 	return &rc, nil
+}
+
+// GetAllRequiredCredentialsByActionType returns all required credentials for
+// the connector that owns the given action type, ordered with oauth2 first.
+// This supports connectors that offer multiple auth methods (e.g. OAuth + API key).
+func GetAllRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType string) ([]RequiredCredential, error) {
+	rows, err := db.Query(ctx, `
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
+		FROM connector_actions ca
+		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
+		WHERE ca.action_type = $1
+		ORDER BY CASE crc.auth_type WHEN 'oauth2' THEN 0 ELSE 1 END`,
+		actionType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var creds []RequiredCredential
+	for rows.Next() {
+		var rc RequiredCredential
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
+			return nil, err
+		}
+		creds = append(creds, rc)
+	}
+	return creds, rows.Err()
 }
