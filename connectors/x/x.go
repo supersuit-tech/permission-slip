@@ -21,6 +21,10 @@ const (
 	defaultTimeout    = 30 * time.Second
 	credKeyToken      = "access_token"
 	defaultRetryAfter = 30 * time.Second
+
+	// maxResponseBytes caps how much data we read from the X API to prevent
+	// OOM from unexpectedly large responses.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // XConnector owns the shared HTTP client and base URL used by all
@@ -93,7 +97,7 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "x.delete_tweet",
 				Name:        "Delete Tweet",
 				Description: "Delete a tweet (irreversible)",
-				RiskLevel:   "medium",
+				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["tweet_id"],
@@ -341,7 +345,7 @@ func (c *XConnector) do(ctx context.Context, creds connectors.Credentials, metho
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
