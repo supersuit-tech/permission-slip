@@ -7,32 +7,35 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func TestSearchIssues_Success(t *testing.T) {
+func TestSearchIssues_FullTextSearch(t *testing.T) {
 	t.Parallel()
 
+	// When no filters are specified, search uses issueSearch (full-text).
 	handler := &graphQLHandler{
 		t: t,
 		response: map[string]any{
 			"data": map[string]any{
-				"issues": map[string]any{
+				"issueSearch": map[string]any{
 					"nodes": []map[string]any{
 						{
-							"id":         "issue-1",
-							"identifier": "ENG-100",
-							"title":      "Login bug",
-							"priority":   1,
-							"url":        "https://linear.app/team/issue/ENG-100",
-							"state":      map[string]string{"name": "In Progress"},
-							"assignee":   map[string]string{"name": "Alice"},
+							"id":          "issue-1",
+							"identifier":  "ENG-100",
+							"title":       "Login bug",
+							"description": "Users cannot log in",
+							"priority":    1,
+							"url":         "https://linear.app/team/issue/ENG-100",
+							"state":       map[string]string{"name": "In Progress"},
+							"assignee":    map[string]string{"name": "Alice"},
 						},
 						{
-							"id":         "issue-2",
-							"identifier": "ENG-101",
-							"title":      "Login redesign",
-							"priority":   3,
-							"url":        "https://linear.app/team/issue/ENG-101",
-							"state":      map[string]string{"name": "Todo"},
-							"assignee":   nil,
+							"id":          "issue-2",
+							"identifier":  "ENG-101",
+							"title":       "Login redesign",
+							"description": "",
+							"priority":    3,
+							"url":         "https://linear.app/team/issue/ENG-101",
+							"state":       map[string]string{"name": "Todo"},
+							"assignee":    nil,
 						},
 					},
 				},
@@ -56,31 +59,35 @@ func TestSearchIssues_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data []searchIssueResult
+	var data searchIssuesResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if len(data) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(data))
+	if data.TotalCount != 2 {
+		t.Errorf("total_count = %d, want 2", data.TotalCount)
 	}
-	if data[0].Identifier != "ENG-100" {
-		t.Errorf("first result identifier = %q, want %q", data[0].Identifier, "ENG-100")
+	if len(data.Issues) != 2 {
+		t.Fatalf("expected 2 issues, got %d", len(data.Issues))
 	}
-	if data[0].Assignee != "Alice" {
-		t.Errorf("first result assignee = %q, want %q", data[0].Assignee, "Alice")
+	if data.Issues[0].Identifier != "ENG-100" {
+		t.Errorf("first result identifier = %q, want %q", data.Issues[0].Identifier, "ENG-100")
 	}
-	if data[0].Priority != "1" {
-		t.Errorf("first result priority = %q, want %q", data[0].Priority, "1")
+	if data.Issues[0].Assignee != "Alice" {
+		t.Errorf("first result assignee = %q, want %q", data.Issues[0].Assignee, "Alice")
+	}
+	if data.Issues[0].Priority != "1" {
+		t.Errorf("first result priority = %q, want %q", data.Issues[0].Priority, "1")
 	}
 	// Second result has nil assignee.
-	if data[1].Assignee != "" {
-		t.Errorf("second result assignee = %q, want empty", data[1].Assignee)
+	if data.Issues[1].Assignee != "" {
+		t.Errorf("second result assignee = %q, want empty", data.Issues[1].Assignee)
 	}
 }
 
 func TestSearchIssues_WithFilters(t *testing.T) {
 	t.Parallel()
 
+	// When filters are specified, search uses filtered issues endpoint.
 	handler := &graphQLHandler{
 		t: t,
 		response: map[string]any{
@@ -112,12 +119,15 @@ func TestSearchIssues_WithFilters(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data []searchIssueResult
+	var data searchIssuesResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if len(data) != 0 {
-		t.Errorf("expected 0 results, got %d", len(data))
+	if data.TotalCount != 0 {
+		t.Errorf("total_count = %d, want 0", data.TotalCount)
+	}
+	if len(data.Issues) != 0 {
+		t.Errorf("expected 0 results, got %d", len(data.Issues))
 	}
 }
 
@@ -192,7 +202,7 @@ func TestSearchIssues_EmptyResults(t *testing.T) {
 		t: t,
 		response: map[string]any{
 			"data": map[string]any{
-				"issues": map[string]any{
+				"issueSearch": map[string]any{
 					"nodes": []map[string]any{},
 				},
 			},
@@ -213,11 +223,14 @@ func TestSearchIssues_EmptyResults(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data []searchIssueResult
+	var data searchIssuesResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if len(data) != 0 {
-		t.Errorf("expected empty results, got %d", len(data))
+	if data.TotalCount != 0 {
+		t.Errorf("total_count = %d, want 0", data.TotalCount)
+	}
+	if len(data.Issues) != 0 {
+		t.Errorf("expected empty results, got %d", len(data.Issues))
 	}
 }

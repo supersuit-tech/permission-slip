@@ -205,7 +205,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "linear.search_issues",
 				Name:        "Search Issues",
-				Description: "Search and filter Linear issues",
+				Description: "Search Linear issues with full-text search or filtered queries",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

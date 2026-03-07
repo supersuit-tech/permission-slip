@@ -103,6 +103,27 @@ func TestUpdateIssue_InvalidPriority(t *testing.T) {
 	}
 }
 
+func TestUpdateIssue_NoUpdates(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateIssueAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{"issue_id": "issue-1"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "linear.update_issue",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when no update fields are provided")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestUpdateIssue_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

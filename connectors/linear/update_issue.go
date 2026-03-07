@@ -30,7 +30,15 @@ func (p *updateIssueParams) validate() error {
 	if p.Priority != nil && (*p.Priority < 0 || *p.Priority > 4) {
 		return &connectors.ValidationError{Message: "priority must be 0 (none), 1 (urgent), 2 (high), 3 (medium), or 4 (low)"}
 	}
+	if !p.hasUpdates() {
+		return &connectors.ValidationError{Message: "at least one field to update must be provided (title, description, assignee_id, priority, state_id, or label_ids)"}
+	}
 	return nil
+}
+
+func (p *updateIssueParams) hasUpdates() bool {
+	return p.Title != "" || p.Description != "" || p.AssigneeID != "" ||
+		p.Priority != nil || p.StateID != "" || len(p.LabelIDs) > 0
 }
 
 const updateIssueMutation = `mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) {
