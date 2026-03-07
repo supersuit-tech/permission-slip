@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Slack connector (`connectors/slack/`) is a good reference for custom Bearer token auth, shared response types across similar actions (`messages.go`), input validation helpers (`validateChannelID`, `validateLimit`), and response body size limits. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -988,9 +988,14 @@ connectors/
 │   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
-│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
+│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), shared validators
+│   ├── messages.go           # Shared message types (slackMessage, messageSummary, messagesResponse)
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
+│   ├── list_channels.go      # slack.list_channels action
+│   ├── read_channel_messages.go  # slack.read_channel_messages action
+│   ├── read_thread.go        # slack.read_thread action
+│   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── zoom/
 │   ├── zoom.go                # ZoomConnector struct, New(), doJSON(), OAuth2 auth, error mapping

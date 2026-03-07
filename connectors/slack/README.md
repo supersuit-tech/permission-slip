@@ -272,7 +272,8 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 
 ```
 connectors/slack/
-├── slack.go                        # SlackConnector struct, New(), Manifest(), doPost(), shared helpers
+├── slack.go                        # SlackConnector, New(), Manifest(), doPost(), shared validators
+├── messages.go                     # Shared types: slackMessage, messageSummary, messagesResponse, toMessagesResult()
 ├── send_message.go                 # slack.send_message action
 ├── create_channel.go               # slack.create_channel action
 ├── list_channels.go                # slack.list_channels action
