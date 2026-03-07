@@ -39,11 +39,13 @@ func (p *updateProductParams) validate() error {
 	}
 	if p.Status != nil {
 		if *p.Status == "" {
-			return &connectors.ValidationError{Message: "status cannot be empty: must be active, draft, or archived"}
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("status cannot be empty: must be one of %s", sortedKeys(validProductStatuses)),
+			}
 		}
 		if !validProductStatuses[*p.Status] {
 			return &connectors.ValidationError{
-				Message: fmt.Sprintf("invalid status %q: must be active, draft, or archived", *p.Status),
+				Message: fmt.Sprintf("invalid status %q: must be one of %s", *p.Status, sortedKeys(validProductStatuses)),
 			}
 		}
 	}
