@@ -43,6 +43,7 @@ import (
 	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	quickbooksconnector "github.com/supersuit-tech/permission-slip-web/connectors/quickbooks"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
+	"github.com/supersuit-tech/permission-slip-web/connectors/monday"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	"github.com/supersuit-tech/permission-slip-web/connectors/netlify"
@@ -361,6 +362,7 @@ func main() {
 	registry.Register(linkedinconnector.New())
 	registry.Register(metaconnector.New())
 	registry.Register(microsoft.New())
+	registry.Register(monday.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
 	registry.Register(notionconnector.New())
