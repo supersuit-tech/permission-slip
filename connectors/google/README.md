@@ -1,6 +1,6 @@
 # Google Connector
 
-The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), and [Google Chat](https://developers.google.com/chat/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
+The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), [Google Chat](https://developers.google.com/chat/api), and [Google Drive](https://developers.google.com/drive/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
 
 ## Connector ID
 
@@ -23,8 +23,9 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `chat.spaces.readonly` | `google.list_chat_spaces` |
 | `chat.messages.create` | `google.send_chat_message` |
+| `drive` | `google.list_drive_files`, `google.get_drive_file`, `google.upload_drive_file`, `google.delete_drive_file` |
 
-Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management).
+Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management). The `drive` scope grants full Drive access; a narrower scope like `drive.file` would only allow access to files created by this app, which is too restrictive for file browsing and reading.
 
 ## Actions
 
@@ -271,6 +272,155 @@ Creates a Google Calendar event with an auto-generated Google Meet conference li
 - The `meet_link` field is only present when Google successfully attaches conference data to the event.
 - Validation rules match `google.create_calendar_event` (RFC 3339 times, end after start).
 
+---
+
+### `google.list_drive_files`
+
+Lists or searches files in Google Drive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `query` | string | No | — | Google Drive search query (e.g., `name contains 'report'`) |
+| `max_results` | integer | No | `10` | Maximum number of files to return (1-100) |
+| `folder_id` | string | No | — | Folder ID to filter by (lists files within that folder) |
+| `order_by` | string | No | relevance | Sort order (e.g., `modifiedTime desc`, `name`) |
+
+**Response:**
+
+```json
+{
+  "files": [
+    {
+      "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+      "name": "Q4 Report",
+      "mime_type": "application/vnd.google-apps.document",
+      "modified_time": "2024-01-15T10:00:00.000Z",
+      "size": "",
+      "web_view_link": "https://docs.google.com/document/d/1Bxi.../edit"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Drive API:** `GET /drive/v3/files` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/list))
+
+Trashed files are automatically excluded. Google Workspace files (Docs, Sheets, Slides) have no `size` — they report an empty string.
+
+---
+
+### `google.get_drive_file`
+
+Gets file metadata and optionally downloads content from Google Drive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `file_id` | string | Yes | — | The ID of the file to retrieve |
+| `include_content` | boolean | No | `false` | Whether to include file content |
+
+**Response (metadata only):**
+
+```json
+{
+  "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "name": "Q4 Report",
+  "mime_type": "application/vnd.google-apps.document",
+  "modified_time": "2024-01-15T10:00:00.000Z",
+  "web_view_link": "https://docs.google.com/document/d/1Bxi.../edit"
+}
+```
+
+**Response (with content):**
+
+```json
+{
+  "id": "...",
+  "name": "Q4 Report",
+  "mime_type": "application/vnd.google-apps.document",
+  "content": "The full text content of the document..."
+}
+```
+
+**Drive API:** `GET /drive/v3/files/{id}` for metadata, `GET /drive/v3/files/{id}/export` for Workspace content, `GET /drive/v3/files/{id}?alt=media` for regular files ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/get))
+
+**Content export behavior:**
+- **Google Docs** → exported as `text/plain`
+- **Google Sheets** → exported as `text/csv`
+- **Google Slides** → exported as `text/plain`
+- **Text files** (text/\*, application/json, etc.) → downloaded directly
+- **Binary files** (images, PDFs, etc.) → content skipped, `content_skipped_reason` field explains why
+
+---
+
+### `google.upload_drive_file`
+
+Creates and uploads a text file to Google Drive.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `name` | string | Yes | — | File name |
+| `content` | string | Yes | — | File content (text, max 4 MB) |
+| `mime_type` | string | No | `text/plain` | MIME type of the file |
+| `folder_id` | string | No | — | Parent folder ID |
+
+**Response:**
+
+```json
+{
+  "id": "1newFileId123",
+  "name": "report.txt",
+  "web_view_link": "https://drive.google.com/file/d/1newFileId123/view"
+}
+```
+
+**Drive API:** `POST /upload/drive/v3/files?uploadType=multipart` ([docs](https://developers.google.com/drive/api/guides/manage-uploads#multipart))
+
+Uses multipart upload with JSON metadata in the first part and file content in the second. Content is capped at 4 MB to prevent oversized payloads.
+
+---
+
+### `google.delete_drive_file`
+
+Moves a file to trash in Google Drive (soft delete — not permanent).
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `file_id` | string | Yes | The ID of the file to move to trash |
+
+**Response:**
+
+```json
+{
+  "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "name": "old-report.txt",
+  "trashed": true
+}
+```
+
+**Drive API:** `PATCH /drive/v3/files/{id}` with `{trashed: true}` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/update))
+
+**Security notes:**
+- This is a **soft delete only** — files are moved to the Google Drive trash and can be recovered by the user. The permanent delete endpoint is intentionally not exposed.
+- File IDs are validated with an allowlist pattern (alphanumeric, hyphens, underscores) to prevent query injection and path traversal.
+
+---
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -303,24 +453,32 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | List chat spaces | `list_chat_spaces` | Nothing — agent controls page size and filter |
 | Create meetings with Meet link | `create_meeting` | Nothing — agent controls all parameters |
 | Create personal meetings | `create_meeting` | `calendar_id` locked to `primary`, no attendees |
+| Browse Drive files | `list_drive_files` | Nothing — agent controls query, folder, and sort |
+| Read Drive files | `get_drive_file` | Nothing — agent can read metadata and content |
+| View Drive file metadata | `get_drive_file` | `include_content` locked to `false` (metadata only) |
+| Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, content, and destination |
+| Upload files to specific folder | `upload_drive_file` | `folder_id` locked to a specific folder |
+| Trash Drive files | `delete_drive_file` | Nothing — agent can trash any file |
 
 ## Adding a New Action
 
 Each action lives in its own file. To add one (e.g., `google.delete_calendar_event`):
 
 1. Create `connectors/google/delete_calendar_event.go` with a params struct, `validate()`, and an `Execute` method.
-2. Use `a.conn.doJSON(ctx, creds, method, url, reqBody, &resp)` for the HTTP lifecycle — it handles JSON marshaling, Bearer auth, rate limiting, response size limits, and timeout detection.
-3. Use `checkResponse()` (called automatically by `doJSON`) to map HTTP errors to typed connector errors.
+2. Use `a.conn.doJSON(ctx, creds, method, url, reqBody, &resp)` for JSON API calls — it handles marshaling, Bearer auth, rate limiting, response size limits, and timeout detection. For non-JSON responses (e.g., file downloads), use `a.conn.doRawGet()`.
+3. Use `checkResponse()` (called automatically by `doJSON` and `doRawGet`) to map HTTP errors to typed connector errors. Use `wrapHTTPError()` when making custom HTTP requests (e.g., multipart upload).
 4. Return `connectors.JSONResult(respBody)` to wrap the response into an `ActionResult`.
-5. Register the action in `Actions()` inside `google.go`.
-6. Add the action to the `Manifest()` return value inside `google.go` with a `ParametersSchema`.
-7. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithChat()`.
+5. Validate user-provided IDs (file IDs, folder IDs) with `isValidDriveID()` to prevent injection attacks.
+6. Register the action in `Actions()` inside `google.go`.
+7. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
+8. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithChat()` / `newDriveForTest()`.
 
 ## File Structure
 
 ```
 connectors/google/
-├── google.go                       # GoogleConnector struct, New(), Manifest(), doJSON(), ValidateCredentials()
+├── google.go                       # GoogleConnector struct, New(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
+├── manifest.go                     # Manifest() — actions, credentials, templates
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
@@ -328,6 +486,10 @@ connectors/google/
 ├── send_chat_message.go            # google.send_chat_message action
 ├── list_chat_spaces.go             # google.list_chat_spaces action
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
+├── list_drive_files.go             # google.list_drive_files action + shared Drive ID validation
+├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
+├── upload_drive_file.go            # google.upload_drive_file action (multipart upload)
+├── delete_drive_file.go            # google.delete_drive_file action (soft delete via trash)
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
@@ -337,6 +499,10 @@ connectors/google/
 ├── send_chat_message_test.go       # Send chat message tests (including path traversal validation)
 ├── list_chat_spaces_test.go        # List chat spaces tests (including page size clamping)
 ├── create_meeting_test.go          # Create meeting tests (including Meet link extraction)
+├── list_drive_files_test.go        # List Drive files tests (including query injection prevention)
+├── get_drive_file_test.go          # Get Drive file tests (metadata, content export, binary skip)
+├── upload_drive_file_test.go       # Upload tests (multipart, size limit, folder targeting)
+├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
 └── README.md                       # This file
 ```
 
