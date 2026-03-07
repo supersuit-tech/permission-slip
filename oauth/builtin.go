@@ -37,6 +37,18 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "salesforce",
+			AuthorizeURL: "https://login.salesforce.com/services/oauth2/authorize",
+			TokenURL:     "https://login.salesforce.com/services/oauth2/token",
+			Scopes: []string{
+				"api",
+				"refresh_token",
+			},
+			ClientID:     os.Getenv("SALESFORCE_CLIENT_ID"),
+			ClientSecret: os.Getenv("SALESFORCE_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "zoom",
 			AuthorizeURL: "https://zoom.us/oauth/authorize",
 			TokenURL:     "https://zoom.us/oauth/token",
@@ -68,7 +80,7 @@ func NewRegistryWithBuiltIns() *Registry {
 
 // RegisterFromManifest registers providers declared in a connector manifest's
 // oauth_providers section. These are external providers that the platform
-// doesn't have built-in support for (e.g. Salesforce, HubSpot). They are
+// doesn't have built-in support for (e.g. HubSpot). They are
 // registered without client credentials — users must supply those via BYOA.
 // Returns an error if any provider fails validation.
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {

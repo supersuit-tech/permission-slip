@@ -33,6 +33,7 @@ import (
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
+	"github.com/supersuit-tech/permission-slip-web/connectors/salesforce"
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
@@ -339,6 +340,7 @@ func main() {
 	registry.Register(shopify.New())
 	registry.Register(slack.New())
 	registry.Register(redisconnector.New())
+	registry.Register(salesforce.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
 	registry.Register(xconnector.New())
