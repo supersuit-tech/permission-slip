@@ -65,6 +65,10 @@ func TestCreatePresentation_Success(t *testing.T) {
 	if data["title"] != "Q1 Review" {
 		t.Errorf("expected title 'Q1 Review', got %q", data["title"])
 	}
+	wantURL := "https://docs.google.com/presentation/d/pres-abc-123/edit"
+	if data["url"] != wantURL {
+		t.Errorf("expected url %q, got %q", wantURL, data["url"])
+	}
 }
 
 func TestCreatePresentation_MissingTitle(t *testing.T) {

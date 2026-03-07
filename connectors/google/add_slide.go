@@ -24,11 +24,20 @@ type addSlideParams struct {
 }
 
 // validSlideLayouts lists the allowed predefined layout values for the
-// Google Slides API CreateSlideRequest.
+// Google Slides API CreateSlideRequest. See:
+// https://developers.google.com/slides/api/reference/rest/v1/presentations/request#PredefinedLayout
 var validSlideLayouts = map[string]bool{
-	"BLANK":          true,
-	"TITLE":          true,
-	"TITLE_AND_BODY": true,
+	"BLANK":            true,
+	"TITLE":            true,
+	"TITLE_AND_BODY":   true,
+	"SECTION_HEADER":   true,
+	"ONE_COLUMN_TEXT":  true,
+	"MAIN_POINT":      true,
+	"BIG_NUMBER":      true,
+	"CAPTION_ONLY":    true,
+	"TITLE_ONLY":      true,
+	"SECTION_TITLE_AND_DESCRIPTION": true,
+	"TITLE_AND_TWO_COLUMNS":         true,
 }
 
 func (p *addSlideParams) validate() error {
@@ -37,7 +46,7 @@ func (p *addSlideParams) validate() error {
 	}
 	if p.Layout != "" && !validSlideLayouts[p.Layout] {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid layout %q: must be one of BLANK, TITLE, TITLE_AND_BODY", p.Layout),
+			Message: fmt.Sprintf("invalid layout %q: see Google Slides PredefinedLayout reference for valid values", p.Layout),
 		}
 	}
 	if p.InsertionIndex != nil && *p.InsertionIndex < 0 {
@@ -121,6 +130,7 @@ func (a *addSlideAction) Execute(ctx context.Context, req connectors.ActionReque
 	}
 
 	return connectors.JSONResult(map[string]string{
-		"slide_id": slideID,
+		"slide_id":        slideID,
+		"presentation_id": params.PresentationID,
 	})
 }

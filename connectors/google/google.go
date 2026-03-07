@@ -1,6 +1,6 @@
 // Package google implements the Google connector for the Permission Slip
-// connector execution layer. It uses Google REST APIs (Gmail, Calendar) with
-// plain net/http and OAuth 2.0 access tokens provided by the platform.
+// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Slides)
+// with plain net/http and OAuth 2.0 access tokens provided by the platform.
 package google
 
 import (
@@ -235,7 +235,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"layout": {
 							"type": "string",
-							"enum": ["BLANK", "TITLE", "TITLE_AND_BODY"],
+							"enum": ["BLANK", "TITLE", "TITLE_AND_BODY", "TITLE_ONLY", "SECTION_HEADER", "SECTION_TITLE_AND_DESCRIPTION", "ONE_COLUMN_TEXT", "MAIN_POINT", "BIG_NUMBER", "CAPTION_ONLY", "TITLE_AND_TWO_COLUMNS"],
 							"default": "BLANK",
 							"description": "Predefined slide layout (defaults to BLANK)"
 						},

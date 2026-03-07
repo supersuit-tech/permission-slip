@@ -58,5 +58,6 @@ func (a *createPresentationAction) Execute(ctx context.Context, req connectors.A
 	return connectors.JSONResult(map[string]string{
 		"presentation_id": resp.PresentationID,
 		"title":           resp.Title,
+		"url":             "https://docs.google.com/presentation/d/" + resp.PresentationID + "/edit",
 	})
 }

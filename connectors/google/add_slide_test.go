@@ -70,6 +70,9 @@ func TestAddSlide_Success(t *testing.T) {
 	if data["slide_id"] != "slide-new-001" {
 		t.Errorf("expected slide_id 'slide-new-001', got %q", data["slide_id"])
 	}
+	if data["presentation_id"] != "pres-abc-123" {
+		t.Errorf("expected presentation_id 'pres-abc-123', got %q", data["presentation_id"])
+	}
 }
 
 func TestAddSlide_WithLayout(t *testing.T) {

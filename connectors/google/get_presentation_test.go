@@ -55,6 +55,8 @@ func TestGetPresentation_Success(t *testing.T) {
 	var data struct {
 		PresentationID string   `json:"presentation_id"`
 		Title          string   `json:"title"`
+		URL            string   `json:"url"`
+		SlideCount     int      `json:"slide_count"`
 		Slides         []string `json:"slides"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
@@ -71,6 +73,13 @@ func TestGetPresentation_Success(t *testing.T) {
 	}
 	if data.Slides[0] != "slide-001" {
 		t.Errorf("expected first slide 'slide-001', got %q", data.Slides[0])
+	}
+	if data.SlideCount != 3 {
+		t.Errorf("expected slide_count 3, got %d", data.SlideCount)
+	}
+	wantURL := "https://docs.google.com/presentation/d/pres-abc-123/edit"
+	if data.URL != wantURL {
+		t.Errorf("expected url %q, got %q", wantURL, data.URL)
 	}
 }
 
@@ -104,13 +113,17 @@ func TestGetPresentation_EmptySlides(t *testing.T) {
 	}
 
 	var data struct {
-		Slides []string `json:"slides"`
+		SlideCount int      `json:"slide_count"`
+		Slides     []string `json:"slides"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
 	if len(data.Slides) != 0 {
 		t.Errorf("expected 0 slides, got %d", len(data.Slides))
+	}
+	if data.SlideCount != 0 {
+		t.Errorf("expected slide_count 0, got %d", data.SlideCount)
 	}
 }
 
