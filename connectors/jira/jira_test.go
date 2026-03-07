@@ -14,7 +14,8 @@ import (
 
 // Compile-time interface checks.
 var (
-	_ connectors.Connector = (*JiraConnector)(nil)
+	_ connectors.Connector        = (*JiraConnector)(nil)
+	_ connectors.ManifestProvider = (*JiraConnector)(nil)
 )
 
 func TestJiraConnector_ID(t *testing.T) {
@@ -184,4 +185,103 @@ func TestJiraConnector_Do_MissingCredentials(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJiraConnector_Actions(t *testing.T) {
+	t.Parallel()
+	c := New()
+	actions := c.Actions()
+
+	want := []string{
+		"jira.create_issue",
+		"jira.update_issue",
+		"jira.transition_issue",
+		"jira.add_comment",
+		"jira.assign_issue",
+		"jira.search",
+	}
+	for _, at := range want {
+		if _, ok := actions[at]; !ok {
+			t.Errorf("Actions() missing %q", at)
+		}
+	}
+	if len(actions) != len(want) {
+		t.Errorf("Actions() returned %d actions, want %d", len(actions), len(want))
+	}
+}
+
+func TestJiraConnector_Manifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	if m.ID != "jira" {
+		t.Errorf("Manifest().ID = %q, want %q", m.ID, "jira")
+	}
+	if m.Name != "Jira" {
+		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Jira")
+	}
+	if len(m.Actions) != 6 {
+		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	}
+
+	actionTypes := make(map[string]bool)
+	for _, a := range m.Actions {
+		actionTypes[a.ActionType] = true
+	}
+	for _, want := range []string{
+		"jira.create_issue", "jira.update_issue", "jira.transition_issue",
+		"jira.add_comment", "jira.assign_issue", "jira.search",
+	} {
+		if !actionTypes[want] {
+			t.Errorf("Manifest().Actions missing %q", want)
+		}
+	}
+
+	if len(m.RequiredCredentials) != 1 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	}
+	cred := m.RequiredCredentials[0]
+	if cred.Service != "jira" {
+		t.Errorf("credential service = %q, want %q", cred.Service, "jira")
+	}
+	if cred.AuthType != "basic" {
+		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "basic")
+	}
+	if cred.InstructionsURL == "" {
+		t.Error("credential instructions_url is empty, want a URL")
+	}
+
+	if err := m.Validate(); err != nil {
+		t.Errorf("Manifest().Validate() = %v", err)
+	}
+}
+
+func TestJiraConnector_ActionsMatchManifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	actions := c.Actions()
+	manifest := c.Manifest()
+
+	manifestTypes := make(map[string]bool, len(manifest.Actions))
+	for _, a := range manifest.Actions {
+		manifestTypes[a.ActionType] = true
+	}
+
+	for actionType := range actions {
+		if !manifestTypes[actionType] {
+			t.Errorf("Actions() has %q but Manifest() does not", actionType)
+		}
+	}
+	for _, a := range manifest.Actions {
+		if _, ok := actions[a.ActionType]; !ok {
+			t.Errorf("Manifest() has %q but Actions() does not", a.ActionType)
+		}
+	}
+}
+
+func TestJiraConnector_ImplementsInterface(t *testing.T) {
+	t.Parallel()
+	var _ connectors.Connector = (*JiraConnector)(nil)
+	var _ connectors.ManifestProvider = (*JiraConnector)(nil)
 }

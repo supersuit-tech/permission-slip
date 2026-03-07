@@ -1,0 +1,58 @@
+package jira
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+// searchAction implements connectors.Action for jira.search.
+// It searches issues using JQL via POST /rest/api/3/search.
+type searchAction struct {
+	conn *JiraConnector
+}
+
+type searchParams struct {
+	JQL        string   `json:"jql"`
+	MaxResults int      `json:"max_results"`
+	Fields     []string `json:"fields"`
+}
+
+func (p *searchParams) validate() error {
+	if p.JQL == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: jql"}
+	}
+	return nil
+}
+
+func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params searchParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := params.validate(); err != nil {
+		return nil, err
+	}
+
+	if params.MaxResults <= 0 {
+		params.MaxResults = 50
+	}
+
+	body := map[string]interface{}{
+		"jql":        params.JQL,
+		"maxResults": params.MaxResults,
+	}
+	if len(params.Fields) > 0 {
+		body["fields"] = params.Fields
+	}
+
+	var resp json.RawMessage
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/search", body, &resp); err != nil {
+		return nil, err
+	}
+
+	return &connectors.ActionResult{Data: resp}, nil
+}
