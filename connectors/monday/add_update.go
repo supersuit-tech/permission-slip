@@ -22,6 +22,9 @@ func (p *addUpdateParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
 	}
+	if !isValidMondayID(p.ItemID) {
+		return &connectors.ValidationError{Message: "item_id must be a numeric string"}
+	}
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}
 	}

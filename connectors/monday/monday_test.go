@@ -159,3 +159,26 @@ func TestMondayConnector_ImplementsInterface(t *testing.T) {
 	var _ connectors.Connector = (*MondayConnector)(nil)
 	var _ connectors.ManifestProvider = (*MondayConnector)(nil)
 }
+
+func TestIsValidMondayID(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		id   string
+		want bool
+	}{
+		{"12345", true},
+		{"0", true},
+		{"9876543210", true},
+		{"", false},
+		{"abc", false},
+		{"123abc", false},
+		{"12.34", false},
+		{"-1", false},
+		{"12 34", false},
+	}
+	for _, tt := range tests {
+		if got := isValidMondayID(tt.id); got != tt.want {
+			t.Errorf("isValidMondayID(%q) = %v, want %v", tt.id, got, tt.want)
+		}
+	}
+}

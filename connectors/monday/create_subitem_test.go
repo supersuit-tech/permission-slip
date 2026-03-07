@@ -144,6 +144,30 @@ func TestCreateSubitem_MissingParentItemID(t *testing.T) {
 	}
 }
 
+func TestCreateSubitem_NonNumericParentItemID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createSubitemAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"parent_item_id": "abc",
+		"item_name":      "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.create_subitem",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric parent_item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateSubitem_MissingItemName(t *testing.T) {
 	t.Parallel()
 

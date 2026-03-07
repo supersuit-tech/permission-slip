@@ -82,11 +82,11 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"column_values": {
 							"type": "object",
-							"description": "JSON object mapping column IDs to values"
+							"description": "JSON object mapping column IDs to values, e.g. {\"status\": {\"label\": \"Working on it\"}, \"date\": {\"date\": \"2024-01-15\"}}"
 						},
 						"group_id": {
 							"type": "string",
-							"description": "Group ID to create the item in (optional)"
+							"description": "Group ID to create the item in (use the group's unique ID, not its display name)"
 						}
 					}
 				}`)),
@@ -224,44 +224,51 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ID:          "tpl_monday_create_item_on_board",
 				ActionType:  "monday.create_item",
-				Name:        "Create items on a board",
-				Description: "Locks the board and lets the agent create items with any name and values.",
+				Name:        "Create items on a specific board",
+				Description: "Replace the board_id with your board's numeric ID. Agent can create items with any name and column values.",
 				Parameters:  json.RawMessage(`{"board_id":"1234567890","item_name":"*","column_values":"*","group_id":"*"}`),
 			},
 			{
 				ID:          "tpl_monday_create_item_any",
 				ActionType:  "monday.create_item",
-				Name:        "Create items freely",
-				Description: "Agent can create items on any board.",
+				Name:        "Create items on any board",
+				Description: "Agent can create items on any board with any values.",
 				Parameters:  json.RawMessage(`{"board_id":"*","item_name":"*","column_values":"*","group_id":"*"}`),
 			},
 			{
 				ID:          "tpl_monday_update_item",
 				ActionType:  "monday.update_item",
-				Name:        "Update items on a board",
-				Description: "Agent can update column values on items in a specific board.",
+				Name:        "Update items on a specific board",
+				Description: "Replace the board_id with your board's numeric ID. Agent can update column values on any item in that board.",
 				Parameters:  json.RawMessage(`{"board_id":"1234567890","item_id":"*","column_values":"*"}`),
 			},
 			{
 				ID:          "tpl_monday_add_update",
 				ActionType:  "monday.add_update",
 				Name:        "Add updates to items",
-				Description: "Agent can add comments/updates to any item.",
+				Description: "Agent can add comments and updates to any item.",
 				Parameters:  json.RawMessage(`{"item_id":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_monday_create_subitem",
+				ActionType:  "monday.create_subitem",
+				Name:        "Create subitems",
+				Description: "Agent can create subitems under any item.",
+				Parameters:  json.RawMessage(`{"parent_item_id":"*","item_name":"*","column_values":"*"}`),
 			},
 			{
 				ID:          "tpl_monday_move_to_group",
 				ActionType:  "monday.move_item_to_group",
-				Name:        "Move items to Done",
-				Description: "Agent can move items to the Done group.",
-				Parameters:  json.RawMessage(`{"item_id":"*","group_id":"done"}`),
+				Name:        "Move items between groups",
+				Description: "Agent can move items to any group (e.g. status changes like moving to 'Done').",
+				Parameters:  json.RawMessage(`{"item_id":"*","group_id":"*"}`),
 			},
 			{
 				ID:          "tpl_monday_search_items",
 				ActionType:  "monday.search_items",
-				Name:        "Search items on a board",
-				Description: "Agent can search and filter items on any board.",
-				Parameters:  json.RawMessage(`{"board_id":"*","query":"*","column_id":"*","column_value":"*","limit":"*"}`),
+				Name:        "Search items on any board",
+				Description: "Agent can search and filter items. Use query for text search or column_id+column_value for filtering.",
+				Parameters:  json.RawMessage(`{"board_id":"*","query":"*","column_id":"*","column_value":"*","limit":20}`),
 			},
 		},
 	}
@@ -391,6 +398,31 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 	}
 
 	return nil
+}
+
+// isValidMondayID checks that an ID is a non-empty numeric string.
+// Monday.com IDs are always numeric, so rejecting non-numeric values
+// prevents unexpected API behavior.
+func isValidMondayID(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// stringifyColumnValues marshals a column_values map to a JSON string,
+// which is the format Monday.com's GraphQL API expects.
+func stringifyColumnValues(cv map[string]any) (string, error) {
+	data, err := json.Marshal(cv)
+	if err != nil {
+		return "", &connectors.ValidationError{Message: fmt.Sprintf("invalid column_values: %v", err)}
+	}
+	return string(data), nil
 }
 
 // mapMondayError converts a Monday.com error code to the appropriate

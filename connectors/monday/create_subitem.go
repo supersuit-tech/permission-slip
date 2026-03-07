@@ -23,6 +23,9 @@ func (p *createSubitemParams) validate() error {
 	if p.ParentItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: parent_item_id"}
 	}
+	if !isValidMondayID(p.ParentItemID) {
+		return &connectors.ValidationError{Message: "parent_item_id must be a numeric string"}
+	}
 	if p.ItemName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_name"}
 	}
@@ -50,11 +53,11 @@ func (a *createSubitemAction) Execute(ctx context.Context, req connectors.Action
 		"item_name":      params.ItemName,
 	}
 	if params.ColumnValues != nil {
-		cv, err := json.Marshal(params.ColumnValues)
+		cv, err := stringifyColumnValues(params.ColumnValues)
 		if err != nil {
-			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid column_values: %v", err)}
+			return nil, err
 		}
-		variables["column_values"] = string(cv)
+		variables["column_values"] = cv
 	}
 
 	var data struct {

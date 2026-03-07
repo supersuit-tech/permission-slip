@@ -9,6 +9,7 @@ import (
 )
 
 // searchItemsAction implements connectors.Action for monday.search_items.
+// It queries boards(ids:) with optional items_page filtering via query_params.
 type searchItemsAction struct {
 	conn *MondayConnector
 }
@@ -25,6 +26,9 @@ func (p *searchItemsParams) validate() error {
 	if p.BoardID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: board_id"}
 	}
+	if !isValidMondayID(p.BoardID) {
+		return &connectors.ValidationError{Message: "board_id must be a numeric string"}
+	}
 	if p.Limit < 0 {
 		return &connectors.ValidationError{Message: "limit must be non-negative"}
 	}
@@ -32,8 +36,8 @@ func (p *searchItemsParams) validate() error {
 }
 
 type searchItemResult struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
+	ID           string             `json:"id"`
+	Name         string             `json:"name"`
 	ColumnValues []searchItemColumn `json:"column_values"`
 }
 
@@ -42,6 +46,19 @@ type searchItemColumn struct {
 	Title string `json:"title"`
 	Text  string `json:"text"`
 }
+
+// itemsFragment is the shared GraphQL selection set for items.
+const itemsFragment = `
+	items {
+		id
+		name
+		column_values {
+			id
+			title: column { title }
+			text
+		}
+	}
+`
 
 func (a *searchItemsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params searchItemsParams
@@ -57,75 +74,39 @@ func (a *searchItemsAction) Execute(ctx context.Context, req connectors.ActionRe
 		limit = 20
 	}
 
-	// Build the query based on whether we have filter criteria.
-	var query string
 	variables := map[string]any{
-		"board_id": params.BoardID,
+		"board_id": []string{params.BoardID},
 		"limit":    limit,
 	}
 
+	// Build the query. Column filter values are passed as GraphQL variables
+	// to prevent injection — never interpolate user input into the query string.
+	var query string
 	if params.ColumnID != "" && params.ColumnValue != "" {
-		// Filter by column value.
-		query = `query ($board_id: [ID!]!, $limit: Int!) {
+		query = `query ($board_id: [ID!]!, $limit: Int!, $column_id: String!, $column_value: String!) {
 			boards(ids: $board_id) {
-				items_page(limit: $limit, query_params: {rules: [{column_id: "` + params.ColumnID + `", compare_value: ["` + params.ColumnValue + `"]}]}) {
-					items {
-						id
-						name
-						column_values {
-							id
-							title: column {
-								title
-							}
-							text
-						}
-					}
+				items_page(limit: $limit, query_params: {rules: [{column_id: $column_id, compare_value: [$column_value]}]}) {` + itemsFragment + `
 				}
 			}
 		}`
+		variables["column_id"] = params.ColumnID
+		variables["column_value"] = params.ColumnValue
 	} else if params.Query != "" {
-		// Text search - use items_page with query_params.
 		query = `query ($board_id: [ID!]!, $limit: Int!, $query: String!) {
 			boards(ids: $board_id) {
-				items_page(limit: $limit, query_params: {rules: [{column_id: "name", compare_value: [$query]}]}) {
-					items {
-						id
-						name
-						column_values {
-							id
-							title: column {
-								title
-							}
-							text
-						}
-					}
+				items_page(limit: $limit, query_params: {rules: [{column_id: "name", compare_value: [$query]}]}) {` + itemsFragment + `
 				}
 			}
 		}`
 		variables["query"] = params.Query
 	} else {
-		// No filter - return all items.
 		query = `query ($board_id: [ID!]!, $limit: Int!) {
 			boards(ids: $board_id) {
-				items_page(limit: $limit) {
-					items {
-						id
-						name
-						column_values {
-							id
-							title: column {
-								title
-							}
-							text
-						}
-					}
+				items_page(limit: $limit) {` + itemsFragment + `
 				}
 			}
 		}`
 	}
-
-	// The board_id variable needs to be an array for boards(ids:).
-	variables["board_id"] = []string{params.BoardID}
 
 	var data struct {
 		Boards []struct {
@@ -149,7 +130,7 @@ func (a *searchItemsAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	// Flatten the response.
+	// Flatten the response into a simpler structure.
 	var items []searchItemResult
 	if len(data.Boards) > 0 {
 		for _, item := range data.Boards[0].ItemsPage.Items {

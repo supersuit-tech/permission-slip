@@ -23,8 +23,14 @@ func (p *updateItemParams) validate() error {
 	if p.BoardID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: board_id"}
 	}
+	if !isValidMondayID(p.BoardID) {
+		return &connectors.ValidationError{Message: "board_id must be a numeric string"}
+	}
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id"}
+	}
+	if !isValidMondayID(p.ItemID) {
+		return &connectors.ValidationError{Message: "item_id must be a numeric string"}
 	}
 	if p.ColumnValues == nil {
 		return &connectors.ValidationError{Message: "missing required parameter: column_values"}
@@ -48,15 +54,15 @@ func (a *updateItemAction) Execute(ctx context.Context, req connectors.ActionReq
 		}
 	}`
 
-	cv, err := json.Marshal(params.ColumnValues)
+	cv, err := stringifyColumnValues(params.ColumnValues)
 	if err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid column_values: %v", err)}
+		return nil, err
 	}
 
 	variables := map[string]any{
 		"board_id":      params.BoardID,
 		"item_id":       params.ItemID,
-		"column_values": string(cv),
+		"column_values": cv,
 	}
 
 	var data struct {

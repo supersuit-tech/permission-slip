@@ -96,6 +96,56 @@ func TestUpdateItem_MissingBoardID(t *testing.T) {
 	}
 }
 
+func TestUpdateItem_NonNumericBoardID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateItemAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"board_id":      "abc",
+		"item_id":       "12345",
+		"column_values": map[string]string{"status": "Done"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.update_item",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric board_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdateItem_NonNumericItemID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateItemAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"board_id":      "9876",
+		"item_id":       "not-numeric",
+		"column_values": map[string]string{"status": "Done"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.update_item",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestUpdateItem_MissingItemID(t *testing.T) {
 	t.Parallel()
 

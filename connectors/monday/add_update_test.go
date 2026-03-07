@@ -86,6 +86,30 @@ func TestAddUpdate_MissingItemID(t *testing.T) {
 	}
 }
 
+func TestAddUpdate_NonNumericItemID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &addUpdateAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"item_id": "abc-def",
+		"body":    "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.add_update",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestAddUpdate_MissingBody(t *testing.T) {
 	t.Parallel()
 

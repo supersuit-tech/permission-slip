@@ -155,6 +155,30 @@ func TestCreateItem_MissingBoardID(t *testing.T) {
 	}
 }
 
+func TestCreateItem_NonNumericBoardID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createItemAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"board_id":  "not-a-number",
+		"item_name": "Test",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.create_item",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric board_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateItem_MissingItemName(t *testing.T) {
 	t.Parallel()
 

@@ -86,6 +86,30 @@ func TestMoveItemToGroup_MissingItemID(t *testing.T) {
 	}
 }
 
+func TestMoveItemToGroup_NonNumericItemID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &moveItemToGroupAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"item_id":  "not-a-number",
+		"group_id": "done",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.move_item_to_group",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric item_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestMoveItemToGroup_MissingGroupID(t *testing.T) {
 	t.Parallel()
 

@@ -24,6 +24,9 @@ func (p *createItemParams) validate() error {
 	if p.BoardID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: board_id"}
 	}
+	if !isValidMondayID(p.BoardID) {
+		return &connectors.ValidationError{Message: "board_id must be a numeric string"}
+	}
 	if p.ItemName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_name"}
 	}
@@ -52,12 +55,11 @@ func (a *createItemAction) Execute(ctx context.Context, req connectors.ActionReq
 		"item_name": params.ItemName,
 	}
 	if params.ColumnValues != nil {
-		// Monday.com expects column_values as a stringified JSON object.
-		cv, err := json.Marshal(params.ColumnValues)
+		cv, err := stringifyColumnValues(params.ColumnValues)
 		if err != nil {
-			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid column_values: %v", err)}
+			return nil, err
 		}
-		variables["column_values"] = string(cv)
+		variables["column_values"] = cv
 	}
 	if params.GroupID != "" {
 		variables["group_id"] = params.GroupID
