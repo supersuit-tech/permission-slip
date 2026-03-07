@@ -82,6 +82,7 @@ Create a new deployment from a Git branch or commit.
 |------|------|----------|---------|-------------|
 | `project_id` | string | Yes | — | Project ID or name |
 | `ref` | string | Yes | — | Git ref (branch, tag, or commit SHA) |
+| `ref_type` | string | No | `"branch"` | Type of Git ref: `"branch"`, `"commit"`, or `"tag"` |
 | `target` | string | No | `"preview"` | `"production"` or `"preview"` |
 | `team_id` | string | No | — | Team ID |
 
