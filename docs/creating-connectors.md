@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub), OAuth 2.0 (Google), custom auth (Slack), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists.
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), custom auth (Slack), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 

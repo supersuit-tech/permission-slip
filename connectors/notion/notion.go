@@ -1,6 +1,16 @@
 // Package notion implements the Notion connector for the Permission Slip
 // connector execution layer. It uses the Notion API with plain net/http
 // (no third-party SDK) and internal integration tokens (API key auth).
+//
+// Actions:
+//   - notion.create_page   — create pages or database entries
+//   - notion.update_page   — update page properties, archive/unarchive
+//   - notion.append_blocks — append content blocks to a page
+//   - notion.query_database — query a database with filters and sorts
+//   - notion.search        — full-text search across shared content
+//
+// Auth: Notion internal integration token (api_key credential).
+// API version: 2022-06-28 (set via Notion-Version header on every request).
 package notion
 
 import (
