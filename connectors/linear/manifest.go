@@ -165,7 +165,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query (matched against issue titles)"
+							"description": "Search query (full-text across titles, descriptions, and comments when no filters are specified; matched against titles when filters are used)"
 						},
 						"team_id": {
 							"type": "string",
@@ -221,6 +221,13 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Update issues",
 				Description: "Agent can update any issue's fields.",
 				Parameters:  json.RawMessage(`{"issue_id":"*","title":"*","description":"*","priority":"*","state_id":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_create_project",
+				ActionType:  "linear.create_project",
+				Name:        "Create projects in teams",
+				Description: "Locks the teams and lets the agent choose project details.",
+				Parameters:  json.RawMessage(`{"team_ids":"TEAM_IDS","name":"*","description":"*"}`),
 			},
 		},
 	}

@@ -16,11 +16,12 @@ func TestCreateIssue_Success(t *testing.T) {
 			"data": map[string]any{
 				"issueCreate": map[string]any{
 					"success": true,
-					"issue": map[string]string{
+					"issue": map[string]any{
 						"id":         "issue-uuid-1",
 						"identifier": "ENG-123",
 						"title":      "Fix login bug",
 						"url":        "https://linear.app/team/issue/ENG-123",
+						"state":      map[string]string{"name": "Backlog"},
 					},
 				},
 			},
@@ -60,6 +61,9 @@ func TestCreateIssue_Success(t *testing.T) {
 	if data["url"] != "https://linear.app/team/issue/ENG-123" {
 		t.Errorf("url = %q, want %q", data["url"], "https://linear.app/team/issue/ENG-123")
 	}
+	if data["state"] != "Backlog" {
+		t.Errorf("state = %q, want %q", data["state"], "Backlog")
+	}
 }
 
 func TestCreateIssue_WithAllOptionalFields(t *testing.T) {
@@ -71,11 +75,12 @@ func TestCreateIssue_WithAllOptionalFields(t *testing.T) {
 			"data": map[string]any{
 				"issueCreate": map[string]any{
 					"success": true,
-					"issue": map[string]string{
+					"issue": map[string]any{
 						"id":         "issue-uuid-2",
 						"identifier": "ENG-456",
 						"title":      "Add feature X",
 						"url":        "https://linear.app/team/issue/ENG-456",
+						"state":      map[string]string{"name": "Todo"},
 					},
 				},
 			},

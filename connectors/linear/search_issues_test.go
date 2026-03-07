@@ -78,7 +78,10 @@ func TestSearchIssues_FullTextSearch(t *testing.T) {
 	if data.Issues[0].Priority != "1" {
 		t.Errorf("first result priority = %q, want %q", data.Issues[0].Priority, "1")
 	}
-	// Second result has nil assignee.
+	if data.Issues[0].Description != "Users cannot log in" {
+		t.Errorf("first result description = %q, want %q", data.Issues[0].Description, "Users cannot log in")
+	}
+	// Second result has nil assignee and empty description.
 	if data.Issues[1].Assignee != "" {
 		t.Errorf("second result assignee = %q, want empty", data.Issues[1].Assignee)
 	}

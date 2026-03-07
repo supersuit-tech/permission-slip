@@ -45,6 +45,9 @@ const createIssueMutation = `mutation IssueCreate($input: IssueCreateInput!) {
 			identifier
 			title
 			url
+			state {
+				name
+			}
 		}
 	}
 }`
@@ -57,6 +60,9 @@ type createIssueResponse struct {
 			Identifier string `json:"identifier"`
 			Title      string `json:"title"`
 			URL        string `json:"url"`
+			State      struct {
+				Name string `json:"name"`
+			} `json:"state"`
 		} `json:"issue"`
 	} `json:"issueCreate"`
 }
@@ -107,5 +113,6 @@ func (a *createIssueAction) Execute(ctx context.Context, req connectors.ActionRe
 		"identifier": resp.IssueCreate.Issue.Identifier,
 		"title":      resp.IssueCreate.Issue.Title,
 		"url":        resp.IssueCreate.Issue.URL,
+		"state":      resp.IssueCreate.Issue.State.Name,
 	})
 }

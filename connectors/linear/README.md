@@ -30,7 +30,7 @@ The credential `auth_type` in the database is `api_key`. Tokens are stored encry
 
 ### `linear.create_issue`
 
-Creates a new issue in a team.
+Creates a new issue in a team. Returns `id`, `identifier`, `title`, `url`, and `state` of the created issue.
 
 **Linear API:** `mutation issueCreate`
 **Required fields:** `team_id`, `title`
@@ -68,7 +68,7 @@ Searches issues using two strategies:
 **Required fields:** `query`
 **Optional filters:** `team_id`, `assignee_id`, `state`, `limit` (default 50, max 100)
 
-**Response format:** Returns `{issues: [...], total_count: N}` — the envelope makes it easy for agents to check result counts.
+**Response format:** Returns `{issues: [...], total_count: N}` — the envelope makes it easy for agents to check result counts. Each issue includes `id`, `identifier`, `title`, `description`, `priority`, `url`, `state`, and `assignee`.
 
 ## Error Handling
 

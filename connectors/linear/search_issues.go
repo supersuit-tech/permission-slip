@@ -108,13 +108,14 @@ type searchIssuesFullTextResponse struct {
 }
 
 type searchIssueResult struct {
-	ID         string `json:"id"`
-	Identifier string `json:"identifier"`
-	Title      string `json:"title"`
-	Priority   string `json:"priority"`
-	URL        string `json:"url"`
-	State      string `json:"state"`
-	Assignee   string `json:"assignee"`
+	ID          string `json:"id"`
+	Identifier  string `json:"identifier"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	Priority    string `json:"priority"`
+	URL         string `json:"url"`
+	State       string `json:"state"`
+	Assignee    string `json:"assignee"`
 }
 
 type searchIssuesResult struct {
@@ -178,13 +179,14 @@ func (a *searchIssuesAction) Execute(ctx context.Context, req connectors.ActionR
 			assignee = node.Assignee.Name
 		}
 		issues = append(issues, searchIssueResult{
-			ID:         node.ID,
-			Identifier: node.Identifier,
-			Title:      node.Title,
-			Priority:   strconv.Itoa(node.Priority),
-			URL:        node.URL,
-			State:      node.State.Name,
-			Assignee:   assignee,
+			ID:          node.ID,
+			Identifier:  node.Identifier,
+			Title:       node.Title,
+			Description: node.Description,
+			Priority:    strconv.Itoa(node.Priority),
+			URL:         node.URL,
+			State:       node.State.Name,
+			Assignee:    assignee,
 		})
 	}
 
