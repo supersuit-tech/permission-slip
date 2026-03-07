@@ -14,15 +14,39 @@ import { ConnectorCredentialsSection } from "../ConnectorCredentialsSection";
 vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
-const requiredCredentials = [
-  { service: "github", auth_type: "api_key" as const },
+const apiKeyCredentials = [
+  { service: "github_pat", auth_type: "api_key" as const },
+];
+
+const oauthCredentials = [
+  {
+    service: "github",
+    auth_type: "oauth2" as const,
+    oauth_provider: "github",
+    oauth_scopes: ["repo"],
+  },
+];
+
+const mixedCredentials = [
+  {
+    service: "github",
+    auth_type: "oauth2" as const,
+    oauth_provider: "github",
+    oauth_scopes: ["repo"],
+  },
+  {
+    service: "github_pat",
+    auth_type: "api_key" as const,
+    instructions_url:
+      "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+  },
 ];
 
 const storedCredentials = {
   credentials: [
     {
       id: "cred_123",
-      service: "github",
+      service: "github_pat",
       label: "Personal Access Token",
       created_at: "2026-02-11T10:00:00Z",
     },
@@ -49,7 +73,7 @@ describe("ConnectorCredentialsSection", () => {
     mockGet.mockReturnValue(new Promise(() => {}));
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
     expect(screen.getByText("Credentials")).toBeInTheDocument();
@@ -60,7 +84,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -76,7 +100,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -92,7 +116,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -112,14 +136,14 @@ describe("ConnectorCredentialsSection", () => {
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
-        service: "github",
+        service: "github_pat",
         created_at: "2026-02-20T10:00:00Z",
       },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -135,7 +159,7 @@ describe("ConnectorCredentialsSection", () => {
       expect(mockPost).toHaveBeenCalledWith("/v1/credentials", {
         headers: { Authorization: "Bearer token" },
         body: {
-          service: "github",
+          service: "github_pat",
           credentials: { api_key: "ghp_test_key" },
         },
       });
@@ -148,7 +172,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -175,7 +199,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -219,5 +243,38 @@ describe("ConnectorCredentialsSection", () => {
 
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
+  });
+
+  it("shows OAuth connect button for oauth2 credential", async () => {
+    // Mock both endpoints: OAuth connections (no connections) and credentials
+    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={oauthCredentials}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
+    });
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
+  });
+
+  it("shows both OAuth and API key options for mixed credentials", async () => {
+    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={mixedCredentials}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
+    });
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("Alternative")).toBeInTheDocument();
   });
 });

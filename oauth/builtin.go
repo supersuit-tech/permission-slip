@@ -94,6 +94,17 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "github",
+			AuthorizeURL: "https://github.com/login/oauth/authorize",
+			TokenURL:     "https://github.com/login/oauth/access_token",
+			Scopes: []string{
+				"repo",
+			},
+			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "kroger",
 			AuthorizeURL: "https://api.kroger.com/v1/connect/oauth2/authorize",
 			TokenURL:     "https://api.kroger.com/v1/connect/oauth2/token",
