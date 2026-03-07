@@ -22,6 +22,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
+	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
@@ -35,6 +36,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
+	"github.com/supersuit-tech/permission-slip-web/connectors/pagerduty"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
@@ -361,8 +363,10 @@ func main() {
 	registry.Register(xconnector.New())
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
+	registry.Register(datadog.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
+	registry.Register(pagerduty.New())
 	registry.Register(zoom.New())
 	registry.Register(calendly.New())
 
