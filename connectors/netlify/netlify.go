@@ -50,7 +50,7 @@ func (c *NetlifyConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "netlify",
 		Name:        "Netlify",
-		Description: "Netlify deployment management — trigger deployments, rollback, manage environment variables",
+		Description: "Netlify deployment management — trigger builds, rollback to previous deploys, check status, and manage environment variables via the Netlify API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "netlify.list_sites",
@@ -283,11 +283,25 @@ func (c *NetlifyConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"site_id":"*","page":"*","per_page":"*"}`),
 			},
 			{
+				ID:          "tpl_netlify_get_deployment",
+				ActionType:  "netlify.get_deployment",
+				Name:        "Check deployment status",
+				Description: "Agent can check the status of any deployment.",
+				Parameters:  json.RawMessage(`{"deploy_id":"*"}`),
+			},
+			{
 				ID:          "tpl_netlify_trigger_deployment",
 				ActionType:  "netlify.trigger_deployment",
-				Name:        "Trigger deployment",
-				Description: "Agent can trigger deployments for any site.",
+				Name:        "Trigger deployment for any site",
+				Description: "Agent can trigger new builds and deployments for any site.",
 				Parameters:  json.RawMessage(`{"site_id":"*","branch":"*","clear_cache":"*","title":"*"}`),
+			},
+			{
+				ID:          "tpl_netlify_list_env_vars",
+				ActionType:  "netlify.list_env_vars",
+				Name:        "List environment variables",
+				Description: "Agent can view environment variable names and values for any site.",
+				Parameters:  json.RawMessage(`{"account_slug":"*","site_id":"*"}`),
 			},
 		},
 	}

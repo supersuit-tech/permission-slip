@@ -24,6 +24,7 @@ func TestVercelConnector_Actions(t *testing.T) {
 		"vercel.list_deployments",
 		"vercel.get_deployment",
 		"vercel.trigger_deployment",
+		"vercel.promote_deployment",
 		"vercel.rollback_deployment",
 		"vercel.list_env_vars",
 		"vercel.set_env_var",
@@ -94,8 +95,8 @@ func TestVercelConnector_Manifest(t *testing.T) {
 	if m.Name != "Vercel" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Vercel")
 	}
-	if len(m.Actions) != 8 {
-		t.Fatalf("Manifest().Actions has %d items, want 8", len(m.Actions))
+	if len(m.Actions) != 9 {
+		t.Fatalf("Manifest().Actions has %d items, want 9", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 1 {
 		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))

@@ -50,7 +50,7 @@ func (c *VercelConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "vercel",
 		Name:        "Vercel",
-		Description: "Vercel deployment management — trigger deployments, rollback, manage environment variables",
+		Description: "Vercel deployment management — trigger and promote deployments, rollback, check status, and manage environment variables via the Vercel REST API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "vercel.list_projects",
@@ -185,6 +185,30 @@ func (c *VercelConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "vercel.promote_deployment",
+				Name:        "Promote to Production",
+				Description: "Promote an existing preview deployment to production. This is the recommended way to ship to production — deploy a preview first, verify it, then promote.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["project_id", "deployment_id"],
+					"properties": {
+						"project_id": {
+							"type": "string",
+							"description": "The project ID or name"
+						},
+						"deployment_id": {
+							"type": "string",
+							"description": "The preview deployment ID to promote to production"
+						},
+						"team_id": {
+							"type": "string",
+							"description": "Team ID to scope the request (required for team projects)"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "vercel.list_env_vars",
 				Name:        "List Environment Variables",
 				Description: "List all environment variables for a project",
@@ -290,11 +314,32 @@ func (c *VercelConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"project_id":"*","team_id":"*","target":"*","state":"*","limit":"*"}`),
 			},
 			{
+				ID:          "tpl_vercel_get_deployment",
+				ActionType:  "vercel.get_deployment",
+				Name:        "Check deployment status",
+				Description: "Agent can check the status of any deployment.",
+				Parameters:  json.RawMessage(`{"deployment_id":"*","team_id":"*"}`),
+			},
+			{
 				ID:          "tpl_vercel_trigger_preview",
 				ActionType:  "vercel.trigger_deployment",
-				Name:        "Trigger preview deployments",
-				Description: "Agent can trigger preview deployments only.",
+				Name:        "Trigger preview deployments only",
+				Description: "Agent can deploy to preview environments but NOT production. Pair with the promote action for a safe deploy-then-promote workflow.",
 				Parameters:  json.RawMessage(`{"project_id":"*","ref":"*","target":"preview","team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_vercel_promote_deployment",
+				ActionType:  "vercel.promote_deployment",
+				Name:        "Promote preview to production",
+				Description: "Agent can promote a verified preview deployment to production.",
+				Parameters:  json.RawMessage(`{"project_id":"*","deployment_id":"*","team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_vercel_list_env_vars",
+				ActionType:  "vercel.list_env_vars",
+				Name:        "List environment variables",
+				Description: "Agent can view environment variable names and metadata (values are redacted by Vercel for sensitive types).",
+				Parameters:  json.RawMessage(`{"project_id":"*","team_id":"*"}`),
 			},
 		},
 	}
@@ -307,6 +352,7 @@ func (c *VercelConnector) Actions() map[string]connectors.Action {
 		"vercel.list_deployments":   &listDeploymentsAction{conn: c},
 		"vercel.get_deployment":     &getDeploymentAction{conn: c},
 		"vercel.trigger_deployment": &triggerDeploymentAction{conn: c},
+		"vercel.promote_deployment":  &promoteDeploymentAction{conn: c},
 		"vercel.rollback_deployment": &rollbackDeploymentAction{conn: c},
 		"vercel.list_env_vars":      &listEnvVarsAction{conn: c},
 		"vercel.set_env_var":        &setEnvVarAction{conn: c},

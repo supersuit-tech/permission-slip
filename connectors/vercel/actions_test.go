@@ -288,6 +288,67 @@ func TestDeleteEnvVar_Success(t *testing.T) {
 	}
 }
 
+func TestPromoteDeployment_Success(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "promoted",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["vercel.promote_deployment"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "vercel.promote_deployment",
+		Parameters:  json.RawMessage(`{"project_id":"prj_123","deployment_id":"dpl_preview"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if result == nil || result.Data == nil {
+		t.Fatal("Execute() returned nil result")
+	}
+}
+
+func TestPromoteDeployment_MissingParams(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := conn.Actions()["vercel.promote_deployment"]
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{name: "missing project_id", params: `{"deployment_id":"d"}`},
+		{name: "missing deployment_id", params: `{"project_id":"p"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "vercel.promote_deployment",
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestRollbackDeployment_Success(t *testing.T) {
 	t.Parallel()
 
