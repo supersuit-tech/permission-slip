@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
@@ -356,6 +357,7 @@ func main() {
 	registry.Register(xconnector.New())
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
+	registry.Register(awsconnector.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
 	registry.Register(zoom.New())
