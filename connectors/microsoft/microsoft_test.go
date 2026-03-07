@@ -24,6 +24,21 @@ func TestMicrosoftConnector_Actions(t *testing.T) {
 		"microsoft.list_emails",
 		"microsoft.create_calendar_event",
 		"microsoft.list_calendar_events",
+		"microsoft.create_document",
+		"microsoft.get_document",
+		"microsoft.update_document",
+		"microsoft.list_documents",
+		"microsoft.list_teams",
+		"microsoft.list_channels",
+		"microsoft.send_channel_message",
+		"microsoft.list_channel_messages",
+		"microsoft.create_presentation",
+		"microsoft.list_presentations",
+		"microsoft.get_presentation",
+		"microsoft.excel_list_worksheets",
+		"microsoft.excel_read_range",
+		"microsoft.excel_write_range",
+		"microsoft.excel_append_rows",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -91,8 +106,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	if m.Name != "Microsoft" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Microsoft")
 	}
-	if len(m.Actions) != 4 {
-		t.Fatalf("Manifest().Actions has %d items, want 4", len(m.Actions))
+	if len(m.Actions) != 19 {
+		t.Fatalf("Manifest().Actions has %d items, want 19", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -103,6 +118,21 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 		"microsoft.list_emails",
 		"microsoft.create_calendar_event",
 		"microsoft.list_calendar_events",
+		"microsoft.create_document",
+		"microsoft.get_document",
+		"microsoft.update_document",
+		"microsoft.list_documents",
+		"microsoft.list_teams",
+		"microsoft.list_channels",
+		"microsoft.send_channel_message",
+		"microsoft.list_channel_messages",
+		"microsoft.create_presentation",
+		"microsoft.list_presentations",
+		"microsoft.get_presentation",
+		"microsoft.excel_list_worksheets",
+		"microsoft.excel_read_range",
+		"microsoft.excel_write_range",
+		"microsoft.excel_append_rows",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
@@ -126,8 +156,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	}
 
 	// Validate templates.
-	if len(m.Templates) != 4 {
-		t.Errorf("Manifest().Templates has %d items, want 4", len(m.Templates))
+	if len(m.Templates) != 20 {
+		t.Errorf("Manifest().Templates has %d items, want 20", len(m.Templates))
 	}
 
 	// Validate the manifest passes validation.
