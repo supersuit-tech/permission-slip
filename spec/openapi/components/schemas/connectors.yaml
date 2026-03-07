@@ -18,7 +18,14 @@ ConnectorListResponse:
         description: "GitHub integration for repository management"
         actions:
           - "github.create_issue"
+          - "github.close_issue"
+          - "github.add_label"
+          - "github.add_comment"
+          - "github.create_pr"
           - "github.merge_pr"
+          - "github.add_reviewer"
+          - "github.create_release"
+          - "github.create_branch"
         required_credentials:
           - "github"
 
@@ -61,7 +68,14 @@ ConnectorSummary:
         List of action types supported by this connector.
       example:
         - "github.create_issue"
+        - "github.close_issue"
+        - "github.add_label"
+        - "github.add_comment"
+        - "github.create_pr"
         - "github.merge_pr"
+        - "github.add_reviewer"
+        - "github.create_release"
+        - "github.create_branch"
 
     required_credentials:
       type: array
@@ -81,7 +95,14 @@ ConnectorSummary:
     description: "GitHub integration for repository management"
     actions:
       - "github.create_issue"
+      - "github.close_issue"
+      - "github.add_label"
+      - "github.add_comment"
+      - "github.create_pr"
       - "github.merge_pr"
+      - "github.add_reviewer"
+      - "github.create_release"
+      - "github.create_branch"
     required_credentials:
       - "github"
 

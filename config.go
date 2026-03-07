@@ -146,13 +146,15 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
-	// OAuth — warn when Google or Microsoft client credentials are not set.
+	// OAuth — warn when built-in provider client credentials are not set.
 	// These are non-fatal because BYOA still works, but the built-in
-	// Google/Microsoft connectors won't be usable without them.
+	// connectors won't be usable without them.
 	hasGoogleClientID := os.Getenv("GOOGLE_CLIENT_ID") != ""
 	hasGoogleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET") != ""
 	hasMicrosoftClientID := os.Getenv("MICROSOFT_CLIENT_ID") != ""
 	hasMicrosoftClientSecret := os.Getenv("MICROSOFT_CLIENT_SECRET") != ""
+	hasSalesforceClientID := os.Getenv("SALESFORCE_CLIENT_ID") != ""
+	hasSalesforceClientSecret := os.Getenv("SALESFORCE_CLIENT_SECRET") != ""
 	if !hasGoogleClientID || !hasGoogleClientSecret {
 		warnings = append(warnings, configError{
 			envVar:  "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET",
@@ -163,6 +165,12 @@ func validateConfig() (errs []configError, warnings []configError) {
 		warnings = append(warnings, configError{
 			envVar:  "MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET",
 			message: "not set; Microsoft OAuth connector will require BYOA credentials (see docs/oauth-setup.md)",
+		})
+	}
+	if !hasSalesforceClientID || !hasSalesforceClientSecret {
+		warnings = append(warnings, configError{
+			envVar:  "SALESFORCE_CLIENT_ID / SALESFORCE_CLIENT_SECRET",
+			message: "not set; Salesforce OAuth connector will require BYOA credentials (see docs/oauth-setup.md)",
 		})
 	}
 
