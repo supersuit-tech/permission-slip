@@ -146,6 +146,26 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
+	// OAuth — warn when Google or Microsoft client credentials are not set.
+	// These are non-fatal because BYOA still works, but the built-in
+	// Google/Microsoft connectors won't be usable without them.
+	hasGoogleClientID := os.Getenv("GOOGLE_CLIENT_ID") != ""
+	hasGoogleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET") != ""
+	hasMicrosoftClientID := os.Getenv("MICROSOFT_CLIENT_ID") != ""
+	hasMicrosoftClientSecret := os.Getenv("MICROSOFT_CLIENT_SECRET") != ""
+	if !hasGoogleClientID || !hasGoogleClientSecret {
+		warnings = append(warnings, configError{
+			envVar:  "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET",
+			message: "not set; Google OAuth connector will require BYOA credentials (see docs/oauth-setup.md)",
+		})
+	}
+	if !hasMicrosoftClientID || !hasMicrosoftClientSecret {
+		warnings = append(warnings, configError{
+			envVar:  "MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET",
+			message: "not set; Microsoft OAuth connector will require BYOA credentials (see docs/oauth-setup.md)",
+		})
+	}
+
 	// Optional but recommended — warn in all modes.
 	if os.Getenv("SUPABASE_SERVICE_ROLE_KEY") == "" {
 		warnings = append(warnings, configError{
