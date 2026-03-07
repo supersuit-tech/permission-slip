@@ -43,9 +43,24 @@ func (a *searchCardsAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
+	// Build the search query string. Trello's search supports inline
+	// modifiers like @member, list:name, and due:day — we append these
+	// to the user's query so they compose naturally.
+	query := params.Query
+	if params.Members != "" {
+		query += " @" + params.Members
+	}
+	if params.ListID != "" {
+		query += " list:" + params.ListID
+	}
+	if params.Due != "" {
+		query += " due:" + params.Due
+	}
+
 	qp := map[string]string{
-		"query":      params.Query,
+		"query":      query,
 		"modelTypes": "cards",
+		"card_fields": "id,name,desc,idList,shortUrl,url,due,dueComplete,labels,idMembers,closed",
 	}
 
 	limit := params.Limit

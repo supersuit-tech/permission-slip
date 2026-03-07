@@ -17,22 +17,23 @@ func TestMoveCard_Success(t *testing.T) {
 		if r.Method != http.MethodPut {
 			t.Errorf("expected PUT, got %s", r.Method)
 		}
-		if r.URL.Path != "/cards/card123" {
-			t.Errorf("expected path /cards/card123, got %s", r.URL.Path)
+		expectedPath := "/cards/" + testCardID
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 		}
 
 		body, _ := io.ReadAll(r.Body)
 		var reqBody map[string]any
 		json.Unmarshal(body, &reqBody)
-		if reqBody["idList"] != "done-list" {
-			t.Errorf("expected idList=done-list, got %v", reqBody["idList"])
+		if reqBody["idList"] != testListID {
+			t.Errorf("expected idList=%s, got %v", testListID, reqBody["idList"])
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":       "card123",
+			"id":       testCardID,
 			"name":     "Card",
-			"idList":   "done-list",
+			"idList":   testListID,
 			"shortUrl": "https://trello.com/c/abc123",
 			"url":      "https://trello.com/c/abc123/1-card",
 		})
@@ -43,8 +44,8 @@ func TestMoveCard_Success(t *testing.T) {
 	action := conn.Actions()["trello.move_card"]
 
 	params, _ := json.Marshal(moveCardParams{
-		CardID: "card123",
-		ListID: "done-list",
+		CardID: testCardID,
+		ListID: testListID,
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -58,8 +59,8 @@ func TestMoveCard_Success(t *testing.T) {
 
 	var data map[string]any
 	json.Unmarshal(result.Data, &data)
-	if data["idList"] != "done-list" {
-		t.Errorf("expected idList=done-list, got %v", data["idList"])
+	if data["idList"] != testListID {
+		t.Errorf("expected idList=%s, got %v", testListID, data["idList"])
 	}
 }
 
@@ -75,7 +76,7 @@ func TestMoveCard_WithPosition(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"id": "card123", "name": "Card", "idList": "list456", "shortUrl": "https://trello.com/c/abc", "url": "https://trello.com/c/abc/1"})
+		json.NewEncoder(w).Encode(map[string]any{"id": testCardID, "name": "Card", "idList": testListID, "shortUrl": "https://trello.com/c/abc", "url": "https://trello.com/c/abc/1"})
 	}))
 	defer srv.Close()
 
@@ -83,8 +84,8 @@ func TestMoveCard_WithPosition(t *testing.T) {
 	action := conn.Actions()["trello.move_card"]
 
 	params, _ := json.Marshal(moveCardParams{
-		CardID: "card123",
-		ListID: "list456",
+		CardID: testCardID,
+		ListID: testListID,
 		Pos:    "top",
 	})
 
@@ -104,7 +105,7 @@ func TestMoveCard_MissingCardID(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["trello.move_card"]
 
-	params, _ := json.Marshal(map[string]string{"list_id": "list123"})
+	params, _ := json.Marshal(map[string]string{"list_id": testListID})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.move_card",
@@ -125,7 +126,7 @@ func TestMoveCard_MissingListID(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["trello.move_card"]
 
-	params, _ := json.Marshal(map[string]string{"card_id": "card123"})
+	params, _ := json.Marshal(map[string]string{"card_id": testCardID})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.move_card",
@@ -134,6 +135,27 @@ func TestMoveCard_MissingListID(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing list_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestMoveCard_InvalidCardID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["trello.move_card"]
+
+	params, _ := json.Marshal(map[string]string{"card_id": "bad-id", "list_id": testListID})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "trello.move_card",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid card_id")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

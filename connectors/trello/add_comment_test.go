@@ -17,8 +17,9 @@ func TestAddComment_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/cards/card123/actions/comments" {
-			t.Errorf("expected path /cards/card123/actions/comments, got %s", r.URL.Path)
+		expectedPath := "/cards/" + testCardID + "/actions/comments"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 		}
 
 		body, _ := io.ReadAll(r.Body)
@@ -41,7 +42,7 @@ func TestAddComment_Success(t *testing.T) {
 	action := conn.Actions()["trello.add_comment"]
 
 	params, _ := json.Marshal(addCommentParams{
-		CardID: "card123",
+		CardID: testCardID,
 		Text:   "This is a comment",
 	})
 
@@ -85,13 +86,34 @@ func TestAddComment_MissingCardID(t *testing.T) {
 	}
 }
 
+func TestAddComment_InvalidCardID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["trello.add_comment"]
+
+	params, _ := json.Marshal(map[string]string{"card_id": "https://trello.com/c/abc", "text": "comment"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "trello.add_comment",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid card_id (URL instead of ID)")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestAddComment_MissingText(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
 	action := conn.Actions()["trello.add_comment"]
 
-	params, _ := json.Marshal(map[string]string{"card_id": "card123"})
+	params, _ := json.Marshal(map[string]string{"card_id": testCardID})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.add_comment",

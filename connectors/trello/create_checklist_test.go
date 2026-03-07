@@ -30,18 +30,18 @@ func TestCreateChecklist_Success(t *testing.T) {
 			body, _ := io.ReadAll(r.Body)
 			var reqBody map[string]string
 			json.Unmarshal(body, &reqBody)
-			if reqBody["idCard"] != "card123" {
-				t.Errorf("expected idCard=card123, got %q", reqBody["idCard"])
+			if reqBody["idCard"] != testCardID {
+				t.Errorf("expected idCard=%s, got %q", testCardID, reqBody["idCard"])
 			}
 			if reqBody["name"] != "TODO" {
 				t.Errorf("expected name=TODO, got %q", reqBody["name"])
 			}
 			json.NewEncoder(w).Encode(map[string]any{
-				"id":   "checklist123",
+				"id":   testChecklistID,
 				"name": "TODO",
 			})
 
-		case n == 2 && r.URL.Path == "/checklists/checklist123/checkItems":
+		case n == 2 && r.URL.Path == "/checklists/"+testChecklistID+"/checkItems":
 			body, _ := io.ReadAll(r.Body)
 			var reqBody map[string]string
 			json.Unmarshal(body, &reqBody)
@@ -50,7 +50,7 @@ func TestCreateChecklist_Success(t *testing.T) {
 				"name": reqBody["name"],
 			})
 
-		case n == 3 && r.URL.Path == "/checklists/checklist123/checkItems":
+		case n == 3 && r.URL.Path == "/checklists/"+testChecklistID+"/checkItems":
 			body, _ := io.ReadAll(r.Body)
 			var reqBody map[string]string
 			json.Unmarshal(body, &reqBody)
@@ -70,7 +70,7 @@ func TestCreateChecklist_Success(t *testing.T) {
 	action := conn.Actions()["trello.create_checklist"]
 
 	params, _ := json.Marshal(createChecklistParams{
-		CardID: "card123",
+		CardID: testCardID,
 		Name:   "TODO",
 		Items:  []string{"Buy milk", "Walk dog"},
 	})
@@ -86,8 +86,8 @@ func TestCreateChecklist_Success(t *testing.T) {
 
 	var data map[string]any
 	json.Unmarshal(result.Data, &data)
-	if data["id"] != "checklist123" {
-		t.Errorf("expected id=checklist123, got %v", data["id"])
+	if data["id"] != testChecklistID {
+		t.Errorf("expected id=%s, got %v", testChecklistID, data["id"])
 	}
 	items, ok := data["items"].([]any)
 	if !ok {
@@ -107,7 +107,7 @@ func TestCreateChecklist_NoItems(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":   "checklist456",
+			"id":   testChecklistID,
 			"name": "Empty List",
 		})
 	}))
@@ -117,7 +117,7 @@ func TestCreateChecklist_NoItems(t *testing.T) {
 	action := conn.Actions()["trello.create_checklist"]
 
 	params, _ := json.Marshal(createChecklistParams{
-		CardID: "card123",
+		CardID: testCardID,
 		Name:   "Empty List",
 	})
 
@@ -132,8 +132,8 @@ func TestCreateChecklist_NoItems(t *testing.T) {
 
 	var data map[string]any
 	json.Unmarshal(result.Data, &data)
-	if data["id"] != "checklist456" {
-		t.Errorf("expected id=checklist456, got %v", data["id"])
+	if data["id"] != testChecklistID {
+		t.Errorf("expected id=%s, got %v", testChecklistID, data["id"])
 	}
 }
 
@@ -164,7 +164,7 @@ func TestCreateChecklist_MissingName(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["trello.create_checklist"]
 
-	params, _ := json.Marshal(map[string]string{"card_id": "card123"})
+	params, _ := json.Marshal(map[string]string{"card_id": testCardID})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.create_checklist",

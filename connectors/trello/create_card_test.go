@@ -36,8 +36,8 @@ func TestCreateCard_Success(t *testing.T) {
 		if err := json.Unmarshal(body, &reqBody); err != nil {
 			t.Fatalf("failed to decode request body: %v", err)
 		}
-		if reqBody["idList"] != "list123" {
-			t.Errorf("expected idList=list123, got %v", reqBody["idList"])
+		if reqBody["idList"] != testListID {
+			t.Errorf("expected idList=%s, got %v", testListID, reqBody["idList"])
 		}
 		if reqBody["name"] != "Test Card" {
 			t.Errorf("expected name=Test Card, got %v", reqBody["name"])
@@ -46,7 +46,7 @@ func TestCreateCard_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":       "card123",
+			"id":       testCardID,
 			"name":     "Test Card",
 			"shortUrl": "https://trello.com/c/abc123",
 			"url":      "https://trello.com/c/abc123/1-test-card",
@@ -58,7 +58,7 @@ func TestCreateCard_Success(t *testing.T) {
 	action := conn.Actions()["trello.create_card"]
 
 	params, _ := json.Marshal(createCardParams{
-		ListID: "list123",
+		ListID: testListID,
 		Name:   "Test Card",
 	})
 
@@ -75,8 +75,8 @@ func TestCreateCard_Success(t *testing.T) {
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if data["id"] != "card123" {
-		t.Errorf("expected id=card123, got %v", data["id"])
+	if data["id"] != testCardID {
+		t.Errorf("expected id=%s, got %v", testCardID, data["id"])
 	}
 	if data["shortUrl"] != "https://trello.com/c/abc123" {
 		t.Errorf("expected shortUrl, got %v", data["shortUrl"])
@@ -102,7 +102,7 @@ func TestCreateCard_WithOptionalFields(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"id": "card456", "name": "Full Card", "shortUrl": "https://trello.com/c/xyz", "url": "https://trello.com/c/xyz/1"})
+		json.NewEncoder(w).Encode(map[string]any{"id": testCardID, "name": "Full Card", "shortUrl": "https://trello.com/c/xyz", "url": "https://trello.com/c/xyz/1"})
 	}))
 	defer srv.Close()
 
@@ -110,7 +110,7 @@ func TestCreateCard_WithOptionalFields(t *testing.T) {
 	action := conn.Actions()["trello.create_card"]
 
 	params, _ := json.Marshal(createCardParams{
-		ListID: "list123",
+		ListID: testListID,
 		Name:   "Full Card",
 		Desc:   "A description",
 		Pos:    "top",
@@ -148,13 +148,34 @@ func TestCreateCard_MissingListID(t *testing.T) {
 	}
 }
 
+func TestCreateCard_InvalidListID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["trello.create_card"]
+
+	params, _ := json.Marshal(map[string]string{"list_id": "not-a-valid-id", "name": "Test"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "trello.create_card",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid list_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateCard_MissingName(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
 	action := conn.Actions()["trello.create_card"]
 
-	params, _ := json.Marshal(map[string]string{"list_id": "list123"})
+	params, _ := json.Marshal(map[string]string{"list_id": testListID})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.create_card",
@@ -201,7 +222,7 @@ func TestCreateCard_RateLimit(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL)
 	action := conn.Actions()["trello.create_card"]
 
-	params, _ := json.Marshal(createCardParams{ListID: "list123", Name: "Test"})
+	params, _ := json.Marshal(createCardParams{ListID: testListID, Name: "Test"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.create_card",
@@ -234,7 +255,7 @@ func TestCreateCard_AuthError(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL)
 	action := conn.Actions()["trello.create_card"]
 
-	params, _ := json.Marshal(createCardParams{ListID: "list123", Name: "Test"})
+	params, _ := json.Marshal(createCardParams{ListID: testListID, Name: "Test"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "trello.create_card",

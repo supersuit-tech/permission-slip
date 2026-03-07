@@ -25,8 +25,8 @@ type createCardParams struct {
 }
 
 func (p *createCardParams) validate() error {
-	if p.ListID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: list_id"}
+	if err := validateTrelloID(p.ListID, "list_id"); err != nil {
+		return err
 	}
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}

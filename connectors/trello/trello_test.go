@@ -45,10 +45,42 @@ func TestActions(t *testing.T) {
 
 func TestValidateCredentials_Valid(t *testing.T) {
 	t.Parallel()
-	c := New()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/members/me" {
+			t.Errorf("expected /members/me, got %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("key") == "" || r.URL.Query().Get("token") == "" {
+			t.Error("expected key and token in query params")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"id": "member123", "username": "testuser"})
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
 	err := c.ValidateCredentials(context.Background(), validCreds())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateCredentials_InvalidCreds(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("invalid key"))
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	err := c.ValidateCredentials(context.Background(), validCreds())
+	if err == nil {
+		t.Fatal("expected error for invalid credentials")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got: %T", err)
 	}
 }
 
@@ -119,6 +151,68 @@ func TestManifest(t *testing.T) {
 		if err := json.Unmarshal(a.ParametersSchema, &schema); err != nil {
 			t.Errorf("action %q has invalid JSON schema: %v", a.ActionType, err)
 		}
+	}
+
+	// Verify risk levels match the issue spec.
+	riskMap := map[string]string{}
+	for _, a := range m.Actions {
+		riskMap[a.ActionType] = a.RiskLevel
+	}
+	if riskMap["trello.move_card"] != "medium" {
+		t.Errorf("expected move_card risk=medium, got %q", riskMap["trello.move_card"])
+	}
+	for _, action := range []string{"trello.create_card", "trello.update_card", "trello.add_comment", "trello.create_checklist", "trello.search_cards"} {
+		if riskMap[action] != "low" {
+			t.Errorf("expected %s risk=low, got %q", action, riskMap[action])
+		}
+	}
+}
+
+func TestValidateTrelloID_Valid(t *testing.T) {
+	t.Parallel()
+	err := validateTrelloID("507f1f77bcf86cd799439011", "card_id")
+	if err != nil {
+		t.Errorf("expected nil for valid ID, got: %v", err)
+	}
+}
+
+func TestValidateTrelloID_Empty(t *testing.T) {
+	t.Parallel()
+	err := validateTrelloID("", "card_id")
+	if err == nil {
+		t.Fatal("expected error for empty ID")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestValidateTrelloID_TooShort(t *testing.T) {
+	t.Parallel()
+	err := validateTrelloID("abc123", "card_id")
+	if err == nil {
+		t.Fatal("expected error for short ID")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestValidateTrelloID_InvalidChars(t *testing.T) {
+	t.Parallel()
+	// 24 chars but contains uppercase and non-hex chars
+	err := validateTrelloID("507f1f77bcf86cd79943901X", "card_id")
+	if err == nil {
+		t.Fatal("expected error for non-hex chars")
+	}
+}
+
+func TestValidateTrelloID_URL(t *testing.T) {
+	t.Parallel()
+	// Common mistake: passing a Trello URL instead of an ID
+	err := validateTrelloID("https://trello.com/c/abc", "card_id")
+	if err == nil {
+		t.Fatal("expected error when passing URL")
 	}
 }
 

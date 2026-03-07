@@ -76,16 +76,49 @@ func (c *TrelloConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain non-empty
-// api_key and token fields. Trello API keys are 32-character hex strings and
-// tokens are longer hex strings, but we only validate presence here.
-func (c *TrelloConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+// api_key and token fields, then verifies them against the Trello API by
+// calling GET /1/members/me. This catches invalid or revoked credentials
+// early instead of failing on the first action.
+func (c *TrelloConnector) ValidateCredentials(ctx context.Context, creds connectors.Credentials) error {
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+		return &connectors.ValidationError{Message: "missing required credential: api_key — get yours at https://trello.com/power-ups/admin"}
 	}
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: token"}
+		return &connectors.ValidationError{Message: "missing required credential: token — generate one at https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&key=YOUR_API_KEY"}
+	}
+
+	// Verify credentials by hitting the members/me endpoint.
+	var me struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+	}
+	if err := c.doGet(ctx, creds, "/members/me", map[string]string{"fields": "id,username"}, &me); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateTrelloID checks that a string looks like a valid Trello ID
+// (24-character hexadecimal string). This catches common mistakes like
+// passing a card URL or name instead of an ID.
+func validateTrelloID(value, paramName string) error {
+	if value == "" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", paramName)}
+	}
+	if len(value) != 24 {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s %q: expected a 24-character Trello ID (e.g. 507f1f77bcf86cd799439011)", paramName, value),
+		}
+	}
+	for _, c := range value {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("invalid %s %q: expected a 24-character hex string — did you pass a URL or name instead of an ID?", paramName, value),
+			}
+		}
 	}
 	return nil
 }

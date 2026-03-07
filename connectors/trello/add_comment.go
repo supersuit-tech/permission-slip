@@ -20,8 +20,8 @@ type addCommentParams struct {
 }
 
 func (p *addCommentParams) validate() error {
-	if p.CardID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: card_id"}
+	if err := validateTrelloID(p.CardID, "card_id"); err != nil {
+		return err
 	}
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}

@@ -17,8 +17,9 @@ func TestUpdateCard_Success(t *testing.T) {
 		if r.Method != http.MethodPut {
 			t.Errorf("expected PUT, got %s", r.Method)
 		}
-		if r.URL.Path != "/cards/card123" {
-			t.Errorf("expected path /cards/card123, got %s", r.URL.Path)
+		expectedPath := "/cards/" + testCardID
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 		}
 
 		body, _ := io.ReadAll(r.Body)
@@ -30,7 +31,7 @@ func TestUpdateCard_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":       "card123",
+			"id":       testCardID,
 			"name":     "Updated Name",
 			"shortUrl": "https://trello.com/c/abc123",
 			"url":      "https://trello.com/c/abc123/1-updated-name",
@@ -42,7 +43,7 @@ func TestUpdateCard_Success(t *testing.T) {
 	action := conn.Actions()["trello.update_card"]
 
 	params, _ := json.Marshal(map[string]any{
-		"card_id": "card123",
+		"card_id": testCardID,
 		"name":    "Updated Name",
 	})
 
@@ -57,8 +58,8 @@ func TestUpdateCard_Success(t *testing.T) {
 
 	var data map[string]any
 	json.Unmarshal(result.Data, &data)
-	if data["id"] != "card123" {
-		t.Errorf("expected id=card123, got %v", data["id"])
+	if data["id"] != testCardID {
+		t.Errorf("expected id=%s, got %v", testCardID, data["id"])
 	}
 }
 
@@ -78,7 +79,7 @@ func TestUpdateCard_BooleanFields(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"id": "card123", "name": "Card", "shortUrl": "https://trello.com/c/abc", "url": "https://trello.com/c/abc/1"})
+		json.NewEncoder(w).Encode(map[string]any{"id": testCardID, "name": "Card", "shortUrl": "https://trello.com/c/abc", "url": "https://trello.com/c/abc/1"})
 	}))
 	defer srv.Close()
 
@@ -87,7 +88,7 @@ func TestUpdateCard_BooleanFields(t *testing.T) {
 
 	bTrue := true
 	params, _ := json.Marshal(updateCardParams{
-		CardID:      "card123",
+		CardID:      testCardID,
 		DueComplete: &bTrue,
 		Closed:      &bTrue,
 	})
@@ -117,6 +118,27 @@ func TestUpdateCard_MissingCardID(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing card_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdateCard_InvalidCardID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["trello.update_card"]
+
+	params, _ := json.Marshal(map[string]string{"card_id": "short", "name": "Test"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "trello.update_card",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid card_id")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

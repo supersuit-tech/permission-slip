@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -27,6 +28,10 @@ func TestSearchCards_Success(t *testing.T) {
 		}
 		if r.URL.Query().Get("cards_limit") != "10" {
 			t.Errorf("expected cards_limit=10, got %q", r.URL.Query().Get("cards_limit"))
+		}
+		// Verify card_fields is requested for richer responses.
+		if !strings.Contains(r.URL.Query().Get("card_fields"), "id") {
+			t.Errorf("expected card_fields to include 'id', got %q", r.URL.Query().Get("card_fields"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -73,8 +78,8 @@ func TestSearchCards_WithBoardFilter(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("idBoards") != "board123" {
-			t.Errorf("expected idBoards=board123, got %q", r.URL.Query().Get("idBoards"))
+		if r.URL.Query().Get("idBoards") != testBoardID {
+			t.Errorf("expected idBoards=%s, got %q", testBoardID, r.URL.Query().Get("idBoards"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -89,7 +94,72 @@ func TestSearchCards_WithBoardFilter(t *testing.T) {
 
 	params, _ := json.Marshal(searchCardsParams{
 		Query:   "test",
-		BoardID: "board123",
+		BoardID: testBoardID,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "trello.search_cards",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSearchCards_WithMemberFilter(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Members filter is appended to query as @member.
+		query := r.URL.Query().Get("query")
+		if !strings.Contains(query, "@johndoe") {
+			t.Errorf("expected query to contain '@johndoe', got %q", query)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"cards": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["trello.search_cards"]
+
+	params, _ := json.Marshal(searchCardsParams{
+		Query:   "test",
+		Members: "johndoe",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "trello.search_cards",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSearchCards_WithDueFilter(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		if !strings.Contains(query, "due:week") {
+			t.Errorf("expected query to contain 'due:week', got %q", query)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"cards": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["trello.search_cards"]
+
+	params, _ := json.Marshal(searchCardsParams{
+		Query: "test",
+		Due:   "week",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
