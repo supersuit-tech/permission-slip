@@ -95,14 +95,14 @@ func (c *ZoomConnector) doJSON(ctx context.Context, creds connectors.Credentials
 	if reqBody != nil {
 		payload, err := json.Marshal(reqBody)
 		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
+			return &connectors.ExternalError{Message: fmt.Sprintf("marshaling request body: %v", err)}
 		}
 		body = bytes.NewReader(payload)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	if reqBody != nil {
