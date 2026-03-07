@@ -385,7 +385,7 @@ func (c *NetlifyConnector) do(ctx context.Context, creds connectors.Credentials,
 		return err
 	}
 
-	if respBody != nil {
+	if respBody != nil && len(respBytes) > 0 {
 		if err := json.Unmarshal(respBytes, respBody); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Netlify response: %v", err)}
 		}
