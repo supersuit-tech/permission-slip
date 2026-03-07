@@ -21,11 +21,14 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/connectors/airtable"
+	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
+	"github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
+	"github.com/supersuit-tech/permission-slip-web/connectors/figma"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
@@ -33,6 +36,7 @@ import (
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	linkedinconnector "github.com/supersuit-tech/permission-slip-web/connectors/linkedin"
+	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
 	metaconnector "github.com/supersuit-tech/permission-slip-web/connectors/meta"
 	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
@@ -52,6 +56,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -371,11 +376,16 @@ func main() {
 	registry.Register(xconnector.New())
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
+	registry.Register(awsconnector.New())
+	registry.Register(discord.New())
 	registry.Register(datadog.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
+	registry.Register(figma.New())
 	registry.Register(pagerduty.New())
 	registry.Register(zoom.New())
+	registry.Register(zapier.New())
+	registry.Register(makeconnector.New())
 	registry.Register(calendly.New())
 
 	// Auto-seed built-in connectors from their manifests.
