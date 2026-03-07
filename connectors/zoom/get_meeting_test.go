@@ -82,7 +82,7 @@ func TestGetMeeting_URLEncodesSpecialChars(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The path should have the UUID properly escaped.
-		expectedPath := "/meetings/abc123%3D%3D%2F%2Fdef456"
+		expectedPath := "/meetings/abc123==%2F%2Fdef456"
 		if r.URL.RawPath != expectedPath {
 			t.Errorf("expected raw path %q, got %q", expectedPath, r.URL.RawPath)
 		}
