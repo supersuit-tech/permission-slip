@@ -64,6 +64,43 @@ const (
 // validKeyPrefixes lists all recognized Stripe secret key prefixes.
 var validKeyPrefixes = []string{liveKeyPrefix, testKeyPrefix, rLiveKeyPrefix, rTestKeyPrefix}
 
+// validateEnum checks that value is one of the allowed values, or empty
+// (treated as "not provided"). Returns nil if valid, ValidationError if not.
+// This deduplicates the map[string]bool pattern used across multiple actions.
+func validateEnum(value, field string, allowed []string) error {
+	if value == "" {
+		return nil
+	}
+	for _, a := range allowed {
+		if value == a {
+			return nil
+		}
+	}
+	return &connectors.ValidationError{
+		Message: fmt.Sprintf("invalid %s %q: must be one of %s", field, value, strings.Join(allowed, ", ")),
+	}
+}
+
+// validateCurrency checks that a currency string is a plausible 3-letter
+// ISO 4217 code. Stripe silently lowercases the value, so we accept both
+// "usd" and "USD". This catches obvious typos (e.g. "dollars", "us")
+// before they reach the API.
+func validateCurrency(currency string) error {
+	if len(currency) != 3 {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("currency must be a 3-letter ISO 4217 code (e.g. \"usd\"), got %q", currency),
+		}
+	}
+	for _, c := range currency {
+		if c < 'A' || (c > 'Z' && c < 'a') || c > 'z' {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("currency must be a 3-letter ISO 4217 code (e.g. \"usd\"), got %q", currency),
+			}
+		}
+	}
+	return nil
+}
+
 // validateMetadata checks that the metadata map does not exceed Stripe's
 // 50-key limit and that all values are strings. Stripe metadata only supports
 // string values — rejecting non-string types here gives a clear error instead

@@ -152,13 +152,19 @@ func TestCancelSubscription_ImmediateWithProration(t *testing.T) {
 
 		// Go's ParseForm only parses request bodies for POST/PUT/PATCH.
 		// For DELETE, read the body directly and parse the form values.
+		// NOTE: Use t.Errorf (not t.Fatalf) here — t.Fatalf calls
+		// runtime.Goexit which panics in non-test goroutines.
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			t.Fatalf("reading body: %v", err)
+			t.Errorf("reading body: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
 		}
 		vals, err := url.ParseQuery(string(bodyBytes))
 		if err != nil {
-			t.Fatalf("parsing body as form: %v", err)
+			t.Errorf("parsing body as form: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
 		}
 		if got := vals.Get("proration_behavior"); got != "create_prorations" {
 			t.Errorf("proration_behavior = %q, want create_prorations", got)

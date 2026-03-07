@@ -215,6 +215,72 @@ func TestValidateMetadata_AcceptsStringValues(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// validateEnum
+// ---------------------------------------------------------------------------
+
+func TestValidateEnum_Valid(t *testing.T) {
+	t.Parallel()
+
+	if err := validateEnum("once", "duration", []string{"once", "repeating", "forever"}); err != nil {
+		t.Errorf("validateEnum() unexpected error: %v", err)
+	}
+}
+
+func TestValidateEnum_EmptyIsValid(t *testing.T) {
+	t.Parallel()
+
+	// Empty string means "not provided" and should not be rejected.
+	if err := validateEnum("", "duration", []string{"once", "repeating", "forever"}); err != nil {
+		t.Errorf("validateEnum(\"\") unexpected error: %v", err)
+	}
+}
+
+func TestValidateEnum_Invalid(t *testing.T) {
+	t.Parallel()
+
+	err := validateEnum("bad_value", "duration", []string{"once", "repeating", "forever"})
+	if err == nil {
+		t.Fatal("expected error for invalid enum value, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// validateCurrency
+// ---------------------------------------------------------------------------
+
+func TestValidateCurrency_Valid(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []string{"usd", "USD", "eur", "gbp", "jpy"} {
+		if err := validateCurrency(c); err != nil {
+			t.Errorf("validateCurrency(%q) unexpected error: %v", c, err)
+		}
+	}
+}
+
+func TestValidateCurrency_Invalid(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []string{"us", "dollars", "1234", "u$d", ""} {
+		// Empty string is handled by callers before validateCurrency, so
+		// if it reaches here it should fail the length check.
+		if c == "" {
+			continue
+		}
+		err := validateCurrency(c)
+		if err == nil {
+			t.Errorf("validateCurrency(%q) expected error, got nil", c)
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("validateCurrency(%q) expected ValidationError, got %T: %v", c, err, err)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // encodeParams (deterministic ordering)
 // ---------------------------------------------------------------------------
 

@@ -58,18 +58,10 @@ func (p *createSubscriptionParams) validate() error {
 	if p.TrialPeriodDays != nil && *p.TrialPeriodDays < 0 {
 		return &connectors.ValidationError{Message: "trial_period_days must be non-negative"}
 	}
-
-	validBehaviors := map[string]bool{
-		"default_incomplete":   true,
-		"error_if_incomplete":  true,
-		"allow_incomplete":     true,
-		"pending_if_incomplete": true,
-		"":                     true,
-	}
-	if !validBehaviors[p.PaymentBehavior] {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid payment_behavior %q: must be one of default_incomplete, error_if_incomplete, allow_incomplete, pending_if_incomplete", p.PaymentBehavior),
-		}
+	if err := validateEnum(p.PaymentBehavior, "payment_behavior", []string{
+		"default_incomplete", "error_if_incomplete", "allow_incomplete", "pending_if_incomplete",
+	}); err != nil {
+		return err
 	}
 	return validateMetadata(p.Metadata)
 }

@@ -28,18 +28,9 @@ func (p *cancelSubscriptionParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: subscription_id"}
 	}
 
-	validProrations := map[string]bool{
-		"create_prorations":    true,
-		"none":                 true,
-		"always_invoice":       true,
-		"":                     true,
-	}
-	if !validProrations[p.ProrationBehavior] {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid proration_behavior %q: must be one of create_prorations, none, always_invoice", p.ProrationBehavior),
-		}
-	}
-	return nil
+	return validateEnum(p.ProrationBehavior, "proration_behavior", []string{
+		"create_prorations", "none", "always_invoice",
+	})
 }
 
 // cancelSubscriptionResponse is the common shape returned for both immediate

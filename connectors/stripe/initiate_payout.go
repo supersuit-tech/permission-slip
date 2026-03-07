@@ -30,6 +30,9 @@ func (p *initiatePayoutParams) validate() error {
 	if p.Currency == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: currency"}
 	}
+	if err := validateCurrency(p.Currency); err != nil {
+		return err
+	}
 	return validateMetadata(p.Metadata)
 }
 

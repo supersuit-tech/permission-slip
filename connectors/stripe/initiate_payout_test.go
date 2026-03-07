@@ -165,6 +165,25 @@ func TestInitiatePayout_MissingCurrency(t *testing.T) {
 	}
 }
 
+func TestInitiatePayout_InvalidCurrency(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.initiate_payout"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.initiate_payout",
+		Parameters:  json.RawMessage(`{"amount":10000,"currency":"dollars"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestInitiatePayout_APIError(t *testing.T) {
 	t.Parallel()
 

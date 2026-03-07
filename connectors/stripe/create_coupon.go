@@ -42,20 +42,16 @@ func (p *createCouponParams) validate() error {
 		if p.Currency == "" {
 			return &connectors.ValidationError{Message: "currency is required when using amount_off"}
 		}
+		if err := validateCurrency(p.Currency); err != nil {
+			return err
+		}
 	}
 
-	validDurations := map[string]bool{
-		"once":      true,
-		"repeating": true,
-		"forever":   true,
-	}
 	if p.Duration == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: duration"}
 	}
-	if !validDurations[p.Duration] {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid duration %q: must be one of once, repeating, forever", p.Duration),
-		}
+	if err := validateEnum(p.Duration, "duration", []string{"once", "repeating", "forever"}); err != nil {
+		return err
 	}
 	if p.Duration == "repeating" && (p.DurationMonths == nil || *p.DurationMonths <= 0) {
 		return &connectors.ValidationError{Message: "duration_in_months is required and must be positive when duration is \"repeating\""}
