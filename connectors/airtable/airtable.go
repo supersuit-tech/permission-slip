@@ -85,8 +85,11 @@ func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connect
 	return nil
 }
 
-// isAlphanumeric checks that s contains only ASCII letters and digits.
+// isAlphanumeric checks that s is non-empty and contains only ASCII letters and digits.
 func isAlphanumeric(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
 	for _, c := range s {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
 			return false
@@ -216,9 +219,13 @@ type airtableErrorDetail struct {
 func mapAirtableError(statusCode int, body []byte) error {
 	var errResp airtableErrorResponse
 	if err := json.Unmarshal(body, &errResp); err != nil || errResp.Error == nil {
+		snippet := string(body)
+		if len(snippet) > 500 {
+			snippet = snippet[:500] + "...(truncated)"
+		}
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
-			Message:    fmt.Sprintf("Airtable API error (HTTP %d): %s", statusCode, string(body)),
+			Message:    fmt.Sprintf("Airtable API error (HTTP %d): %s", statusCode, snippet),
 		}
 	}
 

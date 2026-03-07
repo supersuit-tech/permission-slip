@@ -38,6 +38,9 @@ func (p *listRecordsParams) validate() error {
 	if p.Table == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: table"}
 	}
+	if p.MaxRecords < 0 {
+		return &connectors.ValidationError{Message: fmt.Sprintf("max_records must be non-negative, got %d", p.MaxRecords)}
+	}
 	if p.PageSize != 0 && (p.PageSize < 1 || p.PageSize > 100) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("page_size must be between 1 and 100, got %d", p.PageSize)}
 	}
@@ -115,17 +118,24 @@ func (a *listRecordsAction) Execute(ctx context.Context, req connectors.ActionRe
 	return connectors.JSONResult(toListRecordsResult(resp))
 }
 
-func toListRecordsResult(resp listRecordsResponse) listRecordsResult {
-	result := listRecordsResult{
-		Records: make([]recordSummary, 0, len(resp.Records)),
-		Offset:  resp.Offset,
-	}
-	for _, r := range resp.Records {
-		result.Records = append(result.Records, recordSummary{
+// recordEntriesToSummaries converts a slice of recordEntry (API response) to
+// recordSummary (client-facing result). Shared by list, create, update, and search.
+func recordEntriesToSummaries(entries []recordEntry) []recordSummary {
+	out := make([]recordSummary, 0, len(entries))
+	for _, r := range entries {
+		out = append(out, recordSummary{
 			ID:          r.ID,
 			CreatedTime: r.CreatedTime,
 			Fields:      r.Fields,
 		})
+	}
+	return out
+}
+
+func toListRecordsResult(resp listRecordsResponse) listRecordsResult {
+	result := listRecordsResult{
+		Records: recordEntriesToSummaries(resp.Records),
+		Offset:  resp.Offset,
 	}
 	return result
 }

@@ -23,7 +23,7 @@ func TestDeleteRecords_Success(t *testing.T) {
 		// Verify record IDs in query params
 		records := r.URL.Query()["records[]"]
 		if len(records) != 2 {
-			t.Fatalf("expected 2 record IDs in query, got %d", len(records))
+			t.Errorf("expected 2 record IDs in query, got %d", len(records))
 		}
 
 		w.Header().Set("Content-Type", "application/json")

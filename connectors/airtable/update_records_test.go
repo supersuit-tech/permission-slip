@@ -22,10 +22,12 @@ func TestUpdateRecords_Success(t *testing.T) {
 
 		var body updateRecordsRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
 		}
 		if len(body.Records) != 1 {
-			t.Fatalf("expected 1 record, got %d", len(body.Records))
+			t.Errorf("expected 1 record, got %d", len(body.Records))
 		}
 		if body.Records[0].ID != "recXYZ789" {
 			t.Errorf("expected record ID 'recXYZ789', got %q", body.Records[0].ID)

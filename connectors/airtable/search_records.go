@@ -34,6 +34,9 @@ func (p *searchRecordsParams) validate() error {
 	if p.Formula == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: formula"}
 	}
+	if p.MaxRecords < 0 {
+		return &connectors.ValidationError{Message: fmt.Sprintf("max_records must be non-negative, got %d", p.MaxRecords)}
+	}
 	return nil
 }
 

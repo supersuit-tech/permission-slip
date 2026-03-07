@@ -77,16 +77,7 @@ func (a *updateRecordsAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	result := listRecordsResult{
-		Records: make([]recordSummary, 0, len(resp.Records)),
-	}
-	for _, r := range resp.Records {
-		result.Records = append(result.Records, recordSummary{
-			ID:          r.ID,
-			CreatedTime: r.CreatedTime,
-			Fields:      r.Fields,
-		})
-	}
-
-	return connectors.JSONResult(result)
+	return connectors.JSONResult(listRecordsResult{
+		Records: recordEntriesToSummaries(resp.Records),
+	})
 }
