@@ -28,11 +28,12 @@ type ConnectorDetail struct {
 
 // ConnectorAction represents a row from the connector_actions table.
 type ConnectorAction struct {
-	ActionType       string
-	Name             string
-	Description      *string
-	RiskLevel        *string
-	ParametersSchema []byte // raw JSONB
+	ActionType            string
+	Name                  string
+	Description           *string
+	RiskLevel             *string
+	ParametersSchema      []byte // raw JSONB
+	RequiresPaymentMethod bool
 }
 
 // RequiredCredential represents a row from the connector_required_credentials table.
@@ -40,6 +41,8 @@ type RequiredCredential struct {
 	Service         string
 	AuthType        string
 	InstructionsURL *string
+	OAuthProvider   *string
+	OAuthScopes     []string
 }
 
 // ListConnectors returns all connectors with their action types and required credential services.
@@ -87,7 +90,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch actions.
 	actionRows, err := db.Query(ctx,
-		`SELECT action_type, name, description, risk_level, parameters_schema
+		`SELECT action_type, name, description, risk_level, parameters_schema, requires_payment_method
 		 FROM connector_actions
 		 WHERE connector_id = $1
 		 ORDER BY action_type`,
@@ -100,7 +103,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for actionRows.Next() {
 		var a ConnectorAction
-		if err := actionRows.Scan(&a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema); err != nil {
+		if err := actionRows.Scan(&a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod); err != nil {
 			return nil, err
 		}
 		cd.Actions = append(cd.Actions, a)
@@ -111,7 +114,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch required credentials.
 	credRows, err := db.Query(ctx,
-		`SELECT service, auth_type, instructions_url
+		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes
 		 FROM connector_required_credentials
 		 WHERE connector_id = $1
 		 ORDER BY service`,
@@ -124,7 +127,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for credRows.Next() {
 		var rc RequiredCredential
-		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL); err != nil {
+		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
 			return nil, err
 		}
 		cd.RequiredCredentials = append(cd.RequiredCredentials, rc)
@@ -200,6 +203,25 @@ func ListConnectorIDs(ctx context.Context, db DBTX) ([]string, error) {
 	return ids, rows.Err()
 }
 
+// GetActionRequiresPaymentMethod checks whether the given action type requires
+// a payment method. Returns (true, nil) if the action exists and requires payment,
+// (false, nil) if it exists but doesn't require payment, and (false, error) if
+// the action type is not found or a query error occurs.
+func GetActionRequiresPaymentMethod(ctx context.Context, db DBTX, actionType string) (bool, error) {
+	var requires bool
+	err := db.QueryRow(ctx,
+		`SELECT requires_payment_method FROM connector_actions WHERE action_type = $1`,
+		actionType,
+	).Scan(&requires)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return requires, nil
+}
+
 // ExternalConnectorManifest contains the data needed to upsert a connector
 // from an external connector's manifest. This is a plain struct (no dependency
 // on the connectors package) to keep the db package import-free of connectors/.
@@ -214,11 +236,12 @@ type ExternalConnectorManifest struct {
 
 // ExternalConnectorAction describes an action from an external connector manifest.
 type ExternalConnectorAction struct {
-	ActionType       string
-	Name             string
-	Description      string
-	RiskLevel        string
-	ParametersSchema []byte // raw JSON
+	ActionType            string
+	Name                  string
+	Description           string
+	RiskLevel             string
+	ParametersSchema      []byte // raw JSON
+	RequiresPaymentMethod bool
 }
 
 // ExternalConnectorCredential describes a required credential from an external connector manifest.
@@ -226,6 +249,8 @@ type ExternalConnectorCredential struct {
 	Service         string
 	AuthType        string
 	InstructionsURL string
+	OAuthProvider   string
+	OAuthScopes     []string
 }
 
 // ExternalConnectorTemplate describes a configuration template from a connector manifest.
@@ -266,14 +291,15 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	for _, a := range m.Actions {
 		actionTypes = append(actionTypes, a.ActionType)
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_actions (connector_id, action_type, name, description, risk_level, parameters_schema)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO connector_actions (connector_id, action_type, name, description, risk_level, parameters_schema, requires_payment_method)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (connector_id, action_type) DO UPDATE SET
 				name = EXCLUDED.name,
 				description = EXCLUDED.description,
 				risk_level = EXCLUDED.risk_level,
-				parameters_schema = EXCLUDED.parameters_schema`,
-			m.ID, a.ActionType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema))
+				parameters_schema = EXCLUDED.parameters_schema,
+				requires_payment_method = EXCLUDED.requires_payment_method`,
+			m.ID, a.ActionType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod)
 		if err != nil {
 			return err
 		}
@@ -297,12 +323,14 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	for _, c := range m.Credentials {
 		services = append(services, c.Service)
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url)
-			VALUES ($1, $2, $3, $4)
+			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			ON CONFLICT (connector_id, service) DO UPDATE SET
 				auth_type = EXCLUDED.auth_type,
-				instructions_url = EXCLUDED.instructions_url`,
-			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL))
+				instructions_url = EXCLUDED.instructions_url,
+				oauth_provider = EXCLUDED.oauth_provider,
+				oauth_scopes = EXCLUDED.oauth_scopes`,
+			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes)
 		if err != nil {
 			return err
 		}

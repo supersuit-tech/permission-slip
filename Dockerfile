@@ -24,6 +24,8 @@ ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ARG VITE_SENTRY_DSN
 ARG VITE_POSTHOG_KEY
 ARG VITE_POSTHOG_HOST
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+ARG VITE_STRIPE_PUBLISHABLE_KEY_TEST
 
 # Sentry source-map upload (optional — skip if not set).
 # @sentry/vite-plugin reads these during the Vite build to upload maps.

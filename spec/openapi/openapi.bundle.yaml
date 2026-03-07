@@ -100,6 +100,10 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Expo Push Tokens
     description: Expo push token management for mobile push notifications (session-authenticated)
+  - name: OAuth
+    description: OAuth 2.0 provider authorization and connection management (session-authenticated)
+  - name: Payment Methods
+    description: Stored payment methods for agent-initiated purchases (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -349,6 +353,8 @@ paths:
                 agent_id: 42
                 expires_at: '2026-02-11T13:25:00Z'
                 verification_required: true
+                approver:
+                  username: alice
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -538,6 +544,8 @@ paths:
               example:
                 status: registered
                 registered_at: '2026-02-11T13:20:15Z'
+                approver:
+                  username: alice
         '400':
           description: Invalid request or agent ID mismatch
           content:
@@ -989,6 +997,8 @@ paths:
               example:
                 agent_id: 42
                 status: registered
+                approver:
+                  username: alice
                 metadata:
                   name: My AI Assistant
                   version: 1.0.0
@@ -1124,6 +1134,8 @@ paths:
                   summary: Agent with multiple connectors, mixed readiness
                   value:
                     agent_id: 42
+                    approver:
+                      username: alice
                     connectors:
                       - id: gmail
                         name: Gmail
@@ -1237,11 +1249,15 @@ paths:
                   summary: Agent with no enabled connectors
                   value:
                     agent_id: 43
+                    approver:
+                      username: bob
                     connectors: []
                 standing_approval_only:
                   summary: Single connector, all actions with standing approvals
                   value:
                     agent_id: 44
+                    approver:
+                      username: carol
                     connectors:
                       - id: gmail
                         name: Gmail
@@ -1711,6 +1727,9 @@ paths:
         - **One-off approvals**: approved, denied, or cancelled approval requests
         - **Standing approval executions**: auto-executed actions via standing approvals
         - **Agent lifecycle**: agent registration and deactivation events
+        - **Payment charges**: when a stored payment method is used by a connector
+          action (`payment_method.charged`). The action object contains only safe
+          display metadata (brand, last4, amount, currency) — never raw card details.
 
         Results are filtered by the user's plan retention window (7 days for free,
         90 days for paid). The response includes a `retention` object with the
@@ -1777,6 +1796,7 @@ paths:
               - deactivated
               - pending
               - expired
+              - charged
           example: approved
         - name: connector_id
           in: query
@@ -1823,6 +1843,21 @@ paths:
                     outcome: auto_executed
                     connector_id: email
                     execution_status: success
+                  - event_type: payment_method.charged
+                    timestamp: '2026-02-20T14:20:00Z'
+                    agent_id: 42
+                    agent_metadata:
+                      name: My AI Assistant
+                    action:
+                      type: expedia.create_booking
+                      payment_method_id: pm_abc123
+                      brand: visa
+                      last4: '4242'
+                      amount_cents: 15000
+                      currency: usd
+                      description: Hotel booking — 2 nights
+                    outcome: charged
+                    connector_id: expedia
                   - event_type: agent.registered
                     timestamp: '2026-02-19T10:00:00Z'
                     agent_id: 43
@@ -3298,17 +3333,31 @@ paths:
                     field: action
                   trace_id: trace_xyz789
         '401':
-          description: Invalid signature
+          description: Invalid signature or OAuth authorization required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_signature
-                  message: Signature verification failed
-                  retryable: false
-                  trace_id: trace_xyz789
+              examples:
+                invalid_signature:
+                  summary: Agent signature verification failed
+                  value:
+                    error:
+                      code: invalid_signature
+                      message: Signature verification failed
+                      retryable: false
+                      trace_id: trace_xyz789
+                oauth_refresh_failed:
+                  summary: OAuth token expired or revoked — user must re-authorize
+                  value:
+                    error:
+                      code: oauth_refresh_failed
+                      message: OAuth authorization required — user must re-connect the provider in Settings
+                      retryable: false
+                      details:
+                        provider: google
+                        action_required: reauthorize
+                      trace_id: trace_xyz789
         '403':
           description: Standing approval exhausted or constraint violation
           content:
@@ -5256,6 +5305,627 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/oauth/providers:
+    get:
+      operationId: listOAuthProviders
+      summary: List OAuth Providers
+      description: |
+        Returns all registered OAuth providers and their configuration status.
+        This lets the frontend discover which providers are available, which are
+        ready to use (have credentials configured), and which need BYOA setup.
+
+        Providers come from three sources:
+        - **built_in**: Platform-provided providers (e.g. Google, Microsoft)
+        - **manifest**: Declared in a connector manifest (e.g. Salesforce)
+        - **byoa**: User-configured (Bring Your Own App)
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: OAuth providers listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderListResponse'
+              example:
+                providers:
+                  - id: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/userinfo.email
+                    source: built_in
+                    has_credentials: true
+                  - id: microsoft
+                    scopes:
+                      - openid
+                      - offline_access
+                      - User.Read
+                    source: built_in
+                    has_credentials: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/oauth/{provider}/authorize:
+    get:
+      operationId: oauthAuthorize
+      summary: Initiate OAuth Authorization
+      description: |
+        Generates an authorization URL for the given OAuth provider and redirects
+        the user's browser to the provider's consent screen. The redirect includes
+        a signed CSRF state parameter that ties the flow to the authenticated user.
+
+        After the user grants consent, the provider redirects back to the callback
+        endpoint (`GET /v1/oauth/{provider}/callback`) with an authorization code.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - A signed state token prevents CSRF and session-fixation attacks
+        - The provider must have client credentials configured (built-in or BYOA)
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: Additional OAuth scopes to request beyond the provider defaults
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '307':
+          description: Redirects to the OAuth provider's authorization endpoint
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth provider not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/{provider}/callback:
+    get:
+      operationId: oauthCallback
+      summary: OAuth Callback
+      description: |
+        Handles the OAuth provider's redirect after user consent. Validates the
+        CSRF state token, exchanges the authorization code for access/refresh
+        tokens, encrypts them in the vault, and creates an `oauth_connections` row.
+
+        On success, redirects the user to the frontend settings page with
+        `?oauth_status=success`. On failure, redirects with `?oauth_status=error`.
+
+        This endpoint is called by the OAuth provider, not directly by the frontend.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: false
+          description: The authorization code from the provider
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: The signed CSRF state token
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Error code from the provider (e.g. "access_denied")
+          schema:
+            type: string
+        - name: error_description
+          in: query
+          required: false
+          description: Human-readable error description from the provider
+          schema:
+            type: string
+      responses:
+        '307':
+          description: Redirects to frontend settings page with success/error status
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/connections:
+    get:
+      operationId: listOAuthConnections
+      summary: List OAuth Connections
+      description: |
+        Returns all active OAuth connections for the authenticated user. Each
+        connection includes the provider, granted scopes, status, and when it
+        was established. Tokens are never included in the response.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - Only returns connections belonging to the authenticated user
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: OAuth connections listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthConnectionListResponse'
+              example:
+                connections:
+                  - provider: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/userinfo.email
+                    status: active
+                    connected_at: '2026-03-05T10:00:00Z'
+                  - provider: microsoft
+                    scopes:
+                      - openid
+                      - offline_access
+                      - User.Read
+                    status: active
+                    connected_at: '2026-03-05T11:30:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/connections/{provider}:
+    delete:
+      operationId: deleteOAuthConnection
+      summary: Disconnect OAuth Provider
+      description: |
+        Disconnects an OAuth provider for the authenticated user. Deletes the
+        OAuth connection row and removes the encrypted tokens from the vault.
+
+        After disconnection, any connector actions that depend on this OAuth
+        provider will fail until the user re-authorizes.
+
+        ## Security
+
+        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+        - Only the user who created the connection can delete it
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to disconnect
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OAuth provider disconnected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthDisconnectResponse'
+              example:
+                provider: google
+                disconnected_at: '2026-03-05T15:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth connection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/provider-configs:
+    get:
+      operationId: listOAuthProviderConfigs
+      summary: List BYOA Provider Configs
+      description: |
+        Returns all BYOA (Bring Your Own App) OAuth provider configurations for
+        the authenticated user. Each config indicates that the user has registered
+        their own OAuth client credentials for that provider.
+
+        Client secrets are never included in the response — only the provider ID
+        and timestamps are returned.
+
+        ## Related Endpoints
+
+        - `GET /v1/oauth/providers` — lists all available providers (built-in + manifest + BYOA)
+        - `POST /v1/oauth/provider-configs` — register new BYOA credentials
+        - `PUT /v1/oauth/provider-configs/{provider}` — rotate existing credentials
+        - `DELETE /v1/oauth/provider-configs/{provider}` — remove BYOA credentials
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: BYOA provider configs listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfigListResponse'
+              example:
+                configs:
+                  - provider: salesforce
+                    created_at: '2026-03-05T12:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createOAuthProviderConfig
+      summary: Register BYOA OAuth Credentials
+      description: |
+        Registers user-provided OAuth client credentials for a provider. The
+        provider must already be declared by a built-in config or connector
+        manifest — this endpoint only supplies the client ID and secret.
+
+        Client credentials are encrypted in Supabase Vault (AES-256-GCM) and
+        never stored in plaintext. The vault secret IDs are stored in the
+        `oauth_provider_configs` database table.
+
+        After registration, the provider's OAuth flows will use these credentials
+        immediately. Only one config per provider per user is allowed — delete the
+        existing config before creating a new one.
+
+        ## Credential Lifecycle
+
+        1. **Register**: `POST /v1/oauth/provider-configs` (this endpoint)
+        2. **Rotate**: `PUT /v1/oauth/provider-configs/{provider}`
+        3. **Remove**: `DELETE /v1/oauth/provider-configs/{provider}`
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthProviderConfigRequest'
+      responses:
+        '201':
+          description: BYOA provider config created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfig'
+              example:
+                provider: salesforce
+                created_at: '2026-03-05T12:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: OAuth provider not found (not declared by any built-in or connector manifest)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: BYOA config already exists for this provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/oauth/provider-configs/{provider}:
+    put:
+      operationId: updateOAuthProviderConfig
+      summary: Update BYOA Provider Config
+      description: |
+        Replaces the client credentials for an existing BYOA provider config.
+        This supports credential rotation without requiring delete + create.
+
+        The old vault secrets are deleted and replaced with new ones atomically.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to update
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthProviderConfigRequest'
+      responses:
+        '200':
+          description: BYOA provider config updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfig'
+              example:
+                provider: salesforce
+                created_at: '2026-03-05T12:00:00Z'
+                updated_at: '2026-03-05T14:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: BYOA provider config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteOAuthProviderConfig
+      summary: Delete BYOA Provider Config
+      description: |
+        Removes the user's BYOA OAuth client credentials for a provider. The
+        encrypted vault secrets are deleted along with the database row.
+
+        After deletion, the provider reverts to its built-in or manifest
+        configuration (if any). If no built-in credentials exist, the provider
+        will require new BYOA credentials before OAuth flows can be initiated.
+      tags:
+        - OAuth
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: The OAuth provider ID to delete the config for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: BYOA provider config deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthProviderConfigDeleteResponse'
+              example:
+                provider: salesforce
+                deleted_at: '2026-03-05T15:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: BYOA provider config not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payment-methods:
+    get:
+      tags:
+        - Payment Methods
+      summary: List stored payment methods
+      description: |
+        Returns all stored payment methods for the authenticated user, ordered by
+        default status (default first) then creation date. Each method includes
+        its current monthly spend (rolling 30-day window) and the maximum number
+        of payment methods allowed per user.
+      operationId: listPaymentMethods
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Payment methods retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Payment Methods
+      summary: Confirm and store a payment method
+      description: |
+        Saves a payment method after it has been set up via Stripe Elements.
+        The payment_method_id must be a valid Stripe pm_* token returned by the
+        SetupIntent confirmation flow on the client.
+
+        **Flow:**
+        1. Client calls POST /payment-methods/setup-intent to get a client_secret
+        2. Client uses stripe.confirmCardSetup(client_secret) with Stripe Elements
+        3. Client calls this endpoint with the resulting pm_* token
+
+        **Constraints:**
+        - Maximum 10 payment methods per user (returns 409 if exceeded)
+        - Label must be 100 characters or fewer
+        - payment_method_id must start with "pm_"
+        - Raw card data never touches our servers — only Stripe tokens are stored
+      operationId: confirmPaymentMethod
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentMethodRequest'
+      responses:
+        '201':
+          description: Payment method saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payment-methods/setup-intent:
+    post:
+      tags:
+        - Payment Methods
+      summary: Create a SetupIntent for card collection
+      description: |
+        Creates a Stripe SetupIntent for collecting payment method details
+        via Stripe Elements. Returns a client_secret to use with
+        stripe.confirmCardSetup() on the frontend.
+
+        If the user does not yet have a Stripe customer record, one is created
+        automatically and associated with their subscription.
+
+        The client_secret is single-use and expires after 24 hours.
+      operationId: createSetupIntent
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: SetupIntent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupIntentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payment-methods/{id}:
+    patch:
+      tags:
+        - Payment Methods
+      summary: Update a payment method
+      description: |
+        Update label, spending limits, or default status of a stored payment method.
+
+        **Spending limits:**
+        - Values are in cents (e.g. 5000 = $50.00)
+        - Per-transaction limit cannot exceed monthly limit
+        - Negative values are rejected
+        - Use clear_per_transaction_limit / clear_monthly_limit to remove a limit
+        - Label must be 100 characters or fewer
+      operationId: updatePaymentMethod
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentMethodRequest'
+      responses:
+        '200':
+          description: Payment method updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Payment Methods
+      summary: Delete a payment method
+      description: |
+        Removes a stored payment method and detaches it from the Stripe customer.
+        The detachment from Stripe is best-effort — the local record is always
+        deleted even if the Stripe API call fails.
+      operationId: deletePaymentMethod
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment method deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePaymentMethodResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/config:
     get:
       summary: Get server configuration
@@ -5283,6 +5953,7 @@ paths:
                 $ref: '#/components/schemas/ConfigResponse'
               example:
                 billing_enabled: false
+                stripe_test_mode: false
         '401':
           $ref: '#/components/responses/Unauthorized'
   /v1/config/vapid-key:
@@ -5509,10 +6180,19 @@ components:
             agent registers. The agent must collect the code from the user and submit
             it via `POST /v1/agents/{agent_id}/verify`.
           example: true
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is registering with. Included so the
+            agent knows whose account it's connecting to — especially useful when
+            an agent registers with multiple users and needs to distinguish them.
       example:
         agent_id: 42
         expires_at: '2026-02-11T13:25:00Z'
         verification_required: true
+        approver:
+          username: alice
     VerifyRegistrationRequest:
       type: object
       required:
@@ -5568,9 +6248,18 @@ components:
           description: |
             ISO 8601 timestamp (RFC 3339 format, UTC) when registration was completed.
           example: '2026-02-11T13:20:15Z'
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is now registered with. The agent should
+            store this alongside the `agent_id` to identify which user this
+            registration belongs to.
       example:
         status: registered
         registered_at: '2026-02-11T13:20:15Z'
+        approver:
+          username: alice
     ApprovalRequest:
       type: object
       required:
@@ -6734,11 +7423,21 @@ components:
                 type: string
               body:
                 type: string
+        requires_payment_method:
+          type: boolean
+          default: false
+          description: |
+            Whether this action requires a payment method to execute. When `true`, the
+            agent must include `payment_method_id` and `amount_cents` in the execute request.
+            The payment method is resolved to a Stripe token at execution time — raw card
+            details are never exposed to the agent.
+          example: false
       example:
         action_type: github.create_issue
         name: Create Issue
         description: Create a new issue in a repository
         risk_level: low
+        requires_payment_method: false
         parameters_schema:
           type: object
           required:
@@ -6762,8 +7461,10 @@ components:
             - api_key
             - basic
             - custom
+            - oauth2
           description: |
-            Authentication type required by the external service.
+            Authentication type required by the external service. When `oauth2`, the user
+            must connect their account via the OAuth flow instead of providing static credentials.
           example: api_key
         instructions_url:
           type: string
@@ -6773,6 +7474,21 @@ components:
             URL to human-readable documentation explaining how to obtain credentials
             for this service. Only present when the connector provides setup instructions.
           example: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
+        oauth_provider:
+          type: string
+          maxLength: 255
+          description: |
+            OAuth provider identifier. Only present when `auth_type` is `oauth2`.
+            Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft").
+          example: google
+        oauth_scopes:
+          type: array
+          items:
+            type: string
+          description: |
+            OAuth scopes required by this connector. Only present when `auth_type` is `oauth2`.
+          example:
+            - https://www.googleapis.com/auth/gmail.send
       example:
         service: github
         auth_type: api_key
@@ -6951,6 +7667,24 @@ components:
           example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         action:
           $ref: '#/components/schemas/Action'
+        payment_method_id:
+          type: string
+          format: uuid
+          description: |
+            ID of a stored payment method to use for this action. Required when the
+            action declares `requires_payment_method: true`. The payment method must
+            belong to the user who owns the agent. Permission Slip resolves it to a
+            Stripe token at execution time — raw card details are never exposed.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        amount_cents:
+          type: integer
+          minimum: 0
+          description: |
+            Transaction amount in cents. Required when the action declares
+            `requires_payment_method: true`. Used for spending limit enforcement
+            (per-transaction and monthly limits). The authorized amount is passed to
+            the connector alongside the Stripe payment method token.
+          example: 4999
       example:
         request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
         configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
@@ -7224,6 +7958,7 @@ components:
             - standing_approval.executed
             - agent.registered
             - agent.deactivated
+            - payment_method.charged
           description: The type of event.
           example: approval.approved
         timestamp:
@@ -7250,8 +7985,11 @@ components:
             approvals, contains `type`, `version`, and `parameters`. For standing
             approval executions, contains `type`, `version`, `parameters` (the
             actual parameters used in the execution), and `constraints` (the
-            boundary rules from the standing approval). Null for agent lifecycle
-            events.
+            boundary rules from the standing approval). For payment_method.charged
+            events, contains `type`, `payment_method_id`, `brand`, `last4`,
+            `amount_cents`, `currency`, and optionally `description` (a human-readable
+            summary of the charge). Never includes raw card details.
+            Null for agent lifecycle events.
         outcome:
           type: string
           enum:
@@ -7263,6 +8001,7 @@ components:
             - deactivated
             - pending
             - expired
+            - charged
           description: The outcome of the event.
           example: approved
         connector_id:
@@ -7344,6 +8083,7 @@ components:
             - standing_approval.executed
             - agent.registered
             - agent.deactivated
+            - payment_method.charged
           description: The type of event.
           example: approval.approved
         timestamp:
@@ -7366,7 +8106,9 @@ components:
           nullable: true
           additionalProperties: true
           description: |
-            Action details for approval and standing approval events.
+            Action details for approval and standing approval events. For
+            payment_method.charged events, contains `type`, `payment_method_id`,
+            `brand`, `last4`, `amount_cents`, and `currency`.
         outcome:
           type: string
           enum:
@@ -7378,6 +8120,7 @@ components:
             - deactivated
             - pending
             - expired
+            - charged
           description: The outcome of the event.
           example: approved
         source_id:
@@ -7539,6 +8282,12 @@ components:
             - deactivated
           description: Current agent status (always "registered" for successful requests, since the middleware requires it)
           example: registered
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) this agent is registered to. Identifies whose
+            account and permissions this agent operates under.
         metadata:
           type: object
           nullable: true
@@ -7595,6 +8344,13 @@ components:
           description: |
             The authenticated agent's identifier.
           example: 42
+        approver:
+          allOf:
+            - $ref: '#/components/schemas/ApproverInfo'
+          description: |
+            The user (approver) whose capabilities are being returned. Identifies
+            which user's connectors, standing approvals, and action configurations
+            are represented in this response.
         connectors:
           type: array
           items:
@@ -7607,6 +8363,8 @@ components:
             If the agent has no enabled connectors, this array is empty.
       example:
         agent_id: 42
+        approver:
+          username: alice
         connectors:
           - id: gmail
             name: Gmail
@@ -9350,6 +10108,361 @@ components:
           type: integer
           description: Number of billable requests attributed to this agent
           example: 500
+    OAuthProvider:
+      type: object
+      required:
+        - id
+        - scopes
+        - source
+        - has_credentials
+      properties:
+        id:
+          type: string
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          example: google
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Default OAuth scopes for this provider
+          example:
+            - openid
+            - https://www.googleapis.com/auth/userinfo.email
+        source:
+          type: string
+          enum:
+            - built_in
+            - manifest
+            - byoa
+          description: Where the provider configuration originated
+          example: built_in
+        has_credentials:
+          type: boolean
+          description: Whether the provider has client credentials configured and is ready to use
+          example: true
+    OAuthProviderListResponse:
+      type: object
+      required:
+        - providers
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProvider'
+          description: List of available OAuth providers
+    OAuthConnection:
+      type: object
+      required:
+        - provider
+        - scopes
+        - status
+        - connected_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID (e.g. "google", "microsoft")
+          example: google
+        scopes:
+          type: array
+          items:
+            type: string
+          description: The OAuth scopes granted by the provider
+          example:
+            - openid
+            - https://www.googleapis.com/auth/userinfo.email
+        status:
+          type: string
+          enum:
+            - active
+            - needs_reauth
+            - revoked
+          description: |
+            The current status of the connection. `active` — connection is valid and tokens are current (automatically refreshed before expiry). `needs_reauth` — token refresh failed (token revoked, expired refresh token, or no refresh token available); user must re-authorize via Settings. `revoked` — user explicitly disconnected the provider.
+          example: active
+        connected_at:
+          type: string
+          format: date-time
+          description: When the OAuth connection was established
+          example: '2026-03-05T10:00:00Z'
+    OAuthConnectionListResponse:
+      type: object
+      required:
+        - connections
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthConnection'
+          description: List of OAuth connections for the authenticated user
+    OAuthDisconnectResponse:
+      type: object
+      required:
+        - provider
+        - disconnected_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider that was disconnected
+          example: google
+        disconnected_at:
+          type: string
+          format: date-time
+          description: When the OAuth provider was disconnected
+          example: '2026-03-05T15:00:00Z'
+    CreateOAuthProviderConfigRequest:
+      type: object
+      description: |
+        Request body for registering BYOA (Bring Your Own App) OAuth credentials.
+        The provider must already be declared by a built-in config or connector
+        manifest — this endpoint only supplies the client ID and secret.
+        Credentials are encrypted at rest in Supabase Vault (AES-256-GCM).
+        Only one config per provider per user is allowed.
+      required:
+        - provider
+        - client_id
+        - client_secret
+      properties:
+        provider:
+          type: string
+          description: |
+            The OAuth provider ID to configure. Must match a provider already
+            declared by a built-in config or connector manifest (e.g. "salesforce",
+            "google"). Use GET /v1/oauth/providers to discover available providers.
+          example: salesforce
+          maxLength: 128
+        client_id:
+          type: string
+          description: |
+            The OAuth application's client ID, obtained from the provider's
+            developer console (e.g. Google Cloud Console, Salesforce Connected App).
+          example: my-client-id
+          maxLength: 2048
+        client_secret:
+          type: string
+          description: |
+            The OAuth application's client secret. This value is encrypted in
+            Supabase Vault and never returned in API responses.
+          example: my-client-secret
+          maxLength: 2048
+    UpdateOAuthProviderConfigRequest:
+      type: object
+      description: |
+        Request body for rotating BYOA OAuth credentials. Both client_id and
+        client_secret must be provided — partial updates are not supported.
+        The old vault secrets are deleted and replaced atomically within a
+        database transaction.
+      required:
+        - client_id
+        - client_secret
+      properties:
+        client_id:
+          type: string
+          description: The new OAuth application's client ID
+          example: my-new-client-id
+          maxLength: 2048
+        client_secret:
+          type: string
+          description: |
+            The new OAuth application's client secret. Encrypted in Supabase
+            Vault and never returned in API responses.
+          example: my-new-client-secret
+          maxLength: 2048
+    OAuthProviderConfig:
+      type: object
+      description: |
+        A BYOA provider config indicating the user has registered their own
+        OAuth client credentials for this provider. Client secrets are never
+        included — only the provider ID and timestamps are returned.
+      required:
+        - provider
+        - created_at
+        - updated_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider ID (e.g. "salesforce", "google")
+          example: salesforce
+        created_at:
+          type: string
+          format: date-time
+          description: When the BYOA credentials were first registered
+          example: '2026-03-05T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: When the BYOA credentials were last rotated (equals created_at if never updated)
+          example: '2026-03-05T14:00:00Z'
+    OAuthProviderConfigListResponse:
+      type: object
+      required:
+        - configs
+      properties:
+        configs:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProviderConfig'
+          description: |
+            List of BYOA provider configs for the authenticated user. Each entry
+            indicates the user has registered custom OAuth credentials for that
+            provider. Empty array if no BYOA configs exist.
+    OAuthProviderConfigDeleteResponse:
+      type: object
+      description: |
+        Confirmation that the BYOA provider config and its encrypted vault
+        secrets have been deleted. After deletion, the provider reverts to
+        its built-in or manifest configuration (if any).
+      required:
+        - provider
+        - deleted_at
+      properties:
+        provider:
+          type: string
+          description: The OAuth provider whose BYOA credentials were deleted
+          example: salesforce
+        deleted_at:
+          type: string
+          format: date-time
+          description: When the BYOA credentials were deleted
+          example: '2026-03-05T15:00:00Z'
+    PaymentMethod:
+      type: object
+      description: |
+        A stored payment method (credit/debit card) tokenized via Stripe.
+        Raw card data is never stored — only the Stripe token and display
+        metadata (last4, brand, expiry).
+      required:
+        - id
+        - brand
+        - last4
+        - exp_month
+        - exp_year
+        - is_default
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          maxLength: 100
+          description: User-friendly label for the card (e.g. "Personal Visa")
+        brand:
+          type: string
+          description: Card brand (e.g. visa, mastercard, amex)
+        last4:
+          type: string
+          description: Last 4 digits of the card number
+          pattern: ^\d{4}$
+        exp_month:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Card expiration month (1-12)
+        exp_year:
+          type: integer
+          description: Card expiration year (e.g. 2027)
+        is_default:
+          type: boolean
+          description: Whether this is the user's default payment method
+        per_transaction_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Maximum amount in cents per individual agent transaction (null = no limit)
+        monthly_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Maximum total spend in cents across all agent transactions in the last 30 days (null = no limit)
+        monthly_spend:
+          type: integer
+          minimum: 0
+          description: Current total spend in cents for the rolling 30-day window. Always included in list responses.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PaymentMethodListResponse:
+      type: object
+      required:
+        - payment_methods
+        - max_allowed
+      properties:
+        payment_methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMethod'
+        max_allowed:
+          type: integer
+          description: Maximum number of payment methods a user can store (currently 10)
+    SetupIntentResponse:
+      type: object
+      required:
+        - client_secret
+      properties:
+        client_secret:
+          type: string
+          description: |
+            Stripe SetupIntent client secret for use with stripe.confirmCardSetup()
+            in Stripe Elements on the frontend. Single-use, expires after 24 hours.
+    ConfirmPaymentMethodRequest:
+      type: object
+      required:
+        - payment_method_id
+      properties:
+        payment_method_id:
+          type: string
+          pattern: ^pm_
+          description: Stripe payment method ID (must start with "pm_")
+        label:
+          type: string
+          maxLength: 100
+          description: User-friendly label for the card (e.g. "Personal Visa")
+        is_default:
+          type: boolean
+          default: false
+          description: Set to true to make this the default payment method
+    UpdatePaymentMethodRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 100
+          description: User-friendly label for the card
+        is_default:
+          type: boolean
+          description: Set to true to make this the default payment method
+        per_transaction_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: |
+            Per-transaction limit in cents. Must not exceed monthly_limit if both
+            are set. Set to a value to create/update the limit.
+        monthly_limit:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: |
+            Monthly spend limit in cents (rolling 30-day window). Must be >= per_transaction_limit
+            if both are set. Set to a value to create/update the limit.
+        clear_per_transaction_limit:
+          type: boolean
+          description: Set to true to remove the per-transaction limit entirely
+        clear_monthly_limit:
+          type: boolean
+          description: Set to true to remove the monthly limit entirely
+    DeletePaymentMethodResponse:
+      type: object
+      required:
+        - deleted
+      properties:
+        deleted:
+          type: boolean
+          description: Always true on successful deletion
     ConfigResponse:
       type: object
       description: |
@@ -9357,6 +10470,7 @@ components:
         fetch this once at startup to determine which UI features to show.
       required:
         - billing_enabled
+        - stripe_test_mode
       properties:
         billing_enabled:
           type: boolean
@@ -9365,6 +10479,14 @@ components:
             limits) are active. When `false` (the default), all users have the
             unlimited `pay_as_you_go` plan and billing UI should be hidden.
             Controlled by the `BILLING_ENABLED` server environment variable.
+          example: false
+        stripe_test_mode:
+          type: boolean
+          description: |
+            Whether the server is using Stripe test-mode keys. When `true`, the
+            frontend should use `VITE_STRIPE_PUBLISHABLE_KEY_TEST` instead of
+            `VITE_STRIPE_PUBLISHABLE_KEY`. Only enabled when `STRIPE_TEST_MODE=true`
+            and `BILLING_ENABLED=true` on the server.
           example: false
     Action:
       type: object
@@ -9576,6 +10698,7 @@ components:
             - timestamp_expired
             - invalid_code
             - invalid_token
+            - oauth_refresh_failed
             - agent_not_authorized
             - approval_denied
             - token_already_used
@@ -9667,6 +10790,26 @@ components:
             timestamp: '1770816000'
             expected_window: 300 seconds
           trace_id: trace_xyz789
+    ApproverInfo:
+      type: object
+      description: |
+        Identifies the user (approver) an agent is registered to. Included in
+        agent-facing responses so the agent knows which user it's working with.
+
+        Only the username is exposed — email, phone, and other PII are never
+        sent to agents.
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          maxLength: 40
+          description: |
+            The approver's username on Permission Slip. This is the user's
+            public-facing identifier — safe to display and log.
+          example: alice
+      example:
+        username: alice
     AgentListResponse:
       type: object
       description: Paginated list of agents.

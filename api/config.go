@@ -7,6 +7,7 @@ import "net/http"
 // (e.g., feature flags for upcoming features).
 type configResponse struct {
 	BillingEnabled bool `json:"billing_enabled"`
+	StripeTestMode bool `json:"stripe_test_mode"`
 }
 
 // RegisterConfigRoutes adds server configuration endpoints to the mux.
@@ -21,6 +22,7 @@ func handleGetConfig(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		RespondJSON(w, http.StatusOK, configResponse{
 			BillingEnabled: deps.BillingEnabled,
+			StripeTestMode: deps.StripeTestMode,
 		})
 	}
 }

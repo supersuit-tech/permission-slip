@@ -62,11 +62,12 @@ func SecurityHeadersMiddleware(sentryCSPEndpoint string, extraConnectSrc, extraS
 
 	directives := []string{
 		"default-src 'self'",
-		"script-src " + scriptSrc,
+		"script-src " + scriptSrc + " https://js.stripe.com",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"font-src 'self' https://fonts.gstatic.com",
 		"img-src 'self' data:",
-		"connect-src " + connectSrc,
+		"connect-src " + connectSrc + " https://api.stripe.com",
+		"frame-src https://js.stripe.com",
 		"worker-src 'self'",
 		"frame-ancestors 'none'",
 	}

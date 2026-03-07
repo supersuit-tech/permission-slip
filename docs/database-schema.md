@@ -39,6 +39,7 @@ Actions available on a connector (e.g., "send email" on Gmail).
 | `description` | text | max 4096 chars |
 | `risk_level` | text | CHECK IN ('low', 'medium', 'high') |
 | `parameters_schema` | jsonb | max 64 KB |
+| `requires_payment_method` | boolean | NOT NULL, DEFAULT false — when true, execute requests must include `payment_method_id` and `amount_cents` |
 
 ### `connector_required_credentials`
 
@@ -48,7 +49,10 @@ Credential types required by a connector. The `service` column is a join key to 
 |---|---|---|
 | `connector_id` | text | PK (composite), FK → connectors ON DELETE CASCADE, max 255 chars |
 | `service` | text | PK (composite), max 255 chars (join key to `credentials.service`) |
-| `auth_type` | text | NOT NULL, CHECK IN ('api_key', 'basic', 'custom') |
+| `auth_type` | text | NOT NULL, CHECK IN ('api_key', 'basic', 'custom', 'oauth2') |
+| `instructions_url` | text | max 2048 chars, optional URL for credential setup docs |
+| `oauth_provider` | text | max 255 chars, required when auth_type = 'oauth2', NULL otherwise |
+| `oauth_scopes` | text[] | DEFAULT '{}', OAuth scopes required when auth_type = 'oauth2' |
 
 ### `registration_invites`
 
@@ -166,6 +170,49 @@ User credentials stored via Supabase Vault. The table holds a reference to the V
 
 **Indexes:** `idx_credentials_user_service` on `(user_id, service)`
 
+### `oauth_connections`
+
+Stores OAuth 2.0 connections for users. Each row represents a user's authenticated connection to an OAuth provider (e.g., Google, Microsoft). Tokens are stored in the Vault — this table only holds Vault references.
+
+A background job proactively refreshes tokens within 15 minutes of expiry (`token_expiry`). If refresh fails (token revoked, no refresh token available), the connection's `status` is set to `needs_reauth`, signaling the user to re-authorize via the Settings page.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | text | PK, max 255 chars | |
+| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE | |
+| `provider` | text | NOT NULL, max 255 chars (e.g., "google", "microsoft") | |
+| `access_token_vault_id` | uuid | NOT NULL | Vault reference; rotated on each refresh |
+| `refresh_token_vault_id` | uuid | Nullable | Nullable — some providers don't issue refresh tokens. If NULL, the connection cannot be refreshed and will be marked `needs_reauth` on expiry. |
+| `scopes` | text[] | NOT NULL, DEFAULT '{}' | |
+| `token_expiry` | timestamptz | Nullable | When the access token expires. The background refresh job queries for tokens where this is within 15 minutes of now. NULL means the token doesn't expire. |
+| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'needs_reauth', 'revoked') | See status lifecycle below |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() | |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() | Updated on token refresh and status change |
+
+**Status lifecycle:** `active` → `needs_reauth` (on refresh failure or token expiry without refresh token) → `active` (on user re-authorization). Users can also set `revoked` by disconnecting the provider.
+
+**Constraints:** UNIQUE on `(user_id, provider)` — one connection per provider per user.
+
+**Indexes:** `idx_oauth_connections_user` on `(user_id)`, `idx_oauth_connections_status` on `(user_id, status)`
+
+### `oauth_provider_configs`
+
+Stores user-provided ("bring your own app") OAuth client credentials. Users register their own OAuth app's client ID and secret for a provider, rather than using a platform-managed app.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `id` | text | PK, max 255 chars |
+| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
+| `provider` | text | NOT NULL, max 255 chars |
+| `client_id_vault_id` | uuid | NOT NULL |
+| `client_secret_vault_id` | uuid | NOT NULL |
+| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
+
+**Constraints:** UNIQUE on `(user_id, provider)` — one config per provider per user.
+
+**Indexes:** `idx_oauth_provider_configs_user` on `(user_id)`
+
 ### `agent_connectors`
 
 Join table controlling which connectors are enabled for each agent. Users enable connectors per-agent through the dashboard — an agent can only submit actions from connectors in this table.
@@ -251,24 +298,32 @@ Per-execution records for standing approvals. Each row represents a single execu
 
 ### `audit_events`
 
-Immutable log of significant actions: approval decisions, agent lifecycle events, and standing approval executions. Used by the dashboard activity feed.
+Immutable log of significant actions: approval decisions, agent lifecycle events, standing approval executions, and payment method charges. Used by the dashboard activity feed and compliance export.
 
 | Column | Type | Constraints |
 |---|---|---|
 | `id` | bigserial | PK |
 | `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE RESTRICT |
 | `agent_id` | bigint | NOT NULL, FK → agents(agent_id) ON DELETE RESTRICT |
-| `event_type` | text | NOT NULL, CHECK IN ('approval.approved', 'approval.denied', 'approval.cancelled', 'standing_approval.executed', 'agent.registered', 'agent.deactivated') |
-| `outcome` | text | NOT NULL, CHECK IN ('approved', 'denied', 'cancelled', 'auto_executed', 'registered', 'deactivated', 'pending', 'expired') |
+| `event_type` | text | NOT NULL, CHECK IN ('approval.requested', 'approval.approved', 'approval.denied', 'approval.cancelled', 'action.executed', 'standing_approval.executed', 'agent.registered', 'agent.deactivated', 'payment_method.charged') |
+| `outcome` | text | NOT NULL, CHECK IN ('approved', 'denied', 'cancelled', 'auto_executed', 'registered', 'deactivated', 'pending', 'expired', 'charged') |
 | `source_id` | text | |
-| `source_type` | text | CHECK IN ('approval', 'standing_approval', 'agent', 'registration_invite') |
+| `source_type` | text | CHECK IN ('approval', 'standing_approval', 'agent', 'registration_invite', 'payment_method_transaction') |
 | `agent_meta` | jsonb | Point-in-time snapshot of agent metadata |
-| `action` | jsonb | Action context (optional) |
+| `action` | jsonb | Action context (optional, see below) |
+| `connector_id` | text | Nullable — which connector handled the action |
+| `execution_status` | text | Nullable — 'success', 'failure', 'timeout', 'skipped' |
+| `execution_error` | text | Nullable — failure details (truncated to 512 chars) |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 
 **Indexes:** `idx_audit_events_user_created` on `(user_id, created_at DESC, id DESC)`, `idx_audit_events_agent` on `(agent_id, created_at DESC, id DESC)`
 
 **Note:** Audit events use ON DELETE RESTRICT (not CASCADE) to prevent accidental deletion of audit history when cleaning up users or agents. The `agent_meta` column captures a snapshot of the agent's metadata at event time so the audit trail remains meaningful even if the agent is later modified or deactivated.
+
+**Action JSON shapes by event type:**
+- **Approval/standing approval events:** `{"type": "connector.action", "version": "1", "parameters": {...}, "constraints": {...}}`
+- **`payment_method.charged`:** `{"type": "connector.action", "payment_method_id": "pm_...", "brand": "visa", "last4": "4242", "amount_cents": 15000, "currency": "usd", "description": "..."}` — never includes raw card numbers, CVV, or full expiry. Only safe display metadata (brand, last4) and the opaque payment method ID are stored.
+- **Agent lifecycle events:** `null`
 
 ### `plans`
 
@@ -351,6 +406,8 @@ auth.users
         ├── agents (approver_id → profiles, CASCADE)
         ├── approvals (approver_id → profiles, CASCADE)
         ├── credentials (user_id → profiles, CASCADE)
+        ├── oauth_connections (user_id → profiles, CASCADE)
+        ├── oauth_provider_configs (user_id → profiles, CASCADE)
         ├── standing_approvals (user_id → profiles, CASCADE)
         └── audit_events (user_id → profiles, RESTRICT)
 

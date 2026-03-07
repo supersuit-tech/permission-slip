@@ -155,6 +155,75 @@ func TestBuildEmailHTMLBody_EscapesHTML(t *testing.T) {
 	}
 }
 
+func TestBuildEmailSubject_CardExpiring(t *testing.T) {
+	t.Parallel()
+	approval := Approval{
+		Type:    NotificationTypeCardExpiring,
+		Context: json.RawMessage(`{"brand":"Visa","last4":"4242","exp_month":3,"exp_year":2026,"expired":false}`),
+	}
+	subject := buildEmailSubject(approval)
+	if !strings.Contains(subject, "Visa") || !strings.Contains(subject, "4242") || !strings.Contains(subject, "expiring soon") {
+		t.Errorf("unexpected card expiring subject: %s", subject)
+	}
+}
+
+func TestBuildEmailSubject_CardExpired(t *testing.T) {
+	t.Parallel()
+	approval := Approval{
+		Type:    NotificationTypeCardExpiring,
+		Context: json.RawMessage(`{"brand":"Amex","last4":"3333","exp_month":1,"exp_year":2024,"expired":true}`),
+	}
+	subject := buildEmailSubject(approval)
+	if !strings.Contains(subject, "Amex") || !strings.Contains(subject, "3333") || !strings.Contains(subject, "has expired") {
+		t.Errorf("unexpected card expired subject: %s", subject)
+	}
+}
+
+func TestBuildEmailPlainBody_CardExpiring(t *testing.T) {
+	t.Parallel()
+	approval := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Visa","last4":"4242","exp_month":3,"exp_year":2026,"expired":false}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	body := buildEmailPlainBody(approval)
+	for _, check := range []string{"Visa", "4242", "03/26", "replacement", "settings?tab=billing"} {
+		if !strings.Contains(body, check) {
+			t.Errorf("expected plain body to contain %q, got: %s", check, body)
+		}
+	}
+}
+
+func TestBuildEmailHTMLBody_CardExpiring(t *testing.T) {
+	t.Parallel()
+	approval := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Visa","last4":"4242","exp_month":3,"exp_year":2026,"expired":false}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	html := buildEmailHTMLBody(approval)
+	for _, check := range []string{"Visa", "4242", "03/26", "Card Expiring Soon", "Update Payment Methods", "#d97706"} {
+		if !strings.Contains(html, check) {
+			t.Errorf("expected HTML body to contain %q", check)
+		}
+	}
+}
+
+func TestBuildEmailHTMLBody_CardExpired(t *testing.T) {
+	t.Parallel()
+	approval := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Amex","last4":"3333","exp_month":1,"exp_year":2024,"expired":true}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	html := buildEmailHTMLBody(approval)
+	for _, check := range []string{"Amex", "3333", "Card Expired", "#dc2626"} {
+		if !strings.Contains(html, check) {
+			t.Errorf("expected HTML body to contain %q", check)
+		}
+	}
+}
+
 func TestExtractActionType(t *testing.T) {
 	t.Parallel()
 

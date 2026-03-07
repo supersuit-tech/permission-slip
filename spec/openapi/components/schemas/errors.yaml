@@ -26,6 +26,7 @@ Error:
         - timestamp_expired
         - invalid_code
         - invalid_token
+        - oauth_refresh_failed
         # 403 Forbidden
         - agent_not_authorized
         - approval_denied
