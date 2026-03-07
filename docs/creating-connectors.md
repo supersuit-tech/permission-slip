@@ -967,11 +967,15 @@ connectors/
 │   └── *_test.go             # Per-action + connector + response tests
 ├── google/
 │   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
-│   ├── manifest.go           # Manifest() with 19 action schemas and 28 templates
+│   ├── manifest.go           # Manifest() with 22 action schemas and 31+ templates
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── create_presentation.go    # google.create_presentation action (Slides API)
+│   ├── get_presentation.go       # google.get_presentation action (Slides API)
+│   ├── add_slide.go              # google.add_slide action (batchUpdate)
+│   ├── slides_helpers.go         # Shared helpers for Slides actions
 │   ├── sheets_read.go        # google.sheets_read_range action
 │   ├── sheets_write.go       # google.sheets_write_range action
 │   ├── sheets_append.go      # google.sheets_append_rows action
