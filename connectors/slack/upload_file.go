@@ -3,7 +3,6 @@ package slack
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -92,10 +91,7 @@ type completeUploadResponse struct {
 // Execute uploads a file to a Slack channel using the v2 upload flow.
 func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params uploadFileParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 

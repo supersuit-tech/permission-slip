@@ -2,7 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -57,10 +56,7 @@ type scheduleMessageResponse struct {
 // Execute schedules a message for future delivery and returns the scheduled message metadata.
 func (a *scheduleMessageAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params scheduleMessageParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 

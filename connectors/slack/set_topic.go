@@ -2,7 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -59,10 +58,7 @@ type setTopicChannelInfo struct {
 // Execute updates a channel's topic and returns the updated topic.
 func (a *setTopicAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params setTopicParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 

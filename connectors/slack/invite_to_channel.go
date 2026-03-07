@@ -2,8 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -50,10 +48,7 @@ type inviteChannelInfo struct {
 // Execute invites user(s) to a Slack channel and returns the channel metadata.
 func (a *inviteToChannelAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params inviteToChannelParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 

@@ -2,8 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -51,10 +49,7 @@ type addReactionResponse struct {
 // Execute adds an emoji reaction to a message and returns confirmation.
 func (a *addReactionAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params addReactionParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
