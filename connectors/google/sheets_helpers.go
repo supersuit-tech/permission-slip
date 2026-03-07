@@ -19,6 +19,14 @@ const (
 	maxSheetsCells = 500_000
 )
 
+// sheetsUpdateValuesRequest is the request body sent to both values.update
+// (write) and values.append. It lives here because both actions share it.
+type sheetsUpdateValuesRequest struct {
+	Range          string  `json:"range"`
+	MajorDimension string  `json:"majorDimension"`
+	Values         [][]any `json:"values"`
+}
+
 // validateValues checks that the values array is within safe limits and that
 // all rows have a consistent column count.
 func validateValues(values [][]any) error {

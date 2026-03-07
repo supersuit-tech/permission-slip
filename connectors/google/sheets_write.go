@@ -41,13 +41,6 @@ func (p *sheetsWriteRangeParams) validate() error {
 	return nil
 }
 
-// sheetsUpdateValuesRequest is the request body for values.update.
-type sheetsUpdateValuesRequest struct {
-	Range          string  `json:"range"`
-	MajorDimension string `json:"majorDimension"`
-	Values         [][]any `json:"values"`
-}
-
 // sheetsUpdateValuesResponse is the Google Sheets API response for values.update.
 type sheetsUpdateValuesResponse struct {
 	SpreadsheetID  string `json:"spreadsheetId"`
