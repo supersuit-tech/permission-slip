@@ -78,6 +78,40 @@ type asanaEnvelope struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// execRequest is the shared HTTP lifecycle: sets auth, sends the request,
+// reads the (size-limited) response body, and maps HTTP errors to typed
+// connector errors. Returns the raw response bytes on success.
+func (c *AsanaConnector) execRequest(ctx context.Context, creds connectors.Credentials, req *http.Request) ([]byte, error) {
+	key, ok := creds.Get("api_key")
+	if !ok || key == "" {
+		return nil, &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Asana API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return nil, &connectors.TimeoutError{Message: "Asana API request canceled"}
+		}
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Asana API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
+		return nil, err
+	}
+
+	return respBytes, nil
+}
+
 // do is the shared request lifecycle for all Asana actions. It marshals
 // reqBody as JSON (wrapping in {"data": ...}), sends the request with auth
 // headers, checks the response status, unwraps the {"data": ...} envelope,
@@ -102,30 +136,8 @@ func (c *AsanaConnector) do(ctx context.Context, creds connectors.Credentials, m
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
-	}
-	req.Header.Set("Authorization", "Bearer "+key)
-
-	resp, err := c.client.Do(req)
+	respBytes, err := c.execRequest(ctx, creds, req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Asana API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Asana API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Asana API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
 		return err
 	}
 
@@ -150,30 +162,8 @@ func (c *AsanaConnector) doRaw(ctx context.Context, creds connectors.Credentials
 		return fmt.Errorf("creating request: %w", err)
 	}
 
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
-	}
-	req.Header.Set("Authorization", "Bearer "+key)
-
-	resp, err := c.client.Do(req)
+	respBytes, err := c.execRequest(ctx, creds, req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Asana API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Asana API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Asana API request failed: %v", err)}
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
 		return err
 	}
 

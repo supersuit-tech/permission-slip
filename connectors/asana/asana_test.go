@@ -10,10 +10,6 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
-
 func TestAsanaConnector_ID(t *testing.T) {
 	t.Parallel()
 	c := New()
@@ -264,7 +260,7 @@ func TestAsanaConnector_ErrorMapping(t *testing.T) {
 					t.Errorf("expected ValidationError, got %T: %v", err, err)
 				}
 				errMsg := err.Error()
-				if !contains(errMsg, "hint:") {
+				if !strings.Contains(errMsg, "hint:") {
 					t.Errorf("error should include hint, got: %s", errMsg)
 				}
 			},
