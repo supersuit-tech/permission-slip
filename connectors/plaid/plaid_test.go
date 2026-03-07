@@ -1,6 +1,9 @@
 package plaid
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -155,6 +158,51 @@ func TestPlaidConnector_BaseURLForCreds(t *testing.T) {
 				t.Errorf("baseURLForCreds() = %q, want %q", got, tt.wantURL)
 			}
 		})
+	}
+}
+
+func TestDoPost_DoesNotLeakCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify credentials arrive in the request body.
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding body: %v", err)
+			return
+		}
+		if body["client_id"] != testClientID {
+			t.Errorf("client_id missing from request body")
+		}
+		if body["secret"] != testSecret {
+			t.Errorf("secret missing from request body")
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+
+	// Pass a body map and verify it's NOT mutated with credentials.
+	callerBody := map[string]any{
+		"some_param": "some_value",
+	}
+	err := conn.doPost(t.Context(), validCreds(), "/test", callerBody, nil)
+	if err != nil {
+		t.Fatalf("doPost() unexpected error: %v", err)
+	}
+
+	// The caller's map must not contain client_id or secret.
+	if _, ok := callerBody["client_id"]; ok {
+		t.Error("doPost leaked client_id into caller's body map")
+	}
+	if _, ok := callerBody["secret"]; ok {
+		t.Error("doPost leaked secret into caller's body map")
+	}
+	// Original param should still be there.
+	if callerBody["some_param"] != "some_value" {
+		t.Error("doPost modified caller's original body values")
 	}
 }
 
