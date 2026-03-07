@@ -36,7 +36,7 @@ type usageInfo struct {
 }
 
 type checkoutResponse struct {
-	URL string `json:"url"`
+	CheckoutURL string `json:"checkout_url"`
 }
 
 // usageResponse is the JSON shape returned by GET /billing/usage.
@@ -348,7 +348,7 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, checkoutResponse{URL: sess.URL})
+		RespondJSON(w, http.StatusOK, checkoutResponse{CheckoutURL: sess.URL})
 	}
 }
 

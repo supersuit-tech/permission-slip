@@ -24,17 +24,20 @@ type connectorListResponse struct {
 }
 
 type connectorActionResponse struct {
-	ActionType       string `json:"action_type"`
-	Name             string `json:"name"`
-	Description      *string `json:"description,omitempty"`
-	RiskLevel        *string `json:"risk_level,omitempty"`
-	ParametersSchema any    `json:"parameters_schema,omitempty"`
+	ActionType            string  `json:"action_type"`
+	Name                  string  `json:"name"`
+	Description           *string `json:"description,omitempty"`
+	RiskLevel             *string `json:"risk_level,omitempty"`
+	ParametersSchema      any     `json:"parameters_schema,omitempty"`
+	RequiresPaymentMethod bool    `json:"requires_payment_method"`
 }
 
 type requiredCredentialResponse struct {
-	Service         string  `json:"service"`
-	AuthType        string  `json:"auth_type"`
-	InstructionsURL *string `json:"instructions_url,omitempty"`
+	Service         string   `json:"service"`
+	AuthType        string   `json:"auth_type"`
+	InstructionsURL *string  `json:"instructions_url,omitempty"`
+	OAuthProvider   *string  `json:"oauth_provider,omitempty"`
+	OAuthScopes     []string `json:"oauth_scopes,omitempty"`
 }
 
 type connectorDetailResponse struct {
@@ -107,10 +110,11 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 	actions := make([]connectorActionResponse, len(c.Actions))
 	for i, a := range c.Actions {
 		resp := connectorActionResponse{
-			ActionType:  a.ActionType,
-			Name:        a.Name,
-			Description: a.Description,
-			RiskLevel:   a.RiskLevel,
+			ActionType:            a.ActionType,
+			Name:                  a.Name,
+			Description:           a.Description,
+			RiskLevel:             a.RiskLevel,
+			RequiresPaymentMethod: a.RequiresPaymentMethod,
 		}
 		if len(a.ParametersSchema) > 0 {
 			var schema any
@@ -129,6 +133,8 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 			Service:         rc.Service,
 			AuthType:        rc.AuthType,
 			InstructionsURL: rc.InstructionsURL,
+			OAuthProvider:   rc.OAuthProvider,
+			OAuthScopes:     rc.OAuthScopes,
 		}
 	}
 

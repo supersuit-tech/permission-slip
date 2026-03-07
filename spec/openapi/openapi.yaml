@@ -104,6 +104,10 @@ tags:
     description: Web Push subscription management (session-authenticated)
   - name: Expo Push Tokens
     description: Expo push token management for mobile push notifications (session-authenticated)
+  - name: OAuth
+    description: OAuth 2.0 provider authorization and connection management (session-authenticated)
+  - name: Payment Methods
+    description: Stored payment methods for agent-initiated purchases (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
   - name: Billing
@@ -272,6 +276,36 @@ paths:
 
   /v1/admin/usage/by-agent:
     $ref: './components/paths/admin_usage.yaml#/adminUsageByAgent'
+
+  /v1/oauth/providers:
+    $ref: './components/paths/oauth.yaml#/oauthProviders'
+
+  /v1/oauth/{provider}/authorize:
+    $ref: './components/paths/oauth.yaml#/oauthAuthorize'
+
+  /v1/oauth/{provider}/callback:
+    $ref: './components/paths/oauth.yaml#/oauthCallback'
+
+  /v1/oauth/connections:
+    $ref: './components/paths/oauth.yaml#/oauthConnections'
+
+  /v1/oauth/connections/{provider}:
+    $ref: './components/paths/oauth.yaml#/oauthDisconnect'
+
+  /v1/oauth/provider-configs:
+    $ref: './components/paths/oauth.yaml#/oauthProviderConfigs'
+
+  /v1/oauth/provider-configs/{provider}:
+    $ref: './components/paths/oauth.yaml#/oauthProviderConfigByProvider'
+
+  /v1/payment-methods:
+    $ref: './components/paths/payment_methods.yaml#/paymentMethods'
+
+  /v1/payment-methods/setup-intent:
+    $ref: './components/paths/payment_methods.yaml#/setupIntent'
+
+  /v1/payment-methods/{id}:
+    $ref: './components/paths/payment_methods.yaml#/paymentMethodById'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -537,6 +571,42 @@ components:
       $ref: './components/schemas/admin_usage.yaml#/AgentUsageResponse'
     AgentUsageEntry:
       $ref: './components/schemas/admin_usage.yaml#/AgentUsageEntry'
+
+    # OAuth
+    OAuthProvider:
+      $ref: './components/schemas/oauth.yaml#/OAuthProvider'
+    OAuthProviderListResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderListResponse'
+    OAuthConnection:
+      $ref: './components/schemas/oauth.yaml#/OAuthConnection'
+    OAuthConnectionListResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthConnectionListResponse'
+    OAuthDisconnectResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
+    CreateOAuthProviderConfigRequest:
+      $ref: './components/schemas/oauth.yaml#/CreateOAuthProviderConfigRequest'
+    UpdateOAuthProviderConfigRequest:
+      $ref: './components/schemas/oauth.yaml#/UpdateOAuthProviderConfigRequest'
+    OAuthProviderConfig:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfig'
+    OAuthProviderConfigListResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfigListResponse'
+    OAuthProviderConfigDeleteResponse:
+      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfigDeleteResponse'
+
+    # Payment Methods
+    PaymentMethod:
+      $ref: './components/schemas/payment_methods.yaml#/PaymentMethod'
+    PaymentMethodListResponse:
+      $ref: './components/schemas/payment_methods.yaml#/PaymentMethodListResponse'
+    SetupIntentResponse:
+      $ref: './components/schemas/payment_methods.yaml#/SetupIntentResponse'
+    ConfirmPaymentMethodRequest:
+      $ref: './components/schemas/payment_methods.yaml#/ConfirmPaymentMethodRequest'
+    UpdatePaymentMethodRequest:
+      $ref: './components/schemas/payment_methods.yaml#/UpdatePaymentMethodRequest'
+    DeletePaymentMethodResponse:
+      $ref: './components/schemas/payment_methods.yaml#/DeletePaymentMethodResponse'
 
     # Config
     ConfigResponse:

@@ -35,7 +35,8 @@ function EmptyState() {
       </p>
       <p className="text-muted-foreground max-w-xs text-xs">
         Try adjusting your filters or check back later. Approval decisions,
-        standing approval executions, and agent events will appear here.
+        standing approval executions, agent events, and payment charges will
+        appear here.
       </p>
     </div>
   );

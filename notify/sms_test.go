@@ -246,6 +246,38 @@ func TestFormatSMSBody_NoApprovalURL(t *testing.T) {
 	}
 }
 
+func TestFormatSMSBody_CardExpiring(t *testing.T) {
+	t.Parallel()
+	a := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Visa","last4":"4242","exp_month":3,"exp_year":2026,"expired":false}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	body := formatSMSBody(a)
+
+	for _, check := range []string{"Visa", "4242", "03/26", "replacement", "settings?tab=billing"} {
+		if !strings.Contains(body, check) {
+			t.Errorf("expected SMS body to contain %q, got: %s", check, body)
+		}
+	}
+}
+
+func TestFormatSMSBody_CardExpired(t *testing.T) {
+	t.Parallel()
+	a := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Amex","last4":"3333","exp_month":1,"exp_year":2024,"expired":true}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	body := formatSMSBody(a)
+
+	for _, check := range []string{"Amex", "3333", "has expired"} {
+		if !strings.Contains(body, check) {
+			t.Errorf("expected SMS body to contain %q, got: %s", check, body)
+		}
+	}
+}
+
 // ── BuildSenders config tests ───────────────────────────────────────────────
 
 func TestBuildSenders_SMSEnabled(t *testing.T) {

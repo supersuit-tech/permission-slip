@@ -53,6 +53,7 @@ For the full protocol design, architecture, and security model, see [SPEC.md](SP
 - **Self-hostable** — run your own instance for full control
 - **Single binary deployment** — Go server with embedded React frontend
 - **Audit trail** — every request, approval, and execution is logged
+- **OAuth 2.0 connections** — connect Google, Microsoft, or custom OAuth providers; tokens encrypted in vault with automatic background refresh before expiry
 - **User preferences** — per-channel notification settings, contact info, and credential vault management
 
 ## Agent Compatibility
@@ -109,6 +110,7 @@ Permission Slip requires agents that can **(1) make HTTP requests to arbitrary U
 - **[OpenAPI Spec](spec/openapi/)** — machine-readable API definition
 - **[Architecture](docs/architecture.md)** — system diagrams and component overview
 - **[Agent Integration Guide](docs/agents.md)** — how to integrate an autonomous agent with Permission Slip
+- **[Creating Connectors](docs/creating-connectors.md)** — guide to building new built-in connectors (GitHub, Slack, Google, MySQL as references)
 - **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
 - **[Community Connectors](docs/community-connectors.md)** — directory of third-party connectors built by the community
 - **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
@@ -257,6 +259,8 @@ Beyond the variables in `.env.example`, these require attention for production:
 | `POSTHOG_HOST` | Optional | PostHog API host added to CSP `connect-src` — must match `VITE_POSTHOG_HOST` (runtime) |
 | `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
 | `AUDIT_PURGE_INTERVAL` | Optional | How often expired audit events are purged — Go duration format, minimum `1m` (default: `1h`) |
+| `OAUTH_REFRESH_INTERVAL` | Optional | How often the background job checks for expiring OAuth tokens — Go duration format, minimum `1m` (default: `10m`). Tokens within 15 minutes of expiry are proactively refreshed. |
+| `CARD_EXPIRY_CHECK_INTERVAL` | Optional | How often the background job checks for expiring payment methods — Go duration format, minimum `1h` (default: `24h`). Sends one-time email/SMS/push alerts for cards expiring within 30 days. |
 | `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
 | `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
 | `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |

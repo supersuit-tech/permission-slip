@@ -1,6 +1,8 @@
 # Creating Connectors and Actions
 
-This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub and Slack connectors as reference implementations.
+This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
+
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub), OAuth 2.0 (Google), custom auth (Slack), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -8,7 +10,7 @@ For architectural context, see [ADR-009: Connector Execution Architecture](adr/0
 
 ## Overview
 
-A **connector** represents an integration with an external service (e.g., GitHub, Slack, Jira). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
+A **connector** represents an integration with an external service or database (e.g., GitHub, Slack, PostgreSQL). A connector owns shared configuration like HTTP clients, base URLs, and authentication helpers.
 
 An **action** is a single operation within a connector (e.g., `github.create_issue`, `slack.send_message`). Each action has its own file, parameter struct, validation, and `Execute` method.
 
@@ -23,7 +25,7 @@ Connector (shared state: HTTP client, base URL, auth)
 
 - **In-process Go**: Connectors compile into the binary. No plugins, sidecars, or external processes.
 - **One action per file**: Adding an action means adding one file + one line of registration.
-- **Plain `net/http`**: No third-party SDKs. Keeps the dependency footprint minimal.
+- **Plain `net/http` or `database/sql`**: HTTP connectors (GitHub, Slack) use plain net/http. Database connectors (MySQL) use database/sql with parameterized queries. No third-party SDKs beyond drivers.
 - **Typed errors**: Actions return specific error types that map to HTTP status codes.
 - **Credentials at execution time**: Decrypted from the vault only when an action runs, never cached.
 
@@ -340,12 +342,70 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 | Manifest Field | DB Table | Purpose |
 |----------------|----------|---------|
 | Top-level fields | `connectors` | One row per connector (id, name, description) |
-| `actions[]` | `connector_actions` | One row per action (action_type, risk_level, optional parameters_schema) |
-| `required_credentials[]` | `connector_required_credentials` | What credentials this connector needs (service, auth_type, instructions_url) |
+| `actions[]` | `connector_actions` | One row per action (action_type, risk_level, optional parameters_schema, requires_payment_method) |
+| `required_credentials[]` | `connector_required_credentials` | What credentials this connector needs (service, auth_type, instructions_url, oauth_provider, oauth_scopes) |
 
-**Auth types:** `api_key`, `basic`, `custom`
+**Auth types:** `api_key`, `basic`, `custom`, `oauth2`
+
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+
+```go
+// Example: OAuth2 credential in a manifest
+RequiredCredentials: []connectors.ManifestCredential{
+    {
+        Service:       "google",
+        AuthType:      "oauth2",
+        OAuthProvider: "google",
+        OAuthScopes:   []string{"https://www.googleapis.com/auth/gmail.send"},
+    },
+},
+```
+
+#### Declaring custom OAuth providers
+
+External connectors that use OAuth providers not built into the platform (anything other than `google` or `microsoft`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+
+```go
+OAuthProviders: []connectors.ManifestOAuthProvider{
+    {
+        ID:           "salesforce",
+        AuthorizeURL: "https://login.salesforce.com/services/oauth2/authorize",
+        TokenURL:     "https://login.salesforce.com/services/oauth2/token",
+        Scopes:       []string{"api", "refresh_token"},
+    },
+},
+```
+
+Requirements:
+- `authorize_url` and `token_url` must use HTTPS
+- Provider IDs must be unique within the manifest and must be lowercase alphanumeric with hyphens/underscores (1-63 chars)
+- Any `oauth_provider` referenced in `required_credentials` must either be a built-in provider or declared in `oauth_providers`
+
+**How it works at runtime:** On startup, the platform builds an OAuth Provider Registry (`oauth.Registry`). Built-in providers (Google, Microsoft) are registered first with endpoints and default scopes. Then, providers declared in connector manifests are merged in. The registry uses a priority system (BYOA > Manifest > BuiltIn) so that user-provided "bring your own app" credentials overlay the platform's built-in configuration. When a BYOA user registers credentials for a provider, only their client ID and secret are required — endpoints and scopes are inherited from the built-in or manifest definition.
 
 **Risk levels:** `low`, `medium`, `high`
+
+#### Payment-requiring actions
+
+If an action involves a financial transaction (e.g., booking, purchasing), set `RequiresPaymentMethod: true` in the manifest action:
+
+```go
+{
+    ActionType:            "travel.book_flight",
+    Name:                  "Book Flight",
+    Description:           "Book a flight itinerary",
+    RiskLevel:             "high",
+    RequiresPaymentMethod: true,
+    ParametersSchema:      json.RawMessage(`{...}`),
+},
+```
+
+When this flag is set:
+- The API layer requires `payment_method_id` and `amount_cents` in the execute request
+- Per-transaction and monthly spending limits are enforced before execution
+- `req.Payment` is populated with a `*PaymentInfo` containing the Stripe token and card metadata
+- The action implementation can use `req.Payment` to pass billing details to the external service
+- A transaction record is created after successful execution for monthly spend tracking
 
 ### Step 5: Register in main.go
 
@@ -361,6 +421,7 @@ import (
 registry := connectors.NewRegistry()
 registry.Register(ghconnector.New())
 registry.Register(slack.New())
+registry.Register(amadeus.New())
 registry.Register(jiraconnector.New())  // ← add this
 ```
 
@@ -720,7 +781,7 @@ Use this checklist when adding a new connector or action.
 - [ ] Define params struct with `validate()` method
 - [ ] Implement `Execute` following the parse → validate → call → return pattern
 - [ ] Register in connector's `Actions()` map
-- [ ] Add action to connector's `Manifest()` return value with `ParametersSchema`
+- [ ] Add action to connector's `Manifest()` return value with `ParametersSchema` (and `RequiresPaymentMethod: true` if applicable)
 - [ ] Write tests: `connectors/<connector>/<action_name>_test.go`
 - [ ] Update connector-level test's expected action list
 - [ ] Run `make test-backend` — all tests pass
@@ -754,6 +815,16 @@ type ActionRequest struct {
 	ActionType  string          // e.g., "github.create_issue"
 	Parameters  json.RawMessage // validated against schema before reaching here
 	Credentials Credentials     // decrypted at execution time; redacted in logs and JSON
+	Payment     *PaymentInfo    // non-nil when the action requires a payment method
+}
+
+// PaymentInfo is set when the action declares RequiresPaymentMethod: true.
+// Raw card data is never included — only the Stripe token and safe metadata.
+type PaymentInfo struct {
+	StripePaymentMethodID string // Stripe payment method token (e.g. "pm_...")
+	Brand                 string // card brand (e.g. "visa")
+	Last4                 string // last 4 digits of the card
+	AmountCents           int    // authorized transaction amount in cents
 }
 
 type ActionResult struct {
@@ -770,6 +841,21 @@ type ActionResult struct {
 | `*ExternalError` | 502 | External service returned a non-success response |
 | `*RateLimitError` | 429 | External service rate-limited the request (include `RetryAfter`) |
 | `*TimeoutError` | 504 | External service didn't respond in time |
+| `*OAuthRefreshError` | 401 | OAuth token refresh failed — user must re-authorize the provider |
+| `*PaymentError` | 400/403 | Payment method missing, not found, or limit exceeded (see codes below) |
+
+**Payment error codes** (`PaymentError.Code`):
+
+| Code | HTTP Status | Meaning |
+|------|-------------|---------|
+| `PaymentErrMissing` | 400 | `payment_method_id` not provided for an action that requires payment |
+| `PaymentErrNotFound` | 400 | Payment method does not exist or doesn't belong to the user |
+| `PaymentErrAmountRequired` | 400 | `amount_cents` is required but not provided |
+| `PaymentErrInvalidAmount` | 400 | `amount_cents` is negative or otherwise invalid |
+| `PaymentErrPerTxLimit` | 403 | Amount exceeds the payment method's per-transaction limit |
+| `PaymentErrMonthlyLimit` | 403 | Amount would exceed the payment method's monthly spending limit |
+
+Limit errors (`PaymentErrPerTxLimit`, `PaymentErrMonthlyLimit`) include a `Details` map with structured information (e.g., `limit`, `current_spend`, `requested_amount`) to help agents display actionable messages.
 
 ### Helper functions (`connectors/helpers.go`)
 
@@ -804,12 +890,13 @@ CREATE TABLE connectors (
 
 -- One row per action
 CREATE TABLE connector_actions (
-    connector_id      text NOT NULL REFERENCES connectors(id),
-    action_type       text NOT NULL,         -- "github.create_issue"
-    name              text NOT NULL,         -- "Create Issue"
-    description       text,
-    risk_level        text,                  -- 'low' | 'medium' | 'high'
-    parameters_schema jsonb,                 -- optional JSON Schema
+    connector_id              text NOT NULL REFERENCES connectors(id),
+    action_type               text NOT NULL,         -- "github.create_issue"
+    name                      text NOT NULL,         -- "Create Issue"
+    description               text,
+    risk_level                text,                  -- 'low' | 'medium' | 'high'
+    parameters_schema         jsonb,                 -- optional JSON Schema
+    requires_payment_method   boolean NOT NULL DEFAULT false,
     PRIMARY KEY (connector_id, action_type)
 );
 
@@ -817,8 +904,10 @@ CREATE TABLE connector_actions (
 CREATE TABLE connector_required_credentials (
     connector_id    text NOT NULL REFERENCES connectors(id),
     service         text NOT NULL,              -- credential service identifier
-    auth_type       text NOT NULL,              -- 'api_key' | 'basic' | 'custom'
+    auth_type       text NOT NULL,              -- 'api_key' | 'basic' | 'custom' | 'oauth2'
     instructions_url text,                      -- optional URL for credential setup docs
+    oauth_provider  text,                       -- required when auth_type = 'oauth2'
+    oauth_scopes    text[] DEFAULT '{}',        -- OAuth scopes when auth_type = 'oauth2'
     PRIMARY KEY (connector_id, service)
 );
 ```
@@ -853,11 +942,52 @@ connectors/
 │   ├── github_test.go        # Connector-level tests
 │   ├── create_issue_test.go  # Action tests
 │   └── merge_pr_test.go      # Action tests
-└── slack/
-    ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
-    ├── send_message.go       # slack.send_message action
-    ├── create_channel.go     # slack.create_channel action
-    └── ...tests...
+├── mysql/
+│   ├── mysql.go              # MySQLConnector struct, New(), Manifest(), openConn(), shared helpers
+│   ├── query.go              # mysql.query action (read-only, parameterized SELECT)
+│   ├── insert.go             # mysql.insert action (parameterized INSERT with batch limits)
+│   ├── update.go             # mysql.update action (parameterized UPDATE, WHERE required)
+│   ├── delete.go             # mysql.delete action (parameterized DELETE, WHERE required)
+│   ├── helpers_test.go       # validCreds(), newTestConnector() with sqlmock
+│   ├── mysql_test.go         # Connector-level tests
+│   └── *_test.go             # Per-action tests
+├── google/
+│   ├── google.go             # GoogleConnector struct, New(), Manifest(), doJSON(), OAuth2 auth
+│   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
+│   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
+│   ├── create_calendar_event.go  # google.create_calendar_event action
+│   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
+│   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
+│   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
+│   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
+│   └── ...tests...
+├── slack/
+│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
+│   ├── send_message.go       # slack.send_message action
+│   ├── create_channel.go     # slack.create_channel action
+│   └── ...tests...
+├── shopify/
+│   ├── shopify.go            # ShopifyConnector struct, New(), do(), dynamic base URL from shop_domain
+│   ├── manifest.go           # Manifest() with 6 action schemas and 7 templates
+│   ├── response.go           # HTTP status → typed error mapping (handles 3 Shopify error formats)
+│   ├── get_orders.go         # shopify.get_orders — list/filter orders with query params
+│   ├── get_order.go          # shopify.get_order — single order by ID
+│   ├── update_order.go       # shopify.update_order — partial update via PUT
+│   ├── create_product.go     # shopify.create_product — create with optional variants
+│   ├── update_inventory.go   # shopify.update_inventory — relative inventory adjustment
+│   ├── create_discount.go    # shopify.create_discount — two-step: price rule → discount code
+│   ├── README.md             # Connector documentation
+│   ├── helpers_test.go       # validCreds() test helper
+│   └── *_test.go             # Per-action + connector + response tests
+└── expedia/
+    ├── expedia.go            # ExpediaConnector struct, New(), SHA-512 signature auth, do()
+    ├── manifest.go           # Manifest() with 6 action schemas and templates
+    ├── response.go           # HTTP status → typed error mapping
+    ├── README.md             # Connector documentation
+    ├── helpers_test.go       # validCreds() test helper
+    ├── expedia_test.go       # Connector and do() lifecycle tests
+    └── response_test.go      # checkResponse() error mapping tests
 ```
 
 ### Execution flow
@@ -865,8 +995,13 @@ connectors/
 ```
 Agent request → API validates auth → Registry.GetAction(actionType)
   → Decrypt credentials from Vault → connector.ValidateCredentials()
-  → action.Execute(ctx, ActionRequest{...}) → External API call
-  → ActionResult or typed error → HTTP response to agent
+  → If requires_payment_method: validate payment method + check limits
+  → action.Execute(ctx, ActionRequest{Payment: &PaymentInfo{...}})
+  → External API call → ActionResult or typed error
+  → If success + payment: record transaction against monthly spend
+  → HTTP response to agent
 ```
 
-The API layer handles credential decryption, validation orchestration, and error-to-HTTP mapping. Action implementations only need to focus on calling the external API and returning results or typed errors.
+The API layer handles credential decryption, validation orchestration, payment method resolution, and error-to-HTTP mapping. Action implementations only need to focus on calling the external API and returning results or typed errors.
+
+**Payment flow details:** When an action declares `RequiresPaymentMethod: true`, the execution layer validates the payment method and checks per-transaction and monthly limits *before* calling `Execute`. The `Payment` field on `ActionRequest` is populated only for payment-requiring actions. Transactions are recorded *after* successful execution to avoid charging users for failed actions.

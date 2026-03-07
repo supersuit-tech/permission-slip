@@ -44,6 +44,9 @@ const (
 	NotificationTypeApproval NotificationType = ""
 	// NotificationTypePaymentFailed is sent when a subscription payment fails.
 	NotificationTypePaymentFailed NotificationType = "payment_failed"
+	// NotificationTypeCardExpiring is sent when a stored payment method is
+	// expiring soon (within 30 days) or already expired.
+	NotificationTypeCardExpiring NotificationType = "card_expiring"
 )
 
 // Approval holds the fields a notification channel needs to construct its

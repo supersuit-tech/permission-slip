@@ -87,6 +87,24 @@ export const mockAuditEvents: MockAuditEvent[] = [
   },
 ];
 
+/** Payment method charged event fixture for testing payment-specific rendering. */
+export const mockPaymentChargedEvent: MockAuditEvent = {
+  event_type: "payment_method.charged",
+  timestamp: "2026-02-20T11:45:00Z",
+  agent_id: 1,
+  agent_metadata: { name: "Travel Bot" },
+  action: {
+    type: "expedia.create_booking",
+    payment_method_id: "pm_test123",
+    brand: "visa",
+    last4: "4242",
+    amount_cents: 15000,
+    currency: "usd",
+    description: "Hotel booking — 2 nights",
+  },
+  outcome: "charged",
+};
+
 export const mockAuditEventsResponse: MockAuditResponse = {
   data: mockAuditEvents,
   has_more: true,

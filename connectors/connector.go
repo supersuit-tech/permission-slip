@@ -39,6 +39,17 @@ type ActionRequest struct {
 	ActionType  string          // e.g., "github.create_issue"
 	Parameters  json.RawMessage // validated against schema before reaching here
 	Credentials Credentials     // decrypted at execution time; redacted in logs and JSON
+	Payment     *PaymentInfo    // non-nil when the action requires a payment method
+}
+
+// PaymentInfo contains the resolved payment method details passed to connectors
+// that declare requires_payment_method: true. Raw card data is never included —
+// only the Stripe payment method token and safe display metadata.
+type PaymentInfo struct {
+	StripePaymentMethodID string // Stripe payment method token (e.g. "pm_...")
+	Brand                 string // card brand (e.g. "visa")
+	Last4                 string // last 4 digits of the card
+	AmountCents           int    // authorized transaction amount in cents
 }
 
 // ActionResult is returned from a successful execution.
