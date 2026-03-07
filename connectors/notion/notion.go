@@ -1,0 +1,211 @@
+// Package notion implements the Notion connector for the Permission Slip
+// connector execution layer. It uses the Notion API with plain net/http
+// (no third-party SDK) and internal integration tokens (API key auth).
+package notion
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+const (
+	defaultBaseURL = "https://api.notion.com/v1"
+	defaultTimeout = 30 * time.Second
+	credKeyToken   = "api_key"
+	notionVersion  = "2022-06-28"
+
+	// defaultRetryAfter is used when the Notion API returns a rate limit
+	// response without a Retry-After header (or an unparseable one).
+	defaultRetryAfter = 30 * time.Second
+)
+
+// NotionConnector owns the shared HTTP client and base URL used by all
+// Notion actions. Actions hold a pointer back to the connector to access
+// these shared resources.
+type NotionConnector struct {
+	client  *http.Client
+	baseURL string
+}
+
+// New creates a NotionConnector with sensible defaults (30s timeout,
+// https://api.notion.com/v1 base URL).
+func New() *NotionConnector {
+	return &NotionConnector{
+		client:  &http.Client{Timeout: defaultTimeout},
+		baseURL: defaultBaseURL,
+	}
+}
+
+// newForTest creates a NotionConnector that points at a test server.
+func newForTest(client *http.Client, baseURL string) *NotionConnector {
+	return &NotionConnector{
+		client:  client,
+		baseURL: baseURL,
+	}
+}
+
+// ID returns "notion", matching the connectors.id in the database.
+func (c *NotionConnector) ID() string { return "notion" }
+
+// Manifest returns the connector's metadata manifest. Used by the server to
+// auto-seed DB rows on startup. Actions are stubbed here for Phase 1;
+// full parameter schemas will be added in Phase 3.
+func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
+	return &connectors.ConnectorManifest{
+		ID:          "notion",
+		Name:        "Notion",
+		Description: "Notion integration for pages, databases, and content management",
+		Actions:     []connectors.ManifestAction{},
+		RequiredCredentials: []connectors.ManifestCredential{
+			{Service: "notion", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
+		},
+	}
+}
+
+// Actions returns the registered action handlers keyed by action_type.
+// Phase 1 returns an empty map; actions are added in Phase 2.
+func (c *NotionConnector) Actions() map[string]connectors.Action {
+	return map[string]connectors.Action{}
+}
+
+// ValidateCredentials checks that the provided credentials contain a
+// non-empty api_key (Notion internal integration token).
+func (c *NotionConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	}
+	return nil
+}
+
+// notionErrorResponse is the error envelope returned by the Notion API.
+// Example: {"object": "error", "status": 401, "code": "unauthorized", "message": "API token is invalid."}
+type notionErrorResponse struct {
+	Object  string `json:"object"`
+	Status  int    `json:"status"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// do is the shared request lifecycle for all Notion actions. It marshals
+// body as JSON (if non-nil), sends a request with the given HTTP method to
+// the specified path with auth and versioning headers, handles rate limiting
+// and timeouts, and unmarshals the response into dest.
+func (c *NotionConnector) do(ctx context.Context, httpMethod, path string, creds connectors.Credentials, body any, dest any) error {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	}
+
+	var bodyReader io.Reader
+	if body != nil {
+		payload, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("marshaling request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, httpMethod, c.baseURL+path, bodyReader)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Notion-Version", notionVersion)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("Notion API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Notion API request canceled"}
+		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Notion API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	// Notion returns 429 for rate limiting with a Retry-After header.
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
+		return &connectors.RateLimitError{
+			Message:    "Notion API rate limit exceeded",
+			RetryAfter: retryAfter,
+		}
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	// Check for Notion error responses (non-2xx).
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return mapNotionHTTPError(resp.StatusCode, respBody)
+	}
+
+	if err := json.Unmarshal(respBody, dest); err != nil {
+		return &connectors.ExternalError{
+			StatusCode: resp.StatusCode,
+			Message:    "failed to decode Notion API response",
+		}
+	}
+
+	return nil
+}
+
+// mapNotionHTTPError converts a non-2xx Notion API response to the
+// appropriate connector error type.
+func mapNotionHTTPError(statusCode int, body []byte) error {
+	var notionErr notionErrorResponse
+	if err := json.Unmarshal(body, &notionErr); err != nil {
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("Notion API error (status %d): unable to parse error response", statusCode),
+		}
+	}
+
+	return mapNotionError(statusCode, notionErr.Code, notionErr.Message)
+}
+
+// mapNotionError converts a Notion error code and status to the appropriate
+// connector error type. Notion error codes:
+// - unauthorized: invalid or expired token
+// - restricted_resource: token lacks access to the resource
+// - object_not_found: resource doesn't exist or token can't access it
+// - validation_error: malformed request
+// - rate_limited: too many requests
+// - conflict_error: transaction conflict
+// - internal_server_error: Notion server error
+// - service_unavailable: Notion is down
+func mapNotionError(statusCode int, code, message string) error {
+	detail := fmt.Sprintf("Notion API error: %s — %s", code, message)
+
+	switch code {
+	case "unauthorized":
+		return &connectors.AuthError{Message: detail}
+	case "restricted_resource", "object_not_found":
+		// These can indicate permission issues (token not shared with resource).
+		return &connectors.AuthError{Message: detail}
+	case "validation_error":
+		return &connectors.ValidationError{Message: detail}
+	case "rate_limited":
+		return &connectors.RateLimitError{Message: detail, RetryAfter: defaultRetryAfter}
+	default:
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    detail,
+		}
+	}
+}
