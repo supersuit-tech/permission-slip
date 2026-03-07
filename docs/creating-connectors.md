@@ -957,6 +957,10 @@ connectors/
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
+│   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
+│   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
+│   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
