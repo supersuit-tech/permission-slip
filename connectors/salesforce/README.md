@@ -19,6 +19,16 @@ The credential `auth_type` is `oauth2` with provider `salesforce`. The platform 
 
 All API requests use Bearer token authentication: `Authorization: Bearer {access_token}`.
 
+### Instance URL Validation
+
+The `instance_url` is validated at multiple points to prevent SSRF attacks:
+
+1. **At storage time:** `extractTokenExtraData` in the OAuth callback validates that instance_url is a well-formed HTTPS URL before persisting it.
+2. **At credential validation time:** `ValidateCredentials` verifies the URL uses HTTPS and points to a `*.salesforce.com` or `*.force.com` domain.
+3. **At execution time:** `apiBaseURL` re-validates the URL before constructing API endpoints.
+
+The `access_token` credential is always sourced from the vault and set after merging extra_data, ensuring that extra_data fields cannot overwrite security-critical credentials.
+
 ## Actions
 
 | Action Type | Name | Risk | Description |

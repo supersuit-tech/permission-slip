@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -12,13 +13,13 @@ import (
 func TestAddNote_Success(t *testing.T) {
 	t.Parallel()
 
-	calls := 0
+	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 
-		calls++
+		calls.Add(1)
 		switch r.URL.Path {
 		case "/services/data/v62.0/sobjects/ContentNote/":
 			var body map[string]string
@@ -89,8 +90,8 @@ func TestAddNote_Success(t *testing.T) {
 	if data["success"] != true {
 		t.Errorf("expected success true, got %v", data["success"])
 	}
-	if calls != 2 {
-		t.Errorf("expected 2 API calls (ContentNote + ContentDocumentLink), got %d", calls)
+	if got := calls.Load(); got != 2 {
+		t.Errorf("expected 2 API calls (ContentNote + ContentDocumentLink), got %d", got)
 	}
 }
 

@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -75,7 +77,8 @@ func (c *SalesforceConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that access_token and instance_url are present.
+// ValidateCredentials checks that access_token and instance_url are present
+// and that instance_url points to a valid Salesforce domain over HTTPS.
 func (c *SalesforceConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	token, ok := creds.Get(credKeyAccessToken)
 	if !ok || token == "" {
@@ -84,6 +87,11 @@ func (c *SalesforceConnector) ValidateCredentials(_ context.Context, creds conne
 	instanceURL, ok := creds.Get(credKeyInstanceURL)
 	if !ok || instanceURL == "" {
 		return &connectors.ValidationError{Message: "missing required credential: instance_url"}
+	}
+	if c.baseURLOverride == "" {
+		if err := validateInstanceURL(instanceURL); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -98,7 +106,31 @@ func (c *SalesforceConnector) apiBaseURL(creds connectors.Credentials) (string, 
 	if !ok || instanceURL == "" {
 		return "", &connectors.ValidationError{Message: "instance_url credential is missing or empty"}
 	}
+	if err := validateInstanceURL(instanceURL); err != nil {
+		return "", err
+	}
 	return instanceURL + "/services/data/" + apiVersion, nil
+}
+
+// validateInstanceURL ensures the Salesforce instance URL is a valid HTTPS URL
+// pointing to a *.salesforce.com or *.force.com domain. This prevents SSRF
+// attacks where a tampered instance_url could redirect API calls to an
+// attacker-controlled server.
+func validateInstanceURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return &connectors.ValidationError{Message: fmt.Sprintf("instance_url is not a valid URL: %v", err)}
+	}
+	if u.Scheme != "https" {
+		return &connectors.ValidationError{Message: "instance_url must use HTTPS"}
+	}
+	host := strings.ToLower(u.Hostname())
+	if !strings.HasSuffix(host, ".salesforce.com") && !strings.HasSuffix(host, ".force.com") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("instance_url host %q is not a valid Salesforce domain (must end in .salesforce.com or .force.com)", host),
+		}
+	}
+	return nil
 }
 
 // recordURL builds a user-facing Salesforce URL for a record. Returns empty

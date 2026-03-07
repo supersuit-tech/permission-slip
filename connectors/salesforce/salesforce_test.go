@@ -77,6 +77,21 @@ func TestSalesforceConnector_ValidateCredentials(t *testing.T) {
 			creds:   connectors.Credentials{},
 			wantErr: true,
 		},
+		{
+			name:    "http instance_url rejected",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "tok", "instance_url": "http://myorg.salesforce.com"}),
+			wantErr: true,
+		},
+		{
+			name:    "non-salesforce domain rejected",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "tok", "instance_url": "https://evil.example.com"}),
+			wantErr: true,
+		},
+		{
+			name:    "valid force.com domain",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "tok", "instance_url": "https://myorg.my.force.com"}),
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -310,6 +325,36 @@ func TestValidateRecordID(t *testing.T) {
 			err := validateRecordID(tt.id, "test_field")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateRecordID(%q) error = %v, wantErr %v", tt.id, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateInstanceURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		url     string
+		wantErr bool
+	}{
+		{"https://myorg.salesforce.com", false},
+		{"https://myorg.my.salesforce.com", false},
+		{"https://myorg.my.force.com", false},
+		{"https://na1.salesforce.com", false},
+		{"http://myorg.salesforce.com", true},           // not HTTPS
+		{"https://evil.example.com", true},               // wrong domain
+		{"https://salesforce.com.evil.com", true},         // subdomain trick
+		{"ftp://myorg.salesforce.com", true},              // wrong scheme
+		{"not-a-url", true},                               // invalid URL
+		{"https://", true},                                // no host
+		{"https://evil.com/salesforce.com", true},         // path, not host
+	}
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			t.Parallel()
+			err := validateInstanceURL(tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateInstanceURL(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
 			}
 		})
 	}

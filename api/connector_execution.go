@@ -324,9 +324,7 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 		return zero, fmt.Errorf("read access token from vault: %w", err)
 	}
 
-	creds := map[string]string{
-		"access_token": string(accessTokenBytes),
-	}
+	creds := map[string]string{}
 
 	// Merge provider-specific extra data (e.g. instance_url) into credentials
 	// so connectors can access them alongside the access token.
@@ -338,6 +336,10 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 			}
 		}
 	}
+
+	// Set access_token AFTER merging extra_data so that a tampered extra_data
+	// field cannot overwrite the vault-sourced access token.
+	creds["access_token"] = string(accessTokenBytes)
 
 	return connectors.NewCredentials(creds), nil
 }
