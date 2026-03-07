@@ -76,6 +76,25 @@ func TestGetProduct_MissingItemID(t *testing.T) {
 	}
 }
 
+func TestGetProduct_NonNumericItemID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["walmart.get_product"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "walmart.get_product",
+		Parameters:  json.RawMessage(`{"item_id":"abc-123"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestGetProduct_NotFound(t *testing.T) {
 	t.Parallel()
 

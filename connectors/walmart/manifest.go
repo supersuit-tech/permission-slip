@@ -68,6 +68,7 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
+							"pattern": "^\\d+$",
 							"description": "The Walmart item ID (numeric, e.g. \"12345678\")"
 						}
 					},

@@ -6,9 +6,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// itemIDPattern validates that Walmart item IDs contain only digits.
+// Walmart item IDs are numeric (e.g. "12345678"). Rejecting non-numeric
+// input prevents path injection even before url.PathEscape.
+var itemIDPattern = regexp.MustCompile(`^\d+$`)
 
 // getProductAction implements connectors.Action for walmart.get_product.
 // It fetches product details via GET /items/{id}.
@@ -24,6 +30,9 @@ type getProductParams struct {
 func (p *getProductParams) validate() error {
 	if p.ItemID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: item_id (e.g. \"12345678\")"}
+	}
+	if !itemIDPattern.MatchString(p.ItemID) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("item_id must be numeric, got %q", p.ItemID)}
 	}
 	if len(p.ItemID) > 20 {
 		return &connectors.ValidationError{Message: fmt.Sprintf("item_id exceeds 20 characters (got %d)", len(p.ItemID))}

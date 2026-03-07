@@ -158,6 +158,28 @@ func TestDo_DefaultKeyVersion(t *testing.T) {
 	}
 }
 
+func TestDo_ContextCanceled(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{}`))
+	})
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err := conn.do(ctx, validCreds(), http.MethodGet, "/test", nil)
+	if err == nil {
+		t.Fatal("do() expected error with canceled context, got nil")
+	}
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("expected TimeoutError, got %T: %v", err, err)
+	}
+}
+
 func TestManifest_Valid(t *testing.T) {
 	t.Parallel()
 	c := New()
