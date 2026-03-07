@@ -37,7 +37,7 @@ func TestCreateCalendarEvent_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createCalendarEventAction{conn: conn}
 
 	params, _ := json.Marshal(createCalendarEventParams{
@@ -87,7 +87,7 @@ func TestCreateCalendarEvent_WithAttendees(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createCalendarEventAction{conn: conn}
 
 	params, _ := json.Marshal(createCalendarEventParams{
@@ -242,7 +242,7 @@ func TestCreateCalendarEvent_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createCalendarEventAction{conn: conn}
 
 	params, _ := json.Marshal(createCalendarEventParams{
@@ -282,7 +282,7 @@ func TestCreateCalendarEvent_CalendarIDURLEncoded(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createCalendarEventAction{conn: conn}
 
 	params, _ := json.Marshal(createCalendarEventParams{

@@ -36,6 +36,20 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("MICROSOFT_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "zoom",
+			AuthorizeURL: "https://zoom.us/oauth/authorize",
+			TokenURL:     "https://zoom.us/oauth/token",
+			Scopes: []string{
+				"meeting:read",
+				"meeting:write",
+				"recording:read",
+				"user:read",
+			},
+			ClientID:     os.Getenv("ZOOM_CLIENT_ID"),
+			ClientSecret: os.Getenv("ZOOM_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 

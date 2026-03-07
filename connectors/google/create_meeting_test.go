@@ -53,7 +53,7 @@ func TestCreateMeeting_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createMeetingAction{conn: conn}
 
 	params, _ := json.Marshal(createMeetingParams{
@@ -100,7 +100,7 @@ func TestCreateMeeting_NoConferenceData(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createMeetingAction{conn: conn}
 
 	params, _ := json.Marshal(createMeetingParams{
@@ -237,7 +237,7 @@ func TestCreateMeeting_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL)
+	conn := newForTest(srv.Client(), "", srv.URL, "")
 	action := &createMeetingAction{conn: conn}
 
 	params, _ := json.Marshal(createMeetingParams{
