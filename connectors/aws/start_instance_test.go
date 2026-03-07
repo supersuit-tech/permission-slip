@@ -80,6 +80,7 @@ func TestStartInstance_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "aws.start_instance",
 				Parameters:  json.RawMessage(tt.params),
@@ -112,6 +113,7 @@ func TestStopInstance_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "aws.stop_instance",
 				Parameters:  json.RawMessage(tt.params),
@@ -144,6 +146,7 @@ func TestRestartInstance_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "aws.restart_instance",
 				Parameters:  json.RawMessage(tt.params),

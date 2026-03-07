@@ -165,18 +165,3 @@ func executeWithProxy(t *testing.T, srv *httptest.Server, conn *AWSConnector, ac
 	})
 }
 
-// testTransport redirects requests to a test server URL.
-type testTransport struct {
-	inner   http.RoundTripper
-	testURL string
-}
-
-func (t *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Redirect to test server.
-	testReq := req.Clone(req.Context())
-	testReq.URL, _ = testReq.URL.Parse(t.testURL + req.URL.Path)
-	if req.URL.RawQuery != "" {
-		testReq.URL.RawQuery = req.URL.RawQuery
-	}
-	return t.inner.RoundTrip(testReq)
-}

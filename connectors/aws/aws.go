@@ -384,7 +384,9 @@ func (c *AWSConnector) do(ctx context.Context, creds connectors.Credentials, met
 	if err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+	}
 
 	// Sign the request with AWS Signature V4.
 	if err := c.signV4(req, creds, body); err != nil {

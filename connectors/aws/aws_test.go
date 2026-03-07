@@ -87,6 +87,7 @@ func TestAWSConnector_ValidateCredentials(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := c.ValidateCredentials(t.Context(), tt.creds)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateCredentials() error = %v, wantErr %v", err, tt.wantErr)
@@ -195,6 +196,7 @@ func TestParseServiceHost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
+			t.Parallel()
 			service, region := parseServiceHost(tt.host)
 			if service != tt.wantService {
 				t.Errorf("service = %q, want %q", service, tt.wantService)
