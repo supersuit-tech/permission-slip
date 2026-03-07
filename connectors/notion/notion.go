@@ -17,6 +17,33 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+// validatable is implemented by all action parameter structs. It enables the
+// shared parseParams helper to unmarshal and validate in one call.
+type validatable interface {
+	validate() error
+}
+
+// parseParams unmarshals JSON parameters and validates them. Every Execute()
+// method uses this to reduce boilerplate.
+func parseParams(data json.RawMessage, dest validatable) error {
+	if err := json.Unmarshal(data, dest); err != nil {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	return dest.validate()
+}
+
+// applyPagination sets page_size and start_cursor on the request body.
+// A zero page_size defaults to 100.
+func applyPagination(body map[string]any, pageSize int, startCursor string) {
+	if pageSize == 0 {
+		pageSize = 100
+	}
+	body["page_size"] = pageSize
+	if startCursor != "" {
+		body["start_cursor"] = startCursor
+	}
+}
+
 // validateNotionID checks that an ID is safe to embed in a URL path.
 // It rejects IDs containing path traversal sequences or URL-unsafe characters.
 func validateNotionID(id, fieldName string) error {

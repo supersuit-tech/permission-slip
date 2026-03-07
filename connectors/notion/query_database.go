@@ -37,10 +37,7 @@ func (p *queryDatabaseParams) validate() error {
 // Execute queries a Notion database and returns the matching pages.
 func (a *queryDatabaseAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params queryDatabaseParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseParams(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
@@ -59,14 +56,7 @@ func (a *queryDatabaseAction) Execute(ctx context.Context, req connectors.Action
 		}
 		body["sorts"] = sorts
 	}
-	if params.StartCursor != "" {
-		body["start_cursor"] = params.StartCursor
-	}
-	pageSize := params.PageSize
-	if pageSize == 0 {
-		pageSize = 100
-	}
-	body["page_size"] = pageSize
+	applyPagination(body, params.PageSize, params.StartCursor)
 
 	var resp map[string]any
 	if err := a.conn.do(ctx, http.MethodPost, "/v1/databases/"+params.DatabaseID+"/query", req.Credentials, body, &resp); err != nil {

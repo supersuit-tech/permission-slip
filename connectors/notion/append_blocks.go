@@ -35,10 +35,7 @@ func (p *appendBlocksParams) validate() error {
 // Execute appends blocks to a Notion page and returns the appended block metadata.
 func (a *appendBlocksAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params appendBlocksParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseParams(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 

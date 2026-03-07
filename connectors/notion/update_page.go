@@ -35,10 +35,7 @@ func (p *updatePageParams) validate() error {
 // Execute updates a Notion page and returns the updated page metadata.
 func (a *updatePageAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params updatePageParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseParams(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 

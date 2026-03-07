@@ -36,10 +36,7 @@ func (p *searchParams) validate() error {
 // Execute searches Notion and returns matching pages and databases.
 func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params searchParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseParams(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
@@ -53,14 +50,7 @@ func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest
 		}
 		body["filter"] = filter
 	}
-	if params.StartCursor != "" {
-		body["start_cursor"] = params.StartCursor
-	}
-	pageSize := params.PageSize
-	if pageSize == 0 {
-		pageSize = 100
-	}
-	body["page_size"] = pageSize
+	applyPagination(body, params.PageSize, params.StartCursor)
 
 	var resp map[string]any
 	if err := a.conn.do(ctx, http.MethodPost, "/v1/search", req.Credentials, body, &resp); err != nil {

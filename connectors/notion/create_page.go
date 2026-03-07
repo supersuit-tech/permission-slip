@@ -36,10 +36,7 @@ func (p *createPageParams) validate() error {
 // Execute creates a page in Notion and returns the created page metadata.
 func (a *createPageAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createPageParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseParams(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
