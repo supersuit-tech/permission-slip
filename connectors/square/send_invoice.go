@@ -2,6 +2,8 @@ package square
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -91,6 +93,11 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
+	// Derive a stable base idempotency key from the request parameters so
+	// retries of the same send_invoice call reuse the same keys across all
+	// three steps, preventing duplicate orders/invoices on partial failures.
+	baseKey := deriveBaseKey(req.ActionType, req.Parameters)
+
 	// Build line items for the order (invoices require an order).
 	orderLineItems := make([]map[string]interface{}, len(params.LineItems))
 	for i, item := range params.LineItems {
@@ -103,7 +110,7 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	// Step 1: Create an order for the invoice line items.
 	orderBody := map[string]interface{}{
-		"idempotency_key": newIdempotencyKey(),
+		"idempotency_key": baseKey + "-order",
 		"order": map[string]interface{}{
 			"location_id": params.LocationID,
 			"customer_id": params.CustomerID,
@@ -152,7 +159,7 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	createBody := map[string]interface{}{
-		"idempotency_key": newIdempotencyKey(),
+		"idempotency_key": baseKey + "-invoice",
 		"invoice":         invoice,
 	}
 
@@ -169,7 +176,7 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	// Step 3: Publish the invoice to send it to the customer.
 	publishBody := map[string]interface{}{
-		"idempotency_key": newIdempotencyKey(),
+		"idempotency_key": baseKey + "-publish",
 		"version":         createResp.Invoice.Version,
 	}
 

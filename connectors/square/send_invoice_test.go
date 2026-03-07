@@ -28,9 +28,16 @@ func TestSendInvoice_Success(t *testing.T) {
 			t.Error("missing idempotency_key in request body")
 		}
 
+		// Verify deterministic keys have correct step suffixes.
+		var key string
+		json.Unmarshal(reqBody["idempotency_key"], &key)
+
 		callCount++
 		switch {
 		case r.URL.Path == "/orders":
+			if !strings.HasSuffix(key, "-order") {
+				t.Errorf("order idempotency_key should end with -order, got %q", key)
+			}
 			// Step 1: Create order
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]any{
@@ -41,6 +48,9 @@ func TestSendInvoice_Success(t *testing.T) {
 			})
 
 		case r.URL.Path == "/invoices":
+			if !strings.HasSuffix(key, "-invoice") {
+				t.Errorf("invoice idempotency_key should end with -invoice, got %q", key)
+			}
 			// Step 2: Create invoice
 			var invoice map[string]json.RawMessage
 			json.Unmarshal(reqBody["invoice"], &invoice)
@@ -61,6 +71,9 @@ func TestSendInvoice_Success(t *testing.T) {
 			})
 
 		case strings.HasPrefix(r.URL.Path, "/invoices/") && strings.HasSuffix(r.URL.Path, "/publish"):
+			if !strings.HasSuffix(key, "-publish") {
+				t.Errorf("publish idempotency_key should end with -publish, got %q", key)
+			}
 			// Step 3: Publish invoice
 			expectedPath := "/invoices/INV123/publish"
 			if r.URL.Path != expectedPath {

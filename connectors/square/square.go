@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -124,6 +126,18 @@ func newIdempotencyKey() string {
 	buf[8] = (buf[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		buf[0:4], buf[4:6], buf[6:8], buf[8:10], buf[10:16])
+}
+
+// deriveBaseKey computes a deterministic idempotency key base from the
+// action type and raw parameters. Multi-step actions (like send_invoice)
+// append a step suffix (e.g. "-order", "-invoice") to produce per-step
+// keys that are stable across retries of the same request.
+func deriveBaseKey(actionType string, parameters json.RawMessage) string {
+	h := sha256.New()
+	h.Write([]byte(actionType))
+	h.Write([]byte{0}) // separator
+	h.Write(parameters)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // do is the shared request lifecycle for all Square actions. It marshals
