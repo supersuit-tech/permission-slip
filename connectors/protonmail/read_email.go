@@ -93,6 +93,10 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 
 	bodySection := &imap.FetchItemBodySection{
 		Peek: true, // don't mark as read
+		// Limit the download at the IMAP protocol level to avoid pulling
+		// multi-MB attachments into memory. We request maxBodySize+1 so
+		// parseBody can detect truncation.
+		Partial: &imap.SectionPartial{Offset: 0, Size: int64(maxBodySize) + 1},
 	}
 
 	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
