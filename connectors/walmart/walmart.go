@@ -203,3 +203,13 @@ func signRequest(consumerID, timestamp, keyVersion, pemData string) (string, err
 
 	return base64.StdEncoding.EncodeToString(sig), nil
 }
+
+// Actions returns the registered action handlers keyed by action_type.
+func (c *WalmartConnector) Actions() map[string]connectors.Action {
+	return map[string]connectors.Action{
+		"walmart.search_products": &searchProductsAction{conn: c},
+		"walmart.get_product":     &getProductAction{conn: c},
+		"walmart.get_taxonomy":    &getTaxonomyAction{conn: c},
+		"walmart.get_trending":    &getTrendingAction{conn: c},
+	}
+}
