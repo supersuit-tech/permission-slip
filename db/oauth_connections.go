@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -28,6 +29,7 @@ type OAuthConnection struct {
 	Scopes               []string
 	TokenExpiry          *time.Time
 	Status               string
+	ExtraData            json.RawMessage // provider-specific data (e.g. Salesforce instance_url)
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
@@ -41,6 +43,7 @@ type CreateOAuthConnectionParams struct {
 	RefreshTokenVaultID  *string
 	Scopes               []string
 	TokenExpiry          *time.Time
+	ExtraData            json.RawMessage // optional provider-specific data
 }
 
 // OAuthConnectionError represents a domain-specific error from OAuth connection operations.
@@ -61,14 +64,14 @@ const (
 
 // oauthConnectionColumns is the shared SELECT column list for oauth_connections queries.
 const oauthConnectionColumns = `id, user_id, provider, access_token_vault_id, refresh_token_vault_id,
-		       scopes, token_expiry, status, created_at, updated_at`
+		       scopes, token_expiry, status, extra_data, created_at, updated_at`
 
 // scanOAuthConnection scans an OAuthConnection from a row scanner (pgx.Row or pgx.Rows).
 func scanOAuthConnection(scan func(dest ...any) error) (OAuthConnection, error) {
 	var c OAuthConnection
 	err := scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
 		&c.RefreshTokenVaultID, &c.Scopes, &c.TokenExpiry, &c.Status,
-		&c.CreatedAt, &c.UpdatedAt)
+		&c.ExtraData, &c.CreatedAt, &c.UpdatedAt)
 	return c, err
 }
 
@@ -120,10 +123,10 @@ func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider
 // the (user_id, provider) unique constraint is violated.
 func CreateOAuthConnection(ctx context.Context, db DBTX, p CreateOAuthConnectionParams) (*OAuthConnection, error) {
 	row := db.QueryRow(ctx, `
-		INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, refresh_token_vault_id, scopes, token_expiry)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, refresh_token_vault_id, scopes, token_expiry, extra_data)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING `+oauthConnectionColumns,
-		p.ID, p.UserID, p.Provider, p.AccessTokenVaultID, p.RefreshTokenVaultID, p.Scopes, p.TokenExpiry,
+		p.ID, p.UserID, p.Provider, p.AccessTokenVaultID, p.RefreshTokenVaultID, p.Scopes, p.TokenExpiry, p.ExtraData,
 	)
 	c, err := scanOAuthConnection(row.Scan)
 	if err != nil {

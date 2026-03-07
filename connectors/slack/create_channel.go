@@ -2,8 +2,6 @@ package slack
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -41,10 +39,7 @@ type channelInfo struct {
 // Execute creates a Slack channel and returns the channel metadata.
 func (a *createChannelAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createChannelParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	if err := parseAndValidate(req.Parameters, &params); err != nil {
 		return nil, err
 	}
 
