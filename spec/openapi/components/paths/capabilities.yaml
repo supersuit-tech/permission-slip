@@ -103,6 +103,8 @@ agentCapabilities:
                 summary: Agent with multiple connectors, mixed readiness
                 value:
                   agent_id: 42
+                  approver:
+                    username: "alice"
                   connectors:
                     - id: "gmail"
                       name: "Gmail"
@@ -217,12 +219,16 @@ agentCapabilities:
                 summary: Agent with no enabled connectors
                 value:
                   agent_id: 43
+                  approver:
+                    username: "bob"
                   connectors: []
 
               standing_approval_only:
                 summary: Single connector, all actions with standing approvals
                 value:
                   agent_id: 44
+                  approver:
+                    username: "carol"
                   connectors:
                     - id: "gmail"
                       name: "Gmail"

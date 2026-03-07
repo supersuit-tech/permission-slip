@@ -13,11 +13,11 @@ Poll a GitHub Pull Request for all comments (general and inline review comments)
 
 Extract the PR number from the provided URL: `$ARGUMENTS`
 
-Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permission-slip-web/pull/123` → `123`).
+Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permission-slip/pull/123` → `123`).
 
 Set these variables for the session:
 - `PR_NUMBER` — the extracted PR number
-- `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh`
+- `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 
 ## Pre-Poll: Merge from Main
 
@@ -42,13 +42,13 @@ Fetch **all** comments and reviews using all three endpoints (PR reviews, review
 
 ```bash
 # PR reviews (top-level review submissions — approve, request changes, comment)
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh api "/repos/supersuit-tech/permission-slip-web/pulls/${PR_NUMBER}/reviews?per_page=100"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}/reviews?per_page=100"
 
 # Review comments (inline on diffs)
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh api "/repos/supersuit-tech/permission-slip-web/pulls/${PR_NUMBER}/comments?per_page=100"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}/comments?per_page=100"
 
 # Issue-level comments (general PR conversation)
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh api "/repos/supersuit-tech/permission-slip-web/issues/${PR_NUMBER}/comments?per_page=100"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments?per_page=100"
 ```
 
 Handle pagination if there are more than 100 results per endpoint.
@@ -119,7 +119,7 @@ For each new comment or review:
 After addressing a review comment, **resolve the conversation** using the GitHub GraphQL API:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh api graphql -f query='
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api graphql -f query='
 mutation {
   resolveReviewThread(input: {threadId: "THREAD_NODE_ID"}) {
     thread {
@@ -132,9 +132,9 @@ mutation {
 To get the thread node ID, use the `node_id` field from the review comment, or query for PR review threads:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh api graphql -f query='
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api graphql -f query='
 query {
-  repository(owner: "supersuit-tech", name: "permission-slip-web") {
+  repository(owner: "supersuit-tech", name: "permission-slip") {
     pullRequest(number: PR_NUMBER) {
       reviewThreads(first: 100) {
         nodes {
@@ -185,7 +185,7 @@ If any cycle finds new comments, reviews, merge conflicts that needed resolution
 When stopping due to the idle timeout, post a comment on the PR summarizing the entire watch session. Use the following command:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh api "/repos/supersuit-tech/permission-slip-web/issues/${PR_NUMBER}/comments" -f body="<comment body>"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments" -f body="<comment body>"
 ```
 
 The comment must include these sections:
@@ -249,7 +249,7 @@ CI is manual-only, so after posting the wrap-up comment, **trigger CI once** aga
 #### a) Trigger the CI workflow
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh workflow run ci.yml --ref "$(git branch --show-current)"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run ci.yml --ref "$(git branch --show-current)"
 ```
 
 #### b) Wait for the run to appear and complete
@@ -258,7 +258,7 @@ Poll until the run triggered above finishes. First, wait ~5 seconds for the run 
 
 ```bash
 # Find the most recent run on this branch
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run list --workflow=ci.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run list --workflow=ci.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
 ```
 
 Poll every 30 seconds until `status` is `completed`.
@@ -271,7 +271,7 @@ If `conclusion` is `failure`:
 
 1. Fetch the failed run's logs:
    ```bash
-   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh run view <run-id> --log-failed
+   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run view <run-id> --log-failed
    ```
 2. **Read the failure logs** to understand what went wrong.
 3. **Reproduce locally** by running the relevant commands (`make test-backend`, `make test-frontend`, `make build`).

@@ -18,6 +18,8 @@ type executeActionRequest struct {
 	RequestID       string      `json:"request_id"`
 	ConfigurationID string      `json:"configuration_id"`
 	Action          *actionBody `json:"action"`
+	PaymentMethodID string      `json:"payment_method_id,omitempty"`
+	AmountCents     *int        `json:"amount_cents,omitempty"`
 }
 
 type actionBody struct {
@@ -179,7 +181,10 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 
 	// ── Execute the action via connector ─────────────────────────
 
-	result, execErr := executeConnectorAction(r.Context(), deps, exec.UserID, req.Action.Type, params)
+	result, execErr := executeConnectorAction(r.Context(), deps, exec.UserID, req.Action.Type, params, &paymentParams{
+		PaymentMethodID: req.PaymentMethodID,
+		AmountCents:     req.AmountCents,
+	})
 
 	// Always emit the audit event with the actual execution result,
 	// regardless of success or failure (best-effort).

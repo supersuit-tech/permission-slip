@@ -25,6 +25,14 @@ const (
 	ErrInviteLocked   ErrorCode = "invite_locked"
 )
 
+// ── Shared types ────────────────────────────────────────────────────────────
+
+// approverInfo identifies the user (approver) an agent is registered to.
+// Exposed in agent-facing responses so the agent knows who it's working with.
+type approverInfo struct {
+	Username string `json:"username"`
+}
+
 // ── Request / Response types ────────────────────────────────────────────────
 
 type registerAgentRequest struct {
@@ -34,9 +42,10 @@ type registerAgentRequest struct {
 }
 
 type registerAgentResponse struct {
-	AgentID              int64      `json:"agent_id"`
-	ExpiresAt            *time.Time `json:"expires_at,omitempty"`
-	VerificationRequired bool       `json:"verification_required"`
+	AgentID              int64         `json:"agent_id"`
+	ExpiresAt            *time.Time    `json:"expires_at,omitempty"`
+	VerificationRequired bool          `json:"verification_required"`
+	Approver             *approverInfo `json:"approver,omitempty"`
 }
 
 type verifyRegistrationRequest struct {
@@ -45,8 +54,9 @@ type verifyRegistrationRequest struct {
 }
 
 type verifyRegistrationResponse struct {
-	Status       string     `json:"status"`
-	RegisteredAt *time.Time `json:"registered_at,omitempty"`
+	Status       string        `json:"status"`
+	RegisteredAt *time.Time    `json:"registered_at,omitempty"`
+	Approver     *approverInfo `json:"approver,omitempty"`
 }
 
 // ── Route registration ──────────────────────────────────────────────────────
@@ -241,11 +251,22 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		RespondJSON(w, http.StatusOK, registerAgentResponse{
+		resp := registerAgentResponse{
 			AgentID:              agent.AgentID,
 			ExpiresAt:            agent.ExpiresAt,
 			VerificationRequired: true,
-		})
+		}
+
+		// Look up the approver's profile to include their username.
+		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, invite.UserID)
+		if err != nil {
+			log.Printf("[%s] RegisterAgent: lookup approver profile: %v", TraceID(r.Context()), err)
+			// Non-fatal: registration succeeded, just omit the approver info.
+		} else if profile != nil {
+			resp.Approver = &approverInfo{Username: profile.Username}
+		}
+
+		RespondJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -357,9 +378,19 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 			log.Printf("[%s] VerifyRegistration: audit event: %v", TraceID(r.Context()), err)
 		}
 
-		RespondJSON(w, http.StatusOK, verifyRegistrationResponse{
+		resp := verifyRegistrationResponse{
 			Status:       "registered",
 			RegisteredAt: registered.RegisteredAt,
-		})
+		}
+
+		// Look up the approver's profile to include their username.
+		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, registered.ApproverID)
+		if err != nil {
+			log.Printf("[%s] VerifyRegistration: lookup approver profile: %v", TraceID(r.Context()), err)
+		} else if profile != nil {
+			resp.Approver = &approverInfo{Username: profile.Username}
+		}
+
+		RespondJSON(w, http.StatusOK, resp)
 	}
 }

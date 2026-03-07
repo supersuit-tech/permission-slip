@@ -428,6 +428,196 @@ func TestListAuditEvents(t *testing.T) {
 	})
 }
 
+func TestPaymentMethodChargedAuditEvent(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("InsertAndList", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		actionJSON := []byte(`{"type":"expedia.create_booking","payment_method_id":"pm_test123","brand":"visa","last4":"4242","amount_cents":15000,"currency":"usd"}`)
+		connectorID := "expedia"
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:      uid,
+			AgentID:     agentID,
+			EventType:   db.AuditEventPaymentMethodCharged,
+			Outcome:     db.OutcomeCharged,
+			SourceID:    testhelper.GenerateID(t, "pmtx_"),
+			SourceType:  db.SourceTypePaymentMethodTx,
+			AgentMeta:   []byte(`{"name":"travel-agent"}`),
+			Action:      actionJSON,
+			ConnectorID: &connectorID,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		e := page.Events[0]
+		if e.EventType != db.AuditEventPaymentMethodCharged {
+			t.Errorf("expected payment_method.charged, got %s", e.EventType)
+		}
+		if e.Outcome != db.OutcomeCharged {
+			t.Errorf("expected outcome charged, got %q", e.Outcome)
+		}
+		if e.ConnectorID == nil || *e.ConnectorID != "expedia" {
+			t.Errorf("expected connector_id=expedia, got %v", e.ConnectorID)
+		}
+	})
+
+	t.Run("ActionContainsSafeMetadataOnly", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		actionJSON := []byte(`{"type":"expedia.create_booking","payment_method_id":"pm_abc","brand":"mastercard","last4":"5678","amount_cents":9900,"currency":"usd"}`)
+		connectorID := "expedia"
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:      uid,
+			AgentID:     agentID,
+			EventType:   db.AuditEventPaymentMethodCharged,
+			Outcome:     db.OutcomeCharged,
+			SourceID:    testhelper.GenerateID(t, "pmtx_"),
+			SourceType:  db.SourceTypePaymentMethodTx,
+			AgentMeta:   []byte(`{"name":"test"}`),
+			Action:      actionJSON,
+			ConnectorID: &connectorID,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+
+		var action map[string]json.RawMessage
+		if err := json.Unmarshal(page.Events[0].Action, &action); err != nil {
+			t.Fatalf("failed to parse action JSON: %v", err)
+		}
+
+		// Verify safe fields are present.
+		requiredFields := []string{"type", "payment_method_id", "brand", "last4", "amount_cents", "currency"}
+		for _, field := range requiredFields {
+			if _, ok := action[field]; !ok {
+				t.Errorf("action missing required field %q", field)
+			}
+		}
+
+		// Verify no sensitive fields are present.
+		sensitiveFields := []string{"card_number", "cvv", "expiry", "full_number"}
+		for _, field := range sensitiveFields {
+			if _, ok := action[field]; ok {
+				t.Errorf("action must not contain sensitive field %q", field)
+			}
+		}
+	})
+
+	t.Run("FilterByEventType", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		connectorID := "expedia"
+		// Insert a payment event and an approval event.
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID,
+			string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
+			testhelper.GenerateID(t, "pmtx_"), &connectorID)
+		testhelper.InsertAuditEvent(t, tx, uid, agentID,
+			"approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"))
+
+		filter := &db.AuditEventFilter{
+			EventTypes: []db.AuditEventType{db.AuditEventPaymentMethodCharged},
+		}
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 payment event, got %d", len(page.Events))
+		}
+		if page.Events[0].EventType != db.AuditEventPaymentMethodCharged {
+			t.Errorf("expected payment_method.charged, got %s", page.Events[0].EventType)
+		}
+	})
+
+	t.Run("FilterByChargedOutcome", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		connectorID := "expedia"
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID,
+			string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
+			testhelper.GenerateID(t, "pmtx_"), &connectorID)
+		testhelper.InsertAuditEvent(t, tx, uid, agentID,
+			"approval.approved", "approved",
+			testhelper.GenerateID(t, "appr_"))
+
+		filter := &db.AuditEventFilter{Outcome: db.OutcomeCharged}
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 charged event, got %d", len(page.Events))
+		}
+		if page.Events[0].Outcome != db.OutcomeCharged {
+			t.Errorf("expected outcome charged, got %q", page.Events[0].Outcome)
+		}
+	})
+
+	t.Run("ExportIncludesPaymentEvents", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		connectorID := "expedia"
+		testhelper.InsertAuditEventWithConnector(t, tx, uid, agentID,
+			string(db.AuditEventPaymentMethodCharged), db.OutcomeCharged,
+			testhelper.GenerateID(t, "pmtx_"), &connectorID)
+
+		since := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		eventTypes := []db.AuditEventType{db.AuditEventPaymentMethodCharged}
+		page, err := db.ExportAuditLogs(ctx, tx, uid, since, nil, eventTypes, nil, 100, nil, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 payment event in export, got %d", len(page.Events))
+		}
+		if page.Events[0].EventType != db.AuditEventPaymentMethodCharged {
+			t.Errorf("expected payment_method.charged, got %s", page.Events[0].EventType)
+		}
+		if page.Events[0].ID == 0 {
+			t.Error("export events should include ID")
+		}
+		if page.Events[0].SourceID == "" {
+			t.Error("export events should include source_id")
+		}
+	})
+}
+
 func TestExportAuditLogs(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

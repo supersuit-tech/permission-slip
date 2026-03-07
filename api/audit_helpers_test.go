@@ -2,12 +2,14 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
 
 func TestConnectorIDFromActionType(t *testing.T) {
@@ -160,6 +162,291 @@ func TestResolveExecResult(t *testing.T) {
 			t.Errorf("len(errMsg) = %d, want 512", len(*errMsg))
 		}
 	})
+}
+
+func TestRecordPaymentMethodUsage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("CreatesTransactionAndAuditEvent", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Create a payment method so the FK on payment_method_transactions is satisfied.
+		pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+			UserID:                uid,
+			StripePaymentMethodID: "pm_test_" + uid[:8],
+			Label:                 "Test Card",
+			Brand:                 "visa",
+			Last4:                 "4242",
+			ExpMonth:              12,
+			ExpYear:               2027,
+			IsDefault:             true,
+		})
+		if err != nil {
+			t.Fatalf("CreatePaymentMethod: %v", err)
+		}
+
+		RecordPaymentMethodUsage(ctx, tx, PaymentChargeParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			AgentMeta:       []byte(`{"name":"travel-agent"}`),
+			PaymentMethodID: pm.ID,
+			Brand:           "visa",
+			Last4:           "4242",
+			ConnectorID:     "expedia",
+			ActionType:      "expedia.create_booking",
+			AmountCents:     15000,
+			Currency:        "usd",
+			Description:     "Hotel booking",
+		})
+
+		// Verify the payment method transaction was created.
+		spend, err := db.GetMonthlySpend(ctx, tx, pm.ID)
+		if err != nil {
+			t.Fatalf("GetMonthlySpend: %v", err)
+		}
+		if spend != 15000 {
+			t.Errorf("expected 15000 monthly spend, got %d", spend)
+		}
+
+		// Verify the audit event was created.
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, &db.AuditEventFilter{
+			EventTypes: []db.AuditEventType{db.AuditEventPaymentMethodCharged},
+		}, 0)
+		if err != nil {
+			t.Fatalf("ListAuditEvents: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 audit event, got %d", len(page.Events))
+		}
+
+		e := page.Events[0]
+		if e.EventType != db.AuditEventPaymentMethodCharged {
+			t.Errorf("expected payment_method.charged, got %s", e.EventType)
+		}
+		if e.Outcome != db.OutcomeCharged {
+			t.Errorf("expected outcome charged, got %q", e.Outcome)
+		}
+		if e.ConnectorID == nil || *e.ConnectorID != "expedia" {
+			t.Errorf("expected connector_id=expedia, got %v", e.ConnectorID)
+		}
+
+		// Verify the action contains safe metadata and no raw card details.
+		var action map[string]json.RawMessage
+		if err := json.Unmarshal(e.Action, &action); err != nil {
+			t.Fatalf("failed to parse action JSON: %v", err)
+		}
+
+		requiredFields := []string{"type", "payment_method_id", "brand", "last4", "amount_cents", "currency", "description"}
+		for _, field := range requiredFields {
+			if _, ok := action[field]; !ok {
+				t.Errorf("action missing field %q", field)
+			}
+		}
+
+		// Verify the amount is correct in the action JSON.
+		var amountCents int
+		if err := json.Unmarshal(action["amount_cents"], &amountCents); err != nil {
+			t.Fatalf("failed to parse amount_cents: %v", err)
+		}
+		if amountCents != 15000 {
+			t.Errorf("expected amount_cents=15000, got %d", amountCents)
+		}
+
+		// Verify the description is included.
+		var desc string
+		if err := json.Unmarshal(action["description"], &desc); err != nil {
+			t.Fatalf("failed to parse description: %v", err)
+		}
+		if desc != "Hotel booking" {
+			t.Errorf("expected description=%q, got %q", "Hotel booking", desc)
+		}
+	})
+
+	t.Run("DefaultsCurrencyToUSD", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+			UserID:                uid,
+			StripePaymentMethodID: "pm_test2_" + uid[:8],
+			Label:                 "Test Card",
+			Brand:                 "mastercard",
+			Last4:                 "5678",
+			ExpMonth:              6,
+			ExpYear:               2028,
+		})
+		if err != nil {
+			t.Fatalf("CreatePaymentMethod: %v", err)
+		}
+
+		RecordPaymentMethodUsage(ctx, tx, PaymentChargeParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			AgentMeta:       []byte(`{"name":"test"}`),
+			PaymentMethodID: pm.ID,
+			Brand:           "mastercard",
+			Last4:           "5678",
+			ConnectorID:     "amazon",
+			ActionType:      "amazon.purchase",
+			AmountCents:     999,
+			Currency:        "", // should default to "usd"
+			Description:     "Purchase",
+		})
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("ListAuditEvents: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+
+		var action map[string]json.RawMessage
+		if err := json.Unmarshal(page.Events[0].Action, &action); err != nil {
+			t.Fatalf("failed to parse action JSON: %v", err)
+		}
+
+		var currency string
+		if err := json.Unmarshal(action["currency"], &currency); err != nil {
+			t.Fatalf("failed to parse currency: %v", err)
+		}
+		if currency != "usd" {
+			t.Errorf("expected currency=usd, got %q", currency)
+		}
+	})
+
+	t.Run("NeverLogsRawCardDetails", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+			UserID:                uid,
+			StripePaymentMethodID: "pm_test3_" + uid[:8],
+			Label:                 "Test Card",
+			Brand:                 "amex",
+			Last4:                 "0005",
+			ExpMonth:              3,
+			ExpYear:               2029,
+		})
+		if err != nil {
+			t.Fatalf("CreatePaymentMethod: %v", err)
+		}
+
+		RecordPaymentMethodUsage(ctx, tx, PaymentChargeParams{
+			UserID:          uid,
+			AgentID:         agentID,
+			AgentMeta:       []byte(`{"name":"test"}`),
+			PaymentMethodID: pm.ID,
+			Brand:           "amex",
+			Last4:           "0005",
+			ConnectorID:     "doordash",
+			ActionType:      "doordash.place_order",
+			AmountCents:     2500,
+			Currency:        "usd",
+			Description:     "Food delivery",
+		})
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("ListAuditEvents: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+
+		actionStr := string(page.Events[0].Action)
+		// Ensure no full card number patterns appear.
+		sensitivePatterns := []string{"card_number", "cvv", "full_number", "expiry"}
+		for _, pattern := range sensitivePatterns {
+			if strings.Contains(actionStr, pattern) {
+				t.Errorf("action JSON must not contain %q, got: %s", pattern, actionStr)
+			}
+		}
+
+		// Verify only safe fields: last4 and brand are present, not full card info.
+		var action map[string]json.RawMessage
+		if err := json.Unmarshal(page.Events[0].Action, &action); err != nil {
+			t.Fatalf("failed to parse action JSON: %v", err)
+		}
+		if _, ok := action["last4"]; !ok {
+			t.Error("expected last4 in action")
+		}
+		if _, ok := action["brand"]; !ok {
+			t.Error("expected brand in action")
+		}
+	})
+}
+
+func TestSanitiseLast4(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"4242", "4242"},
+		{"42", "42"},
+		{"", ""},
+		{"4242424242424242", "4242"}, // full card number → only last 4
+		{"12345", "2345"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := sanitiseLast4(tt.input); got != tt.want {
+				t.Errorf("sanitiseLast4(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRecordPaymentMethodUsageRejectsNegativeAmount(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	ctx := context.Background()
+
+	pm, err := db.CreatePaymentMethod(ctx, tx, &db.PaymentMethod{
+		UserID:                uid,
+		StripePaymentMethodID: "pm_neg_" + uid[:8],
+		Label:                 "Test Card",
+		Brand:                 "visa",
+		Last4:                 "9999",
+		ExpMonth:              12,
+		ExpYear:               2027,
+	})
+	if err != nil {
+		t.Fatalf("CreatePaymentMethod: %v", err)
+	}
+
+	// Negative amount should be rejected — no transaction or audit event created.
+	RecordPaymentMethodUsage(ctx, tx, PaymentChargeParams{
+		UserID:          uid,
+		AgentID:         agentID,
+		AgentMeta:       []byte(`{"name":"test"}`),
+		PaymentMethodID: pm.ID,
+		Brand:           "visa",
+		Last4:           "9999",
+		ConnectorID:     "test",
+		ActionType:      "test.action",
+		AmountCents:     -100,
+		Currency:        "usd",
+	})
+
+	page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+	if err != nil {
+		t.Fatalf("ListAuditEvents: %v", err)
+	}
+	if len(page.Events) != 0 {
+		t.Errorf("expected 0 audit events for negative amount, got %d", len(page.Events))
+	}
 }
 
 func strPtr(s string) *string { return &s }

@@ -276,7 +276,7 @@ describe("ActivityPage", () => {
     const select = screen.getByLabelText("Event Type");
     const options = within(select).getAllByRole("option");
     expect(options[0]).toHaveTextContent("All Types");
-    expect(options.length).toBe(7); // All + 6 event types
+    expect(options.length).toBe(8); // All + 7 event types
   });
 
   it("calls API with event_type filter when event type is selected", async () => {

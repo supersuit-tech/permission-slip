@@ -1,9 +1,5 @@
-/**
- * Format a dollar amount from cents (e.g. 271 → "$2.71").
- */
-export function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+// Re-export shared currency formatter so existing billing imports keep working.
+export { formatCents } from "@/lib/utils";
 
 /**
  * Validate that a URL is a safe HTTPS URL (not javascript:, data:, etc.).

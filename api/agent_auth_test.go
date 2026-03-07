@@ -275,6 +275,13 @@ func TestGetAgentMe_Success(t *testing.T) {
 	if resp.RegisteredAt == nil {
 		t.Error("expected registered_at to be set")
 	}
+	if resp.Approver == nil {
+		t.Fatal("expected approver to be set in /agents/me response")
+	}
+	expectedUsername := "u_" + uid[:8]
+	if resp.Approver.Username != expectedUsername {
+		t.Errorf("expected approver.username %q, got %q", expectedUsername, resp.Approver.Username)
+	}
 }
 
 func TestGetAgentMe_WithMetadata(t *testing.T) {

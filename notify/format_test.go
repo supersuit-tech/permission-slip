@@ -179,6 +179,85 @@ func TestTruncateUTF8_LimitFour(t *testing.T) {
 	}
 }
 
+// ── BuildPushContent — card expiring tests ──────────────────────────────────
+
+func TestBuildPushContent_CardExpiring(t *testing.T) {
+	t.Parallel()
+	a := Approval{
+		Type:        NotificationTypeCardExpiring,
+		Context:     json.RawMessage(`{"brand":"Visa","last4":"4242","exp_month":3,"exp_year":2026,"expired":false}`),
+		ApprovalURL: "https://app.example.com/settings?tab=billing",
+	}
+	c := BuildPushContent(a)
+	if c.Title != "Card Expiring Soon" {
+		t.Errorf("expected title 'Card Expiring Soon', got: %s", c.Title)
+	}
+	if !strings.Contains(c.Body, "Visa") || !strings.Contains(c.Body, "4242") {
+		t.Errorf("expected card details in body, got: %s", c.Body)
+	}
+}
+
+func TestBuildPushContent_CardExpired(t *testing.T) {
+	t.Parallel()
+	a := Approval{
+		Type:    NotificationTypeCardExpiring,
+		Context: json.RawMessage(`{"brand":"Amex","last4":"3333","exp_month":1,"exp_year":2024,"expired":true}`),
+	}
+	c := BuildPushContent(a)
+	if c.Title != "Card Expired" {
+		t.Errorf("expected title 'Card Expired', got: %s", c.Title)
+	}
+	if !strings.Contains(c.Body, "Amex") || !strings.Contains(c.Body, "3333") {
+		t.Errorf("expected card details in body, got: %s", c.Body)
+	}
+}
+
+// ── FormatBrand tests ────────────────────────────────────────────────────────
+
+func TestFormatBrand_KnownBrands(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"visa":       "Visa",
+		"mastercard": "Mastercard",
+		"amex":       "Amex",
+		"discover":   "Discover",
+		"jcb":        "JCB",
+		"unionpay":   "UnionPay",
+	}
+	for input, expected := range cases {
+		if got := FormatBrand(input); got != expected {
+			t.Errorf("FormatBrand(%q) = %q, want %q", input, got, expected)
+		}
+	}
+}
+
+func TestFormatBrand_UnknownBrand(t *testing.T) {
+	t.Parallel()
+	if got := FormatBrand("elo"); got != "elo" {
+		t.Errorf("expected unknown brand returned as-is, got: %q", got)
+	}
+}
+
+// ── CardExpiringInfo helpers ─────────────────────────────────────────────────
+
+func TestCardIdentifier_WithLabel(t *testing.T) {
+	t.Parallel()
+	info := CardExpiringInfo{Brand: "visa", Last4: "4242", Label: "Work Card"}
+	expected := "Work Card (Visa ending in 4242)"
+	if got := info.CardIdentifier(); got != expected {
+		t.Errorf("CardIdentifier() = %q, want %q", got, expected)
+	}
+}
+
+func TestCardIdentifier_WithoutLabel(t *testing.T) {
+	t.Parallel()
+	info := CardExpiringInfo{Brand: "mastercard", Last4: "5555"}
+	expected := "Mastercard ending in 5555"
+	if got := info.CardIdentifier(); got != expected {
+		t.Errorf("CardIdentifier() = %q, want %q", got, expected)
+	}
+}
+
 // ── AgentDisplayName tests ──────────────────────────────────────────────────
 
 func TestAgentDisplayName_WithName(t *testing.T) {
