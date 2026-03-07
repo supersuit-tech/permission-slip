@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -70,8 +71,32 @@ type FigmaConnector struct {
 // https://api.figma.com/v1 base URL).
 func New() *FigmaConnector {
 	return &FigmaConnector{
-		client:  &http.Client{Timeout: defaultTimeout},
+		client: &http.Client{
+			Timeout:       defaultTimeout,
+			CheckRedirect: safeRedirectPolicy(defaultBaseURL),
+		},
 		baseURL: defaultBaseURL,
+	}
+}
+
+// safeRedirectPolicy returns an http.Client CheckRedirect function that strips
+// the X-Figma-Token header when a redirect goes to a different host than the
+// base URL. This prevents credential leakage if the Figma API (or a
+// compromised intermediate) issues a cross-origin redirect.
+func safeRedirectPolicy(baseURL string) func(*http.Request, []*http.Request) error {
+	parsed, _ := url.Parse(baseURL)
+	allowedHost := ""
+	if parsed != nil {
+		allowedHost = parsed.Host
+	}
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if req.URL.Host != allowedHost {
+			req.Header.Del("X-Figma-Token")
+		}
+		return nil
 	}
 }
 
