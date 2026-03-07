@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
@@ -38,21 +39,25 @@ import (
 	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
 	metaconnector "github.com/supersuit-tech/permission-slip-web/connectors/meta"
 	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
+	quickbooksconnector "github.com/supersuit-tech/permission-slip-web/connectors/quickbooks"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
+	"github.com/supersuit-tech/permission-slip-web/connectors/netlify"
 	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	"github.com/supersuit-tech/permission-slip-web/connectors/pagerduty"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
 	"github.com/supersuit-tech/permission-slip-web/connectors/salesforce"
+	"github.com/supersuit-tech/permission-slip-web/connectors/sendgrid"
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	"github.com/supersuit-tech/permission-slip-web/connectors/trello"
 	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
+	vercelconnector "github.com/supersuit-tech/permission-slip-web/connectors/vercel"
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
@@ -364,8 +369,10 @@ func main() {
 	if v := os.Getenv("ENABLE_PROTONMAIL_CONNECTOR"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") {
 		registry.Register(protonmail.New())
 	}
+	registry.Register(quickbooksconnector.New())
 	registry.Register(redisconnector.New())
 	registry.Register(salesforce.New())
+	registry.Register(sendgrid.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
 	registry.Register(trello.New())
@@ -375,12 +382,15 @@ func main() {
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
 	registry.Register(docusign.New())
+	registry.Register(awsconnector.New())
 	registry.Register(discord.New())
 	registry.Register(datadog.New())
 	registry.Register(doordash.New())
 	registry.Register(expedia.New())
 	registry.Register(figma.New())
+	registry.Register(netlify.New())
 	registry.Register(pagerduty.New())
+	registry.Register(vercelconnector.New())
 	registry.Register(zoom.New())
 	registry.Register(zapier.New())
 	registry.Register(makeconnector.New())

@@ -30,6 +30,11 @@ func TestHubSpotConnector_Actions(t *testing.T) {
 		"hubspot.create_ticket",
 		"hubspot.add_note",
 		"hubspot.search",
+		"hubspot.list_deals",
+		"hubspot.update_deal_stage",
+		"hubspot.enroll_in_workflow",
+		"hubspot.create_email_campaign",
+		"hubspot.get_analytics",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -116,8 +121,8 @@ func TestHubSpotConnector_Manifest(t *testing.T) {
 		t.Error("credential instructions_url is empty, want a URL")
 	}
 
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 11 {
+		t.Fatalf("Manifest().Actions has %d items, want 11", len(m.Actions))
 	}
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v", err)
