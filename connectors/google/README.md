@@ -1,6 +1,6 @@
 # Google Connector
 
-The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), [Google Slides](https://developers.google.com/slides/api), and [Google Chat](https://developers.google.com/chat/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
+The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), [Google Slides](https://developers.google.com/slides/api), [Google Sheets](https://developers.google.com/sheets/api), [Google Docs](https://developers.google.com/docs/api), [Google Chat](https://developers.google.com/chat/api), and [Google Drive](https://developers.google.com/drive/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
 
 ## Connector ID
 
@@ -22,10 +22,13 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `gmail.readonly` | `google.list_emails` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
+| `spreadsheets` | `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
+| `documents` | `google.create_document`, `google.get_document`, `google.update_document` |
 | `chat.spaces.readonly` | `google.list_chat_spaces` |
 | `chat.messages.create` | `google.send_chat_message` |
+| `drive` | `google.list_drive_files`, `google.get_drive_file`, `google.upload_drive_file`, `google.delete_drive_file`, `google.list_documents` |
 
-Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management).
+Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management). The `drive` scope grants full Drive access; a narrower scope like `drive.file` would only allow access to files created by this app, which is too restrictive for file browsing and reading.
 
 ## Actions
 
@@ -258,6 +261,273 @@ The `batchUpdate` pattern is the standard Slides API approach for mutations and 
 
 ---
 
+### `google.sheets_read_range`
+
+Reads cell values from a specified range in a Google Sheets spreadsheet.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet to read from |
+| `range` | string | Yes | The A1 notation range to read (e.g., `Sheet1!A1:D10`) |
+
+**Response:**
+
+```json
+{
+  "range": "Sheet1!A1:D3",
+  "values": [
+    ["Name", "Age", "City"],
+    ["Alice", 30, "NYC"]
+  ]
+}
+```
+
+**Sheets API:** `GET /v4/spreadsheets/{id}/values/{range}` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/get))
+
+---
+
+### `google.sheets_write_range`
+
+Writes cell values to a specified range in a Google Sheets spreadsheet.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet to write to |
+| `range` | string | Yes | The A1 notation range to write (e.g., `Sheet1!A1:D3`) |
+| `values` | any[][] | Yes | 2D array of cell values to write (rows of columns) |
+
+**Response:**
+
+```json
+{
+  "updated_range": "Sheet1!A1:C2",
+  "updated_rows": 2,
+  "updated_columns": 3,
+  "updated_cells": 6
+}
+```
+
+**Sheets API:** `PUT /v4/spreadsheets/{id}/values/{range}?valueInputOption=USER_ENTERED` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/update))
+
+Values are interpreted as if the user typed them into the UI (`USER_ENTERED`), so formulas and number formats are applied automatically.
+
+---
+
+### `google.sheets_append_rows`
+
+Appends rows to a sheet or table in a Google Sheets spreadsheet.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet to append to |
+| `range` | string | Yes | The A1 notation of the range to search for a table to append to (e.g., `Sheet1`) |
+| `values` | any[][] | Yes | 2D array of row values to append (rows of columns) |
+
+**Response:**
+
+```json
+{
+  "updated_range": "Sheet1!A4:C5",
+  "updated_rows": 2,
+  "updated_columns": 3,
+  "updated_cells": 6
+}
+```
+
+**Sheets API:** `POST /v4/spreadsheets/{id}/values/{range}:append?valueInputOption=USER_ENTERED` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append))
+
+The Sheets API finds the last row with data in the specified range and appends rows after it.
+
+---
+
+### `google.sheets_list_sheets`
+
+Lists all worksheets (tabs) in a Google Sheets spreadsheet.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet |
+
+**Response:**
+
+```json
+{
+  "sheets": [
+    {
+      "sheet_id": 0,
+      "title": "Sheet1",
+      "index": 0,
+      "sheet_type": "GRID",
+      "row_count": 1000,
+      "column_count": 26
+    },
+    {
+      "sheet_id": 123456,
+      "title": "Data",
+      "index": 1,
+      "sheet_type": "GRID",
+      "row_count": 500,
+      "column_count": 10
+    }
+  ]
+}
+```
+
+**Sheets API:** `GET /v4/spreadsheets/{id}?fields=sheets.properties` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get))
+
+The response includes `row_count` and `column_count` from the sheet's grid properties, which can be used to determine sheet dimensions before read/write operations.
+
+---
+
+### `google.create_document`
+
+Creates a new Google Doc with a title and optional initial body content.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `title` | string | Yes | Title of the new Google Doc |
+| `body` | string | No | Optional initial body content (plain text) |
+
+**Response:**
+
+```json
+{
+  "document_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "title": "Meeting Notes",
+  "document_url": "https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/edit"
+}
+```
+
+**Docs API:** `POST /v1/documents` ([docs](https://developers.google.com/docs/api/reference/rest/v1/documents/create))
+
+**Implementation notes:**
+- Document creation and body insertion are two separate API calls. If the create succeeds but body insertion fails, the response includes a `warning` field with the error details and the document info (to avoid orphaning).
+- Document IDs are URL-encoded in all constructed URLs.
+
+---
+
+### `google.get_document`
+
+Retrieves the content and metadata of a Google Doc by document ID. Returns plain text content extracted from the Docs API structural content (paragraphs and text runs).
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `document_id` | string | Yes | The ID of the Google Doc (e.g., `1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms`) |
+
+**Response:**
+
+```json
+{
+  "document_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "title": "Meeting Notes",
+  "body_text": "Full plain text content of the document...",
+  "document_url": "https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/edit",
+  "word_count": 42
+}
+```
+
+**Docs API:** `GET /v1/documents/{documentId}` ([docs](https://developers.google.com/docs/api/reference/rest/v1/documents/get))
+
+**Implementation notes:**
+- The Google Docs API returns structural content (paragraphs, text runs, inline objects). This action extracts plain text only — formatting, images, tables, and other rich content are not preserved.
+- `word_count` is a whitespace-separated count of the extracted text.
+
+---
+
+### `google.update_document`
+
+Appends or inserts text into an existing Google Doc using the Docs API batchUpdate.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `document_id` | string | Yes | — | The ID of the Google Doc to update |
+| `text` | string | Yes | — | Text to insert into the document |
+| `index` | integer | No | end | Character index to insert at (1-based). Defaults to end of document. |
+
+**Response:**
+
+```json
+{
+  "document_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "status": "updated"
+}
+```
+
+**Docs API:** `POST /v1/documents/{documentId}:batchUpdate` ([docs](https://developers.google.com/docs/api/reference/rest/v1/documents/batchUpdate))
+
+**Validation:**
+- `index` must be >= 1 when provided (Google Docs uses 1-based indexing where index 1 is the start of the document body).
+- When `index` is omitted (or 0), text is appended to the end of the document using `endOfSegmentLocation`.
+
+---
+
+### `google.list_documents`
+
+Searches and lists Google Docs from Drive, filtered by the Google Docs MIME type.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `query` | string | No | — | Search query to filter documents by name |
+| `max_results` | integer | No | `10` | Maximum number of documents to return (1-100) |
+
+**Response:**
+
+```json
+{
+  "documents": [
+    {
+      "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+      "name": "Meeting Notes",
+      "created_time": "2024-01-15T09:00:00.000Z",
+      "modified_time": "2024-01-16T10:00:00.000Z",
+      "web_view_link": "https://docs.google.com/document/d/1Bxi.../edit"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Drive API:** `GET /drive/v3/files` ([docs](https://developers.google.com/drive/api/v3/reference/files/list))
+
+**Security notes:**
+- The `query` parameter is escaped (single quotes and backslashes) before being inserted into the Drive query string to prevent query injection.
+- Results are ordered by `modifiedTime desc` and capped at 100 items.
+- Trashed documents are automatically excluded.
+
+---
+
 ### `google.send_chat_message`
 
 Sends a message to a Google Chat space.
@@ -357,6 +627,155 @@ Creates a Google Calendar event with an auto-generated Google Meet conference li
 - The `meet_link` field is only present when Google successfully attaches conference data to the event.
 - Validation rules match `google.create_calendar_event` (RFC 3339 times, end after start).
 
+---
+
+### `google.list_drive_files`
+
+Lists or searches files in Google Drive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `query` | string | No | — | Google Drive search query (e.g., `name contains 'report'`) |
+| `max_results` | integer | No | `10` | Maximum number of files to return (1-100) |
+| `folder_id` | string | No | — | Folder ID to filter by (lists files within that folder) |
+| `order_by` | string | No | relevance | Sort order (e.g., `modifiedTime desc`, `name`) |
+
+**Response:**
+
+```json
+{
+  "files": [
+    {
+      "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+      "name": "Q4 Report",
+      "mime_type": "application/vnd.google-apps.document",
+      "modified_time": "2024-01-15T10:00:00.000Z",
+      "size": "",
+      "web_view_link": "https://docs.google.com/document/d/1Bxi.../edit"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Drive API:** `GET /drive/v3/files` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/list))
+
+Trashed files are automatically excluded. Google Workspace files (Docs, Sheets, Slides) have no `size` — they report an empty string.
+
+---
+
+### `google.get_drive_file`
+
+Gets file metadata and optionally downloads content from Google Drive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `file_id` | string | Yes | — | The ID of the file to retrieve |
+| `include_content` | boolean | No | `false` | Whether to include file content |
+
+**Response (metadata only):**
+
+```json
+{
+  "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "name": "Q4 Report",
+  "mime_type": "application/vnd.google-apps.document",
+  "modified_time": "2024-01-15T10:00:00.000Z",
+  "web_view_link": "https://docs.google.com/document/d/1Bxi.../edit"
+}
+```
+
+**Response (with content):**
+
+```json
+{
+  "id": "...",
+  "name": "Q4 Report",
+  "mime_type": "application/vnd.google-apps.document",
+  "content": "The full text content of the document..."
+}
+```
+
+**Drive API:** `GET /drive/v3/files/{id}` for metadata, `GET /drive/v3/files/{id}/export` for Workspace content, `GET /drive/v3/files/{id}?alt=media` for regular files ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/get))
+
+**Content export behavior:**
+- **Google Docs** → exported as `text/plain`
+- **Google Sheets** → exported as `text/csv`
+- **Google Slides** → exported as `text/plain`
+- **Text files** (text/\*, application/json, etc.) → downloaded directly
+- **Binary files** (images, PDFs, etc.) → content skipped, `content_skipped_reason` field explains why
+
+---
+
+### `google.upload_drive_file`
+
+Creates and uploads a text file to Google Drive.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `name` | string | Yes | — | File name |
+| `content` | string | Yes | — | File content (text, max 4 MB) |
+| `mime_type` | string | No | `text/plain` | MIME type of the file |
+| `folder_id` | string | No | — | Parent folder ID |
+
+**Response:**
+
+```json
+{
+  "id": "1newFileId123",
+  "name": "report.txt",
+  "web_view_link": "https://drive.google.com/file/d/1newFileId123/view"
+}
+```
+
+**Drive API:** `POST /upload/drive/v3/files?uploadType=multipart` ([docs](https://developers.google.com/drive/api/guides/manage-uploads#multipart))
+
+Uses multipart upload with JSON metadata in the first part and file content in the second. Content is capped at 4 MB to prevent oversized payloads.
+
+---
+
+### `google.delete_drive_file`
+
+Moves a file to trash in Google Drive (soft delete — not permanent).
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `file_id` | string | Yes | The ID of the file to move to trash |
+
+**Response:**
+
+```json
+{
+  "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "name": "old-report.txt",
+  "trashed": true
+}
+```
+
+**Drive API:** `PATCH /drive/v3/files/{id}` with `{trashed: true}` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/update))
+
+**Security notes:**
+- This is a **soft delete only** — files are moved to the Google Drive trash and can be recovered by the user. The permanent delete endpoint is intentionally not exposed.
+- File IDs are validated with an allowlist pattern (alphanumeric, hyphens, underscores) to prevent query injection and path traversal.
+
+---
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -387,30 +806,48 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Create presentations | `create_presentation` | Nothing — agent controls title |
 | View presentations | `get_presentation` | Nothing — agent controls presentation ID |
 | Add slides to presentations | `add_slide` | Nothing — agent controls all parameters |
+| Read from specific spreadsheet | `sheets_read_range` | `spreadsheet_id` locked; agent chooses range |
+| Write to specific spreadsheet | `sheets_write_range` | `spreadsheet_id` locked; agent chooses range and values |
+| Append to specific spreadsheet | `sheets_append_rows` | `spreadsheet_id` locked; agent chooses range and values |
+| Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
+| List worksheets in any spreadsheet | `sheets_list_sheets` | Nothing — agent controls spreadsheet |
+| Create documents | `create_document` | Nothing — agent controls title and body |
+| Create empty documents | `create_document` | `body` omitted — title only |
+| Read any document | `get_document` | Nothing — agent can read any doc by ID |
+| Edit any document | `update_document` | Nothing — agent controls all parameters |
+| Search documents | `list_documents` | Nothing — agent controls query and count |
 | Send chat messages | `send_chat_message` | Nothing — agent controls space and text |
 | Send message to specific space | `send_chat_message` | `space_name` locked to a placeholder; admin sets the real space |
 | List chat spaces | `list_chat_spaces` | Nothing — agent controls page size and filter |
 | Create meetings with Meet link | `create_meeting` | Nothing — agent controls all parameters |
 | Create personal meetings | `create_meeting` | `calendar_id` locked to `primary`, no attendees |
+| Browse Drive files | `list_drive_files` | Nothing — agent controls query, folder, and sort |
+| Read Drive files | `get_drive_file` | Nothing — agent can read metadata and content |
+| View Drive file metadata | `get_drive_file` | `include_content` locked to `false` (metadata only) |
+| Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, content, and destination |
+| Upload files to specific folder | `upload_drive_file` | `folder_id` locked to a specific folder |
+| Trash Drive files | `delete_drive_file` | Nothing — agent can trash any file |
 
 ## Adding a New Action
 
 Each action lives in its own file. To add one (e.g., `google.delete_calendar_event`):
 
 1. Create `connectors/google/delete_calendar_event.go` with a params struct, `validate()`, and an `Execute` method.
-2. Use `a.conn.doJSON(ctx, creds, method, url, reqBody, &resp)` for the HTTP lifecycle — it handles JSON marshaling, Bearer auth, rate limiting, response size limits, and timeout detection.
-3. Use `checkResponse()` (called automatically by `doJSON`) to map HTTP errors to typed connector errors.
+2. Use `a.conn.doJSON(ctx, creds, method, url, reqBody, &resp)` for JSON API calls — it handles marshaling, Bearer auth, rate limiting, response size limits, and timeout detection. For non-JSON responses (e.g., file downloads), use `a.conn.doRawGet()`.
+3. Use `checkResponse()` (called automatically by `doJSON` and `doRawGet`) to map HTTP errors to typed connector errors. Use `wrapHTTPError()` when making custom HTTP requests (e.g., multipart upload).
 4. Return `connectors.JSONResult(respBody)` to wrap the response into an `ActionResult`.
-5. Register the action in `Actions()` inside `google.go`.
-6. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
-7. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithSlides()` / `newForTestWithChat()`.
+5. Validate user-provided IDs (file IDs, folder IDs) with `isValidDriveID()` to prevent injection attacks.
+6. Register the action in `Actions()` inside `google.go`.
+7. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
+8. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithSlides()` / `newForTestWithChat()` / `newDriveForTest()` / `newForTestDocs()`.
 
 ## File Structure
 
 ```
 connectors/google/
-├── google.go                       # GoogleConnector struct, New(), doJSON(), ValidateCredentials()
-├── manifest.go                     # Manifest() — connector metadata, action schemas, templates
+├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
+├── manifest.go                     # Manifest() — actions, credentials, templates
+├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
@@ -419,10 +856,23 @@ connectors/google/
 ├── get_presentation.go             # google.get_presentation action
 ├── add_slide.go                    # google.add_slide action (via batchUpdate)
 ├── slides_helpers.go               # Shared helpers for Slides actions (presentationURL)
+├── sheets_read.go                  # google.sheets_read_range action
+├── sheets_write.go                 # google.sheets_write_range action
+├── sheets_append.go                # google.sheets_append_rows action
+├── sheets_list.go                  # google.sheets_list_sheets action
+├── sheets_helpers.go               # Shared validation helpers for Sheets actions
+├── create_document.go              # google.create_document action
+├── get_document.go                 # google.get_document action
+├── update_document.go              # google.update_document action
+├── list_documents.go               # google.list_documents action
 ├── send_chat_message.go            # google.send_chat_message action
 ├── list_chat_spaces.go             # google.list_chat_spaces action
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
 ├── calendar_helpers.go             # Shared calendar validation (time range, attendees)
+├── list_drive_files.go             # google.list_drive_files action + shared Drive ID validation
+├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
+├── upload_drive_file.go            # google.upload_drive_file action (multipart upload)
+├── delete_drive_file.go            # google.delete_drive_file action (soft delete via trash)
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
@@ -432,9 +882,22 @@ connectors/google/
 ├── create_presentation_test.go     # Create presentation tests
 ├── get_presentation_test.go        # Get presentation tests (including URL encoding)
 ├── add_slide_test.go               # Add slide tests (layout validation, insertion index)
+├── sheets_read_test.go             # Sheets read range tests
+├── sheets_write_test.go            # Sheets write range tests
+├── sheets_append_test.go           # Sheets append rows tests
+├── sheets_list_test.go             # Sheets list worksheets tests
+├── sheets_helpers_test.go          # Sheets validation helpers tests
+├── create_document_test.go         # Create document tests (including partial failure handling)
+├── get_document_test.go            # Get document tests (including plain text extraction)
+├── update_document_test.go         # Update document tests (append and insert-at-index)
+├── list_documents_test.go          # List documents tests (including query escaping)
 ├── send_chat_message_test.go       # Send chat message tests (including path traversal validation)
 ├── list_chat_spaces_test.go        # List chat spaces tests (including page size clamping)
 ├── create_meeting_test.go          # Create meeting tests (including Meet link extraction)
+├── list_drive_files_test.go        # List Drive files tests (including query injection prevention)
+├── get_drive_file_test.go          # Get Drive file tests (metadata, content export, binary skip)
+├── upload_drive_file_test.go       # Upload tests (multipart, size limit, folder targeting)
+├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
 └── README.md                       # This file
 ```
 

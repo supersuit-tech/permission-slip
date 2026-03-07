@@ -27,6 +27,18 @@ func TestGoogleConnector_Actions(t *testing.T) {
 		"google.create_presentation",
 		"google.get_presentation",
 		"google.add_slide",
+		"google.sheets_read_range",
+		"google.sheets_write_range",
+		"google.sheets_append_rows",
+		"google.sheets_list_sheets",
+		"google.create_document",
+		"google.get_document",
+		"google.update_document",
+		"google.list_documents",
+		"google.list_drive_files",
+		"google.get_drive_file",
+		"google.upload_drive_file",
+		"google.delete_drive_file",
 		"google.send_chat_message",
 		"google.list_chat_spaces",
 		"google.create_meeting",
@@ -97,8 +109,8 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 	if m.Name != "Google" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Google")
 	}
-	if len(m.Actions) != 10 {
-		t.Fatalf("Manifest().Actions has %d items, want 10", len(m.Actions))
+	if len(m.Actions) != 22 {
+		t.Fatalf("Manifest().Actions has %d items, want 22", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -112,6 +124,18 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 		"google.create_presentation",
 		"google.get_presentation",
 		"google.add_slide",
+		"google.sheets_read_range",
+		"google.sheets_write_range",
+		"google.sheets_append_rows",
+		"google.sheets_list_sheets",
+		"google.create_document",
+		"google.get_document",
+		"google.update_document",
+		"google.list_documents",
+		"google.list_drive_files",
+		"google.get_drive_file",
+		"google.upload_drive_file",
+		"google.delete_drive_file",
 		"google.send_chat_message",
 		"google.list_chat_spaces",
 		"google.create_meeting",
