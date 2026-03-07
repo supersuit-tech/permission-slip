@@ -23,6 +23,7 @@ const mockActions: ConnectorAction[] = [
     name: "Create Issue",
     description: "Create a new issue in a repository",
     risk_level: "low",
+    requires_payment_method: false,
     parameters_schema: {
       type: "object",
       required: ["repo", "title"],
@@ -38,6 +39,7 @@ const mockActions: ConnectorAction[] = [
     name: "Merge Pull Request",
     description: "Merge an open pull request",
     risk_level: "high",
+    requires_payment_method: false,
     parameters_schema: {
       type: "object",
       required: ["repo", "pr"],
