@@ -219,3 +219,53 @@ func TestCreateDocument_InvalidJSON(t *testing.T) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
+
+func TestCreateDocument_BodyInsertionFailure(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/documents" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(docsCreateResponse{
+				DocumentID: "doc-partial",
+				Title:      "Partial Doc",
+			})
+		} else if r.URL.Path == "/v1/documents/doc-partial:batchUpdate" {
+			// batchUpdate fails
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 500, "message": "Internal error"},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTestDocs(srv.Client(), srv.URL, "")
+	action := &createDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(createDocumentParams{
+		Title: "Partial Doc",
+		Body:  "some text",
+	})
+
+	// Should succeed with a warning, not error — the document was created.
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("expected no error (partial success), got: %v", err)
+	}
+
+	var data map[string]string
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["document_id"] != "doc-partial" {
+		t.Errorf("expected document_id 'doc-partial', got %q", data["document_id"])
+	}
+	if data["warning"] == "" {
+		t.Error("expected warning about body insertion failure")
+	}
+}

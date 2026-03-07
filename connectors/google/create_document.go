@@ -59,6 +59,8 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
+	documentURL := "https://docs.google.com/document/d/" + url.PathEscape(resp.DocumentID) + "/edit"
+
 	// If body text was provided, insert it via batchUpdate.
 	if params.Body != "" {
 		batchReq := docsBatchUpdateRequest{
@@ -73,11 +75,17 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 		}
 		updateURL := a.conn.docsBaseURL + "/v1/documents/" + url.PathEscape(resp.DocumentID) + ":batchUpdate"
 		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, updateURL, batchReq, nil); err != nil {
-			return nil, err
+			// Document was created but body insertion failed. Return the
+			// document info so the caller knows what was created, rather
+			// than silently orphaning it.
+			return connectors.JSONResult(map[string]string{
+				"document_id":  resp.DocumentID,
+				"title":        resp.Title,
+				"document_url": documentURL,
+				"warning":      fmt.Sprintf("document created but body insertion failed: %v", err),
+			})
 		}
 	}
-
-	documentURL := "https://docs.google.com/document/d/" + resp.DocumentID + "/edit"
 
 	return connectors.JSONResult(map[string]string{
 		"document_id":  resp.DocumentID,
