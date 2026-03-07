@@ -18,6 +18,11 @@ import (
 const (
 	defaultBaseURL = "https://api.datadoghq.com"
 	defaultTimeout = 30 * time.Second
+
+	// maxResponseBytes caps the API response body at 10 MB to prevent OOM
+	// from unexpectedly large responses (e.g., metrics queries returning
+	// massive time series data).
+	maxResponseBytes = 10 << 20 // 10 MB
 )
 
 // siteBaseURLs maps Datadog site identifiers to their API base URLs.
@@ -303,7 +308,7 @@ func (c *DatadogConnector) do(ctx context.Context, creds connectors.Credentials,
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

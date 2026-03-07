@@ -18,6 +18,10 @@ import (
 const (
 	defaultBaseURL = "https://api.pagerduty.com"
 	defaultTimeout = 30 * time.Second
+
+	// maxResponseBytes caps the API response body at 10 MB to prevent OOM
+	// from unexpectedly large responses.
+	maxResponseBytes = 10 << 20 // 10 MB
 )
 
 // PagerDutyConnector owns the shared HTTP client and base URL used by all
@@ -304,7 +308,7 @@ func (c *PagerDutyConnector) do(ctx context.Context, creds connectors.Credential
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
