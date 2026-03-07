@@ -26,7 +26,9 @@ func TestAddComment_Success(t *testing.T) {
 			if got := r.Header.Get("LinkedIn-Version"); got != linkedInVersion {
 				t.Errorf("expected LinkedIn-Version %q, got %q", linkedInVersion, got)
 			}
-			json.NewDecoder(r.Body).Decode(&gotBody)
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Errorf("failed to decode request body: %v", err)
+			}
 			w.WriteHeader(http.StatusCreated)
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)

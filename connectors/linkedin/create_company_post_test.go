@@ -23,7 +23,9 @@ func TestCreateCompanyPost_Success(t *testing.T) {
 		if got := r.Header.Get("LinkedIn-Version"); got != linkedInVersion {
 			t.Errorf("expected LinkedIn-Version %q, got %q", linkedInVersion, got)
 		}
-		json.NewDecoder(r.Body).Decode(&gotBody)
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+		}
 		w.Header().Set("x-restli-id", "urn:li:share:9999999")
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -76,7 +78,9 @@ func TestCreateCompanyPost_WithArticle(t *testing.T) {
 
 	var gotBody linkedInPostRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&gotBody)
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+		}
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer srv.Close()

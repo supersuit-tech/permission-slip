@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -38,10 +37,8 @@ func (p *createPostParams) validate() error {
 	if p.Visibility != "" && p.Visibility != "PUBLIC" && p.Visibility != "CONNECTIONS" {
 		return &connectors.ValidationError{Message: "visibility must be \"PUBLIC\" or \"CONNECTIONS\""}
 	}
-	if p.ArticleURL != "" {
-		if _, err := url.ParseRequestURI(p.ArticleURL); err != nil {
-			return &connectors.ValidationError{Message: "article_url must be a valid URL"}
-		}
+	if err := validateArticleURL(p.ArticleURL); err != nil {
+		return err
 	}
 	return nil
 }
@@ -127,16 +124,3 @@ func (a *createPostAction) Execute(ctx context.Context, req connectors.ActionReq
 	return connectors.JSONResult(result)
 }
 
-// getPersonURN fetches the authenticated user's person URN via the userinfo
-// endpoint and returns it in the format "urn:li:person:{sub}".
-func (c *LinkedInConnector) getPersonURN(ctx context.Context, creds connectors.Credentials) (string, error) {
-	var resp userinfoResponse
-	url := c.v2BaseURL + "/userinfo"
-	if err := c.do(ctx, creds, http.MethodGet, url, nil, &resp, false); err != nil {
-		return "", err
-	}
-	if resp.Sub == "" {
-		return "", &connectors.ExternalError{Message: "LinkedIn userinfo returned empty sub"}
-	}
-	return "urn:li:person:" + resp.Sub, nil
-}

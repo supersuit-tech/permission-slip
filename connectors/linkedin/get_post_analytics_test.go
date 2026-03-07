@@ -22,11 +22,11 @@ func TestGetPostAnalytics_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(socialActionsResponse{
-			LikesSummary: socialActionsSummary{
+			LikesSummary: likesSummary{
 				TotalLikes:         42,
 				LikedByCurrentUser: true,
 			},
-			CommentsSummary: socialActionsSummary{
+			CommentsSummary: commentsSummary{
 				TotalComments: 7,
 			},
 		})

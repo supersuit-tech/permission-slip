@@ -27,7 +27,7 @@ func TestCreatePost_Success(t *testing.T) {
 				t.Errorf("expected LinkedIn-Version %q, got %q", linkedInVersion, got)
 			}
 			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-				t.Fatalf("failed to decode request body: %v", err)
+				t.Errorf("failed to decode request body: %v", err)
 			}
 			w.Header().Set("x-restli-id", "urn:li:share:7654321")
 			w.WriteHeader(http.StatusCreated)
@@ -118,7 +118,9 @@ func TestCreatePost_WithArticle(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(userinfoResponse{Sub: "person123"})
 		case "/posts":
-			json.NewDecoder(r.Body).Decode(&gotBody)
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Errorf("failed to decode request body: %v", err)
+			}
 			w.WriteHeader(http.StatusCreated)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -253,7 +255,9 @@ func TestCreatePost_DefaultVisibility(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(userinfoResponse{Sub: "person123"})
 		case "/posts":
-			json.NewDecoder(r.Body).Decode(&gotBody)
+			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+				t.Errorf("failed to decode request body: %v", err)
+			}
 			w.WriteHeader(http.StatusCreated)
 		default:
 			w.WriteHeader(http.StatusNotFound)

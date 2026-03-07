@@ -12,9 +12,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+var (
+	// urnPattern validates LinkedIn URN format (e.g. urn:li:share:123456).
+	urnPattern = regexp.MustCompile(`^urn:li:[a-zA-Z]+:\d+$`)
+
+	// numericPattern validates that organization IDs are numeric.
+	numericPattern = regexp.MustCompile(`^\d+$`)
 )
 
 const (
@@ -86,6 +97,38 @@ func (c *LinkedInConnector) ValidateCredentials(_ context.Context, creds connect
 	return nil
 }
 
+// validateArticleURL checks that the article URL uses a safe scheme.
+func validateArticleURL(rawURL string) error {
+	if rawURL == "" {
+		return nil
+	}
+	parsed, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return &connectors.ValidationError{Message: "article_url must be a valid URL"}
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return &connectors.ValidationError{Message: "article_url must use http or https scheme"}
+	}
+	return nil
+}
+
+// validatePostURN checks that a post URN matches the expected LinkedIn format.
+func validatePostURN(urn string) error {
+	if !urnPattern.MatchString(urn) {
+		return &connectors.ValidationError{Message: "post_urn must be a valid LinkedIn URN (e.g. urn:li:share:123456)"}
+	}
+	return nil
+}
+
+// validateOrganizationID checks that the organization ID is numeric.
+func validateOrganizationID(id string) error {
+	if !numericPattern.MatchString(id) {
+		return &connectors.ValidationError{Message: "organization_id must be numeric"}
+	}
+	return nil
+}
+
 // linkedInErrorResponse is the LinkedIn API error envelope.
 type linkedInErrorResponse struct {
 	Status           int    `json:"status"`
@@ -99,57 +142,8 @@ type linkedInErrorResponse struct {
 // useRestAPI controls whether the LinkedIn-Version header is set (required for
 // /rest/ endpoints).
 func (c *LinkedInConnector) do(ctx context.Context, creds connectors.Credentials, method, url string, reqBody, dest any, useRestAPI bool) error {
-	token, ok := creds.Get(credKeyAccessToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
-	}
-
-	var body io.Reader
-	if reqBody != nil {
-		payload, err := json.Marshal(reqBody)
-		if err != nil {
-			return fmt.Errorf("marshaling request body: %w", err)
-		}
-		body = bytes.NewReader(payload)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	if reqBody != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if useRestAPI {
-		req.Header.Set("LinkedIn-Version", linkedInVersion)
-	}
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return wrapHTTPError(err)
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
-	}
-
-	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
-		return err
-	}
-
-	if dest != nil && len(respBytes) > 0 {
-		if err := json.Unmarshal(respBytes, dest); err != nil {
-			return &connectors.ExternalError{
-				StatusCode: resp.StatusCode,
-				Message:    "failed to decode LinkedIn API response",
-			}
-		}
-	}
-
-	return nil
+	_, err := c.doWithHeaders(ctx, creds, method, url, reqBody, dest, useRestAPI)
+	return err
 }
 
 // doWithHeaders is like do but also returns the response headers. This is
@@ -207,6 +201,20 @@ func (c *LinkedInConnector) doWithHeaders(ctx context.Context, creds connectors.
 	}
 
 	return resp.Header, nil
+}
+
+// getPersonURN fetches the authenticated user's person URN via the userinfo
+// endpoint and returns it in the format "urn:li:person:{sub}".
+func (c *LinkedInConnector) getPersonURN(ctx context.Context, creds connectors.Credentials) (string, error) {
+	var resp userinfoResponse
+	url := c.v2BaseURL + "/userinfo"
+	if err := c.do(ctx, creds, http.MethodGet, url, nil, &resp, false); err != nil {
+		return "", err
+	}
+	if resp.Sub == "" {
+		return "", &connectors.ExternalError{Message: "LinkedIn userinfo returned empty sub"}
+	}
+	return "urn:li:person:" + resp.Sub, nil
 }
 
 // wrapHTTPError converts HTTP client errors into typed connector errors.
