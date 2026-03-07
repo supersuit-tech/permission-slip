@@ -1,6 +1,6 @@
 # Google Connector
 
-The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api) and [Google Calendar](https://developers.google.com/calendar/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
+The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), and [Google Slides](https://developers.google.com/slides/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
 
 ## Connector ID
 
@@ -21,6 +21,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `gmail.send` | `google.send_email` |
 | `gmail.readonly` | `google.list_emails` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events` |
+| `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
 
 Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management).
 
@@ -168,6 +169,91 @@ Lists upcoming events from Google Calendar.
 
 Events are returned as single instances (recurring events expanded) ordered by start time. All-day events use a date string (e.g., `2024-01-15`) instead of a full RFC 3339 timestamp.
 
+---
+
+### `google.create_presentation`
+
+Creates a new Google Slides presentation.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `title` | string | Yes | Title of the new presentation |
+
+**Response:**
+
+```json
+{
+  "presentation_id": "1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi",
+  "title": "Q1 Review",
+  "url": "https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi/edit"
+}
+```
+
+**Slides API:** `POST /v1/presentations` ([docs](https://developers.google.com/slides/api/reference/rest/v1/presentations/create))
+
+---
+
+### `google.get_presentation`
+
+Retrieves metadata about an existing Google Slides presentation, including slide count and individual slide IDs.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `presentation_id` | string | Yes | The ID of the presentation to retrieve |
+
+**Response:**
+
+```json
+{
+  "presentation_id": "1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi",
+  "title": "Q1 Review",
+  "url": "https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi/edit",
+  "slide_count": 3,
+  "slides": ["slide-001", "slide-002", "slide-003"]
+}
+```
+
+**Slides API:** `GET /v1/presentations/{presentationId}` ([docs](https://developers.google.com/slides/api/reference/rest/v1/presentations/get))
+
+---
+
+### `google.add_slide`
+
+Adds a new slide to an existing presentation using the Slides API's `batchUpdate` endpoint.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `presentation_id` | string | Yes | — | The ID of the presentation to add a slide to |
+| `layout` | string | No | `BLANK` | Predefined slide layout (see below) |
+| `insertion_index` | integer | No | end | Position to insert the slide at (0-indexed) |
+
+**Supported layouts:** `BLANK`, `TITLE`, `TITLE_AND_BODY`, `TITLE_ONLY`, `SECTION_HEADER`, `SECTION_TITLE_AND_DESCRIPTION`, `ONE_COLUMN_TEXT`, `MAIN_POINT`, `BIG_NUMBER`, `CAPTION_ONLY`, `TITLE_AND_TWO_COLUMNS`
+
+**Response:**
+
+```json
+{
+  "slide_id": "g123abc",
+  "presentation_id": "1BxiMVs0XRA5nFMdKvNZL4mZHlAGaSqWi"
+}
+```
+
+**Slides API:** `POST /v1/presentations/{presentationId}:batchUpdate` ([docs](https://developers.google.com/slides/api/reference/rest/v1/presentations/batchUpdate))
+
+The `batchUpdate` pattern is the standard Slides API approach for mutations and is extensible for future text/image insertion actions.
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -195,6 +281,9 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Create calendar events | `create_calendar_event` | Nothing — agent controls all parameters |
 | Create personal calendar events | `create_calendar_event` | `calendar_id` locked to `primary`, no attendees |
 | List calendar events | `list_calendar_events` | Nothing — agent controls all parameters |
+| Create presentations | `create_presentation` | Nothing — agent controls title |
+| View presentations | `get_presentation` | Nothing — agent controls presentation ID |
+| Add slides to presentations | `add_slide` | Nothing — agent controls all parameters |
 
 ## Adding a New Action
 
@@ -217,12 +306,19 @@ connectors/google/
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
 ├── list_calendar_events.go         # google.list_calendar_events action
+├── create_presentation.go          # google.create_presentation action
+├── get_presentation.go             # google.get_presentation action
+├── add_slide.go                    # google.add_slide action (via batchUpdate)
+├── slides_helpers.go               # Shared helpers for Slides actions (presentationURL)
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
 ├── list_emails_test.go             # List emails action tests
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests
+├── create_presentation_test.go     # Create presentation tests
+├── get_presentation_test.go        # Get presentation tests (including URL encoding)
+├── add_slide_test.go               # Add slide tests (layout validation, insertion index)
 └── README.md                       # This file
 ```
 

@@ -957,6 +957,10 @@ connectors/
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── create_presentation.go    # google.create_presentation action (Slides API)
+│   ├── get_presentation.go       # google.get_presentation action (Slides API)
+│   ├── add_slide.go              # google.add_slide action (batchUpdate)
+│   ├── slides_helpers.go         # Shared helpers for Slides actions
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
