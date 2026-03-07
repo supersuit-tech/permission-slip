@@ -1,5 +1,5 @@
 // Package google implements the Google connector for the Permission Slip
-// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Sheets)
+// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
 package google
 
@@ -20,6 +20,9 @@ const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
 	defaultSheetsBaseURL   = "https://sheets.googleapis.com/v4"
+	defaultDocsBaseURL     = "https://docs.googleapis.com"
+	defaultDriveBaseURL    = "https://www.googleapis.com"
+	defaultChatBaseURL     = "https://chat.googleapis.com"
 	defaultTimeout         = 30 * time.Second
 	credKeyAccessToken     = "access_token"
 
@@ -40,6 +43,9 @@ type GoogleConnector struct {
 	gmailBaseURL    string
 	calendarBaseURL string
 	sheetsBaseURL   string
+	docsBaseURL     string
+	driveBaseURL    string
+	chatBaseURL     string
 }
 
 // New creates a GoogleConnector with sensible defaults.
@@ -49,6 +55,9 @@ func New() *GoogleConnector {
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
 		sheetsBaseURL:   defaultSheetsBaseURL,
+		docsBaseURL:     defaultDocsBaseURL,
+		driveBaseURL:    defaultDriveBaseURL,
+		chatBaseURL:     defaultChatBaseURL,
 	}
 }
 
@@ -59,6 +68,33 @@ func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL, sheetsBaseUR
 		gmailBaseURL:    gmailBaseURL,
 		calendarBaseURL: calendarBaseURL,
 		sheetsBaseURL:   sheetsBaseURL,
+	}
+}
+
+func newForTestWithChat(client *http.Client, gmailBaseURL, calendarBaseURL, chatBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:          client,
+		gmailBaseURL:    gmailBaseURL,
+		calendarBaseURL: calendarBaseURL,
+		chatBaseURL:     chatBaseURL,
+	}
+}
+
+// newDriveForTest creates a GoogleConnector with only driveBaseURL set, for Drive action tests.
+func newDriveForTest(client *http.Client, driveBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		driveBaseURL: driveBaseURL,
+	}
+}
+
+// newForTestDocs creates a GoogleConnector that points at a test server for
+// Google Docs and Drive API calls.
+func newForTestDocs(client *http.Client, docsBaseURL, driveBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		docsBaseURL:  docsBaseURL,
+		driveBaseURL: driveBaseURL,
 	}
 }
 
@@ -76,6 +112,17 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.sheets_write_range":    &sheetsWriteRangeAction{conn: c},
 		"google.sheets_append_rows":    &sheetsAppendRowsAction{conn: c},
 		"google.sheets_list_sheets":    &sheetsListSheetsAction{conn: c},
+		"google.create_document":       &createDocumentAction{conn: c},
+		"google.get_document":          &getDocumentAction{conn: c},
+		"google.update_document":       &updateDocumentAction{conn: c},
+		"google.list_documents":        &listDocumentsAction{conn: c},
+		"google.list_drive_files":      &listDriveFilesAction{conn: c},
+		"google.get_drive_file":        &getDriveFileAction{conn: c},
+		"google.upload_drive_file":     &uploadDriveFileAction{conn: c},
+		"google.delete_drive_file":     &deleteDriveFileAction{conn: c},
+		"google.send_chat_message":     &sendChatMessageAction{conn: c},
+		"google.list_chat_spaces":      &listChatSpacesAction{conn: c},
+		"google.create_meeting":        &createMeetingAction{conn: c},
 	}
 }
 
@@ -120,13 +167,7 @@ func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentia
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Google API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Google API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Google API request failed: %v", err)}
+		return wrapHTTPError(err)
 	}
 	defer resp.Body.Close()
 
@@ -149,6 +190,51 @@ func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentia
 	}
 
 	return nil
+}
+
+// doRawGet performs a GET request and returns the response body as a string.
+// Used for Drive file export/download endpoints that return non-JSON content.
+func (c *GoogleConnector) doRawGet(ctx context.Context, creds connectors.Credentials, rawURL string) (string, error) {
+	token, ok := creds.Get(credKeyAccessToken)
+	if !ok || token == "" {
+		return "", &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", wrapHTTPError(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return "", &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if err := checkResponse(resp.StatusCode, resp.Header, body); err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
+// wrapHTTPError converts HTTP client errors into typed connector errors.
+// This centralizes the timeout/cancel/external error mapping so it doesn't
+// need to be duplicated across doJSON, doRawGet, and multipart upload.
+func wrapHTTPError(err error) error {
+	if connectors.IsTimeout(err) {
+		return &connectors.TimeoutError{Message: fmt.Sprintf("Google API request timed out: %v", err)}
+	}
+	if errors.Is(err, context.Canceled) {
+		return &connectors.TimeoutError{Message: "Google API request canceled"}
+	}
+	return &connectors.ExternalError{Message: fmt.Sprintf("Google API request failed: %v", err)}
 }
 
 // checkResponse maps HTTP status codes to typed connector errors.

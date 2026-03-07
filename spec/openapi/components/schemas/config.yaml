@@ -6,6 +6,8 @@ ConfigResponse:
   required:
     - billing_enabled
     - stripe_test_mode
+    - google_oauth_configured
+    - microsoft_oauth_configured
   properties:
     billing_enabled:
       type: boolean
@@ -23,3 +25,19 @@ ConfigResponse:
         `VITE_STRIPE_PUBLISHABLE_KEY`. Only enabled when `STRIPE_TEST_MODE=true`
         and `BILLING_ENABLED=true` on the server.
       example: false
+    google_oauth_configured:
+      type: boolean
+      description: |
+        Whether Google OAuth client credentials are configured on the server.
+        When `true`, the built-in Google connector can initiate OAuth flows
+        without BYOA setup. When `false`, users must provide their own Google
+        OAuth app credentials via the BYOA configuration UI.
+      example: true
+    microsoft_oauth_configured:
+      type: boolean
+      description: |
+        Whether Microsoft OAuth client credentials are configured on the server.
+        When `true`, the built-in Microsoft connector can initiate OAuth flows
+        without BYOA setup. When `false`, users must provide their own Microsoft
+        OAuth app credentials via the BYOA configuration UI.
+      example: true
