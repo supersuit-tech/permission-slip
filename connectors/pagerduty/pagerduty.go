@@ -51,12 +51,12 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "pagerduty",
 		Name:        "PagerDuty",
-		Description: "PagerDuty integration for incident management, alert handling, on-call schedules, and escalations",
+		Description: "PagerDuty integration for incident management, alert handling, on-call schedules, and escalations. Supports the full incident lifecycle: triggered → acknowledged → resolved.",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "pagerduty.create_incident",
 				Name:        "Create Incident",
-				Description: "Create a new incident in PagerDuty",
+				Description: "Create a new incident in PagerDuty, which pages the on-call responder. Use when automated detection identifies an issue that needs human attention.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -64,24 +64,24 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"service_id": {
 							"type": "string",
-							"description": "The ID of the PagerDuty service to create the incident on"
+							"description": "The ID of the PagerDuty service to create the incident on (e.g. PABC123)"
 						},
 						"title": {
 							"type": "string",
-							"description": "Incident title"
+							"description": "Incident title — should clearly describe the issue"
 						},
 						"body": {
 							"type": "string",
-							"description": "Incident body/details"
+							"description": "Incident body with additional details, investigation steps, or context"
 						},
 						"urgency": {
 							"type": "string",
 							"enum": ["high", "low"],
-							"description": "Incident urgency level"
+							"description": "Incident urgency: 'high' pages immediately, 'low' respects notification rules"
 						},
 						"escalation_policy_id": {
 							"type": "string",
-							"description": "The ID of the escalation policy to use (defaults to service's policy)"
+							"description": "Override the escalation policy (defaults to the service's policy)"
 						}
 					}
 				}`)),
@@ -89,7 +89,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "pagerduty.acknowledge_alert",
 				Name:        "Acknowledge Alert",
-				Description: "Acknowledge an incident in PagerDuty to indicate it is being worked on",
+				Description: "Acknowledge an incident to stop further notifications and signal that someone is investigating. Standard triage action — safe for autonomous use on low-severity alerts.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -97,7 +97,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"incident_id": {
 							"type": "string",
-							"description": "The ID of the incident to acknowledge"
+							"description": "The ID of the incident to acknowledge (e.g. P1234567)"
 						}
 					}
 				}`)),
@@ -105,7 +105,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "pagerduty.resolve_incident",
 				Name:        "Resolve Incident",
-				Description: "Resolve an incident in PagerDuty",
+				Description: "Resolve an incident in PagerDuty, marking it as fixed. Only resolve after confirming the underlying issue is actually resolved — premature resolution can mask ongoing problems.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -121,7 +121,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "pagerduty.escalate_incident",
 				Name:        "Escalate Incident",
-				Description: "Escalate an incident to the next level in the escalation policy or to a specific policy",
+				Description: "Escalate an incident to the next level in the escalation policy, paging additional responders. Use when the current on-call cannot resolve the issue or when urgency increases.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -133,7 +133,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"escalation_level": {
 							"type": "integer",
-							"description": "The escalation level to set on the incident"
+							"description": "The escalation level to set (2 = first escalation, 3 = second, etc.)"
 						},
 						"escalation_policy_id": {
 							"type": "string",
@@ -145,7 +145,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "pagerduty.list_on_call",
 				Name:        "List On-Call Schedules",
-				Description: "List current on-call entries, optionally filtered by schedule or escalation policy",
+				Description: "List who is currently on-call, optionally filtered by schedule or escalation policy. Use to identify the right person to escalate to or to provide context during triage.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -162,7 +162,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"since": {
 							"type": "string",
-							"description": "Start of the time range (ISO 8601)"
+							"description": "Start of the time range (ISO 8601, e.g. 2024-01-15T00:00:00Z)"
 						},
 						"until": {
 							"type": "string",
@@ -174,7 +174,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "pagerduty.add_note",
 				Name:        "Add Incident Note",
-				Description: "Add a note to an existing incident's timeline",
+				Description: "Add a note to an existing incident's timeline. Use to document investigation findings, context gathered from metrics, or actions taken during triage.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -186,7 +186,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"content": {
 							"type": "string",
-							"description": "The note content"
+							"description": "The note content (supports plain text)"
 						}
 					}
 				}`)),
@@ -200,7 +200,7 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_pagerduty_acknowledge_alert",
 				ActionType:  "pagerduty.acknowledge_alert",
 				Name:        "Acknowledge any alert",
-				Description: "Agent can acknowledge any incident.",
+				Description: "Agent can acknowledge any incident. Safe for autonomous triage of low-severity alerts.",
 				Parameters:  json.RawMessage(`{"incident_id":"*"}`),
 			},
 			{
@@ -209,6 +209,20 @@ func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create incidents",
 				Description: "Agent can create incidents on any service.",
 				Parameters:  json.RawMessage(`{"service_id":"*","title":"*","body":"*","urgency":"*"}`),
+			},
+			{
+				ID:          "tpl_pagerduty_resolve_incident",
+				ActionType:  "pagerduty.resolve_incident",
+				Name:        "Resolve any incident",
+				Description: "Agent can resolve any incident.",
+				Parameters:  json.RawMessage(`{"incident_id":"*"}`),
+			},
+			{
+				ID:          "tpl_pagerduty_escalate_incident",
+				ActionType:  "pagerduty.escalate_incident",
+				Name:        "Escalate any incident",
+				Description: "Agent can escalate any incident to any level.",
+				Parameters:  json.RawMessage(`{"incident_id":"*","escalation_level":"*","escalation_policy_id":"*"}`),
 			},
 			{
 				ID:          "tpl_pagerduty_list_on_call",
@@ -241,7 +255,8 @@ func (c *PagerDutyConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key, which is required for all PagerDuty API calls.
+// non-empty api_key. The optional "email" credential is used as the From
+// header on write operations (required by PagerDuty for audit trails).
 func (c *PagerDutyConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	key, ok := creds.Get("api_key")
 	if !ok || key == "" {
@@ -272,6 +287,13 @@ func (c *PagerDutyConnector) do(ctx context.Context, creds connectors.Credential
 
 	apiKey, _ := creds.Get("api_key")
 	req.Header.Set("Authorization", "Token token="+apiKey)
+
+	// PagerDuty requires a From header with a valid user email for write
+	// operations. This provides an audit trail of who (or what agent)
+	// performed the action.
+	if email, ok := creds.Get("email"); ok && email != "" {
+		req.Header.Set("From", email)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {

@@ -1,6 +1,9 @@
 package datadog
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -21,6 +24,7 @@ func TestDatadogConnector_Actions(t *testing.T) {
 
 	want := []string{
 		"datadog.get_metrics",
+		"datadog.get_incident",
 		"datadog.create_incident",
 		"datadog.snooze_alert",
 		"datadog.trigger_runbook",
@@ -48,6 +52,16 @@ func TestDatadogConnector_ValidateCredentials(t *testing.T) {
 			name:    "valid credentials",
 			creds:   validCreds(),
 			wantErr: false,
+		},
+		{
+			name:    "valid with site",
+			creds:   connectors.NewCredentials(map[string]string{"api_key": "k", "app_key": "a", "site": "datadoghq.eu"}),
+			wantErr: false,
+		},
+		{
+			name:    "invalid site",
+			creds:   connectors.NewCredentials(map[string]string{"api_key": "k", "app_key": "a", "site": "invalid.example.com"}),
+			wantErr: true,
 		},
 		{
 			name:    "missing api_key",
@@ -89,6 +103,43 @@ func TestDatadogConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
+func TestDatadogConnector_SiteRouting(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	// newForTest overrides the base URL, but we can test the baseURLForCreds logic directly.
+	c := New()
+
+	tests := []struct {
+		name    string
+		site    string
+		wantURL string
+	}{
+		{name: "default (no site)", site: "", wantURL: "https://api.datadoghq.com"},
+		{name: "EU site", site: "datadoghq.eu", wantURL: "https://api.datadoghq.eu"},
+		{name: "US3 site", site: "us3.datadoghq.com", wantURL: "https://api.us3.datadoghq.com"},
+		{name: "Gov site", site: "ddog-gov.com", wantURL: "https://api.ddog-gov.com"},
+		{name: "unknown site falls back to default", site: "unknown.example.com", wantURL: "https://api.datadoghq.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			creds := connectors.NewCredentials(map[string]string{
+				"api_key": "k", "app_key": "a", "site": tt.site,
+			})
+			got := c.baseURLForCreds(creds)
+			if got != tt.wantURL {
+				t.Errorf("baseURLForCreds() = %q, want %q", got, tt.wantURL)
+			}
+		})
+	}
+}
+
 func TestDatadogConnector_Manifest(t *testing.T) {
 	t.Parallel()
 	c := New()
@@ -100,8 +151,8 @@ func TestDatadogConnector_Manifest(t *testing.T) {
 	if m.Name != "Datadog" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Datadog")
 	}
-	if len(m.Actions) != 4 {
-		t.Fatalf("Manifest().Actions has %d items, want 4", len(m.Actions))
+	if len(m.Actions) != 5 {
+		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
 	}
 
 	actionTypes := make(map[string]bool)
@@ -110,6 +161,7 @@ func TestDatadogConnector_Manifest(t *testing.T) {
 	}
 	for _, want := range []string{
 		"datadog.get_metrics",
+		"datadog.get_incident",
 		"datadog.create_incident",
 		"datadog.snooze_alert",
 		"datadog.trigger_runbook",

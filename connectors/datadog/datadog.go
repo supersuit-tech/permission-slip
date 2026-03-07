@@ -20,6 +20,18 @@ const (
 	defaultTimeout = 30 * time.Second
 )
 
+// siteBaseURLs maps Datadog site identifiers to their API base URLs.
+// Users in non-US1 regions must set the "site" credential to route
+// requests to the correct Datadog datacenter.
+var siteBaseURLs = map[string]string{
+	"datadoghq.com":      "https://api.datadoghq.com",
+	"us3.datadoghq.com":  "https://api.us3.datadoghq.com",
+	"us5.datadoghq.com":  "https://api.us5.datadoghq.com",
+	"datadoghq.eu":       "https://api.datadoghq.eu",
+	"ap1.datadoghq.com":  "https://api.ap1.datadoghq.com",
+	"ddog-gov.com":       "https://api.ddog-gov.com",
+}
+
 // DatadogConnector owns the shared HTTP client and base URL used by all
 // Datadog actions.
 type DatadogConnector struct {
@@ -51,12 +63,12 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "datadog",
 		Name:        "Datadog",
-		Description: "Datadog integration for metrics querying, incident management, alert handling, and runbook automation",
+		Description: "Datadog integration for metrics querying, incident management, alert handling, and runbook automation. Supports all Datadog sites (US1, US3, US5, EU, AP1, Gov).",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "datadog.get_metrics",
 				Name:        "Get Metrics",
-				Description: "Query time series metrics from Datadog",
+				Description: "Query time series metrics from Datadog using the metrics query language. Use this to gather observability data for triage, capacity planning, or anomaly detection.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -64,7 +76,7 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Datadog metrics query (e.g. avg:system.cpu.user{host:myhost})"
+							"description": "Datadog metrics query (e.g. avg:system.cpu.user{host:myhost}). Uses the Datadog query syntax, similar to PromQL."
 						},
 						"from": {
 							"type": "integer",
@@ -78,9 +90,25 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "datadog.get_incident",
+				Name:        "Get Incident",
+				Description: "Retrieve details of an existing Datadog incident by ID. Use this to gather context during triage before deciding whether to escalate or resolve.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["incident_id"],
+					"properties": {
+						"incident_id": {
+							"type": "string",
+							"description": "The ID of the incident to retrieve"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "datadog.create_incident",
 				Name:        "Create Incident",
-				Description: "Create a new incident in Datadog",
+				Description: "Create a new incident in Datadog. Pages on-call teams and creates a tracking record. Use when automated detection identifies an issue requiring human attention.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -88,17 +116,17 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
-							"description": "Incident title"
+							"description": "Incident title — should clearly describe the issue (e.g. 'High error rate on payments service')"
 						},
 						"severity": {
 							"type": "string",
 							"enum": ["SEV-1", "SEV-2", "SEV-3", "SEV-4", "SEV-5", "UNKNOWN"],
 							"default": "UNKNOWN",
-							"description": "Incident severity level"
+							"description": "Incident severity: SEV-1 (critical) through SEV-5 (informational)"
 						},
 						"customer_impact_scope": {
 							"type": "string",
-							"description": "Description of the customer impact"
+							"description": "Description of the customer impact (e.g. '10% of checkout requests failing')"
 						},
 						"customer_impacted": {
 							"type": "boolean",
@@ -111,7 +139,7 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "datadog.snooze_alert",
 				Name:        "Snooze Alert",
-				Description: "Mute (snooze) a Datadog monitor for a specified duration",
+				Description: "Mute (snooze) a Datadog monitor for a specified duration. Delays alert notifications — use during planned maintenance or when a known issue is being actively worked.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -123,11 +151,11 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"end": {
 							"type": "integer",
-							"description": "UNIX epoch timestamp when the mute should end. Omit to mute indefinitely."
+							"description": "UNIX epoch timestamp when the mute should end. Omit to mute indefinitely (not recommended)."
 						},
 						"scope": {
 							"type": "string",
-							"description": "The scope to apply the mute to (e.g. host:myhost)"
+							"description": "Scope to apply the mute to (e.g. host:myhost). Omit to mute all scopes."
 						}
 					}
 				}`)),
@@ -135,7 +163,7 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "datadog.trigger_runbook",
 				Name:        "Trigger Runbook",
-				Description: "Trigger a Datadog Workflow automation (runbook)",
+				Description: "Trigger a Datadog Workflow automation (runbook). Executes automated remediation — this is high-risk as workflows can modify infrastructure, restart services, or take other potentially destructive actions.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -147,7 +175,7 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"payload": {
 							"type": "object",
-							"description": "Input payload to pass to the workflow"
+							"description": "Input payload to pass to the workflow (workflow-specific parameters)"
 						}
 					}
 				}`)),
@@ -165,6 +193,13 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"query":"*","from":"*","to":"*"}`),
 			},
 			{
+				ID:          "tpl_datadog_get_incident",
+				ActionType:  "datadog.get_incident",
+				Name:        "View any incident",
+				Description: "Agent can retrieve details of any Datadog incident.",
+				Parameters:  json.RawMessage(`{"incident_id":"*"}`),
+			},
+			{
 				ID:          "tpl_datadog_create_incident",
 				ActionType:  "datadog.create_incident",
 				Name:        "Create incidents",
@@ -178,6 +213,13 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can mute any Datadog monitor.",
 				Parameters:  json.RawMessage(`{"monitor_id":"*","end":"*","scope":"*"}`),
 			},
+			{
+				ID:          "tpl_datadog_trigger_runbook",
+				ActionType:  "datadog.trigger_runbook",
+				Name:        "Trigger any runbook",
+				Description: "Agent can trigger any Datadog Workflow automation. High-risk: workflows may modify infrastructure.",
+				Parameters:  json.RawMessage(`{"workflow_id":"*","payload":"*"}`),
+			},
 		},
 	}
 }
@@ -185,15 +227,17 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 // Actions returns the registered action handlers keyed by action_type.
 func (c *DatadogConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"datadog.get_metrics":    &getMetricsAction{conn: c},
+		"datadog.get_metrics":     &getMetricsAction{conn: c},
+		"datadog.get_incident":    &getIncidentAction{conn: c},
 		"datadog.create_incident": &createIncidentAction{conn: c},
-		"datadog.snooze_alert":   &snoozeAlertAction{conn: c},
+		"datadog.snooze_alert":    &snoozeAlertAction{conn: c},
 		"datadog.trigger_runbook": &triggerRunbookAction{conn: c},
 	}
 }
 
 // ValidateCredentials checks that the provided credentials contain the
-// required api_key and app_key for Datadog API calls.
+// required api_key and app_key for Datadog API calls. If a "site"
+// credential is provided, it must be a known Datadog site identifier.
 func (c *DatadogConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	key, ok := creds.Get("api_key")
 	if !ok || key == "" {
@@ -203,7 +247,25 @@ func (c *DatadogConnector) ValidateCredentials(_ context.Context, creds connecto
 	if !ok || appKey == "" {
 		return &connectors.ValidationError{Message: "missing required credential: app_key"}
 	}
+	if site, ok := creds.Get("site"); ok && site != "" {
+		if _, known := siteBaseURLs[site]; !known {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("unknown Datadog site %q — valid sites: datadoghq.com, us3.datadoghq.com, us5.datadoghq.com, datadoghq.eu, ap1.datadoghq.com, ddog-gov.com", site),
+			}
+		}
+	}
 	return nil
+}
+
+// baseURLForCreds returns the API base URL, respecting the optional "site"
+// credential for multi-region support.
+func (c *DatadogConnector) baseURLForCreds(creds connectors.Credentials) string {
+	if site, ok := creds.Get("site"); ok && site != "" {
+		if url, known := siteBaseURLs[site]; known {
+			return url
+		}
+	}
+	return c.baseURL
 }
 
 // do is the shared request lifecycle for all Datadog actions.
@@ -217,7 +279,8 @@ func (c *DatadogConnector) do(ctx context.Context, creds connectors.Credentials,
 		body = bytes.NewReader(payload)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	baseURL := c.baseURLForCreds(creds)
+	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, body)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}

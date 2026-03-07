@@ -12,14 +12,28 @@ The Datadog connector integrates Permission Slip with the [Datadog REST API](htt
 |-----|----------|-------------|
 | `api_key` | Yes | A Datadog API key for authenticating requests. |
 | `app_key` | Yes | A Datadog Application key for authenticating requests. |
+| `site` | No | Datadog site identifier for multi-region support (see below). Defaults to `datadoghq.com` (US1). |
 
-The credential `auth_type` in the database is `custom`. Both keys are required for all Datadog API calls.
+The credential `auth_type` in the database is `custom`. Both `api_key` and `app_key` are required for all Datadog API calls.
+
+### Multi-Region Support
+
+Datadog operates multiple regional sites. Set the `site` credential to route requests to the correct datacenter:
+
+| Site | Region | API Base URL |
+|------|--------|-------------|
+| `datadoghq.com` | US1 (default) | `https://api.datadoghq.com` |
+| `us3.datadoghq.com` | US3 | `https://api.us3.datadoghq.com` |
+| `us5.datadoghq.com` | US5 | `https://api.us5.datadoghq.com` |
+| `datadoghq.eu` | EU | `https://api.datadoghq.eu` |
+| `ap1.datadoghq.com` | AP1 | `https://api.ap1.datadoghq.com` |
+| `ddog-gov.com` | US1-FED (GovCloud) | `https://api.ddog-gov.com` |
 
 ## Actions
 
 ### `datadog.get_metrics`
 
-Queries time series metrics from Datadog.
+Queries time series metrics from Datadog using the metrics query language.
 
 **Risk level:** low
 
@@ -32,6 +46,22 @@ Queries time series metrics from Datadog.
 | `to` | integer | Yes | End of query window as UNIX epoch timestamp (seconds) |
 
 **Datadog API:** `GET /api/v1/query` ([docs](https://docs.datadoghq.com/api/latest/metrics/#query-timeseries-data-across-multiple-products))
+
+---
+
+### `datadog.get_incident`
+
+Retrieves details of an existing Datadog incident by ID. Useful for triage context before escalation or resolution.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `incident_id` | string | Yes | The ID of the incident to retrieve |
+
+**Datadog API:** `GET /api/v2/incidents/{incident_id}` ([docs](https://docs.datadoghq.com/api/latest/incidents/#get-the-details-of-an-incident))
 
 ---
 
@@ -103,13 +133,15 @@ Triggers a Datadog Workflow automation (runbook).
 connectors/datadog/
 ├── datadog.go              # DatadogConnector struct, New(), Manifest(), do(), ValidateCredentials()
 ├── get_metrics.go          # datadog.get_metrics action
+├── get_incident.go         # datadog.get_incident action
 ├── create_incident.go      # datadog.create_incident action
 ├── snooze_alert.go         # datadog.snooze_alert action
 ├── trigger_runbook.go      # datadog.trigger_runbook action
 ├── response.go             # Shared HTTP response → typed error mapping
-├── datadog_test.go         # Connector-level tests
+├── datadog_test.go         # Connector-level tests (incl. site routing)
 ├── helpers_test.go         # Shared test helpers (validCreds)
 ├── get_metrics_test.go     # Get metrics action tests
+├── get_incident_test.go    # Get incident action tests
 ├── create_incident_test.go # Create incident action tests
 ├── snooze_alert_test.go    # Snooze alert action tests
 ├── trigger_runbook_test.go # Trigger runbook action tests

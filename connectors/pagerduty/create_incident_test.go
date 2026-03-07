@@ -153,6 +153,69 @@ func TestCreateIncident_Timeout(t *testing.T) {
 	}
 }
 
+func TestCreateIncident_FromHeader(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("From"); got != "agent@example.com" {
+			t.Errorf("From = %q, want %q", got, "agent@example.com")
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"incident": map[string]any{"id": "P1234567", "status": "triggered"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["pagerduty.create_incident"]
+
+	creds := connectors.NewCredentials(map[string]string{
+		"api_key": "pd_test_api_key_123",
+		"email":   "agent@example.com",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "pagerduty.create_incident",
+		Parameters:  json.RawMessage(`{"service_id":"PSERVICE1","title":"Bug"}`),
+		Credentials: creds,
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
+func TestCreateIncident_NoFromHeaderWithoutEmail(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("From"); got != "" {
+			t.Errorf("From = %q, want empty (no email credential)", got)
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"incident": map[string]any{"id": "P1234567", "status": "triggered"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["pagerduty.create_incident"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "pagerduty.create_incident",
+		Parameters:  json.RawMessage(`{"service_id":"PSERVICE1","title":"Bug"}`),
+		Credentials: validCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestCreateIncident_RateLimit(t *testing.T) {
 	t.Parallel()
 

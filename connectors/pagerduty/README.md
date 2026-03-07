@@ -11,6 +11,7 @@ The PagerDuty connector integrates Permission Slip with the [PagerDuty REST API]
 | Key | Required | Description |
 |-----|----------|-------------|
 | `api_key` | Yes | A PagerDuty REST API key (v2). |
+| `email` | No | Email address of the PagerDuty user performing actions. Used as the `From` header for audit trails on write operations. |
 
 The credential `auth_type` in the database is `api_key`. Tokens are stored encrypted and decrypted only at execution time.
 
