@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), JWT-based auth (DoorDash), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks). The DoorDash connector (`connectors/doordash/`) is a good reference for self-signed JWT auth (HS256 with base64-decoded secret), status enum validation, and `RequiresPaymentMethod` for financial actions.
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -1025,6 +1025,18 @@ connectors/
 │   ├── get_message.go        # twilio.get_message action (SM/MM SID validation)
 │   ├── get_call.go           # twilio.get_call action (CA SID validation)
 │   ├── lookup_phone.go       # twilio.lookup_phone action (Lookup API v2)
+│   ├── README.md             # Connector documentation
+│   ├── helpers_test.go       # validCreds() test helper
+│   └── *_test.go             # Per-action + connector + response tests
+├── doordash/
+│   ├── doordash.go           # DoorDashConnector struct, New(), JWT auth (HS256 + base64 secret), do()
+│   ├── manifest.go           # Manifest() with 5 action schemas and templates
+│   ├── response.go           # HTTP status → typed error mapping
+│   ├── create_delivery.go    # doordash.create_delivery action (high risk, RequiresPaymentMethod)
+│   ├── get_quote.go          # doordash.get_quote action
+│   ├── get_delivery.go       # doordash.get_delivery action
+│   ├── cancel_delivery.go    # doordash.cancel_delivery action
+│   ├── list_deliveries.go    # doordash.list_deliveries action (status enum validation)
 │   ├── README.md             # Connector documentation
 │   ├── helpers_test.go       # validCreds() test helper
 │   └── *_test.go             # Per-action + connector + response tests
