@@ -42,7 +42,10 @@ func (a *appendBlocksAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	body := buildAppendBlocksBody(params)
+	body, err := buildAppendBlocksBody(params)
+	if err != nil {
+		return nil, err
+	}
 
 	var resp map[string]any
 	if err := a.conn.do(ctx, http.MethodPatch, "/v1/blocks/"+params.PageID+"/children", req.Credentials, body, &resp); err != nil {
@@ -52,16 +55,17 @@ func (a *appendBlocksAction) Execute(ctx context.Context, req connectors.ActionR
 	return connectors.JSONResult(resp)
 }
 
-// buildAppendBlocksBody constructs the Notion API request body. If only text
-// is provided (no explicit children), it auto-wraps the text as a paragraph block
-// for convenience.
-func buildAppendBlocksBody(params appendBlocksParams) map[string]any {
+// buildAppendBlocksBody constructs the Notion API request body. If children is
+// provided, it is used directly. Otherwise, if only text is provided, it is
+// auto-wrapped as a single paragraph block for convenience.
+func buildAppendBlocksBody(params appendBlocksParams) (map[string]any, error) {
 	// If explicit children are provided, use them directly.
 	if len(params.Children) > 0 {
 		var children []any
-		if err := json.Unmarshal(params.Children, &children); err == nil {
-			return map[string]any{"children": children}
+		if err := json.Unmarshal(params.Children, &children); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid children JSON (expected array of block objects): %v", err)}
 		}
+		return map[string]any{"children": children}, nil
 	}
 
 	// Auto-wrap plain text as a paragraph block.
@@ -77,5 +81,5 @@ func buildAppendBlocksBody(params appendBlocksParams) map[string]any {
 				},
 			},
 		},
-	}
+	}, nil
 }

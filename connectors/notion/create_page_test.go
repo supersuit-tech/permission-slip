@@ -166,6 +166,54 @@ func TestCreatePage_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestCreatePage_MalformedProperties(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPageAction{conn: conn}
+	params, _ := json.Marshal(map[string]any{
+		"parent_id":  "parent-123",
+		"title":      "Test",
+		"properties": "not-an-object",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "notion.create_page",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for malformed properties")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreatePage_MalformedContent(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPageAction{conn: conn}
+	params, _ := json.Marshal(map[string]any{
+		"parent_id": "parent-123",
+		"title":     "Test",
+		"content":   "not-an-array",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "notion.create_page",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for malformed content")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreatePage_APIError(t *testing.T) {
 	t.Parallel()
 

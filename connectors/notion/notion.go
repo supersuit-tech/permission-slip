@@ -66,7 +66,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "notion.create_page",
 				Name:        "Create Page",
-				Description: "Create a new page or database entry",
+				Description: "Create a new page or database entry under a parent page or database",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -74,19 +74,19 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"parent_id": {
 							"type": "string",
-							"description": "Parent page or database ID"
+							"description": "Parent page or database ID (UUID, e.g. 8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c). Accepts both page IDs and database IDs."
 						},
 						"title": {
 							"type": "string",
-							"description": "Page title"
+							"description": "Page title text"
 						},
 						"properties": {
 							"type": "object",
-							"description": "Database properties (overrides default title property when creating database entries)"
+							"description": "Database-schema properties object. Overrides the default title-only property when creating database entries. Example: {\"Status\": {\"select\": {\"name\": \"In Progress\"}}}"
 						},
 						"content": {
 							"type": "array",
-							"description": "Array of Notion block objects to add as page content",
+							"description": "Array of Notion block objects to add as initial page content. Supports paragraph, heading_2, to_do, code, bulleted_list_item, etc.",
 							"items": {"type": "object"}
 						}
 					}
@@ -95,7 +95,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "notion.update_page",
 				Name:        "Update Page",
-				Description: "Update properties on an existing page",
+				Description: "Update properties or archive/unarchive an existing page",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -103,15 +103,15 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "The ID of the page to update"
+							"description": "The page ID to update (UUID format)"
 						},
 						"properties": {
 							"type": "object",
-							"description": "Partial property updates (Notion property objects)"
+							"description": "Partial property updates using Notion property objects. Example: {\"Status\": {\"select\": {\"name\": \"Done\"}}}"
 						},
 						"archived": {
 							"type": "boolean",
-							"description": "Set to true to archive (soft-delete) the page"
+							"description": "Set to true to archive (soft-delete) the page, or false to restore it"
 						}
 					}
 				}`)),
@@ -119,7 +119,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "notion.append_blocks",
 				Name:        "Append Content",
-				Description: "Append blocks to the end of a page — useful for logs, journals, and running notes",
+				Description: "Append content blocks to the end of a page — ideal for logs, journals, and running notes",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -127,16 +127,16 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "The ID of the page to append content to"
+							"description": "The page ID to append content to (UUID format)"
 						},
 						"children": {
 							"type": "array",
-							"description": "Array of Notion block objects (paragraph, heading, to_do, code, etc.)",
+							"description": "Array of Notion block objects (paragraph, heading_2, to_do, code, bulleted_list_item, etc.). Takes precedence over text if both are provided.",
 							"items": {"type": "object"}
 						},
 						"text": {
 							"type": "string",
-							"description": "Plain text to append (auto-wrapped as a paragraph block if children is not provided)"
+							"description": "Plain text shorthand — auto-wrapped as a paragraph block. Ignored if children is provided. Use children for rich formatting."
 						}
 					}
 				}`)),
@@ -144,7 +144,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "notion.query_database",
 				Name:        "Query Database",
-				Description: "Query a database with filters and sorts",
+				Description: "Query a Notion database with optional filters, sorts, and pagination",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -152,15 +152,15 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"database_id": {
 							"type": "string",
-							"description": "The ID of the database to query"
+							"description": "The database ID to query (UUID format)"
 						},
 						"filter": {
 							"type": "object",
-							"description": "Notion filter object (see Notion API docs for filter syntax)"
+							"description": "Notion filter object. Example: {\"property\": \"Status\", \"select\": {\"equals\": \"Done\"}}"
 						},
 						"sorts": {
 							"type": "array",
-							"description": "Array of sort objects with property and direction",
+							"description": "Array of sort objects. Example: [{\"property\": \"Created\", \"direction\": \"descending\"}]",
 							"items": {"type": "object"}
 						},
 						"page_size": {
@@ -168,7 +168,11 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 100,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Number of results to return (max 100)"
+							"description": "Number of results per page (1–100, default 100)"
+						},
+						"start_cursor": {
+							"type": "string",
+							"description": "Pagination cursor from a previous response's next_cursor field"
 						}
 					}
 				}`)),
@@ -176,7 +180,7 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "notion.search",
 				Name:        "Search",
-				Description: "Full-text search across all shared pages and databases",
+				Description: "Full-text search across all pages and databases shared with the integration",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -188,14 +192,18 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"filter": {
 							"type": "object",
-							"description": "Filter by object type: {\"property\": \"object\", \"value\": \"page\"} or \"database\""
+							"description": "Filter by object type. Example: {\"property\": \"object\", \"value\": \"page\"} (or \"database\")"
 						},
 						"page_size": {
 							"type": "integer",
 							"default": 100,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Number of results to return (max 100)"
+							"description": "Number of results per page (1–100, default 100)"
+						},
+						"start_cursor": {
+							"type": "string",
+							"description": "Pagination cursor from a previous response's next_cursor field"
 						}
 					}
 				}`)),

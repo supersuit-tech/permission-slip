@@ -43,7 +43,10 @@ func (a *createPageAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
-	body := buildCreatePageBody(params)
+	body, err := buildCreatePageBody(params)
+	if err != nil {
+		return nil, err
+	}
 
 	var resp map[string]any
 	if err := a.conn.do(ctx, http.MethodPost, "/v1/pages", req.Credentials, body, &resp); err != nil {
@@ -54,9 +57,7 @@ func (a *createPageAction) Execute(ctx context.Context, req connectors.ActionReq
 }
 
 // buildCreatePageBody constructs the Notion API request body for creating a page.
-// It detects whether parent_id is a database ID (starts with a UUID pattern with
-// dashes) and sets the parent type accordingly.
-func buildCreatePageBody(params createPageParams) map[string]any {
+func buildCreatePageBody(params createPageParams) (map[string]any, error) {
 	body := map[string]any{
 		"parent": map[string]string{
 			"page_id": params.ParentID,
@@ -73,18 +74,20 @@ func buildCreatePageBody(params createPageParams) map[string]any {
 	// properties follow the database schema.
 	if len(params.Properties) > 0 {
 		var props map[string]any
-		if err := json.Unmarshal(params.Properties, &props); err == nil {
-			body["properties"] = props
+		if err := json.Unmarshal(params.Properties, &props); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid properties JSON: %v", err)}
 		}
+		body["properties"] = props
 	}
 
 	// Append child blocks if provided.
 	if len(params.Content) > 0 {
 		var children []any
-		if err := json.Unmarshal(params.Content, &children); err == nil {
-			body["children"] = children
+		if err := json.Unmarshal(params.Content, &children); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid content JSON (expected array of block objects): %v", err)}
 		}
+		body["children"] = children
 	}
 
-	return body
+	return body, nil
 }

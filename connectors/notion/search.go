@@ -17,9 +17,10 @@ type searchAction struct {
 
 // searchParams is the user-facing parameter schema.
 type searchParams struct {
-	Query    string          `json:"query"`
-	Filter   json.RawMessage `json:"filter,omitempty"`
-	PageSize int             `json:"page_size,omitempty"`
+	Query       string          `json:"query"`
+	Filter      json.RawMessage `json:"filter,omitempty"`
+	PageSize    int             `json:"page_size,omitempty"`
+	StartCursor string          `json:"start_cursor,omitempty"`
 }
 
 func (p *searchParams) validate() error {
@@ -27,7 +28,7 @@ func (p *searchParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: query"}
 	}
 	if p.PageSize < 0 || p.PageSize > 100 {
-		return &connectors.ValidationError{Message: "page_size must be between 0 and 100"}
+		return &connectors.ValidationError{Message: "page_size must be between 1 and 100"}
 	}
 	return nil
 }
@@ -47,9 +48,13 @@ func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest
 	}
 	if len(params.Filter) > 0 {
 		var filter any
-		if err := json.Unmarshal(params.Filter, &filter); err == nil {
-			body["filter"] = filter
+		if err := json.Unmarshal(params.Filter, &filter); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid filter JSON: %v", err)}
 		}
+		body["filter"] = filter
+	}
+	if params.StartCursor != "" {
+		body["start_cursor"] = params.StartCursor
 	}
 	pageSize := params.PageSize
 	if pageSize == 0 {

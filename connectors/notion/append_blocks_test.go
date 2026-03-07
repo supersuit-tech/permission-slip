@@ -146,6 +146,29 @@ func TestAppendBlocks_NoContent(t *testing.T) {
 	}
 }
 
+func TestAppendBlocks_MalformedChildren(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &appendBlocksAction{conn: conn}
+	params, _ := json.Marshal(map[string]any{
+		"page_id":  "page-123",
+		"children": "not-an-array",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "notion.append_blocks",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for malformed children")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestAppendBlocks_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

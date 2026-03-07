@@ -17,10 +17,11 @@ type queryDatabaseAction struct {
 
 // queryDatabaseParams is the user-facing parameter schema.
 type queryDatabaseParams struct {
-	DatabaseID string          `json:"database_id"`
-	Filter     json.RawMessage `json:"filter,omitempty"`
-	Sorts      json.RawMessage `json:"sorts,omitempty"`
-	PageSize   int             `json:"page_size,omitempty"`
+	DatabaseID  string          `json:"database_id"`
+	Filter      json.RawMessage `json:"filter,omitempty"`
+	Sorts       json.RawMessage `json:"sorts,omitempty"`
+	PageSize    int             `json:"page_size,omitempty"`
+	StartCursor string          `json:"start_cursor,omitempty"`
 }
 
 func (p *queryDatabaseParams) validate() error {
@@ -28,7 +29,7 @@ func (p *queryDatabaseParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: database_id"}
 	}
 	if p.PageSize < 0 || p.PageSize > 100 {
-		return &connectors.ValidationError{Message: "page_size must be between 0 and 100"}
+		return &connectors.ValidationError{Message: "page_size must be between 1 and 100"}
 	}
 	return nil
 }
@@ -46,15 +47,20 @@ func (a *queryDatabaseAction) Execute(ctx context.Context, req connectors.Action
 	body := make(map[string]any)
 	if len(params.Filter) > 0 {
 		var filter any
-		if err := json.Unmarshal(params.Filter, &filter); err == nil {
-			body["filter"] = filter
+		if err := json.Unmarshal(params.Filter, &filter); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid filter JSON: %v", err)}
 		}
+		body["filter"] = filter
 	}
 	if len(params.Sorts) > 0 {
 		var sorts any
-		if err := json.Unmarshal(params.Sorts, &sorts); err == nil {
-			body["sorts"] = sorts
+		if err := json.Unmarshal(params.Sorts, &sorts); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sorts JSON: %v", err)}
 		}
+		body["sorts"] = sorts
+	}
+	if params.StartCursor != "" {
+		body["start_cursor"] = params.StartCursor
 	}
 	pageSize := params.PageSize
 	if pageSize == 0 {
