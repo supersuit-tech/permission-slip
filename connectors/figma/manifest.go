@@ -57,7 +57,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "figma.export_images",
 				Name:        "Export Images",
-				Description: "Export PNG, SVG, or PDF from specific nodes in a file",
+				Description: "Export PNG, SVG, PDF, or JPG from specific nodes in a file",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

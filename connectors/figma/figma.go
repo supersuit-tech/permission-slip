@@ -5,7 +5,7 @@
 // Actions:
 //   - figma.get_file         — get a design file tree with metadata
 //   - figma.get_components   — get design system components from a file
-//   - figma.export_images    — export PNG, SVG, or PDF from specific nodes
+//   - figma.export_images    — export PNG, SVG, PDF, or JPG from specific nodes
 //   - figma.list_comments    — list comments on a file
 //   - figma.post_comment     — post a comment on a file
 //   - figma.get_versions     — get version history for a file
