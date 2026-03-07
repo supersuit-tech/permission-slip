@@ -27,7 +27,7 @@ var moneySchema = `{
 }`
 
 // Manifest returns the connector's metadata manifest for DB auto-seeding.
-// Includes full parameter JSON schemas for all 6 actions and configuration
+// Includes full parameter JSON schemas for all 11 actions and configuration
 // templates for common use cases.
 func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{

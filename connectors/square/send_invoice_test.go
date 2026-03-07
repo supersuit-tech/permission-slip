@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -14,7 +15,7 @@ import (
 func TestSendInvoice_Success(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	var callCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("method = %s, want POST", r.Method)
@@ -32,7 +33,7 @@ func TestSendInvoice_Success(t *testing.T) {
 		var key string
 		json.Unmarshal(reqBody["idempotency_key"], &key)
 
-		callCount++
+		callCount.Add(1)
 		switch {
 		case r.URL.Path == "/orders":
 			if !strings.HasSuffix(key, "-order") {
@@ -116,8 +117,8 @@ func TestSendInvoice_Success(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if callCount != 3 {
-		t.Errorf("expected 3 API calls (order + invoice + publish), got %d", callCount)
+	if c := callCount.Load(); c != 3 {
+		t.Errorf("expected 3 API calls (order + invoice + publish), got %d", c)
 	}
 
 	var data map[string]any
