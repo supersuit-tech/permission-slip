@@ -469,7 +469,10 @@ func mapFigmaHTTPError(statusCode int, body []byte) error {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return &connectors.AuthError{Message: detail + " — check that your personal access token is valid and has access to this resource"}
 	case http.StatusNotFound:
-		return &connectors.AuthError{Message: detail + " — the file key may be incorrect, or your token may not have access to this file"}
+		// 404 indicates the requested resource (file, node, etc.) was not found
+		// or is invalid. Mapped to ValidationError for consistency with other
+		// connectors (e.g. zoom).
+		return &connectors.ValidationError{Message: detail + " — the file key may be incorrect, or the resource does not exist"}
 	case http.StatusTooManyRequests:
 		return &connectors.RateLimitError{Message: detail, RetryAfter: defaultRetryAfter}
 	case http.StatusBadRequest:

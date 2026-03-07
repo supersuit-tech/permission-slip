@@ -23,10 +23,10 @@ var validExportFormats = map[string]bool{
 }
 
 type exportImagesParams struct {
-	FileKey string  `json:"file_key"`
-	NodeIDs string  `json:"node_ids"`
-	Format  string  `json:"format"`
-	Scale   float64 `json:"scale,omitempty"`
+	FileKey string   `json:"file_key"`
+	NodeIDs string   `json:"node_ids"`
+	Format  string   `json:"format"`
+	Scale   *float64 `json:"scale,omitempty"`
 }
 
 func (p *exportImagesParams) validate() error {
@@ -43,8 +43,8 @@ func (p *exportImagesParams) validate() error {
 	if !validExportFormats[p.Format] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid format %q: must be png, svg, pdf, or jpg", p.Format)}
 	}
-	if p.Scale != 0 && (p.Scale < 0.01 || p.Scale > 4) {
-		return &connectors.ValidationError{Message: fmt.Sprintf("scale must be between 0.01 and 4, got %g", p.Scale)}
+	if p.Scale != nil && (*p.Scale < 0.01 || *p.Scale > 4) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("scale must be between 0.01 and 4, got %g", *p.Scale)}
 	}
 	return nil
 }
@@ -61,8 +61,8 @@ func (a *exportImagesAction) Execute(ctx context.Context, req connectors.ActionR
 	query := url.Values{}
 	query.Set("ids", params.NodeIDs)
 	query.Set("format", params.Format)
-	if params.Scale > 0 {
-		query.Set("scale", fmt.Sprintf("%g", params.Scale))
+	if params.Scale != nil {
+		query.Set("scale", fmt.Sprintf("%g", *params.Scale))
 	}
 	path += "?" + query.Encode()
 

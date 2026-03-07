@@ -75,11 +75,12 @@ func TestExportImages_WithScale(t *testing.T) {
 	})
 
 	action := &exportImagesAction{conn: conn}
+	scale := 2.0
 	params, _ := json.Marshal(exportImagesParams{
 		FileKey: "abc123",
 		NodeIDs: "1:2",
 		Format:  "png",
-		Scale:   2,
+		Scale:   &scale,
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -135,6 +136,31 @@ func TestExportImages_InvalidScale(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for scale > 4")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestExportImages_ZeroScale(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &exportImagesAction{conn: conn}
+	params, _ := json.Marshal(map[string]any{
+		"file_key": "abc123",
+		"node_ids": "1:2",
+		"format":   "png",
+		"scale":    0,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "figma.export_images",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for scale=0 (below minimum 0.01)")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

@@ -249,8 +249,8 @@ func TestFigmaConnector_DoGet_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !connectors.IsAuthError(err) {
-		t.Errorf("expected AuthError for 404, got %T: %v", err, err)
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for 404, got %T: %v", err, err)
 	}
 }
 
@@ -288,7 +288,9 @@ func TestFigmaConnector_DoPost_Success(t *testing.T) {
 		}
 
 		var body map[string]string
-		json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"id":"comment-1","message":%q}`, body["message"])
@@ -313,7 +315,7 @@ func TestMapFigmaHTTPError(t *testing.T) {
 	}{
 		{401, connectors.IsAuthError},
 		{403, connectors.IsAuthError},
-		{404, connectors.IsAuthError},
+		{404, connectors.IsValidationError},
 		{400, connectors.IsValidationError},
 		{429, connectors.IsRateLimitError},
 		{500, connectors.IsExternalError},
