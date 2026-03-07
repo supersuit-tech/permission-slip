@@ -37,29 +37,6 @@ func (p *updateDocumentParams) validate() error {
 	return nil
 }
 
-// Shared Docs API batchUpdate request types, used by both create_document
-// (for inserting initial body) and update_document.
-
-type docsBatchUpdateRequest struct {
-	Requests []docsRequest `json:"requests"`
-}
-
-type docsRequest struct {
-	InsertText *docsInsertTextRequest `json:"insertText,omitempty"`
-}
-
-type docsInsertTextRequest struct {
-	Text                 string                      `json:"text"`
-	Location             *docsLocation               `json:"location,omitempty"`
-	EndOfSegmentLocation *docsEndOfSegmentLocation   `json:"endOfSegmentLocation,omitempty"`
-}
-
-type docsLocation struct {
-	Index int `json:"index"`
-}
-
-type docsEndOfSegmentLocation struct{}
-
 // Execute inserts text into a Google Doc and returns success status.
 func (a *updateDocumentAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params updateDocumentParams

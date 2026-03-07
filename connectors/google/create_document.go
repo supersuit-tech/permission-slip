@@ -59,7 +59,7 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	documentURL := "https://docs.google.com/document/d/" + url.PathEscape(resp.DocumentID) + "/edit"
+	documentURL := documentEditURL(resp.DocumentID)
 
 	// If body text was provided, insert it via batchUpdate.
 	if params.Body != "" {

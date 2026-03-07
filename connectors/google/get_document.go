@@ -94,7 +94,7 @@ func (a *getDocumentAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	bodyText := extractPlainText(resp.Body.Content)
-	documentURL := "https://docs.google.com/document/d/" + url.PathEscape(resp.DocumentID) + "/edit"
+	documentURL := documentEditURL(resp.DocumentID)
 
 	return connectors.JSONResult(map[string]any{
 		"document_id":  resp.DocumentID,
