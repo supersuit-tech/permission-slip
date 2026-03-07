@@ -91,9 +91,19 @@ test: test-backend test-frontend mobile-test
 
 test-backend:
 	@echo "=== Step 1: go build (compilation check) ==="
-	go build ./... 2>&1 || (echo "BUILD FAILED" && exit 1)
+	go build ./... 2>&1 | tee /tmp/build_out.txt; BUILD_EXIT=$${PIPESTATUS[0]}; \
+	if [ $$BUILD_EXIT -ne 0 ]; then \
+		echo "::error::BUILD FAILED with exit $$BUILD_EXIT"; \
+		while IFS= read -r line; do echo "::error::$$line"; done < /tmp/build_out.txt; \
+		exit $$BUILD_EXIT; \
+	fi
 	@echo "=== Step 2: go vet (static analysis) ==="
-	go vet ./... 2>&1 || (echo "VET FAILED" && exit 1)
+	go vet ./... 2>&1 | tee /tmp/vet_out.txt; VET_EXIT=$${PIPESTATUS[0]}; \
+	if [ $$VET_EXIT -ne 0 ]; then \
+		echo "::error::VET FAILED with exit $$VET_EXIT"; \
+		while IFS= read -r line; do echo "::error::$$line"; done < /tmp/vet_out.txt; \
+		exit $$VET_EXIT; \
+	fi
 	@echo "=== Step 3: go test ==="
 	go test -vet=off ./...
 	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
