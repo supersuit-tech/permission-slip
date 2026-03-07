@@ -117,3 +117,39 @@ func IsOAuthRefreshError(err error) bool {
 func AsOAuthRefreshError(err error, target **OAuthRefreshError) bool {
 	return errors.As(err, target)
 }
+
+// PaymentError indicates a payment method-related failure (missing, limit
+// exceeded, etc.). Maps to HTTP 400 Bad Request or 403 Forbidden depending
+// on the error code.
+type PaymentError struct {
+	Code    PaymentErrorCode
+	Message string         // human-readable description
+	Details map[string]any // optional structured details for limit errors
+}
+
+func (e *PaymentError) Error() string {
+	return fmt.Sprintf("payment error: %s", e.Message)
+}
+
+// PaymentErrorCode enumerates payment-specific error codes.
+type PaymentErrorCode int
+
+const (
+	PaymentErrMissing        PaymentErrorCode = iota // payment_method_id not provided
+	PaymentErrNotFound                               // payment method does not exist or doesn't belong to user
+	PaymentErrPerTxLimit                             // amount exceeds per-transaction limit
+	PaymentErrMonthlyLimit                           // amount would exceed monthly limit
+	PaymentErrAmountRequired                         // amount_cents is required but not provided
+	PaymentErrInvalidAmount                          // amount_cents is negative or otherwise invalid
+)
+
+// IsPaymentError reports whether err is or wraps a *PaymentError.
+func IsPaymentError(err error) bool {
+	var target *PaymentError
+	return errors.As(err, &target)
+}
+
+// AsPaymentError extracts a *PaymentError from err if present.
+func AsPaymentError(err error, target **PaymentError) bool {
+	return errors.As(err, target)
+}

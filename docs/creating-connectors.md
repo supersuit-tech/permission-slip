@@ -342,7 +342,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 | Manifest Field | DB Table | Purpose |
 |----------------|----------|---------|
 | Top-level fields | `connectors` | One row per connector (id, name, description) |
-| `actions[]` | `connector_actions` | One row per action (action_type, risk_level, optional parameters_schema) |
+| `actions[]` | `connector_actions` | One row per action (action_type, risk_level, optional parameters_schema, requires_payment_method) |
 | `required_credentials[]` | `connector_required_credentials` | What credentials this connector needs (service, auth_type, instructions_url, oauth_provider, oauth_scopes) |
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
@@ -384,6 +384,28 @@ Requirements:
 **How it works at runtime:** On startup, the platform builds an OAuth Provider Registry (`oauth.Registry`). Built-in providers (Google, Microsoft) are registered first with endpoints and default scopes. Then, providers declared in connector manifests are merged in. The registry uses a priority system (BYOA > Manifest > BuiltIn) so that user-provided "bring your own app" credentials overlay the platform's built-in configuration. When a BYOA user registers credentials for a provider, only their client ID and secret are required — endpoints and scopes are inherited from the built-in or manifest definition.
 
 **Risk levels:** `low`, `medium`, `high`
+
+#### Payment-requiring actions
+
+If an action involves a financial transaction (e.g., booking, purchasing), set `RequiresPaymentMethod: true` in the manifest action:
+
+```go
+{
+    ActionType:            "travel.book_flight",
+    Name:                  "Book Flight",
+    Description:           "Book a flight itinerary",
+    RiskLevel:             "high",
+    RequiresPaymentMethod: true,
+    ParametersSchema:      json.RawMessage(`{...}`),
+},
+```
+
+When this flag is set:
+- The API layer requires `payment_method_id` and `amount_cents` in the execute request
+- Per-transaction and monthly spending limits are enforced before execution
+- `req.Payment` is populated with a `*PaymentInfo` containing the Stripe token and card metadata
+- The action implementation can use `req.Payment` to pass billing details to the external service
+- A transaction record is created after successful execution for monthly spend tracking
 
 ### Step 5: Register in main.go
 
@@ -759,7 +781,7 @@ Use this checklist when adding a new connector or action.
 - [ ] Define params struct with `validate()` method
 - [ ] Implement `Execute` following the parse → validate → call → return pattern
 - [ ] Register in connector's `Actions()` map
-- [ ] Add action to connector's `Manifest()` return value with `ParametersSchema`
+- [ ] Add action to connector's `Manifest()` return value with `ParametersSchema` (and `RequiresPaymentMethod: true` if applicable)
 - [ ] Write tests: `connectors/<connector>/<action_name>_test.go`
 - [ ] Update connector-level test's expected action list
 - [ ] Run `make test-backend` — all tests pass
@@ -793,6 +815,16 @@ type ActionRequest struct {
 	ActionType  string          // e.g., "github.create_issue"
 	Parameters  json.RawMessage // validated against schema before reaching here
 	Credentials Credentials     // decrypted at execution time; redacted in logs and JSON
+	Payment     *PaymentInfo    // non-nil when the action requires a payment method
+}
+
+// PaymentInfo is set when the action declares RequiresPaymentMethod: true.
+// Raw card data is never included — only the Stripe token and safe metadata.
+type PaymentInfo struct {
+	StripePaymentMethodID string // Stripe payment method token (e.g. "pm_...")
+	Brand                 string // card brand (e.g. "visa")
+	Last4                 string // last 4 digits of the card
+	AmountCents           int    // authorized transaction amount in cents
 }
 
 type ActionResult struct {
@@ -809,6 +841,21 @@ type ActionResult struct {
 | `*ExternalError` | 502 | External service returned a non-success response |
 | `*RateLimitError` | 429 | External service rate-limited the request (include `RetryAfter`) |
 | `*TimeoutError` | 504 | External service didn't respond in time |
+| `*OAuthRefreshError` | 401 | OAuth token refresh failed — user must re-authorize the provider |
+| `*PaymentError` | 400/403 | Payment method missing, not found, or limit exceeded (see codes below) |
+
+**Payment error codes** (`PaymentError.Code`):
+
+| Code | HTTP Status | Meaning |
+|------|-------------|---------|
+| `PaymentErrMissing` | 400 | `payment_method_id` not provided for an action that requires payment |
+| `PaymentErrNotFound` | 400 | Payment method does not exist or doesn't belong to the user |
+| `PaymentErrAmountRequired` | 400 | `amount_cents` is required but not provided |
+| `PaymentErrInvalidAmount` | 400 | `amount_cents` is negative or otherwise invalid |
+| `PaymentErrPerTxLimit` | 403 | Amount exceeds the payment method's per-transaction limit |
+| `PaymentErrMonthlyLimit` | 403 | Amount would exceed the payment method's monthly spending limit |
+
+Limit errors (`PaymentErrPerTxLimit`, `PaymentErrMonthlyLimit`) include a `Details` map with structured information (e.g., `limit`, `current_spend`, `requested_amount`) to help agents display actionable messages.
 
 ### Helper functions (`connectors/helpers.go`)
 
@@ -843,12 +890,13 @@ CREATE TABLE connectors (
 
 -- One row per action
 CREATE TABLE connector_actions (
-    connector_id      text NOT NULL REFERENCES connectors(id),
-    action_type       text NOT NULL,         -- "github.create_issue"
-    name              text NOT NULL,         -- "Create Issue"
-    description       text,
-    risk_level        text,                  -- 'low' | 'medium' | 'high'
-    parameters_schema jsonb,                 -- optional JSON Schema
+    connector_id              text NOT NULL REFERENCES connectors(id),
+    action_type               text NOT NULL,         -- "github.create_issue"
+    name                      text NOT NULL,         -- "Create Issue"
+    description               text,
+    risk_level                text,                  -- 'low' | 'medium' | 'high'
+    parameters_schema         jsonb,                 -- optional JSON Schema
+    requires_payment_method   boolean NOT NULL DEFAULT false,
     PRIMARY KEY (connector_id, action_type)
 );
 
@@ -909,6 +957,10 @@ connectors/
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
+│   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
+│   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
+│   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
@@ -943,8 +995,13 @@ connectors/
 ```
 Agent request → API validates auth → Registry.GetAction(actionType)
   → Decrypt credentials from Vault → connector.ValidateCredentials()
-  → action.Execute(ctx, ActionRequest{...}) → External API call
-  → ActionResult or typed error → HTTP response to agent
+  → If requires_payment_method: validate payment method + check limits
+  → action.Execute(ctx, ActionRequest{Payment: &PaymentInfo{...}})
+  → External API call → ActionResult or typed error
+  → If success + payment: record transaction against monthly spend
+  → HTTP response to agent
 ```
 
-The API layer handles credential decryption, validation orchestration, and error-to-HTTP mapping. Action implementations only need to focus on calling the external API and returning results or typed errors.
+The API layer handles credential decryption, validation orchestration, payment method resolution, and error-to-HTTP mapping. Action implementations only need to focus on calling the external API and returning results or typed errors.
+
+**Payment flow details:** When an action declares `RequiresPaymentMethod: true`, the execution layer validates the payment method and checks per-transaction and monthly limits *before* calling `Execute`. The `Payment` field on `ActionRequest` is populated only for payment-requiring actions. Transactions are recorded *after* successful execution to avoid charging users for failed actions.
