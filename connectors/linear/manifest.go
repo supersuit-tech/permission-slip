@@ -191,6 +191,12 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
+			{
+				Service:       "linear_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "linear",
+				OAuthScopes:   []string{"read", "write"},
+			},
 			{Service: "linear", AuthType: "api_key", InstructionsURL: "https://linear.app/docs/graphql/working-with-the-graphql-api#personal-api-keys"},
 		},
 		Templates: []connectors.ManifestTemplate{

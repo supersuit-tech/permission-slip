@@ -41,25 +41,11 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		return nil, nil
 	}
 
-	// Check auth_type for this connector's required credentials.
-	reqCred, err := db.GetRequiredCredentialByActionType(ctx, deps.DB, actionType)
+	// Resolve credentials: connectors may support multiple auth methods (e.g. OAuth + API key).
+	// When multiple methods are available, OAuth is tried first, falling back to static credentials.
+	creds, err := resolveCredentials(ctx, deps, userID, actionType)
 	if err != nil {
-		return nil, fmt.Errorf("look up required credential: %w", err)
-	}
-
-	var creds connectors.Credentials
-	if reqCred != nil && reqCred.AuthType == "oauth2" {
-		// OAuth2 path: resolve access token from oauth_connections.
-		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Static credential path (api_key, basic, custom): existing behavior.
-		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	// Validate credentials before executing the action.
@@ -223,6 +209,90 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 		last4:                 pm.Last4,
 		amount:                amount,
 	}, nil
+}
+
+// resolveCredentials determines the best authentication method for a connector action
+// and returns the resolved credentials. For connectors that support multiple auth methods
+// (e.g. both OAuth and API key), OAuth is preferred. If the user has no active OAuth
+// connection, it falls back to static credentials (API key, basic, custom).
+func resolveCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	allCreds, err := db.GetAllRequiredCredentialsByActionType(ctx, deps.DB, actionType)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up required credentials: %w", err)
+	}
+
+	// Separate OAuth and static credential entries.
+	var oauthCred *db.RequiredCredential
+	var staticServices []string
+	for i, rc := range allCreds {
+		if rc.AuthType == "oauth2" {
+			oauthCred = &allCreds[i]
+		} else {
+			staticServices = append(staticServices, rc.Service)
+		}
+	}
+
+	// Single auth method (most connectors) — use the fast path.
+	if oauthCred == nil && len(staticServices) > 0 {
+		return resolveStaticCredentials(ctx, deps, userID, actionType)
+	}
+	if oauthCred != nil && len(staticServices) == 0 {
+		return resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+	}
+
+	// Multiple auth methods: try OAuth first, fall back to static.
+	if oauthCred != nil {
+		oauthCreds, oauthErr := resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+		if oauthErr == nil {
+			return oauthCreds, nil
+		}
+		// OAuth failed (no connection, needs_reauth, etc.) — fall through to static.
+	}
+
+	if len(staticServices) > 0 {
+		return resolveStaticCredentialsForServices(ctx, deps, userID, staticServices)
+	}
+
+	// No credentials configured at all.
+	return connectors.Credentials{}, &connectors.ValidationError{
+		Message: "no credentials configured for this action",
+	}
+}
+
+// resolveStaticCredentialsForServices fetches and decrypts static credentials for
+// a specific set of services. Used when falling back from OAuth to API key auth,
+// to avoid trying to resolve OAuth service entries as static credentials.
+func resolveStaticCredentialsForServices(ctx context.Context, deps *Deps, userID string, services []string) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+	credMap := make(map[string]string, len(services))
+	for _, service := range services {
+		if deps.Vault == nil {
+			return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
+		}
+		decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
+		if err != nil {
+			var credErr *db.CredentialError
+			if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
+				return zero, &connectors.ValidationError{
+					Message: fmt.Sprintf("no credentials stored for service %q", service),
+				}
+			}
+			return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
+		}
+		for k, v := range decrypted {
+			switch vv := v.(type) {
+			case string:
+				credMap[k] = vv
+			default:
+				b, err := json.Marshal(v)
+				if err != nil {
+					return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
+				}
+				credMap[k] = string(b)
+			}
+		}
+	}
+	return connectors.NewCredentials(credMap), nil
 }
 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
