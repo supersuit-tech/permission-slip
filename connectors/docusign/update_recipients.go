@@ -2,7 +2,6 @@ package docusign
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -77,14 +76,10 @@ type recipientUpdateResult struct {
 
 func (a *updateRecipientsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params updateRecipientsParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	accountID, err := parseParams(req, &params)
+	if err != nil {
 		return nil, err
 	}
-
-	accountID, _ := req.Credentials.Get(credKeyAccountID)
 
 	signers := make([]signerRequest, len(params.Signers))
 	for i, s := range params.Signers {

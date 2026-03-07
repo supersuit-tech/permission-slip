@@ -2,8 +2,6 @@ package docusign
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -37,14 +35,10 @@ type sendEnvelopeResponse struct {
 
 func (a *sendEnvelopeAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params sendEnvelopeParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	accountID, err := parseParams(req, &params)
+	if err != nil {
 		return nil, err
 	}
-
-	accountID, _ := req.Credentials.Get(credKeyAccountID)
 
 	body := sendEnvelopeRequest{Status: "sent"}
 

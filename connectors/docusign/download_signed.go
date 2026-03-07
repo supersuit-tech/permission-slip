@@ -3,8 +3,6 @@ package docusign
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
-	"fmt"
 	"net/url"
 	"strconv"
 
@@ -31,14 +29,10 @@ func (p *downloadSignedParams) validate() error {
 
 func (a *downloadSignedAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params downloadSignedParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	accountID, err := parseParams(req, &params)
+	if err != nil {
 		return nil, err
 	}
-
-	accountID, _ := req.Credentials.Get(credKeyAccountID)
 
 	documentID := params.DocumentID
 	if documentID == "" {

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -105,9 +107,14 @@ func TestCheckStatus_Success(t *testing.T) {
 func TestCheckStatus_WithoutRecipients(t *testing.T) {
 	t.Parallel()
 
+	var requestCount atomic.Int32
+	var mu sync.Mutex
 	requestPaths := make([]string, 0)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		mu.Lock()
 		requestPaths = append(requestPaths, r.URL.Path)
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"envelopeId":            "env-abc-123",
@@ -137,8 +144,8 @@ func TestCheckStatus_WithoutRecipients(t *testing.T) {
 	}
 
 	// Should only hit the envelope endpoint, not recipients
-	if len(requestPaths) != 1 {
-		t.Errorf("expected 1 API call (envelope only), got %d", len(requestPaths))
+	if count := requestCount.Load(); count != 1 {
+		t.Errorf("expected 1 API call (envelope only), got %d", count)
 	}
 
 	var data map[string]json.RawMessage

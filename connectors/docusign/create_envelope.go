@@ -2,7 +2,6 @@ package docusign
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -72,14 +71,10 @@ type createEnvelopeResponse struct {
 
 func (a *createEnvelopeAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createEnvelopeParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	accountID, err := parseParams(req, &params)
+	if err != nil {
 		return nil, err
 	}
-
-	accountID, _ := req.Credentials.Get(credKeyAccountID)
 
 	roles := make([]templateRoleRequest, len(params.Recipients))
 	for i, r := range params.Recipients {
@@ -110,3 +105,4 @@ func (a *createEnvelopeAction) Execute(ctx context.Context, req connectors.Actio
 		"uri":         resp.URI,
 	})
 }
+
