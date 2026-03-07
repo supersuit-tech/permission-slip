@@ -457,13 +457,7 @@ func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentia
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Google API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Google API request canceled"}
-		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Google API request failed: %v", err)}
+		return wrapHTTPError(err)
 	}
 	defer resp.Body.Close()
 
@@ -486,6 +480,51 @@ func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentia
 	}
 
 	return nil
+}
+
+// doRawGet performs a GET request and returns the response body as a string.
+// Used for Drive file export/download endpoints that return non-JSON content.
+func (c *GoogleConnector) doRawGet(ctx context.Context, creds connectors.Credentials, rawURL string) (string, error) {
+	token, ok := creds.Get(credKeyAccessToken)
+	if !ok || token == "" {
+		return "", &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", wrapHTTPError(err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return "", &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if err := checkResponse(resp.StatusCode, resp.Header, body); err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
+// wrapHTTPError converts HTTP client errors into typed connector errors.
+// This centralizes the timeout/cancel/external error mapping so it doesn't
+// need to be duplicated across doJSON, doRawGet, and multipart upload.
+func wrapHTTPError(err error) error {
+	if connectors.IsTimeout(err) {
+		return &connectors.TimeoutError{Message: fmt.Sprintf("Google API request timed out: %v", err)}
+	}
+	if errors.Is(err, context.Canceled) {
+		return &connectors.TimeoutError{Message: "Google API request canceled"}
+	}
+	return &connectors.ExternalError{Message: fmt.Sprintf("Google API request failed: %v", err)}
 }
 
 // checkResponse maps HTTP status codes to typed connector errors.

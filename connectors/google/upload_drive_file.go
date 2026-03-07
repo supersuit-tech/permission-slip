@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -129,13 +128,7 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 
 	resp, err := a.conn.client.Do(httpReq)
 	if err != nil {
-		if connectors.IsTimeout(err) {
-			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Google API request timed out: %v", err)}
-		}
-		if errors.Is(err, context.Canceled) {
-			return nil, &connectors.TimeoutError{Message: "Google API request canceled"}
-		}
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Google API request failed: %v", err)}
+		return nil, wrapHTTPError(err)
 	}
 	defer resp.Body.Close()
 
