@@ -24,6 +24,22 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "meta",
+			AuthorizeURL: "https://www.facebook.com/v19.0/dialog/oauth",
+			TokenURL:     "https://graph.facebook.com/v19.0/oauth/access_token",
+			Scopes: []string{
+				"pages_manage_posts",
+				"pages_read_engagement",
+				"pages_read_user_content",
+				"instagram_basic",
+				"instagram_content_publish",
+				"instagram_manage_insights",
+			},
+			ClientID:     os.Getenv("META_CLIENT_ID"),
+			ClientSecret: os.Getenv("META_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "microsoft",
 			AuthorizeURL: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
 			TokenURL:     "https://login.microsoftonline.com/common/oauth2/v2.0/token",
