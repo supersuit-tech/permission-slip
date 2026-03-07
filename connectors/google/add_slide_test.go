@@ -47,7 +47,7 @@ func TestAddSlide_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &addSlideAction{conn: conn}
 
 	params, _ := json.Marshal(addSlideParams{
@@ -97,7 +97,7 @@ func TestAddSlide_WithLayout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &addSlideAction{conn: conn}
 
 	params, _ := json.Marshal(addSlideParams{
@@ -145,7 +145,7 @@ func TestAddSlide_WithInsertionIndex(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &addSlideAction{conn: conn}
 
 	idx := 2
@@ -264,7 +264,7 @@ func TestAddSlide_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &addSlideAction{conn: conn}
 
 	params, _ := json.Marshal(addSlideParams{

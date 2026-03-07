@@ -1,6 +1,6 @@
 # Google Connector
 
-The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), and [Google Slides](https://developers.google.com/slides/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
+The Google connector integrates Permission Slip with [Gmail](https://developers.google.com/gmail/api), [Google Calendar](https://developers.google.com/calendar/api), [Google Slides](https://developers.google.com/slides/api), and [Google Chat](https://developers.google.com/chat/api) APIs. It uses plain `net/http` with OAuth 2.0 access tokens provided by the platform — no third-party Google SDK.
 
 ## Connector ID
 
@@ -20,8 +20,10 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 |-------|---------|
 | `gmail.send` | `google.send_email` |
 | `gmail.readonly` | `google.list_emails` |
-| `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events` |
+| `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
+| `chat.spaces.readonly` | `google.list_chat_spaces` |
+| `chat.messages.create` | `google.send_chat_message` |
 
 Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management).
 
@@ -254,6 +256,107 @@ Adds a new slide to an existing presentation using the Slides API's `batchUpdate
 
 The `batchUpdate` pattern is the standard Slides API approach for mutations and is extensible for future text/image insertion actions.
 
+---
+
+### `google.send_chat_message`
+
+Sends a message to a Google Chat space.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `space_name` | string | Yes | The resource name of the space (e.g., `spaces/AAAA1234`) |
+| `text` | string | Yes | The message text |
+
+**Response:**
+
+```json
+{
+  "name": "spaces/AAAA1234/messages/msg-001",
+  "space": "spaces/AAAA1234",
+  "thread": "spaces/AAAA1234/threads/thread-001",
+  "create_time": "2024-01-15T09:00:00Z"
+}
+```
+
+**Chat API:** `POST /v1/{parent}/messages` ([docs](https://developers.google.com/chat/api/reference/rest/v1/spaces.messages/create))
+
+**Security notes:**
+- `space_name` is validated to start with `spaces/` and cannot contain `..` segments, preventing path traversal attacks.
+
+---
+
+### `google.list_chat_spaces`
+
+Lists Google Chat spaces accessible to the authenticated user.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `page_size` | integer | No | `20` | Maximum number of spaces to return (1-100) |
+| `filter` | string | No | — | Optional filter query (e.g., `spaceType = "SPACE"` to list only named spaces) |
+
+**Response:**
+
+```json
+{
+  "spaces": [
+    {
+      "name": "spaces/AAAA1234",
+      "display_name": "Engineering",
+      "type": "ROOM",
+      "space_type": "SPACE"
+    }
+  ]
+}
+```
+
+**Chat API:** `GET /v1/spaces` ([docs](https://developers.google.com/chat/api/reference/rest/v1/spaces/list))
+
+---
+
+### `google.create_meeting`
+
+Creates a Google Calendar event with an auto-generated Google Meet conference link.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `summary` | string | Yes | — | Meeting title |
+| `description` | string | No | — | Meeting description |
+| `start_time` | string | Yes | — | Start time in RFC 3339 format (e.g., `2024-01-15T09:00:00-05:00`) |
+| `end_time` | string | Yes | — | End time in RFC 3339 format (must be after `start_time`) |
+| `attendees` | string[] | No | — | List of attendee email addresses |
+| `calendar_id` | string | No | `primary` | Calendar ID (defaults to `primary`) |
+
+**Response:**
+
+```json
+{
+  "id": "event-123",
+  "html_link": "https://calendar.google.com/event?eid=123",
+  "status": "confirmed",
+  "meet_link": "https://meet.google.com/abc-defg-hij"
+}
+```
+
+**Calendar API:** `POST /calendars/{calendarId}/events?conferenceDataVersion=1` ([docs](https://developers.google.com/calendar/api/v3/reference/events/insert))
+
+**Implementation details:**
+- Uses `conferenceDataVersion=1` and `conferenceSolutionKey.type=hangoutsMeet` to request automatic Meet link generation.
+- The `requestId` is derived deterministically from the meeting summary and start time (SHA-256 hash), making the request idempotent — creating the same meeting twice returns the same conference link.
+- The `meet_link` field is only present when Google successfully attaches conference data to the event.
+- Validation rules match `google.create_calendar_event` (RFC 3339 times, end after start).
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -284,6 +387,11 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Create presentations | `create_presentation` | Nothing — agent controls title |
 | View presentations | `get_presentation` | Nothing — agent controls presentation ID |
 | Add slides to presentations | `add_slide` | Nothing — agent controls all parameters |
+| Send chat messages | `send_chat_message` | Nothing — agent controls space and text |
+| Send message to specific space | `send_chat_message` | `space_name` locked to a placeholder; admin sets the real space |
+| List chat spaces | `list_chat_spaces` | Nothing — agent controls page size and filter |
+| Create meetings with Meet link | `create_meeting` | Nothing — agent controls all parameters |
+| Create personal meetings | `create_meeting` | `calendar_id` locked to `primary`, no attendees |
 
 ## Adding a New Action
 
@@ -294,14 +402,15 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 3. Use `checkResponse()` (called automatically by `doJSON`) to map HTTP errors to typed connector errors.
 4. Return `connectors.JSONResult(respBody)` to wrap the response into an `ActionResult`.
 5. Register the action in `Actions()` inside `google.go`.
-6. Add the action to the `Manifest()` return value inside `google.go` with a `ParametersSchema`.
-7. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()`.
+6. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
+7. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithSlides()` / `newForTestWithChat()`.
 
 ## File Structure
 
 ```
 connectors/google/
-├── google.go                       # GoogleConnector struct, New(), Manifest(), doJSON(), ValidateCredentials()
+├── google.go                       # GoogleConnector struct, New(), doJSON(), ValidateCredentials()
+├── manifest.go                     # Manifest() — connector metadata, action schemas, templates
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
 ├── create_calendar_event.go        # google.create_calendar_event action
@@ -310,6 +419,10 @@ connectors/google/
 ├── get_presentation.go             # google.get_presentation action
 ├── add_slide.go                    # google.add_slide action (via batchUpdate)
 ├── slides_helpers.go               # Shared helpers for Slides actions (presentationURL)
+├── send_chat_message.go            # google.send_chat_message action
+├── list_chat_spaces.go             # google.list_chat_spaces action
+├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
+├── calendar_helpers.go             # Shared calendar validation (time range, attendees)
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
@@ -319,6 +432,9 @@ connectors/google/
 ├── create_presentation_test.go     # Create presentation tests
 ├── get_presentation_test.go        # Get presentation tests (including URL encoding)
 ├── add_slide_test.go               # Add slide tests (layout validation, insertion index)
+├── send_chat_message_test.go       # Send chat message tests (including path traversal validation)
+├── list_chat_spaces_test.go        # List chat spaces tests (including page size clamping)
+├── create_meeting_test.go          # Create meeting tests (including Meet link extraction)
 └── README.md                       # This file
 ```
 

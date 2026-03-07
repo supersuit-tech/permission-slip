@@ -61,7 +61,7 @@ func TestSendEmail_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), srv.URL, "", "")
+	conn := newForTest(srv.Client(), srv.URL, "")
 	action := &sendEmailAction{conn: conn}
 
 	params, _ := json.Marshal(sendEmailParams{
@@ -178,7 +178,7 @@ func TestSendEmail_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), srv.URL, "", "")
+	conn := newForTest(srv.Client(), srv.URL, "")
 	action := &sendEmailAction{conn: conn}
 
 	params, _ := json.Marshal(sendEmailParams{
@@ -209,7 +209,7 @@ func TestSendEmail_RateLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), srv.URL, "", "")
+	conn := newForTest(srv.Client(), srv.URL, "")
 	action := &sendEmailAction{conn: conn}
 
 	params, _ := json.Marshal(sendEmailParams{

@@ -42,7 +42,7 @@ func TestListCalendarEvents_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL, "")
+	conn := newForTest(srv.Client(), "", srv.URL)
 	action := &listCalendarEventsAction{conn: conn}
 
 	params, _ := json.Marshal(listCalendarEventsParams{MaxResults: 10})
@@ -83,7 +83,7 @@ func TestListCalendarEvents_EmptyResult(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL, "")
+	conn := newForTest(srv.Client(), "", srv.URL)
 	action := &listCalendarEventsAction{conn: conn}
 
 	params, _ := json.Marshal(listCalendarEventsParams{})
@@ -166,7 +166,7 @@ func TestListCalendarEvents_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", srv.URL, "")
+	conn := newForTest(srv.Client(), "", srv.URL)
 	action := &listCalendarEventsAction{conn: conn}
 
 	params, _ := json.Marshal(listCalendarEventsParams{})

@@ -57,7 +57,7 @@ func TestListEmails_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), srv.URL, "", "")
+	conn := newForTest(srv.Client(), srv.URL, "")
 	action := &listEmailsAction{conn: conn}
 
 	params, _ := json.Marshal(listEmailsParams{MaxResults: 5})
@@ -92,7 +92,7 @@ func TestListEmails_EmptyResult(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), srv.URL, "", "")
+	conn := newForTest(srv.Client(), srv.URL, "")
 	action := &listEmailsAction{conn: conn}
 
 	params, _ := json.Marshal(listEmailsParams{})
@@ -128,7 +128,7 @@ func TestListEmails_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), srv.URL, "", "")
+	conn := newForTest(srv.Client(), srv.URL, "")
 	action := &listEmailsAction{conn: conn}
 
 	params, _ := json.Marshal(listEmailsParams{})

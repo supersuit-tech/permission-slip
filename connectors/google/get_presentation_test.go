@@ -36,7 +36,7 @@ func TestGetPresentation_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &getPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(getPresentationParams{
@@ -96,7 +96,7 @@ func TestGetPresentation_EmptySlides(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &getPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(getPresentationParams{
@@ -178,7 +178,7 @@ func TestGetPresentation_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &getPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(getPresentationParams{
@@ -215,7 +215,7 @@ func TestGetPresentation_PresentationIDURLEncoded(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &getPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(getPresentationParams{

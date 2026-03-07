@@ -39,7 +39,7 @@ func TestCreatePresentation_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &createPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(createPresentationParams{
@@ -122,7 +122,7 @@ func TestCreatePresentation_AuthFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &createPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(createPresentationParams{
@@ -154,7 +154,7 @@ func TestCreatePresentation_RateLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	conn := newForTest(srv.Client(), "", "", srv.URL)
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
 	action := &createPresentationAction{conn: conn}
 
 	params, _ := json.Marshal(createPresentationParams{

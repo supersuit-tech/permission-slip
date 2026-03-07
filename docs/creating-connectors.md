@@ -961,6 +961,10 @@ connectors/
 │   ├── get_presentation.go       # google.get_presentation action (Slides API)
 │   ├── add_slide.go              # google.add_slide action (batchUpdate)
 │   ├── slides_helpers.go         # Shared helpers for Slides actions
+│   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
+│   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
+│   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
+│   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
