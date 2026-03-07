@@ -9,7 +9,10 @@ import (
 )
 
 // checkResponse inspects the HTTP status code and returns an appropriate
-// typed error for non-success responses.
+// typed error for non-success responses. The error type determines the
+// HTTP response code returned to the caller (see connectors/errors.go).
+// 404 maps to ValidationError (not ExternalError) because a missing
+// product is a client-side input issue, not a server failure.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil

@@ -12,7 +12,7 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "walmart",
 		Name:        "Walmart",
-		Description: "Walmart Affiliate API for product search, details, taxonomy, and trending products with shoppable cart links",
+		Description: "Walmart Affiliate API for product search, details, taxonomy, and trending products with shoppable cart links. All actions are read-only.",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "walmart.search_products",

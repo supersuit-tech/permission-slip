@@ -17,6 +17,8 @@ type searchProductsAction struct {
 	conn *WalmartConnector
 }
 
+// searchProductsParams maps the JSON parameters for walmart.search_products.
+// Limit defaults to 10 when omitted or zero. Walmart caps results at 25 per page.
 type searchProductsParams struct {
 	Query      string `json:"query"`
 	CategoryID string `json:"category_id"`
@@ -26,6 +28,7 @@ type searchProductsParams struct {
 	Limit      int    `json:"limit"`
 }
 
+// validSortFields lists the Walmart API's accepted sort values.
 var validSortFields = map[string]bool{
 	"relevance": true,
 	"price":     true,

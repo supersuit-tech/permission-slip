@@ -16,6 +16,7 @@ type getProductAction struct {
 	conn *WalmartConnector
 }
 
+// getProductParams maps the JSON parameters for walmart.get_product.
 type getProductParams struct {
 	ItemID string `json:"item_id"`
 }
