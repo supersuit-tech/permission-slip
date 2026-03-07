@@ -36,6 +36,7 @@ import (
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
+	"github.com/supersuit-tech/permission-slip-web/connectors/sendgrid"
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
@@ -349,6 +350,7 @@ func main() {
 		registry.Register(protonmail.New())
 	}
 	registry.Register(redisconnector.New())
+	registry.Register(sendgrid.New())
 	registry.Register(square.New())
 	registry.Register(stripeconnector.New())
 	registry.Register(twilio.New())
