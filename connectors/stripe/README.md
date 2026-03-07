@@ -31,7 +31,12 @@ All actions are implemented with full test coverage (see [issue #90](https://git
 | `stripe.list_subscriptions` | low | *(none)* | List subscriptions. Optional filters: `customer_id`, `status`, `price_id`, `limit` (default 10, max 100) |
 | `stripe.create_invoice` | medium | `customer_id` | Create an invoice, add line items, and optionally finalize. Optional: `description`, `due_date`, `currency` (default "usd"), `auto_advance`, `line_items[]`, `metadata` |
 | `stripe.create_payment_link` | medium | `line_items[]` | Create a shareable payment link. Each item needs `price_id` + `quantity`. Optional: `after_completion` (redirect URL), `allow_promotion_codes`, `metadata` |
+| `stripe.create_subscription` | medium | `customer`, `items[]` | Create a recurring subscription. Each item needs `price`. Optional: `quantity`, `trial_period_days`, `payment_behavior`, `metadata`. Max 20 items |
+| `stripe.create_coupon` | medium | `duration` | Create a discount coupon — exactly one of `percent_off` or `amount_off` required. `currency` required with `amount_off`. `duration_in_months` required when duration is "repeating". Optional: `name`, `max_redemptions`, `metadata` |
+| `stripe.create_promotion_code` | medium | `coupon` | Create a shareable promotion code for an existing coupon. Optional: `code` (auto-generated if omitted), `max_redemptions`, `expires_at`, `metadata` |
+| `stripe.cancel_subscription` | **high** | `subscription_id` | Cancel a subscription immediately (DELETE) or at period end (POST with `cancel_at_period_end: true`). Optional: `proration_behavior` |
 | `stripe.issue_refund` | **high** | `payment_intent_id` or `charge_id` | Refund a payment. Optional: `amount` (cents, omit for full refund), `reason`, `metadata`. Idempotency keys are mandatory. |
+| `stripe.initiate_payout` | **high** | `amount`, `currency` | Trigger a payout to a connected bank account. Currency must be a 3-letter ISO 4217 code. Optional: `description`, `destination`, `metadata` |
 
 ### Action Details
 
@@ -45,12 +50,29 @@ This action performs up to 3 API calls:
 
 If a line item or finalize step fails, the error includes the invoice ID for recovery (e.g., `"adding line item to invoice in_xxx: ..."`).
 
+#### `stripe.cancel_subscription` — High Risk
+
+Cancellation has two modes depending on `cancel_at_period_end`:
+
+- **`cancel_at_period_end: true`** → POST update to `/v1/subscriptions/{id}` — the subscription stays active until the current billing period ends, then cancels. Safer for customer experience.
+- **`cancel_at_period_end: false` or omitted** → DELETE `/v1/subscriptions/{id}` — immediate cancellation with optional proration.
+
+User-supplied subscription IDs are escaped with `url.PathEscape` to prevent path injection.
+
 #### `stripe.issue_refund` — High Risk
 
 Refunds move real money. The connector enforces:
 - Exactly one of `payment_intent_id` or `charge_id` (not both, not neither)
 - `reason` must be one of `duplicate`, `fraudulent`, `requested_by_customer`, or empty
 - Deterministic idempotency keys prevent double-refunds on retries
+
+#### `stripe.initiate_payout` — High Risk
+
+Payouts move money out of the Stripe account to a connected bank account. The connector enforces:
+- `amount` must be positive (in smallest currency unit, e.g., cents)
+- `currency` must be a valid 3-letter ISO 4217 code
+- Deterministic idempotency keys prevent double-payouts on retries
+- If `destination` is omitted, Stripe uses the account's default bank
 
 ### Validation Limits
 
@@ -60,11 +82,13 @@ All actions enforce these limits client-side for clear error messages:
 - **Invoice line items:** max 250 (Stripe's limit)
 - **Payment link line items:** max 20 (Stripe's limit)
 - **Payment link redirect URL:** must use HTTPS scheme (prevents open redirects via `javascript:`, `data:`, or `http:` schemes)
+- **Subscription items:** max 20 (Stripe's limit)
 - **Subscription list limit:** 1–100 (default 10)
+- **Currency:** must be a 3-letter ISO 4217 code (validated client-side)
 
 ## Configuration Templates
 
-The connector ships with 8 pre-built templates at different permission levels. Administrators can assign templates to agents to grant minimum-necessary access:
+The connector ships with 16 pre-built templates at different permission levels. Administrators can assign templates to agents to grant minimum-necessary access:
 
 | Template | Action | Risk | Notes |
 |----------|--------|------|-------|
@@ -74,7 +98,15 @@ The connector ships with 8 pre-built templates at different permission levels. A
 | Create customers | `create_customer` | Low | Any customer details |
 | Create invoices | `create_invoice` | Medium | Any customer, any line items |
 | Create payment links | `create_payment_link` | Medium | Any products |
-| Issue refunds up to $99.99 | `issue_refund` | **High** | Amount capped via `$pattern` regex (`^[1-9]\d{0,3}$` = max 9999 cents) |
+| Create subscriptions | `create_subscription` | Medium | Any customer, any price, trials allowed |
+| Create subscriptions (no trials) | `create_subscription` | Medium | `trial_period_days` locked to 0 |
+| Create coupons | `create_coupon` | Medium | Any discount type, duration, limits |
+| Create promotion codes | `create_promotion_code` | Medium | Any coupon, any code |
+| Cancel subscriptions (end of period) | `cancel_subscription` | **High** | `cancel_at_period_end` locked to true — safer |
+| Cancel subscriptions (immediate) | `cancel_subscription` | **High** | Both immediate and period-end cancellation |
+| Initiate payouts (default destination) | `initiate_payout` | **High** | Cannot override bank destination |
+| Initiate payouts (any destination) | `initiate_payout` | **High** | Can specify any bank account or card |
+| Issue refunds up to $99.99 | `issue_refund` | **High** | Amount capped via `$pattern` (max 9999 cents) |
 | Issue refunds (any amount) | `issue_refund` | **High** | Uncapped — for trusted agents only |
 
 Templates are defined in `manifest.go` and auto-seeded into the database on startup.
@@ -149,9 +181,12 @@ Each action lives in its own file. To add one:
 
 **Validation checklist for new actions:**
 - Call `validateMetadata()` if accepting metadata
+- Call `validateCurrency()` if accepting currency codes
+- Use `validateEnum()` for string enum fields (avoids duplicating `map[string]bool` patterns)
 - Cap array parameters (line items, etc.) to prevent resource exhaustion
 - Use `url.PathEscape()` for any user-supplied or API-returned IDs in URL paths
 - Include `t.Parallel()` in all tests and protect shared state with `sync.Mutex`
+- Never use `t.Fatal`/`t.Fatalf` inside `httptest` handler goroutines — use `t.Errorf` + early return instead (prevents `runtime.Goexit` panics)
 
 The `doPost`/`doGet` methods handle auth, form encoding, idempotency, error mapping, and response size limits. Each action file only contains parameter parsing, validation, and the Stripe endpoint path.
 
@@ -159,15 +194,20 @@ The `doPost`/`doGet` methods handle auth, form encoding, idempotency, error mapp
 
 ```
 connectors/stripe/
-├── stripe.go                    # StripeConnector, New(), do(), doGet(), doPost(), formEncode(), validateMetadata()
+├── stripe.go                    # StripeConnector, New(), do(), doGet(), doPost(), formEncode(), validateMetadata(), validateEnum(), validateCurrency()
 ├── manifest.go                  # ManifestProvider: action schemas, credentials, templates
 ├── response.go                  # Stripe error parsing and typed error mapping
+├── cancel_subscription.go       # stripe.cancel_subscription action (high risk, DELETE or POST)
+├── create_coupon.go             # stripe.create_coupon action (percent_off or amount_off)
 ├── create_customer.go           # stripe.create_customer action
 ├── create_invoice.go            # stripe.create_invoice action (multi-step: create → items → finalize)
+├── create_payment_link.go       # stripe.create_payment_link action
+├── create_promotion_code.go     # stripe.create_promotion_code action
+├── create_subscription.go       # stripe.create_subscription action (recurring billing)
+├── get_balance.go               # stripe.get_balance action
+├── initiate_payout.go           # stripe.initiate_payout action (high risk, moves money out)
 ├── issue_refund.go              # stripe.issue_refund action (high risk, idempotency-critical)
 ├── list_subscriptions.go        # stripe.list_subscriptions action
-├── create_payment_link.go       # stripe.create_payment_link action
-├── get_balance.go               # stripe.get_balance action
 ├── *_test.go                    # Corresponding test files for each action
 ├── helpers_test.go              # Shared test helpers (validCreds)
 ├── stripe_test.go               # Core tests (form encoding, do(), error mapping, idempotency, manifest validation)
