@@ -5375,7 +5375,7 @@ paths:
         - name: provider
           in: path
           required: true
-          description: The OAuth provider ID (e.g. "google", "microsoft")
+          description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
           schema:
             type: string
         - name: scope
@@ -7479,7 +7479,7 @@ components:
           maxLength: 255
           description: |
             OAuth provider identifier. Only present when `auth_type` is `oauth2`.
-            Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft").
+            Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft", "zoom").
           example: google
         oauth_scopes:
           type: array
@@ -10118,7 +10118,7 @@ components:
       properties:
         id:
           type: string
-          description: The OAuth provider ID (e.g. "google", "microsoft")
+          description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
           example: google
         scopes:
           type: array
@@ -10160,7 +10160,7 @@ components:
       properties:
         provider:
           type: string
-          description: The OAuth provider ID (e.g. "google", "microsoft")
+          description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
           example: google
         scopes:
           type: array

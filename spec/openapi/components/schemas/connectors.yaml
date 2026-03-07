@@ -293,7 +293,7 @@ RequiredCredential:
       maxLength: 255
       description: |
         OAuth provider identifier. Only present when `auth_type` is `oauth2`.
-        Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft").
+        Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft", "zoom").
       example: "google"
 
     oauth_scopes:

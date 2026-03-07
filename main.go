@@ -36,6 +36,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
@@ -339,6 +340,7 @@ func main() {
 	registry.Register(stripeconnector.New())
 	registry.Register(amadeus.New())
 	registry.Register(expedia.New())
+	registry.Register(zoom.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
