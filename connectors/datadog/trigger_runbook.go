@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -36,14 +37,17 @@ func (a *triggerRunbookAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
+	meta := map[string]any{}
+	if len(params.Payload) > 0 {
+		meta["payload"] = params.Payload
+	}
+
 	body := map[string]any{
-		"meta": map[string]any{
-			"payload": params.Payload,
-		},
+		"meta": meta,
 	}
 
 	var respBody json.RawMessage
-	path := fmt.Sprintf("/api/v2/workflows/%s/instances", params.WorkflowID)
+	path := fmt.Sprintf("/api/v2/workflows/%s/instances", url.PathEscape(params.WorkflowID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &respBody); err != nil {
 		return nil, err
 	}

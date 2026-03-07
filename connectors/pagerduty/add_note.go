@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -46,7 +47,7 @@ func (a *addNoteAction) Execute(ctx context.Context, req connectors.ActionReques
 	}
 
 	var respBody json.RawMessage
-	path := fmt.Sprintf("/incidents/%s/notes", params.IncidentID)
+	path := fmt.Sprintf("/incidents/%s/notes", url.PathEscape(params.IncidentID))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &respBody); err != nil {
 		return nil, err
 	}

@@ -312,7 +312,7 @@ func (c *DatadogConnector) do(ctx context.Context, creds connectors.Credentials,
 		return err
 	}
 
-	if respBody != nil {
+	if respBody != nil && len(respBytes) > 0 {
 		if err := json.Unmarshal(respBytes, respBody); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Datadog response: %v", err)}
 		}
