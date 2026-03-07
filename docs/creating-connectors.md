@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), JWT-based auth (DoorDash), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Slack connector (`connectors/slack/`) is a good reference for custom Bearer token auth, shared response types across similar actions (`messages.go`), input validation helpers (`validateChannelID`, `validateLimit`), and response body size limits. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks). The DoorDash connector (`connectors/doordash/`) is a good reference for self-signed JWT auth (HS256 with base64-decoded secret), status enum validation, and `RequiresPaymentMethod` for financial actions.
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), JWT-based auth (DoorDash), and more. The Jira connector (`connectors/jira/`) is a good starting reference for basic auth with dynamic base URLs and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Slack connector (`connectors/slack/`) is a good reference for custom Bearer token auth, shared response types across similar actions (`messages.go`), input validation helpers (`validateChannelID`, `validateLimit`), and response body size limits. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks). The DoorDash connector (`connectors/doordash/`) is a good reference for self-signed JWT auth (HS256 with base64-decoded secret), status enum validation, and `RequiresPaymentMethod` for financial actions. The Plaid connector (`connectors/plaid/`) is a good reference for custom body-based auth (client_id/secret in request body), sandbox/production environment switching via credentials, API version pinning, shared action types for DRY endpoints, and preventing credential leakage in HTTP helpers. The Datadog connector (`connectors/datadog/`) is a good reference for multi-region site routing via credentials, dual-key auth (API key + application key), and high-risk action classification (trigger_runbook). The PagerDuty connector (`connectors/pagerduty/`) is a good reference for incident lifecycle management (triggered → acknowledged → resolved), the `From` email header pattern for audit trails, and read-only vs. write action risk differentiation. The Zapier connector (`connectors/zapier/`) is a good reference for webhook-based integrations with SSRF-safe URL prefix validation, redirect-disabled HTTP clients, and fire-and-forget vs. synchronous execution modes. The Make connector (`connectors/make/`) is a good reference for region-based multi-datacenter routing via credential allowlists (instead of arbitrary URLs), `url.Values` for safe query string construction, and structured response wrapping for better UX. The QuickBooks connector (`connectors/quickbooks/`) is a good reference for OAuth 2.0 with realm/company-scoped credentials, high-risk financial actions with explicit warnings, allowlist-based query injection prevention, and comprehensive manifest templates for progressive permission levels (read-only → medium-risk → high-risk).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -920,6 +920,8 @@ Action types follow the pattern `<connector_id>.<action_name>`:
 - `github.merge_pr`
 - `slack.send_message`
 - `slack.create_channel`
+- `slack.schedule_message`
+- `slack.upload_file`
 
 The registry uses the part before the first `.` to route to the correct connector.
 
@@ -988,13 +990,19 @@ connectors/
 │   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
-│   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), shared validators
+│   ├── slack.go              # SlackConnector struct, New(), Actions(), doPost(), shared validators
+│   ├── manifest.go           # Manifest() — action schemas, templates, credentials
 │   ├── messages.go           # Shared message types (slackMessage, messageSummary, messagesResponse)
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
 │   ├── list_channels.go      # slack.list_channels action
 │   ├── read_channel_messages.go  # slack.read_channel_messages action
 │   ├── read_thread.go        # slack.read_thread action
+│   ├── schedule_message.go   # slack.schedule_message action
+│   ├── set_topic.go          # slack.set_topic action
+│   ├── invite_to_channel.go  # slack.invite_to_channel action
+│   ├── upload_file.go        # slack.upload_file action (v2 upload flow)
+│   ├── add_reaction.go       # slack.add_reaction action
 │   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── kroger/

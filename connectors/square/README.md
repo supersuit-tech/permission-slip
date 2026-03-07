@@ -2,7 +2,7 @@
 
 The Square connector integrates Permission Slip with the [Square REST API](https://developer.squareup.com/reference/square). It uses plain `net/http` — no third-party Square SDK.
 
-Square powers 2M+ merchants across restaurants, retail, services, and appointments. This connector enables agents to create orders, process payments, manage catalog items, create customer profiles, book appointments, and search orders.
+Square powers 2M+ merchants across restaurants, retail, services, and appointments. This connector enables agents to create orders, process payments, issue refunds, manage catalog and inventory, create customer profiles, book appointments, search orders, and send invoices.
 
 ## Connector ID
 
@@ -144,6 +144,109 @@ Searches and filters orders across locations.
 
 **Square API:** `POST /v2/orders/search` ([docs](https://developer.squareup.com/reference/square/orders-api/search-orders))
 
+---
+
+### `square.issue_refund`
+
+Refunds a payment in full or partially. **High risk — returns real money and is irreversible.**
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `payment_id` | string | Yes | ID of the payment to refund |
+| `amount_money` | object | No | `{amount, currency}` — omit for full refund |
+| `reason` | string | No | Reason for the refund (shown on receipt) |
+
+**Square API:** `POST /v2/refunds` ([docs](https://developer.squareup.com/reference/square/refunds-api/refund-payment))
+
+---
+
+### `square.update_catalog_item`
+
+Updates a catalog item's name, description, or pricing.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `object_id` | string | Yes | Catalog item ID (from `list_catalog`) |
+| `name` | string | No | New display name |
+| `description` | string | No | New description |
+| `variations` | array | No | Variations with ID, name, pricing_type, price_money |
+| `version` | integer | No | Current version for conflict detection (strongly recommended) |
+
+At least one of `name`, `description`, or `variations` must be provided.
+
+**Square API:** `POST /v2/catalog/object` ([docs](https://developer.squareup.com/reference/square/catalog-api/upsert-catalog-object))
+
+---
+
+### `square.send_invoice`
+
+Creates and sends an invoice to a customer in a single atomic operation (creates order → creates invoice → publishes invoice). **High risk — sends a real payment request.**
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `customer_id` | string | Yes | Invoice recipient (from `create_customer`) |
+| `location_id` | string | Yes | Location the invoice is issued from |
+| `line_items` | array | Yes | Items with description, quantity, and `base_price_money` |
+| `due_date` | string | Yes | Payment due date (`YYYY-MM-DD`) |
+| `delivery_method` | string | No | `EMAIL` (default), `SMS`, or `SHARE_MANUALLY` |
+| `title` | string | No | Invoice title |
+| `note` | string | No | Additional note on the invoice |
+
+Uses deterministic idempotency keys derived from the request parameters, so retries after partial failures are safe.
+
+**Square API:** `POST /v2/invoices` + `POST /v2/invoices/{id}/publish` ([docs](https://developer.squareup.com/reference/square/invoices-api))
+
+---
+
+### `square.get_inventory`
+
+Retrieves current inventory counts for catalog items. Read-only.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `catalog_object_ids` | array | Yes | Catalog object IDs to check (max 1000) |
+| `location_ids` | array | No | Filter to specific locations |
+
+**Square API:** `POST /v2/inventory/counts/batch-retrieve` ([docs](https://developer.squareup.com/reference/square/inventory-api/batch-retrieve-inventory-counts))
+
+---
+
+### `square.adjust_inventory`
+
+Adjusts inventory counts for a catalog item at a location.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `catalog_object_id` | string | Yes | Catalog item ID |
+| `location_id` | string | Yes | Location ID |
+| `quantity` | string | Yes | Quantity as a positive number string |
+| `from_state` | string | Yes | Current state (e.g. `NONE`, `IN_STOCK`, `SOLD`) |
+| `to_state` | string | Yes | Target state (e.g. `IN_STOCK`, `SOLD`, `WASTE`) |
+
+Uses `ADJUSTMENT` type for state transitions (from → to) and `PHYSICAL_COUNT` when from_state equals to_state (setting an absolute count).
+
+**Square API:** `POST /v2/inventory/changes/batch-create` ([docs](https://developer.squareup.com/reference/square/inventory-api/batch-change-inventory))
+
 ## Money Amounts
 
 Square represents all monetary amounts in the **smallest currency unit** (cents for USD). For example:
@@ -156,16 +259,20 @@ Square represents all monetary amounts in the **smallest currency unit** (cents 
 
 ## Idempotency
 
-All Square write operations (`create_order`, `create_payment`, `create_customer`, `create_booking`) require an `idempotency_key` (UUID). The connector generates these automatically — callers don't need to provide them. This prevents duplicate charges or double-created records if a request is retried.
+All Square write operations require an `idempotency_key`. The connector generates these automatically — callers don't need to provide them. Most actions use random UUIDs. The `send_invoice` action uses deterministic keys derived from request parameters (SHA-256), with per-step suffixes (`-order`, `-invoice`, `-publish`), so retries of the same request after partial failures are safe.
 
 ## Local Validation
 
 All actions validate parameters locally before sending requests to Square. This catches common mistakes early with clear error messages instead of opaque API errors:
 
 - **Payments:** `amount_money.amount` must be > 0; currency is required. Prevents zero-dollar or negative charges.
+- **Refunds:** `payment_id` is required; if `amount_money` is provided, amount must be > 0 with currency.
 - **Orders:** Line item `quantity` must be a positive integer string; `base_price_money.amount` must not be negative.
 - **Bookings:** `start_at` must be valid RFC 3339 format.
 - **Search orders:** `limit` must be 0-500 (0 uses Square's default); `query` must be a JSON object (not a string or array).
+- **Catalog updates:** At least one of `name`, `description`, or `variations` must be provided. Variation prices must be >= 0.
+- **Invoices:** `due_date` must be `YYYY-MM-DD` format; line item quantities must be positive integers; max 500 line items.
+- **Inventory:** `catalog_object_ids` max 1000 items; `quantity` must be a positive number; `from_state`/`to_state` validated against Square's state enum.
 - **All write actions:** Required fields are checked before the API call.
 
 ## Error Handling
@@ -190,7 +297,7 @@ Each action lives in its own file. To add one (e.g., `square.update_order`):
 
 1. Create `connectors/square/update_order.go` with a params struct, `validate()`, and an `Execute` method.
 2. Use `a.conn.do(ctx, creds, method, path, reqBody, &respBody)` for the HTTP lifecycle.
-3. For write operations, include `"idempotency_key": newIdempotencyKey()` in the request body.
+3. For single-step write operations, include `"idempotency_key": newIdempotencyKey()` in the request body. For multi-step operations, use `deriveBaseKey(actionType, parameters)` with step suffixes (see `send_invoice.go`).
 4. Return `connectors.JSONResult(respBody)` to wrap the response.
 5. Register the action in `Actions()` inside `square.go`.
 6. Add the action manifest in `manifest.go` — include a `ParametersSchema`.
@@ -209,6 +316,11 @@ connectors/square/
 ├── create_customer.go     # square.create_customer action
 ├── create_booking.go      # square.create_booking action
 ├── search_orders.go       # square.search_orders action
+├── issue_refund.go        # square.issue_refund action (high risk)
+├── update_catalog_item.go # square.update_catalog_item action
+├── send_invoice.go        # square.send_invoice action (high risk, multi-step)
+├── get_inventory.go       # square.get_inventory action (read-only)
+├── adjust_inventory.go    # square.adjust_inventory action
 ├── helpers_test.go        # Shared test helpers (validCreds, sandboxCreds)
 ├── square_test.go         # Connector-level tests (do, credentials, environment routing)
 ├── response_test.go       # Error message formatting and response checking tests
