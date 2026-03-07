@@ -23,8 +23,8 @@ type updatePageParams struct {
 }
 
 func (p *updatePageParams) validate() error {
-	if p.PageID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: page_id"}
+	if err := validateNotionID(p.PageID, "page_id"); err != nil {
+		return err
 	}
 	if len(p.Properties) == 0 && p.Archived == nil {
 		return &connectors.ValidationError{Message: "at least one of properties or archived must be provided"}

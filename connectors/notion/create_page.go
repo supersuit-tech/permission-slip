@@ -24,8 +24,8 @@ type createPageParams struct {
 }
 
 func (p *createPageParams) validate() error {
-	if p.ParentID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: parent_id"}
+	if err := validateNotionID(p.ParentID, "parent_id"); err != nil {
+		return err
 	}
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}

@@ -152,6 +152,46 @@ func TestNotionConnector_ActionsMatchManifest(t *testing.T) {
 	}
 }
 
+func TestValidateNotionID_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		id   string
+	}{
+		{"slash", "page-123/../../other"},
+		{"dot-dot", "page-123/../secret"},
+		{"backslash", "page-123\\..\\secret"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateNotionID(tc.id, "page_id")
+			if err == nil {
+				t.Errorf("expected error for path traversal ID %q", tc.id)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got: %T", err)
+			}
+		})
+	}
+}
+
+func TestValidateNotionID_ValidUUIDs(t *testing.T) {
+	t.Parallel()
+
+	validIDs := []string{
+		"8c4d7b3e-a1f2-4e5d-b6c8-9d0e1f2a3b4c",
+		"8c4d7b3ea1f24e5db6c89d0e1f2a3b4c",
+		"some-page-id",
+	}
+	for _, id := range validIDs {
+		if err := validateNotionID(id, "page_id"); err != nil {
+			t.Errorf("unexpected error for valid ID %q: %v", id, err)
+		}
+	}
+}
+
 func TestNotionConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*NotionConnector)(nil)

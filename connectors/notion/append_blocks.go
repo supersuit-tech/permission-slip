@@ -23,8 +23,8 @@ type appendBlocksParams struct {
 }
 
 func (p *appendBlocksParams) validate() error {
-	if p.PageID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: page_id"}
+	if err := validateNotionID(p.PageID, "page_id"); err != nil {
+		return err
 	}
 	if len(p.Children) == 0 && p.Text == "" {
 		return &connectors.ValidationError{Message: "at least one of children or text must be provided"}

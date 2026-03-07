@@ -11,10 +11,23 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// validateNotionID checks that an ID is safe to embed in a URL path.
+// It rejects IDs containing path traversal sequences or URL-unsafe characters.
+func validateNotionID(id, fieldName string) error {
+	if id == "" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", fieldName)}
+	}
+	if strings.Contains(id, "/") || strings.Contains(id, "..") || strings.Contains(id, "\\") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain path separators or traversal sequences", fieldName)}
+	}
+	return nil
+}
 
 const (
 	defaultBaseURL = "https://api.notion.com/v1"

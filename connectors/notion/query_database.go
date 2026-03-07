@@ -25,8 +25,8 @@ type queryDatabaseParams struct {
 }
 
 func (p *queryDatabaseParams) validate() error {
-	if p.DatabaseID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: database_id"}
+	if err := validateNotionID(p.DatabaseID, "database_id"); err != nil {
+		return err
 	}
 	if p.PageSize < 0 || p.PageSize > 100 {
 		return &connectors.ValidationError{Message: "page_size must be between 1 and 100"}
