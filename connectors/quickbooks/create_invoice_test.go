@@ -27,7 +27,9 @@ func TestCreateInvoice_Success(t *testing.T) {
 
 		customerRef, ok := body["CustomerRef"].(map[string]any)
 		if !ok {
-			t.Fatal("missing CustomerRef")
+			t.Errorf("missing CustomerRef")
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		if customerRef["value"] != "42" {
 			t.Errorf("CustomerRef.value = %v, want 42", customerRef["value"])
@@ -35,7 +37,9 @@ func TestCreateInvoice_Success(t *testing.T) {
 
 		lines, ok := body["Line"].([]any)
 		if !ok || len(lines) != 2 {
-			t.Fatalf("expected 2 lines, got %v", body["Line"])
+			t.Errorf("expected 2 lines, got %v", body["Line"])
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{

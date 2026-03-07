@@ -66,7 +66,9 @@ func TestRecordPayment_WithInvoiceID(t *testing.T) {
 
 		lines, ok := body["Line"].([]any)
 		if !ok || len(lines) != 1 {
-			t.Fatalf("expected 1 line for invoice link, got %v", body["Line"])
+			t.Errorf("expected 1 line for invoice link, got %v", body["Line"])
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{

@@ -128,3 +128,22 @@ func TestCreateExpense_EmptyLines(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestCreateExpense_InvalidPaymentType(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["quickbooks.create_expense"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "quickbooks.create_expense",
+		Parameters:  json.RawMessage(`{"account_id":"35","payment_type":"Bitcoin","lines":[{"description":"Test","amount":50,"account_id":"20"}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid payment_type, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
