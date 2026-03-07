@@ -18,26 +18,33 @@ type searchLocationsAction struct {
 }
 
 type searchLocationsParams struct {
-	ZipCode     string  `json:"zip_code"`
-	Lat         float64 `json:"lat"`
-	Lon         float64 `json:"lon"`
-	RadiusMiles int     `json:"radius_miles"`
-	Chain       string  `json:"chain"`
-	Limit       int     `json:"limit"`
+	ZipCode     string   `json:"zip_code"`
+	Lat         *float64 `json:"lat"`
+	Lon         *float64 `json:"lon"`
+	RadiusMiles int      `json:"radius_miles"`
+	Chain       string   `json:"chain"`
+	Limit       int      `json:"limit"`
 }
 
 func (p *searchLocationsParams) validate() error {
 	hasZip := p.ZipCode != ""
-	hasCoords := p.Lat != 0 || p.Lon != 0
+	hasLat := p.Lat != nil
+	hasLon := p.Lon != nil
+	hasCoords := hasLat || hasLon
+
 	if !hasZip && !hasCoords {
 		return &connectors.ValidationError{Message: "at least one location filter is required: provide zip_code or lat/lon coordinates"}
 	}
-	if p.Lat != 0 || p.Lon != 0 {
-		if p.Lat < -90 || p.Lat > 90 {
-			return &connectors.ValidationError{Message: fmt.Sprintf("lat must be between -90 and 90 (got %.6f)", p.Lat)}
+	// Require both lat and lon if either is provided.
+	if hasLat != hasLon {
+		return &connectors.ValidationError{Message: "both lat and lon must be provided together"}
+	}
+	if hasLat && hasLon {
+		if *p.Lat < -90 || *p.Lat > 90 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("lat must be between -90 and 90 (got %.6f)", *p.Lat)}
 		}
-		if p.Lon < -180 || p.Lon > 180 {
-			return &connectors.ValidationError{Message: fmt.Sprintf("lon must be between -180 and 180 (got %.6f)", p.Lon)}
+		if *p.Lon < -180 || *p.Lon > 180 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("lon must be between -180 and 180 (got %.6f)", *p.Lon)}
 		}
 	}
 	if p.RadiusMiles != 0 && (p.RadiusMiles < 1 || p.RadiusMiles > 100) {
@@ -68,9 +75,9 @@ func (a *searchLocationsAction) Execute(ctx context.Context, req connectors.Acti
 	if params.ZipCode != "" {
 		path += "&filter.zipCode.near=" + url.QueryEscape(params.ZipCode)
 	}
-	if params.Lat != 0 || params.Lon != 0 {
-		path += "&filter.lat.near=" + strconv.FormatFloat(params.Lat, 'f', 6, 64) +
-			"&filter.lon.near=" + strconv.FormatFloat(params.Lon, 'f', 6, 64)
+	if params.Lat != nil && params.Lon != nil {
+		path += "&filter.lat.near=" + strconv.FormatFloat(*params.Lat, 'f', 6, 64) +
+			"&filter.lon.near=" + strconv.FormatFloat(*params.Lon, 'f', 6, 64)
 	}
 	if params.RadiusMiles > 0 {
 		path += "&filter.radiusInMiles=" + strconv.Itoa(params.RadiusMiles)

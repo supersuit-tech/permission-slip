@@ -150,15 +150,7 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 				Service:       "kroger",
 				AuthType:      "oauth2",
 				OAuthProvider: "kroger",
-				OAuthScopes:   []string{"product.compact"},
-			},
-		},
-		OAuthProviders: []connectors.ManifestOAuthProvider{
-			{
-				ID:           "kroger",
-				AuthorizeURL: "https://api.kroger.com/v1/connect/oauth2/authorize",
-				TokenURL:     "https://api.kroger.com/v1/connect/oauth2/token",
-				Scopes:       []string{"product.compact", "cart.basic:write"},
+				OAuthScopes:   []string{"product.compact", "cart.basic:write"},
 			},
 		},
 		Templates: []connectors.ManifestTemplate{

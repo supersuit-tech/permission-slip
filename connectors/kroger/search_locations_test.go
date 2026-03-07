@@ -150,6 +150,74 @@ func TestSearchLocations_NoLocationFilter(t *testing.T) {
 	}
 }
 
+func TestSearchLocations_LatWithoutLon(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{"lat":39.1}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchLocations_LonWithoutLat(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{"lon":-84.5}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchLocations_ZeroCoordinates(t *testing.T) {
+	t.Parallel()
+
+	// Searching near (0, 0) should be valid — it's a real location (Gulf of Guinea).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("filter.lat.near"); got != "0.000000" {
+			t.Errorf("filter.lat.near = %q, want %q", got, "0.000000")
+		}
+		if got := r.URL.Query().Get("filter.lon.near"); got != "0.000000" {
+			t.Errorf("filter.lon.near = %q, want %q", got, "0.000000")
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{"lat":0.0,"lon":0.0}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestSearchLocations_InvalidLatitude(t *testing.T) {
 	t.Parallel()
 
