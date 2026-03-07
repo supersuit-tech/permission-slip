@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -37,6 +38,11 @@ func (p *createCompanyPostParams) validate() error {
 	if p.Visibility != "" && p.Visibility != "PUBLIC" {
 		return &connectors.ValidationError{Message: "visibility for company posts must be \"PUBLIC\""}
 	}
+	if p.ArticleURL != "" {
+		if _, err := url.ParseRequestURI(p.ArticleURL); err != nil {
+			return &connectors.ValidationError{Message: "article_url must be a valid URL"}
+		}
+	}
 	return nil
 }
 
@@ -67,13 +73,19 @@ func (a *createCompanyPostAction) Execute(ctx context.Context, req connectors.Ac
 		}
 	}
 
-	url := a.conn.restBaseURL + "/posts"
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, url, body, nil, true); err != nil {
+	apiURL := a.conn.restBaseURL + "/posts"
+	respHeaders, err := a.conn.doWithHeaders(ctx, req.Credentials, http.MethodPost, apiURL, body, nil, true)
+	if err != nil {
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
+	result := map[string]string{
 		"status":          "created",
 		"organization_id": params.OrganizationID,
-	})
+	}
+	if postURN := respHeaders.Get("x-restli-id"); postURN != "" {
+		result["post_urn"] = postURN
+	}
+
+	return connectors.JSONResult(result)
 }

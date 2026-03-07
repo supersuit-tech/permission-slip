@@ -29,6 +29,7 @@ func TestCreatePost_Success(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
 				t.Fatalf("failed to decode request body: %v", err)
 			}
+			w.Header().Set("x-restli-id", "urn:li:share:7654321")
 			w.WriteHeader(http.StatusCreated)
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -77,6 +78,33 @@ func TestCreatePost_Success(t *testing.T) {
 	}
 	if data["status"] != "created" {
 		t.Errorf("expected status 'created', got %q", data["status"])
+	}
+	if data["post_urn"] != "urn:li:share:7654321" {
+		t.Errorf("expected post_urn 'urn:li:share:7654321', got %q", data["post_urn"])
+	}
+}
+
+func TestCreatePost_InvalidArticleURL(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPostAction{conn: conn}
+
+	params, _ := json.Marshal(createPostParams{
+		Text:       "Check this out",
+		ArticleURL: "not a url",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "linkedin.create_post",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid article_url")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 

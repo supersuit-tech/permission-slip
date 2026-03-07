@@ -88,8 +88,9 @@ func (c *LinkedInConnector) ValidateCredentials(_ context.Context, creds connect
 
 // linkedInErrorResponse is the LinkedIn API error envelope.
 type linkedInErrorResponse struct {
-	Status  int    `json:"status"`
-	Message string `json:"message"`
+	Status           int    `json:"status"`
+	ServiceErrorCode int    `json:"serviceErrorCode,omitempty"`
+	Message          string `json:"message"`
 }
 
 // do is the shared request lifecycle for all LinkedIn actions. It sends the
@@ -151,6 +152,63 @@ func (c *LinkedInConnector) do(ctx context.Context, creds connectors.Credentials
 	return nil
 }
 
+// doWithHeaders is like do but also returns the response headers. This is
+// needed for POST endpoints where LinkedIn returns the created resource ID
+// in the x-restli-id header.
+func (c *LinkedInConnector) doWithHeaders(ctx context.Context, creds connectors.Credentials, method, url string, reqBody, dest any, useRestAPI bool) (http.Header, error) {
+	token, ok := creds.Get(credKeyAccessToken)
+	if !ok || token == "" {
+		return nil, &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	var body io.Reader
+	if reqBody != nil {
+		payload, err := json.Marshal(reqBody)
+		if err != nil {
+			return nil, fmt.Errorf("marshaling request body: %w", err)
+		}
+		body = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if useRestAPI {
+		req.Header.Set("LinkedIn-Version", linkedInVersion)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, wrapHTTPError(err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
+		return nil, err
+	}
+
+	if dest != nil && len(respBytes) > 0 {
+		if err := json.Unmarshal(respBytes, dest); err != nil {
+			return nil, &connectors.ExternalError{
+				StatusCode: resp.StatusCode,
+				Message:    "failed to decode LinkedIn API response",
+			}
+		}
+	}
+
+	return resp.Header, nil
+}
+
 // wrapHTTPError converts HTTP client errors into typed connector errors.
 func wrapHTTPError(err error) error {
 	if connectors.IsTimeout(err) {
@@ -168,11 +226,14 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	// Try to extract a LinkedIn API error message.
+	// Try to extract a LinkedIn API error message and service error code.
 	var apiErr linkedInErrorResponse
 	msg := "LinkedIn API error"
 	if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Message != "" {
 		msg = apiErr.Message
+		if apiErr.ServiceErrorCode != 0 {
+			msg = fmt.Sprintf("%s (service error %d)", msg, apiErr.ServiceErrorCode)
+		}
 	}
 
 	switch statusCode {

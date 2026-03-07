@@ -24,6 +24,7 @@ func TestCreateCompanyPost_Success(t *testing.T) {
 			t.Errorf("expected LinkedIn-Version %q, got %q", linkedInVersion, got)
 		}
 		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("x-restli-id", "urn:li:share:9999999")
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer srv.Close()
@@ -64,6 +65,9 @@ func TestCreateCompanyPost_Success(t *testing.T) {
 	}
 	if data["organization_id"] != "12345" {
 		t.Errorf("expected organization_id '12345', got %q", data["organization_id"])
+	}
+	if data["post_urn"] != "urn:li:share:9999999" {
+		t.Errorf("expected post_urn 'urn:li:share:9999999', got %q", data["post_urn"])
 	}
 }
 
@@ -165,6 +169,31 @@ func TestCreateCompanyPost_InvalidVisibility(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid visibility")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateCompanyPost_InvalidArticleURL(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createCompanyPostAction{conn: conn}
+
+	params, _ := json.Marshal(createCompanyPostParams{
+		OrganizationID: "12345",
+		Text:           "Check this out",
+		ArticleURL:     "not a url",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "linkedin.create_company_post",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid article_url")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
