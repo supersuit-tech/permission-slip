@@ -28,6 +28,9 @@ func TestListDocuments_Success(t *testing.T) {
 		if !strings.Contains(q, "mimeType='application/vnd.google-apps.document'") {
 			t.Errorf("expected mimeType filter in query, got %q", q)
 		}
+		if !strings.Contains(q, "trashed=false") {
+			t.Errorf("expected trashed=false filter in query, got %q", q)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(driveListResponse{

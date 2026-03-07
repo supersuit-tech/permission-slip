@@ -63,7 +63,7 @@ func (a *listDocumentsAction) Execute(ctx context.Context, req connectors.Action
 	}
 	params.normalize()
 
-	q := "mimeType='application/vnd.google-apps.document'"
+	q := "mimeType='application/vnd.google-apps.document' and trashed=false"
 	if params.Query != "" {
 		q += " and name contains '" + escapeDriveQuery(params.Query) + "'"
 	}
