@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -28,6 +29,12 @@ func (p *createPagePostParams) validate() error {
 	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
+	}
+	if p.Link != "" {
+		u, err := url.Parse(p.Link)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return &connectors.ValidationError{Message: "link must be a valid HTTP or HTTPS URL"}
+		}
 	}
 	return nil
 }

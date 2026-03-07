@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -45,6 +46,11 @@ func (p *createInstagramPostParams) validate() error {
 	}
 	if p.ImageURL == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: image_url"}
+	}
+	// Instagram requires HTTPS URLs for media container creation.
+	u, err := url.Parse(p.ImageURL)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return &connectors.ValidationError{Message: "image_url must be a valid HTTPS URL (Instagram requires HTTPS)"}
 	}
 	if p.Caption == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: caption"}

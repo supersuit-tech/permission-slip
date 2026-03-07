@@ -160,6 +160,31 @@ func TestCreateInstagramPost_MissingImageURL(t *testing.T) {
 	}
 }
 
+func TestCreateInstagramPost_NonHTTPSImageURL(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createInstagramPostAction{conn: conn}
+
+	params, _ := json.Marshal(createInstagramPostParams{
+		InstagramAccountID: "ig_123",
+		ImageURL:           "http://example.com/photo.jpg",
+		Caption:            "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "meta.create_instagram_post",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-HTTPS image_url")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateInstagramPost_CaptionTooLong(t *testing.T) {
 	t.Parallel()
 

@@ -182,6 +182,31 @@ func TestCreatePagePost_RateLimit(t *testing.T) {
 	}
 }
 
+func TestCreatePagePost_InvalidLinkURL(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createPagePostAction{conn: conn}
+
+	params, _ := json.Marshal(createPagePostParams{
+		PageID:  "123456",
+		Message: "Check this out",
+		Link:    "not-a-url",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "meta.create_page_post",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid link URL")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreatePagePost_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
