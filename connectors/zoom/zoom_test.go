@@ -23,8 +23,24 @@ func TestZoomConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
 	actions := c.Actions()
-	if actions == nil {
-		t.Fatal("Actions() returned nil, want non-nil map")
+
+	expected := []string{
+		"zoom.list_meetings",
+		"zoom.create_meeting",
+		"zoom.get_meeting",
+		"zoom.update_meeting",
+		"zoom.delete_meeting",
+		"zoom.list_recordings",
+		"zoom.get_meeting_participants",
+	}
+	for _, name := range expected {
+		if _, ok := actions[name]; !ok {
+			t.Errorf("expected action %q to be registered", name)
+		}
+	}
+
+	if len(actions) != len(expected) {
+		t.Errorf("expected %d actions, got %d", len(expected), len(actions))
 	}
 }
 
@@ -75,6 +91,85 @@ func TestZoomConnector_ValidateCredentials(t *testing.T) {
 func TestZoomConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*ZoomConnector)(nil)
+	var _ connectors.ManifestProvider = (*ZoomConnector)(nil)
+}
+
+func TestZoomConnector_Manifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	if m.ID != "zoom" {
+		t.Errorf("Manifest().ID = %q, want %q", m.ID, "zoom")
+	}
+	if m.Name != "Zoom" {
+		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Zoom")
+	}
+	if len(m.Actions) != 7 {
+		t.Fatalf("Manifest().Actions has %d items, want 7", len(m.Actions))
+	}
+
+	actionTypes := make(map[string]bool)
+	for _, a := range m.Actions {
+		actionTypes[a.ActionType] = true
+	}
+	for _, want := range []string{
+		"zoom.list_meetings",
+		"zoom.create_meeting",
+		"zoom.get_meeting",
+		"zoom.update_meeting",
+		"zoom.delete_meeting",
+		"zoom.list_recordings",
+		"zoom.get_meeting_participants",
+	} {
+		if !actionTypes[want] {
+			t.Errorf("Manifest().Actions missing %q", want)
+		}
+	}
+
+	if len(m.RequiredCredentials) != 1 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	}
+	cred := m.RequiredCredentials[0]
+	if cred.Service != "zoom" {
+		t.Errorf("credential service = %q, want %q", cred.Service, "zoom")
+	}
+	if cred.AuthType != "oauth2" {
+		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "oauth2")
+	}
+	if cred.OAuthProvider != "zoom" {
+		t.Errorf("credential oauth_provider = %q, want %q", cred.OAuthProvider, "zoom")
+	}
+	if len(cred.OAuthScopes) != 4 {
+		t.Errorf("credential oauth_scopes has %d items, want 4", len(cred.OAuthScopes))
+	}
+
+	if err := m.Validate(); err != nil {
+		t.Errorf("Manifest().Validate() = %v", err)
+	}
+}
+
+func TestZoomConnector_ActionsMatchManifest(t *testing.T) {
+	t.Parallel()
+	c := New()
+	actions := c.Actions()
+	manifest := c.Manifest()
+
+	manifestTypes := make(map[string]bool, len(manifest.Actions))
+	for _, a := range manifest.Actions {
+		manifestTypes[a.ActionType] = true
+	}
+
+	for actionType := range actions {
+		if !manifestTypes[actionType] {
+			t.Errorf("Actions() has %q but Manifest() does not", actionType)
+		}
+	}
+	for _, a := range manifest.Actions {
+		if _, ok := actions[a.ActionType]; !ok {
+			t.Errorf("Manifest() has %q but Actions() does not", a.ActionType)
+		}
+	}
 }
 
 func TestDoJSON_Success(t *testing.T) {

@@ -93,6 +93,7 @@ var validAuthTypes = map[string]bool{
 var BuiltInOAuthProviders = map[string]bool{
 	"google":    true,
 	"microsoft": true,
+	"zoom":      true,
 }
 
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies
