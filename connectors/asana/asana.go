@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +19,8 @@ import (
 const (
 	defaultBaseURL = "https://app.asana.com/api/1.0"
 	defaultTimeout = 30 * time.Second
+	// maxResponseBytes caps the response body we'll read from Asana APIs.
+	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
 // AsanaConnector owns the shared HTTP client and base URL used by all
@@ -110,11 +113,14 @@ func (c *AsanaConnector) do(ctx context.Context, creds connectors.Credentials, m
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Asana API request timed out: %v", err)}
 		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Asana API request canceled"}
+		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Asana API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
@@ -155,11 +161,14 @@ func (c *AsanaConnector) doRaw(ctx context.Context, creds connectors.Credentials
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Asana API request timed out: %v", err)}
 		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Asana API request canceled"}
+		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Asana API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
