@@ -20,18 +20,21 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/airtable"
 	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
 	asanaconnector "github.com/supersuit-tech/permission-slip-web/connectors/asana"
 	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
 	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
 	"github.com/supersuit-tech/permission-slip-web/connectors/discord"
+	"github.com/supersuit-tech/permission-slip-web/connectors/docusign"
 	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	"github.com/supersuit-tech/permission-slip-web/connectors/figma"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	"github.com/supersuit-tech/permission-slip-web/connectors/intercom"
 	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
@@ -61,6 +64,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zendesk"
 	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -349,6 +353,7 @@ func main() {
 
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
+	registry.Register(airtable.New())
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
 	registry.Register(hubspot.New())
@@ -382,6 +387,7 @@ func main() {
 	registry.Register(krogerconnector.New())
 	registry.Register(amadeus.New())
 	registry.Register(asanaconnector.New())
+	registry.Register(docusign.New())
 	registry.Register(awsconnector.New())
 	registry.Register(discord.New())
 	registry.Register(datadog.New())
@@ -391,6 +397,8 @@ func main() {
 	registry.Register(netlify.New())
 	registry.Register(pagerduty.New())
 	registry.Register(vercelconnector.New())
+	registry.Register(zendesk.New())
+	registry.Register(intercom.New())
 	registry.Register(zoom.New())
 	registry.Register(zapier.New())
 	registry.Register(makeconnector.New())
