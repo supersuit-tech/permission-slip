@@ -140,6 +140,36 @@ func TestSetTopic_MissingTopic(t *testing.T) {
 	}
 }
 
+func TestSetTopic_TopicTooLong(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &setTopicAction{conn: conn}
+
+	// Create a topic that exceeds 250 characters.
+	longTopic := ""
+	for i := 0; i < 251; i++ {
+		longTopic += "x"
+	}
+
+	params, _ := json.Marshal(setTopicParams{
+		Channel: "C01234567",
+		Topic:   longTopic,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.set_topic",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for topic too long")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSetTopic_SlackAPIError(t *testing.T) {
 	t.Parallel()
 

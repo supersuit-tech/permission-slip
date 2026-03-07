@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -31,6 +32,8 @@ func (p *addReactionParams) validate() error {
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}
+	// Strip surrounding colons — users often pass `:thumbsup:` instead of `thumbsup`.
+	p.Name = strings.Trim(p.Name, ":")
 	return nil
 }
 

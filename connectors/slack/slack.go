@@ -537,13 +537,47 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 }
 
 // mapSlackError converts a Slack API error string to the appropriate
-// connector error type.
+// connector error type with user-friendly messages for common errors.
 func mapSlackError(slackErr string) error {
 	switch slackErr {
-	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive", "missing_scope":
+	// Auth errors
+	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive":
 		return &connectors.AuthError{Message: fmt.Sprintf("Slack auth error: %s", slackErr)}
+	case "missing_scope":
+		return &connectors.AuthError{Message: "Slack bot token is missing a required OAuth scope — check your app's permissions at https://api.slack.com/apps"}
+
+	// Rate limiting
 	case "ratelimited":
 		return &connectors.RateLimitError{Message: "Slack API rate limit exceeded"}
+
+	// Channel errors
+	case "channel_not_found":
+		return &connectors.ExternalError{StatusCode: 200, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
+	case "not_in_channel":
+		return &connectors.ExternalError{StatusCode: 200, Message: "bot is not a member of this channel — invite the bot first"}
+	case "is_archived":
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot perform this action on an archived channel"}
+
+	// Reaction errors
+	case "already_reacted":
+		return &connectors.ExternalError{StatusCode: 200, Message: "this emoji reaction has already been added to this message"}
+	case "too_many_emoji":
+		return &connectors.ExternalError{StatusCode: 200, Message: "too many emoji reactions on this message"}
+
+	// Invite errors
+	case "already_in_channel":
+		return &connectors.ExternalError{StatusCode: 200, Message: "one or more users are already members of this channel"}
+	case "cant_invite_self":
+		return &connectors.ExternalError{StatusCode: 200, Message: "the bot cannot invite itself to a channel"}
+	case "user_not_found":
+		return &connectors.ExternalError{StatusCode: 200, Message: "one or more user IDs were not found — verify the user IDs are correct"}
+
+	// Message errors
+	case "time_in_past":
+		return &connectors.ExternalError{StatusCode: 200, Message: "scheduled message time is in the past — post_at must be a future Unix timestamp"}
+	case "message_too_long":
+		return &connectors.ExternalError{StatusCode: 200, Message: "message exceeds Slack's maximum length"}
+
 	default:
 		return &connectors.ExternalError{
 			StatusCode: 200,

@@ -119,6 +119,31 @@ func TestScheduleMessage_MissingPostAt(t *testing.T) {
 	}
 }
 
+func TestScheduleMessage_PostAtInPast(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &scheduleMessageAction{conn: conn}
+
+	params, _ := json.Marshal(scheduleMessageParams{
+		Channel: "#general",
+		Message: "Hello",
+		PostAt:  1000000000, // 2001-09-08, well in the past
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.schedule_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for post_at in the past")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestScheduleMessage_SlackAPIError(t *testing.T) {
 	t.Parallel()
 

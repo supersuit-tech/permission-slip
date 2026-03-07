@@ -71,6 +71,46 @@ func TestAddReaction_Success(t *testing.T) {
 	}
 }
 
+func TestAddReaction_StripsColonsFromEmoji(t *testing.T) {
+	t.Parallel()
+
+	var receivedName string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body addReactionRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+		}
+		receivedName = body.Name
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &addReactionAction{conn: conn}
+
+	// Users often pass :thumbsup: with colons — we should strip them.
+	params, _ := json.Marshal(addReactionParams{
+		Channel:   "C01234567",
+		Timestamp: "1234567890.123456",
+		Name:      ":thumbsup:",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.add_reaction",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedName != "thumbsup" {
+		t.Errorf("expected colons to be stripped, got %q", receivedName)
+	}
+}
+
 func TestAddReaction_MissingChannel(t *testing.T) {
 	t.Parallel()
 

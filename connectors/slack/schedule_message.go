@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -30,6 +31,11 @@ func (p *scheduleMessageParams) validate() error {
 	}
 	if p.PostAt <= 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: post_at (must be a future Unix timestamp)"}
+	}
+	if p.PostAt <= time.Now().Unix() {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("post_at must be in the future (got %d, current time is %d)", p.PostAt, time.Now().Unix()),
+		}
 	}
 	return nil
 }

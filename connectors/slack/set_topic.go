@@ -20,12 +20,20 @@ type setTopicParams struct {
 	Topic   string `json:"topic"`
 }
 
+// maxTopicLength is the Slack-enforced limit for channel topics.
+const maxTopicLength = 250
+
 func (p *setTopicParams) validate() error {
 	if err := validateChannelID(p.Channel); err != nil {
 		return err
 	}
 	if p.Topic == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: topic"}
+	}
+	if len([]rune(p.Topic)) > maxTopicLength {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("topic exceeds Slack's %d-character limit (got %d characters)", maxTopicLength, len([]rune(p.Topic))),
+		}
 	}
 	return nil
 }
