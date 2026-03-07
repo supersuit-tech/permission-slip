@@ -21,7 +21,7 @@ type downloadSignedParams struct {
 }
 
 func (p *downloadSignedParams) validate() error {
-	if p.EnvelopeID == "" {
+	if isBlank(p.EnvelopeID) {
 		return &connectors.ValidationError{Message: "missing required parameter: envelope_id"}
 	}
 	return nil

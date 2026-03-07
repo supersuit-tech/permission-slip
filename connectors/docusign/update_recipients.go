@@ -27,23 +27,23 @@ type signerParam struct {
 }
 
 func (p *updateRecipientsParams) validate() error {
-	if p.EnvelopeID == "" {
+	if isBlank(p.EnvelopeID) {
 		return &connectors.ValidationError{Message: "missing required parameter: envelope_id"}
 	}
 	if len(p.Signers) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: signers (at least one signer required)"}
 	}
 	for i, s := range p.Signers {
-		if s.Email == "" {
+		if isBlank(s.Email) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("signers[%d].email is required", i)}
 		}
-		if s.Name == "" {
+		if isBlank(s.Name) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("signers[%d].name is required", i)}
 		}
-		if s.RecipientID == "" {
+		if isBlank(s.RecipientID) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("signers[%d].recipient_id is required", i)}
 		}
-		if s.RoutingOrder == "" {
+		if isBlank(s.RoutingOrder) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("signers[%d].routing_order is required", i)}
 		}
 	}

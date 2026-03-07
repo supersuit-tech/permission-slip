@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -112,8 +113,14 @@ func parseParams(req connectors.ActionRequest, params validatable) (string, erro
 // produce confusing 404s from DocuSign.
 func requireAccountID(creds connectors.Credentials) (string, error) {
 	accountID, ok := creds.Get(credKeyAccountID)
-	if !ok || accountID == "" {
+	if !ok || isBlank(accountID) {
 		return "", &connectors.ValidationError{Message: "missing required credential: account_id"}
 	}
 	return accountID, nil
+}
+
+// isBlank returns true if s is empty or contains only whitespace.
+// Used by validate() methods to reject whitespace-only required fields.
+func isBlank(s string) bool {
+	return strings.TrimSpace(s) == ""
 }

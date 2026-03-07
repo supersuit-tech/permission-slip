@@ -19,10 +19,10 @@ type voidEnvelopeParams struct {
 }
 
 func (p *voidEnvelopeParams) validate() error {
-	if p.EnvelopeID == "" {
+	if isBlank(p.EnvelopeID) {
 		return &connectors.ValidationError{Message: "missing required parameter: envelope_id"}
 	}
-	if p.VoidReason == "" {
+	if isBlank(p.VoidReason) {
 		return &connectors.ValidationError{Message: "missing required parameter: void_reason"}
 	}
 	return nil

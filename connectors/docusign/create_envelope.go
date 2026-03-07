@@ -27,20 +27,20 @@ type envelopeRecipient struct {
 }
 
 func (p *createEnvelopeParams) validate() error {
-	if p.TemplateID == "" {
+	if isBlank(p.TemplateID) {
 		return &connectors.ValidationError{Message: "missing required parameter: template_id"}
 	}
 	if len(p.Recipients) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: recipients (at least one recipient required)"}
 	}
 	for i, r := range p.Recipients {
-		if r.Email == "" {
+		if isBlank(r.Email) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("recipients[%d].email is required", i)}
 		}
-		if r.Name == "" {
+		if isBlank(r.Name) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("recipients[%d].name is required", i)}
 		}
-		if r.RoleName == "" {
+		if isBlank(r.RoleName) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("recipients[%d].role_name is required", i)}
 		}
 	}
@@ -105,4 +105,3 @@ func (a *createEnvelopeAction) Execute(ctx context.Context, req connectors.Actio
 		"uri":         resp.URI,
 	})
 }
-

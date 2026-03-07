@@ -20,7 +20,7 @@ type checkStatusParams struct {
 }
 
 func (p *checkStatusParams) validate() error {
-	if p.EnvelopeID == "" {
+	if isBlank(p.EnvelopeID) {
 		return &connectors.ValidationError{Message: "missing required parameter: envelope_id"}
 	}
 	return nil
@@ -130,9 +130,12 @@ func (a *checkStatusAction) Execute(ctx context.Context, req connectors.ActionRe
 				}
 			}
 			result["recipients"] = recipients
+			result["recipients_included"] = true
+		} else {
+			// Recipient fetch failed — still return envelope status, but flag
+			// that recipients are missing so the caller knows the result is partial.
+			result["recipients_included"] = false
 		}
-		// If recipient fetch fails, we still return the envelope status —
-		// recipient details are supplementary, not critical.
 	}
 
 	return connectors.JSONResult(result)

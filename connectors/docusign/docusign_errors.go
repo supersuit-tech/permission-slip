@@ -1,6 +1,7 @@
 package docusign
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -23,6 +24,17 @@ func truncateBody(body []byte) string {
 type docuSignAPIError struct {
 	ErrorCode string `json:"errorCode"`
 	Message   string `json:"message"`
+}
+
+// tryParseDocuSignError attempts to parse a DocuSign structured error from a
+// response body. Returns the parsed error and true if successful, or a zero
+// value and false if the body doesn't contain a recognized DocuSign error.
+func tryParseDocuSignError(body []byte) (docuSignAPIError, bool) {
+	var apiErr docuSignAPIError
+	if json.Unmarshal(body, &apiErr) == nil && apiErr.ErrorCode != "" {
+		return apiErr, true
+	}
+	return docuSignAPIError{}, false
 }
 
 // mapDocuSignError converts a DocuSign API error to the appropriate connector

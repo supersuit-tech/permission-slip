@@ -111,8 +111,7 @@ func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, cre
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		var apiErr docuSignAPIError
-		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.ErrorCode != "" {
+		if apiErr, ok := tryParseDocuSignError(respBody); ok {
 			return mapDocuSignError(resp.StatusCode, apiErr)
 		}
 		return &connectors.ValidationError{
@@ -121,8 +120,7 @@ func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, cre
 	}
 
 	if resp.StatusCode >= 400 {
-		var apiErr docuSignAPIError
-		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.ErrorCode != "" {
+		if apiErr, ok := tryParseDocuSignError(respBody); ok {
 			return mapDocuSignError(resp.StatusCode, apiErr)
 		}
 		return &connectors.ExternalError{
