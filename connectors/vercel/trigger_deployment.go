@@ -22,12 +22,21 @@ type triggerDeploymentParams struct {
 	TeamID    string `json:"team_id"`
 }
 
+var validRefTypes = map[string]bool{
+	"branch": true,
+	"commit": true,
+	"tag":    true,
+}
+
 func (p *triggerDeploymentParams) validate() error {
 	if p.ProjectID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: project_id"}
 	}
 	if p.Ref == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: ref"}
+	}
+	if p.RefType != "" && !validRefTypes[p.RefType] {
+		return &connectors.ValidationError{Message: "ref_type must be one of: branch, commit, tag"}
 	}
 	return nil
 }

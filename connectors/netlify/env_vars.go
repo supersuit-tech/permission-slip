@@ -10,6 +10,11 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+// defaultEnvVarScopes are the Netlify environment variable scopes applied
+// when creating a new variable. These cover the standard Netlify execution
+// contexts where env vars are typically needed.
+var defaultEnvVarScopes = []string{"builds", "functions", "runtime", "post_processing"}
+
 // listEnvVarsAction implements netlify.list_env_vars.
 type listEnvVarsAction struct {
 	conn *NetlifyConnector
@@ -94,7 +99,7 @@ func (a *setEnvVarAction) Execute(ctx context.Context, req connectors.ActionRequ
 	body := []map[string]interface{}{
 		{
 			"key":    params.Key,
-			"scopes": []string{"builds", "functions", "runtime", "post_processing"},
+			"scopes": defaultEnvVarScopes,
 			"values": params.Values,
 		},
 	}
