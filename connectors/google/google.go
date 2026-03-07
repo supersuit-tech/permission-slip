@@ -19,6 +19,7 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultDocsBaseURL     = "https://docs.googleapis.com"
 	defaultDriveBaseURL    = "https://www.googleapis.com"
 	defaultChatBaseURL     = "https://chat.googleapis.com"
 	defaultTimeout         = 30 * time.Second
@@ -40,6 +41,7 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	docsBaseURL     string
 	driveBaseURL    string
 	chatBaseURL     string
 }
@@ -50,6 +52,7 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		docsBaseURL:     defaultDocsBaseURL,
 		driveBaseURL:    defaultDriveBaseURL,
 		chatBaseURL:     defaultChatBaseURL,
 	}
@@ -77,6 +80,16 @@ func newDriveForTest(client *http.Client, driveBaseURL string) *GoogleConnector 
 	}
 }
 
+// newForTestDocs creates a GoogleConnector that points at a test server for
+// Google Docs and Drive API calls.
+func newForTestDocs(client *http.Client, docsBaseURL, driveBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		docsBaseURL:  docsBaseURL,
+		driveBaseURL: driveBaseURL,
+	}
+}
+
 // ID returns "google", matching the connectors.id in the database.
 func (c *GoogleConnector) ID() string { return "google" }
 
@@ -87,6 +100,10 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.create_document":       &createDocumentAction{conn: c},
+		"google.get_document":          &getDocumentAction{conn: c},
+		"google.update_document":       &updateDocumentAction{conn: c},
+		"google.list_documents":        &listDocumentsAction{conn: c},
 		"google.list_drive_files":      &listDriveFilesAction{conn: c},
 		"google.get_drive_file":        &getDriveFileAction{conn: c},
 		"google.upload_drive_file":     &uploadDriveFileAction{conn: c},

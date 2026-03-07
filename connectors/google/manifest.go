@@ -12,7 +12,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail, Calendar, Chat, Meet, and Drive",
+		Description: "Google integration for Gmail, Calendar, Docs, Chat, Meet, and Drive",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -125,6 +125,89 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"time_max": {
 							"type": "string",
 							"description": "Upper bound (exclusive) for event start time in RFC 3339 format"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.create_document",
+				Name:        "Create Document",
+				Description: "Create a new Google Doc with a title and optional body content",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["title"],
+					"properties": {
+						"title": {
+							"type": "string",
+							"description": "Title of the new Google Doc"
+						},
+						"body": {
+							"type": "string",
+							"description": "Optional initial body content (plain text)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.get_document",
+				Name:        "Get Document",
+				Description: "Retrieve the content and metadata of a Google Doc by document ID. Returns plain text content, word count, and a direct link to the document.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["document_id"],
+					"properties": {
+						"document_id": {
+							"type": "string",
+							"description": "The ID of the Google Doc to retrieve (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.update_document",
+				Name:        "Update Document",
+				Description: "Append or insert text into an existing Google Doc. By default text is appended to the end; specify an index to insert at a specific position.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["document_id", "text"],
+					"properties": {
+						"document_id": {
+							"type": "string",
+							"description": "The ID of the Google Doc to update (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')"
+						},
+						"text": {
+							"type": "string",
+							"description": "Text to insert into the document"
+						},
+						"index": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Character index to insert at (1-based). Defaults to end of document."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.list_documents",
+				Name:        "List Documents",
+				Description: "Search and list Google Docs from Drive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Search query to filter documents by name"
+						},
+						"max_results": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Maximum number of documents to return (1-100, default 10)"
 						}
 					}
 				}`)),
@@ -315,6 +398,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/gmail.send",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
+					"https://www.googleapis.com/auth/documents",
 					"https://www.googleapis.com/auth/chat.spaces.readonly",
 					"https://www.googleapis.com/auth/chat.messages.create",
 					"https://www.googleapis.com/auth/drive",
@@ -370,6 +454,41 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List calendar events",
 				Description: "Agent can list upcoming events from any calendar.",
 				Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_document",
+				ActionType:  "google.create_document",
+				Name:        "Create documents",
+				Description: "Agent can create new Google Docs with any title and body.",
+				Parameters:  json.RawMessage(`{"title":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_document_title_only",
+				ActionType:  "google.create_document",
+				Name:        "Create empty documents",
+				Description: "Agent can create new Google Docs with any title but no initial body content.",
+				Parameters:  json.RawMessage(`{"title":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_document",
+				ActionType:  "google.get_document",
+				Name:        "Read any document",
+				Description: "Agent can read the content of any Google Doc by ID.",
+				Parameters:  json.RawMessage(`{"document_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_update_document",
+				ActionType:  "google.update_document",
+				Name:        "Edit any document",
+				Description: "Agent can insert or append text to any Google Doc.",
+				Parameters:  json.RawMessage(`{"document_id":"*","text":"*","index":"*"}`),
+			},
+			{
+				ID:          "tpl_google_list_documents",
+				ActionType:  "google.list_documents",
+				Name:        "Search documents",
+				Description: "Agent can search and list Google Docs from Drive.",
+				Parameters:  json.RawMessage(`{"query":"*","max_results":"*"}`),
 			},
 			{
 				ID:          "tpl_google_send_chat_message",
