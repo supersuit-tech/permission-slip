@@ -466,6 +466,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return &connectors.ValidationError{Message: fmt.Sprintf("Zoom API bad request: %s", msg)}
 	case statusCode == http.StatusNotFound:
 		return &connectors.ValidationError{Message: fmt.Sprintf("Zoom API not found: %s", msg)}
+	case statusCode == http.StatusConflict:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Zoom API conflict: %s", msg)}
 	default:
 		return &connectors.ExternalError{
 			StatusCode: statusCode,

@@ -152,6 +152,7 @@ func (a *listRecordingsAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"recordings": recordings,
+		"total_recordings": len(recordings),
+		"recordings":       recordings,
 	})
 }

@@ -37,7 +37,7 @@ func (a *deleteMeetingAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	meetingURL := a.conn.baseURL + "/meetings/" + params.MeetingID
+	meetingURL := a.conn.baseURL + "/meetings/" + url.PathEscape(params.MeetingID)
 	if params.ScheduleForReminder != nil {
 		q := url.Values{}
 		if *params.ScheduleForReminder {

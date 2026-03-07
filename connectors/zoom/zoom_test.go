@@ -362,6 +362,23 @@ func TestCheckResponse_NotFound(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_Conflict(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprint(w, `{"code":3003,"message":"Meeting has ended."}`)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]any
+	err := conn.doJSON(t.Context(), validCreds(), http.MethodPatch, srv.URL+"/meetings/123", nil, &resp)
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for 409, got %T: %v", err, err)
+	}
+}
+
 func TestCheckResponse_ServerError(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

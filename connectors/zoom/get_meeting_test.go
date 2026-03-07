@@ -74,6 +74,43 @@ func TestGetMeeting_Success(t *testing.T) {
 	}
 }
 
+func TestGetMeeting_URLEncodesSpecialChars(t *testing.T) {
+	t.Parallel()
+
+	// Zoom double-encoded UUIDs can contain '/' which must be path-escaped.
+	const uuidWithSlash = "abc123==//def456"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The path should have the UUID properly escaped.
+		expectedPath := "/meetings/abc123%3D%3D%2F%2Fdef456"
+		if r.URL.RawPath != expectedPath {
+			t.Errorf("expected raw path %q, got %q", expectedPath, r.URL.RawPath)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(zoomMeetingDetail{
+			ID:    123456,
+			UUID:  uuidWithSlash,
+			Topic: "Test",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &getMeetingAction{conn: conn}
+
+	params, _ := json.Marshal(getMeetingParams{MeetingID: uuidWithSlash})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "zoom.get_meeting",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestGetMeeting_MissingMeetingID(t *testing.T) {
 	t.Parallel()
 

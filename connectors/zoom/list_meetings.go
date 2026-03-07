@@ -112,6 +112,7 @@ func (a *listMeetingsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"meetings": meetings,
+		"total_meetings": len(meetings),
+		"meetings":       meetings,
 	})
 }

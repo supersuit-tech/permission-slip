@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -59,7 +60,7 @@ func (a *getMeetingParticipantsAction) Execute(ctx context.Context, req connecto
 	}
 
 	var resp zoomParticipantsResponse
-	participantsURL := a.conn.baseURL + "/past_meetings/" + params.MeetingID + "/participants"
+	participantsURL := a.conn.baseURL + "/past_meetings/" + url.PathEscape(params.MeetingID) + "/participants"
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, participantsURL, nil, &resp); err != nil {
 		return nil, err
 	}
@@ -77,6 +78,7 @@ func (a *getMeetingParticipantsAction) Execute(ctx context.Context, req connecto
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"participants": participants,
+		"total_participants": len(participants),
+		"participants":       participants,
 	})
 }

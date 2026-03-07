@@ -59,10 +59,14 @@ func TestGetMeetingParticipants_Success(t *testing.T) {
 	}
 
 	var data struct {
-		Participants []participantItem `json:"participants"`
+		TotalParticipants int               `json:"total_participants"`
+		Participants      []participantItem `json:"participants"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data.TotalParticipants != 2 {
+		t.Errorf("expected total_participants 2, got %d", data.TotalParticipants)
 	}
 	if len(data.Participants) != 2 {
 		t.Fatalf("expected 2 participants, got %d", len(data.Participants))
@@ -102,10 +106,14 @@ func TestGetMeetingParticipants_EmptyResult(t *testing.T) {
 	}
 
 	var data struct {
-		Participants []participantItem `json:"participants"`
+		TotalParticipants int               `json:"total_participants"`
+		Participants      []participantItem `json:"participants"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data.TotalParticipants != 0 {
+		t.Errorf("expected total_participants 0, got %d", data.TotalParticipants)
 	}
 	if len(data.Participants) != 0 {
 		t.Errorf("expected 0 participants, got %d", len(data.Participants))

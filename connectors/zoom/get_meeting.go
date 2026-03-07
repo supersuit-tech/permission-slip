@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -65,7 +66,7 @@ func (a *getMeetingAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	var resp zoomMeetingDetail
-	meetingURL := a.conn.baseURL + "/meetings/" + params.MeetingID
+	meetingURL := a.conn.baseURL + "/meetings/" + url.PathEscape(params.MeetingID)
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, meetingURL, nil, &resp); err != nil {
 		return nil, err
 	}

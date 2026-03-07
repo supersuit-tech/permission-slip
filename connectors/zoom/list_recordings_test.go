@@ -71,7 +71,8 @@ func TestListRecordings_Success(t *testing.T) {
 	}
 
 	var data struct {
-		Recordings []recordingItem `json:"recordings"`
+		TotalRecordings int             `json:"total_recordings"`
+		Recordings      []recordingItem `json:"recordings"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)

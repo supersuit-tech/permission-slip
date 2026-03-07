@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -61,7 +62,7 @@ func (a *updateMeetingAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	// Zoom returns 204 No Content on successful update.
-	meetingURL := a.conn.baseURL + "/meetings/" + params.MeetingID
+	meetingURL := a.conn.baseURL + "/meetings/" + url.PathEscape(params.MeetingID)
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPatch, meetingURL, body, nil); err != nil {
 		return nil, err
 	}

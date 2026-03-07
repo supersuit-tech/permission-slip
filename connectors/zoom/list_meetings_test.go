@@ -57,7 +57,8 @@ func TestListMeetings_Success(t *testing.T) {
 	}
 
 	var data struct {
-		Meetings []meetingListItem `json:"meetings"`
+		TotalMeetings int               `json:"total_meetings"`
+		Meetings      []meetingListItem `json:"meetings"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
@@ -97,7 +98,8 @@ func TestListMeetings_EmptyResult(t *testing.T) {
 	}
 
 	var data struct {
-		Meetings []meetingListItem `json:"meetings"`
+		TotalMeetings int               `json:"total_meetings"`
+		Meetings      []meetingListItem `json:"meetings"`
 	}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)

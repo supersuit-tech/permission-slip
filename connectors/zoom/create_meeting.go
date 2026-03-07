@@ -61,6 +61,7 @@ type zoomCreateMeetingResponse struct {
 	StartTime string `json:"start_time"`
 	Duration  int    `json:"duration"`
 	Timezone  string `json:"timezone"`
+	Agenda    string `json:"agenda"`
 	JoinURL   string `json:"join_url"`
 	StartURL  string `json:"start_url"`
 	Password  string `json:"password"`
@@ -92,7 +93,7 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]any{
+	result := map[string]any{
 		"id":         resp.ID,
 		"uuid":       resp.UUID,
 		"topic":      resp.Topic,
@@ -103,5 +104,10 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 		"join_url":   resp.JoinURL,
 		"start_url":  resp.StartURL,
 		"password":   resp.Password,
-	})
+	}
+	if resp.Agenda != "" {
+		result["agenda"] = resp.Agenda
+	}
+
+	return connectors.JSONResult(result)
 }
