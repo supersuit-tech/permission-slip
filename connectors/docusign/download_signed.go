@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -52,10 +53,11 @@ func (a *downloadSignedAction) Execute(ctx context.Context, req connectors.Actio
 	encoded := base64.StdEncoding.EncodeToString(body)
 
 	return connectors.JSONResult(map[string]string{
-		"envelope_id": params.EnvelopeID,
-		"document_id": documentID,
-		"content":     encoded,
-		"encoding":    "base64",
-		"mime_type":   "application/pdf",
+		"envelope_id":     params.EnvelopeID,
+		"document_id":     documentID,
+		"content":         encoded,
+		"encoding":        "base64",
+		"mime_type":       "application/pdf",
+		"file_size_bytes": strconv.Itoa(len(body)),
 	})
 }

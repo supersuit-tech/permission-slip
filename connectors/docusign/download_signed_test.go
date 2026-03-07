@@ -66,6 +66,9 @@ func TestDownloadSigned_Success(t *testing.T) {
 	if string(decoded) != string(pdfContent) {
 		t.Errorf("expected decoded content to match PDF, got %q", string(decoded))
 	}
+	if data["file_size_bytes"] != "25" {
+		t.Errorf("expected file_size_bytes 25, got %q", data["file_size_bytes"])
+	}
 }
 
 func TestDownloadSigned_SpecificDocument(t *testing.T) {

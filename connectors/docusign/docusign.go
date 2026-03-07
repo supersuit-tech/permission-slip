@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -22,6 +23,7 @@ const (
 
 	credKeyAccessToken = "access_token"
 	credKeyAccountID   = "account_id"
+	credKeyBaseURL     = "base_url" // optional — override for production or other regions
 
 	// defaultRetryAfter is used when the DocuSign API returns a rate limit
 	// response without a Retry-After header.
@@ -130,7 +132,7 @@ func (c *DocuSignConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "docusign.check_status",
 				Name:        "Check Envelope Status",
-				Description: "Check the current status of an envelope (created, sent, delivered, completed, voided, declined)",
+				Description: "Check the current status of an envelope and optionally see per-recipient signing progress",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -139,6 +141,11 @@ func (c *DocuSignConnector) Manifest() *connectors.ConnectorManifest {
 						"envelope_id": {
 							"type": "string",
 							"description": "ID of the envelope to check"
+						},
+						"include_recipients": {
+							"type": "boolean",
+							"default": true,
+							"description": "Include per-recipient signing status (who has signed, who hasn't)"
 						}
 					}
 				}`)),
@@ -345,12 +352,24 @@ func accountPath(accountID string) string {
 	return "/accounts/" + accountID
 }
 
+// resolveBaseURL returns the base URL to use for API requests. If the user
+// has configured a base_url credential (for production or a specific region),
+// that takes precedence over the connector's default (demo sandbox).
+func (c *DocuSignConnector) resolveBaseURL(creds connectors.Credentials) string {
+	if customURL, ok := creds.Get(credKeyBaseURL); ok && customURL != "" {
+		return strings.TrimRight(customURL, "/")
+	}
+	return c.baseURL
+}
+
 // doJSON sends a JSON request to the DocuSign API and unmarshals the response.
 func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
 	token, ok := creds.Get(credKeyAccessToken)
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
 	}
+
+	baseURL := c.resolveBaseURL(creds)
 
 	var bodyReader io.Reader
 	if body != nil {
@@ -361,7 +380,7 @@ func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, cre
 		bodyReader = bytes.NewReader(payload)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, bodyReader)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
@@ -429,7 +448,9 @@ func (c *DocuSignConnector) doRaw(ctx context.Context, method, path string, cred
 		return nil, &connectors.ValidationError{Message: "access_token credential is missing or empty"}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
+	baseURL := c.resolveBaseURL(creds)
+
+	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -481,11 +502,53 @@ type docuSignAPIError struct {
 	Message   string `json:"message"`
 }
 
-// mapDocuSignError converts a DocuSign API error to the appropriate connector error type.
+// mapDocuSignError converts a DocuSign API error to the appropriate connector
+// error type. Provides actionable error messages for common DocuSign error codes
+// so agents and users understand what went wrong and how to fix it.
 func mapDocuSignError(statusCode int, apiErr docuSignAPIError) error {
 	switch apiErr.ErrorCode {
-	case "AUTHORIZATION_INVALID_TOKEN", "USER_AUTHENTICATION_FAILED":
+	// Auth errors
+	case "AUTHORIZATION_INVALID_TOKEN", "USER_AUTHENTICATION_FAILED",
+		"ACCOUNT_NOT_AUTHORIZED", "USER_NOT_AUTHORIZED_FOR_ACCOUNT":
 		return &connectors.AuthError{Message: fmt.Sprintf("DocuSign auth error: %s", apiErr.Message)}
+
+	// Envelope state errors — include hints about what state is expected
+	case "ENVELOPE_NOT_IN_CORRECT_STATE":
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("DocuSign: envelope is not in the correct state for this operation — %s. Check the envelope status with docusign.check_status first.", apiErr.Message),
+		}
+	case "ENVELOPE_IS_INCOMPLETE":
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("DocuSign: envelope is missing required information — %s. Ensure all recipients and document fields are filled.", apiErr.Message),
+		}
+
+	// Template errors
+	case "TEMPLATE_NOT_FOUND":
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    "DocuSign: template not found. Use docusign.list_templates to browse available templates.",
+		}
+
+	// Recipient errors
+	case "RECIPIENT_NOT_IN_SEQUENCE":
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("DocuSign: recipient routing order conflict — %s. Ensure routing_order values are sequential.", apiErr.Message),
+		}
+	case "INVALID_EMAIL_ADDRESS_FOR_RECIPIENT":
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("DocuSign: invalid email address for recipient — %s", apiErr.Message),
+		}
+
+	// Resource not found
+	case "ENVELOPE_DOES_NOT_EXIST":
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    "DocuSign: envelope not found. Verify the envelope_id is correct.",
+		}
+
 	default:
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
