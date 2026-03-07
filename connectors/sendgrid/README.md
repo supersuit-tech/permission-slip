@@ -29,12 +29,23 @@ All API requests use Bearer token authentication with the API key in the `Author
 | `sendgrid.create_template` | Create Email Template | medium | Create a dynamic transactional email template |
 | `sendgrid.get_campaign_stats` | Get Campaign Stats | low | Get analytics for a campaign (opens, clicks, bounces) |
 | `sendgrid.list_segments` | List Segments | low | List all contact segments in the account |
+| `sendgrid.list_senders` | List Verified Senders | low | List verified sender identities (find sender_id for campaigns) |
+| `sendgrid.list_lists` | List Contact Lists | low | List contact lists with subscriber counts (find list_id values) |
 
 ### Risk Levels
 
 - **High:** `send_campaign`, `schedule_campaign` — sends to potentially thousands of recipients. The blast radius of a bad email is large, so these always require approval.
 - **Medium:** `add_to_list`, `remove_from_list`, `create_template` — modifies audience data or content.
-- **Low:** `get_campaign_stats`, `list_segments` — read-only operations with no side effects.
+- **Low:** `get_campaign_stats`, `list_segments`, `list_senders`, `list_lists` — read-only operations with no side effects.
+
+### Discovery Actions
+
+Before creating campaigns, agents typically need to discover available resources:
+- **`list_senders`** — find `sender_id` values (required for campaigns)
+- **`list_lists`** — find `list_id` values (required for campaigns and subscriber management)
+- **`list_segments`** — find segments for targeted campaigns
+
+These are all low-risk, read-only actions that help agents work autonomously without requiring users to look up IDs manually.
 
 ### Campaign Sending
 
@@ -57,6 +68,8 @@ The `add_to_list` action validates email addresses with a basic pattern check be
 | create_template | POST | `/templates` |
 | get_campaign_stats | GET | `/marketing/singlesends/{id}` |
 | list_segments | GET | `/marketing/segments/2.0` |
+| list_senders | GET | `/verified_senders` |
+| list_lists | GET | `/marketing/lists` |
 
 All endpoints use `application/json` request and response bodies.
 
@@ -95,6 +108,8 @@ connectors/sendgrid/
 ├── create_template.go       # sendgrid.create_template action
 ├── get_campaign_stats.go    # sendgrid.get_campaign_stats action
 ├── list_segments.go         # sendgrid.list_segments action
+├── list_senders.go          # sendgrid.list_senders action
+├── list_lists.go            # sendgrid.list_lists action
 ├── *_test.go                # Tests for each action + connector + response
 ├── helpers_test.go          # Shared test helpers (validCreds, testAPIKey)
 └── README.md                # This file
