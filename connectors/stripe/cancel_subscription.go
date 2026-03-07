@@ -92,8 +92,10 @@ func (a *cancelSubscriptionAction) Execute(ctx context.Context, req connectors.A
 
 	var resp cancelSubscriptionResponse
 	path := "/v1/subscriptions/" + escapedID
-	idempotencyKey := deriveIdempotencyKey(req.ActionType, req.Parameters)
-	if err := a.conn.do(ctx, req.Credentials, http.MethodDelete, path, formParams, &resp, idempotencyKey); err != nil {
+	// No idempotency key for DELETE — StripeConnector.do only sends the
+	// Idempotency-Key header on POST requests, so passing one here would
+	// be silently ignored.
+	if err := a.conn.do(ctx, req.Credentials, http.MethodDelete, path, formParams, &resp, ""); err != nil {
 		return nil, err
 	}
 

@@ -2,8 +2,10 @@ package stripe
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -147,11 +149,18 @@ func TestCancelSubscription_ImmediateWithProration(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("method = %s, want DELETE", r.Method)
 		}
-		if err := r.ParseForm(); err != nil {
-			t.Errorf("parsing form: %v", err)
-			return
+
+		// Go's ParseForm only parses request bodies for POST/PUT/PATCH.
+		// For DELETE, read the body directly and parse the form values.
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("reading body: %v", err)
 		}
-		if got := r.FormValue("proration_behavior"); got != "create_prorations" {
+		vals, err := url.ParseQuery(string(bodyBytes))
+		if err != nil {
+			t.Fatalf("parsing body as form: %v", err)
+		}
+		if got := vals.Get("proration_behavior"); got != "create_prorations" {
 			t.Errorf("proration_behavior = %q, want create_prorations", got)
 		}
 
