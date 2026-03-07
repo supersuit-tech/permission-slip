@@ -36,8 +36,8 @@ The credential `auth_type` in the database is `oauth2`. The connector defines a 
 
 ## Validation Limits
 
-- Invoice line items: max 750
-- Expense line items: max 750
+- Invoice line items: max 250
+- Expense line items: max 250
 - List accounts max_results: 1–1000 (default 100)
 - Account type filter: validated against a 15-type allowlist (see `validAccountTypes` in `list_accounts.go`)
 - Amounts: must be > 0 (minimum 0.01)

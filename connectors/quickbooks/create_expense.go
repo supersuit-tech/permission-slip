@@ -8,6 +8,15 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+const maxExpenseLineItems = 250
+
+// validPaymentTypes are the QuickBooks purchase payment types.
+var validPaymentTypes = map[string]bool{
+	"Cash":       true,
+	"Check":      true,
+	"CreditCard": true,
+}
+
 // createExpenseAction implements connectors.Action for quickbooks.create_expense.
 // In QuickBooks, expenses are represented as Purchase objects with PaymentType "Cash".
 type createExpenseAction struct {
@@ -32,8 +41,18 @@ func (p *createExpenseParams) validate() error {
 	if p.AccountID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
 	}
+	if p.PaymentType != "" && !validPaymentTypes[p.PaymentType] {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid payment_type %q; valid types: Cash, Check, CreditCard", p.PaymentType),
+		}
+	}
 	if len(p.Lines) == 0 {
 		return &connectors.ValidationError{Message: "at least one line is required"}
+	}
+	if len(p.Lines) > maxExpenseLineItems {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("too many lines: %d (max %d)", len(p.Lines), maxExpenseLineItems),
+		}
 	}
 	for i, line := range p.Lines {
 		if line.Amount <= 0 {

@@ -34,8 +34,8 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						"line_items": {
 							"type": "array",
 							"minItems": 1,
-							"maxItems": 750,
-							"description": "Invoice line items (max 750)",
+							"maxItems": 250,
+							"description": "Invoice line items (max 250)",
 							"items": {
 								"type": "object",
 								"additionalProperties": false,
@@ -115,8 +115,8 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						"lines": {
 							"type": "array",
 							"minItems": 1,
-							"maxItems": 750,
-							"description": "Expense line items (max 750)",
+							"maxItems": 250,
+							"description": "Expense line items (max 250)",
 							"items": {
 								"type": "object",
 								"additionalProperties": false,
