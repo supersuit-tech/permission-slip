@@ -47,6 +47,9 @@ func (p *sendInvoiceParams) validate() error {
 	if len(p.LineItems) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: line_items (must be a non-empty array)"}
 	}
+	if len(p.LineItems) > 500 {
+		return &connectors.ValidationError{Message: "line_items exceeds maximum of 500 items"}
+	}
 	if p.DueDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: due_date"}
 	}

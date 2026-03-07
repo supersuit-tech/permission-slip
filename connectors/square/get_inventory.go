@@ -25,6 +25,9 @@ func (p *getInventoryParams) validate() error {
 	if len(p.CatalogObjectIDs) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: catalog_object_ids (must be a non-empty array)"}
 	}
+	if len(p.CatalogObjectIDs) > 1000 {
+		return &connectors.ValidationError{Message: "catalog_object_ids exceeds maximum of 1000 items"}
+	}
 	return nil
 }
 
