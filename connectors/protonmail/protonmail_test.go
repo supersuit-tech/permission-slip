@@ -85,6 +85,21 @@ func TestProtonMailConnector_ValidateCredentials(t *testing.T) {
 			creds:   connectors.Credentials{},
 			wantErr: true,
 		},
+		{
+			name:    "invalid smtp_port",
+			creds:   connectors.NewCredentials(map[string]string{"username": "user@proton.me", "password": "pass", "smtp_port": "abc"}),
+			wantErr: true,
+		},
+		{
+			name:    "invalid imap_port",
+			creds:   connectors.NewCredentials(map[string]string{"username": "user@proton.me", "password": "pass", "imap_port": "xyz"}),
+			wantErr: true,
+		},
+		{
+			name:    "valid custom ports",
+			creds:   connectors.NewCredentials(map[string]string{"username": "user@proton.me", "password": "pass", "smtp_port": "587", "imap_port": "993"}),
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -118,6 +118,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		"status":     "sent",
 		"from":       username,
 		"recipients": allRecipients,
+		"subject":    params.Subject,
 	})
 }
 

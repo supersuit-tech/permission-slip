@@ -6,6 +6,8 @@ package protonmail
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -249,6 +251,16 @@ func (c *ProtonMailConnector) ValidateCredentials(_ context.Context, creds conne
 	if !ok || password == "" {
 		return &connectors.ValidationError{Message: "missing required credential: password"}
 	}
+
+	// Validate optional port fields are numeric if provided.
+	for _, key := range []string{credKeySMTPPort, credKeyIMAPPort} {
+		if v, exists := creds.Get(key); exists && v != "" {
+			if _, err := strconv.Atoi(v); err != nil {
+				return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must be a numeric port value", key)}
+			}
+		}
+	}
+
 	return nil
 }
 
