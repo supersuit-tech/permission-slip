@@ -12,8 +12,12 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// imapDial is a package-level variable so tests can replace it.
-// It dials with a timeout and uses TLS for non-localhost hosts.
+// imapDial establishes a raw IMAP connection. It is a package-level variable
+// so tests can replace it without needing a running server.
+//
+// For localhost (Proton Mail Bridge), it dials without TLS since Bridge handles
+// encryption internally. For remote hosts, it uses implicit TLS (port 993 style)
+// to protect credentials in transit.
 var imapDial = func(addr string, timeout time.Duration) (*imapclient.Client, error) {
 	host, _, _ := net.SplitHostPort(addr)
 	dialer := &net.Dialer{Timeout: timeout}
@@ -46,12 +50,14 @@ func isLocalhost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// imapSession holds an authenticated IMAP session with a selected mailbox.
+// imapSession wraps an authenticated IMAP client. All IMAP actions share this
+// type to ensure consistent connection lifecycle (connect → select → operate → close).
 type imapSession struct {
 	client *imapclient.Client
 }
 
-// connectIMAP creates an authenticated IMAP connection with a timeout.
+// connectIMAP dials and authenticates to the IMAP server using credentials
+// from the action request. The caller must call session.close() when done.
 func connectIMAP(creds connectors.Credentials, timeout time.Duration) (*imapSession, error) {
 	host, port, username, password := imapConfig(creds)
 	addr := net.JoinHostPort(host, port)
@@ -72,7 +78,8 @@ func connectIMAP(creds connectors.Credentials, timeout time.Duration) (*imapSess
 	return &imapSession{client: client}, nil
 }
 
-// selectMailbox selects a mailbox (e.g., "INBOX") in read-only mode.
+// selectMailbox opens a mailbox in read-only mode. Read-only prevents
+// accidental flag changes (e.g., marking messages as \Seen).
 func (s *imapSession) selectMailbox(folder string) (*imap.SelectData, error) {
 	if folder == "" {
 		folder = "INBOX"
@@ -194,7 +201,8 @@ func envelopeToSummary(seqNum uint32, env *imap.Envelope, flags []imap.Flag) ema
 	return summary
 }
 
-// mapIMAPError converts an IMAP error to the appropriate connector error type.
+// mapIMAPError translates raw IMAP errors into typed connector errors so the
+// execution layer can distinguish auth failures from transient issues.
 func mapIMAPError(err error) error {
 	if err == nil {
 		return nil

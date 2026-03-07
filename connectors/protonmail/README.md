@@ -192,12 +192,22 @@ Fetches a specific email by sequence number with full body content.
 - **Single user per Bridge** — Each Bridge instance serves one Proton account.
 - **Sequence numbers are volatile** — Sequence numbers from `read_inbox`/`search_emails` can change if messages are deleted. Use them promptly.
 
+## Architecture
+
+The connector follows the standard Permission Slip connector pattern:
+
+- **`ProtonMailConnector`** implements `connectors.Connector` and `connectors.ManifestProvider`
+- Each action (send, read inbox, search, read email) is a separate struct implementing `connectors.Action`
+- IMAP actions share helpers in `imap_helpers.go` for connection management, envelope fetching, limit validation, and error mapping
+- The connector is gated behind the `ENABLE_PROTONMAIL_CONNECTOR` environment variable since it requires a local Bridge daemon
+- Credentials use the `custom` auth type — there's no OAuth flow; users provide their Bridge-generated password directly
+
 ## File Structure
 
 ```
 connectors/protonmail/
 ├── protonmail.go          # ProtonMailConnector struct, New(), Manifest(), Actions(), ValidateCredentials()
-├── imap_helpers.go        # IMAP session management, envelope conversion, error mapping
+├── imap_helpers.go        # IMAP session, shared helpers (fetchEnvelopes, validateLimit), error mapping
 ├── send_email.go          # protonmail.send_email action (SMTP)
 ├── read_inbox.go          # protonmail.read_inbox action (IMAP)
 ├── search_emails.go       # protonmail.search_emails action (IMAP)

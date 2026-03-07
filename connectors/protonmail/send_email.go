@@ -13,6 +13,9 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
+// sendEmailAction sends an email via SMTP through Proton Mail Bridge.
+// The sendFunc field allows tests to inject a mock SMTP sender without
+// requiring a running Bridge instance.
 type sendEmailAction struct {
 	conn     *ProtonMailConnector
 	sendFunc func(addr string, a smtp.Auth, from string, to []string, msg []byte) error
@@ -144,7 +147,9 @@ func buildMessage(from string, params sendEmailParams) []byte {
 	return []byte(b.String())
 }
 
-// sendMailTLS connects via TLS (Proton Mail Bridge uses STARTTLS on port 1025).
+// sendMailTLS establishes a plain TCP connection, upgrades to TLS via STARTTLS
+// if the server advertises it, then authenticates and sends the message. This
+// matches Proton Mail Bridge's default behavior on port 1025.
 func sendMailTLS(ctx context.Context, addr, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
 	// Use a dialer with context deadline if set.
 	dialer := &net.Dialer{}

@@ -14,8 +14,13 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-const maxBodySize = 1024 * 1024 // 1 MB body limit
+// maxBodySize caps email body content at 1 MB to prevent memory issues with
+// large messages. Bodies exceeding this limit are truncated with a "[truncated]"
+// suffix so consumers know the content is incomplete.
+const maxBodySize = 1024 * 1024
 
+// readEmailAction fetches a single email by sequence number, returning the
+// full body, headers, and attachment metadata (but not attachment content).
 type readEmailAction struct {
 	conn *ProtonMailConnector
 }
@@ -155,7 +160,9 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	return connectors.JSONResult(detail)
 }
 
-// parseBody extracts the text body from a raw RFC 5322 message.
+// parseBody extracts the text body from a raw RFC 5322 message. It walks MIME
+// parts and prefers text/plain over text/html. If the message can't be parsed
+// as MIME, it falls back to the raw bytes as text/plain.
 func parseBody(rawBody []byte) (body, contentType string) {
 	mr, err := mail.CreateReader(bytes.NewReader(rawBody))
 	if err != nil {

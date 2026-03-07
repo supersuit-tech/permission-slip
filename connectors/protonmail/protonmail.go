@@ -1,6 +1,9 @@
 // Package protonmail implements the Proton Mail connector for the Permission
 // Slip connector execution layer. It uses IMAP/SMTP to communicate with
 // Proton Mail Bridge, which must be running locally.
+//
+// Actions: send_email (SMTP), read_inbox, search_emails, read_email (IMAP).
+// Registration is gated behind the ENABLE_PROTONMAIL_CONNECTOR env var.
 package protonmail
 
 import (
