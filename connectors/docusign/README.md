@@ -8,7 +8,7 @@ E-signature integration using the [DocuSign eSignature REST API v2.1](https://de
 |-----|----------|-------------|
 | `access_token` | Yes | DocuSign OAuth 2.0 access token |
 | `account_id` | Yes | DocuSign account ID (found in account settings) |
-| `base_url` | No | API base URL — defaults to demo sandbox (`https://demo.docusign.net/restapi/v2.1`). Set to `https://na1.docusign.net/restapi/v2.1` for production (US), or the appropriate regional URL. |
+| `base_url` | No | API base URL — defaults to demo sandbox (`https://demo.docusign.net/restapi/v2.1`). Set to `https://na1.docusign.net/restapi/v2.1` for production (US), or the appropriate regional URL. Must be a `*.docusign.net` HTTPS URL (other domains are rejected to prevent SSRF). |
 
 ## Actions
 
@@ -32,6 +32,29 @@ E-signature integration using the [DocuSign eSignature REST API v2.1](https://de
 
 The two-step create → send flow is intentional: it separates document preparation (medium risk) from sending legally binding documents to external parties (high risk), giving humans a clear approval checkpoint before anything goes out.
 
+## Error handling
+
+The connector maps DocuSign API errors to typed connector errors:
+
+| DocuSign error | Connector error type | Notes |
+|----------------|---------------------|-------|
+| `AUTHORIZATION_INVALID_TOKEN` | `AuthError` | Token expired or invalid |
+| `ENVELOPE_DOES_NOT_EXIST` | `ValidationError` | Incorrect envelope_id |
+| `TEMPLATE_NOT_FOUND` | `ValidationError` | Incorrect template_id |
+| `ENVELOPE_NOT_IN_CORRECT_STATE` | `ExternalError` | e.g. sending an already-sent envelope |
+| `INVALID_EMAIL_ADDRESS_FOR_RECIPIENT` | `ValidationError` | Bad email in recipient list |
+| HTTP 429 | `RateLimitError` | Includes Retry-After from DocuSign |
+| HTTP 404 (no error code) | `ValidationError` | Resource not found |
+
+Error messages include actionable suggestions (e.g. "Use docusign.list_templates to browse available templates").
+
+## Security
+
+- **URL path escaping**: All user-provided values (envelope IDs, document IDs, account IDs) are escaped with `url.PathEscape` before being interpolated into API paths to prevent path traversal.
+- **SSRF prevention**: The `base_url` credential is validated against an allowlist — only `*.docusign.net` HTTPS URLs are accepted. This prevents credential exfiltration via a malicious base URL.
+- **Response size limits**: API responses are capped at 50 MB (`io.LimitReader`) to prevent memory exhaustion from unexpectedly large responses.
+- **Error body truncation**: Response bodies in error messages are truncated to 512 bytes to prevent log bloat and potential information leakage.
+
 ## Production setup
 
 The connector defaults to the DocuSign developer sandbox. For production:
@@ -44,3 +67,19 @@ Regional base URLs:
 - US: `https://na1.docusign.net/restapi/v2.1` through `https://na4.docusign.net/restapi/v2.1`
 - EU: `https://eu.docusign.net/restapi/v2.1`
 - AU: `https://au.docusign.net/restapi/v2.1`
+
+## File organization
+
+| File | Purpose |
+|------|---------|
+| `docusign.go` | Core connector struct, constructor, credential helpers, `parseParams` DRY helper |
+| `docusign_manifest.go` | `Manifest()` — action schemas, credential config, templates for DB seeding |
+| `docusign_http.go` | HTTP transport: `doJSON`, `doRaw`, base URL resolution and SSRF validation |
+| `docusign_errors.go` | Error mapping from DocuSign API codes to typed connector errors |
+| `create_envelope.go` | `docusign.create_envelope` action |
+| `send_envelope.go` | `docusign.send_envelope` action |
+| `check_status.go` | `docusign.check_status` action (with optional recipient details) |
+| `download_signed.go` | `docusign.download_signed` action (PDF download as base64) |
+| `list_templates.go` | `docusign.list_templates` action (search + pagination) |
+| `void_envelope.go` | `docusign.void_envelope` action |
+| `update_recipients.go` | `docusign.update_recipients` action |
