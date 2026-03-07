@@ -327,12 +327,12 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 
 	payload, err := json.Marshal(reqBody)
 	if err != nil {
-		return fmt.Errorf("marshaling request body: %w", err)
+		return &connectors.ExternalError{Message: fmt.Sprintf("marshaling request body: %v", err)}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 	req.Header.Set("Authorization", token)
 	req.Header.Set("Content-Type", "application/json")
@@ -366,6 +366,27 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
+	// Handle HTTP 400 as a validation error (e.g. malformed query).
+	if resp.StatusCode == http.StatusBadRequest {
+		msg := extractErrorMessage(respBody)
+		if msg == "" {
+			msg = "Monday.com API rejected the request"
+		}
+		return &connectors.ValidationError{Message: fmt.Sprintf("Monday.com validation error: %s", msg)}
+	}
+
+	// Catch other non-2xx status codes not already handled above.
+	if resp.StatusCode >= 400 {
+		msg := extractErrorMessage(respBody)
+		if msg == "" {
+			msg = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+		return &connectors.ExternalError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("Monday.com API error: %s", msg),
+		}
+	}
+
 	var gqlResp graphQLResponse
 	if err := json.Unmarshal(respBody, &gqlResp); err != nil {
 		return &connectors.ExternalError{
@@ -383,7 +404,7 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 	if len(gqlResp.Errors) > 0 {
 		msg := gqlResp.Errors[0].Message
 		return &connectors.ExternalError{
-			StatusCode: 200,
+			StatusCode: resp.StatusCode,
 			Message:    fmt.Sprintf("Monday.com API error: %s", msg),
 		}
 	}
@@ -423,6 +444,27 @@ func stringifyColumnValues(cv map[string]any) (string, error) {
 		return "", &connectors.ValidationError{Message: fmt.Sprintf("invalid column_values: %v", err)}
 	}
 	return string(data), nil
+}
+
+// extractErrorMessage tries to pull an error message from a Monday.com
+// error response body. Returns empty string if the body can't be parsed.
+func extractErrorMessage(body []byte) string {
+	var envelope struct {
+		ErrorMessage string `json:"error_message"`
+		Errors       []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if json.Unmarshal(body, &envelope) != nil {
+		return ""
+	}
+	if envelope.ErrorMessage != "" {
+		return envelope.ErrorMessage
+	}
+	if len(envelope.Errors) > 0 && envelope.Errors[0].Message != "" {
+		return envelope.Errors[0].Message
+	}
+	return ""
 }
 
 // mapMondayError converts a Monday.com error code to the appropriate

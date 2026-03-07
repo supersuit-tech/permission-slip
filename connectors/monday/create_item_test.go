@@ -290,6 +290,35 @@ func TestCreateItem_RateLimit(t *testing.T) {
 	}
 }
 
+func TestCreateItem_HTTP400_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createItemAction{conn: conn}
+
+	params, _ := json.Marshal(createItemParams{
+		BoardID:  "9876",
+		ItemName: "Test",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.create_item",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for HTTP 400")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for HTTP 400, got: %T", err)
+	}
+}
+
 func TestCreateItem_GraphQLError(t *testing.T) {
 	t.Parallel()
 

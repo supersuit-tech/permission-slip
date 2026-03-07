@@ -220,6 +220,49 @@ func TestSearchItems_MissingBoardID(t *testing.T) {
 	}
 }
 
+func TestSearchItems_PartialColumnFilter(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &searchItemsAction{conn: conn}
+
+	// Provide column_id without column_value.
+	params, _ := json.Marshal(map[string]string{
+		"board_id":  "9876",
+		"column_id": "status",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.search_items",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when column_id is set without column_value")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+
+	// Provide column_value without column_id.
+	params2, _ := json.Marshal(map[string]string{
+		"board_id":     "9876",
+		"column_value": "Done",
+	})
+
+	_, err = action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.search_items",
+		Parameters:  params2,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when column_value is set without column_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSearchItems_NonNumericBoardID(t *testing.T) {
 	t.Parallel()
 

@@ -29,6 +29,9 @@ func (p *searchItemsParams) validate() error {
 	if !isValidMondayID(p.BoardID) {
 		return &connectors.ValidationError{Message: "board_id must be a numeric string"}
 	}
+	if (p.ColumnID == "" && p.ColumnValue != "") || (p.ColumnID != "" && p.ColumnValue == "") {
+		return &connectors.ValidationError{Message: "column_id and column_value must be provided together"}
+	}
 	if p.Limit < 0 {
 		return &connectors.ValidationError{Message: "limit must be non-negative"}
 	}
