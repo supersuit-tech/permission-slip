@@ -13,14 +13,15 @@ All actions are **read-only** (product search and lookup). The connector returns
 | Key | Required | Description |
 |-----|----------|-------------|
 | `consumer_id` | Yes | Walmart Affiliate API consumer ID from [developer.walmart.com](https://developer.walmart.com) |
+| `private_key` | Yes | PEM-encoded RSA private key (PKCS#1 or PKCS#8) for request signing |
 | `key_version` | No | API key version (defaults to `"1"`) |
 | `impact_id` | No | Impact/affiliate ID for link attribution (sent as `WM_CONSUMER.CHANNEL.TYPE` header) |
 
-The credential `auth_type` in the database is `api_key`. Credentials are stored encrypted in Supabase Vault and decrypted only at execution time.
+The credential `auth_type` in the database is `custom`. Credentials are stored encrypted in Supabase Vault and decrypted only at execution time.
 
 **Setup:** [Walmart Affiliate onboarding guide](https://walmart.io/docs/affiliate/onboarding-guide)
 
-**Authentication:** Walmart uses header-based auth — `WM_CONSUMER.ID` and `WM_SEC.KEY_VERSION` — rather than Bearer tokens or API keys in the query string.
+**Authentication:** Every request is signed using RSA-SHA256. The connector generates a signature over `{consumerID}\n{timestamp}\n{keyVersion}\n` using the consumer's private key. The signature is sent in the `WM_SEC.AUTH_SIGNATURE` header along with a millisecond timestamp in `WM_CONSUMER.INTIMESTAMP`. Signatures have a 3-minute TTL.
 
 ## Actions
 

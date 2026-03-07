@@ -1,18 +1,47 @@
 package walmart
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// validCreds returns a Credentials value with valid consumer_id for tests.
+var (
+	testKeyOnce sync.Once
+	testKeyPEM  string
+)
+
+// testPrivateKeyPEM returns a PEM-encoded RSA private key for testing.
+// The key is generated once and reused across tests.
+func testPrivateKeyPEM() string {
+	testKeyOnce.Do(func() {
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			panic("generating test RSA key: " + err.Error())
+		}
+		der := x509.MarshalPKCS1PrivateKey(key)
+		testKeyPEM = string(pem.EncodeToMemory(&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: der,
+		}))
+	})
+	return testKeyPEM
+}
+
+// validCreds returns a Credentials value with valid consumer_id and
+// private_key for tests.
 func validCreds() connectors.Credentials {
 	return connectors.NewCredentials(map[string]string{
 		"consumer_id": "test-consumer-id",
 		"key_version": "1",
+		"private_key": testPrivateKeyPEM(),
 	})
 }
 

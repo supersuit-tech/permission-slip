@@ -101,7 +101,7 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
 				Service:         "walmart",
-				AuthType:        "api_key",
+				AuthType:        "custom",
 				InstructionsURL: "https://walmart.io/docs/affiliate/onboarding-guide",
 			},
 		},

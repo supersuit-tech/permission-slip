@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -39,7 +40,7 @@ func (a *getProductAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	var resp json.RawMessage
-	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, "/items/"+params.ItemID+"?format=json", &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, "/items/"+url.PathEscape(params.ItemID)+"?format=json", &resp); err != nil {
 		return nil, err
 	}
 

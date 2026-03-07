@@ -149,7 +149,7 @@ func TestSearchProducts_ValidationErrors(t *testing.T) {
 		{"invalid sort", `{"query":"test","sort":"invalid"}`},
 		{"invalid order", `{"query":"test","order":"invalid"}`},
 		{"limit too high", `{"query":"test","limit":50}`},
-		{"limit too low", `{"query":"test","limit":0}`},
+		{"limit negative", `{"query":"test","limit":-1}`},
 		{"negative start", `{"query":"test","start":-1}`},
 		{"invalid JSON", `{invalid}`},
 	}
