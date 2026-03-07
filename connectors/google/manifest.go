@@ -12,7 +12,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "google",
 		Name:        "Google",
-		Description: "Google integration for Gmail, Calendar, Chat, and Meet",
+		Description: "Google integration for Gmail, Calendar, Chat, Meet, and Drive",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "google.send_email",
@@ -209,6 +209,102 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.list_drive_files",
+				Name:        "List Drive Files",
+				Description: "List or search files in Google Drive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Google Drive search query (e.g. \"name contains 'report'\")"
+						},
+						"max_results": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Maximum number of files to return (1-100, default 10)"
+						},
+						"folder_id": {
+							"type": "string",
+							"description": "Folder ID to list files from (defaults to all accessible files)"
+						},
+						"order_by": {
+							"type": "string",
+							"description": "Sort order (e.g. 'modifiedTime desc', 'name'). Defaults to Drive's relevance ordering."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.get_drive_file",
+				Name:        "Get Drive File",
+				Description: "Get file metadata and optionally download content from Google Drive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_id"],
+					"properties": {
+						"file_id": {
+							"type": "string",
+							"description": "The ID of the file to retrieve"
+						},
+						"include_content": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether to include file content (exports Google Docs/Sheets/Slides as plain text)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.upload_drive_file",
+				Name:        "Upload Drive File",
+				Description: "Create and upload a text file to Google Drive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name", "content"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "File name"
+						},
+						"content": {
+							"type": "string",
+							"description": "File content (text)"
+						},
+						"mime_type": {
+							"type": "string",
+							"default": "text/plain",
+							"description": "MIME type of the file (default: text/plain)"
+						},
+						"folder_id": {
+							"type": "string",
+							"description": "Parent folder ID (optional)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.delete_drive_file",
+				Name:        "Delete Drive File",
+				Description: "Move a file to trash in Google Drive (soft delete)",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_id"],
+					"properties": {
+						"file_id": {
+							"type": "string",
+							"description": "The ID of the file to move to trash"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -221,6 +317,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/calendar.events",
 					"https://www.googleapis.com/auth/chat.spaces.readonly",
 					"https://www.googleapis.com/auth/chat.messages.create",
+					"https://www.googleapis.com/auth/drive",
 				},
 			},
 		},
@@ -308,6 +405,48 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create personal meetings",
 				Description: "Agent can create meetings on the primary calendar without inviting attendees.",
 				Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
+			},
+			{
+				ID:          "tpl_google_list_drive_files",
+				ActionType:  "google.list_drive_files",
+				Name:        "Browse Drive files",
+				Description: "Agent can list and search files in Google Drive.",
+				Parameters:  json.RawMessage(`{"query":"*","max_results":"*","folder_id":"*","order_by":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_drive_file",
+				ActionType:  "google.get_drive_file",
+				Name:        "Read Drive files",
+				Description: "Agent can read file metadata and content from Google Drive.",
+				Parameters:  json.RawMessage(`{"file_id":"*","include_content":"*"}`),
+			},
+			{
+				ID:          "tpl_google_get_drive_file_metadata",
+				ActionType:  "google.get_drive_file",
+				Name:        "View Drive file metadata",
+				Description: "Agent can view file metadata only (no content download).",
+				Parameters:  json.RawMessage(`{"file_id":"*","include_content":"false"}`),
+			},
+			{
+				ID:          "tpl_google_upload_drive_file",
+				ActionType:  "google.upload_drive_file",
+				Name:        "Upload files to Drive",
+				Description: "Agent can upload text files to Google Drive.",
+				Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_upload_drive_file_to_folder",
+				ActionType:  "google.upload_drive_file",
+				Name:        "Upload files to specific folder",
+				Description: "Agent can upload text files to a specific locked folder in Google Drive.",
+				Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"folder-id-here"}`),
+			},
+			{
+				ID:          "tpl_google_delete_drive_file",
+				ActionType:  "google.delete_drive_file",
+				Name:        "Trash Drive files",
+				Description: "Agent can move files to trash in Google Drive.",
+				Parameters:  json.RawMessage(`{"file_id":"*"}`),
 			},
 		},
 	}
