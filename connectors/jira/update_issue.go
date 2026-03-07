@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -26,8 +27,9 @@ type updateIssueParams struct {
 }
 
 func (p *updateIssueParams) validate() error {
+	p.IssueKey = strings.TrimSpace(p.IssueKey)
 	if p.IssueKey == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: issue_key"}
+		return &connectors.ValidationError{Message: "missing required parameter: issue_key (e.g. PROJ-123)"}
 	}
 	return nil
 }

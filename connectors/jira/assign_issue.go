@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -22,11 +23,13 @@ type assignIssueParams struct {
 }
 
 func (p *assignIssueParams) validate() error {
+	p.IssueKey = strings.TrimSpace(p.IssueKey)
+	p.AccountID = strings.TrimSpace(p.AccountID)
 	if p.IssueKey == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: issue_key"}
+		return &connectors.ValidationError{Message: "missing required parameter: issue_key (e.g. PROJ-123)"}
 	}
 	if p.AccountID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
+		return &connectors.ValidationError{Message: "missing required parameter: account_id (Atlassian account ID)"}
 	}
 	return nil
 }

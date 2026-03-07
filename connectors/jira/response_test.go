@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,6 +91,19 @@ func TestCheckResponse_JiraErrorFormat(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestCheckResponse_EmptyBody(t *testing.T) {
+	t.Parallel()
+
+	err := checkResponse(http.StatusBadRequest, http.Header{}, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "no error details") {
+		t.Errorf("expected empty body message, got: %s", errMsg)
 	}
 }
 

@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+const maxSearchResults = 1000
 
 // searchAction implements connectors.Action for jira.search.
 // It searches issues using JQL via POST /rest/api/3/search.
@@ -22,8 +25,12 @@ type searchParams struct {
 }
 
 func (p *searchParams) validate() error {
+	p.JQL = strings.TrimSpace(p.JQL)
 	if p.JQL == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: jql"}
+	}
+	if p.MaxResults > maxSearchResults {
+		return &connectors.ValidationError{Message: fmt.Sprintf("max_results cannot exceed %d", maxSearchResults)}
 	}
 	return nil
 }

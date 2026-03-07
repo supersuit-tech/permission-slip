@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -23,11 +24,14 @@ type transitionIssueParams struct {
 }
 
 func (p *transitionIssueParams) validate() error {
+	p.IssueKey = strings.TrimSpace(p.IssueKey)
+	p.TransitionID = strings.TrimSpace(p.TransitionID)
+	p.TransitionName = strings.TrimSpace(p.TransitionName)
 	if p.IssueKey == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: issue_key"}
+		return &connectors.ValidationError{Message: "missing required parameter: issue_key (e.g. PROJ-123)"}
 	}
 	if p.TransitionID == "" && p.TransitionName == "" {
-		return &connectors.ValidationError{Message: "one of transition_id or transition_name is required"}
+		return &connectors.ValidationError{Message: "one of transition_id or transition_name is required (e.g. \"In Progress\", \"Done\")"}
 	}
 	return nil
 }
@@ -82,30 +86,16 @@ func (a *transitionIssueAction) resolveTransitionName(ctx context.Context, creds
 		return "", err
 	}
 
+	var available []string
 	for _, t := range resp.Transitions {
-		if equalFold(t.Name, name) {
+		available = append(available, t.Name)
+		if strings.EqualFold(t.Name, name) {
 			return t.ID, nil
 		}
 	}
 
 	return "", &connectors.ValidationError{
-		Message: fmt.Sprintf("transition %q not found for this issue", name),
+		Message: fmt.Sprintf("transition %q not found for this issue; available transitions: [%s]",
+			name, strings.Join(available, ", ")),
 	}
-}
-
-// equalFold is a simple case-insensitive string comparison.
-func equalFold(a, b string) bool {
-	return len(a) == len(b) && foldLower(a) == foldLower(b)
-}
-
-func foldLower(s string) string {
-	b := make([]byte, len(s))
-	for i := range s {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
 }

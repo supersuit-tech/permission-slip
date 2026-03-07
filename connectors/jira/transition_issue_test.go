@@ -3,6 +3,7 @@ package jira
 import (
 	"encoding/json"
 	"io"
+	"strings"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -139,6 +140,11 @@ func TestTransitionIssue_NameNotFound(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+	// Error should list available transitions.
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "To Do") {
+		t.Errorf("error message should list available transitions, got: %s", errMsg)
 	}
 }
 

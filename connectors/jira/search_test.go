@@ -127,6 +127,25 @@ func TestSearch_WithFields(t *testing.T) {
 	}
 }
 
+func TestSearch_MaxResultsExceeded(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["jira.search"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "jira.search",
+		Parameters:  json.RawMessage(`{"jql":"project = PROJ","max_results":5000}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for excessive max_results, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestSearch_MissingJQL(t *testing.T) {
 	t.Parallel()
 

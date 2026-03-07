@@ -43,13 +43,17 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 //	{"errorMessages": ["msg1", "msg2"], "errors": {"field": "msg"}}
 //	{"message": "msg"}
 func extractErrorMessage(body []byte) string {
+	if len(body) == 0 {
+		return "(no error details returned)"
+	}
+
 	var jiraErr struct {
 		ErrorMessages []string          `json:"errorMessages"`
 		Errors        map[string]string `json:"errors"`
 		Message       string            `json:"message"`
 	}
 	if json.Unmarshal(body, &jiraErr) != nil {
-		return string(body)
+		return truncate(string(body), 200)
 	}
 
 	var parts []string
@@ -62,7 +66,15 @@ func extractErrorMessage(body []byte) string {
 	}
 
 	if len(parts) == 0 {
-		return string(body)
+		return truncate(string(body), 200)
 	}
 	return strings.Join(parts, "; ")
+}
+
+// truncate shortens s to maxLen characters, appending "..." if truncated.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

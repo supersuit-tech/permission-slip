@@ -122,3 +122,42 @@ func TestPlainTextToADF(t *testing.T) {
 		t.Errorf("text = %v, want %q", textNode["text"], "Hello world")
 	}
 }
+
+func TestPlainTextToADF_Multiline(t *testing.T) {
+	t.Parallel()
+
+	adf := plainTextToADF("Line 1\nLine 2\nLine 3")
+
+	content := adf["content"].([]interface{})
+	if len(content) != 3 {
+		t.Fatalf("content length = %d, want 3 (one paragraph per line)", len(content))
+	}
+
+	for i, expected := range []string{"Line 1", "Line 2", "Line 3"} {
+		para := content[i].(map[string]interface{})
+		textNodes := para["content"].([]interface{})
+		textNode := textNodes[0].(map[string]interface{})
+		if textNode["text"] != expected {
+			t.Errorf("paragraph %d text = %v, want %q", i, textNode["text"], expected)
+		}
+	}
+}
+
+func TestAddComment_WhitespaceOnlyBody(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["jira.add_comment"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "jira.add_comment",
+		Parameters:  json.RawMessage(`{"issue_key":"PROJ-1","body":"   "}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for whitespace-only body, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

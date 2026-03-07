@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -26,11 +27,14 @@ type createIssueParams struct {
 }
 
 func (p *createIssueParams) validate() error {
+	p.ProjectKey = strings.TrimSpace(p.ProjectKey)
+	p.IssueType = strings.TrimSpace(p.IssueType)
+	p.Summary = strings.TrimSpace(p.Summary)
 	if p.ProjectKey == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: project_key"}
 	}
 	if p.IssueType == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: issue_type"}
+		return &connectors.ValidationError{Message: "missing required parameter: issue_type (e.g. Bug, Story, Task)"}
 	}
 	if p.Summary == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: summary"}
