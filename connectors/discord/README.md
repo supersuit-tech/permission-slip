@@ -50,7 +50,7 @@ connector validates that IDs contain only digits.
 | Event `name` | 1-100 characters |
 | Event `description` | Up to 1000 characters |
 | Thread `name` | 1-100 characters |
-| Thread `auto_archive_duration` | One of: 60, 1440, 4320, 10080 (minutes) |
+| Thread `auto_archive_duration` | One of: 0 (server default), 60, 1440, 4320, 10080 (minutes) |
 | `entity_type` | 1 (stage), 2 (voice), or 3 (external) |
 | Ban `delete_message_seconds` | 0 - 604800 (0 = none, 604800 = 7 days) |
 | List `limit` | 1 - 1000 (default 100) |

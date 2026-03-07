@@ -389,9 +389,9 @@ func (c *DiscordConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"auto_archive_duration": {
 							"type": "integer",
-							"enum": [60, 1440, 4320, 10080],
+							"enum": [0, 60, 1440, 4320, 10080],
 							"default": 1440,
-							"description": "Minutes of inactivity before auto-archive (60 = 1h, 1440 = 24h, 4320 = 3d, 10080 = 7d)"
+							"description": "Minutes of inactivity before auto-archive: 0 = server default, 60 = 1h, 1440 = 24h, 4320 = 3d, 10080 = 7d"
 						}
 					}
 				}`)),

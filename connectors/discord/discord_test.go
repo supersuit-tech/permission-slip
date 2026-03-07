@@ -2,6 +2,7 @@ package discord
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -218,24 +219,11 @@ func TestMapDiscordError(t *testing.T) {
 					t.Errorf("expected ValidationError, got %T: %v", err, err)
 				}
 			}
-			if got := err.Error(); !containsSubstring(got, tt.wantSubstr) {
+			if got := err.Error(); !strings.Contains(got, tt.wantSubstr) {
 				t.Errorf("error %q should contain %q", got, tt.wantSubstr)
 			}
 		})
 	}
-}
-
-func containsSubstring(s, sub string) bool {
-	return len(s) >= len(sub) && (sub == "" || contains(s, sub))
-}
-
-func contains(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }
 
 func TestManifestTemplateParametersAreValidJSON(t *testing.T) {
