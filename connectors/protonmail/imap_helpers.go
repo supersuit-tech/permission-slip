@@ -92,6 +92,65 @@ func (s *imapSession) close() {
 	}
 }
 
+// defaultLimit is the default number of emails to fetch.
+const defaultLimit = 10
+
+// maxLimit is the maximum number of emails that can be fetched.
+const maxLimit = 50
+
+// validateLimit applies defaults and validates the limit parameter.
+func validateLimit(limit *int) error {
+	if *limit <= 0 {
+		*limit = defaultLimit
+	}
+	if *limit > maxLimit {
+		return &connectors.ValidationError{Message: fmt.Sprintf("limit must be at most %d", maxLimit)}
+	}
+	return nil
+}
+
+// emptyEmailResult returns a JSON result with an empty email list.
+func emptyEmailResult() (*connectors.ActionResult, error) {
+	return connectors.JSONResult(map[string]any{
+		"emails": []emailSummary{},
+		"total":  0,
+	})
+}
+
+// emailListResult returns a JSON result wrapping the given email summaries.
+func emailListResult(emails []emailSummary) (*connectors.ActionResult, error) {
+	return connectors.JSONResult(map[string]any{
+		"emails": emails,
+		"total":  len(emails),
+	})
+}
+
+// fetchEnvelopes fetches message envelopes for the given sequence set and
+// returns them as email summaries.
+func fetchEnvelopes(session *imapSession, seqSet imap.SeqSet) ([]emailSummary, error) {
+	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
+		Envelope: true,
+		Flags:    true,
+	})
+	defer fetchCmd.Close()
+
+	var emails []emailSummary
+	for {
+		msg := fetchCmd.Next()
+		if msg == nil {
+			break
+		}
+		buf, err := msg.Collect()
+		if err != nil {
+			return nil, mapIMAPError(err)
+		}
+		if buf.Envelope != nil {
+			emails = append(emails, envelopeToSummary(buf.SeqNum, buf.Envelope, buf.Flags))
+		}
+	}
+	return emails, nil
+}
+
 // emailSummary is the JSON representation of an email summary.
 type emailSummary struct {
 	SeqNum  uint32   `json:"seq_num"`
@@ -102,28 +161,32 @@ type emailSummary struct {
 	Flags   []string `json:"flags"`
 }
 
+// formatAddresses formats IMAP addresses as human-readable strings.
+// Addresses with a name are formatted as "Name <email>", others as bare email.
+func formatAddresses(addrs []imap.Address) []string {
+	var result []string
+	for _, addr := range addrs {
+		a := addr.Addr()
+		if a == "" {
+			continue
+		}
+		if addr.Name != "" {
+			result = append(result, fmt.Sprintf("%s <%s>", addr.Name, a))
+		} else {
+			result = append(result, a)
+		}
+	}
+	return result
+}
+
 // envelopeToSummary converts an IMAP envelope to our JSON summary format.
 func envelopeToSummary(seqNum uint32, env *imap.Envelope, flags []imap.Flag) emailSummary {
 	summary := emailSummary{
 		SeqNum:  seqNum,
 		Subject: env.Subject,
 		Date:    env.Date.Format(time.RFC3339),
-	}
-	for _, addr := range env.From {
-		a := addr.Addr()
-		if a != "" {
-			if addr.Name != "" {
-				summary.From = append(summary.From, fmt.Sprintf("%s <%s>", addr.Name, a))
-			} else {
-				summary.From = append(summary.From, a)
-			}
-		}
-	}
-	for _, addr := range env.To {
-		a := addr.Addr()
-		if a != "" {
-			summary.To = append(summary.To, a)
-		}
+		From:    formatAddresses(env.From),
+		To:      formatAddresses(env.To),
 	}
 	for _, f := range flags {
 		summary.Flags = append(summary.Flags, string(f))

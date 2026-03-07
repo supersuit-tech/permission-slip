@@ -23,13 +23,7 @@ func (p *readInboxParams) validate() error {
 	if p.Folder == "" {
 		p.Folder = "INBOX"
 	}
-	if p.Limit <= 0 {
-		p.Limit = 10
-	}
-	if p.Limit > 50 {
-		return &connectors.ValidationError{Message: "limit must be at most 50"}
-	}
-	return nil
+	return validateLimit(&p.Limit)
 }
 
 func (a *readInboxAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -53,10 +47,7 @@ func (a *readInboxAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}
 
 	if mboxData.NumMessages == 0 {
-		return connectors.JSONResult(map[string]any{
-			"emails": []emailSummary{},
-			"total":  0,
-		})
+		return emptyEmailResult()
 	}
 
 	// If unread_only, search for unseen messages first.
@@ -76,10 +67,7 @@ func (a *readInboxAction) Execute(ctx context.Context, req connectors.ActionRequ
 	var seqSet imap.SeqSet
 	if params.UnreadOnly {
 		if len(seqNums) == 0 {
-			return connectors.JSONResult(map[string]any{
-				"emails": []emailSummary{},
-				"total":  0,
-			})
+			return emptyEmailResult()
 		}
 		// Take only the last `limit` unread messages (most recent).
 		start := 0
@@ -98,29 +86,9 @@ func (a *readInboxAction) Execute(ctx context.Context, req connectors.ActionRequ
 		seqSet.AddRange(from, mboxData.NumMessages)
 	}
 
-	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
-		Envelope: true,
-		Flags:    true,
-	})
-	defer fetchCmd.Close()
-
-	var emails []emailSummary
-	for {
-		msg := fetchCmd.Next()
-		if msg == nil {
-			break
-		}
-		buf, err := msg.Collect()
-		if err != nil {
-			return nil, mapIMAPError(err)
-		}
-		if buf.Envelope != nil {
-			emails = append(emails, envelopeToSummary(buf.SeqNum, buf.Envelope, buf.Flags))
-		}
+	emails, err := fetchEnvelopes(session, seqSet)
+	if err != nil {
+		return nil, err
 	}
-
-	return connectors.JSONResult(map[string]any{
-		"emails": emails,
-		"total":  len(emails),
-	})
+	return emailListResult(emails)
 }

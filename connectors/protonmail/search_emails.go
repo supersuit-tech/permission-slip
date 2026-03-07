@@ -27,11 +27,8 @@ func (p *searchEmailsParams) validate() error {
 	if p.Folder == "" {
 		p.Folder = "INBOX"
 	}
-	if p.Limit <= 0 {
-		p.Limit = 10
-	}
-	if p.Limit > 50 {
-		return &connectors.ValidationError{Message: "limit must be at most 50"}
+	if err := validateLimit(&p.Limit); err != nil {
+		return err
 	}
 	if p.Subject == "" && p.From == "" && p.Since == "" && p.Before == "" {
 		return &connectors.ValidationError{Message: "at least one search criterion (subject, from, since, before) is required"}
@@ -98,10 +95,7 @@ func (a *searchEmailsAction) Execute(ctx context.Context, req connectors.ActionR
 
 	seqNums := searchData.AllSeqNums()
 	if len(seqNums) == 0 {
-		return connectors.JSONResult(map[string]any{
-			"emails": []emailSummary{},
-			"total":  0,
-		})
+		return emptyEmailResult()
 	}
 
 	// Limit results (take most recent).
@@ -116,29 +110,9 @@ func (a *searchEmailsAction) Execute(ctx context.Context, req connectors.ActionR
 		seqSet.AddNum(n)
 	}
 
-	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
-		Envelope: true,
-		Flags:    true,
-	})
-	defer fetchCmd.Close()
-
-	var emails []emailSummary
-	for {
-		msg := fetchCmd.Next()
-		if msg == nil {
-			break
-		}
-		buf, err := msg.Collect()
-		if err != nil {
-			return nil, mapIMAPError(err)
-		}
-		if buf.Envelope != nil {
-			emails = append(emails, envelopeToSummary(buf.SeqNum, buf.Envelope, buf.Flags))
-		}
+	emails, err := fetchEnvelopes(session, seqSet)
+	if err != nil {
+		return nil, err
 	}
-
-	return connectors.JSONResult(map[string]any{
-		"emails": emails,
-		"total":  len(emails),
-	})
+	return emailListResult(emails)
 }

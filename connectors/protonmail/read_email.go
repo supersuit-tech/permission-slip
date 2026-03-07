@@ -155,22 +155,6 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	return connectors.JSONResult(detail)
 }
 
-func formatAddresses(addrs []imap.Address) []string {
-	var result []string
-	for _, addr := range addrs {
-		a := addr.Addr()
-		if a == "" {
-			continue
-		}
-		if addr.Name != "" {
-			result = append(result, fmt.Sprintf("%s <%s>", addr.Name, a))
-		} else {
-			result = append(result, a)
-		}
-	}
-	return result
-}
-
 // parseBody extracts the text body from a raw RFC 5322 message.
 func parseBody(rawBody []byte) (body, contentType string) {
 	mr, err := mail.CreateReader(bytes.NewReader(rawBody))
