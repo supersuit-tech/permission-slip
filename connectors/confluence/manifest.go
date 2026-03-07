@@ -179,11 +179,25 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"page_id":"*","title":"*","body":"*","version_number":"*","version_message":"*","status":"*"}`),
 			},
 			{
+				ID:          "tpl_confluence_get_page",
+				ActionType:  "confluence.get_page",
+				Name:        "Read pages",
+				Description: "Agent can read any page's content and metadata.",
+				Parameters:  json.RawMessage(`{"page_id":"*","body_format":"*"}`),
+			},
+			{
 				ID:          "tpl_confluence_search",
 				ActionType:  "confluence.search",
 				Name:        "Search pages",
 				Description: "Agent can search across Confluence pages using CQL.",
 				Parameters:  json.RawMessage(`{"cql":"*","limit":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_add_comment",
+				ActionType:  "confluence.add_comment",
+				Name:        "Comment on pages",
+				Description: "Agent can add comments to any page.",
+				Parameters:  json.RawMessage(`{"page_id":"*","body":"*"}`),
 			},
 		},
 	}

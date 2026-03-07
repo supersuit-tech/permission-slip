@@ -37,6 +37,7 @@ func TestUpdatePage_Success(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id": "98765", "title": "Updated Title", "status": "current",
 			"version": map[string]interface{}{"number": 2},
+			"_links":  map[string]interface{}{"webui": "/spaces/DEV/pages/98765/Updated+Title"},
 		})
 	}))
 	defer srv.Close()
@@ -57,6 +58,10 @@ func TestUpdatePage_Success(t *testing.T) {
 	json.Unmarshal(result.Data, &data)
 	if data["title"] != "Updated Title" {
 		t.Errorf("title = %v, want %q", data["title"], "Updated Title")
+	}
+	wantURL := "https://testsite.atlassian.net/wiki/spaces/DEV/pages/98765/Updated+Title"
+	if data["web_url"] != wantURL {
+		t.Errorf("web_url = %v, want %q", data["web_url"], wantURL)
 	}
 }
 

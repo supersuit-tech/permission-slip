@@ -76,11 +76,26 @@ func (a *createPageAction) Execute(ctx context.Context, req connectors.ActionReq
 		Version struct {
 			Number int `json:"number"`
 		} `json:"version"`
+		Links struct {
+			WebUI string `json:"webui"`
+		} `json:"_links"`
 	}
 
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/pages", reqBody, &resp); err != nil {
 		return nil, err
 	}
 
-	return connectors.JSONResult(resp)
+	// Build a full web URL for easy navigation if webui path is available.
+	result := map[string]interface{}{
+		"id":      resp.ID,
+		"title":   resp.Title,
+		"status":  resp.Status,
+		"version": resp.Version,
+	}
+	if resp.Links.WebUI != "" {
+		site, _ := req.Credentials.Get("site")
+		result["web_url"] = "https://" + site + ".atlassian.net/wiki" + resp.Links.WebUI
+	}
+
+	return connectors.JSONResult(result)
 }

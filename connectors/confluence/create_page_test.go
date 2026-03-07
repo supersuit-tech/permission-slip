@@ -43,10 +43,11 @@ func TestCreatePage_Success(t *testing.T) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":    "98765",
-			"title": "Test Page",
-			"status": "current",
+			"id":      "98765",
+			"title":   "Test Page",
+			"status":  "current",
 			"version": map[string]interface{}{"number": 1},
+			"_links":  map[string]interface{}{"webui": "/spaces/DEV/pages/98765/Test+Page"},
 		})
 	}))
 	defer srv.Close()
@@ -69,6 +70,10 @@ func TestCreatePage_Success(t *testing.T) {
 	}
 	if data["id"] != "98765" {
 		t.Errorf("id = %v, want %q", data["id"], "98765")
+	}
+	wantURL := "https://testsite.atlassian.net/wiki/spaces/DEV/pages/98765/Test+Page"
+	if data["web_url"] != wantURL {
+		t.Errorf("web_url = %v, want %q", data["web_url"], wantURL)
 	}
 }
 
