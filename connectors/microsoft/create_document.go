@@ -58,16 +58,6 @@ func (p *createDocumentParams) defaults() {
 	}
 }
 
-// graphDriveItem represents a OneDrive item returned by the Graph API.
-type graphDriveItem struct {
-	ID                   string `json:"id"`
-	Name                 string `json:"name"`
-	WebURL               string `json:"webUrl"`
-	Size                 int64  `json:"size,omitempty"`
-	CreatedDateTime      string `json:"createdDateTime,omitempty"`
-	LastModifiedDateTime string `json:"lastModifiedDateTime,omitempty"`
-	DownloadURL          string `json:"@microsoft.graph.downloadUrl,omitempty"`
-}
 
 // documentResult is the simplified response returned to the caller for create/update.
 type documentResult struct {

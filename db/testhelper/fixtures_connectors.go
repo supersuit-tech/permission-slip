@@ -23,6 +23,14 @@ func InsertConnectorAction(t *testing.T, d db.DBTX, connectorID, actionType, nam
 		connectorID, actionType, name)
 }
 
+// InsertConnectorActionWithPayment creates an action that requires a payment method.
+func InsertConnectorActionWithPayment(t *testing.T, d db.DBTX, connectorID, actionType, name string) {
+	t.Helper()
+	mustExec(t, d,
+		`INSERT INTO connector_actions (connector_id, action_type, name, requires_payment_method) VALUES ($1, $2, $3, true)`,
+		connectorID, actionType, name)
+}
+
 // ConnectorActionOpts holds optional fields for InsertConnectorActionFull.
 type ConnectorActionOpts struct {
 	Description      *string

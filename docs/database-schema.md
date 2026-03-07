@@ -39,6 +39,7 @@ Actions available on a connector (e.g., "send email" on Gmail).
 | `description` | text | max 4096 chars |
 | `risk_level` | text | CHECK IN ('low', 'medium', 'high') |
 | `parameters_schema` | jsonb | max 64 KB |
+| `requires_payment_method` | boolean | NOT NULL, DEFAULT false — when true, execute requests must include `payment_method_id` and `amount_cents` |
 
 ### `connector_required_credentials`
 
