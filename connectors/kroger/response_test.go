@@ -47,7 +47,9 @@ func TestCheckResponse_TruncatesLargeBody(t *testing.T) {
 	t.Parallel()
 
 	// Create a body larger than 512 chars that doesn't parse as JSON.
-	largeBody := []byte(strings.Repeat("x", 1000))
+	// Use "z" instead of "x" because "x" appears in the error wrapper
+	// ("external service error..."), which inflates the count.
+	largeBody := []byte(strings.Repeat("z", 1000))
 	err := checkResponse(http.StatusInternalServerError, http.Header{}, largeBody)
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -57,7 +59,7 @@ func TestCheckResponse_TruncatesLargeBody(t *testing.T) {
 		t.Errorf("large error body should be truncated, got length %d", len(msg))
 	}
 	// The raw body portion should be at most 512 chars + truncation suffix.
-	if strings.Count(msg, "x") > 512 {
+	if strings.Count(msg, "z") > 512 {
 		t.Error("truncated body should contain at most 512 chars of raw content")
 	}
 }
