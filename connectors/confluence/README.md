@@ -14,7 +14,7 @@ The Confluence connector integrates Permission Slip with the [Confluence Cloud R
 | `email` | Yes | Atlassian account email address used for API authentication. |
 | `api_token` | Yes | Atlassian API token. See [Atlassian docs](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/) for how to generate one. |
 
-**Shared credentials:** Uses the `atlassian` credential service, shared with the Jira connector. Users who already have Jira credentials configured can reuse them for Confluence.
+**Shared credentials:** Uses the `jira` credential service, shared with the Jira connector. Users who already have Jira credentials configured can reuse them for Confluence.
 
 ### Base URL
 

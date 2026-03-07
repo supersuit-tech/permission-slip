@@ -28,6 +28,9 @@ type updatePageParams struct {
 
 func (p *updatePageParams) validate() error {
 	p.PageID = strings.TrimSpace(p.PageID)
+	p.Title = strings.TrimSpace(p.Title)
+	p.Body = strings.TrimSpace(p.Body)
+	p.Status = strings.TrimSpace(p.Status)
 	if p.PageID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: page_id"}
 	}

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -144,7 +145,7 @@ func (c *ConfluenceConnector) do(ctx context.Context, creds connectors.Credentia
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Confluence API request timed out: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Confluence API request failed: %v", err)}

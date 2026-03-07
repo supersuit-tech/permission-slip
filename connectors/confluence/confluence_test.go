@@ -241,8 +241,8 @@ func TestConfluenceConnector_Manifest(t *testing.T) {
 		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
 	}
 	cred := m.RequiredCredentials[0]
-	if cred.Service != "atlassian" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "atlassian")
+	if cred.Service != "jira" {
+		t.Errorf("credential service = %q, want %q", cred.Service, "jira")
 	}
 	if cred.AuthType != "basic" {
 		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "basic")

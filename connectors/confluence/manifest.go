@@ -151,7 +151,7 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
-				Service:         "atlassian",
+				Service:         "jira",
 				AuthType:        "basic",
 				InstructionsURL: "https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/",
 			},
