@@ -42,10 +42,10 @@ var validOrderValues = map[string]bool{
 
 func (p *searchProductsParams) validate() error {
 	if p.Query == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: query"}
+		return &connectors.ValidationError{Message: "missing required parameter: query (e.g. \"paper towels\", \"laptop\")"}
 	}
 	if len(p.Query) > 500 {
-		return &connectors.ValidationError{Message: "query must be 500 characters or fewer"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("query exceeds 500 characters (got %d)", len(p.Query))}
 	}
 	if p.Sort != "" && !validSortFields[p.Sort] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort %q: must be relevance, price, title, bestseller, customerRating, or new", p.Sort)}

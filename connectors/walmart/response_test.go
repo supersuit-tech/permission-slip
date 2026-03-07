@@ -84,12 +84,22 @@ func TestCheckResponse_ServerError(t *testing.T) {
 	}
 }
 
-func TestExtractErrorMessage_ErrorsArray(t *testing.T) {
+func TestExtractErrorMessage_ErrorsArrayWithCode(t *testing.T) {
 	t.Parallel()
 	body := walmartErrorResponse(400, "Invalid query parameter")
 	msg := extractErrorMessage(body)
-	if msg != "Invalid query parameter" {
-		t.Errorf("extractErrorMessage = %q, want %q", msg, "Invalid query parameter")
+	want := "Invalid query parameter (code: 400)"
+	if msg != want {
+		t.Errorf("extractErrorMessage = %q, want %q", msg, want)
+	}
+}
+
+func TestExtractErrorMessage_ErrorsArrayNoCode(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"errors":[{"code":0,"message":"Something failed"}]}`)
+	msg := extractErrorMessage(body)
+	if msg != "Something failed" {
+		t.Errorf("extractErrorMessage = %q, want %q", msg, "Something failed")
 	}
 }
 

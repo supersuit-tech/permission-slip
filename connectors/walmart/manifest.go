@@ -28,17 +28,17 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"category_id": {
 							"type": "string",
-							"description": "Category ID to filter results (from taxonomy endpoint)"
+							"description": "Category ID to filter results (e.g. \"3944\" for Grocery — from walmart.get_taxonomy)"
 						},
 						"sort": {
 							"type": "string",
 							"enum": ["relevance", "price", "title", "bestseller", "customerRating", "new"],
-							"description": "Sort field for results"
+							"description": "Sort field for results (defaults to relevance)"
 						},
 						"order": {
 							"type": "string",
 							"enum": ["asc", "desc"],
-							"description": "Sort order (ascending or descending)"
+							"description": "Sort order: ascending or descending (defaults to relevance order)"
 						},
 						"start": {
 							"type": "integer",
@@ -68,7 +68,7 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
-							"description": "The Walmart item ID"
+							"description": "The Walmart item ID (numeric, e.g. \"12345678\")"
 						}
 					},
 					"required": ["item_id"],

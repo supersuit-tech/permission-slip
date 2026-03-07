@@ -21,21 +21,21 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	case statusCode == http.StatusTooManyRequests:
 		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), 0)
 		return &connectors.RateLimitError{
-			Message:    fmt.Sprintf("Walmart API rate limit exceeded: %s", msg),
+			Message:    fmt.Sprintf("Walmart rate limit exceeded: %s", msg),
 			RetryAfter: retryAfter,
 		}
 	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: fmt.Sprintf("Walmart API auth error (401): %s", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("Walmart auth error: %s", msg)}
 	case statusCode == http.StatusForbidden:
-		return &connectors.AuthError{Message: fmt.Sprintf("Walmart API forbidden (403): %s", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("Walmart auth error: %s", msg)}
 	case statusCode == http.StatusBadRequest:
-		return &connectors.ValidationError{Message: fmt.Sprintf("Walmart API validation error: %s", msg)}
+		return &connectors.ValidationError{Message: fmt.Sprintf("Walmart validation error: %s", msg)}
 	case statusCode == http.StatusNotFound:
-		return &connectors.ValidationError{Message: fmt.Sprintf("Walmart API resource not found: %s", msg)}
+		return &connectors.ValidationError{Message: fmt.Sprintf("Walmart resource not found: %s", msg)}
 	default:
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
-			Message:    fmt.Sprintf("Walmart API error: %s", msg),
+			Message:    fmt.Sprintf("Walmart error: %s", msg),
 		}
 	}
 }
@@ -57,6 +57,9 @@ func extractErrorMessage(body []byte) string {
 	if json.Unmarshal(body, &errorsEnvelope) == nil && len(errorsEnvelope.Errors) > 0 {
 		first := errorsEnvelope.Errors[0]
 		if first.Message != "" {
+			if first.Code != 0 {
+				return fmt.Sprintf("%s (code: %d)", first.Message, first.Code)
+			}
 			return first.Message
 		}
 	}

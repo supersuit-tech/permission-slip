@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	// defaultBaseURL pins the Walmart Affiliate API version (currently v2).
+	// Update deliberately when ready to handle new response shapes.
+	// See https://walmart.io/docs/affiliate/introduction
 	defaultBaseURL = "https://developer.api.walmart.com/api-proxy/service/affil/product/v2"
 	defaultTimeout = 30 * time.Second
 
@@ -24,7 +27,8 @@ const (
 	credKeyKeyVersion  = "key_version"
 	credKeyImpactID    = "impact_id"
 
-	// maxResponseBytes caps how much data we read from the Walmart API.
+	// maxResponseBytes prevents memory exhaustion from a malicious or
+	// misconfigured upstream. 10 MB is generous for any Walmart search response.
 	maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 )
 
