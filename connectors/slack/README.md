@@ -85,6 +85,7 @@ Lists Slack channels visible to the bot.
 | `types` | string | No | `public_channel` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im` |
 | `limit` | integer | No | `100` | Max channels to return (1–1000) |
 | `cursor` | string | No | — | Pagination cursor from a previous response |
+| `exclude_archived` | boolean | No | `true` | Exclude archived channels from results |
 
 **Response:**
 
