@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,33 +23,19 @@ type addReviewerParams struct {
 }
 
 func (p *addReviewerParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
+	if err := requirePositiveInt(p.PullNumber, "pull_number"); err != nil {
+		return err
 	}
-	if p.PullNumber <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: pull_number"}
-	}
-	if len(p.Reviewers) == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: reviewers"}
-	}
-	for _, r := range p.Reviewers {
-		if r == "" {
-			return &connectors.ValidationError{Message: "reviewers must not contain empty strings"}
-		}
-	}
-	return nil
+	return requireNonEmptyStrings(p.Reviewers, "reviewers")
 }
 
 // Execute requests reviews on a pull request and returns the updated PR data.
 func (a *addReviewerAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params addReviewerParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[addReviewerParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

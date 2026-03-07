@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -31,14 +30,11 @@ var validStateReasons = map[string]bool{
 }
 
 func (p *closeIssueParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
-	}
-	if p.IssueNumber <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: issue_number"}
+	if err := requirePositiveInt(p.IssueNumber, "issue_number"); err != nil {
+		return err
 	}
 	if p.StateReason == "" {
 		p.StateReason = "completed"
@@ -51,11 +47,8 @@ func (p *closeIssueParams) validate() error {
 
 // Execute closes a GitHub issue, optionally posting a comment first.
 func (a *closeIssueAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params closeIssueParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[closeIssueParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

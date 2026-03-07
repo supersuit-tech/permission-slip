@@ -389,6 +389,7 @@ connectors/github/
 ├── add_reviewer.go          # github.add_reviewer action
 ├── create_release.go        # github.create_release action
 ├── create_branch.go         # github.create_branch action
+├── validation.go            # Shared validation helpers (parseAndValidate, requireOwnerRepo, etc.)
 ├── response.go              # Shared HTTP response → typed error mapping
 ├── github_test.go           # Connector-level tests
 ├── helpers_test.go          # Shared test helpers (validCreds)

@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,33 +23,19 @@ type addLabelParams struct {
 }
 
 func (p *addLabelParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
+	if err := requirePositiveInt(p.IssueNumber, "issue_number"); err != nil {
+		return err
 	}
-	if p.IssueNumber <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: issue_number"}
-	}
-	if len(p.Labels) == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: labels"}
-	}
-	for _, l := range p.Labels {
-		if l == "" {
-			return &connectors.ValidationError{Message: "labels must not contain empty strings"}
-		}
-	}
-	return nil
+	return requireNonEmptyStrings(p.Labels, "labels")
 }
 
 // Execute adds labels to a GitHub issue or pull request.
 func (a *addLabelAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params addLabelParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[addLabelParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

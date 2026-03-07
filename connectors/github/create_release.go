@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -27,11 +26,8 @@ type createReleaseParams struct {
 }
 
 func (p *createReleaseParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
-	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
 	if p.TagName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: tag_name"}
@@ -41,11 +37,8 @@ func (p *createReleaseParams) validate() error {
 
 // Execute creates a GitHub release and returns the created release data.
 func (a *createReleaseAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params createReleaseParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[createReleaseParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

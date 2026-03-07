@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -27,11 +26,8 @@ type createPRParams struct {
 }
 
 func (p *createPRParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
-	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
@@ -47,11 +43,8 @@ func (p *createPRParams) validate() error {
 
 // Execute creates a GitHub pull request and returns the created PR data.
 func (a *createPRAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params createPRParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[createPRParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

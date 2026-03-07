@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,41 +24,9 @@ type createBranchParams struct {
 	FromRef    string `json:"from_ref"`
 }
 
-// invalidRefChars contains characters forbidden in git ref names.
-// See: https://git-scm.com/docs/git-check-ref-format
-var invalidRefChars = strings.NewReplacer(
-	"..", "",
-	"~", "",
-	"^", "",
-	":", "",
-	"?", "",
-	"*", "",
-	"[", "",
-	"\\", "",
-)
-
-func validateRefName(name, field string) error {
-	if name == "" {
-		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", field)}
-	}
-	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, ".") {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not start with '/' or '.'", field)}
-	}
-	if strings.HasSuffix(name, ".lock") || strings.HasSuffix(name, ".") {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not end with '.lock' or '.'", field)}
-	}
-	if invalidRefChars.Replace(name) != name {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: contains forbidden characters (.. ~ ^ : ? * [ \\)", field)}
-	}
-	return nil
-}
-
 func (p *createBranchParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
-	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
 	if err := validateRefName(p.BranchName, "branch_name"); err != nil {
 		return err
@@ -72,11 +39,8 @@ func (p *createBranchParams) validate() error {
 
 // Execute creates a new branch in a GitHub repository.
 func (a *createBranchAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params createBranchParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[createBranchParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

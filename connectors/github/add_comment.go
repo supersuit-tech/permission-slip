@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,14 +23,11 @@ type addCommentParams struct {
 }
 
 func (p *addCommentParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
-	}
-	if p.IssueNumber <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: issue_number"}
+	if err := requirePositiveInt(p.IssueNumber, "issue_number"); err != nil {
+		return err
 	}
 	if p.Body == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: body"}
@@ -41,11 +37,8 @@ func (p *addCommentParams) validate() error {
 
 // Execute adds a comment to a GitHub issue or pull request.
 func (a *addCommentAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params addCommentParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidate[addCommentParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 
