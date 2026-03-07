@@ -1,5 +1,5 @@
 // Package google implements the Google connector for the Permission Slip
-// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Chat)
+// connector execution layer. It uses Google REST APIs (Gmail, Calendar, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
 package google
 
@@ -19,6 +19,8 @@ import (
 const (
 	defaultGmailBaseURL    = "https://gmail.googleapis.com"
 	defaultCalendarBaseURL = "https://www.googleapis.com/calendar/v3"
+	defaultSheetsBaseURL   = "https://sheets.googleapis.com/v4"
+	defaultDocsBaseURL     = "https://docs.googleapis.com"
 	defaultDriveBaseURL    = "https://www.googleapis.com"
 	defaultChatBaseURL     = "https://chat.googleapis.com"
 	defaultTimeout         = 30 * time.Second
@@ -40,6 +42,8 @@ type GoogleConnector struct {
 	client          *http.Client
 	gmailBaseURL    string
 	calendarBaseURL string
+	sheetsBaseURL   string
+	docsBaseURL     string
 	driveBaseURL    string
 	chatBaseURL     string
 }
@@ -50,14 +54,21 @@ func New() *GoogleConnector {
 		client:          &http.Client{Timeout: defaultTimeout},
 		gmailBaseURL:    defaultGmailBaseURL,
 		calendarBaseURL: defaultCalendarBaseURL,
+		sheetsBaseURL:   defaultSheetsBaseURL,
+		docsBaseURL:     defaultDocsBaseURL,
 		driveBaseURL:    defaultDriveBaseURL,
 		chatBaseURL:     defaultChatBaseURL,
 	}
 }
 
 // newForTest creates a GoogleConnector that points at a test server.
-func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL string) *GoogleConnector {
-	return newForTestWithChat(client, gmailBaseURL, calendarBaseURL, "")
+func newForTest(client *http.Client, gmailBaseURL, calendarBaseURL, sheetsBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:          client,
+		gmailBaseURL:    gmailBaseURL,
+		calendarBaseURL: calendarBaseURL,
+		sheetsBaseURL:   sheetsBaseURL,
+	}
 }
 
 func newForTestWithChat(client *http.Client, gmailBaseURL, calendarBaseURL, chatBaseURL string) *GoogleConnector {
@@ -77,6 +88,16 @@ func newDriveForTest(client *http.Client, driveBaseURL string) *GoogleConnector 
 	}
 }
 
+// newForTestDocs creates a GoogleConnector that points at a test server for
+// Google Docs and Drive API calls.
+func newForTestDocs(client *http.Client, docsBaseURL, driveBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		docsBaseURL:  docsBaseURL,
+		driveBaseURL: driveBaseURL,
+	}
+}
+
 // ID returns "google", matching the connectors.id in the database.
 func (c *GoogleConnector) ID() string { return "google" }
 
@@ -87,6 +108,14 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.list_emails":           &listEmailsAction{conn: c},
 		"google.create_calendar_event": &createCalendarEventAction{conn: c},
 		"google.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"google.sheets_read_range":     &sheetsReadRangeAction{conn: c},
+		"google.sheets_write_range":    &sheetsWriteRangeAction{conn: c},
+		"google.sheets_append_rows":    &sheetsAppendRowsAction{conn: c},
+		"google.sheets_list_sheets":    &sheetsListSheetsAction{conn: c},
+		"google.create_document":       &createDocumentAction{conn: c},
+		"google.get_document":          &getDocumentAction{conn: c},
+		"google.update_document":       &updateDocumentAction{conn: c},
+		"google.list_documents":        &listDocumentsAction{conn: c},
 		"google.list_drive_files":      &listDriveFilesAction{conn: c},
 		"google.get_drive_file":        &getDriveFileAction{conn: c},
 		"google.upload_drive_file":     &uploadDriveFileAction{conn: c},

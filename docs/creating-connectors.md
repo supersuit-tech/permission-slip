@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, and Square connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub), OAuth 2.0 (Google), custom auth (Slack), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists.
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), custom auth (Slack), and more. The Shopify connector (`connectors/shopify/`) is a good reference for dynamic base URLs (derived from credentials at request time), multi-step API flows (create_discount), and comprehensive parameter validation with allowlists. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 ```go
 // Example: OAuth2 credential in a manifest
@@ -363,7 +363,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google` or `microsoft`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `google`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
@@ -952,20 +952,38 @@ connectors/
 │   ├── mysql_test.go         # Connector-level tests
 │   └── *_test.go             # Per-action tests
 ├── google/
-│   ├── google.go             # GoogleConnector struct, New(), Manifest(), doJSON(), OAuth2 auth
+│   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
+│   ├── manifest.go           # Manifest() with 19 action schemas and 28 templates
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── sheets_read.go        # google.sheets_read_range action
+│   ├── sheets_write.go       # google.sheets_write_range action
+│   ├── sheets_append.go      # google.sheets_append_rows action
+│   ├── sheets_list.go        # google.sheets_list_sheets action
+│   ├── sheets_helpers.go     # Shared validation (row/cell limits, ragged row check)
 │   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
 │   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
 │   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
 │   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
+│   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
 │   ├── slack.go              # SlackConnector struct, New(), Manifest(), doPost(), error mapping
 │   ├── send_message.go       # slack.send_message action
 │   ├── create_channel.go     # slack.create_channel action
+│   └── ...tests...
+├── zoom/
+│   ├── zoom.go                # ZoomConnector struct, New(), doJSON(), OAuth2 auth, error mapping
+│   ├── manifest.go            # Manifest() with 7 action schemas and 8 templates
+│   ├── list_meetings.go       # zoom.list_meetings action
+│   ├── create_meeting.go      # zoom.create_meeting action
+│   ├── get_meeting.go         # zoom.get_meeting action
+│   ├── update_meeting.go      # zoom.update_meeting action
+│   ├── delete_meeting.go      # zoom.delete_meeting action
+│   ├── list_recordings.go     # zoom.list_recordings action
+│   ├── get_meeting_participants.go  # zoom.get_meeting_participants action
 │   └── ...tests...
 ├── shopify/
 │   ├── shopify.go            # ShopifyConnector struct, New(), do(), dynamic base URL from shop_domain

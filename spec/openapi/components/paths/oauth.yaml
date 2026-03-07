@@ -73,7 +73,7 @@ oauthAuthorize:
       - name: provider
         in: path
         required: true
-        description: The OAuth provider ID (e.g. "google", "microsoft")
+        description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
         schema:
           type: string
       - name: scope

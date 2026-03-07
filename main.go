@@ -25,9 +25,11 @@ import (
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
 	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
 	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
+	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
 	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
@@ -35,6 +37,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors/square"
 	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
+	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
@@ -325,9 +328,11 @@ func main() {
 	registry.Register(ghconnector.New())
 	registry.Register(googleconnector.New())
 	registry.Register(hubspot.New())
+	registry.Register(linear.New())
 	registry.Register(microsoft.New())
 	registry.Register(mongodb.New())
 	registry.Register(mysqlconnector.New())
+	registry.Register(notionconnector.New())
 	registry.Register(pgconnector.New())
 	registry.Register(shopify.New())
 	registry.Register(slack.New())
@@ -337,6 +342,7 @@ func main() {
 	registry.Register(xconnector.New())
 	registry.Register(amadeus.New())
 	registry.Register(expedia.New())
+	registry.Register(zoom.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
