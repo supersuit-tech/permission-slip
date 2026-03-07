@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email and calendar via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, Teams, presentations, and Excel via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -180,6 +180,338 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.create_document",
+				Name:        "Create Document",
+				Description: "Create a new Word document in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the document (.docx appended if missing)",
+							"examples": ["quarterly-report.docx", "meeting-notes"]
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
+						},
+						"content": {
+							"type": "string",
+							"description": "Initial plain-text document content (max 4 MB)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_document",
+				Name:        "Get Document",
+				Description: "Get metadata of a Word document from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the document (returned by create or list)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.update_document",
+				Name:        "Update Document",
+				Description: "Update the content of a Word document in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "content"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the document (returned by create or list)"
+						},
+						"content": {
+							"type": "string",
+							"description": "New document content (max 4 MB)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_documents",
+				Name:        "List Documents",
+				Description: "List Word documents from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of documents to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_teams",
+				Name:        "List Teams",
+				Description: "List Microsoft Teams the user is a member of",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"top": {
+							"type": "integer",
+							"default": 20,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of teams to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_channels",
+				Name:        "List Channels",
+				Description: "List channels in a Microsoft Teams team",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team to list channels for"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.send_channel_message",
+				Name:        "Send Channel Message",
+				Description: "Send a message to a Microsoft Teams channel",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id", "channel_id", "message"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team"
+						},
+						"channel_id": {
+							"type": "string",
+							"description": "The ID of the channel to post to"
+						},
+						"message": {
+							"type": "string",
+							"description": "Message content (HTML or plain text — auto-detected)"
+						},
+						"reply_to_message_id": {
+							"type": "string",
+							"description": "Optional message ID to reply to (creates a threaded reply)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_channel_messages",
+				Name:        "List Channel Messages",
+				Description: "List recent messages from a Microsoft Teams channel",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id", "channel_id"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The ID of the team"
+						},
+						"channel_id": {
+							"type": "string",
+							"description": "The ID of the channel to read messages from"
+						},
+						"top": {
+							"type": "integer",
+							"default": 20,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of messages to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create Presentation",
+				Description: "Create a new PowerPoint presentation in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the presentation file (.pptx extension added if missing)"
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (e.g. Documents/Presentations). Defaults to root."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List Presentations",
+				Description: "Search for PowerPoint presentations in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path to search in. Defaults to searching all files."
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of presentations to return (max 50)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_presentation",
+				Name:        "Get Presentation",
+				Description: "Get metadata about a specific PowerPoint presentation",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the presentation"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_list_worksheets",
+				Name:        "List Excel Worksheets",
+				Description: "List all worksheets in an Excel workbook stored in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read Excel Range",
+				Description: "Read cell values from a worksheet range in an Excel workbook",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "sheet_name", "range"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Name of the worksheet to read from"
+						},
+						"range": {
+							"type": "string",
+							"description": "Cell range to read (e.g. A1:C10)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_write_range",
+				Name:        "Write Excel Range",
+				Description: "Write cell values to a worksheet range in an Excel workbook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "sheet_name", "range", "values"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Name of the worksheet to write to"
+						},
+						"range": {
+							"type": "string",
+							"description": "Cell range to write (e.g. A1:C3)"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of cell values to write"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_append_rows",
+				Name:        "Append Excel Rows",
+				Description: "Append rows to a named table in an Excel workbook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "table_name", "values"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"table_name": {
+							"type": "string",
+							"description": "Name of the table to append rows to"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of row values to append"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -190,6 +522,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					"Mail.Send",
 					"Mail.Read",
 					"Calendars.ReadWrite",
+					"Files.ReadWrite",
+					"Team.ReadBasic.All",
+					"Channel.ReadBasic.All",
+					"ChannelMessage.Send",
+					"ChannelMessage.Read.All",
 				},
 			},
 		},
@@ -222,6 +559,118 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can view upcoming calendar events.",
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_create_document",
+				ActionType:  "microsoft.create_document",
+				Name:        "Create Word documents",
+				Description: "Agent can create Word documents in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*","content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_document",
+				ActionType:  "microsoft.get_document",
+				Name:        "Read any document",
+				Description: "Agent can read metadata of any document in OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_update_document",
+				ActionType:  "microsoft.update_document",
+				Name:        "Edit any document",
+				Description: "Agent can update the content of any document in OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*","content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_documents",
+				ActionType:  "microsoft.list_documents",
+				Name:        "Browse documents",
+				Description: "Agent can list Word documents in OneDrive folders.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_teams",
+				ActionType:  "microsoft.list_teams",
+				Name:        "List teams",
+				Description: "Agent can list the Microsoft Teams the user belongs to.",
+				Parameters:  json.RawMessage(`{"top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_channels",
+				ActionType:  "microsoft.list_channels",
+				Name:        "List channels",
+				Description: "Agent can list channels in a specified team.",
+				Parameters:  json.RawMessage(`{"team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_send_channel_message",
+				ActionType:  "microsoft.send_channel_message",
+				Name:        "Send channel messages",
+				Description: "Agent can send messages to any Teams channel.",
+				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","message":"*","reply_to_message_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_channel_messages",
+				ActionType:  "microsoft.list_channel_messages",
+				Name:        "Read channel messages",
+				Description: "Agent can read messages from any Teams channel.",
+				Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_create_presentation",
+				ActionType:  "microsoft.create_presentation",
+				Name:        "Create presentations",
+				Description: "Agent can create new PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_presentations",
+				ActionType:  "microsoft.list_presentations",
+				Name:        "List presentations",
+				Description: "Agent can search for PowerPoint presentations in OneDrive.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_presentation",
+				ActionType:  "microsoft.get_presentation",
+				Name:        "View presentation details",
+				Description: "Agent can view metadata about PowerPoint presentations.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_list_worksheets",
+				ActionType:  "microsoft.excel_list_worksheets",
+				Name:        "List Excel worksheets",
+				Description: "Agent can list worksheets in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_read_range",
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read Excel range",
+				Description: "Agent can read any range from a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_write_range",
+				ActionType:  "microsoft.excel_write_range",
+				Name:        "Write Excel range",
+				Description: "Agent can write to any range in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_append_rows",
+				ActionType:  "microsoft.excel_append_rows",
+				Name:        "Append Excel rows",
+				Description: "Agent can append rows to a table in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","table_name":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_read_any",
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read from any workbook",
+				Description: "Agent can read from any Excel workbook the user has access to.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			},
 		},
 	}
 }
@@ -233,6 +682,21 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},
+		"microsoft.create_document":       &createDocumentAction{conn: c},
+		"microsoft.get_document":          &getDocumentAction{conn: c},
+		"microsoft.update_document":       &updateDocumentAction{conn: c},
+		"microsoft.list_documents":        &listDocumentsAction{conn: c},
+		"microsoft.list_teams":            &listTeamsAction{conn: c},
+		"microsoft.list_channels":         &listChannelsAction{conn: c},
+		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
+		"microsoft.list_channel_messages": &listChannelMessagesAction{conn: c},
+		"microsoft.create_presentation":   &createPresentationAction{conn: c},
+		"microsoft.list_presentations":    &listPresentationsAction{conn: c},
+		"microsoft.get_presentation":      &getPresentationAction{conn: c},
+		"microsoft.excel_list_worksheets": &excelListWorksheetsAction{conn: c},
+		"microsoft.excel_read_range":      &excelReadRangeAction{conn: c},
+		"microsoft.excel_write_range":     &excelWriteRangeAction{conn: c},
+		"microsoft.excel_append_rows":     &excelAppendRowsAction{conn: c},
 	}
 }
 
@@ -246,18 +710,36 @@ func (c *MicrosoftConnector) ValidateCredentials(_ context.Context, creds connec
 	return nil
 }
 
-// doRequest is the shared request lifecycle for all Microsoft Graph actions.
-// It handles:
-//   - JSON marshaling of the request body (if non-nil)
-//   - Authorization header with the OAuth access token
-//   - Rate limit detection (HTTP 429 → RateLimitError with Retry-After)
-//   - Response body size limiting (maxResponseBodySize) to prevent OOM
-//   - Error response mapping via mapGraphError (see response.go)
-//   - JSON unmarshaling of successful responses into dest (if non-nil)
-//   - 204 No Content handling (e.g. sendMail returns no body)
-//
-// Callers provide the HTTP method, Graph API path (e.g. "/me/sendMail"),
-// credentials, optional request body, and optional response destination.
+// doUpload sends a raw-body request to the Microsoft Graph API.
+// Used by OneDrive file upload endpoints (PUT .../content) where the body is
+// file content rather than JSON. Delegates to executeAndHandleResponse for
+// shared response handling (rate limiting, error mapping, body parsing).
+func (c *MicrosoftConnector) doUpload(ctx context.Context, method, path string, creds connectors.Credentials, body []byte, contentType string, dest any) error {
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
+	return c.executeAndHandleResponse(req, dest)
+}
+
+// doRequest is the shared request lifecycle for JSON-based Microsoft Graph actions.
+// It handles JSON marshaling of the request body, auth, and delegates to
+// executeAndHandleResponse for rate limiting, error mapping, and response parsing.
 func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
@@ -282,6 +764,13 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	return c.executeAndHandleResponse(req, dest)
+}
+
+// executeAndHandleResponse executes an HTTP request and handles the response
+// lifecycle shared by all Graph API calls: transport errors, rate limiting,
+// response body reading with size limits, error mapping, and JSON decoding.
+func (c *MicrosoftConnector) executeAndHandleResponse(req *http.Request, dest any) error {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
@@ -294,7 +783,6 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	}
 	defer resp.Body.Close()
 
-	// Microsoft Graph returns 429 for rate limiting.
 	if resp.StatusCode == http.StatusTooManyRequests {
 		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
 		return &connectors.RateLimitError{
