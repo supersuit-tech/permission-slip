@@ -77,7 +77,9 @@ func (c *DoorDashConnector) ValidateCredentials(_ context.Context, creds connect
 	for _, key := range []string{credKeyDeveloperID, credKeyKeyID, credKeySigningSecret} {
 		v, ok := creds.Get(key)
 		if !ok || v == "" {
-			return &connectors.ValidationError{Message: fmt.Sprintf("missing required credential: %s", key)}
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("missing required credential: %s — find your credentials at https://developer.doordash.com/portal/integration/drive", key),
+			}
 		}
 	}
 	return nil

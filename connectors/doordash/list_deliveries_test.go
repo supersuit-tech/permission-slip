@@ -106,3 +106,23 @@ func TestListDeliveries_InvalidLimit(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestListDeliveries_InvalidStatus(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["doordash.list_deliveries"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "doordash.list_deliveries",
+		Parameters:  json.RawMessage(`{"status": "bogus"}`),
+		Credentials: validCreds(),
+	})
+
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

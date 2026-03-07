@@ -37,9 +37,9 @@ func checkResponse(statusCode int, body []byte) error {
 			Message: fmt.Sprintf("DoorDash API rate limit exceeded: %s", msg),
 		}
 	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: fmt.Sprintf("DoorDash API auth error: %s", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("DoorDash API auth error: %s — verify your developer_id, key_id, and signing_secret at https://developer.doordash.com/portal/integration/drive", msg)}
 	case statusCode == http.StatusForbidden:
-		return &connectors.AuthError{Message: fmt.Sprintf("DoorDash API auth error: %s", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("DoorDash API forbidden: %s — your credentials may lack Drive API access. Check your app permissions at https://developer.doordash.com/portal/integration/drive", msg)}
 	case statusCode == http.StatusBadRequest:
 		return &connectors.ValidationError{Message: fmt.Sprintf("DoorDash API validation error: %s", msg)}
 	case statusCode == http.StatusNotFound:

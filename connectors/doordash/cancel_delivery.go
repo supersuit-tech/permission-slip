@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -37,7 +38,7 @@ func (a *cancelDeliveryAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	var resp json.RawMessage
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, "/drive/v2/deliveries/"+params.DeliveryID+"/cancel", nil, &resp); err != nil {
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, "/drive/v2/deliveries/"+url.PathEscape(params.DeliveryID)+"/cancel", nil, &resp); err != nil {
 		return nil, err
 	}
 

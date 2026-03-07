@@ -241,7 +241,8 @@ func listDeliveriesManifest() connectors.ManifestAction {
 				},
 				"status": {
 					"type": "string",
-					"description": "Filter by delivery status (e.g. \"created\", \"delivered\", \"cancelled\")"
+					"enum": ["created", "confirmed", "enroute_to_pickup", "arrived_at_pickup", "picked_up", "enroute_to_dropoff", "arrived_at_dropoff", "delivered", "cancelled", "enroute_to_return", "returned"],
+					"description": "Filter by delivery status"
 				}
 			}
 		}`)),

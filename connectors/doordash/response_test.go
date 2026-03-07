@@ -24,6 +24,9 @@ func TestCheckResponse_Unauthorized(t *testing.T) {
 	if !connectors.IsAuthError(err) {
 		t.Errorf("expected AuthError, got %T: %v", err, err)
 	}
+	if !strings.Contains(err.Error(), "developer.doordash.com") {
+		t.Errorf("auth error should include developer portal link: %v", err)
+	}
 }
 
 func TestCheckResponse_Forbidden(t *testing.T) {
@@ -34,6 +37,9 @@ func TestCheckResponse_Forbidden(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("expected AuthError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "developer.doordash.com") {
+		t.Errorf("auth error should include developer portal link: %v", err)
 	}
 }
 
