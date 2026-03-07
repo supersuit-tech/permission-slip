@@ -2,9 +2,17 @@
 // Slip connector execution layer. DoorDash Drive is a delivery-as-a-service API
 // that moves items from point A to point B — it is NOT consumer food ordering.
 //
-// Auth uses self-signed JWT tokens: the connector generates a short-lived JWT
-// (5 min) on each request using the developer's credentials (developer_id,
-// key_id, signing_secret) with HS256 signing.
+// Auth: self-signed JWT tokens (HS256). The connector generates a short-lived
+// JWT (5 min) on each request using three credentials:
+//   - developer_id: identifies the developer account (JWT "iss" claim)
+//   - key_id: identifies the specific API key (JWT "kid" header)
+//   - signing_secret: base64url-encoded HMAC key (decoded before signing)
+//
+// The signing_secret is base64url-encoded as provided by the DoorDash Developer
+// Portal. The connector decodes it before use — passing the raw string would
+// produce invalid signatures. See [DoorDash JWT docs] for details.
+//
+// [DoorDash JWT docs]: https://developer.doordash.com/en-US/docs/drive/reference/JWTs/
 package doordash
 
 import (

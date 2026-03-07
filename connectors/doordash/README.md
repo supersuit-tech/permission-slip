@@ -14,9 +14,11 @@ DoorDash Drive uses self-signed JWT tokens (HS256 with a `DD-JWT-V1` header). Th
 |-----|----------|-------------|
 | `developer_id` | Yes | Your DoorDash developer ID |
 | `key_id` | Yes | The key ID for your API key |
-| `signing_secret` | Yes | The signing secret for JWT generation |
+| `signing_secret` | Yes | The signing secret for JWT generation (base64url-encoded) |
 
 The credential `auth_type` in the database is `api_key`. All three values are found in the [DoorDash Developer Portal](https://developer.doordash.com/portal/integration/drive) under your Drive integration.
+
+**Important:** The `signing_secret` is base64url-encoded as provided by DoorDash. The connector automatically decodes it before using it as the HMAC-SHA256 key. Do not manually decode it — pass the value exactly as shown in the developer portal.
 
 **Setup:** [DoorDash Drive Getting Started](https://developer.doordash.com/en-US/docs/drive/getting-started/)
 
