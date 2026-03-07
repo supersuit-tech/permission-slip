@@ -44,14 +44,15 @@ type graphAttendee struct {
 
 // graphDriveItem represents a file or folder in OneDrive in Graph API format.
 type graphDriveItem struct {
-	ID               string          `json:"id"`
-	Name             string          `json:"name"`
-	Size             int64           `json:"size"`
-	WebURL           string          `json:"webUrl,omitempty"`
-	CreatedDateTime  string          `json:"createdDateTime,omitempty"`
-	ModifiedDateTime string          `json:"lastModifiedDateTime,omitempty"`
-	Folder           *graphFolder    `json:"folder,omitempty"`
-	File             *graphFileFacet `json:"file,omitempty"`
+	ID                   string          `json:"id"`
+	Name                 string          `json:"name"`
+	Size                 int64           `json:"size,omitempty"`
+	WebURL               string          `json:"webUrl,omitempty"`
+	CreatedDateTime      string          `json:"createdDateTime,omitempty"`
+	LastModifiedDateTime string          `json:"lastModifiedDateTime,omitempty"`
+	DownloadURL          string          `json:"@microsoft.graph.downloadUrl,omitempty"`
+	Folder               *graphFolder    `json:"folder,omitempty"`
+	File                 *graphFileFacet `json:"file,omitempty"`
 }
 
 // graphFolder represents the folder facet of a OneDrive item.

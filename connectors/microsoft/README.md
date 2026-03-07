@@ -81,6 +81,125 @@ Lists recent emails from a mail folder.
 
 ---
 
+### `microsoft.list_teams`
+
+Lists the Microsoft Teams the authenticated user is a member of.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `top` | integer | No | `20` | Number of teams to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "name": "Engineering",
+    "description": "Engineering team workspace",
+    "visibility": "private"
+  }
+]
+```
+
+**Graph API:** `GET /me/joinedTeams` ([docs](https://learn.microsoft.com/en-us/graph/api/user-list-joinedteams))
+
+---
+
+### `microsoft.list_channels`
+
+Lists channels in a Microsoft Teams team.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team to list channels for |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "19:abc123@thread.tacv2",
+    "name": "General",
+    "description": "General discussion",
+    "membership_type": "standard"
+  }
+]
+```
+
+**Graph API:** `GET /teams/{team-id}/channels` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-list))
+
+---
+
+### `microsoft.send_channel_message`
+
+Sends a message to a Microsoft Teams channel. Supports plain text and HTML (auto-detected). Optionally replies to an existing message thread.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team |
+| `channel_id` | string | Yes | — | The ID of the channel to post to |
+| `message` | string | Yes | — | Message content (HTML or plain text — auto-detected) |
+| `reply_to_message_id` | string | No | — | Message ID to reply to (creates a threaded reply) |
+
+**Response:**
+
+```json
+{
+  "status": "sent",
+  "message_id": "1616990032035",
+  "created_at": "2024-01-15T09:00:00Z"
+}
+```
+
+**Graph API:** `POST /teams/{team-id}/channels/{channel-id}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-post-messages))
+When `reply_to_message_id` is provided: `POST /teams/{team-id}/channels/{channel-id}/messages/{message-id}/replies` ([docs](https://learn.microsoft.com/en-us/graph/api/chatmessage-post-replies))
+
+---
+
+### `microsoft.list_channel_messages`
+
+Lists recent messages from a Microsoft Teams channel.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `team_id` | string | Yes | — | The ID of the team |
+| `channel_id` | string | Yes | — | The ID of the channel to read messages from |
+| `top` | integer | No | `20` | Number of messages to return (1–50) |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "1616990032035",
+    "created_at": "2024-01-15T09:00:00Z",
+    "from": "Jane Smith",
+    "content": "Hello team!"
+  }
+]
+```
+
+**Graph API:** `GET /teams/{team-id}/channels/{channel-id}/messages` ([docs](https://learn.microsoft.com/en-us/graph/api/channel-list-messages))
+
+---
+
 ### `microsoft.create_calendar_event`
 
 Creates a new event on the user's calendar.
@@ -284,6 +403,130 @@ Moves a file to the OneDrive recycle bin (recoverable — not permanent deletion
 
 ---
 
+### `microsoft.create_document`
+
+Creates a new Word document in OneDrive via a simple upload.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `filename` | string | Yes | — | Document name (`.docx` appended if missing) |
+| `folder_path` | string | No | root | OneDrive folder path (e.g., `Documents/Work`) |
+| `content` | string | No | — | Initial plain-text content (max 4 MB) |
+
+**Response:**
+
+```json
+{
+  "id": "01BYE5RZ...",
+  "name": "report.docx",
+  "web_url": "https://onedrive.live.com/...",
+  "created_date_time": "2024-01-15T09:00:00Z"
+}
+```
+
+**Graph API:** `PUT /me/drive/root:/{path}:/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+---
+
+### `microsoft.get_document`
+
+Gets metadata (and a temporary download URL) for a Word document in OneDrive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID (returned by `create_document` or `list_documents`) |
+
+**Response:**
+
+```json
+{
+  "id": "01BYE5RZ...",
+  "name": "report.docx",
+  "web_url": "https://onedrive.live.com/...",
+  "size": 12345,
+  "created_date_time": "2024-01-15T09:00:00Z",
+  "last_modified_date_time": "2024-01-16T10:00:00Z",
+  "download_url": "https://download.example.com/..."
+}
+```
+
+The `download_url` is a pre-authenticated temporary URL from `@microsoft.graph.downloadUrl` — it can be used to fetch the file content without additional auth.
+
+**Graph API:** `GET /me/drive/items/{itemId}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
+
+---
+
+### `microsoft.update_document`
+
+Replaces the content of an existing Word document in OneDrive.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID (returned by `create_document` or `list_documents`) |
+| `content` | string | Yes | — | New document content (max 4 MB) |
+
+**Response:**
+
+```json
+{
+  "id": "01BYE5RZ...",
+  "name": "report.docx",
+  "web_url": "https://onedrive.live.com/...",
+  "last_modified_date_time": "2024-01-16T10:00:00Z"
+}
+```
+
+**Graph API:** `PUT /me/drive/items/{itemId}/content` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-put-content))
+
+---
+
+### `microsoft.list_documents`
+
+Lists Word documents (`.docx`) from a OneDrive folder.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `folder_path` | string | No | root | OneDrive folder path (e.g., `Documents`) |
+| `top` | integer | No | `10` | Number of documents to return (1–50) |
+
+**Response:**
+
+```json
+{
+  "documents": [
+    {
+      "id": "01BYE5RZ...",
+      "name": "report.docx",
+      "web_url": "https://onedrive.live.com/...",
+      "size": 12345,
+      "last_modified_date_time": "2024-01-16T10:00:00Z"
+    }
+  ]
+}
+```
+
+Results are filtered server-side using `$filter=endswith(name,'.docx')` so only Word documents are returned.
+
+**Graph API:** `GET /me/drive/root:/{path}:/children` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-list-children))
+
+---
+
 ### `microsoft.create_presentation`
 
 Creates a new empty PowerPoint (.pptx) file in the user's OneDrive. The file is created using a minimal embedded PPTX template (~1.2 KB) uploaded via the OneDrive file upload endpoint.
@@ -370,6 +613,138 @@ Gets metadata about a specific PowerPoint file by its OneDrive item ID.
 
 **Graph API:** `GET /me/drive/items/{itemId}` ([docs](https://learn.microsoft.com/en-us/graph/api/driveitem-get))
 
+---
+
+### Excel Actions
+
+All Excel actions operate on workbooks stored in OneDrive via the Microsoft Graph workbook API. They require the `Files.ReadWrite` OAuth scope.
+
+**Obtaining `item_id`:** The `item_id` parameter is the OneDrive item ID of the `.xlsx` file. You can find it by browsing OneDrive via the Graph API (`GET /me/drive/root/children`) or by using the OneDrive search endpoint (`GET /me/drive/search(q='.xlsx')`). The ID looks like `01BYE5RZ6QN3ZWBTUFOFD3GSPGOHDJD36K`.
+
+**Note on `excel_append_rows`:** This action operates on named [Excel tables](https://support.microsoft.com/en-us/office/create-and-format-tables-e81aa349-b006-4f8a-9806-5af9df0ac664), not raw ranges. The workbook must contain a table created via "Insert > Table" in Excel.
+
+### `microsoft.excel_list_worksheets`
+
+Lists all worksheets in an Excel workbook stored in OneDrive.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+
+**Response:**
+
+```json
+[
+  {
+    "id": "{00000000-0001-0000-0000-000000000000}",
+    "name": "Sheet1",
+    "position": 0,
+    "visibility": "Visible"
+  }
+]
+```
+
+**Graph API:** `GET /me/drive/items/{itemId}/workbook/worksheets` ([docs](https://learn.microsoft.com/en-us/graph/api/workbook-list-worksheets))
+
+---
+
+### `microsoft.excel_read_range`
+
+Reads cell values from a worksheet range in an Excel workbook.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+| `sheet_name` | string | Yes | — | Name of the worksheet to read from |
+| `range` | string | Yes | — | Cell range to read (e.g., `A1:C10`) |
+
+**Response:**
+
+```json
+{
+  "address": "Sheet1!A1:B2",
+  "values": [
+    ["Name", "Age"],
+    ["Alice", 30]
+  ],
+  "row_count": 2,
+  "column_count": 2
+}
+```
+
+**Graph API:** `GET /me/drive/items/{itemId}/workbook/worksheets/{sheetName}/range(address='{range}')` ([docs](https://learn.microsoft.com/en-us/graph/api/range-get))
+
+---
+
+### `microsoft.excel_write_range`
+
+Writes cell values to a worksheet range in an Excel workbook.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+| `sheet_name` | string | Yes | — | Name of the worksheet to write to |
+| `range` | string | Yes | — | Cell range to write (e.g., `A1:C3`) |
+| `values` | any[][] | Yes | — | 2D array of cell values to write — all rows must have the same number of columns |
+
+**Response:**
+
+```json
+{
+  "address": "Sheet1!A1:B2",
+  "values": [
+    ["Name", "Age"],
+    ["Alice", 30]
+  ],
+  "row_count": 2,
+  "column_count": 2
+}
+```
+
+**Graph API:** `PATCH /me/drive/items/{itemId}/workbook/worksheets/{sheetName}/range(address='{range}')` ([docs](https://learn.microsoft.com/en-us/graph/api/range-update))
+
+---
+
+### `microsoft.excel_append_rows`
+
+Appends rows to a named table in an Excel workbook.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `item_id` | string | Yes | — | OneDrive item ID of the Excel workbook |
+| `table_name` | string | Yes | — | Name of the table to append rows to |
+| `values` | any[][] | Yes | — | 2D array of row values to append — all rows must have the same number of columns |
+
+**Response:**
+
+```json
+{
+  "index": 5,
+  "values": [
+    ["Widget", 100, 9.99]
+  ],
+  "rows_added": 1
+}
+```
+
+**Graph API:** `POST /me/drive/items/{itemId}/workbook/tables/{tableName}/rows` ([docs](https://learn.microsoft.com/en-us/graph/api/table-post-rows))
+
 ## Error Handling
 
 The connector maps Microsoft Graph API responses to typed connector errors:
@@ -389,7 +764,7 @@ Rate limit responses include the `Retry-After` header value so callers know how 
 Each action lives in its own file. To add one (e.g., `microsoft.list_contacts`):
 
 1. Create `connectors/microsoft/list_contacts.go` with a params struct, `validate()` / `defaults()`, and an `Execute` method.
-2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON API calls — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection. For binary file uploads, use `a.conn.doPutFileRequest(ctx, path, creds, fileBytes, &resp)`.
+2. Use `a.conn.doRequest(ctx, method, path, creds, body, &resp)` for JSON API calls — it handles JSON marshaling, auth headers, rate limiting, error mapping, and timeout detection. For binary file uploads, use `a.conn.doUpload(ctx, method, path, creds, fileBytes, contentType, &resp)`.
 3. Return `connectors.JSONResult(respBody)` to wrap the response struct into an `ActionResult`.
 4. Register the action in `Actions()` inside `microsoft.go`.
 5. Add the action to the `Manifest()` return value inside `microsoft.go` — include a `ParametersSchema` and a template.
@@ -400,7 +775,7 @@ Four request helpers are available depending on the content type:
 - `doRequest` — JSON request/response (most actions)
 - `doRequestRaw` — Returns raw string response (file content download)
 - `doPutRaw` — Sends raw bytes, returns raw bytes (file upload)
-- `doPutFileRequest` — Sends typed file bytes (e.g. PPTX), JSON-unmarshals response (presentation creation)
+- `doUpload` — Sends raw bytes with custom content type, JSON-unmarshals response (document/presentation creation)
 
 All four share a common `executeRequest` lifecycle handler for auth, rate limiting, error mapping, and timeout detection. Each action file only contains what's unique: parameter parsing, validation, request body shape, and response shape.
 
@@ -420,18 +795,23 @@ When adding a new action, add it to the `Manifest()` return value with a `Parame
 ```
 connectors/microsoft/
 ├── microsoft.go                    # MicrosoftConnector struct, Manifest(), request helpers, ValidateCredentials()
-├── types.go                        # Shared Microsoft Graph API types (email, calendar, drive, Teams)
+├── types.go                        # Shared Microsoft Graph API types (email, calendar, drive, Teams, documents)
 ├── response.go                     # Graph API error response → typed connector error mapping
-├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, escapePathSegments, etc.)
+├── validation.go                   # Shared validation helpers (validateEmail, validateGraphID, validateValuesGrid, etc.)
 ├── pptx_template.go                # Minimal embedded .pptx template for create_presentation
+├── excel_helpers.go                # Shared Excel helpers (excelWorkbookPath, newRangeResult)
 ├── send_email.go                   # microsoft.send_email action
-├── list_emails.go                  # microsoft.list_emails action + path validation helpers
+├── list_emails.go                  # microsoft.list_emails action
 ├── create_calendar_event.go        # microsoft.create_calendar_event action
 ├── list_calendar_events.go         # microsoft.list_calendar_events action
 ├── list_drive_files.go             # microsoft.list_drive_files action
-├── get_drive_file.go               # microsoft.get_drive_file action + item ID validation
+├── get_drive_file.go               # microsoft.get_drive_file action + content download
 ├── upload_drive_file.go            # microsoft.upload_drive_file action
 ├── delete_drive_file.go            # microsoft.delete_drive_file action
+├── create_document.go              # microsoft.create_document action (OneDrive)
+├── get_document.go                 # microsoft.get_document action (OneDrive)
+├── update_document.go              # microsoft.update_document action (OneDrive)
+├── list_documents.go               # microsoft.list_documents action (OneDrive)
 ├── list_teams.go                   # microsoft.list_teams action
 ├── list_channels.go                # microsoft.list_channels action
 ├── send_channel_message.go         # microsoft.send_channel_message action
@@ -439,6 +819,10 @@ connectors/microsoft/
 ├── create_presentation.go          # microsoft.create_presentation action
 ├── list_presentations.go           # microsoft.list_presentations action
 ├── get_presentation.go             # microsoft.get_presentation action
+├── excel_list_worksheets.go        # microsoft.excel_list_worksheets action
+├── excel_read.go                   # microsoft.excel_read_range action
+├── excel_write.go                  # microsoft.excel_write_range action
+├── excel_append.go                 # microsoft.excel_append_rows action
 ├── microsoft_test.go               # Connector-level tests
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── *_test.go                       # Per-action test files

@@ -90,7 +90,7 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 		Size:       item.Size,
 		WebURL:     item.WebURL,
 		CreatedAt:  item.CreatedDateTime,
-		ModifiedAt: item.ModifiedDateTime,
+		ModifiedAt: item.LastModifiedDateTime,
 	}
 	if item.Folder != nil {
 		detail.Type = "folder"
@@ -125,19 +125,4 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	return connectors.JSONResult(detail)
-}
-
-// validateItemID rejects item IDs containing path separators, traversal sequences,
-// or URL-special characters that could be used for query/fragment injection.
-func validateItemID(id string) error {
-	if strings.ContainsAny(id, "/\\") {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain path separators"}
-	}
-	if strings.Contains(id, "..") {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain path traversal sequences"}
-	}
-	if strings.ContainsAny(id, "?#%") {
-		return &connectors.ValidationError{Message: "invalid item_id: must not contain URL-special characters"}
-	}
-	return nil
 }

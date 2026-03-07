@@ -34,7 +34,15 @@ func validateGraphID(field, value string) error {
 			Message: fmt.Sprintf("invalid %s: must not contain path separators or URL-special characters (/, \\, ?, #, %%)", field),
 		}
 	}
+	if strings.ContainsRune(value, 0) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s: must not contain null bytes", field)}
+	}
 	return nil
+}
+
+// validateItemID checks that an item_id is a valid Graph API identifier.
+func validateItemID(id string) error {
+	return validateGraphID("item_id", id)
 }
 
 // detectContentType returns "HTML" if the body contains HTML tags, otherwise "Text".
@@ -48,7 +56,11 @@ func detectContentType(body string) string {
 // validateFolderPath checks a OneDrive folder path for traversal sequences and
 // URL-significant characters that could manipulate the Graph API request.
 // Slashes are allowed since folder paths are naturally slash-separated.
+// Empty paths are valid (means root).
 func validateFolderPath(folderPath string) error {
+	if folderPath == "" {
+		return nil
+	}
 	if strings.Contains(folderPath, "..") {
 		return &connectors.ValidationError{
 			Message: "invalid folder_path: must not contain '..' traversal sequences (e.g. use 'Documents/Presentations' instead)",
@@ -58,6 +70,9 @@ func validateFolderPath(folderPath string) error {
 		return &connectors.ValidationError{
 			Message: "invalid folder_path: must not contain special characters (?, #, %, \\)",
 		}
+	}
+	if strings.ContainsRune(folderPath, 0) {
+		return &connectors.ValidationError{Message: "invalid folder_path: must not contain null bytes"}
 	}
 	return nil
 }
@@ -80,4 +95,22 @@ func escapePathSegments(path string) string {
 		segments[i] = url.PathEscape(seg)
 	}
 	return strings.Join(segments, "/")
+}
+
+// validateValuesGrid checks that a 2D values array has consistent column counts
+// across all rows. Inconsistent dimensions cause cryptic Graph API errors, so
+// catching them early provides a better developer experience.
+func validateValuesGrid(values [][]any) error {
+	if len(values) == 0 {
+		return nil
+	}
+	cols := len(values[0])
+	for i, row := range values[1:] {
+		if len(row) != cols {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("values row %d has %d columns, but row 0 has %d — all rows must have the same number of columns", i+1, len(row), cols),
+			}
+		}
+	}
+	return nil
 }

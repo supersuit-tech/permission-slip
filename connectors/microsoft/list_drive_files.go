@@ -79,7 +79,7 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 			Size:       item.Size,
 			WebURL:     item.WebURL,
 			CreatedAt:  item.CreatedDateTime,
-			ModifiedAt: item.ModifiedDateTime,
+			ModifiedAt: item.LastModifiedDateTime,
 		}
 		if item.Folder != nil {
 			summary.Type = "folder"

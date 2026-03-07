@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -79,7 +80,8 @@ func (a *createPresentationAction) Execute(ctx context.Context, req connectors.A
 	}
 
 	var resp graphDriveItemResponse
-	if err := a.conn.doPutFileRequest(ctx, path, req.Credentials, minimalPPTX, &resp); err != nil {
+	const pptxContentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+	if err := a.conn.doUpload(ctx, http.MethodPut, path, req.Credentials, minimalPPTX, pptxContentType, &resp); err != nil {
 		return nil, err
 	}
 

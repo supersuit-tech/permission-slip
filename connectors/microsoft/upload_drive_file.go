@@ -94,7 +94,7 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 		Size:       item.Size,
 		WebURL:     item.WebURL,
 		CreatedAt:  item.CreatedDateTime,
-		ModifiedAt: item.ModifiedDateTime,
+		ModifiedAt: item.LastModifiedDateTime,
 	})
 }
 

@@ -65,7 +65,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
-		Description: "Microsoft 365 integration for email, calendar, OneDrive, Teams, and presentations via Microsoft Graph API",
+		Description: "Microsoft 365 integration for email, calendar, OneDrive, Teams, presentations, and Excel via Microsoft Graph API",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",
@@ -181,7 +181,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_drive_files",
+			ActionType:  "microsoft.list_drive_files",
 				Name:        "List Drive Files",
 				Description: "List files and folders in OneDrive",
 				RiskLevel:   "low",
@@ -261,6 +261,91 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						"item_id": {
 							"type": "string",
 							"description": "OneDrive item ID to delete"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.create_document",
+				Name:        "Create Document",
+				Description: "Create a new Word document in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the document (.docx appended if missing)",
+							"examples": ["quarterly-report.docx", "meeting-notes"]
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
+						},
+						"content": {
+							"type": "string",
+							"description": "Initial plain-text document content (max 4 MB)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.get_document",
+				Name:        "Get Document",
+				Description: "Get metadata of a Word document from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the document (returned by create or list)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.update_document",
+				Name:        "Update Document",
+				Description: "Update the content of a Word document in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "content"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the document (returned by create or list)"
+						},
+						"content": {
+							"type": "string",
+							"description": "New document content (max 4 MB)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.list_documents",
+				Name:        "List Documents",
+				Description: "List Word documents from OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (defaults to root)",
+							"examples": ["Documents", "Projects/2024"]
+						},
+						"top": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 50,
+							"description": "Number of documents to return (max 50)"
 						}
 					}
 				}`)),
@@ -412,6 +497,106 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "microsoft.excel_list_worksheets",
+				Name:        "List Excel Worksheets",
+				Description: "List all worksheets in an Excel workbook stored in OneDrive",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read Excel Range",
+				Description: "Read cell values from a worksheet range in an Excel workbook",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "sheet_name", "range"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Name of the worksheet to read from"
+						},
+						"range": {
+							"type": "string",
+							"description": "Cell range to read (e.g. A1:C10)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_write_range",
+				Name:        "Write Excel Range",
+				Description: "Write cell values to a worksheet range in an Excel workbook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "sheet_name", "range", "values"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Name of the worksheet to write to"
+						},
+						"range": {
+							"type": "string",
+							"description": "Cell range to write (e.g. A1:C3)"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of cell values to write"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "microsoft.excel_append_rows",
+				Name:        "Append Excel Rows",
+				Description: "Append rows to a named table in an Excel workbook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id", "table_name", "values"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "OneDrive item ID of the Excel workbook"
+						},
+						"table_name": {
+							"type": "string",
+							"description": "Name of the table to append rows to"
+						},
+						"values": {
+							"type": "array",
+							"items": {
+								"type": "array",
+								"items": {}
+							},
+							"description": "2D array of row values to append"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -460,7 +645,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
 			{
-				ID:          "tpl_microsoft_list_drive_files",
+			ID:          "tpl_microsoft_list_drive_files",
 				ActionType:  "microsoft.list_drive_files",
 				Name:        "Browse OneDrive files",
 				Description: "Agent can list files and folders in OneDrive.",
@@ -493,6 +678,34 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Delete OneDrive files",
 				Description: "Agent can move files to the OneDrive recycle bin.",
 				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_create_document",
+				ActionType:  "microsoft.create_document",
+				Name:        "Create Word documents",
+				Description: "Agent can create Word documents in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*","content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_get_document",
+				ActionType:  "microsoft.get_document",
+				Name:        "Read any document",
+				Description: "Agent can read metadata of any document in OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_update_document",
+				ActionType:  "microsoft.update_document",
+				Name:        "Edit any document",
+				Description: "Agent can update the content of any document in OneDrive.",
+				Parameters:  json.RawMessage(`{"item_id":"*","content":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_list_documents",
+				ActionType:  "microsoft.list_documents",
+				Name:        "Browse documents",
+				Description: "Agent can list Word documents in OneDrive folders.",
+				Parameters:  json.RawMessage(`{"folder_path":"*","top":"*"}`),
 			},
 			{
 				ID:          "tpl_microsoft_list_teams",
@@ -543,6 +756,41 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can view metadata about PowerPoint presentations.",
 				Parameters:  json.RawMessage(`{"item_id":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_excel_list_worksheets",
+				ActionType:  "microsoft.excel_list_worksheets",
+				Name:        "List Excel worksheets",
+				Description: "Agent can list worksheets in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_read_range",
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read Excel range",
+				Description: "Agent can read any range from a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_write_range",
+				ActionType:  "microsoft.excel_write_range",
+				Name:        "Write Excel range",
+				Description: "Agent can write to any range in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_append_rows",
+				ActionType:  "microsoft.excel_append_rows",
+				Name:        "Append Excel rows",
+				Description: "Agent can append rows to a table in a specific workbook.",
+				Parameters:  json.RawMessage(`{"item_id":"*","table_name":"*","values":"*"}`),
+			},
+			{
+				ID:          "tpl_microsoft_excel_read_any",
+				ActionType:  "microsoft.excel_read_range",
+				Name:        "Read from any workbook",
+				Description: "Agent can read from any Excel workbook the user has access to.",
+				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			},
 		},
 	}
 }
@@ -558,6 +806,10 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.get_drive_file":        &getDriveFileAction{conn: c},
 		"microsoft.upload_drive_file":     &uploadDriveFileAction{conn: c},
 		"microsoft.delete_drive_file":     &deleteDriveFileAction{conn: c},
+		"microsoft.create_document":       &createDocumentAction{conn: c},
+		"microsoft.get_document":          &getDocumentAction{conn: c},
+		"microsoft.update_document":       &updateDocumentAction{conn: c},
+		"microsoft.list_documents":        &listDocumentsAction{conn: c},
 		"microsoft.list_teams":            &listTeamsAction{conn: c},
 		"microsoft.list_channels":         &listChannelsAction{conn: c},
 		"microsoft.send_channel_message":  &sendChannelMessageAction{conn: c},
@@ -565,6 +817,10 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.create_presentation":   &createPresentationAction{conn: c},
 		"microsoft.list_presentations":    &listPresentationsAction{conn: c},
 		"microsoft.get_presentation":      &getPresentationAction{conn: c},
+		"microsoft.excel_list_worksheets": &excelListWorksheetsAction{conn: c},
+		"microsoft.excel_read_range":      &excelReadRangeAction{conn: c},
+		"microsoft.excel_write_range":     &excelWriteRangeAction{conn: c},
+		"microsoft.excel_append_rows":     &excelAppendRowsAction{conn: c},
 	}
 }
 
@@ -674,21 +930,29 @@ func (c *MicrosoftConnector) doRequest(ctx context.Context, method, path string,
 	return nil
 }
 
-// doPutFileRequest uploads raw file bytes via PUT to a Microsoft Graph endpoint
-// with a specific content type. Used for creating files like PPTX presentations.
-// Delegates to executeRequest for the HTTP lifecycle and JSON-unmarshals the response.
-func (c *MicrosoftConnector) doPutFileRequest(ctx context.Context, path string, creds connectors.Credentials, fileBytes []byte, dest any) error {
+// doUpload sends a raw-body request to the Microsoft Graph API.
+// Used by OneDrive file upload endpoints (PUT .../content) where the body is
+// file content rather than JSON. Delegates to executeRequest for the HTTP lifecycle
+// and JSON-unmarshals the response.
+func (c *MicrosoftConnector) doUpload(ctx context.Context, method, path string, creds connectors.Credentials, body []byte, contentType string, dest any) error {
 	token, err := extractToken(creds)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(fileBytes))
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 
 	respBody, err := c.executeRequest(req)
 	if err != nil {
