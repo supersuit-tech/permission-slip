@@ -29,7 +29,7 @@ func (p *getUserTweetsParams) validate() error {
 	if p.UserID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
 	}
-	if p.MaxResults < 0 || p.MaxResults > 100 {
+	if p.MaxResults != 0 && (p.MaxResults < 1 || p.MaxResults > 100) {
 		return &connectors.ValidationError{Message: "max_results must be between 1 and 100"}
 	}
 	return nil

@@ -34,7 +34,7 @@ func (p *searchTweetsParams) validate() error {
 	if p.Query == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: query"}
 	}
-	if p.MaxResults < 0 || p.MaxResults > 100 {
+	if p.MaxResults != 0 && (p.MaxResults < 10 || p.MaxResults > 100) {
 		return &connectors.ValidationError{Message: "max_results must be between 10 and 100"}
 	}
 	if p.SortOrder != "" && !validSortOrders[p.SortOrder] {
