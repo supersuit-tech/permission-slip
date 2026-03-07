@@ -25,7 +25,7 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"list_id": {
 							"type": "string",
-							"description": "ID of the list to create the card in"
+							"description": "ID of the list to create the card in (24-character hex string, e.g. 507f1f77bcf86cd799439011)"
 						},
 						"name": {
 							"type": "string",
@@ -65,7 +65,7 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"card_id": {
 							"type": "string",
-							"description": "ID of the card to update"
+							"description": "ID of the card to update (24-character hex string)"
 						},
 						"name": {
 							"type": "string",
@@ -117,7 +117,7 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"card_id": {
 							"type": "string",
-							"description": "ID of the card to comment on"
+							"description": "ID of the card to comment on (24-character hex string)"
 						},
 						"text": {
 							"type": "string",
@@ -137,11 +137,11 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"card_id": {
 							"type": "string",
-							"description": "ID of the card to move"
+							"description": "ID of the card to move (24-character hex string)"
 						},
 						"list_id": {
 							"type": "string",
-							"description": "ID of the destination list"
+							"description": "ID of the destination list (24-character hex string)"
 						},
 						"pos": {
 							"type": "string",
@@ -161,7 +161,7 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"card_id": {
 							"type": "string",
-							"description": "ID of the card to add the checklist to"
+							"description": "ID of the card to add the checklist to (24-character hex string)"
 						},
 						"name": {
 							"type": "string",
@@ -188,23 +188,23 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query string"
+							"description": "Search query string (supports Trello search operators like @member, #label, is:open)"
 						},
 						"board_id": {
 							"type": "string",
-							"description": "Filter results to a specific board"
+							"description": "Filter results to a specific board (24-character hex string)"
 						},
 						"list_id": {
 							"type": "string",
-							"description": "Filter results to a specific list"
+							"description": "Filter results to a specific list name or ID (appended as list: modifier)"
 						},
 						"members": {
 							"type": "string",
-							"description": "Filter by member"
+							"description": "Filter by member username (appended as @member modifier)"
 						},
 						"due": {
 							"type": "string",
-							"description": "Filter by due date"
+							"description": "Filter by due date: \"day\", \"week\", \"month\", \"overdue\", \"notdue\", or \"incomplete\""
 						},
 						"limit": {
 							"type": "integer",
