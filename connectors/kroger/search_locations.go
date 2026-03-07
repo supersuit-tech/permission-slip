@@ -27,11 +27,24 @@ type searchLocationsParams struct {
 }
 
 func (p *searchLocationsParams) validate() error {
+	hasZip := p.ZipCode != ""
+	hasCoords := p.Lat != 0 || p.Lon != 0
+	if !hasZip && !hasCoords {
+		return &connectors.ValidationError{Message: "at least one location filter is required: provide zip_code or lat/lon coordinates"}
+	}
+	if p.Lat != 0 || p.Lon != 0 {
+		if p.Lat < -90 || p.Lat > 90 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("lat must be between -90 and 90 (got %.6f)", p.Lat)}
+		}
+		if p.Lon < -180 || p.Lon > 180 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("lon must be between -180 and 180 (got %.6f)", p.Lon)}
+		}
+	}
 	if p.RadiusMiles != 0 && (p.RadiusMiles < 1 || p.RadiusMiles > 100) {
-		return &connectors.ValidationError{Message: "radius_miles must be between 1 and 100"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("radius_miles must be between 1 and 100 (got %d)", p.RadiusMiles)}
 	}
 	if p.Limit != 0 && (p.Limit < 1 || p.Limit > 200) {
-		return &connectors.ValidationError{Message: "limit must be between 1 and 200"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("limit must be between 1 and 200 (got %d)", p.Limit)}
 	}
 	return nil
 }

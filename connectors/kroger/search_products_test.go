@@ -208,6 +208,55 @@ func TestSearchProducts_Timeout(t *testing.T) {
 	}
 }
 
+func TestSearchProducts_MissingCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("should not reach server with missing credentials")
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.search_products"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_products",
+		Parameters:  json.RawMessage(`{"term":"test"}`),
+		Credentials: connectors.NewCredentials(map[string]string{}),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchProducts_ServerError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write([]byte(`{"errors":[{"message":"Bad Gateway"}]}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.search_products"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_products",
+		Parameters:  json.RawMessage(`{"term":"test"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	}
+}
+
 func TestSearchProducts_InvalidLimit(t *testing.T) {
 	t.Parallel()
 

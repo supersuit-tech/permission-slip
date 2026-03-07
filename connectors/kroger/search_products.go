@@ -29,10 +29,10 @@ func (p *searchProductsParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: term"}
 	}
 	if p.Limit != 0 && (p.Limit < 1 || p.Limit > 50) {
-		return &connectors.ValidationError{Message: "limit must be between 1 and 50"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("limit must be between 1 and 50 (got %d)", p.Limit)}
 	}
 	if p.Start < 0 {
-		return &connectors.ValidationError{Message: "start must be non-negative"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("start must be non-negative (got %d)", p.Start)}
 	}
 	return nil
 }

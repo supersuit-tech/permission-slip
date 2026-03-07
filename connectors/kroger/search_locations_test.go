@@ -131,6 +131,90 @@ func TestSearchLocations_InvalidRadius(t *testing.T) {
 	}
 }
 
+func TestSearchLocations_NoLocationFilter(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchLocations_InvalidLatitude(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{"lat":91.0,"lon":-84.5}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchLocations_InvalidLongitude(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{"lat":39.1,"lon":-181.0}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSearchLocations_ServerError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]any{
+			"errors": []map[string]string{{"message": "Internal Server Error"}},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["kroger.search_locations"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "kroger.search_locations",
+		Parameters:  json.RawMessage(`{"zip_code":"45202"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	}
+}
+
 func TestSearchLocations_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

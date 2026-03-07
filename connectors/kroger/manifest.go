@@ -12,12 +12,12 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "kroger",
 		Name:        "Kroger",
-		Description: "Kroger grocery integration for product search, store locator, and cart management",
+		Description: "Kroger grocery integration for product search, store locator, and cart management across ~2,800 stores (Kroger, Ralphs, Fred Meyer, Harris Teeter, and more)",
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "kroger.search_products",
 				Name:        "Search Products",
-				Description: "Search for products by keyword with optional location-specific pricing",
+				Description: "Search for products by keyword with optional location-specific pricing and availability",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -25,11 +25,11 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"term": {
 							"type": "string",
-							"description": "Search term for products"
+							"description": "Search term for products (e.g., \"organic milk\", \"sourdough bread\")"
 						},
 						"location_id": {
 							"type": "string",
-							"description": "Kroger location ID for location-specific pricing and availability"
+							"description": "Kroger location ID for store-specific pricing and availability. Get IDs from kroger.search_locations (e.g., \"01400376\")"
 						},
 						"limit": {
 							"type": "integer",
@@ -41,7 +41,7 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 						"start": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Starting index for pagination"
+							"description": "Starting index for pagination (use with limit for paging through results)"
 						}
 					}
 				}`)),
@@ -49,7 +49,7 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "kroger.get_product",
 				Name:        "Get Product Details",
-				Description: "Get detailed product information including nutrition, price, availability, and images",
+				Description: "Get detailed product information including nutrition, price, availability, aisle location, and images by UPC",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -57,11 +57,11 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"product_id": {
 							"type": "string",
-							"description": "Kroger product ID (UPC)"
+							"description": "Kroger product ID — a UPC barcode (e.g., \"0001111041700\"). Found in search results as productId"
 						},
 						"location_id": {
 							"type": "string",
-							"description": "Kroger location ID for location-specific pricing and availability"
+							"description": "Kroger location ID for store-specific pricing and availability. Get IDs from kroger.search_locations (e.g., \"01400376\")"
 						}
 					}
 				}`)),
@@ -69,22 +69,26 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "kroger.search_locations",
 				Name:        "Search Locations",
-				Description: "Find Kroger stores by zip code, coordinates, or chain",
+				Description: "Find Kroger family stores by zip code or coordinates. Covers all banners: Kroger, Ralphs, Fred Meyer, Harris Teeter, etc.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
 						"zip_code": {
 							"type": "string",
-							"description": "ZIP code to search near"
+							"description": "US ZIP code to search near (e.g., \"45202\"). Provide zip_code or lat/lon"
 						},
 						"lat": {
 							"type": "number",
-							"description": "Latitude for location search"
+							"minimum": -90,
+							"maximum": 90,
+							"description": "Latitude for location search (e.g., 39.1031). Use with lon"
 						},
 						"lon": {
 							"type": "number",
-							"description": "Longitude for location search"
+							"minimum": -180,
+							"maximum": 180,
+							"description": "Longitude for location search (e.g., -84.5120). Use with lat"
 						},
 						"radius_miles": {
 							"type": "integer",
@@ -95,7 +99,7 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"chain": {
 							"type": "string",
-							"description": "Filter by chain name (e.g., Kroger, Ralphs, Fred Meyer)"
+							"description": "Filter by store banner (e.g., \"Kroger\", \"Ralphs\", \"Fred Meyer\", \"Harris Teeter\")"
 						},
 						"limit": {
 							"type": "integer",
@@ -110,7 +114,7 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "kroger.add_to_cart",
 				Name:        "Add to Cart",
-				Description: "Add items to the authenticated user's Kroger cart (requires user OAuth consent)",
+				Description: "Add items to the authenticated user's Kroger cart. Requires user OAuth consent with cart.basic:write scope",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -126,16 +130,16 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 								"properties": {
 									"upc": {
 										"type": "string",
-										"description": "Product UPC code"
+										"description": "Product UPC code from search results (e.g., \"0001111041700\")"
 									},
 									"quantity": {
 										"type": "integer",
 										"minimum": 1,
-										"description": "Quantity to add"
+										"description": "Quantity to add to cart"
 									}
 								}
 							},
-							"description": "Items to add to the cart"
+							"description": "Items to add to the cart (max 25 per request)"
 						}
 					}
 				}`)),
@@ -162,22 +166,36 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_kroger_search_products",
 				ActionType:  "kroger.search_products",
 				Name:        "Search for grocery products",
-				Description: "Agent can search Kroger's product catalog.",
+				Description: "Agent can search Kroger's product catalog by keyword.",
 				Parameters:  json.RawMessage(`{"term":"*"}`),
+			},
+			{
+				ID:          "tpl_kroger_search_products_at_store",
+				ActionType:  "kroger.search_products",
+				Name:        "Search products at a specific store",
+				Description: "Agent can search products with pricing locked to a specific store location.",
+				Parameters:  json.RawMessage(`{"term":"*","location_id":"LOCATION_ID"}`),
 			},
 			{
 				ID:          "tpl_kroger_get_product",
 				ActionType:  "kroger.get_product",
 				Name:        "View product details",
-				Description: "Agent can view details for any Kroger product.",
+				Description: "Agent can look up detailed information for any Kroger product by UPC.",
 				Parameters:  json.RawMessage(`{"product_id":"*"}`),
 			},
 			{
 				ID:          "tpl_kroger_search_locations",
 				ActionType:  "kroger.search_locations",
 				Name:        "Find nearby Kroger stores",
-				Description: "Agent can search for Kroger store locations.",
+				Description: "Agent can search for Kroger store locations by zip code or coordinates.",
 				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_kroger_search_locations_by_zip",
+				ActionType:  "kroger.search_locations",
+				Name:        "Find stores near a zip code",
+				Description: "Agent can find Kroger stores near a specific zip code within a 10-mile radius.",
+				Parameters:  json.RawMessage(`{"zip_code":"*","radius_miles":10}`),
 			},
 			{
 				ID:          "tpl_kroger_add_to_cart",
