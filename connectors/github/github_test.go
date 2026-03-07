@@ -19,7 +19,17 @@ func TestGitHubConnector_Actions(t *testing.T) {
 	c := New()
 	actions := c.Actions()
 
-	want := []string{"github.create_issue", "github.merge_pr"}
+	want := []string{
+		"github.create_issue",
+		"github.merge_pr",
+		"github.create_pr",
+		"github.add_reviewer",
+		"github.create_release",
+		"github.close_issue",
+		"github.add_label",
+		"github.add_comment",
+		"github.create_branch",
+	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
 			t.Errorf("Actions() missing %q", at)
@@ -90,14 +100,18 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 	if m.Name != "GitHub" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "GitHub")
 	}
-	if len(m.Actions) != 2 {
-		t.Fatalf("Manifest().Actions has %d items, want 2", len(m.Actions))
+	if len(m.Actions) != 9 {
+		t.Fatalf("Manifest().Actions has %d items, want 9", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
 		actionTypes[a.ActionType] = true
 	}
-	for _, want := range []string{"github.create_issue", "github.merge_pr"} {
+	for _, want := range []string{
+		"github.create_issue", "github.merge_pr", "github.create_pr",
+		"github.add_reviewer", "github.create_release", "github.close_issue",
+		"github.add_label", "github.add_comment", "github.create_branch",
+	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
