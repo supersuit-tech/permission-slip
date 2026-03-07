@@ -205,7 +205,7 @@ If `VITE_POSTHOG_KEY` is not set, analytics are disabled (no-op). PostHog Cloud 
 
 ### Billing (Stripe)
 
-Optional. Only needed if you want to enable paid tiers and usage-based billing.
+Optional. Only needed if you want to enable paid tiers and usage-based billing. See the [Stripe Setup Guide](stripe-setup.md) for detailed instructions on creating Stripe products, configuring webhooks, and testing locally.
 
 | Variable | Description |
 |---|---|
