@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,10 +16,10 @@ func TestScheduleCampaign_Success(t *testing.T) {
 
 	futureTime := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
 
-	callCount := 0
+	var callCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		switch callCount {
+		call := int(callCount.Add(1))
+		switch call {
 		case 1:
 			// Create single send
 			if r.Method != http.MethodPost || r.URL.Path != "/marketing/singlesends" {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,14 +15,14 @@ import (
 func TestSendCampaign_Success(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
+	var callCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer "+testAPIKey {
 			t.Errorf("Authorization = %q, want Bearer %s", got, testAPIKey)
 		}
 
-		callCount++
-		switch callCount {
+		call := int(callCount.Add(1))
+		switch call {
 		case 1:
 			// Create single send
 			if r.Method != http.MethodPost || r.URL.Path != "/marketing/singlesends" {
@@ -37,7 +38,7 @@ func TestSendCampaign_Success(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]any{"status": "scheduled"})
 		default:
-			t.Errorf("unexpected call %d: %s %s", callCount, r.Method, r.URL.Path)
+			t.Errorf("unexpected call %d: %s %s", call, r.Method, r.URL.Path)
 		}
 	}))
 	defer srv.Close()
@@ -94,6 +95,7 @@ func TestSendCampaign_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "sendgrid.send_campaign",
 				Parameters:  json.RawMessage(tt.params),
