@@ -60,7 +60,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	}
 
 	// Map well-known Zendesk API error codes to actionable messages.
-	if mapped := mapZendeskAPIError(zdErr.Error); mapped != nil {
+	if mapped := mapZendeskAPIError(zdErr.Error, msg); mapped != nil {
 		return mapped
 	}
 
@@ -103,8 +103,9 @@ func buildErrorMessage(zdErr zendeskError, fallback string) string {
 }
 
 // mapZendeskAPIError maps well-known Zendesk API error codes to actionable
-// error messages, similar to Slack's mapSlackError pattern.
-func mapZendeskAPIError(errCode string) error {
+// error messages, similar to Slack's mapSlackError pattern. The msg parameter
+// contains the rich error message including any field-level details.
+func mapZendeskAPIError(errCode, msg string) error {
 	switch errCode {
 	// Auth errors
 	case "InvalidCredentials":
@@ -116,7 +117,7 @@ func mapZendeskAPIError(errCode string) error {
 	case "RecordNotFound":
 		return &connectors.ValidationError{Message: "Zendesk record not found — verify the ticket or user ID exists"}
 	case "RecordInvalid":
-		return &connectors.ValidationError{Message: "Zendesk record is invalid — check required fields and field value constraints"}
+		return &connectors.ValidationError{Message: fmt.Sprintf("Zendesk record is invalid: %s", msg)}
 
 	// Merge-specific errors
 	case "MergeNotPossible":
