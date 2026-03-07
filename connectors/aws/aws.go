@@ -11,6 +11,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,10 @@ import (
 )
 
 const defaultTimeout = 30 * time.Second
+
+// maxResponseBytes caps the response body size to prevent memory exhaustion
+// from oversized or malicious upstream responses.
+const maxResponseBytes = 10 * 1024 * 1024 // 10 MB
 
 // AWSConnector owns the shared HTTP client used by all AWS actions.
 // Actions hold a pointer back to the connector to access the client.
@@ -377,7 +382,7 @@ func (c *AWSConnector) do(ctx context.Context, creds connectors.Credentials, met
 
 	req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
 
@@ -388,14 +393,14 @@ func (c *AWSConnector) do(ctx context.Context, creds connectors.Credentials, met
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("AWS API request timed out: %v", err)}
 		}
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("AWS API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
@@ -429,8 +434,10 @@ func (c *AWSConnector) signV4(req *http.Request, creds connectors.Credentials, p
 		req.Header.Set("X-Amz-Security-Token", sessionToken)
 	}
 
-	// Create canonical request.
+	// Compute payload hash and set X-Amz-Content-Sha256 header.
+	// S3 requires this header for Signature V4 Authorization-header requests.
 	payloadHash := sha256Hex(payload)
+	req.Header.Set("X-Amz-Content-Sha256", payloadHash)
 	canonicalHeaders, signedHeaders := buildCanonicalHeaders(req)
 	canonicalQuerystring := ""
 	if req.URL.RawQuery != "" {

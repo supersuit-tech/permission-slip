@@ -67,7 +67,9 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 	amzdate := now.Format("20060102T150405Z")
 
 	host := fmt.Sprintf("s3.%s.amazonaws.com", params.Region)
-	objectPath := "/" + params.Bucket + "/" + params.Key
+	// URI-encode each path segment per SigV4 rules, preserving "/" separators.
+	// S3 object keys can contain spaces, +, ?, # and other reserved characters.
+	objectPath := "/" + uriEncodePath(params.Bucket+"/"+params.Key)
 	credentialScope := datestamp + "/" + params.Region + "/s3/aws4_request"
 
 	// Build canonical query string for presigned URL.

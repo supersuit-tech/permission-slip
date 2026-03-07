@@ -79,7 +79,7 @@ func TestListS3Objects_MissingParams(t *testing.T) {
 	}{
 		{name: "missing region", params: `{"bucket":"my-bucket"}`},
 		{name: "missing bucket", params: `{"region":"us-east-1"}`},
-		{name: "invalid max_keys", params: `{"region":"us-east-1","bucket":"my-bucket","max_keys":0}`},
+		{name: "invalid max_keys", params: `{"region":"us-east-1","bucket":"my-bucket","max_keys":1001}`},
 	}
 
 	for _, tt := range tests {

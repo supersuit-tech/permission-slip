@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -57,6 +58,17 @@ func validateInstanceID(id string) error {
 		}
 	}
 	return nil
+}
+
+// uriEncodePath encodes a path string per AWS SigV4 rules: each segment is
+// percent-encoded but "/" separators are preserved. This is necessary because
+// S3 object keys can contain spaces, +, ?, # and other reserved characters.
+func uriEncodePath(path string) string {
+	segments := strings.Split(path, "/")
+	for i, seg := range segments {
+		segments[i] = url.PathEscape(seg)
+	}
+	return strings.Join(segments, "/")
 }
 
 // validateRFC3339 checks that a timestamp string is valid RFC 3339 format.

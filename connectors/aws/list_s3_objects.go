@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -65,10 +66,13 @@ func (a *listS3ObjectsAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	query := "list-type=2&max-keys=" + strconv.Itoa(params.MaxKeys)
+	qp := url.Values{}
+	qp.Set("list-type", "2")
+	qp.Set("max-keys", strconv.Itoa(params.MaxKeys))
 	if params.Prefix != "" {
-		query += "&prefix=" + params.Prefix
+		qp.Set("prefix", params.Prefix)
 	}
+	query := qp.Encode()
 
 	host := fmt.Sprintf("s3.%s.amazonaws.com", params.Region)
 	path := "/" + params.Bucket
