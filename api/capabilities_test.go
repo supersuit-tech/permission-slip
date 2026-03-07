@@ -73,6 +73,13 @@ func TestGetCapabilities_HappyPath(t *testing.T) {
 	if resp.AgentID != agentID {
 		t.Errorf("expected agent_id %d, got %d", agentID, resp.AgentID)
 	}
+	if resp.Approver == nil {
+		t.Fatal("expected approver to be set in capabilities response")
+	}
+	expectedUsername := "u_" + uid[:8]
+	if resp.Approver.Username != expectedUsername {
+		t.Errorf("expected approver.username %q, got %q", expectedUsername, resp.Approver.Username)
+	}
 	if len(resp.Connectors) != 1 {
 		t.Fatalf("expected 1 connector, got %d", len(resp.Connectors))
 	}

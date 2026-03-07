@@ -20,13 +20,26 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
+	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
+	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
+	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
 	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
+	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
+	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
+	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
+	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
+	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
+	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
 	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
+	"github.com/supersuit-tech/permission-slip-web/connectors/square"
+	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
+	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
@@ -128,15 +141,30 @@ func main() {
 	if deps.BillingEnabled {
 		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
 
+		// When STRIPE_TEST_MODE=true, use _TEST-suffixed env vars instead of
+		// the live keys. This lets developers keep both sets of keys in .env
+		// and switch with a single boolean.
+		stripeTestMode := os.Getenv("STRIPE_TEST_MODE") == "true"
+		deps.StripeTestMode = stripeTestMode
+		stripeKey := os.Getenv("STRIPE_SECRET_KEY")
+		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+		priceID := os.Getenv("STRIPE_PRICE_ID_REQUEST")
+		if stripeTestMode {
+			stripeKey = os.Getenv("STRIPE_SECRET_KEY_TEST")
+			webhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET_TEST")
+			priceID = os.Getenv("STRIPE_PRICE_ID_REQUEST_TEST")
+			log.Println("Stripe: test mode enabled — using _TEST keys")
+		}
+
 		// Initialize Stripe client when billing is enabled and keys are configured.
-		if stripeKey := os.Getenv("STRIPE_SECRET_KEY"); stripeKey != "" {
+		if stripeKey != "" {
 			deps.Stripe = pstripe.New(pstripe.Config{
 				SecretKey:      stripeKey,
-				WebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
-				PriceIDRequest: os.Getenv("STRIPE_PRICE_ID_REQUEST"),
+				WebhookSecret:  webhookSecret,
+				PriceIDRequest: priceID,
 			})
 			log.Println("Stripe: client initialized")
-			if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
+			if webhookSecret == "" {
 				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
 			}
 		} else {
@@ -174,6 +202,8 @@ func main() {
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	defer bgCancel()
 	var auditPurgeDone <-chan struct{}
+	var oauthRefreshDone <-chan struct{}
+	var cardExpiryCheckDone <-chan struct{}
 
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
@@ -293,8 +323,20 @@ func main() {
 	// Initialize connector registry.
 	registry := connectors.NewRegistry()
 	registry.Register(ghconnector.New())
+	registry.Register(googleconnector.New())
+	registry.Register(hubspot.New())
 	registry.Register(linear.New())
+	registry.Register(microsoft.New())
+	registry.Register(mongodb.New())
+	registry.Register(mysqlconnector.New())
+	registry.Register(pgconnector.New())
+	registry.Register(shopify.New())
 	registry.Register(slack.New())
+	registry.Register(redisconnector.New())
+	registry.Register(square.New())
+	registry.Register(stripeconnector.New())
+	registry.Register(amadeus.New())
+	registry.Register(expedia.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
@@ -305,6 +347,47 @@ func main() {
 	loadExternalConnectors(registry, deps.DB)
 
 	deps.Connectors = registry
+
+	// Initialize OAuth provider registry with built-in providers (Google, Microsoft)
+	// and merge in any providers declared by connector manifests.
+	oauthRegistry := poauth.NewRegistryWithBuiltIns()
+	registerManifestOAuthProviders(oauthRegistry, registry)
+	deps.OAuthProviders = oauthRegistry
+	deps.OAuthRedirectBaseURL = os.Getenv("OAUTH_REDIRECT_BASE_URL")
+	deps.OAuthStateSecret = os.Getenv("OAUTH_STATE_SECRET")
+	log.Printf("OAuth provider registry: %d provider(s) registered", oauthRegistry.Len())
+	for _, p := range oauthRegistry.List() {
+		if p.HasClientCredentials() {
+			log.Printf("  %s: configured (client credentials set)", p.ID)
+		} else {
+			log.Printf("  %s: registered (no client credentials — BYOA required)", p.ID)
+		}
+	}
+
+	// Load user BYOA configs from the database and merge into the registry
+	// so BYOA credentials survive server restarts.
+	if deps.DB != nil && deps.Vault != nil {
+		loadBYOAProviderConfigs(oauthRegistry, deps.DB, deps.Vault)
+	}
+
+	// Start background OAuth token refresh job (requires DB, vault, and OAuth registry).
+	if deps.DB != nil && deps.Vault != nil {
+		oauthRefreshDone = startOAuthRefresh(bgCtx, OAuthRefreshDeps{
+			DB:       deps.DB,
+			Vault:    deps.Vault,
+			Registry: oauthRegistry,
+		}, logger)
+	}
+
+	// Start background card expiration check (requires DB + notifier).
+	if deps.DB != nil && deps.Notifier != nil {
+		cardExpiryCheckDone = startCardExpiryCheck(bgCtx, CardExpiryCheckDeps{
+			DB:       deps.DB,
+			Notifier: deps.Notifier,
+			BaseURL:  deps.BaseURL,
+		}, logger)
+	}
+
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
 
 	// Parse allowed CORS origins from a comma-separated list.
@@ -443,6 +526,20 @@ func main() {
 			logger.Warn("audit purge goroutine did not exit in time")
 		}
 	}
+	if oauthRefreshDone != nil {
+		select {
+		case <-oauthRefreshDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("oauth refresh goroutine did not exit in time")
+		}
+	}
+	if cardExpiryCheckDone != nil {
+		select {
+		case <-cardExpiryCheckDone:
+		case <-time.After(5 * time.Second):
+			logger.Warn("card expiry check goroutine did not exit in time")
+		}
+	}
 
 	// Allow up to 30 seconds for in-flight requests to complete.
 	shutdownTimeout := 30 * time.Second
@@ -544,6 +641,97 @@ func seedConnectorFromManifest(manifest *connectors.ConnectorManifest, d db.DBTX
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return db.UpsertConnectorFromManifest(ctx, d, manifest.ToDBManifest())
+}
+
+// registerManifestOAuthProviders iterates over all connectors in the registry
+// and registers any OAuth providers declared in their manifests. This allows
+// external connectors to introduce new OAuth providers (e.g. Salesforce) without
+// core code changes.
+func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connectors.Registry) {
+	for _, id := range connReg.IDs() {
+		conn, _ := connReg.Get(id)
+		mp, ok := conn.(connectors.ManifestProvider)
+		if !ok {
+			continue
+		}
+		manifest := mp.Manifest()
+		if len(manifest.OAuthProviders) == 0 {
+			continue
+		}
+		providers := make([]poauth.ManifestProvider, len(manifest.OAuthProviders))
+		for i, p := range manifest.OAuthProviders {
+			providers[i] = poauth.ManifestProvider{
+				ID:           p.ID,
+				AuthorizeURL: p.AuthorizeURL,
+				TokenURL:     p.TokenURL,
+				Scopes:       p.Scopes,
+			}
+		}
+		if err := poauth.RegisterFromManifest(oauthReg, providers); err != nil {
+			log.Printf("Warning: failed to register OAuth providers from connector %q: %v", id, err)
+		}
+	}
+}
+
+// loadBYOAProviderConfigs reads all user BYOA OAuth provider configs from the
+// database and merges their client credentials into the in-memory provider
+// registry. This ensures BYOA credentials survive server restarts.
+//
+// Multi-tenancy note: BYOA credentials are stored per-user in the DB, but the
+// in-memory registry is global. The last-loaded BYOA config for a given provider
+// wins and becomes the active config for ALL users' OAuth flows on this server.
+// This is acceptable for single-tenant deployments.
+//
+// Only configs whose provider already exists in the registry (from built-in or
+// manifest sources) are loaded. Configs referencing unknown providers are logged
+// as warnings — they'll become active if the provider is registered later.
+func loadBYOAProviderConfigs(oauthReg *poauth.Registry, d db.DBTX, v vault.VaultStore) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	configs, err := db.ListAllOAuthProviderConfigs(ctx, d)
+	if err != nil {
+		log.Printf("Warning: failed to load BYOA provider configs: %v", err)
+		return
+	}
+
+	var loaded, skipped int
+	for _, cfg := range configs {
+		// Only load if the provider exists in the registry.
+		if _, ok := oauthReg.Get(cfg.Provider); !ok {
+			log.Printf("Warning: BYOA config for unknown provider %q (user %s) — skipping", cfg.Provider, cfg.UserID)
+			skipped++
+			continue
+		}
+
+		clientID, err := v.ReadSecret(ctx, d, cfg.ClientIDVaultID)
+		if err != nil {
+			log.Printf("Warning: failed to read BYOA client_id from vault for provider %q: %v", cfg.Provider, err)
+			skipped++
+			continue
+		}
+		clientSecret, err := v.ReadSecret(ctx, d, cfg.ClientSecretVaultID)
+		if err != nil {
+			log.Printf("Warning: failed to read BYOA client_secret from vault for provider %q: %v", cfg.Provider, err)
+			skipped++
+			continue
+		}
+
+		if err := oauthReg.Register(poauth.Provider{
+			ID:           cfg.Provider,
+			ClientID:     string(clientID),
+			ClientSecret: string(clientSecret),
+			Source:       poauth.SourceBYOA,
+		}); err != nil {
+			log.Printf("Warning: failed to register BYOA provider %q: %v", cfg.Provider, err)
+			skipped++
+			continue
+		}
+		loaded++
+	}
+	if loaded > 0 || skipped > 0 {
+		log.Printf("BYOA provider configs: %d loaded, %d skipped", loaded, skipped)
+	}
 }
 
 // validateConnectorRegistry logs warnings for mismatches between code-registered

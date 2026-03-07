@@ -12,6 +12,7 @@ export const EVENT_TYPES = [
   { label: "Standing Executed", value: "standing_approval.executed" },
   { label: "Agent Registered", value: "agent.registered" },
   { label: "Agent Deactivated", value: "agent.deactivated" },
+  { label: "Payment Charged", value: "payment_method.charged" },
 ] as const;
 
 interface ActivityFiltersProps {

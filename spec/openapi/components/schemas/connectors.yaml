@@ -232,11 +232,22 @@ ConnectorAction:
           body:
             type: "string"
 
+    requires_payment_method:
+      type: boolean
+      default: false
+      description: |
+        Whether this action requires a payment method to execute. When `true`, the
+        agent must include `payment_method_id` and `amount_cents` in the execute request.
+        The payment method is resolved to a Stripe token at execution time — raw card
+        details are never exposed to the agent.
+      example: false
+
   example:
     action_type: "github.create_issue"
     name: "Create Issue"
     description: "Create a new issue in a repository"
     risk_level: "low"
+    requires_payment_method: false
     parameters_schema:
       type: "object"
       required:
@@ -262,8 +273,10 @@ RequiredCredential:
         - api_key
         - basic
         - custom
+        - oauth2
       description: |
-        Authentication type required by the external service.
+        Authentication type required by the external service. When `oauth2`, the user
+        must connect their account via the OAuth flow instead of providing static credentials.
       example: "api_key"
 
     instructions_url:
@@ -274,6 +287,23 @@ RequiredCredential:
         URL to human-readable documentation explaining how to obtain credentials
         for this service. Only present when the connector provides setup instructions.
       example: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+
+    oauth_provider:
+      type: string
+      maxLength: 255
+      description: |
+        OAuth provider identifier. Only present when `auth_type` is `oauth2`.
+        Identifies which OAuth provider the user must connect to (e.g. "google", "microsoft").
+      example: "google"
+
+    oauth_scopes:
+      type: array
+      items:
+        type: string
+      description: |
+        OAuth scopes required by this connector. Only present when `auth_type` is `oauth2`.
+      example:
+        - "https://www.googleapis.com/auth/gmail.send"
 
   example:
     service: "github"

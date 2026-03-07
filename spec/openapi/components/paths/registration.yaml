@@ -97,6 +97,8 @@ register:
               agent_id: 42
               expires_at: "2026-02-11T13:25:00Z"
               verification_required: true
+              approver:
+                username: "alice"
 
       '400':
         $ref: '../responses/errors.yaml#/BadRequest'
@@ -306,7 +308,9 @@ verify:
             example:
               status: "registered"
               registered_at: "2026-02-11T13:20:15Z"
-      
+              approver:
+                username: "alice"
+
       '400':
         description: Invalid request or agent ID mismatch
         content:

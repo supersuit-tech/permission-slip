@@ -1,3 +1,24 @@
+ApproverInfo:
+  type: object
+  description: |
+    Identifies the user (approver) an agent is registered to. Included in
+    agent-facing responses so the agent knows which user it's working with.
+
+    Only the username is exposed — email, phone, and other PII are never
+    sent to agents.
+  required:
+    - username
+  properties:
+    username:
+      type: string
+      maxLength: 40
+      description: |
+        The approver's username on Permission Slip. This is the user's
+        public-facing identifier — safe to display and log.
+      example: "alice"
+  example:
+    username: "alice"
+
 Action:
   type: object
   required:

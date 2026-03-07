@@ -48,18 +48,21 @@ graph TB
         SA["Standing Approval Engine<br/><i>Pre-authorized grants,<br/>constraint matching,<br/>execution counting</i>"]
         NS["Notification Service<br/><i>Push notifications,<br/>webhooks</i>"]
         CV["Credential Vault<br/><i>Encrypted at rest,<br/>OAuth tokens, API keys</i>"]
+        OR["OAuth Provider Registry<br/><i>Built-in + manifest providers,<br/>BYOA client credentials</i>"]
         CE["Connector Engine"]
 
         subgraph Connectors
-            GC["Gmail<br/>Connector"]
-            SC["Stripe<br/>Connector"]
+            GC["GitHub<br/>Connector"]
+            SlC["Slack<br/>Connector"]
+            MC["MySQL<br/>Connector"]
             OC["..."]
         end
     end
 
     subgraph External ["External Services"]
-        Gmail["Gmail API"]
-        Stripe["Stripe API"]
+        GH["GitHub API"]
+        SlAPI["Slack API"]
+        MySQL["MySQL DB"]
     end
 
     User["User / Approver"]
@@ -76,15 +79,20 @@ graph TB
     GW --> SA
     SA --> CE
     TE --> CE
-    CE --> GC & SC & OC
+    CE --> GC & SlC & MC & OC
     GC --> CV
-    SC --> CV
-    GC -- "API call with<br/>user credentials" --> Gmail
-    SC -- "API call with<br/>user credentials" --> Stripe
+    SlC --> CV
+    MC --> CV
+    OR --> CV
+    CE --> OR
+    GC -- "API call with<br/>user credentials" --> GH
+    SlC -- "API call with<br/>user credentials" --> SlAPI
+    MC -- "Query with<br/>user credentials" --> MySQL
 
     style PS fill:#E8F0FE,stroke:#4A90D9,color:#000
     style GW fill:#4A90D9,color:#fff,stroke:#2A5F9E
     style CV fill:#D93025,color:#fff,stroke:#B9200F
+    style OR fill:#E37400,color:#fff,stroke:#C35400
     style TE fill:#F9AB00,color:#000,stroke:#D98B00
     style AR fill:#7B68EE,color:#fff,stroke:#5B48CE
     style AE fill:#34A853,color:#fff,stroke:#1A8833
@@ -94,6 +102,16 @@ graph TB
     style SA fill:#0F9D58,color:#fff,stroke:#0B7A43
     style CE fill:#9AA0A6,color:#fff,stroke:#7A8086
 ```
+
+## Background Jobs
+
+The server runs periodic background jobs when a database connection is configured. All jobs are started on server boot, run immediately once, then repeat on a configurable interval. They respect context cancellation for graceful shutdown.
+
+| Job | Default Interval | Description |
+|-----|-----------------|-------------|
+| **Audit log purge** | 1 hour (`AUDIT_PURGE_INTERVAL`) | Deletes expired audit events to prevent unbounded table growth. |
+| **OAuth token refresh** | 10 minutes (`OAUTH_REFRESH_INTERVAL`) | Proactively refreshes OAuth access tokens expiring within 15 minutes. Tokens that fail to refresh (revoked, expired refresh token) are marked `needs_reauth`, prompting the user to re-authorize. |
+| **Card expiry check** | 24 hours (`CARD_EXPIRY_CHECK_INTERVAL`) | Detects payment methods expiring within 30 days (or already expired) and sends one-time notifications via email, SMS, and push. Uses atomic claim-before-notify to prevent duplicate alerts across instances. Requires both DB and notification dispatcher. |
 
 ## Agent Registration Flow
 
