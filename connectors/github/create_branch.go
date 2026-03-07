@@ -59,6 +59,15 @@ func (a *createBranchAction) Execute(ctx context.Context, req connectors.ActionR
 		fromRef = "heads/" + fromRef
 	}
 
+	// Escape each segment of the ref path to prevent URL injection.
+	// Refs like "heads/main" become "heads/main" (no-op for safe chars),
+	// but malicious values like "../foo" are safely encoded per-segment.
+	segments := strings.Split(fromRef, "/")
+	for i, seg := range segments {
+		segments[i] = url.PathEscape(seg)
+	}
+	escapedRef := strings.Join(segments, "/")
+
 	// Resolve the source ref to a SHA.
 	var refResp struct {
 		Object struct {
@@ -67,7 +76,7 @@ func (a *createBranchAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	refPath := fmt.Sprintf("/repos/%s/%s/git/ref/%s",
-		url.PathEscape(params.Owner), url.PathEscape(params.Repo), fromRef)
+		url.PathEscape(params.Owner), url.PathEscape(params.Repo), escapedRef)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, refPath, nil, &refResp); err != nil {
 		return nil, err
 	}
