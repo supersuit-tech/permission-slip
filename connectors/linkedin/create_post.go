@@ -44,6 +44,8 @@ func (p *createPostParams) validate() error {
 }
 
 // linkedInPostRequest is the LinkedIn REST API request body for creating a post.
+// Used by both create_post (personal) and create_company_post (organization).
+// Ref: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api
 type linkedInPostRequest struct {
 	Author         string                  `json:"author"`
 	Commentary     string                  `json:"commentary"`

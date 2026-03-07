@@ -31,17 +31,21 @@ func (p *getPostAnalyticsParams) validate() error {
 	return nil
 }
 
-// socialActionsResponse is the LinkedIn REST API response for social actions.
+// socialActionsResponse is the LinkedIn REST API response from
+// GET /rest/socialActions/{urn}. The response contains separate summary
+// objects for likes and comments with their respective fields.
 type socialActionsResponse struct {
 	LikesSummary    likesSummary    `json:"likesSummary"`
 	CommentsSummary commentsSummary `json:"commentsSummary"`
 }
 
+// likesSummary contains the like count and whether the current user liked the post.
 type likesSummary struct {
 	TotalLikes         int  `json:"totalLikes"`
 	LikedByCurrentUser bool `json:"likedByCurrentUser"`
 }
 
+// commentsSummary contains the total comment count for a post.
 type commentsSummary struct {
 	TotalComments int `json:"totalComments"`
 }

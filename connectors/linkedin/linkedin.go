@@ -33,7 +33,11 @@ const (
 	defaultRestBaseURL = "https://api.linkedin.com/rest"
 	defaultTimeout     = 30 * time.Second
 	credKeyAccessToken = "access_token"
-	linkedInVersion    = "202401"
+
+	// linkedInVersion is sent via the LinkedIn-Version header on /rest/ endpoints.
+	// LinkedIn uses calendar versioning (YYYYMM). Bump this when adopting a newer
+	// API version: https://learn.microsoft.com/en-us/linkedin/marketing/versioning
+	linkedInVersion = "202401"
 
 	// defaultRetryAfter is used when the LinkedIn API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -97,7 +101,9 @@ func (c *LinkedInConnector) ValidateCredentials(_ context.Context, creds connect
 	return nil
 }
 
-// validateArticleURL checks that the article URL uses a safe scheme.
+// validateArticleURL checks that the article URL uses http or https.
+// This prevents injection of dangerous schemes (javascript:, data:, file:)
+// when the URL is rendered in LinkedIn posts.
 func validateArticleURL(rawURL string) error {
 	if rawURL == "" {
 		return nil
@@ -113,7 +119,9 @@ func validateArticleURL(rawURL string) error {
 	return nil
 }
 
-// validatePostURN checks that a post URN matches the expected LinkedIn format.
+// validatePostURN checks that a post URN matches the expected LinkedIn format
+// (urn:li:{type}:{numeric_id}). This prevents path traversal when the URN is
+// URL-encoded and interpolated into API paths.
 func validatePostURN(urn string) error {
 	if !urnPattern.MatchString(urn) {
 		return &connectors.ValidationError{Message: "post_urn must be a valid LinkedIn URN (e.g. urn:li:share:123456)"}
@@ -121,7 +129,8 @@ func validatePostURN(urn string) error {
 	return nil
 }
 
-// validateOrganizationID checks that the organization ID is numeric.
+// validateOrganizationID checks that the organization ID is numeric. The ID
+// is interpolated into "urn:li:organization:{id}" and sent as the post author.
 func validateOrganizationID(id string) error {
 	if !numericPattern.MatchString(id) {
 		return &connectors.ValidationError{Message: "organization_id must be numeric"}
@@ -129,7 +138,9 @@ func validateOrganizationID(id string) error {
 	return nil
 }
 
-// linkedInErrorResponse is the LinkedIn API error envelope.
+// linkedInErrorResponse is the LinkedIn API error envelope. ServiceErrorCode is
+// a LinkedIn-specific numeric code that provides more detail than the HTTP
+// status alone (e.g. 65600 = "Invalid access token").
 type linkedInErrorResponse struct {
 	Status           int    `json:"status"`
 	ServiceErrorCode int    `json:"serviceErrorCode,omitempty"`
@@ -228,7 +239,10 @@ func wrapHTTPError(err error) error {
 	return &connectors.ExternalError{Message: fmt.Sprintf("LinkedIn API request failed: %v", err)}
 }
 
-// checkResponse maps HTTP status codes to typed connector errors.
+// checkResponse maps HTTP status codes to typed connector errors. The mapping
+// ensures the execution layer can distinguish auth failures (trigger re-auth),
+// rate limits (schedule retry), and validation errors (surface to user) from
+// unexpected server errors.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -29,19 +28,22 @@ func (p *createCompanyPostParams) validate() error {
 	if p.OrganizationID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: organization_id"}
 	}
+	if err := validateOrganizationID(p.OrganizationID); err != nil {
+		return err
+	}
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}
 	}
 	if len(p.Text) > maxPostTextLen {
 		return &connectors.ValidationError{Message: fmt.Sprintf("text exceeds maximum length of %d characters", maxPostTextLen)}
 	}
+	// LinkedIn requires company page posts to be PUBLIC — the API rejects
+	// other visibility values for organization authors.
 	if p.Visibility != "" && p.Visibility != "PUBLIC" {
 		return &connectors.ValidationError{Message: "visibility for company posts must be \"PUBLIC\""}
 	}
-	if p.ArticleURL != "" {
-		if _, err := url.ParseRequestURI(p.ArticleURL); err != nil {
-			return &connectors.ValidationError{Message: "article_url must be a valid URL"}
-		}
+	if err := validateArticleURL(p.ArticleURL); err != nil {
+		return err
 	}
 	return nil
 }
