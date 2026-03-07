@@ -226,6 +226,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 1,
 							"maximum": 100,
 							"description": "Maximum number of spaces to return (1-100, default 20)"
+						},
+						"filter": {
+							"type": "string",
+							"description": "Optional filter query (e.g. 'spaceType = \"SPACE\"' to list only named spaces)"
 						}
 					}
 				}`)),
@@ -352,7 +356,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "google.list_chat_spaces",
 				Name:        "List chat spaces",
 				Description: "Agent can list Google Chat spaces accessible to the user.",
-				Parameters:  json.RawMessage(`{"page_size":"*"}`),
+				Parameters:  json.RawMessage(`{"page_size":"*","filter":"*"}`),
 			},
 			{
 				ID:          "tpl_google_create_meeting",

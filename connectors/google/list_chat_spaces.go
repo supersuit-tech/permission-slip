@@ -19,7 +19,8 @@ type listChatSpacesAction struct {
 
 // listChatSpacesParams is the user-facing parameter schema.
 type listChatSpacesParams struct {
-	PageSize int `json:"page_size"`
+	PageSize int    `json:"page_size"`
+	Filter   string `json:"filter"`
 }
 
 func (p *listChatSpacesParams) normalize() {
@@ -61,6 +62,9 @@ func (a *listChatSpacesAction) Execute(ctx context.Context, req connectors.Actio
 
 	q := url.Values{}
 	q.Set("pageSize", strconv.Itoa(params.PageSize))
+	if params.Filter != "" {
+		q.Set("filter", params.Filter)
+	}
 
 	var resp chatSpacesResponse
 	listURL := a.conn.chatBaseURL + "/v1/spaces?" + q.Encode()

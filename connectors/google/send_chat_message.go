@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -24,6 +25,14 @@ type sendChatMessageParams struct {
 func (p *sendChatMessageParams) validate() error {
 	if p.SpaceName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: space_name"}
+	}
+	// Validate the space_name format to prevent path traversal.
+	// Google Chat space names always follow the pattern "spaces/{spaceId}".
+	if !strings.HasPrefix(p.SpaceName, "spaces/") {
+		return &connectors.ValidationError{Message: "space_name must start with 'spaces/' (e.g. 'spaces/AAAA1234')"}
+	}
+	if strings.Contains(p.SpaceName, "..") {
+		return &connectors.ValidationError{Message: "space_name contains invalid path segments"}
 	}
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}

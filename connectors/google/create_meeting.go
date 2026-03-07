@@ -2,6 +2,8 @@ package google
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -119,7 +121,7 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 		End:         calendarEventDateTime{DateTime: params.EndTime},
 		ConferenceData: meetingConferenceData{
 			CreateRequest: meetingCreateRequest{
-				RequestID:             fmt.Sprintf("meet-%d", time.Now().UnixNano()),
+				RequestID:             meetingRequestID(params.Summary, params.StartTime),
 				ConferenceSolutionKey: meetingConferenceSolutionKey{Type: "hangoutsMeet"},
 			},
 		},
@@ -151,4 +153,15 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	return connectors.JSONResult(result)
+}
+
+// meetingRequestID generates a deterministic conference request ID from the
+// meeting summary and start time. This makes the request idempotent — if the
+// same meeting is created twice with the same parameters, the Google API will
+// return the same conference link instead of creating a duplicate.
+func meetingRequestID(summary, startTime string) string {
+	h := sha256.New()
+	h.Write([]byte(summary))
+	h.Write([]byte(startTime))
+	return "meet-" + hex.EncodeToString(h.Sum(nil))[:16]
 }

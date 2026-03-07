@@ -148,6 +148,54 @@ func TestSendChatMessage_AuthFailure(t *testing.T) {
 	}
 }
 
+func TestSendChatMessage_InvalidSpaceNamePrefix(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendChatMessageAction{conn: conn}
+
+	params, _ := json.Marshal(sendChatMessageParams{
+		SpaceName: "invalid/AAAA1234",
+		Text:      "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.send_chat_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid space_name prefix")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSendChatMessage_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendChatMessageAction{conn: conn}
+
+	params, _ := json.Marshal(sendChatMessageParams{
+		SpaceName: "spaces/../admin",
+		Text:      "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.send_chat_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for path traversal in space_name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSendChatMessage_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
