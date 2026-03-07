@@ -23,6 +23,8 @@ type listChannelsParams struct {
 	Limit int `json:"limit,omitempty"`
 	// Cursor is a pagination cursor from a previous response.
 	Cursor string `json:"cursor,omitempty"`
+	// ExcludeArchived filters out archived channels. Defaults to true.
+	ExcludeArchived *bool `json:"exclude_archived,omitempty"`
 }
 
 // listChannelsRequest is the Slack API request body for conversations.list.
@@ -53,7 +55,6 @@ type listChannelEntry struct {
 	} `json:"purpose"`
 }
 
-
 // listChannelsResult is the action output.
 type listChannelsResult struct {
 	Channels   []listChannelSummary `json:"channels"`
@@ -79,11 +80,15 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	excludeArchived := true
+	if params.ExcludeArchived != nil {
+		excludeArchived = *params.ExcludeArchived
+	}
 	body := listChannelsRequest{
 		Types:           params.Types,
 		Limit:           params.Limit,
 		Cursor:          params.Cursor,
-		ExcludeArchived: true,
+		ExcludeArchived: excludeArchived,
 	}
 	if body.Types == "" {
 		body.Types = "public_channel"

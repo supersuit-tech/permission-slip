@@ -131,6 +131,11 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"cursor": {
 							"type": "string",
 							"description": "Pagination cursor from a previous response"
+						},
+						"exclude_archived": {
+							"type": "boolean",
+							"default": true,
+							"description": "Exclude archived channels from results"
 						}
 					}
 				}`)),

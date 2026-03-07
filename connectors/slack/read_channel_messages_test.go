@@ -255,6 +255,38 @@ func TestReadChannelMessages_LimitOutOfRange(t *testing.T) {
 	}
 }
 
+func TestReadChannelMessages_MissingScope(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":    false,
+			"error": "missing_scope",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &readChannelMessagesAction{conn: conn}
+
+	params, _ := json.Marshal(readChannelMessagesParams{
+		Channel: "C01234567",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_channel_messages",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for missing_scope")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError for missing_scope, got: %T", err)
+	}
+}
+
 func TestReadChannelMessages_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
