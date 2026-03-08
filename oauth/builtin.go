@@ -117,6 +117,17 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("PAGERDUTY_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "stripe",
+			AuthorizeURL: "https://connect.stripe.com/oauth/authorize",
+			TokenURL:     "https://connect.stripe.com/oauth/token",
+			Scopes: []string{
+				"read_write",
+			},
+			ClientID:     os.Getenv("STRIPE_CLIENT_ID"),
+			ClientSecret: os.Getenv("STRIPE_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 

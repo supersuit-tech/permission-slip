@@ -15,12 +15,13 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
-import { providerLabel } from "@/lib/providerLabels";
+import { providerLabel } from "@/lib/oauth-providers";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
@@ -250,9 +251,14 @@ function OAuthCredentialRow({
             <Circle className="text-muted-foreground size-5 shrink-0" />
           )}
           <div>
-            <p className="text-sm font-medium">
-              {label} (OAuth)
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">
+                {label}
+              </p>
+              <Badge variant="secondary" className="text-xs">
+                OAuth
+              </Badge>
+            </div>
             <p className="text-muted-foreground text-xs">
               Recommended — automatic token refresh, no manual key management
             </p>
@@ -274,7 +280,16 @@ function OAuthCredentialRow({
                 ? "Needs re-auth"
                 : "Not connected"}
           </span>
-          {!isConnected && (
+          {isConnected ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              asChild
+            >
+              <a href="/settings#connected-accounts">Manage</a>
+            </Button>
+          ) : (
             <Button variant="outline" size="sm" onClick={handleConnect}>
               <LogIn className="size-3" />
               {needsReauth ? "Re-authorize" : "Connect"}
@@ -282,19 +297,6 @@ function OAuthCredentialRow({
           )}
         </div>
       </div>
-      {isConnected && connection && (
-        <div className="mt-3 border-t pt-3">
-          <div className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm">{label} OAuth</p>
-              <p className="text-muted-foreground text-xs">
-                Connected{" "}
-                {new Date(connection.connected_at).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

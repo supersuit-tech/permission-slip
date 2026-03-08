@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.stripe.com"
-	defaultTimeout = 30 * time.Second
-	credKeyAPIKey  = "api_key"
+	defaultBaseURL      = "https://api.stripe.com"
+	defaultTimeout      = 30 * time.Second
+	credKeyAPIKey       = "api_key"
+	credKeyAccessToken  = "access_token"
 
 	// Stripe secret keys always start with one of these prefixes.
 	liveKeyPrefix  = "sk_live_"
@@ -171,19 +172,34 @@ func (c *StripeConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key with a recognized Stripe secret key prefix.
+// ValidateCredentials checks that the provided credentials contain a valid
+// Stripe secret key, either as an access_token (from OAuth) or an api_key
+// (from static credentials). OAuth tokens are tried first since OAuth is
+// the preferred auth method.
 func (c *StripeConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	key := resolveKey(creds)
+	if key == "" {
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token"}
 	}
 	if !hasValidPrefix(key) {
 		return &connectors.ValidationError{
-			Message: "api_key must start with \"sk_live_\", \"sk_test_\", \"rk_live_\", or \"rk_test_\"",
+			Message: "credential must start with \"sk_live_\", \"sk_test_\", \"rk_live_\", or \"rk_test_\"",
 		}
 	}
 	return nil
+}
+
+// resolveKey returns the Stripe secret key from credentials, preferring
+// access_token (OAuth) over api_key (static). Returns empty string if neither
+// is present.
+func resolveKey(creds connectors.Credentials) string {
+	if key, ok := creds.Get(credKeyAccessToken); ok && key != "" {
+		return key
+	}
+	if key, ok := creds.Get(credKeyAPIKey); ok && key != "" {
+		return key
+	}
+	return ""
 }
 
 // hasValidPrefix reports whether key starts with a recognized Stripe
@@ -207,9 +223,9 @@ func hasValidPrefix(key string) bool {
 // When idempotencyKey is non-empty, it is sent as the Idempotency-Key header
 // (only meaningful for POST requests).
 func (c *StripeConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, params map[string]string, respBody any, idempotencyKey string) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	key := resolveKey(creds)
+	if key == "" {
+		return &connectors.ValidationError{Message: "api_key or access_token credential is missing or empty"}
 	}
 
 	var body io.Reader
