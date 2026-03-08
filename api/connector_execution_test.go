@@ -262,6 +262,74 @@ func TestExecuteConnectorAction_OAuthPath_NoConnection(t *testing.T) {
 	}
 }
 
+// TestExecuteConnectorAction_DualAuth_FallbackToAPIKey verifies that when a
+// connector supports both OAuth and API key, and the user has no OAuth connection
+// but has an API key credential, execution succeeds using the API key.
+func TestExecuteConnectorAction_DualAuth_FallbackToAPIKey(t *testing.T) {
+	t.Parallel()
+
+	var capturedCreds connectors.Credentials
+	f := setupOAuthExecutionTest(t, oauthExecOpts{
+		ConnectorID: "testnotion",
+		ActionType:  "testnotion.search",
+		Provider:    "notion",
+		// No OAuth connection — will trigger fallback.
+		OnExec: func(creds connectors.Credentials) {
+			capturedCreds = creds
+		},
+	})
+
+	// Add a static api_key credential alongside the OAuth one.
+	testhelper.InsertConnectorRequiredCredential(t, f.TX, "testnotion", "testnotion", "api_key")
+	vaultID, vaultErr := f.Vault.CreateSecret(t.Context(), nil, "testnotion-cred", []byte(`{"api_key":"ntn_test_key_123"}`))
+	if vaultErr != nil {
+		t.Fatalf("create vault secret: %v", vaultErr)
+	}
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, f.TX, credID, f.UserID, "testnotion", vaultID)
+
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
+	if err != nil {
+		t.Fatalf("expected fallback to API key, got error: %v", err)
+	}
+
+	if token, ok := capturedCreds.Get("api_key"); !ok || token != "ntn_test_key_123" {
+		t.Errorf("expected api_key=ntn_test_key_123, got %q (ok=%v)", token, ok)
+	}
+}
+
+// TestExecuteConnectorAction_DualAuth_NeedsReauth_NoFallback verifies that when
+// a connector supports both OAuth and API key, but the OAuth connection exists
+// with status needs_reauth, we do NOT silently fall back to API key — the user
+// must re-authorize OAuth.
+func TestExecuteConnectorAction_DualAuth_NeedsReauth_NoFallback(t *testing.T) {
+	t.Parallel()
+
+	f := setupOAuthExecutionTest(t, oauthExecOpts{
+		ConnectorID: "testnotion",
+		ActionType:  "testnotion.search",
+		Provider:    "notion",
+		Connection:  &testhelper.OAuthConnectionOpts{Status: "needs_reauth"},
+	})
+
+	// Add a static api_key credential alongside the OAuth one.
+	testhelper.InsertConnectorRequiredCredential(t, f.TX, "testnotion", "testnotion", "api_key")
+	vaultID, vaultErr := f.Vault.CreateSecret(t.Context(), nil, "testnotion-cred", []byte(`{"api_key":"ntn_test_key_123"}`))
+	if vaultErr != nil {
+		t.Fatalf("create vault secret: %v", vaultErr)
+	}
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, f.TX, credID, f.UserID, "testnotion", vaultID)
+
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
+	if err == nil {
+		t.Fatal("expected error for needs_reauth — should NOT fall back to API key")
+	}
+	if !connectors.IsOAuthRefreshError(err) {
+		t.Errorf("expected OAuthRefreshError, got %T: %v", err, err)
+	}
+}
+
 func TestExecuteConnectorAction_OAuthPath_NeedsReauth(t *testing.T) {
 	t.Parallel()
 
