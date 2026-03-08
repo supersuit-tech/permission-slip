@@ -43,8 +43,8 @@ export function ConnectorCredentialsSection({
   });
 
   const hasOAuth = requiredCredentials.some((c) => c.auth_type === "oauth2");
-  const { connections, isLoading: connectionsLoading } = useOAuthConnections();
-  const { providers, isLoading: providersLoading } = useOAuthProviders();
+  const { connections, isLoading: connectionsLoading } = useOAuthConnections({ enabled: hasOAuth });
+  const { providers, isLoading: providersLoading } = useOAuthProviders({ enabled: hasOAuth });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
