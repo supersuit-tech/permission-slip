@@ -83,3 +83,35 @@ func TestSearchCode_MissingQuery(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestSearchCode_InvalidParams(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["github.search_code"]
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{"invalid order", `{"q":"fmt.Println","order":"random"}`},
+		{"per_page too large", `{"q":"fmt.Println","per_page":101}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "github.search_code",
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
