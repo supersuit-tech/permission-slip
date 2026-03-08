@@ -56,11 +56,24 @@ func (p *sendTransactionalEmailParams) validate() error {
 	if p.HTMLContent == "" && p.PlainContent == "" && p.TemplateID == "" {
 		return &connectors.ValidationError{Message: "at least one of html_content, plain_content, or template_id is required"}
 	}
+	// RFC 2822 §2.1.1 limits header lines to 998 characters.
+	if len(p.Subject) > 998 {
+		return &connectors.ValidationError{Message: "subject must be 998 characters or fewer (RFC 2822 limit)"}
+	}
 	if p.ReplyTo != "" && !emailPattern.MatchString(p.ReplyTo) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid reply_to email: %q", p.ReplyTo)}
 	}
 	if len(p.DynamicTemplateData) > 0 && p.TemplateID == "" {
 		return &connectors.ValidationError{Message: "dynamic_template_data requires template_id to be set"}
+	}
+	// SendGrid limits total recipients (to + cc + bcc) to 1000 per send.
+	// We cap CC and BCC independently to prevent bulk-sending abuse through
+	// the connector.
+	if len(p.CC) > 100 {
+		return &connectors.ValidationError{Message: "cc must contain at most 100 addresses"}
+	}
+	if len(p.BCC) > 100 {
+		return &connectors.ValidationError{Message: "bcc must contain at most 100 addresses"}
 	}
 	for _, addr := range p.CC {
 		if !emailPattern.MatchString(addr) {
@@ -74,6 +87,11 @@ func (p *sendTransactionalEmailParams) validate() error {
 	}
 	if len(p.Categories) > 10 {
 		return &connectors.ValidationError{Message: "categories must have at most 10 items (SendGrid limit)"}
+	}
+	for _, cat := range p.Categories {
+		if len(cat) > 255 {
+			return &connectors.ValidationError{Message: fmt.Sprintf("category name %q exceeds 255 character limit", cat[:40]+"...")}
+		}
 	}
 	return nil
 }
