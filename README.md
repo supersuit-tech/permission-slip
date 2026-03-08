@@ -288,6 +288,14 @@ go run ./cmd/generate-vapid-keys --format=heroku
 
 **Mobile Push (Expo):** Mobile push notifications are always enabled when a database is configured — no additional keys required. The sender uses the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/) to deliver notifications to registered devices. Set `EXPO_ACCESS_TOKEN` for authenticated mode (higher rate limits); without it, unauthenticated mode is used.
 
+**Adding a notification channel:** Channels self-register via Go's `init()` mechanism. To add a new channel:
+1. Implement `notify.Sender` in a new package (e.g. `notify/mynewchannel/`).
+2. Add any required env-var fields to `notify.Config` in `notify/config.go`.
+3. Create `notify/mynewchannel/register.go` with an `init()` that calls `notify.RegisterSenderFactory("my-channel", fn)`.
+4. Add a blank import to `notify/all/all.go`.
+
+No changes to `main.go` or the approval handler are needed. See the `notify` package doc comment for details.
+
 ## Mobile App
 
 The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin client for approving and viewing requests from your phone — similar to the Microsoft Authenticator approval flow.

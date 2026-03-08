@@ -11,29 +11,43 @@ import (
 
 // BuildContext holds the runtime dependencies available to sender factories
 // at startup. It is passed to each registered SenderFactory so factories can
-// inspect config, access the database, and communicate results back.
+// inspect config, access the database, and communicate results back to the
+// caller without requiring a global variable.
 type BuildContext struct {
-	// DB is the database handle. Nil when no database is configured.
+	// DB is the database handle. Nil when no database is configured (e.g.
+	// during unit tests or when DATABASE_URL is not set). Factories that
+	// require database access (web push, mobile push, SMS plan gating) should
+	// return nil, nil when DB is nil rather than failing.
 	DB db.DBTX
 
-	// Config holds the notification configuration loaded from environment variables.
+	// Config holds the notification configuration loaded from environment
+	// variables. Each channel reads its own fields from Config to decide
+	// whether it is configured.
 	Config Config
 
-	// DevMode is true when the server is running in development mode.
-	// Factories use this to relax requirements (e.g. auto-generate VAPID keys)
-	// or degrade gracefully instead of calling log.Fatalf.
+	// DevMode is true when the server is running in development mode
+	// (MODE=development). Factories use this to relax hard requirements —
+	// for example, the web push factory auto-generates VAPID keys in dev mode
+	// rather than failing, and uses a default VAPID_SUBJECT.
 	DevMode bool
 
-	// OnVAPIDPublicKey, when non-nil, is called by the web push factory once
-	// VAPID keys are available. The caller stores the key for serving to
-	// browser clients via the /push/vapid-public-key endpoint.
+	// OnVAPIDPublicKey, when non-nil, is called by the web push factory with
+	// the VAPID public key once VAPID keys are initialised. The caller stores
+	// the key for serving to browser clients via /push/vapid-public-key.
+	// This callback pattern avoids a global variable for the public key while
+	// keeping the factory self-contained.
 	OnVAPIDPublicKey func(publicKey string)
 }
 
-// SenderFactory constructs Senders from a BuildContext. It returns the senders
-// to register (nil or empty when the channel is not configured) and any error
-// encountered during construction. Errors are logged but do not prevent other
-// factories from running.
+// SenderFactory constructs Senders from a BuildContext.
+//
+// Return values:
+//   - (senders, nil) — channel is active; senders are appended to the result.
+//   - (nil, nil)     — channel is disabled (e.g. env vars not set); silently skipped.
+//   - (nil, err)     — unexpected failure; error is logged and the channel is skipped.
+//
+// Factories must not call log.Fatalf or os.Exit — return an error instead so
+// BuildSenders can log it and continue with other channels.
 type SenderFactory func(ctx context.Context, bc BuildContext) ([]Sender, error)
 
 // namedFactory pairs a human-readable channel name with its factory so that
