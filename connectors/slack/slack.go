@@ -47,8 +47,10 @@ var OAuthScopes = []string{
 	"groups:history",
 	"groups:read",
 	"im:history",
+	"im:write",
 	"mpim:history",
 	"reactions:write",
+	"search:read",
 	"users:read",
 }
 
@@ -93,6 +95,11 @@ func (c *SlackConnector) Actions() map[string]connectors.Action {
 		"slack.invite_to_channel":     &inviteToChannelAction{conn: c},
 		"slack.upload_file":           &uploadFileAction{conn: c},
 		"slack.add_reaction":          &addReactionAction{conn: c},
+		"slack.send_dm":               &sendDMAction{conn: c},
+		"slack.update_message":        &updateMessageAction{conn: c},
+		"slack.delete_message":        &deleteMessageAction{conn: c},
+		"slack.list_users":            &listUsersAction{conn: c},
+		"slack.search_messages":       &searchMessagesAction{conn: c},
 	}
 }
 
@@ -281,6 +288,16 @@ func mapSlackError(slackErr string) error {
 		return &connectors.ExternalError{StatusCode: 200, Message: "the bot cannot invite itself to a channel"}
 	case "user_not_found":
 		return &connectors.ExternalError{StatusCode: 200, Message: "one or more user IDs were not found — verify the user IDs are correct"}
+
+	// Message edit/delete errors
+	case "message_not_found":
+		return &connectors.ExternalError{StatusCode: 200, Message: "message not found — verify the channel ID and message timestamp are correct"}
+	case "cant_delete_message":
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot delete this message — bots can only delete their own messages"}
+	case "edit_window_closed":
+		return &connectors.ExternalError{StatusCode: 200, Message: "the message editing window has closed — messages can only be edited within a limited time"}
+	case "cant_update_message":
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot update this message — bots can only edit their own messages"}
 
 	// Message errors
 	case "time_in_past":
