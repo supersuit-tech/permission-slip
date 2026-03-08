@@ -268,6 +268,120 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "slack.send_dm",
+				Name:        "Send Direct Message",
+				Description: "Send a direct message to a Slack user",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["user_id", "message"],
+					"properties": {
+						"user_id": {
+							"type": "string",
+							"description": "User ID to send the DM to (e.g. U01234567)"
+						},
+						"message": {
+							"type": "string",
+							"description": "Message text (supports Slack mrkdwn formatting)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "slack.update_message",
+				Name:        "Update Message",
+				Description: "Edit an existing message in a Slack channel",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "ts", "message"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID containing the message (e.g. C01234567)"
+						},
+						"ts": {
+							"type": "string",
+							"description": "Timestamp of the message to update (e.g. 1234567890.123456)"
+						},
+						"message": {
+							"type": "string",
+							"description": "New message text (supports Slack mrkdwn formatting)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "slack.delete_message",
+				Name:        "Delete Message",
+				Description: "Delete a message from a Slack channel",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "ts"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID containing the message (e.g. C01234567)"
+						},
+						"ts": {
+							"type": "string",
+							"description": "Timestamp of the message to delete (e.g. 1234567890.123456)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "slack.list_users",
+				Name:        "List Users",
+				Description: "List workspace users visible to the bot",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"limit": {
+							"type": "integer",
+							"default": 100,
+							"description": "Max users to return (1-1000)"
+						},
+						"cursor": {
+							"type": "string",
+							"description": "Pagination cursor from a previous response"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "slack.search_messages",
+				Name:        "Search Messages",
+				Description: "Search messages across Slack channels (requires a user token with search:read scope; bot tokens are not supported by Slack for this endpoint)",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["query"],
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Search query (supports Slack search modifiers like in:#channel, from:@user)"
+						},
+						"count": {
+							"type": "integer",
+							"default": 20,
+							"description": "Max results per page (1-100)"
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number for pagination"
+						},
+						"sort": {
+							"type": "string",
+							"description": "Sort order: score (relevance) or timestamp"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -355,6 +469,41 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add reactions",
 				Description: "Agent can add emoji reactions to messages.",
 				Parameters:  json.RawMessage(`{"channel":"*","timestamp":"*","name":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_send_dm",
+				ActionType:  "slack.send_dm",
+				Name:        "Send direct messages",
+				Description: "Agent can send direct messages to any user.",
+				Parameters:  json.RawMessage(`{"user_id":"*","message":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_update_message",
+				ActionType:  "slack.update_message",
+				Name:        "Update messages",
+				Description: "Agent can edit messages in any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","ts":"*","message":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_delete_message",
+				ActionType:  "slack.delete_message",
+				Name:        "Delete messages",
+				Description: "Agent can delete messages from any channel.",
+				Parameters:  json.RawMessage(`{"channel":"*","ts":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_list_users",
+				ActionType:  "slack.list_users",
+				Name:        "List users",
+				Description: "Agent can list workspace users.",
+				Parameters:  json.RawMessage(`{"limit":"*","cursor":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_search_messages",
+				ActionType:  "slack.search_messages",
+				Name:        "Search messages",
+				Description: "Agent can search messages across channels.",
+				Parameters:  json.RawMessage(`{"query":"*","count":"*","page":"*","sort":"*"}`),
 			},
 		},
 	}
