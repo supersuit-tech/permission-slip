@@ -83,6 +83,10 @@ type auditLogExportResponse struct {
 }
 
 // RegisterAuditEventRoutes adds audit event endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterAuditEventRoutes)
+}
+
 func RegisterAuditEventRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /audit-events", requireProfile(handleListAuditEvents(deps)))

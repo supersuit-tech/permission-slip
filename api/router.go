@@ -56,36 +56,11 @@ type Deps struct {
 func NewRouter(deps *Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	RegisterActionConfigRoutes(mux, deps)
-	RegisterActionConfigTemplateRoutes(mux, deps)
-	RegisterConfigRoutes(mux, deps)
-	RegisterActionExecuteRoutes(mux, deps)
-	RegisterAgentApprovalRoutes(mux, deps)
-	RegisterAgentRoutes(mux, deps)
-	RegisterAgentConnectorRoutes(mux, deps)
-	RegisterAgentStandingApprovalRoutes(mux, deps)
-	RegisterApprovalRoutes(mux, deps)
-	RegisterCapabilityRoutes(mux, deps)
-	RegisterAuditEventRoutes(mux, deps)
-	RegisterConnectorRoutes(mux, deps)
-	RegisterCredentialRoutes(mux, deps)
-	RegisterOnboardingRoutes(mux, deps)
-	RegisterProfileRoutes(mux, deps)
-	RegisterRegistrationInviteRoutes(mux, deps)
-	RegisterRegistrationRoutes(mux, deps)
-	RegisterPushSubscriptionRoutes(mux, deps)
-	RegisterExpoPushTokenRoutes(mux, deps)
-	RegisterStandingApprovalRoutes(mux, deps)
-	RegisterApprovalEventRoutes(mux, deps)
-	RegisterOAuthRoutes(mux, deps)
-	RegisterOAuthBYOARoutes(mux, deps)
-
-	RegisterPaymentMethodRoutes(mux, deps)
-
-	// Billing routes are always registered (handlers check deps.BillingEnabled
-	// and deps.Stripe internally) so the OpenAPI spec can document them.
-	RegisterBillingRoutes(mux, deps)
-	RegisterAdminUsageRoutes(mux, deps)
+	// Each domain file self-registers via init() + RegisterRouteGroup().
+	// See router_registry.go for the registry.
+	for _, register := range routeGroups {
+		register(mux, deps)
+	}
 	// NOTE: Billing webhook routes are registered on the top-level mux in
 	// main.go, NOT here. They must bypass auth and rate-limiting middleware
 	// because Stripe verifies requests via signature, not Bearer tokens.

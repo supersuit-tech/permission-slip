@@ -66,6 +66,10 @@ type vapidPublicKeyResponse struct {
 // --- Routes ---
 
 // RegisterPushSubscriptionRoutes adds push subscription endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterPushSubscriptionRoutes)
+}
+
 func RegisterPushSubscriptionRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /push-subscriptions", requireProfile(handleListPushSubscriptions(deps)))

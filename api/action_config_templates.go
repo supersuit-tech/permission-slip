@@ -28,6 +28,10 @@ type actionConfigTemplateListResponse struct {
 // --- Routes ---
 
 // RegisterActionConfigTemplateRoutes adds action configuration template endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterActionConfigTemplateRoutes)
+}
+
 func RegisterActionConfigTemplateRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /action-config-templates", requireProfile(handleListActionConfigTemplates(deps)))

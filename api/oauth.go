@@ -98,6 +98,10 @@ type oauthDisconnectResponse struct {
 // --- Routes ---
 
 // RegisterOAuthRoutes adds OAuth-related endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterOAuthRoutes)
+}
+
 func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	requireSession := RequireSession(deps)

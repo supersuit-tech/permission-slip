@@ -58,6 +58,10 @@ type deleteActionConfigResponse struct {
 // --- Routes ---
 
 // RegisterActionConfigRoutes adds action configuration endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterActionConfigRoutes)
+}
+
 func RegisterActionConfigRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("POST /action-configurations", requireProfile(handleCreateActionConfig(deps)))

@@ -34,6 +34,10 @@ type disableAgentConnectorResponse struct {
 }
 
 // RegisterAgentConnectorRoutes adds agent connector endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterAgentConnectorRoutes)
+}
+
 func RegisterAgentConnectorRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /agents/{agent_id}/connectors", requireProfile(handleListAgentConnectors(deps)))

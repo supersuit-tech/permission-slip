@@ -12,6 +12,10 @@ type configResponse struct {
 }
 
 // RegisterConfigRoutes adds server configuration endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterConfigRoutes)
+}
+
 func RegisterConfigRoutes(mux *http.ServeMux, deps *Deps) {
 	requireSession := RequireSession(deps)
 	mux.Handle("GET /v1/config", requireSession(handleGetConfig(deps)))

@@ -51,6 +51,10 @@ type denyResponse struct {
 }
 
 // RegisterApprovalRoutes adds approval-related endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterApprovalRoutes)
+}
+
 func RegisterApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /approvals", requireProfile(handleListApprovals(deps)))

@@ -76,6 +76,10 @@ var validStandingApprovalStatusFilters = map[string]bool{
 var actionVersionPattern = regexp.MustCompile(`^\d+$`)
 
 // RegisterStandingApprovalRoutes adds standing-approval-related endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterStandingApprovalRoutes)
+}
+
 func RegisterStandingApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /standing-approvals", requireProfile(handleListStandingApprovals(deps)))

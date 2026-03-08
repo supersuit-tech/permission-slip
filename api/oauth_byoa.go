@@ -67,6 +67,10 @@ type oauthProviderConfigDeleteResponse struct {
 // --- Routes ---
 
 // RegisterOAuthBYOARoutes adds BYOA provider management endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterOAuthBYOARoutes)
+}
+
 func RegisterOAuthBYOARoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 

@@ -45,6 +45,10 @@ type agentCancelApprovalResponse struct {
 // ── Route registration ─────────────────────────────────────────────────────
 
 // RegisterAgentApprovalRoutes adds agent-authenticated approval endpoints.
+func init() {
+	RegisterRouteGroup(RegisterAgentApprovalRoutes)
+}
+
 func RegisterAgentApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireAgent := RequireAgentSignature(deps)
 	mux.Handle("POST /approvals/request", requireAgent(handleAgentRequestApproval(deps)))

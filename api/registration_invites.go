@@ -36,6 +36,10 @@ type createInviteResponse struct {
 }
 
 // RegisterRegistrationInviteRoutes adds registration-invite endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterRegistrationInviteRoutes)
+}
+
 func RegisterRegistrationInviteRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("POST /registration-invites", requireProfile(handleCreateRegistrationInvite(deps)))

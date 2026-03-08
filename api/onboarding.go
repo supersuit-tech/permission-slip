@@ -25,6 +25,10 @@ type onboardingResponse struct {
 
 // RegisterOnboardingRoutes adds onboarding endpoints to the mux.
 // RequireSession is used (not RequireProfile) because the user has no profile yet.
+func init() {
+	RegisterRouteGroup(RegisterOnboardingRoutes)
+}
+
 func RegisterOnboardingRoutes(mux *http.ServeMux, deps *Deps) {
 	requireSession := RequireSession(deps)
 	mux.Handle("POST /onboarding", requireSession(handleOnboarding(deps)))

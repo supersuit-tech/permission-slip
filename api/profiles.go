@@ -43,6 +43,10 @@ type updateProfileRaw struct {
 }
 
 // RegisterProfileRoutes adds profile-related endpoints to the mux.
+func init() {
+	RegisterRouteGroup(RegisterProfileRoutes)
+}
+
 func RegisterProfileRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 
