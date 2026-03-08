@@ -260,6 +260,10 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			// Datadog OAuth uses split hostnames by design: authorization
+			// redirects go through app.datadoghq.com, while token exchange
+			// happens on api.datadoghq.com. Both paths use the /oauth2/v1/
+			// prefix and are documented in Datadog's OAuth2 API reference.
 			ID:           "datadog",
 			AuthorizeURL: "https://app.datadoghq.com/oauth2/v1/authorize",
 			TokenURL:     "https://api.datadoghq.com/oauth2/v1/token",
