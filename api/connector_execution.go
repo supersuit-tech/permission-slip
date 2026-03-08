@@ -59,6 +59,8 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 			if errors.As(err, &oauthErr) {
 				fallbackCreds, fbErr := resolveNonOAuthCredentials(ctx, deps, userID, actionType)
 				if fbErr == nil {
+					log.Printf("[%s] OAuth credentials unavailable for %s (provider %s: %s), falling back to static credentials",
+						actionType, userID, oauthErr.Provider, oauthErr.Message)
 					creds = fallbackCreds
 					err = nil
 				}

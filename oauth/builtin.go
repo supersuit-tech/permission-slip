@@ -3,6 +3,8 @@ package oauth
 import (
 	"fmt"
 	"os"
+
+	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 )
 
 // BuiltInProviders returns the platform's pre-configured OAuth providers.
@@ -109,20 +111,7 @@ func BuiltInProviders() []Provider {
 			ID:           "slack",
 			AuthorizeURL: "https://slack.com/oauth/v2/authorize",
 			TokenURL:     "https://slack.com/api/oauth.v2.access",
-			Scopes: []string{
-				"channels:history",
-				"channels:join",
-				"channels:manage",
-				"channels:read",
-				"chat:write",
-				"files:write",
-				"groups:history",
-				"groups:read",
-				"im:history",
-				"mpim:history",
-				"reactions:write",
-				"users:read",
-			},
+			Scopes:       slackconnector.OAuthScopes,
 			ClientID:     os.Getenv("SLACK_CLIENT_ID"),
 			ClientSecret: os.Getenv("SLACK_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,

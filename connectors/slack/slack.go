@@ -34,6 +34,24 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
+// OAuthScopes is the canonical list of OAuth scopes required by all Slack
+// connector actions. This is the single source of truth — referenced by both
+// the connector manifest and the built-in OAuth provider registration.
+var OAuthScopes = []string{
+	"channels:history",
+	"channels:join",
+	"channels:manage",
+	"channels:read",
+	"chat:write",
+	"files:write",
+	"groups:history",
+	"groups:read",
+	"im:history",
+	"mpim:history",
+	"reactions:write",
+	"users:read",
+}
+
 // SlackConnector owns the shared HTTP client and base URL used by all
 // Slack actions. Actions hold a pointer back to the connector to access
 // these shared resources.

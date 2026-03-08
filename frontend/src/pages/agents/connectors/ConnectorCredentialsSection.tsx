@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -117,12 +118,16 @@ function OAuthCredentialRow({
     window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
   }
 
+  const scopes = requiredCredential.oauth_scopes ?? [];
+
   return (
     <div className="rounded-lg border p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {isConnected ? (
             <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : needsReauth ? (
+            <AlertTriangle className="size-5 shrink-0 text-amber-500" />
           ) : (
             <Circle className="text-muted-foreground size-5 shrink-0" />
           )}
@@ -141,7 +146,9 @@ function OAuthCredentialRow({
             <p className="text-muted-foreground text-xs">
               {isConnected
                 ? `Connected ${new Date(connection.connected_at).toLocaleDateString()}`
-                : "Connect via OAuth for automatic token management"}
+                : needsReauth
+                  ? "Connection expired or was revoked \u2014 re-authorize to restore access"
+                  : "Connect via OAuth for automatic token management"}
             </p>
           </div>
         </div>
@@ -170,6 +177,13 @@ function OAuthCredentialRow({
           )}
         </div>
       </div>
+      {scopes.length > 0 && !isConnected && (
+        <div className="mt-2 pl-8">
+          <p className="text-muted-foreground text-[11px]">
+            Permissions requested: {scopes.join(", ")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

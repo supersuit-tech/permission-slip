@@ -25,8 +25,13 @@ import {
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
+  kroger: "Kroger",
+  linkedin: "LinkedIn",
+  meta: "Meta",
   microsoft: "Microsoft",
+  salesforce: "Salesforce",
   slack: "Slack",
+  zoom: "Zoom",
 };
 
 function providerLabel(id: string): string {
@@ -67,13 +72,20 @@ export function ConnectedAccountsSection() {
         );
         refetch();
       } else {
-        toast.error(
-          `Failed to connect ${oauthProvider ? providerLabel(oauthProvider) : "account"}. Please try again.`,
-        );
+        const oauthError = searchParams.get("oauth_error");
+        const label = oauthProvider
+          ? providerLabel(oauthProvider)
+          : "account";
+        const detail = oauthError
+          ? `Failed to connect ${label}: ${oauthError}`
+          : `Failed to connect ${label}. Please try again.`;
+        toast.error(detail);
       }
       // Remove query params without a full navigation
       searchParams.delete("oauth_status");
       searchParams.delete("oauth_provider");
+      searchParams.delete("oauth_error");
+      searchParams.delete("oauth_tab");
       setSearchParams(searchParams, { replace: true });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
