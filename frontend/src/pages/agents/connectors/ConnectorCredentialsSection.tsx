@@ -172,12 +172,14 @@ function OAuthCredentialRow({
                 {providerLabel(providerId)}
               </p>
               <p className="text-muted-foreground text-xs">
-                OAuth
+                OAuth <span className="text-muted-foreground/70">(recommended)</span>
                 {isOAuthConnected && (
                   <>
                     {" · "}
                     {connection.scopes.length} scope
                     {connection.scopes.length !== 1 ? "s" : ""} granted
+                    {" · Connected "}
+                    {new Date(connection.connected_at).toLocaleDateString()}
                   </>
                 )}
               </p>
@@ -225,9 +227,22 @@ function OAuthCredentialRow({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Key className="text-muted-foreground size-4" />
-              <p className="text-muted-foreground text-xs">
-                Or use a personal access token
-              </p>
+              <div>
+                <p className="text-muted-foreground text-xs">
+                  Or use a personal access token
+                </p>
+                {requiredCredential.instructions_url && (
+                  <a
+                    href={requiredCredential.instructions_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground mt-0.5 inline-flex items-center gap-1 text-xs"
+                  >
+                    <ExternalLink className="size-3" />
+                    How to get a token
+                  </a>
+                )}
+              </div>
             </div>
             <Button
               variant="ghost"
@@ -271,7 +286,6 @@ function OAuthCredentialRow({
         </div>
       </div>
 
-      {/* PAT dialog uses "custom" auth_type so AddCredentialDialog renders the key input */}
       <AddCredentialDialog
         open={showPATForm}
         onOpenChange={setShowPATForm}
@@ -279,6 +293,10 @@ function OAuthCredentialRow({
           service: requiredCredential.service,
           auth_type: "custom",
         }}
+        title="Add Personal Access Token"
+        credentialKey="personal_access_token"
+        fieldLabel="Personal Access Token"
+        fieldPlaceholder="Paste your personal access token"
       />
 
       {removeTarget && (

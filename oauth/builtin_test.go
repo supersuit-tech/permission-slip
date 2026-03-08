@@ -36,6 +36,25 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("figma", func(t *testing.T) {
+		f, ok := byID["figma"]
+		if !ok {
+			t.Fatal("figma provider not found")
+		}
+		if f.AuthorizeURL != "https://www.figma.com/oauth" {
+			t.Errorf("AuthorizeURL = %q", f.AuthorizeURL)
+		}
+		if f.TokenURL != "https://api.figma.com/v1/oauth/token" {
+			t.Errorf("TokenURL = %q", f.TokenURL)
+		}
+		if f.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", f.Source, SourceBuiltIn)
+		}
+		if len(f.Scopes) != 2 {
+			t.Errorf("expected 2 scopes, got %d: %v", len(f.Scopes), f.Scopes)
+		}
+	})
+
 	t.Run("kroger", func(t *testing.T) {
 		k, ok := byID["kroger"]
 		if !ok {
@@ -83,6 +102,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 		t.Fatalf("expected at least 2 providers, got %d", len(ids))
 	}
 
+	if _, ok := r.Get("figma"); !ok {
+		t.Error("figma not found in registry")
+	}
 	if _, ok := r.Get("google"); !ok {
 		t.Error("google not found in registry")
 	}
