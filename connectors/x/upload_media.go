@@ -1,8 +1,10 @@
 package x
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -153,7 +155,7 @@ func (c *XConnector) doUpload(ctx context.Context, creds connectors.Credentials,
 		return fmt.Errorf("marshaling upload body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, strings.NewReader(string(payload)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("creating upload request: %w", err)
 	}
@@ -162,6 +164,12 @@ func (c *XConnector) doUpload(ctx context.Context, creds connectors.Credentials,
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		if connectors.IsTimeout(err) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("upload request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "upload request canceled"}
+		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("upload request failed: %v", err)}
 	}
 	defer resp.Body.Close()
