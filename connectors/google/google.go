@@ -1,6 +1,10 @@
 // Package google implements the Google connector for the Permission Slip
 // connector execution layer. It uses Google REST APIs (Gmail, Calendar, Slides, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
+//
+// The connector exposes 27 actions covering email (send, reply, list), calendar (create,
+// list, update, delete, meetings), Slides, Sheets, Docs, Chat, and Drive (list, get,
+// upload, delete, search, create folder).
 package google
 
 import (

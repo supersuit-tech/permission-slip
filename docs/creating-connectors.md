@@ -1050,11 +1050,15 @@ connectors/
 │   └── *_test.go             # Per-action + connector + response tests
 ├── google/
 │   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
-│   ├── manifest.go           # Manifest() with 22 action schemas and 31+ templates
+│   ├── manifest.go           # Manifest() with 27 action schemas and 39+ templates
+│   ├── email_helpers.go      # buildGmailRaw() shared RFC 2822 builder (send_email + send_email_reply)
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
+│   ├── send_email_reply.go   # google.send_email_reply action (header fetch, injection strip, thread reply)
 │   ├── create_calendar_event.go  # google.create_calendar_event action
 │   ├── list_calendar_events.go   # google.list_calendar_events action
+│   ├── update_calendar_event.go  # google.update_calendar_event action (PATCH via map[string]any)
+│   ├── delete_calendar_event.go  # google.delete_calendar_event action
 │   ├── create_presentation.go    # google.create_presentation action (Slides API)
 │   ├── get_presentation.go       # google.get_presentation action (Slides API)
 │   ├── add_slide.go              # google.add_slide action (batchUpdate)
@@ -1068,6 +1072,8 @@ connectors/
 │   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
 │   ├── create_meeting.go     # google.create_meeting action (Calendar + Meet link)
 │   ├── calendar_helpers.go   # Shared calendar validation (time range, attendees)
+│   ├── search_drive.go       # google.search_drive action (name/fullText/type/folder, query escaping)
+│   ├── create_drive_folder.go # google.create_drive_folder action
 │   ├── README.md             # Connector documentation
 │   └── ...tests...
 ├── slack/
