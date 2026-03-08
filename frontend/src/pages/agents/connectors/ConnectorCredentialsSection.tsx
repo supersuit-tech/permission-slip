@@ -1,51 +1,19 @@
-import { useState } from "react";
-import {
-  CheckCircle2,
-  Circle,
-  ExternalLink,
-  Loader2,
-  LogIn,
-  Plus,
-  Trash2,
-  Unplug,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
-import type { OAuthConnection } from "@/hooks/useOAuthConnections";
-import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
-import { InlineConfirmButton } from "@/components/InlineConfirmButton";
-import { providerLabel, serviceDisplayName } from "@/lib/providerLabels";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
-import { AddCredentialDialog } from "./AddCredentialDialog";
-import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
+import { OAuthCredentialRow } from "./OAuthCredentialRow";
+import { CredentialRow } from "./CredentialRow";
 
 interface ConnectorCredentialsSectionProps {
   requiredCredentials: RequiredCredential[];
-}
-
-function authTypeLabel(authType: string): string {
-  switch (authType) {
-    case "api_key":
-      return "API Key";
-    case "basic":
-      return "Username & Password";
-    case "oauth2":
-      return "OAuth";
-    case "custom":
-      return "Custom";
-    default:
-      return authType;
-  }
 }
 
 export function ConnectorCredentialsSection({
@@ -75,6 +43,11 @@ export function ConnectorCredentialsSection({
 
   const loading = isLoading || (hasOAuth && oauthLoading);
 
+  const hasMixedAuth =
+    requiredCredentials.length > 1 &&
+    requiredCredentials.some((c) => c.auth_type === "oauth2") &&
+    requiredCredentials.some((c) => c.auth_type !== "oauth2");
+
   return (
     <Card>
       <CardHeader>
@@ -97,10 +70,6 @@ export function ConnectorCredentialsSection({
         ) : (
           <div className="space-y-3">
             {requiredCredentials.map((cred, index) => {
-              const hasMixedAuth =
-                requiredCredentials.length > 1 &&
-                requiredCredentials.some((c) => c.auth_type === "oauth2") &&
-                requiredCredentials.some((c) => c.auth_type !== "oauth2");
               const showDivider = hasMixedAuth && index > 0;
               return (
                 <div key={cred.service}>
@@ -136,229 +105,5 @@ export function ConnectorCredentialsSection({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function OAuthCredentialRow({
-  requiredCredential,
-  connection,
-  recommended,
-}: {
-  requiredCredential: RequiredCredential;
-  connection?: OAuthConnection;
-  recommended?: boolean;
-}) {
-  const { session } = useAuth();
-  const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
-  const isConnected = !!connection && connection.status === "active";
-  const needsReauth = connection?.status === "needs_reauth";
-
-  function handleConnect() {
-    if (!session?.access_token || !requiredCredential.oauth_provider) return;
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${requiredCredential.oauth_provider}/authorize`;
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
-  }
-
-  async function handleDisconnect() {
-    if (!requiredCredential.oauth_provider) return;
-    await disconnect(requiredCredential.oauth_provider);
-  }
-
-  const label = providerLabel(requiredCredential.oauth_provider ?? requiredCredential.service);
-
-  return (
-    <div className="rounded-lg border p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {isConnected ? (
-            <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
-          ) : needsReauth ? (
-            <Circle className="size-5 shrink-0 text-yellow-500" />
-          ) : (
-            <Circle className="text-muted-foreground size-5 shrink-0" />
-          )}
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">{label}</p>
-              <Badge variant="secondary" className="text-xs">
-                {authTypeLabel(requiredCredential.auth_type)}
-              </Badge>
-              {recommended && (
-                <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">
-                  Recommended
-                </Badge>
-              )}
-            </div>
-            {isConnected && connection && (
-              <p className="text-muted-foreground text-xs">
-                {connection.scopes.length} scope
-                {connection.scopes.length !== 1 ? "s" : ""} granted &middot;
-                Connected{" "}
-                {new Date(connection.connected_at).toLocaleDateString()}
-              </p>
-            )}
-            {needsReauth && (
-              <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                Connection expired — please re-authorize
-              </p>
-            )}
-            {!isConnected && !needsReauth && (
-              <p className="text-muted-foreground text-xs">
-                Connect your {label} account to enable this connector
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isConnected ? (
-            <>
-              <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                Connected
-              </span>
-              <InlineConfirmButton
-                confirmLabel="Disconnect"
-                isProcessing={isDisconnecting}
-                onConfirm={handleDisconnect}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Disconnect ${label}`}
-                >
-                  <Unplug className="text-muted-foreground size-4" />
-                </Button>
-              </InlineConfirmButton>
-            </>
-          ) : (
-            <>
-              <span className="text-muted-foreground text-xs font-medium">
-                {needsReauth ? "Needs re-auth" : "Not configured"}
-              </span>
-              <Button variant="outline" size="sm" onClick={handleConnect}>
-                <LogIn className="size-3" />
-                {needsReauth ? "Re-authorize" : `Connect ${label}`}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CredentialRow({
-  requiredCredential,
-  storedCredentials,
-}: {
-  requiredCredential: RequiredCredential;
-  storedCredentials: CredentialSummary[];
-}) {
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(
-    null,
-  );
-
-  const isConnected = storedCredentials.length > 0;
-
-  return (
-    <>
-      <div className="rounded-lg border p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {isConnected ? (
-              <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
-            ) : (
-              <Circle className="text-muted-foreground size-5 shrink-0" />
-            )}
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{serviceDisplayName(requiredCredential.service)}</p>
-                <Badge variant="outline" className="text-xs">
-                  {authTypeLabel(requiredCredential.auth_type)}
-                </Badge>
-              </div>
-              {requiredCredential.instructions_url && (
-                <a
-                  href={requiredCredential.instructions_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-foreground mt-0.5 inline-flex items-center gap-1 text-xs"
-                >
-                  <ExternalLink className="size-3" />
-                  How to get this credential
-                </a>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-xs font-medium ${
-                isConnected
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {isConnected ? "Connected" : "Not configured"}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAddDialogOpen(true)}
-            >
-              <Plus className="size-3" />
-              {isConnected ? "Add Another" : "Connect"}
-            </Button>
-          </div>
-        </div>
-
-        {storedCredentials.length > 0 && (
-          <div className="mt-3 space-y-2 border-t pt-3">
-            {storedCredentials.map((cred) => (
-              <div
-                key={cred.id}
-                className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm">
-                    {cred.label ?? cred.service}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    Added{" "}
-                    {new Date(cred.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setRemoveTarget(cred)}
-                  aria-label={`Remove credential ${cred.label ?? cred.service}`}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <AddCredentialDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        credential={requiredCredential}
-      />
-
-      {removeTarget && (
-        <RemoveCredentialDialog
-          open={!!removeTarget}
-          onOpenChange={(open) => {
-            if (!open) setRemoveTarget(null);
-          }}
-          credential={removeTarget}
-        />
-      )}
-    </>
   );
 }

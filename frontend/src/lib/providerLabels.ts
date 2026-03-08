@@ -1,3 +1,19 @@
+/** User-friendly labels for auth types. */
+export function authTypeLabel(authType: string): string {
+  switch (authType) {
+    case "api_key":
+      return "API Key";
+    case "basic":
+      return "Username & Password";
+    case "oauth2":
+      return "OAuth";
+    case "custom":
+      return "Custom";
+    default:
+      return authType;
+  }
+}
+
 /** Canonical display names for OAuth provider IDs. */
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
