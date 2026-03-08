@@ -7,7 +7,6 @@ import "net/http"
 // (e.g., feature flags for upcoming features).
 type configResponse struct {
 	BillingEnabled       bool `json:"billing_enabled"`
-	StripeTestMode       bool `json:"stripe_test_mode"`
 	GoogleOAuthConfigured    bool `json:"google_oauth_configured"`
 	MicrosoftOAuthConfigured bool `json:"microsoft_oauth_configured"`
 }
@@ -33,7 +32,6 @@ func handleGetConfig(deps *Deps) http.HandlerFunc {
 		}
 		RespondJSON(w, http.StatusOK, configResponse{
 			BillingEnabled:           deps.BillingEnabled,
-			StripeTestMode:           deps.StripeTestMode,
 			GoogleOAuthConfigured:    googleConfigured,
 			MicrosoftOAuthConfigured: microsoftConfigured,
 		})

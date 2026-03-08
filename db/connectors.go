@@ -135,10 +135,10 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 	return &cd, credRows.Err()
 }
 
-// GetRequiredServicesByActionType returns the list of non-OAuth credential
-// services required by the connector that owns the given action type.
-// OAuth services are excluded because they are resolved through the OAuth
-// connection flow, not through static credential storage.
+// GetRequiredServicesByActionType returns the list of static credential services
+// (non-OAuth2) required by the connector that owns the given action type.
+// OAuth2 services are excluded because they are resolved through the OAuth
+// connection path, not through static credential storage.
 // Returns an empty slice if the action type has no required credentials.
 // Returns nil, nil if the action type is not found in the database.
 func GetRequiredServicesByActionType(ctx context.Context, db DBTX, actionType string) ([]string, error) {

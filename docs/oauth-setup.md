@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), Notion, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Microsoft, Meta (Facebook/Instagram), Notion, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -10,6 +10,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 2. **BYOA (Bring Your Own App)**: Users provide their own OAuth client credentials through the Settings UI. Required for self-hosted deployments or custom providers.
 
 ## Environment Variables
+
+### GitHub OAuth
+
+| Variable | Description |
+|---|---|
+| `GITHUB_CLIENT_ID` | OAuth App Client ID from GitHub Developer Settings |
+| `GITHUB_CLIENT_SECRET` | OAuth App Client Secret from GitHub Developer Settings |
 
 ### Google OAuth
 
@@ -39,6 +46,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
 | `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
 
+### Stripe OAuth
+
+| Variable | Description |
+|---|---|
+| `STRIPE_CLIENT_ID` | OAuth client ID from Stripe Connect settings (starts with `ca_`) |
+| `STRIPE_CLIENT_SECRET` | Stripe secret key used as the client secret for the OAuth token exchange |
+
 ### OAuth Infrastructure
 
 | Variable | Description | Default |
@@ -46,6 +60,33 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `OAUTH_REDIRECT_BASE_URL` | Base URL for OAuth callbacks (e.g., `https://app.example.com/api`) | Falls back to `BASE_URL` |
 | `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens | Falls back to `SUPABASE_JWT_SECRET` |
 | `OAUTH_REFRESH_INTERVAL` | Interval for background token refresh job | `10m` |
+
+## GitHub OAuth Setup
+
+### 1. Create a GitHub OAuth App
+
+1. Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Fill in the required fields:
+   - Application name: Your deployment name (e.g., "Permission Slip")
+   - Homepage URL: Your deployment URL
+   - Authorization callback URL:
+     ```
+     https://your-domain.com/api/v1/oauth/github/callback
+     ```
+
+### 2. Configure Environment
+
+```bash
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+```
+
+### Scopes
+
+The GitHub connector requests the `repo` scope, which provides full access to private and public repositories. This enables all GitHub connector actions (create issues, merge PRs, create releases, manage branches, etc.).
+
+> **Note:** The GitHub connector supports both OAuth and Personal Access Tokens (PATs). OAuth is recommended for end users; PATs can be used as an alternative by configuring a `github_pat` credential with an `api_key` auth type.
 
 ## Google OAuth Setup
 
@@ -208,6 +249,47 @@ If you don't need OAuth, you can use an internal integration token instead:
 
 The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
 
+## Stripe OAuth Setup
+
+Stripe uses [Stripe Connect](https://docs.stripe.com/connect) OAuth to authorize access to Stripe accounts. This lets users connect their Stripe account without manually creating and pasting API keys.
+
+### 1. Enable Stripe Connect
+
+1. Go to [Stripe Dashboard > Settings > Connect](https://dashboard.stripe.com/settings/connect)
+2. Enable Stripe Connect for your platform
+3. Note your **Client ID** (starts with `ca_`) from the Connect settings page
+
+### 2. Configure Redirect URI
+
+1. In the Connect settings, add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/stripe/callback
+   ```
+2. For development, add `http://localhost:PORT/api/v1/oauth/stripe/callback`
+
+### 3. Configure Environment
+
+```bash
+STRIPE_CLIENT_ID=ca_your-connect-client-id
+STRIPE_CLIENT_SECRET=sk_live_your-secret-key
+```
+
+The `STRIPE_CLIENT_SECRET` is your platform's Stripe secret key — Stripe uses it as the client secret during the OAuth token exchange.
+
+### 4. Scopes
+
+The Stripe connector requests the `read_write` scope, which provides full API access to the connected account. Stripe Connect does not support more granular OAuth scopes.
+
+### 5. How It Works
+
+When a user connects their Stripe account:
+1. They are redirected to `connect.stripe.com/oauth/authorize`
+2. After authorizing, Stripe redirects back with an authorization code
+3. The platform exchanges the code for the connected account's secret key
+4. This key (stored as `access_token`) works like a regular Stripe API key but is scoped to the connected account
+
+The Stripe connector also supports manual API key entry as a fallback for users who prefer not to use OAuth.
+
 ## X (Twitter) OAuth Setup
 
 The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
@@ -296,10 +378,12 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 ### Redirect URI mismatch
 
 Ensure the redirect URI in your OAuth app matches exactly:
+- GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
 - Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
+- Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.

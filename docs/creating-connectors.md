@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"github"`, `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`github`, `google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 ```go
 // Example: OAuth2 credential in a manifest
@@ -376,7 +376,7 @@ The connector's `ValidateCredentials` and action code should accept either crede
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google`, `kroger`, `microsoft`, `notion`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `github`, `google`, `kroger`, `microsoft`, `notion`, `stripe`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{

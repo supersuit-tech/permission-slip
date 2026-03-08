@@ -14,15 +14,39 @@ import { ConnectorCredentialsSection } from "../ConnectorCredentialsSection";
 vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
-const requiredCredentials = [
-  { service: "github", auth_type: "api_key" as const },
+const apiKeyCredentials = [
+  { service: "github_pat", auth_type: "api_key" as const },
+];
+
+const oauthCredentials = [
+  {
+    service: "github",
+    auth_type: "oauth2" as const,
+    oauth_provider: "github",
+    oauth_scopes: ["repo"],
+  },
+];
+
+const mixedCredentials = [
+  {
+    service: "github",
+    auth_type: "oauth2" as const,
+    oauth_provider: "github",
+    oauth_scopes: ["repo"],
+  },
+  {
+    service: "github_pat",
+    auth_type: "api_key" as const,
+    instructions_url:
+      "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+  },
 ];
 
 const storedCredentials = {
   credentials: [
     {
       id: "cred_123",
-      service: "github",
+      service: "github_pat",
       label: "Personal Access Token",
       created_at: "2026-02-11T10:00:00Z",
     },
@@ -65,7 +89,7 @@ describe("ConnectorCredentialsSection", () => {
     mockGet.mockReturnValue(new Promise(() => {}));
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
     expect(screen.getByText("Credentials")).toBeInTheDocument();
@@ -78,7 +102,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -94,7 +118,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -110,7 +134,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -130,14 +154,14 @@ describe("ConnectorCredentialsSection", () => {
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
-        service: "github",
+        service: "github_pat",
         created_at: "2026-02-20T10:00:00Z",
       },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -153,7 +177,7 @@ describe("ConnectorCredentialsSection", () => {
       expect(mockPost).toHaveBeenCalledWith("/v1/credentials", {
         headers: { Authorization: "Bearer token" },
         body: {
-          service: "github",
+          service: "github_pat",
           credentials: { api_key: "ghp_test_key" },
         },
       });
@@ -168,7 +192,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -197,7 +221,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -243,90 +267,40 @@ describe("ConnectorCredentialsSection", () => {
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
   });
 
-  it("renders OAuth connect button for oauth2 auth type", async () => {
-    setupMockGet();
+  it("shows OAuth connect button for oauth2 credential", async () => {
+    // Mock both endpoints: OAuth connections (no connections) and credentials
+    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={[
-          {
-            service: "notion_oauth",
-            auth_type: "oauth2" as const,
-            oauth_provider: "notion",
-          },
-        ]}
+        requiredCredentials={oauthCredentials}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Notion (OAuth)")).toBeInTheDocument();
+      expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
     });
-    expect(screen.getByText("Connect Notion")).toBeInTheDocument();
-    expect(screen.getByText("Not connected")).toBeInTheDocument();
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
   });
 
-  it("shows connected status for active OAuth connection", async () => {
-    setupMockGet({
-      "/v1/oauth/connections": {
-        data: {
-          connections: [
-            {
-              provider: "notion",
-              status: "active",
-              scopes: [],
-              connected_at: "2026-03-01T10:00:00Z",
-            },
-          ],
-        },
-      },
-    });
+  it("shows both OAuth and API key options for mixed credentials", async () => {
+    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={[
-          {
-            service: "notion_oauth",
-            auth_type: "oauth2" as const,
-            oauth_provider: "notion",
-          },
-        ]}
+        requiredCredentials={mixedCredentials}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Connected")).toBeInTheDocument();
+      expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
     });
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("Alternative")).toBeInTheDocument();
+    // Service name should be human-readable, not raw ID
     expect(
-      screen.getByText("Connected via OAuth — tokens refresh automatically"),
+      screen.getByText("GitHub Personal Access Token"),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Connect Notion")).not.toBeInTheDocument();
-  });
-
-  it("renders both OAuth and API key for dual-auth connectors", async () => {
-    setupMockGet();
-
-    renderWithProviders(
-      <ConnectorCredentialsSection
-        requiredCredentials={[
-          {
-            service: "notion_oauth",
-            auth_type: "oauth2" as const,
-            oauth_provider: "notion",
-          },
-          {
-            service: "notion",
-            auth_type: "api_key" as const,
-            instructions_url:
-              "https://developers.notion.com/docs/create-a-notion-integration",
-          },
-        ]}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Notion (OAuth)")).toBeInTheDocument();
-    });
-    expect(screen.getByText("API Key (alternative)")).toBeInTheDocument();
-    expect(screen.getByText("Connect Notion")).toBeInTheDocument();
   });
 });

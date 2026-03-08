@@ -9,11 +9,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
-import { buildOAuthAuthorizeUrl } from "@/lib/oauth";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,17 +23,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  intercom: "Intercom",
-  microsoft: "Microsoft",
-  notion: "Notion",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
 
 function statusBadge(status: string) {
   switch (status) {
@@ -93,7 +82,8 @@ export function ConnectedAccountsSection() {
 
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
-    window.location.href = buildOAuthAuthorizeUrl(providerId, session.access_token);
+    // Open in same window — the callback redirects back to settings
+    window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
   }
 
   // Providers that are ready to connect but don't have an active connection

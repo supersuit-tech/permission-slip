@@ -159,8 +159,10 @@ BASE_URL=http://localhost:8080           # or your ngrok URL if using ngrok
 For the frontend, set in your shell or `.env`:
 
 ```bash
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...
 ```
+
+The frontend automatically uses `VITE_STRIPE_PUBLISHABLE_KEY_TEST` in development mode (`MODE=development`) and `VITE_STRIPE_PUBLISHABLE_KEY` in production builds.
 
 > **Note:** In development mode (`MODE=development`), the server relaxes Stripe config validation — it warns instead of refusing to start if keys are missing.
 

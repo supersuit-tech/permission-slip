@@ -447,6 +447,12 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "stripe_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "stripe",
+				OAuthScopes:   []string{"read_write"},
+			},
+			{
 				Service:         "stripe",
 				AuthType:        "api_key",
 				InstructionsURL: "https://docs.stripe.com/keys",
