@@ -359,9 +359,184 @@ Adds an emoji reaction to a Slack message.
 
 ---
 
+### `slack.send_dm`
+
+Sends a direct message to a Slack user. Opens (or reuses) a DM channel with the user, then posts the message.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `user_id` | string | Yes | Slack user ID (e.g., `U01234567`) — must start with `U` or `W` |
+| `message` | string | Yes | Message text (supports Slack mrkdwn formatting) |
+
+**Response:**
+
+```json
+{
+  "ts": "1234567890.123456",
+  "channel": "D09876543"
+}
+```
+
+**Slack API:** `POST /conversations.open` + `POST /chat.postMessage` ([docs](https://api.slack.com/methods/conversations.open))
+
+**Required bot token scopes:** `im:write`, `chat:write`
+
+---
+
+### `slack.update_message`
+
+Edits an existing message in a Slack channel. Bots can only edit their own messages.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `channel` | string | Yes | Channel ID (e.g., `C01234567`) |
+| `ts` | string | Yes | Timestamp of the message to update (e.g., `1234567890.123456`) |
+| `message` | string | Yes | New message text (supports Slack mrkdwn formatting) |
+
+**Response:**
+
+```json
+{
+  "ts": "1234567890.123456",
+  "channel": "C01234567"
+}
+```
+
+**Slack API:** `POST /chat.update` ([docs](https://api.slack.com/methods/chat.update))
+
+**Required bot token scopes:** `chat:write`
+
+---
+
+### `slack.delete_message`
+
+Deletes a message from a Slack channel. Bots can only delete their own messages.
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `channel` | string | Yes | Channel ID (e.g., `C01234567`) |
+| `ts` | string | Yes | Timestamp of the message to delete (e.g., `1234567890.123456`) |
+
+**Response:**
+
+```json
+{
+  "ts": "1234567890.123456",
+  "channel": "C01234567"
+}
+```
+
+**Slack API:** `POST /chat.delete` ([docs](https://api.slack.com/methods/chat.delete))
+
+**Required bot token scopes:** `chat:write`
+
+---
+
+### `slack.list_users`
+
+Lists workspace users visible to the bot, with cursor-based pagination.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `limit` | integer | No | `100` | Max users to return (1–1000) |
+| `cursor` | string | No | — | Pagination cursor from a previous response |
+
+**Response:**
+
+```json
+{
+  "users": [
+    {
+      "id": "U001",
+      "name": "jdoe",
+      "real_name": "John Doe",
+      "display_name": "John",
+      "email": "john@example.com",
+      "is_bot": false,
+      "is_admin": false
+    }
+  ],
+  "next_cursor": "dGVhbTpDMDI="
+}
+```
+
+**Slack API:** `POST /users.list` ([docs](https://api.slack.com/methods/users.list))
+
+**Required bot token scopes:** `users:read`
+
+---
+
+### `slack.search_messages`
+
+Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the `search:read` scope — bot tokens (`xoxb-`) do not support this endpoint.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `query` | string | Yes | — | Search query (supports Slack modifiers like `in:#channel`, `from:@user`) |
+| `count` | integer | No | `20` | Max results per page (1–100) |
+| `page` | integer | No | `1` | Page number for pagination (1-indexed) |
+| `sort` | string | No | `score` | Sort order: `score` (relevance) or `timestamp` |
+
+**Response:**
+
+```json
+{
+  "matches": [
+    {
+      "channel_id": "C001",
+      "channel_name": "engineering",
+      "user": "U001",
+      "username": "jdoe",
+      "text": "Deploying v2.0 now",
+      "ts": "1234567890.123456",
+      "permalink": "https://team.slack.com/archives/C001/p1234567890123456"
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "pages": 3
+}
+```
+
+**Slack API:** `POST /search.messages` ([docs](https://api.slack.com/methods/search.messages))
+
+**Required scopes:** `search:read` (user token only)
+
+> **Note:** This action will return a `missing_scope` error when invoked with a bot token. To use it, the OAuth flow must persist the user's access token (the `authed_user.access_token` field from Slack's OAuth v2 response).
+
+---
+
 ### Channel ID Validation
 
 The `channel` parameter on `read_channel_messages` and `read_thread` must be a Slack channel ID — not a channel name. Valid IDs start with `C` (public channels), `G` (private channels / group DMs), or `D` (direct messages). Passing a name like `#general` or `general` returns a `ValidationError` with a helpful hint before hitting the Slack API.
+
+### User ID Validation
+
+The `user_id` parameter on `send_dm` must be a Slack user ID starting with `U` or `W`. Passing a username or email returns a `ValidationError` with a helpful hint.
+
+### Message Timestamp Validation
+
+The `ts` / `timestamp` parameters on `update_message`, `delete_message`, and `add_reaction` must be a valid Slack timestamp in `<seconds>.<microseconds>` format (e.g., `1234567890.123456`). Non-numeric values or missing dot separators are rejected with a `ValidationError`.
 
 ### Pagination Limits
 
@@ -377,6 +552,7 @@ The Slack API returns HTTP 200 for most errors, with success/failure indicated b
 | `missing_scope` | `AuthError` (with link to Slack app settings) | 502 Bad Gateway |
 | `ratelimited` (or HTTP 429) | `RateLimitError` | 429 Too Many Requests |
 | `channel_not_found`, `not_in_channel`, `is_archived` | `ExternalError` (user-friendly message) | 502 Bad Gateway |
+| `message_not_found`, `cant_update_message`, `cant_delete_message`, `edit_window_closed` | `ExternalError` (user-friendly message) | 502 Bad Gateway |
 | `already_reacted`, `already_in_channel`, `user_not_found`, etc. | `ExternalError` (user-friendly message) | 502 Bad Gateway |
 | All other Slack errors | `ExternalError` | 502 Bad Gateway |
 | Client timeout / context deadline / cancellation | `TimeoutError` | 504 Gateway Timeout |
@@ -456,18 +632,14 @@ connectors/slack/
 ├── invite_to_channel.go            # slack.invite_to_channel action
 ├── upload_file.go                  # slack.upload_file action (v2 upload flow)
 ├── add_reaction.go                 # slack.add_reaction action
-├── slack_test.go                   # Connector-level tests
+├── send_dm.go                      # slack.send_dm action (conversations.open + chat.postMessage)
+├── update_message.go               # slack.update_message action
+├── delete_message.go               # slack.delete_message action
+├── list_users.go                   # slack.list_users action
+├── search_messages.go              # slack.search_messages action (requires user token)
+├── slack_test.go                   # Connector-level tests + validator tests
 ├── helpers_test.go                 # Shared test helpers (validCreds)
-├── send_message_test.go            # Send message action tests
-├── create_channel_test.go          # Create channel action tests
-├── list_channels_test.go           # List channels action tests
-├── read_channel_messages_test.go   # Read channel messages action tests
-├── read_thread_test.go             # Read thread action tests
-├── schedule_message_test.go        # Schedule message action tests
-├── set_topic_test.go               # Set topic action tests
-├── invite_to_channel_test.go       # Invite to channel action tests
-├── upload_file_test.go             # Upload file action tests
-├── add_reaction_test.go            # Add reaction action tests
+├── *_test.go                       # Per-action test files (one per action)
 └── README.md                       # This file
 ```
 
