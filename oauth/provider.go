@@ -54,6 +54,11 @@ type Provider struct {
 	// rules as ClientID.
 	ClientSecret string
 
+	// ScopeSeparator overrides the default space-separated scope encoding
+	// used in the authorization URL. Some providers (e.g. Slack) require
+	// comma-separated scopes. When empty, the standard space separator is used.
+	ScopeSeparator string
+
 	// Source indicates where the provider configuration originated.
 	Source ProviderSource
 }

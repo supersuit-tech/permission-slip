@@ -56,11 +56,15 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 			// non-OAuth static credentials. This supports connectors with
 			// dual auth such as Slack (OAuth + bot token).
 			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) {
+			if errors.As(err, &oauthErr) && oauthErr.NotConnected {
+				// Only fall back to static credentials when the user has no
+				// OAuth connection at all. Refresh failures (expired/revoked
+				// tokens) should surface to the user so they re-authorize,
+				// not silently degrade to a different credential.
 				fallbackCreds, fbErr := resolveNonOAuthCredentials(ctx, deps, userID, actionType)
 				if fbErr == nil {
-					log.Printf("[%s] OAuth credentials unavailable for %s (provider %s: %s), falling back to static credentials",
-						actionType, userID, oauthErr.Provider, oauthErr.Message)
+					log.Printf("[%s] OAuth not connected for %s (provider %s), falling back to static credentials",
+						actionType, userID, oauthErr.Provider)
 					creds = fallbackCreds
 					err = nil
 				}
@@ -328,8 +332,9 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	}
 	if conn == nil {
 		return zero, &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Message:  fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			Provider:     providerID,
+			Message:      fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			NotConnected: true,
 		}
 	}
 

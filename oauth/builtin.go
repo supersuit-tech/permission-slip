@@ -108,13 +108,14 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
-			ID:           "slack",
-			AuthorizeURL: "https://slack.com/oauth/v2/authorize",
-			TokenURL:     "https://slack.com/api/oauth.v2.access",
-			Scopes:       slackconnector.OAuthScopes,
-			ClientID:     os.Getenv("SLACK_CLIENT_ID"),
-			ClientSecret: os.Getenv("SLACK_CLIENT_SECRET"),
-			Source:       SourceBuiltIn,
+			ID:             "slack",
+			AuthorizeURL:   "https://slack.com/oauth/v2/authorize",
+			TokenURL:       "https://slack.com/api/oauth.v2.access",
+			Scopes:         slackconnector.OAuthScopes,
+			ScopeSeparator: ",",
+			ClientID:       os.Getenv("SLACK_CLIENT_ID"),
+			ClientSecret:   os.Getenv("SLACK_CLIENT_SECRET"),
+			Source:         SourceBuiltIn,
 		},
 	}
 }

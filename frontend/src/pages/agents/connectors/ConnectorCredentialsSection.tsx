@@ -40,7 +40,11 @@ export function ConnectorCredentialsSection({
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasStaticCredentials,
   });
-  const { connections, isLoading: oauthLoading } = useOAuthConnections();
+  const {
+    connections,
+    isLoading: oauthLoading,
+    error: oauthError,
+  } = useOAuthConnections();
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -68,8 +72,8 @@ export function ConnectorCredentialsSection({
               aria-hidden="true"
             />
           </div>
-        ) : error ? (
-          <p className="text-destructive text-sm">{error}</p>
+        ) : error || oauthError ? (
+          <p className="text-destructive text-sm">{error ?? oauthError}</p>
         ) : (
           <div className="space-y-3">
             {requiredCredentials.map((cred) =>

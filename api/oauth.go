@@ -26,6 +26,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -272,7 +273,14 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		authURL := cfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
+		// Build the authorization URL. Some providers (e.g. Slack) require
+		// comma-separated scopes instead of the standard space-separated format.
+		// When a custom separator is configured, override the scope parameter.
+		opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+		if provider.ScopeSeparator != "" {
+			opts = append(opts, oauth2.SetAuthURLParam("scope", strings.Join(cfg.Scopes, provider.ScopeSeparator)))
+		}
+		authURL := cfg.AuthCodeURL(state, opts...)
 		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 	}
 }
