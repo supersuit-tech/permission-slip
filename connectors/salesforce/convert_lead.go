@@ -16,13 +16,13 @@ type convertLeadAction struct {
 }
 
 type convertLeadParams struct {
-	LeadID              string `json:"lead_id"`
-	ConvertedStatus     string `json:"converted_status"`
-	AccountID           string `json:"account_id,omitempty"`
-	ContactID           string `json:"contact_id,omitempty"`
-	OpportunityName     string `json:"opportunity_name,omitempty"`
-	DoNotCreateOpportunity bool `json:"do_not_create_opportunity,omitempty"`
-	OwnerID             string `json:"owner_id,omitempty"`
+	LeadID                 string `json:"lead_id"`
+	ConvertedStatus        string `json:"converted_status"`
+	AccountID              string `json:"account_id,omitempty"`
+	ContactID              string `json:"contact_id,omitempty"`
+	OpportunityName        string `json:"opportunity_name,omitempty"`
+	DoNotCreateOpportunity bool   `json:"do_not_create_opportunity,omitempty"`
+	OwnerID                string `json:"owner_id,omitempty"`
 }
 
 func (p *convertLeadParams) validate() error {
@@ -66,11 +66,11 @@ type sfConvertLeadRequest struct {
 
 // sfConvertLeadResponse is the response body from the Salesforce Lead convert endpoint.
 type sfConvertLeadResponse struct {
-	AccountID      string `json:"accountId"`
-	ContactID      string `json:"contactId"`
-	LeadID         string `json:"leadId"`
-	OpportunityID  string `json:"opportunityId"`
-	Success        bool   `json:"success"`
+	AccountID     string `json:"accountId"`
+	ContactID     string `json:"contactId"`
+	LeadID        string `json:"leadId"`
+	OpportunityID string `json:"opportunityId"`
+	Success       bool   `json:"success"`
 }
 
 func (a *convertLeadAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

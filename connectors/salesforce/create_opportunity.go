@@ -15,12 +15,12 @@ type createOpportunityAction struct {
 }
 
 type createOpportunityParams struct {
-	Name        string  `json:"name"`
-	StageName   string  `json:"stage_name"`
-	CloseDate   string  `json:"close_date"`
-	Amount      float64 `json:"amount,omitempty"`
-	AccountID   string  `json:"account_id,omitempty"`
-	Description string  `json:"description,omitempty"`
+	Name        string   `json:"name"`
+	StageName   string   `json:"stage_name"`
+	CloseDate   string   `json:"close_date"`
+	Amount      *float64 `json:"amount,omitempty"`
+	AccountID   string   `json:"account_id,omitempty"`
+	Description string   `json:"description,omitempty"`
 }
 
 func (p *createOpportunityParams) validate() error {
@@ -36,7 +36,7 @@ func (p *createOpportunityParams) validate() error {
 	if err := validateDate(p.CloseDate, "close_date"); err != nil {
 		return err
 	}
-	if p.Amount < 0 {
+	if p.Amount != nil && *p.Amount < 0 {
 		return &connectors.ValidationError{Message: "invalid amount: must be non-negative"}
 	}
 	if p.AccountID != "" {
@@ -61,8 +61,8 @@ func (a *createOpportunityAction) Execute(ctx context.Context, req connectors.Ac
 		"StageName": params.StageName,
 		"CloseDate": params.CloseDate,
 	}
-	if params.Amount != 0 {
-		fields["Amount"] = params.Amount
+	if params.Amount != nil {
+		fields["Amount"] = *params.Amount
 	}
 	if params.AccountID != "" {
 		fields["AccountId"] = params.AccountID

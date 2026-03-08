@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -191,7 +192,7 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "salesforce.update_opportunity",
 				Name:        "Update Opportunity",
-				Description: "Update stage, amount, or close date on an existing Opportunity",
+				Description: "Update stage, amount, close date, name, or description on an existing Opportunity",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -279,8 +280,8 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "salesforce.convert_lead",
 				Name:        "Convert Lead",
-				Description: "Convert a Lead to an Account, Contact, and optionally an Opportunity",
-				RiskLevel:   "medium",
+				Description: "Convert a Lead to an Account, Contact, and optionally an Opportunity (irreversible)",
+				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["lead_id", "converted_status"],
@@ -452,14 +453,14 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_salesforce_create_opportunity_any",
 				ActionType:  "salesforce.create_opportunity",
 				Name:        "Create opportunities",
-				Description: "Agent can create Opportunity records with any fields.",
+				Description: "Agent can create Opportunity records (name, stage, close date, amount, account, description).",
 				Parameters:  json.RawMessage(`{"name":"*","stage_name":"*","close_date":"*","amount":"*","account_id":"*","description":"*"}`),
 			},
 			{
 				ID:          "tpl_salesforce_update_opportunity_any",
 				ActionType:  "salesforce.update_opportunity",
 				Name:        "Update opportunities",
-				Description: "Agent can update any Opportunity record fields.",
+				Description: "Agent can update Opportunity stage, amount, close date, name, or description.",
 				Parameters:  json.RawMessage(`{"record_id":"*","stage_name":"*","amount":"*","close_date":"*","name":"*","description":"*"}`),
 			},
 			{
@@ -468,6 +469,20 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create leads (typed)",
 				Description: "Agent can create Lead records using the typed create_lead action.",
 				Parameters:  json.RawMessage(`{"last_name":"*","company":"*","first_name":"*","email":"*","phone":"*","title":"*","lead_source":"*","status":"*","website":"*","industry":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_convert_lead_any",
+				ActionType:  "salesforce.convert_lead",
+				Name:        "Convert leads",
+				Description: "Agent can convert Leads to Accounts, Contacts, and Opportunities. This action is irreversible.",
+				Parameters:  json.RawMessage(`{"lead_id":"*","converted_status":"*","account_id":"*","contact_id":"*","opportunity_name":"*","do_not_create_opportunity":"*","owner_id":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_delete_record_any",
+				ActionType:  "salesforce.delete_record",
+				Name:        "Delete any record",
+				Description: "Agent can permanently delete any Salesforce record by ID. Use with caution.",
+				Parameters:  json.RawMessage(`{"sobject_type":"*","record_id":"*"}`),
 			},
 			{
 				ID:          "tpl_salesforce_describe_object_any",

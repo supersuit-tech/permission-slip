@@ -43,11 +43,12 @@ func TestCreateOpportunity_Success(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &createOpportunityAction{conn: conn}
 
+	amount := 50000.0
 	params, _ := json.Marshal(createOpportunityParams{
 		Name:      "Big Deal",
 		StageName: "Prospecting",
 		CloseDate: "2026-12-31",
-		Amount:    50000,
+		Amount:    &amount,
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
