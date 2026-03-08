@@ -36,6 +36,10 @@ type deleteExpoPushTokenResponse struct {
 
 // --- Routes ---
 
+func init() {
+	RegisterRouteGroup(RegisterExpoPushTokenRoutes)
+}
+
 // RegisterExpoPushTokenRoutes adds Expo push token endpoints to the mux.
 func RegisterExpoPushTokenRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)

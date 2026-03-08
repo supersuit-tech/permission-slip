@@ -33,6 +33,10 @@ type disableAgentConnectorResponse struct {
 	RevokedStandingApprovals int64     `json:"revoked_standing_approvals"`
 }
 
+func init() {
+	RegisterRouteGroup(RegisterAgentConnectorRoutes)
+}
+
 // RegisterAgentConnectorRoutes adds agent connector endpoints to the mux.
 func RegisterAgentConnectorRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)

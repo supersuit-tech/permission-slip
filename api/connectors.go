@@ -52,6 +52,10 @@ type connectorDetailResponse struct {
 
 // RegisterConnectorRoutes adds connector-related endpoints to the mux.
 // These are public endpoints (no auth required).
+func init() {
+	RegisterRouteGroup(RegisterConnectorRoutes)
+}
+
 func RegisterConnectorRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("GET /connectors", handleListConnectors(deps))
 	mux.Handle("GET /connectors/{connector_id}", handleGetConnector(deps))

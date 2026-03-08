@@ -56,6 +56,10 @@ type standingApprovalCapability struct {
 
 // ── Route registration ──────────────────────────────────────────────────────
 
+func init() {
+	RegisterRouteGroup(RegisterCapabilityRoutes)
+}
+
 // RegisterCapabilityRoutes adds the agent capabilities endpoint to the mux.
 func RegisterCapabilityRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("GET /agents/{agent_id}/capabilities", handleGetCapabilities(deps))

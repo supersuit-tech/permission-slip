@@ -11,6 +11,10 @@ type configResponse struct {
 	MicrosoftOAuthConfigured bool `json:"microsoft_oauth_configured"`
 }
 
+func init() {
+	RegisterRouteGroup(RegisterConfigRoutes)
+}
+
 // RegisterConfigRoutes adds server configuration endpoints to the mux.
 func RegisterConfigRoutes(mux *http.ServeMux, deps *Deps) {
 	requireSession := RequireSession(deps)

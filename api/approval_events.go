@@ -127,6 +127,10 @@ func (b *ApprovalEventBroker) NotifyAll(event string) {
 // client passes the Supabase session token as a `?token=` query parameter.
 // This middleware copies it into the Authorization header before the standard
 // RequireProfile middleware runs, keeping auth logic in one place.
+func init() {
+	RegisterRouteGroup(RegisterApprovalEventRoutes)
+}
+
 func RegisterApprovalEventRoutes(mux *http.ServeMux, deps *Deps) {
 	if deps.ApprovalEvents == nil {
 		return

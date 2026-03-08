@@ -42,6 +42,10 @@ var servicePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
 
 // --- Routes ---
 
+func init() {
+	RegisterRouteGroup(RegisterCredentialRoutes)
+}
+
 // RegisterCredentialRoutes adds credential-related endpoints to the mux.
 func RegisterCredentialRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)

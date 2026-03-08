@@ -55,6 +55,10 @@ type agentUsageEntry struct {
 // connector aggregation) are intentionally omitted. They require an
 // admin role system that does not yet exist. Adding them behind
 // RequireProfile alone would create a cross-tenant data leak.
+func init() {
+	RegisterRouteGroup(RegisterAdminUsageRoutes)
+}
+
 func RegisterAdminUsageRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /admin/usage", requireProfile(handleAdminGetUsage(deps)))

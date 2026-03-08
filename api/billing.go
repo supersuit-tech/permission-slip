@@ -157,6 +157,10 @@ const maxInvoiceResults = 24
 
 // RegisterBillingRoutes adds billing endpoints to the mux.
 // These are only registered when billing is enabled.
+func init() {
+	RegisterRouteGroup(RegisterBillingRoutes)
+}
+
 func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /billing/plan", requireProfile(handleGetBillingPlan(deps)))

@@ -64,6 +64,10 @@ type verifyRegistrationResponse struct {
 // RegisterRegistrationRoutes adds the versioned agent registration endpoints
 // to the mux (mounted under /api/v1/). The invite endpoint is intentionally
 // excluded — it lives at the top level (/invite/{code}) via InviteHandler.
+func init() {
+	RegisterRouteGroup(RegisterRegistrationRoutes)
+}
+
 func RegisterRegistrationRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /agents/{agent_id}/verify", handleVerifyRegistration(deps))
 }

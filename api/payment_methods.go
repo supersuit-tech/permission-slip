@@ -77,6 +77,10 @@ func toPaymentMethodResponse(pm *db.PaymentMethod) paymentMethodResponse {
 
 // ── Route registration ──────────────────────────────────────────────────────
 
+func init() {
+	RegisterRouteGroup(RegisterPaymentMethodRoutes)
+}
+
 // RegisterPaymentMethodRoutes adds payment method endpoints to the mux.
 func RegisterPaymentMethodRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)

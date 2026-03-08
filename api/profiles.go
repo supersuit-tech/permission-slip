@@ -42,6 +42,10 @@ type updateProfileRaw struct {
 	MarketingOptIn json.RawMessage `json:"marketing_opt_in"`
 }
 
+func init() {
+	RegisterRouteGroup(RegisterProfileRoutes)
+}
+
 // RegisterProfileRoutes adds profile-related endpoints to the mux.
 func RegisterProfileRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
