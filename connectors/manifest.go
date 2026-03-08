@@ -48,10 +48,11 @@ type ManifestCredential struct {
 // connector. This allows external connectors to register providers that the
 // platform doesn't have built-in support for (e.g. Salesforce, HubSpot).
 type ManifestOAuthProvider struct {
-	ID           string   `json:"id"`
-	AuthorizeURL string   `json:"authorize_url"`
-	TokenURL     string   `json:"token_url"`
-	Scopes       []string `json:"scopes,omitempty"`
+	ID              string            `json:"id"`
+	AuthorizeURL    string            `json:"authorize_url"`
+	TokenURL        string            `json:"token_url"`
+	Scopes          []string          `json:"scopes,omitempty"`
+	AuthorizeParams map[string]string `json:"authorize_params,omitempty"`
 }
 
 // ManifestTemplate describes a predefined configuration preset for an action.

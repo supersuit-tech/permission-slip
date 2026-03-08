@@ -129,11 +129,12 @@ func NewRegistryWithBuiltIns() *Registry {
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {
 		if err := r.Register(Provider{
-			ID:           mp.ID,
-			AuthorizeURL: mp.AuthorizeURL,
-			TokenURL:     mp.TokenURL,
-			Scopes:       mp.Scopes,
-			Source:       SourceManifest,
+			ID:              mp.ID,
+			AuthorizeURL:    mp.AuthorizeURL,
+			TokenURL:        mp.TokenURL,
+			Scopes:          mp.Scopes,
+			AuthorizeParams: mp.AuthorizeParams,
+			Source:          SourceManifest,
 		}); err != nil {
 			return fmt.Errorf("registering manifest OAuth provider %q: %w", mp.ID, err)
 		}
@@ -144,8 +145,9 @@ func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 // ManifestProvider mirrors the OAuth provider declaration in a connector
 // manifest. This avoids a circular import between oauth/ and connectors/.
 type ManifestProvider struct {
-	ID           string
-	AuthorizeURL string
-	TokenURL     string
-	Scopes       []string
+	ID              string
+	AuthorizeURL    string
+	TokenURL        string
+	Scopes          []string
+	AuthorizeParams map[string]string
 }

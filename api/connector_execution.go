@@ -240,22 +240,25 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 	// Multiple credential entries: try each in order, return first success.
 	// Each entry is resolved independently — OAuth entries use the OAuth
 	// connection, static entries look up credentials for that specific service.
-	var lastErr error
+	var authMethods []string
 	for _, rc := range reqCreds {
 		rc := rc
 		var creds connectors.Credentials
 		var err error
 		if rc.AuthType == "oauth2" {
 			creds, err = resolveOAuthCredentials(ctx, deps, userID, &rc)
+			authMethods = append(authMethods, "OAuth (connect via Settings)")
 		} else {
 			creds, err = resolveStaticCredentialsForService(ctx, deps, userID, rc.Service)
+			authMethods = append(authMethods, fmt.Sprintf("API key (add credentials for service %q)", rc.Service))
 		}
 		if err == nil {
 			return creds, nil
 		}
-		lastErr = err
 	}
-	return connectors.Credentials{}, lastErr
+	return connectors.Credentials{}, &connectors.ValidationError{
+		Message: fmt.Sprintf("no credentials found — set up one of: %s", strings.Join(authMethods, " or ")),
+	}
 }
 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)

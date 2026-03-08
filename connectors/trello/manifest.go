@@ -16,9 +16,13 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 		OAuthProviders: []connectors.ManifestOAuthProvider{
 			{
 				ID:           "trello",
-				AuthorizeURL: "https://trello.com/1/authorize",
-				TokenURL:     "https://trello.com/1/OAuthGetAccessToken",
-				Scopes:       []string{"read", "write", "account"},
+				AuthorizeURL: "https://auth.atlassian.com/authorize",
+				TokenURL:     "https://auth.atlassian.com/oauth/token",
+				Scopes:       []string{"read:me:trello", "read:board:trello", "write:board:trello"},
+				AuthorizeParams: map[string]string{
+					"audience": "api.atlassian.com",
+					"prompt":   "consent",
+				},
 			},
 		},
 		Actions: []connectors.ManifestAction{
@@ -228,7 +232,7 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 				Service:       "trello",
 				AuthType:      "oauth2",
 				OAuthProvider: "trello",
-				OAuthScopes:   []string{"read", "write", "account"},
+				OAuthScopes:   []string{"read:me:trello", "read:board:trello", "write:board:trello"},
 			},
 			{
 				Service:         "trello_api_key",

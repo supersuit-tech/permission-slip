@@ -272,7 +272,13 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		authURL := cfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
+		// Build auth URL with standard params + any provider-specific params
+		// (e.g. Atlassian's audience=api.atlassian.com for 3LO).
+		authOpts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+		for k, v := range provider.AuthorizeParams {
+			authOpts = append(authOpts, oauth2.SetAuthURLParam(k, v))
+		}
+		authURL := cfg.AuthCodeURL(state, authOpts...)
 		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 	}
 }
