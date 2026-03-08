@@ -19,6 +19,12 @@ func BuiltInProviders() []Provider {
 			// Atlassian Cloud products. The audience param is required by
 			// Atlassian's authorization server to issue API-scoped tokens.
 			// prompt=consent ensures a refresh token is always returned.
+			//
+			// Scopes:
+			//   read:me          — user profile, required for accessible-resources discovery
+			//   read:jira-work   — read issues, projects, search results
+			//   write:jira-work  — create/update issues, add comments, transitions
+			//   offline_access   — obtain a refresh token for long-lived connections
 			ID:           "atlassian",
 			AuthorizeURL: "https://auth.atlassian.com/authorize",
 			TokenURL:     "https://auth.atlassian.com/oauth/token",

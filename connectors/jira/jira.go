@@ -7,12 +7,15 @@ package jira
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -23,10 +26,15 @@ import (
 // Jira site and is obtained from the accessible-resources endpoint.
 const atlassianCloudAPIBase = "https://api.atlassian.com"
 
-// accessibleResourcesURL is the Atlassian endpoint that returns the list
-// of cloud resources the authenticated user can access. Used to discover
-// the cloud ID for constructing Jira API URLs with OAuth.
-const accessibleResourcesURL = atlassianCloudAPIBase + "/oauth/token/accessible-resources"
+// defaultAccessibleResourcesURL is the Atlassian endpoint that returns
+// the list of cloud resources the authenticated user can access. Used to
+// discover the cloud ID for constructing Jira API URLs with OAuth.
+const defaultAccessibleResourcesURL = atlassianCloudAPIBase + "/oauth/token/accessible-resources"
+
+// cloudIDCacheTTL is how long a discovered cloud ID is cached before
+// re-fetching from the accessible-resources endpoint. Cloud IDs are
+// stable identifiers, so a long TTL is safe.
+const cloudIDCacheTTL = 1 * time.Hour
 
 // validSite matches Atlassian site subdomains: alphanumeric with hyphens.
 // Prevents SSRF by ensuring the site value cannot contain path separators,
@@ -40,26 +48,59 @@ const (
 	maxResponseBody = 10 << 20
 )
 
+// cloudIDEntry holds a cached cloud ID with its expiration time.
+type cloudIDEntry struct {
+	cloudID   string
+	expiresAt time.Time
+}
+
 // JiraConnector owns the shared HTTP client used by all Jira actions.
 // The base URL is constructed per-request from the site credential
-// (https://{site}.atlassian.net/rest/api/3/).
+// (basic auth) or discovered via OAuth cloud ID lookup.
 type JiraConnector struct {
 	client  *http.Client
 	baseURL string // empty for production (derived from credentials); set for tests
+
+	// accessibleResourcesURL is the endpoint used to discover cloud IDs.
+	// Defaults to defaultAccessibleResourcesURL; overridden in tests.
+	accessibleResourcesURL string
+
+	// cloudIDCache caches discovered cloud IDs keyed by a hash of the
+	// access token. This avoids calling the accessible-resources endpoint
+	// on every API request. Protected by cloudIDMu.
+	cloudIDMu    sync.RWMutex
+	cloudIDCache map[string]cloudIDEntry
 }
 
 // New creates a JiraConnector with sensible defaults (30s timeout).
 func New() *JiraConnector {
 	return &JiraConnector{
-		client: &http.Client{Timeout: defaultTimeout},
+		client:                 &http.Client{Timeout: defaultTimeout},
+		accessibleResourcesURL: defaultAccessibleResourcesURL,
+		cloudIDCache:           make(map[string]cloudIDEntry),
 	}
 }
 
 // newForTest creates a JiraConnector that points at a test server.
+// The baseURL overrides all URL construction (both OAuth and basic auth).
 func newForTest(client *http.Client, baseURL string) *JiraConnector {
 	return &JiraConnector{
-		client:  client,
-		baseURL: baseURL,
+		client:                 client,
+		baseURL:                baseURL,
+		accessibleResourcesURL: defaultAccessibleResourcesURL,
+		cloudIDCache:           make(map[string]cloudIDEntry),
+	}
+}
+
+// newOAuthForTest creates a JiraConnector configured for OAuth testing.
+// Unlike newForTest, it does NOT set baseURL so the OAuth cloud ID
+// discovery path is exercised. The accessibleResourcesURL is pointed at
+// the test server so no external calls are made.
+func newOAuthForTest(client *http.Client, resourcesURL string) *JiraConnector {
+	return &JiraConnector{
+		client:                 client,
+		accessibleResourcesURL: resourcesURL,
+		cloudIDCache:           make(map[string]cloudIDEntry),
 	}
 }
 
@@ -150,12 +191,49 @@ type accessibleResource struct {
 	URL  string `json:"url"`
 }
 
+// tokenFingerprint returns a short hash of the access token for use as
+// a cache key. We never store raw tokens in the cache map.
+func tokenFingerprint(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:8])
+}
+
 // oauthAPIBase discovers the Jira cloud ID by calling the Atlassian
 // accessible-resources endpoint, then constructs the API base URL.
+// Results are cached per access token to avoid redundant API calls.
 func (c *JiraConnector) oauthAPIBase(ctx context.Context, creds connectors.Credentials) (string, error) {
 	accessToken, _ := creds.Get("access_token")
+	fp := tokenFingerprint(accessToken)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, accessibleResourcesURL, nil)
+	// Check cache first.
+	c.cloudIDMu.RLock()
+	entry, ok := c.cloudIDCache[fp]
+	c.cloudIDMu.RUnlock()
+	if ok && time.Now().Before(entry.expiresAt) {
+		return atlassianCloudAPIBase + "/ex/jira/" + entry.cloudID + "/rest/api/3", nil
+	}
+
+	// Cache miss or expired — fetch from Atlassian.
+	cloudID, err := c.fetchCloudID(ctx, accessToken)
+	if err != nil {
+		return "", err
+	}
+
+	// Update cache.
+	c.cloudIDMu.Lock()
+	c.cloudIDCache[fp] = cloudIDEntry{
+		cloudID:   cloudID,
+		expiresAt: time.Now().Add(cloudIDCacheTTL),
+	}
+	c.cloudIDMu.Unlock()
+
+	return atlassianCloudAPIBase + "/ex/jira/" + cloudID + "/rest/api/3", nil
+}
+
+// fetchCloudID calls the Atlassian accessible-resources endpoint and
+// returns the cloud ID of the first accessible Jira site.
+func (c *JiraConnector) fetchCloudID(ctx context.Context, accessToken string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.accessibleResourcesURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating accessible-resources request: %w", err)
 	}
@@ -177,9 +255,7 @@ func (c *JiraConnector) oauthAPIBase(ctx context.Context, creds connectors.Crede
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", &connectors.ExternalError{
-			Message: fmt.Sprintf("accessible-resources returned status %d: %s", resp.StatusCode, truncate(string(body), 200)),
-		}
+		return "", classifyResourcesError(resp.StatusCode, body)
 	}
 
 	var resources []accessibleResource
@@ -199,7 +275,28 @@ func (c *JiraConnector) oauthAPIBase(ctx context.Context, creds connectors.Crede
 		return "", &connectors.ExternalError{Message: "accessible-resources returned a resource with an empty ID"}
 	}
 
-	return atlassianCloudAPIBase + "/ex/jira/" + cloudID + "/rest/api/3", nil
+	return cloudID, nil
+}
+
+// classifyResourcesError maps HTTP error codes from the Atlassian
+// accessible-resources endpoint to specific connector error types so
+// users get actionable error messages.
+func classifyResourcesError(statusCode int, body []byte) error {
+	detail := truncate(string(body), 200)
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return &connectors.AuthError{
+			Message: "Atlassian OAuth token is invalid or expired — reconnect your Atlassian account",
+		}
+	case http.StatusForbidden:
+		return &connectors.AuthError{
+			Message: "Atlassian OAuth app lacks required permissions — check app scopes and re-authorize",
+		}
+	default:
+		return &connectors.ExternalError{
+			Message: fmt.Sprintf("Atlassian accessible-resources returned status %d: %s", statusCode, detail),
+		}
+	}
 }
 
 // do is the shared request lifecycle for all Jira actions. It marshals

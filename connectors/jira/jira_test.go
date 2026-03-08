@@ -334,44 +334,48 @@ func TestJiraConnector_Do_OAuthBearerToken(t *testing.T) {
 func TestJiraConnector_OAuthAPIBase_DiscoverCloudID(t *testing.T) {
 	t.Parallel()
 
-	// Serve both the accessible-resources endpoint and the Jira API.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/oauth/token/accessible-resources":
-			if got := r.Header.Get("Authorization"); got != "Bearer test-oauth-token-456" {
-				t.Errorf("accessible-resources auth = %q, want Bearer token", got)
-			}
-			json.NewEncoder(w).Encode([]accessibleResource{
-				{ID: "cloud-id-abc", Name: "My Site", URL: "https://mysite.atlassian.net"},
-			})
-		default:
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		if got := r.Header.Get("Authorization"); got != "Bearer test-oauth-token-456" {
+			t.Errorf("accessible-resources auth = %q, want Bearer token", got)
 		}
+		json.NewEncoder(w).Encode([]accessibleResource{
+			{ID: "cloud-id-abc", Name: "My Site", URL: "https://mysite.atlassian.net"},
+		})
 	}))
 	defer srv.Close()
 
-	// Override the accessible-resources URL for testing by using the test
-	// server directly. We'll test the oauthAPIBase method by creating a
-	// connector that does NOT have baseURL set but points its HTTP client
-	// at the test server.
-	// Since oauthAPIBase uses the hardcoded atlassianCloudAPIBase, we test
-	// the method indirectly via the test-mode baseURL override in `do`.
-
-	// Direct test: verify oauthAPIBase calls accessible-resources correctly.
-	conn := &JiraConnector{client: srv.Client()}
-
-	// We can't easily override the URL constant, so we test the full
-	// flow through `do` using the test server baseURL instead.
-	testConn := newForTest(srv.Client(), srv.URL)
-	var resp map[string]string
-	err := testConn.do(t.Context(), validOAuthCreds(), http.MethodGet, "/test", nil, &resp)
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	base, err := conn.oauthAPIBase(t.Context(), validOAuthCreds())
 	if err != nil {
-		t.Fatalf("do() with OAuth creds unexpected error: %v", err)
+		t.Fatalf("oauthAPIBase() unexpected error: %v", err)
 	}
-	// Verify it used the test baseURL (OAuth creds with test baseURL skips
-	// cloud ID discovery but still uses Bearer auth).
-	_ = conn // referenced above for documentation purposes
+	want := "https://api.atlassian.com/ex/jira/cloud-id-abc/rest/api/3"
+	if base != want {
+		t.Errorf("oauthAPIBase() = %q, want %q", base, want)
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_MultipleSites(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]accessibleResource{
+			{ID: "first-cloud-id", Name: "Primary Site", URL: "https://primary.atlassian.net"},
+			{ID: "second-cloud-id", Name: "Secondary Site", URL: "https://secondary.atlassian.net"},
+		})
+	}))
+	defer srv.Close()
+
+	// Should use the first accessible resource.
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	base, err := conn.oauthAPIBase(t.Context(), validOAuthCreds())
+	if err != nil {
+		t.Fatalf("oauthAPIBase() unexpected error: %v", err)
+	}
+	want := "https://api.atlassian.com/ex/jira/first-cloud-id/rest/api/3"
+	if base != want {
+		t.Errorf("oauthAPIBase() = %q, want %q", base, want)
+	}
 }
 
 func TestJiraConnector_OAuthAPIBase_NoResources(t *testing.T) {
@@ -382,18 +386,145 @@ func TestJiraConnector_OAuthAPIBase_NoResources(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Test that oauthAPIBase returns an error when no resources are found.
-	// We need to call it directly since `do` would use baseURL in test mode.
-	conn := &JiraConnector{client: srv.Client()}
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
 	creds := connectors.NewCredentials(map[string]string{"access_token": "tok"})
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err == nil {
+		t.Fatal("oauthAPIBase() expected error for empty resources, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
 
-	// Patch the URL by calling the method that uses the constant.
-	// Since we can't override the constant, we test the error path
-	// through the internal method. In production the URL would be the
-	// real Atlassian endpoint.
-	// For this unit test, we verify the behavior through the test server.
-	_ = conn
-	_ = creds
+func TestJiraConnector_OAuthAPIBase_EmptyCloudID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]accessibleResource{
+			{ID: "", Name: "Bad Site", URL: "https://bad.atlassian.net"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	creds := connectors.NewCredentials(map[string]string{"access_token": "tok"})
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err == nil {
+		t.Fatal("oauthAPIBase() expected error for empty cloud ID, got nil")
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_Unauthorized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error": "invalid_token"}`))
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	creds := connectors.NewCredentials(map[string]string{"access_token": "expired-token"})
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err == nil {
+		t.Fatal("oauthAPIBase() expected error for 401, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError for 401, got %T: %v", err, err)
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_Forbidden(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error": "insufficient_scope"}`))
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	creds := connectors.NewCredentials(map[string]string{"access_token": "bad-scope-token"})
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err == nil {
+		t.Fatal("oauthAPIBase() expected error for 403, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError for 403, got %T: %v", err, err)
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_ServerError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("internal server error"))
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	creds := connectors.NewCredentials(map[string]string{"access_token": "tok"})
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err == nil {
+		t.Fatal("oauthAPIBase() expected error for 500, got nil")
+	}
+	// 500 should be ExternalError, not AuthError.
+	if connectors.IsAuthError(err) {
+		t.Errorf("expected ExternalError for 500, got AuthError: %v", err)
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_MalformedJSON(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("not valid json"))
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	creds := connectors.NewCredentials(map[string]string{"access_token": "tok"})
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err == nil {
+		t.Fatal("oauthAPIBase() expected error for malformed JSON, got nil")
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_CachesCloudID(t *testing.T) {
+	t.Parallel()
+
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		json.NewEncoder(w).Encode([]accessibleResource{
+			{ID: "cached-cloud-id", Name: "My Site", URL: "https://mysite.atlassian.net"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+	creds := validOAuthCreds()
+
+	// First call should hit the server.
+	base1, err := conn.oauthAPIBase(t.Context(), creds)
+	if err != nil {
+		t.Fatalf("first oauthAPIBase() unexpected error: %v", err)
+	}
+
+	// Second call should use the cache.
+	base2, err := conn.oauthAPIBase(t.Context(), creds)
+	if err != nil {
+		t.Fatalf("second oauthAPIBase() unexpected error: %v", err)
+	}
+
+	if base1 != base2 {
+		t.Errorf("cached result differs: %q vs %q", base1, base2)
+	}
+	if callCount != 1 {
+		t.Errorf("expected 1 server call (cached), got %d", callCount)
+	}
 }
 
 func TestJiraConnector_IsOAuth(t *testing.T) {
