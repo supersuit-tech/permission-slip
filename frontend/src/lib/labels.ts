@@ -4,6 +4,7 @@
  */
 
 const PROVIDER_LABELS: Record<string, string> = {
+  atlassian: "Atlassian",
   figma: "Figma",
   github: "GitHub",
   google: "Google",

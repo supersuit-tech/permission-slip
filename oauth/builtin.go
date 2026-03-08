@@ -15,6 +15,28 @@ import (
 func BuiltInProviders() []Provider {
 	return []Provider{
 		{
+			// Atlassian OAuth 2.0 (3LO) covers Jira, Confluence, and other
+			// Atlassian Cloud products. The audience param is required by
+			// Atlassian's authorization server to issue API-scoped tokens.
+			// prompt=consent ensures a refresh token is always returned.
+			ID:           "atlassian",
+			AuthorizeURL: "https://auth.atlassian.com/authorize",
+			TokenURL:     "https://auth.atlassian.com/oauth/token",
+			Scopes: []string{
+				"read:me",
+				"read:jira-work",
+				"write:jira-work",
+				"offline_access",
+			},
+			AuthorizeParams: map[string]string{
+				"audience": "api.atlassian.com",
+				"prompt":   "consent",
+			},
+			ClientID:     os.Getenv("ATLASSIAN_CLIENT_ID"),
+			ClientSecret: os.Getenv("ATLASSIAN_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "google",
 			AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
 			TokenURL:     "https://oauth2.googleapis.com/token",

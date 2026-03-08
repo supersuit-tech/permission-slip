@@ -190,6 +190,17 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "jira",
+				AuthType:      "oauth2",
+				OAuthProvider: "atlassian",
+				OAuthScopes: []string{
+					"read:me",
+					"read:jira-work",
+					"write:jira-work",
+					"offline_access",
+				},
+			},
+			{
 				Service:         "jira",
 				AuthType:        "basic",
 				InstructionsURL: "https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/",
