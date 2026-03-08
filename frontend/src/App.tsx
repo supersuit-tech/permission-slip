@@ -8,16 +8,11 @@ import LoginPage from "./auth/LoginPage";
 import MfaChallengePage from "./auth/MfaChallengePage";
 import OnboardingPage from "./auth/OnboardingPage";
 import { AppLayout } from "./components/AppLayout";
-import { Dashboard } from "./pages/dashboard/Dashboard";
-import { AgentConfigPage } from "./pages/agents/AgentConfigPage";
-import { ConnectorConfigPage } from "./pages/agents/connectors/ConnectorConfigPage";
-import { ActivityPage } from "./pages/activity/ActivityPage";
-import { SettingsPage } from "./pages/settings/SettingsPage";
-import { BillingPage } from "./pages/billing/BillingPage";
 import { PrivacyPolicyPage } from "./pages/policy/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/policy/TermsOfServicePage";
 import { CookiePolicyPage } from "./pages/policy/CookiePolicyPage";
 import { useProfile } from "./hooks/useProfile";
+import { appRoutes } from "./routes";
 
 const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
@@ -102,12 +97,13 @@ function App() {
     <Sentry.ErrorBoundary fallback={<AppCrashFallback />} showDialog>
       <AppLayout>
         <SentryRoutes>
-          <Route path="/" element={<RouteWithBoundary><Dashboard /></RouteWithBoundary>} />
-          <Route path="/agents/:agentId" element={<RouteWithBoundary><AgentConfigPage /></RouteWithBoundary>} />
-          <Route path="/agents/:agentId/connectors/:connectorId" element={<RouteWithBoundary><ConnectorConfigPage /></RouteWithBoundary>} />
-          <Route path="/activity" element={<RouteWithBoundary><ActivityPage /></RouteWithBoundary>} />
-          <Route path="/settings" element={<RouteWithBoundary><SettingsPage /></RouteWithBoundary>} />
-          <Route path="/billing" element={<RouteWithBoundary><BillingPage /></RouteWithBoundary>} />
+          {appRoutes.map(({ path, element: Element }) => (
+            <Route
+              key={path}
+              path={path}
+              element={<RouteWithBoundary><Element /></RouteWithBoundary>}
+            />
+          ))}
           <Route path="*" element={<Navigate to="/" replace />} />
         </SentryRoutes>
       </AppLayout>
