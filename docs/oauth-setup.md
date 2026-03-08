@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Datadog, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -10,6 +10,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 2. **BYOA (Bring Your Own App)**: Users provide their own OAuth client credentials through the Settings UI. Required for self-hosted deployments or custom providers.
 
 ## Environment Variables
+
+### Datadog OAuth
+
+| Variable | Description |
+|---|---|
+| `DATADOG_CLIENT_ID` | Client ID from the Datadog OAuth application |
+| `DATADOG_CLIENT_SECRET` | Client Secret from the Datadog OAuth application |
 
 ### GitHub OAuth
 
@@ -88,6 +95,64 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `OAUTH_REDIRECT_BASE_URL` | Base URL for OAuth callbacks (e.g., `https://app.example.com/api`) | Falls back to `BASE_URL` |
 | `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens | Falls back to `SUPABASE_JWT_SECRET` |
 | `OAUTH_REFRESH_INTERVAL` | Interval for background token refresh job | `10m` |
+
+## Datadog OAuth Setup
+
+Datadog OAuth is designed for marketplace-style integrations. The connector supports both OAuth (recommended) and API key + application key authentication.
+
+> **Note:** Datadog's OAuth implementation uses split hostnames by design: authorization redirects go through `app.datadoghq.com` and token exchange happens on `api.datadoghq.com`. This is intentional per Datadog's OAuth2 API reference.
+
+### 1. Create a Datadog OAuth Application
+
+1. Log in to your Datadog account and go to [OAuth Apps](https://app.datadoghq.com/organization-settings/oauth-apps)
+2. Click **+ New OAuth App**
+3. Fill in the required fields:
+   - Application name: Your deployment name (e.g., "Permission Slip")
+   - Description: Brief description of the integration
+4. Under **Redirect URIs**, add:
+   ```
+   https://your-domain.com/api/v1/oauth/datadog/callback
+   ```
+5. Copy the **Client ID** and **Client Secret**
+
+### 2. Configure OAuth Scopes
+
+The Datadog connector requests these scopes:
+- `metrics_read` — query time series metrics data
+- `incidents_read` — read incident details
+- `incidents_write` — create and update incidents
+- `monitors_read` — read monitor configuration and status
+- `monitors_write` — mute/unmute monitors (required for snooze_alert)
+- `workflows_run` — trigger Workflow automations (required for trigger_runbook)
+
+### 3. Configure Environment
+
+```bash
+DATADOG_CLIENT_ID=your-datadog-client-id
+DATADOG_CLIENT_SECRET=your-datadog-client-secret
+```
+
+### 4. Multi-Region Support
+
+The Datadog connector supports all Datadog sites. If your organization uses a non-US1 site, users should set the optional `site` credential when configuring the connector:
+
+| Site | Identifier |
+|---|---|
+| US1 (default) | `datadoghq.com` |
+| US3 | `us3.datadoghq.com` |
+| US5 | `us5.datadoghq.com` |
+| EU | `datadoghq.eu` |
+| AP1 | `ap1.datadoghq.com` |
+| US1-Fed | `ddog-gov.com` |
+
+The `site` credential is optional for OAuth users — if omitted, requests are routed to the US1 API.
+
+### Alternative: API Key + Application Key Auth
+
+Users who prefer not to use OAuth can connect Datadog with an API key and application key:
+1. Go to [Datadog API Keys](https://app.datadoghq.com/organization-settings/api-keys) and create an API key
+2. Go to [Datadog Application Keys](https://app.datadoghq.com/organization-settings/application-keys) and create an application key
+3. In Permission Slip, add both as a `custom` credential in the connector settings
 
 ## GitHub OAuth Setup
 
@@ -542,6 +607,7 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 ### Redirect URI mismatch
 
 Ensure the redirect URI in your OAuth app matches exactly:
+- Datadog: `https://your-domain.com/api/v1/oauth/datadog/callback`
 - Figma: `https://your-domain.com/api/v1/oauth/figma/callback`
 - GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
