@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -152,6 +153,233 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "salesforce.create_opportunity",
+				Name:        "Create Opportunity",
+				Description: "Create a new Salesforce Opportunity with typed fields",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name", "stage_name", "close_date"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Opportunity name"
+						},
+						"stage_name": {
+							"type": "string",
+							"description": "Sales stage (e.g. Prospecting, Qualification, Closed Won)"
+						},
+						"close_date": {
+							"type": "string",
+							"description": "Expected close date in YYYY-MM-DD format"
+						},
+						"amount": {
+							"type": "number",
+							"description": "Opportunity amount (revenue)"
+						},
+						"account_id": {
+							"type": "string",
+							"description": "Related Account record ID (15 or 18 characters)"
+						},
+						"description": {
+							"type": "string",
+							"description": "Opportunity description"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "salesforce.update_opportunity",
+				Name:        "Update Opportunity",
+				Description: "Update stage, amount, close date, name, or description on an existing Opportunity",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["record_id"],
+					"properties": {
+						"record_id": {
+							"type": "string",
+							"description": "Opportunity record ID (15 or 18 characters)"
+						},
+						"stage_name": {
+							"type": "string",
+							"description": "New sales stage"
+						},
+						"amount": {
+							"type": "number",
+							"description": "Updated opportunity amount"
+						},
+						"close_date": {
+							"type": "string",
+							"description": "Updated close date in YYYY-MM-DD format"
+						},
+						"name": {
+							"type": "string",
+							"description": "Updated opportunity name"
+						},
+						"description": {
+							"type": "string",
+							"description": "Updated description"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "salesforce.create_lead",
+				Name:        "Create Lead",
+				Description: "Create a new Salesforce Lead with typed fields",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["last_name", "company"],
+					"properties": {
+						"last_name": {
+							"type": "string",
+							"description": "Lead last name"
+						},
+						"company": {
+							"type": "string",
+							"description": "Lead company name"
+						},
+						"first_name": {
+							"type": "string",
+							"description": "Lead first name"
+						},
+						"email": {
+							"type": "string",
+							"description": "Lead email address"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Lead phone number"
+						},
+						"title": {
+							"type": "string",
+							"description": "Lead job title"
+						},
+						"lead_source": {
+							"type": "string",
+							"description": "Lead source (e.g. Web, Phone Inquiry, Partner)"
+						},
+						"status": {
+							"type": "string",
+							"description": "Lead status (e.g. Open - Not Contacted, Working, Closed - Converted)"
+						},
+						"website": {
+							"type": "string",
+							"description": "Lead company website"
+						},
+						"industry": {
+							"type": "string",
+							"description": "Lead industry"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "salesforce.convert_lead",
+				Name:        "Convert Lead",
+				Description: "Convert a Lead to an Account, Contact, and optionally an Opportunity (irreversible)",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["lead_id", "converted_status"],
+					"properties": {
+						"lead_id": {
+							"type": "string",
+							"description": "Lead record ID to convert (15 or 18 characters)"
+						},
+						"converted_status": {
+							"type": "string",
+							"description": "Lead status to set after conversion (e.g. Closed - Converted)"
+						},
+						"account_id": {
+							"type": "string",
+							"description": "Existing Account ID to merge into (omit to create new account)"
+						},
+						"contact_id": {
+							"type": "string",
+							"description": "Existing Contact ID to merge into (omit to create new contact)"
+						},
+						"opportunity_name": {
+							"type": "string",
+							"description": "Name for the new Opportunity (ignored if do_not_create_opportunity is true)"
+						},
+						"do_not_create_opportunity": {
+							"type": "boolean",
+							"description": "Set to true to skip creating an Opportunity during conversion"
+						},
+						"owner_id": {
+							"type": "string",
+							"description": "User ID to assign as owner of the converted records"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "salesforce.delete_record",
+				Name:        "Delete Record",
+				Description: "Delete a Salesforce record by ID",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["sobject_type", "record_id"],
+					"properties": {
+						"sobject_type": {
+							"type": "string",
+							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity)"
+						},
+						"record_id": {
+							"type": "string",
+							"description": "The 15 or 18-character Salesforce record ID to delete"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "salesforce.describe_object",
+				Name:        "Describe Object",
+				Description: "Get the full schema and metadata for a Salesforce sObject type, including all fields and their types",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["sobject_type"],
+					"properties": {
+						"sobject_type": {
+							"type": "string",
+							"description": "Salesforce object type to describe (e.g. Lead, Opportunity, Account, or any custom object)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:       "salesforce.list_reports",
+				Name:             "List Reports",
+				Description:      "List all available Salesforce reports",
+				RiskLevel:        "low",
+				ParametersSchema: json.RawMessage(`{"type": "object", "properties": {}}`),
+			},
+			{
+				ActionType:  "salesforce.run_report",
+				Name:        "Run Report",
+				Description: "Execute a Salesforce report and return the results",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["report_id"],
+					"properties": {
+						"report_id": {
+							"type": "string",
+							"description": "Report record ID (15 or 18 characters)"
+						},
+						"include_details": {
+							"type": "boolean",
+							"description": "Include detailed row-level data in the response (default: false, summary only)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -220,6 +448,62 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add notes to any record",
 				Description: "Agent can add notes to any Salesforce record.",
 				Parameters:  json.RawMessage(`{"parent_id":"*","title":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_create_opportunity_any",
+				ActionType:  "salesforce.create_opportunity",
+				Name:        "Create opportunities",
+				Description: "Agent can create Opportunity records (name, stage, close date, amount, account, description).",
+				Parameters:  json.RawMessage(`{"name":"*","stage_name":"*","close_date":"*","amount":"*","account_id":"*","description":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_update_opportunity_any",
+				ActionType:  "salesforce.update_opportunity",
+				Name:        "Update opportunities",
+				Description: "Agent can update Opportunity stage, amount, close date, name, or description.",
+				Parameters:  json.RawMessage(`{"record_id":"*","stage_name":"*","amount":"*","close_date":"*","name":"*","description":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_create_lead_typed",
+				ActionType:  "salesforce.create_lead",
+				Name:        "Create leads (typed)",
+				Description: "Agent can create Lead records using the typed create_lead action.",
+				Parameters:  json.RawMessage(`{"last_name":"*","company":"*","first_name":"*","email":"*","phone":"*","title":"*","lead_source":"*","status":"*","website":"*","industry":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_convert_lead_any",
+				ActionType:  "salesforce.convert_lead",
+				Name:        "Convert leads",
+				Description: "Agent can convert Leads to Accounts, Contacts, and Opportunities. This action is irreversible.",
+				Parameters:  json.RawMessage(`{"lead_id":"*","converted_status":"*","account_id":"*","contact_id":"*","opportunity_name":"*","do_not_create_opportunity":"*","owner_id":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_delete_record_any",
+				ActionType:  "salesforce.delete_record",
+				Name:        "Delete any record",
+				Description: "Agent can permanently delete any Salesforce record by ID. Use with caution.",
+				Parameters:  json.RawMessage(`{"sobject_type":"*","record_id":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_describe_object_any",
+				ActionType:  "salesforce.describe_object",
+				Name:        "Describe any object",
+				Description: "Agent can retrieve schema metadata for any Salesforce object type.",
+				Parameters:  json.RawMessage(`{"sobject_type":"*"}`),
+			},
+			{
+				ID:          "tpl_salesforce_list_reports",
+				ActionType:  "salesforce.list_reports",
+				Name:        "List reports",
+				Description: "Agent can list available Salesforce reports.",
+				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_salesforce_run_report_any",
+				ActionType:  "salesforce.run_report",
+				Name:        "Run any report",
+				Description: "Agent can execute any Salesforce report and retrieve results.",
+				Parameters:  json.RawMessage(`{"report_id":"*","include_details":"*"}`),
 			},
 		},
 	}

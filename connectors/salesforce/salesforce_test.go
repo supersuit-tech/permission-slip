@@ -26,6 +26,14 @@ func TestSalesforceConnector_Actions(t *testing.T) {
 		"salesforce.query",
 		"salesforce.create_task",
 		"salesforce.add_note",
+		"salesforce.create_opportunity",
+		"salesforce.update_opportunity",
+		"salesforce.create_lead",
+		"salesforce.convert_lead",
+		"salesforce.delete_record",
+		"salesforce.describe_object",
+		"salesforce.list_reports",
+		"salesforce.run_report",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -118,8 +126,8 @@ func TestSalesforceConnector_Manifest(t *testing.T) {
 	if m.Name != "Salesforce" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Salesforce")
 	}
-	if len(m.Actions) != 5 {
-		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
+	if len(m.Actions) != 13 {
+		t.Fatalf("Manifest().Actions has %d items, want 13", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -131,6 +139,14 @@ func TestSalesforceConnector_Manifest(t *testing.T) {
 		"salesforce.query",
 		"salesforce.create_task",
 		"salesforce.add_note",
+		"salesforce.create_opportunity",
+		"salesforce.update_opportunity",
+		"salesforce.create_lead",
+		"salesforce.convert_lead",
+		"salesforce.delete_record",
+		"salesforce.describe_object",
+		"salesforce.list_reports",
+		"salesforce.run_report",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
