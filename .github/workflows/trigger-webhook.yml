@@ -11,37 +11,49 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Call webhook
+      - name: Send Twilio SMS
         env:
           PR_URL: ${{ inputs.pr_url }}
-          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE_FROM: ${{ secrets.TWILIO_PHONE_FROM }}
+          TWILIO_PHONE_TO: ${{ secrets.TWILIO_PHONE_TO }}
         run: |
-          if [ -z "$WEBHOOK_URL" ]; then
-            echo "::error::WEBHOOK_URL secret is not set"
+          if [ -z "$TWILIO_ACCOUNT_SID" ]; then
+            echo "::error::TWILIO_ACCOUNT_SID secret is not set"
             exit 1
           fi
-          if [ -z "$WEBHOOK_TOKEN" ]; then
-            echo "::error::WEBHOOK_TOKEN secret is not set"
+          if [ -z "$TWILIO_AUTH_TOKEN" ]; then
+            echo "::error::TWILIO_AUTH_TOKEN secret is not set"
+            exit 1
+          fi
+          if [ -z "$TWILIO_PHONE_FROM" ]; then
+            echo "::error::TWILIO_PHONE_FROM secret is not set"
+            exit 1
+          fi
+          if [ -z "$TWILIO_PHONE_TO" ]; then
+            echo "::error::TWILIO_PHONE_TO secret is not set"
             exit 1
           fi
 
           if [ -n "$PR_URL" ]; then
-            PAYLOAD=$(jq -n --arg pr_url "$PR_URL" '{pr_url: $pr_url}')
+            MESSAGE="permission-slip: PR needs attention — ${PR_URL}"
           else
-            PAYLOAD='{}'
+            MESSAGE="permission-slip: Claude Code needs your attention"
           fi
 
-          RESPONSE=$(echo "$PAYLOAD" | curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
-            -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @-)
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json" \
+            -u "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
+            --data-urlencode "To=${TWILIO_PHONE_TO}" \
+            --data-urlencode "From=${TWILIO_PHONE_FROM}" \
+            --data-urlencode "Body=${MESSAGE}")
 
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
           echo "::notice::status=$HTTP_STATUS body=$BODY"
 
           if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
-            echo "::error::Webhook call failed with status $HTTP_STATUS"
+            echo "::error::Twilio SMS failed with status $HTTP_STATUS"
             exit 1
           fi
