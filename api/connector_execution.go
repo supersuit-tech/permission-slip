@@ -42,45 +42,17 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	}
 
 	// Check auth_type for this connector's required credentials.
-	reqCred, err := db.GetRequiredCredentialByActionType(ctx, deps.DB, actionType)
+	// A connector may support multiple auth methods (e.g. both oauth2 and api_key).
+	// We try OAuth first; if the user has no OAuth connection, fall back to static credentials.
+	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return nil, fmt.Errorf("look up required credential: %w", err)
+		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
 
 	var creds connectors.Credentials
-	if reqCred != nil && reqCred.AuthType == "oauth2" {
-		// OAuth2 path: resolve access token from oauth_connections.
-		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
-		if err != nil {
-			// If the user has no OAuth connection at all, fall back to static
-			// credentials (e.g. a personal access token stored manually).
-			// This supports connectors like Figma that offer both OAuth and
-			// PAT authentication.
-			//
-			// Only fall back for "not connected" — if the user has a broken
-			// OAuth connection (needs_reauth, refresh failed), surface that
-			// error so they're prompted to reconnect instead of silently
-			// running with weaker credentials.
-			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) && oauthErr.Reason == connectors.OAuthReasonNotConnected {
-				staticCreds, staticErr := resolveStaticCredentials(ctx, deps, userID, actionType)
-				if staticErr == nil {
-					creds = staticCreds
-					err = nil
-				}
-				// If static also fails, return the original OAuth error
-				// so the user sees a clear "connect via Settings" message.
-			}
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		// Static credential path (api_key, basic, custom): existing behavior.
-		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-		if err != nil {
-			return nil, err
-		}
+	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, reqCreds)
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate credentials before executing the action.
@@ -470,4 +442,46 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	conn.AccessTokenVaultID = newAccessVaultID
 
 	return nil
+}
+
+// resolveCredentialsWithFallback tries to resolve credentials using the preferred
+// auth method (OAuth first), falling back to static credentials if OAuth is
+// unavailable. This supports connectors that offer multiple auth methods (e.g.
+// Intercom supports both OAuth and API key).
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+
+	// Partition credentials by auth type.
+	var oauthCred *db.RequiredCredential
+	var hasStaticCred bool
+	for i := range reqCreds {
+		if reqCreds[i].AuthType == "oauth2" && oauthCred == nil {
+			oauthCred = &reqCreds[i]
+		} else if reqCreds[i].AuthType != "oauth2" {
+			hasStaticCred = true
+		}
+	}
+
+	// If the connector has an OAuth credential, try it first.
+	if oauthCred != nil {
+		creds, err := resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+		if err == nil {
+			return creds, nil
+		}
+		// Only fall back to static credentials when the user has no OAuth
+		// connection at all (OAuthReasonNotConnected). If OAuth is configured
+		// but broken (needs_reauth, refresh failed), surface the error so
+		// the user is prompted to reconnect instead of silently running with
+		// weaker credentials.
+		var oauthErr *connectors.OAuthRefreshError
+		canFallback := hasStaticCred &&
+			errors.As(err, &oauthErr) &&
+			oauthErr.Reason == connectors.OAuthReasonNotConnected
+		if !canFallback {
+			return zero, err
+		}
+	}
+
+	// Fall back to static credentials (api_key, basic, custom).
+	return resolveStaticCredentials(ctx, deps, userID, actionType)
 }

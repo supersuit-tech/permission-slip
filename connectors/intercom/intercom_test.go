@@ -103,18 +103,40 @@ func TestIntercomConnector_Manifest(t *testing.T) {
 	if m.Name != "Intercom" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Intercom")
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "intercom" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "intercom")
+
+	// First credential: OAuth (preferred auth method).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "intercom_oauth" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "intercom_oauth")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "intercom" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "intercom")
+	}
+
+	// Second credential: API key (fallback).
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "intercom" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "intercom")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
+	}
+
+	// OAuth provider should be declared.
+	if len(m.OAuthProviders) != 1 {
+		t.Fatalf("Manifest().OAuthProviders has %d items, want 1", len(m.OAuthProviders))
+	}
+	if m.OAuthProviders[0].ID != "intercom" {
+		t.Errorf("oauth provider ID = %q, want %q", m.OAuthProviders[0].ID, "intercom")
 	}
 
 	if len(m.Actions) != 7 {
