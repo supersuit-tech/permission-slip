@@ -169,6 +169,14 @@ func (c *StripeConnector) Actions() map[string]connectors.Action {
 		"stripe.create_coupon":         &createCouponAction{conn: c},
 		"stripe.create_promotion_code": &createPromotionCodeAction{conn: c},
 		"stripe.initiate_payout":       &initiatePayoutAction{conn: c},
+		"stripe.create_checkout_session": &createCheckoutSessionAction{conn: c},
+		"stripe.create_product":        &createProductAction{conn: c},
+		"stripe.create_price":          &createPriceAction{conn: c},
+		"stripe.update_subscription":   &updateSubscriptionAction{conn: c},
+		"stripe.list_customers":        &listCustomersAction{conn: c},
+		"stripe.get_customer":          &getCustomerAction{conn: c},
+		"stripe.list_invoices":         &listInvoicesAction{conn: c},
+		"stripe.list_charges":          &listChargesAction{conn: c},
 	}
 }
 
