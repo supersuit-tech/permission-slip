@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), Square, and other services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -31,6 +31,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `META_CLIENT_ID` | App ID from Meta Developer Dashboard |
 | `META_CLIENT_SECRET` | App Secret from Meta Developer Dashboard |
+
+### Square OAuth
+
+| Variable | Description |
+|---|---|
+| `SQUARE_CLIENT_ID` | Production Application ID from Square Developer Dashboard |
+| `SQUARE_CLIENT_SECRET` | Production Application Secret from Square Developer Dashboard |
 
 ### OAuth Infrastructure
 
@@ -160,6 +167,44 @@ META_CLIENT_SECRET=your-meta-app-secret
 
 Find these under **App Settings > Basic** in the Meta Developer Dashboard.
 
+## Square OAuth Setup
+
+### 1. Create a Square Developer Application
+
+1. Go to [Square Developer Dashboard](https://developer.squareup.com/apps)
+2. Click **+** to create a new application
+3. Fill in the application name (e.g., "Permission Slip")
+
+### 2. Configure OAuth Settings
+
+1. Navigate to **OAuth** in the left sidebar
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/square/callback
+   ```
+3. Select the required OAuth permissions (scopes):
+   - `ORDERS_READ`, `ORDERS_WRITE`
+   - `PAYMENTS_READ`, `PAYMENTS_WRITE`
+   - `ITEMS_READ`, `ITEMS_WRITE`
+   - `CUSTOMERS_READ`, `CUSTOMERS_WRITE`
+   - `APPOINTMENTS_READ`, `APPOINTMENTS_WRITE`
+   - `INVOICES_READ`, `INVOICES_WRITE`
+   - `INVENTORY_READ`, `INVENTORY_WRITE`
+
+### 3. Get Credentials
+
+1. Navigate to **Credentials** in the left sidebar
+2. Copy the **Production Application ID** and **Production Application Secret**
+
+### 4. Configure Environment
+
+```bash
+SQUARE_CLIENT_ID=your-production-application-id
+SQUARE_CLIENT_SECRET=your-production-application-secret
+```
+
+> **Note:** The Square connector supports both OAuth and API key authentication. OAuth is recommended for production use. API keys can be generated from the Square Developer Dashboard under **Credentials > Production Access Token**.
+
 ## X (Twitter) OAuth Setup
 
 The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
@@ -251,6 +296,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
+- Square: `https://your-domain.com/api/v1/oauth/square/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
