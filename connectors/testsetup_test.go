@@ -42,4 +42,12 @@ func TestBuiltInConnectorsAreRegistered(t *testing.T) {
 		}
 		seen[c.ID()] = true
 	}
+
+	// ProtonMail must be in BuiltInConnectors unconditionally — the env-var
+	// gating (ENABLE_PROTONMAIL_CONNECTOR) is applied in main.go, not in
+	// the connector's init(). This ensures .env values loaded by godotenv
+	// are visible to the check.
+	if !seen["protonmail"] {
+		t.Error("protonmail not found in BuiltInConnectors — it must register unconditionally; env-var gating belongs in main.go")
+	}
 }
