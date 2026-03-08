@@ -40,11 +40,19 @@ import (
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
 
-// shopSubdomainPattern matches valid Shopify store subdomains: lowercase
+// subdomainPattern matches valid RFC 1123-style subdomains: lowercase
 // alphanumeric and hyphens, not starting or ending with a hyphen, max 63 chars.
-// Used to validate the "shop" query parameter before substituting it into URLs
-// to prevent URL injection or SSRF.
-var shopSubdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+// Shared by all per-instance OAuth providers (Shopify, Zendesk, etc.) to
+// prevent URL injection or SSRF when substituting into provider URL templates.
+var subdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// shopSubdomainPattern uses the shared RFC 1123 label rules to validate the
+// "shop" query parameter before substituting it into Shopify OAuth URLs.
+var shopSubdomainPattern = subdomainPattern
+
+// zendeskSubdomainPattern uses the shared RFC 1123 label rules to validate the
+// "subdomain" query parameter before substituting it into Zendesk OAuth URLs.
+var zendeskSubdomainPattern = subdomainPattern
 
 // isReservedOAuthParam returns true if the parameter name is a reserved
 // OAuth 2.0 param that must not be overridden by AuthorizeParams.
@@ -71,6 +79,10 @@ type oauthConnectionResponse struct {
 	Scopes      []string  `json:"scopes"`
 	Status      string    `json:"status"`
 	ConnectedAt time.Time `json:"connected_at"`
+	// Instance is the per-instance identifier for providers with subdomain-based
+	// OAuth URLs (e.g. "mycompany.zendesk.com" for Zendesk, "mystore.myshopify.com"
+	// for Shopify). Empty for providers with static OAuth endpoints.
+	Instance string `json:"instance,omitempty"`
 }
 
 type oauthConnectionListResponse struct {
@@ -108,14 +120,15 @@ func oauthStateSecret(deps *Deps) string {
 }
 
 // createOAuthState produces a short-lived signed JWT encoding the user ID,
-// OAuth provider, requested scopes, and optional shop subdomain. This prevents
-// CSRF and state-fixation attacks on the callback endpoint and carries the
-// final scope list so the callback can store exactly what was requested
-// (including any extra scopes from the authorize query params).
+// OAuth provider, requested scopes, and optional per-instance identifier.
+// This prevents CSRF and state-fixation attacks on the callback endpoint
+// and carries the final scope list so the callback can store exactly what
+// was requested (including any extra scopes from the authorize query params).
 //
-// The shop parameter is used by providers with per-shop URLs (e.g. Shopify)
-// so the callback can reconstruct the token endpoint. Pass "" for providers
-// with static URLs.
+// The shop parameter carries the per-instance identifier for providers with
+// dynamic OAuth URLs — the Shopify store subdomain (e.g. "mystore") or the
+// Zendesk subdomain (e.g. "mycompany"). Pass "" for providers with static
+// OAuth endpoints (e.g. Google, Slack).
 func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
@@ -141,15 +154,18 @@ type oauthState struct {
 	UserID   string
 	Provider string
 	Scopes   []string
-	// Shop is the Shopify store subdomain, used to reconstruct per-shop
-	// OAuth URLs. Empty for providers with static endpoints.
+	// Shop holds the per-instance identifier for providers with dynamic
+	// OAuth URLs: the Shopify store subdomain (e.g. "mystore") or the
+	// Zendesk subdomain (e.g. "mycompany"). Empty for providers with
+	// static OAuth endpoints (e.g. Google, Slack). The JWT claim key is
+	// "shop" for backward compatibility with in-flight tokens.
 	Shop string
 }
 
 // verifyOAuthState validates the signed state JWT and returns the encoded
-// user ID, provider, requested scopes, and optional shop subdomain. Returns
-// an error if the signature is invalid, the token is expired, or the claims
-// are missing.
+// user ID, provider, requested scopes, and optional per-instance identifier
+// (Shop field). Returns an error if the signature is invalid, the token is
+// expired, or the required claims are missing.
 func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
@@ -273,6 +289,48 @@ func validateShopSubdomain(raw string) (string, error) {
 	return raw, nil
 }
 
+// --- Per-subdomain URL helpers (Zendesk) ---
+
+// providerNeedsSubdomain returns true if the provider's authorize or token URL
+// contains a {subdomain} placeholder that must be resolved before use.
+func providerNeedsSubdomain(p oauth.Provider) bool {
+	return strings.Contains(p.AuthorizeURL, "{subdomain}") || strings.Contains(p.TokenURL, "{subdomain}")
+}
+
+// resolveSubdomainURLs replaces {subdomain} placeholders in the provider's
+// authorize and token URLs with the given subdomain. The subdomain value must
+// already be validated (see zendeskSubdomainPattern). Returns a copy of the
+// provider with resolved URLs.
+func resolveSubdomainURLs(p oauth.Provider, subdomain string) oauth.Provider {
+	p.AuthorizeURL = strings.ReplaceAll(p.AuthorizeURL, "{subdomain}", subdomain)
+	p.TokenURL = strings.ReplaceAll(p.TokenURL, "{subdomain}", subdomain)
+	return p
+}
+
+// validateZendeskSubdomain checks that a subdomain value is a valid Zendesk
+// subdomain. Accepts either a bare subdomain ("mycompany") or a full domain
+// ("mycompany.zendesk.com") and returns the normalized bare subdomain.
+func validateZendeskSubdomain(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimRight(raw, "/")
+	raw = strings.ToLower(raw)
+
+	// Accept full domain form.
+	if strings.HasSuffix(raw, ".zendesk.com") {
+		raw = strings.TrimSuffix(raw, ".zendesk.com")
+	} else if strings.Contains(raw, ".") {
+		return "", fmt.Errorf("subdomain must be a bare subdomain (e.g. \"mycompany\") or full domain (e.g. \"mycompany.zendesk.com\")")
+	}
+
+	if raw == "" {
+		return "", fmt.Errorf("subdomain is required")
+	}
+	if !zendeskSubdomainPattern.MatchString(raw) {
+		return "", fmt.Errorf("subdomain contains invalid characters")
+	}
+	return raw, nil
+}
+
 // --- Handlers ---
 
 // handleListOAuthProviders returns all registered OAuth providers with their
@@ -330,18 +388,30 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Resolve per-shop URL templates (e.g. Shopify).
-		var shop string
+		// Resolve per-instance URL templates (Shopify: {shop}, Zendesk: {subdomain}).
+		// instanceID carries the per-instance identifier (subdomain or shop) so it
+		// can be encoded in the CSRF state token for use during the callback.
+		var instanceID string
 		if providerNeedsShop(provider) {
 			rawShop := r.URL.Query().Get("shop")
 			var err error
-			shop, err = validateShopSubdomain(rawShop)
+			instanceID, err = validateShopSubdomain(rawShop)
 			if err != nil {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
 					fmt.Sprintf("invalid shop parameter: %v", err)))
 				return
 			}
-			provider = resolveShopURLs(provider, shop)
+			provider = resolveShopURLs(provider, instanceID)
+		} else if providerNeedsSubdomain(provider) {
+			rawSubdomain := r.URL.Query().Get("subdomain")
+			var err error
+			instanceID, err = validateZendeskSubdomain(rawSubdomain)
+			if err != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+					fmt.Sprintf("invalid subdomain parameter: %v", err)))
+				return
+			}
+			provider = resolveSubdomainURLs(provider, instanceID)
 		}
 
 		cfg := newOAuth2Config(deps, provider)
@@ -354,7 +424,7 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// Create the CSRF state token after computing the final scope list so
 		// the callback can store exactly which scopes were requested.
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, shop)
+		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
@@ -448,9 +518,18 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Resolve per-shop URL templates using the shop from the state token.
-		if state.Shop != "" && providerNeedsShop(provider) {
-			provider = resolveShopURLs(provider, state.Shop)
+		// Resolve per-instance URL templates using the instance identifier from
+		// the state token. Capture the placeholder flags before resolution so
+		// we can determine the correct extra_data key below without re-checking
+		// the (now-resolved) URLs.
+		needsShop := providerNeedsShop(provider)
+		needsSubdomain := providerNeedsSubdomain(provider)
+		if state.Shop != "" {
+			if needsShop {
+				provider = resolveShopURLs(provider, state.Shop)
+			} else if needsSubdomain {
+				provider = resolveSubdomainURLs(provider, state.Shop)
+			}
 		}
 
 		cfg := newOAuth2Config(deps, provider)
@@ -473,14 +552,21 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		}
 
 		// Build extra data to persist alongside the tokens. For providers
-		// with per-shop URLs (e.g. Shopify), store the shop_domain so it's
+		// with per-instance URLs, store an instance identifier so it's
 		// available at execution time as a credential.
 		var stateExtraData map[string]string
-		// NOTE: state.Shop is validated and normalized during the authorize step
-		// to be a bare subdomain (e.g. "mystore"), so appending ".myshopify.com"
-		// here is intentional and produces the full domain.
 		if state.Shop != "" {
-			stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
+			if needsSubdomain {
+				// Zendesk: store bare subdomain (e.g. "mycompany") so the
+				// connector can build API URLs like mycompany.zendesk.com.
+				stateExtraData = map[string]string{"subdomain": state.Shop}
+			} else if needsShop {
+				// Shopify: store the full shop domain (e.g. "mystore.myshopify.com").
+				// NOTE: state.Shop is validated to be a bare subdomain during
+				// the authorize step, so appending ".myshopify.com" is intentional.
+				stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
+			}
+			// Other per-instance providers: no extra_data needed beyond the token.
 		}
 
 		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
@@ -631,6 +717,28 @@ func isURLExtraKey(key string) bool {
 	return key == "instance_url"
 }
 
+// instanceFromExtraData extracts a human-readable instance identifier from an
+// OAuth connection's extra_data JSON. For Zendesk connections it returns
+// "{subdomain}.zendesk.com"; for Shopify it returns the raw shop_domain (which
+// already includes ".myshopify.com"). Returns "" for providers with no
+// per-instance data (e.g. Google, Slack).
+func instanceFromExtraData(extraData json.RawMessage) string {
+	if len(extraData) == 0 {
+		return ""
+	}
+	var extra map[string]string
+	if err := json.Unmarshal(extraData, &extra); err != nil {
+		return ""
+	}
+	if subdomain, ok := extra["subdomain"]; ok && subdomain != "" {
+		return subdomain + ".zendesk.com"
+	}
+	if shopDomain, ok := extra["shop_domain"]; ok && shopDomain != "" {
+		return shopDomain
+	}
+	return ""
+}
+
 // handleListOAuthConnections returns all OAuth connections for the authenticated user.
 func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -654,6 +762,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 				Scopes:      c.Scopes,
 				Status:      c.Status,
 				ConnectedAt: c.CreatedAt,
+				Instance:    instanceFromExtraData(c.ExtraData),
 			}
 		}
 

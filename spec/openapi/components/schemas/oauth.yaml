@@ -69,6 +69,14 @@ OAuthConnection:
       format: date-time
       description: When the OAuth connection was established
       example: "2026-03-05T10:00:00Z"
+    instance:
+      type: string
+      description: >
+        For providers with per-instance OAuth URLs (e.g. Zendesk, Shopify),
+        the instance identifier — subdomain for Zendesk (e.g. "mycompany.zendesk.com")
+        or shop domain for Shopify (e.g. "mystore.myshopify.com"). Omitted for
+        providers with static OAuth endpoints (e.g. Google, Slack).
+      example: "mycompany.zendesk.com"
 
 OAuthConnectionListResponse:
   type: object

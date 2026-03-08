@@ -111,6 +111,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"slack":      true,
 	"square":     true,
 	"stripe":     true,
+	"zendesk":    true,
 	"zoom":       true,
 	"pagerduty":  true,
 	"datadog":    true,

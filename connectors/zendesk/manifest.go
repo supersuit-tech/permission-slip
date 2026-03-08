@@ -251,6 +251,16 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
+			// OAuth is the preferred authentication method — better UX,
+			// no manual token management, and automatic token refresh.
+			{
+				Service:       "zendesk",
+				AuthType:      "oauth2",
+				OAuthProvider: "zendesk",
+				OAuthScopes:   []string{"read", "write"},
+			},
+			// API token remains supported for service accounts and users
+			// who prefer not to use OAuth.
 			{
 				Service:         "zendesk",
 				AuthType:        "custom",

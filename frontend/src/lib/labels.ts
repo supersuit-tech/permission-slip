@@ -23,6 +23,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   slack: "Slack",
   square: "Square",
   stripe: "Stripe",
+  zendesk: "Zendesk",
   zoom: "Zoom",
 };
 
