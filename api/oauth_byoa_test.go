@@ -10,6 +10,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
+	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
