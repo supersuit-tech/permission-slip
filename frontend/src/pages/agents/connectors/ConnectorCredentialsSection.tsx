@@ -137,34 +137,16 @@ function OAuthCredentialRow({
   const { session } = useAuth();
   const provider = requiredCredential.oauth_provider ?? "";
 
-  async function handleConnect() {
+  function handleConnect() {
     if (!session?.access_token) return;
     const baseUrl =
       import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
     const url = `${baseUrl}/v1/oauth/${provider}/authorize`;
 
-    try {
-      // Use fetch with Authorization header instead of putting the token
-      // in the URL (avoids leaking credentials via browser history, logs,
-      // and Referer headers). redirect: "manual" captures the 302 so we
-      // can read the Location header without the browser following it.
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        redirect: "manual",
-      });
-
-      const location = response.headers.get("Location");
-      if (location) {
-        window.location.href = location;
-      } else {
-        // Fallback: direct navigation (works if the backend reads
-        // access_token from query params or a proxy injects the header).
-        window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
-      }
-    } catch {
-      // Network error — fall back to direct navigation.
-      window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
-    }
+    // Navigate to the OAuth authorize endpoint. The backend reads the
+    // token from the query string and issues a 302 to the provider's
+    // consent screen. Same pattern as ConnectedAccountsSection.
+    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
   }
 
   return (
