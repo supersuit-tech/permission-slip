@@ -99,6 +99,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"meta":       true,
 	"microsoft":  true,
 	"salesforce": true,
+	"stripe":     true,
 	"zoom":       true,
 }
 

@@ -30,6 +30,16 @@ import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
+const AUTH_TYPE_LABELS: Record<string, string> = {
+  api_key: "API Key",
+  basic: "Username & Password",
+  custom: "Custom Credential",
+};
+
+function authTypeLabel(authType: string): string {
+  return AUTH_TYPE_LABELS[authType] ?? authType;
+}
+
 interface ConnectorCredentialsSectionProps {
   requiredCredentials: RequiredCredential[];
 }
@@ -84,23 +94,41 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {sorted.map((cred) =>
-              cred.auth_type === "oauth2" && cred.oauth_provider ? (
-                <OAuthCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  connections={connections}
-                  providers={providers}
-                />
-              ) : (
-                <StaticCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  storedCredentials={storedByService.get(cred.service) ?? []}
-                  isAlternative={hasOAuth}
-                />
-              ),
-            )}
+            {sorted.map((cred, idx) => {
+              const prevCred =
+                idx > 0 ? sorted[idx - 1] : undefined;
+              const showOrSeparator =
+                prevCred != null &&
+                prevCred.auth_type === "oauth2" &&
+                cred.auth_type !== "oauth2";
+
+              return (
+                <div key={cred.service}>
+                  {showOrSeparator && (
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="bg-border h-px flex-1" />
+                      <span className="text-muted-foreground text-xs font-medium uppercase">
+                        or
+                      </span>
+                      <div className="bg-border h-px flex-1" />
+                    </div>
+                  )}
+                  {cred.auth_type === "oauth2" && cred.oauth_provider ? (
+                    <OAuthCredentialRow
+                      requiredCredential={cred}
+                      connections={connections}
+                      providers={providers}
+                    />
+                  ) : (
+                    <StaticCredentialRow
+                      requiredCredential={cred}
+                      storedCredentials={storedByService.get(cred.service) ?? []}
+                      isAlternative={hasOAuth}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
