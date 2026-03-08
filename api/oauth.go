@@ -26,10 +26,10 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"golang.org/x/oauth2"
@@ -37,6 +37,13 @@ import (
 
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
+
+// isReservedOAuthParam returns true if the parameter name is a reserved
+// OAuth 2.0 param that must not be overridden by AuthorizeParams.
+// Uses the canonical list from connectors.ReservedAuthorizeParams.
+func isReservedOAuthParam(name string) bool {
+	return connectors.ReservedAuthorizeParams[name]
+}
 
 // --- Response types ---
 
@@ -273,14 +280,18 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Build the authorization URL. Some providers (e.g. Slack) require
-		// comma-separated scopes instead of the standard space-separated format.
-		// When a custom separator is configured, override the scope parameter.
-		opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
-		if provider.ScopeSeparator != "" {
-			opts = append(opts, oauth2.SetAuthURLParam("scope", strings.Join(cfg.Scopes, provider.ScopeSeparator)))
+		// Build auth URL with standard params + any provider-specific params
+		// (e.g. Atlassian's audience=api.atlassian.com for 3LO, Slack's
+		// comma-separated scope override).
+		authOpts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+		for k, v := range provider.AuthorizeParams {
+			if isReservedOAuthParam(k) {
+				log.Printf("[%s] OAuthAuthorize: skipping reserved param %q from provider %q AuthorizeParams", TraceID(r.Context()), k, providerID)
+				continue
+			}
+			authOpts = append(authOpts, oauth2.SetAuthURLParam(k, v))
 		}
-		authURL := cfg.AuthCodeURL(state, opts...)
+		authURL := cfg.AuthCodeURL(state, authOpts...)
 		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 	}
 }
