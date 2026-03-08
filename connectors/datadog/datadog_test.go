@@ -48,18 +48,19 @@ func TestDatadogConnector_ValidateCredentials(t *testing.T) {
 		creds   connectors.Credentials
 		wantErr bool
 	}{
+		// Custom auth (api_key + app_key)
 		{
-			name:    "valid credentials",
+			name:    "valid custom credentials",
 			creds:   validCreds(),
 			wantErr: false,
 		},
 		{
-			name:    "valid with site",
+			name:    "valid custom with site",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": "k", "app_key": "a", "site": "datadoghq.eu"}),
 			wantErr: false,
 		},
 		{
-			name:    "invalid site",
+			name:    "invalid site with custom auth",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": "k", "app_key": "a", "site": "invalid.example.com"}),
 			wantErr: true,
 		},
@@ -87,6 +88,27 @@ func TestDatadogConnector_ValidateCredentials(t *testing.T) {
 			name:    "zero-value credentials",
 			creds:   connectors.Credentials{},
 			wantErr: true,
+		},
+		// OAuth auth (access_token)
+		{
+			name:    "valid OAuth access_token",
+			creds:   validOAuthCreds(),
+			wantErr: false,
+		},
+		{
+			name:    "OAuth with valid site",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "tok", "site": "us3.datadoghq.com"}),
+			wantErr: false,
+		},
+		{
+			name:    "OAuth with invalid site",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "tok", "site": "invalid.example.com"}),
+			wantErr: true,
+		},
+		{
+			name:    "OAuth preferred over api_key+app_key when both present",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "tok", "api_key": "k", "app_key": "a"}),
+			wantErr: false,
 		},
 	}
 
@@ -171,18 +193,33 @@ func TestDatadogConnector_Manifest(t *testing.T) {
 		}
 	}
 
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "datadog" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "datadog")
+	// OAuth should be first (default/primary auth method).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "datadog_oauth" {
+		t.Errorf("RequiredCredentials[0].Service = %q, want %q", oauthCred.Service, "datadog_oauth")
 	}
-	if cred.AuthType != "custom" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "custom")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "datadog" {
+		t.Errorf("RequiredCredentials[0].OAuthProvider = %q, want %q", oauthCred.OAuthProvider, "datadog")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("RequiredCredentials[0].OAuthScopes is empty, want scopes")
+	}
+	// Custom auth should be second (alternative auth method).
+	customCred := m.RequiredCredentials[1]
+	if customCred.Service != "datadog" {
+		t.Errorf("RequiredCredentials[1].Service = %q, want %q", customCred.Service, "datadog")
+	}
+	if customCred.AuthType != "custom" {
+		t.Errorf("RequiredCredentials[1].AuthType = %q, want %q", customCred.AuthType, "custom")
+	}
+	if customCred.InstructionsURL == "" {
+		t.Error("RequiredCredentials[1].InstructionsURL is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {
@@ -217,4 +254,83 @@ func TestDatadogConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*DatadogConnector)(nil)
 	var _ connectors.ManifestProvider = (*DatadogConnector)(nil)
+}
+
+func TestDatadogConnector_Do_UsesOAuthBearerToken(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// OAuth path must use Authorization: Bearer, not DD-API-KEY.
+		if got := r.Header.Get("Authorization"); got != "Bearer dd_oauth_test_token_abc" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer dd_oauth_test_token_abc")
+		}
+		if got := r.Header.Get("DD-API-KEY"); got != "" {
+			t.Errorf("DD-API-KEY should not be set for OAuth, got %q", got)
+		}
+		if got := r.Header.Get("DD-APPLICATION-KEY"); got != "" {
+			t.Errorf("DD-APPLICATION-KEY should not be set for OAuth, got %q", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	if err := c.do(t.Context(), validOAuthCreds(), http.MethodGet, "/api/v2/metrics", nil, &resp); err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
+func TestDatadogConnector_Do_UsesAPIKeysWhenNoAccessToken(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("DD-API-KEY"); got != "dd_test_api_key_123" {
+			t.Errorf("DD-API-KEY = %q, want %q", got, "dd_test_api_key_123")
+		}
+		if got := r.Header.Get("DD-APPLICATION-KEY"); got != "dd_test_app_key_456" {
+			t.Errorf("DD-APPLICATION-KEY = %q, want %q", got, "dd_test_app_key_456")
+		}
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Errorf("Authorization should not be set for custom auth, got %q", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	if err := c.do(t.Context(), validCreds(), http.MethodGet, "/api/v2/metrics", nil, &resp); err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
+func TestDatadogConnector_Do_PrefersOAuthOverAPIKeys(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// When both access_token and api_key are present, Bearer wins.
+		if got := r.Header.Get("Authorization"); got != "Bearer oauth_wins" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer oauth_wins")
+		}
+		if got := r.Header.Get("DD-API-KEY"); got != "" {
+			t.Errorf("DD-API-KEY should not be set when access_token present, got %q", got)
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token": "oauth_wins",
+		"api_key":      "should_be_ignored",
+		"app_key":      "should_be_ignored",
+	})
+	c := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	if err := c.do(t.Context(), creds, http.MethodGet, "/api/v2/metrics", nil, &resp); err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
 }

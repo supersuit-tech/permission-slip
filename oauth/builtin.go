@@ -259,6 +259,22 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("STRIPE_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "datadog",
+			AuthorizeURL: "https://app.datadoghq.com/oauth2/v1/authorize",
+			TokenURL:     "https://api.datadoghq.com/oauth2/v1/token",
+			Scopes: []string{
+				"metrics_read",
+				"incidents_read",
+				"incidents_write",
+				"monitors_read",
+				"monitors_write",
+				"workflows_run",
+			},
+			ClientID:     os.Getenv("DATADOG_CLIENT_ID"),
+			ClientSecret: os.Getenv("DATADOG_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 
