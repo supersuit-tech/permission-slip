@@ -73,7 +73,11 @@ func (c *SendGridConnector) Actions() map[string]connectors.Action {
 		"sendgrid.get_campaign_stats": &getCampaignStatsAction{conn: c},
 		"sendgrid.list_segments":      &listSegmentsAction{conn: c},
 		"sendgrid.list_senders":       &listSendersAction{conn: c},
-		"sendgrid.list_lists":         &listListsAction{conn: c},
+		"sendgrid.list_lists":               &listListsAction{conn: c},
+		"sendgrid.send_transactional_email": &sendTransactionalEmailAction{conn: c},
+		"sendgrid.create_contact":           &createContactAction{conn: c},
+		"sendgrid.get_bounces":              &getBouncesAction{conn: c},
+		"sendgrid.get_suppressions":         &getSuppressionsAction{conn: c},
 	}
 }
 
