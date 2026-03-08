@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), Notion, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -31,6 +31,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `META_CLIENT_ID` | App ID from Meta Developer Dashboard |
 | `META_CLIENT_SECRET` | App Secret from Meta Developer Dashboard |
+
+### Notion OAuth
+
+| Variable | Description |
+|---|---|
+| `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
+| `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
 
 ### OAuth Infrastructure
 
@@ -160,6 +167,47 @@ META_CLIENT_SECRET=your-meta-app-secret
 
 Find these under **App Settings > Basic** in the Meta Developer Dashboard.
 
+## Notion OAuth Setup
+
+Notion supports both OAuth and internal integration tokens (API keys). OAuth is recommended for end users; API keys are useful for server-to-server integrations or when OAuth is not available.
+
+### 1. Create a Notion Integration
+
+1. Go to [My Integrations](https://www.notion.so/my-integrations)
+2. Click **New integration**
+3. Fill in the required fields:
+   - Name: Your deployment name (e.g., "Permission Slip")
+   - Associated workspace: Select the workspace to connect
+4. Under **Capabilities**, select the permissions your connectors need (read content, update content, insert content)
+5. Under **Distribution**, enable **Public integration** to use OAuth
+
+### 2. Configure OAuth Settings
+
+1. In the integration settings, go to the **OAuth Domain & URIs** section
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/notion/callback
+   ```
+3. Copy the **OAuth client ID** and **OAuth client secret**
+
+### 3. Configure Environment
+
+```bash
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
+```
+
+### Alternative: API Key (Internal Integration Token)
+
+If you don't need OAuth, you can use an internal integration token instead:
+
+1. Create a **private** integration (not public) at [My Integrations](https://www.notion.so/my-integrations)
+2. Copy the **Internal Integration Secret** (starts with `ntn_`)
+3. In Permission Slip, add it as an API key credential in the connector settings
+4. Share your Notion pages/databases with the integration
+
+The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
+
 ## X (Twitter) OAuth Setup
 
 The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
@@ -251,6 +299,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
+- Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.

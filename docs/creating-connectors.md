@@ -363,7 +363,20 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google`, `kroger`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+**Dual-auth support:** A connector can offer both OAuth and API key authentication by declaring multiple credentials. The execution layer tries OAuth first and falls back to API key only when the user has no OAuth connection. Example:
+
+```go
+RequiredCredentials: []connectors.ManifestCredential{
+    {Service: "notion_oauth", AuthType: "oauth2", OAuthProvider: "notion"},
+    {Service: "notion", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
+},
+```
+
+The connector's `ValidateCredentials` and action code should accept either credential type (e.g., check for `access_token` first, then fall back to `api_key`).
+
+#### Declaring custom OAuth providers
+
+External connectors that use OAuth providers not built into the platform (anything other than `google`, `kroger`, `microsoft`, `notion`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
