@@ -158,7 +158,28 @@ func (c *XConnector) do(ctx context.Context, creds connectors.Credentials, metho
 	return nil
 }
 
-// checkResponse inspects the HTTP status code and returns an appropriate
+// resolveUserID returns userID as-is if non-empty, otherwise fetches the
+// authenticated user's ID via GET /users/me. This lets callers omit user_id
+// for actions that operate on the authenticated user's own account.
+func (c *XConnector) resolveUserID(ctx context.Context, creds connectors.Credentials, userID string) (string, error) {
+	if userID != "" {
+		return userID, nil
+	}
+	var resp struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := c.do(ctx, creds, http.MethodGet, "/users/me?user.fields=id", nil, &resp); err != nil {
+		return "", fmt.Errorf("resolving authenticated user ID: %w", err)
+	}
+	if resp.Data.ID == "" {
+		return "", &connectors.ExternalError{Message: "could not resolve authenticated user ID from /users/me"}
+	}
+	return resp.Data.ID, nil
+}
+
+
 // typed error for non-success responses.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {

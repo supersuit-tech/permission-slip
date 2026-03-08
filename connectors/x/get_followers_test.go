@@ -47,7 +47,47 @@ func TestGetFollowers_Success(t *testing.T) {
 	}
 }
 
-func TestGetFollowers_MissingUserID(t *testing.T) {
+// TestGetFollowers_AutoResolveUserID verifies that omitting user_id falls back
+// to the authenticated user's followers.
+func TestGetFollowers_AutoResolveUserID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/users/me" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "77", "name": "Me", "username": "me"},
+			})
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/users/77/followers") {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{{"id": "1", "name": "Bob", "username": "bob"}},
+			})
+			return
+		}
+		t.Errorf("unexpected path: %s", r.URL.Path)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["x.get_followers"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.get_followers",
+		Parameters:  json.RawMessage(`{}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if result == nil || len(result.Data) == 0 {
+		t.Fatal("Execute() returned empty result")
+	}
+}
+
+func TestGetFollowers_InvalidMaxResults(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
@@ -55,7 +95,7 @@ func TestGetFollowers_MissingUserID(t *testing.T) {
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "x.get_followers",
-		Parameters:  json.RawMessage(`{}`),
+		Parameters:  json.RawMessage(`{"user_id":"99","max_results":9999}`),
 		Credentials: validCreds(),
 	})
 	if err == nil {

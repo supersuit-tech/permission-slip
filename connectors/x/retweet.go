@@ -18,14 +18,12 @@ type retweetAction struct {
 
 // retweetParams are the parameters parsed from ActionRequest.Parameters.
 type retweetParams struct {
+	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
 	UserID  string `json:"user_id"`
 	TweetID string `json:"tweet_id"`
 }
 
 func (p *retweetParams) validate() error {
-	if p.UserID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
-	}
 	if p.TweetID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: tweet_id"}
 	}
@@ -42,6 +40,11 @@ func (a *retweetAction) Execute(ctx context.Context, req connectors.ActionReques
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	body := map[string]string{"tweet_id": params.TweetID}
 
 	var xResp struct {
@@ -50,7 +53,7 @@ func (a *retweetAction) Execute(ctx context.Context, req connectors.ActionReques
 		} `json:"data"`
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/retweets"
+	path := "/users/" + url.PathEscape(userID) + "/retweets"
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &xResp); err != nil {
 		return nil, err
 	}
@@ -74,13 +77,18 @@ func (a *unretweetAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	var xResp struct {
 		Data struct {
 			Retweeted bool `json:"retweeted"`
 		} `json:"data"`
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/retweets/" + url.PathEscape(params.TweetID)
+	path := "/users/" + url.PathEscape(userID) + "/retweets/" + url.PathEscape(params.TweetID)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodDelete, path, nil, &xResp); err != nil {
 		return nil, err
 	}

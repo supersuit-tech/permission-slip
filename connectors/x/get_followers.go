@@ -19,15 +19,13 @@ type getFollowersAction struct {
 
 // getFollowersParams are the parameters parsed from ActionRequest.Parameters.
 type getFollowersParams struct {
-	UserID     string `json:"user_id"`
-	MaxResults int    `json:"max_results"`
+	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
+	UserID          string `json:"user_id"`
+	MaxResults      int    `json:"max_results"`
 	PaginationToken string `json:"pagination_token"`
 }
 
 func (p *getFollowersParams) validate() error {
-	if p.UserID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
-	}
 	if p.MaxResults != 0 && (p.MaxResults < 1 || p.MaxResults > 1000) {
 		return &connectors.ValidationError{Message: "max_results must be between 1 and 1000"}
 	}
@@ -44,12 +42,17 @@ func (a *getFollowersAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	maxResults := params.MaxResults
 	if maxResults == 0 {
 		maxResults = 100
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/followers" +
+	path := "/users/" + url.PathEscape(userID) + "/followers" +
 		"?max_results=" + strconv.Itoa(maxResults) +
 		"&user.fields=id,name,username,description,public_metrics"
 	if params.PaginationToken != "" {
@@ -80,12 +83,17 @@ func (a *getFollowingAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	maxResults := params.MaxResults
 	if maxResults == 0 {
 		maxResults = 100
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/following" +
+	path := "/users/" + url.PathEscape(userID) + "/following" +
 		"?max_results=" + strconv.Itoa(maxResults) +
 		"&user.fields=id,name,username,description,public_metrics"
 	if params.PaginationToken != "" {

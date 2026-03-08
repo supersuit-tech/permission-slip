@@ -162,15 +162,15 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "x.like_tweet",
 				Name:        "Like Tweet",
-				Description: "Like a tweet on behalf of a user",
+				Description: "Like a tweet on behalf of the authenticated user",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id", "tweet_id"],
+					"required": ["tweet_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "The authenticated user's ID"
+							"description": "Authenticated user's ID. If omitted, resolved automatically via /users/me"
 						},
 						"tweet_id": {
 							"type": "string",
@@ -186,11 +186,11 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id", "tweet_id"],
+					"required": ["tweet_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "The authenticated user's ID"
+							"description": "Authenticated user's ID. If omitted, resolved automatically via /users/me"
 						},
 						"tweet_id": {
 							"type": "string",
@@ -202,15 +202,15 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "x.retweet",
 				Name:        "Retweet",
-				Description: "Retweet a tweet on behalf of a user",
+				Description: "Retweet a tweet on behalf of the authenticated user",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id", "tweet_id"],
+					"required": ["tweet_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "The authenticated user's ID"
+							"description": "Authenticated user's ID. If omitted, resolved automatically via /users/me"
 						},
 						"tweet_id": {
 							"type": "string",
@@ -226,11 +226,11 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id", "tweet_id"],
+					"required": ["tweet_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "The authenticated user's ID"
+							"description": "Authenticated user's ID. If omitted, resolved automatically via /users/me"
 						},
 						"tweet_id": {
 							"type": "string",
@@ -246,11 +246,11 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id", "target_user_id"],
+					"required": ["target_user_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "The authenticated user's ID"
+							"description": "Authenticated user's ID. If omitted, resolved automatically via /users/me"
 						},
 						"target_user_id": {
 							"type": "string",
@@ -266,11 +266,11 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id", "target_user_id"],
+					"required": ["target_user_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "The authenticated user's ID"
+							"description": "Authenticated user's ID. If omitted, resolved automatically via /users/me"
 						},
 						"target_user_id": {
 							"type": "string",
@@ -282,15 +282,14 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "x.get_followers",
 				Name:        "Get Followers",
-				Description: "Get a user's followers list",
+				Description: "Get a user's followers list (defaults to the authenticated user)",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "User ID to get followers for"
+							"description": "User ID to get followers for. If omitted, defaults to the authenticated user"
 						},
 						"max_results": {
 							"type": "integer",
@@ -309,15 +308,14 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "x.get_following",
 				Name:        "Get Following",
-				Description: "Get the list of users that a user follows",
+				Description: "Get the list of users that a user follows (defaults to the authenticated user)",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["user_id"],
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "User ID to get following list for"
+							"description": "User ID to get following list for. If omitted, defaults to the authenticated user"
 						},
 						"max_results": {
 							"type": "integer",

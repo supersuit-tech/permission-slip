@@ -57,7 +57,52 @@ func TestFollowUser_Success(t *testing.T) {
 	}
 }
 
-func TestFollowUser_MissingParams(t *testing.T) {
+// TestFollowUser_AutoResolveUserID verifies that omitting user_id resolves to
+// the authenticated user's ID automatically.
+func TestFollowUser_AutoResolveUserID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/users/me" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "55", "name": "Me", "username": "me"},
+			})
+			return
+		}
+		if r.URL.Path == "/users/55/following" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"following": true, "pending_follow": false},
+			})
+			return
+		}
+		t.Errorf("unexpected path: %s", r.URL.Path)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["x.follow_user"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.follow_user",
+		Parameters:  json.RawMessage(`{"target_user_id":"42"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["following"] != true {
+		t.Errorf("following = %v, want true", data["following"])
+	}
+}
+
+func TestFollowUser_MissingTargetUserID(t *testing.T) {
 	t.Parallel()
 
 	conn := New()

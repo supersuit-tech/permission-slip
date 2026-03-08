@@ -18,14 +18,12 @@ type followUserAction struct {
 
 // followUserParams are the parameters parsed from ActionRequest.Parameters.
 type followUserParams struct {
+	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
 	UserID       string `json:"user_id"`
 	TargetUserID string `json:"target_user_id"`
 }
 
 func (p *followUserParams) validate() error {
-	if p.UserID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
-	}
 	if p.TargetUserID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: target_user_id"}
 	}
@@ -42,16 +40,21 @@ func (a *followUserAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	body := map[string]string{"target_user_id": params.TargetUserID}
 
 	var xResp struct {
 		Data struct {
-			Following            bool `json:"following"`
-			PendingFollow        bool `json:"pending_follow"`
+			Following     bool `json:"following"`
+			PendingFollow bool `json:"pending_follow"`
 		} `json:"data"`
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/following"
+	path := "/users/" + url.PathEscape(userID) + "/following"
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &xResp); err != nil {
 		return nil, err
 	}
@@ -75,13 +78,18 @@ func (a *unfollowUserAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	var xResp struct {
 		Data struct {
 			Following bool `json:"following"`
 		} `json:"data"`
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/following/" + url.PathEscape(params.TargetUserID)
+	path := "/users/" + url.PathEscape(userID) + "/following/" + url.PathEscape(params.TargetUserID)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodDelete, path, nil, &xResp); err != nil {
 		return nil, err
 	}

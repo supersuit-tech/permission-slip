@@ -54,7 +54,52 @@ func TestRetweet_Success(t *testing.T) {
 	}
 }
 
-func TestRetweet_MissingParams(t *testing.T) {
+// TestRetweet_AutoResolveUserID verifies that omitting user_id auto-resolves
+// to the authenticated user via /users/me.
+func TestRetweet_AutoResolveUserID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/users/me" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "33", "name": "Me", "username": "me"},
+			})
+			return
+		}
+		if r.URL.Path == "/users/33/retweets" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"retweeted": true},
+			})
+			return
+		}
+		t.Errorf("unexpected path: %s", r.URL.Path)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["x.retweet"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.retweet",
+		Parameters:  json.RawMessage(`{"tweet_id":"5678"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["retweeted"] != true {
+		t.Errorf("retweeted = %v, want true", data["retweeted"])
+	}
+}
+
+func TestRetweet_MissingTweetID(t *testing.T) {
 	t.Parallel()
 
 	conn := New()

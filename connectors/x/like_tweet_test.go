@@ -54,32 +54,67 @@ func TestLikeTweet_Success(t *testing.T) {
 	}
 }
 
-func TestLikeTweet_MissingParams(t *testing.T) {
+// TestLikeTweet_AutoResolveUserID verifies that omitting user_id triggers
+// a /users/me lookup and uses the returned ID for the likes endpoint.
+func TestLikeTweet_AutoResolveUserID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/users/me" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "42", "name": "Test User", "username": "testuser"},
+			})
+			return
+		}
+		if r.URL.Path == "/users/42/likes" {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"liked": true},
+			})
+			return
+		}
+		t.Errorf("unexpected path: %s", r.URL.Path)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["x.like_tweet"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.like_tweet",
+		Parameters:  json.RawMessage(`{"tweet_id":"1234"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["liked"] != true {
+		t.Errorf("liked = %v, want true", data["liked"])
+	}
+}
+
+func TestLikeTweet_MissingTweetID(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
 	action := conn.Actions()["x.like_tweet"]
 
-	for _, tc := range []struct {
-		name   string
-		params string
-	}{
-		{"missing user_id", `{"tweet_id":"1234"}`},
-		{"missing tweet_id", `{"user_id":"99"}`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := action.Execute(t.Context(), connectors.ActionRequest{
-				ActionType:  "x.like_tweet",
-				Parameters:  json.RawMessage(tc.params),
-				Credentials: validCreds(),
-			})
-			if err == nil {
-				t.Fatal("Execute() expected error, got nil")
-			}
-			if !connectors.IsValidationError(err) {
-				t.Errorf("expected ValidationError, got %T: %v", err, err)
-			}
-		})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.like_tweet",
+		Parameters:  json.RawMessage(`{"user_id":"99"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
 

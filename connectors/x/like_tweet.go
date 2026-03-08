@@ -18,14 +18,12 @@ type likeTweetAction struct {
 
 // likeTweetParams are the parameters parsed from ActionRequest.Parameters.
 type likeTweetParams struct {
+	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
 	UserID  string `json:"user_id"`
 	TweetID string `json:"tweet_id"`
 }
 
 func (p *likeTweetParams) validate() error {
-	if p.UserID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
-	}
 	if p.TweetID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: tweet_id"}
 	}
@@ -42,6 +40,11 @@ func (a *likeTweetAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	body := map[string]string{"tweet_id": params.TweetID}
 
 	var xResp struct {
@@ -50,7 +53,7 @@ func (a *likeTweetAction) Execute(ctx context.Context, req connectors.ActionRequ
 		} `json:"data"`
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/likes"
+	path := "/users/" + url.PathEscape(userID) + "/likes"
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, body, &xResp); err != nil {
 		return nil, err
 	}
@@ -74,13 +77,18 @@ func (a *unlikeTweetAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
+	userID, err := a.conn.resolveUserID(ctx, req.Credentials, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+
 	var xResp struct {
 		Data struct {
 			Liked bool `json:"liked"`
 		} `json:"data"`
 	}
 
-	path := "/users/" + url.PathEscape(params.UserID) + "/likes/" + url.PathEscape(params.TweetID)
+	path := "/users/" + url.PathEscape(userID) + "/likes/" + url.PathEscape(params.TweetID)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodDelete, path, nil, &xResp); err != nil {
 		return nil, err
 	}
