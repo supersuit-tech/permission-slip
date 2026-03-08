@@ -216,7 +216,7 @@ describe("ConnectorCredentialsSection", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Pagerduty (OAuth)")).toBeInTheDocument();
+      expect(screen.getByText("PagerDuty (OAuth)")).toBeInTheDocument();
     });
     expect(screen.getByText("Not connected")).toBeInTheDocument();
     expect(screen.getByText("Connect")).toBeInTheDocument();
@@ -268,12 +268,12 @@ describe("ConnectorCredentialsSection", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Pagerduty — connect with one of the following:"),
+        screen.getByText("PagerDuty — connect with one of the following:"),
       ).toBeInTheDocument();
     });
     expect(screen.getByText("or")).toBeInTheDocument();
-    expect(screen.getByText("Pagerduty (OAuth)")).toBeInTheDocument();
-    expect(screen.getByText("Pagerduty (API Key)")).toBeInTheDocument();
+    expect(screen.getByText("PagerDuty (OAuth)")).toBeInTheDocument();
+    expect(screen.getByText("PagerDuty (API Key)")).toBeInTheDocument();
   });
 
   it("shows human-readable auth type labels", async () => {

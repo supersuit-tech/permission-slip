@@ -20,6 +20,7 @@ import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
+import { providerLabel } from "@/lib/providerLabels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
@@ -40,9 +41,16 @@ function authTypeLabel(authType: string): string {
   return AUTH_TYPE_LABELS[authType] ?? authType;
 }
 
-/** Capitalize a service name for display (e.g. "pagerduty" → "Pagerduty"). */
-function capitalizeService(service: string): string {
-  return service.charAt(0).toUpperCase() + service.slice(1);
+/**
+ * Sort credentials so oauth2 comes first (recommended default), then others.
+ * This ensures a consistent rendering order regardless of backend ordering.
+ */
+function sortCredentials(creds: RequiredCredential[]): RequiredCredential[] {
+  return [...creds].sort((a, b) => {
+    if (a.auth_type === "oauth2" && b.auth_type !== "oauth2") return -1;
+    if (a.auth_type !== "oauth2" && b.auth_type === "oauth2") return 1;
+    return 0;
+  });
 }
 
 /**
@@ -53,8 +61,9 @@ function capitalizeService(service: string): string {
 function groupByService(
   creds: RequiredCredential[],
 ): Map<string, RequiredCredential[]> {
+  const sorted = sortCredentials(creds);
   const groups = new Map<string, RequiredCredential[]>();
-  for (const c of creds) {
+  for (const c of sorted) {
     const list = groups.get(c.service) ?? [];
     list.push(c);
     groups.set(c.service, list);
@@ -72,7 +81,11 @@ export function ConnectorCredentialsSection({
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasStatic,
   });
-  const { connections, isLoading: oauthLoading } = useOAuthConnections();
+  const {
+    connections,
+    isLoading: oauthLoading,
+    error: oauthError,
+  } = useOAuthConnections({ enabled: hasOAuth });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -86,6 +99,7 @@ export function ConnectorCredentialsSection({
   );
 
   const loading = (hasStatic && isLoading) || (hasOAuth && oauthLoading);
+  const combinedError = error ?? oauthError;
   const serviceGroups = groupByService(requiredCredentials);
 
   return (
@@ -105,8 +119,8 @@ export function ConnectorCredentialsSection({
               aria-hidden="true"
             />
           </div>
-        ) : error ? (
-          <p className="text-destructive text-sm">{error}</p>
+        ) : combinedError ? (
+          <p className="text-destructive text-sm">{combinedError}</p>
         ) : (
           <div className="space-y-3">
             {[...serviceGroups.entries()].map(([service, creds]) => {
@@ -164,7 +178,7 @@ function CredentialGroup({
   return (
     <div className="rounded-lg border p-3">
       <p className="text-muted-foreground mb-2 text-xs font-medium">
-        {capitalizeService(service)} — connect with one of the following:
+        {providerLabel(service)} — connect with one of the following:
       </p>
       <div className="space-y-2">
         {credentials.map((cred, idx) => (
@@ -220,11 +234,9 @@ function OAuthCredentialRow({
     window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
   }
 
-  const providerLabel =
-    (requiredCredential.oauth_provider ?? requiredCredential.service)
-      .charAt(0)
-      .toUpperCase() +
-    (requiredCredential.oauth_provider ?? requiredCredential.service).slice(1);
+  const label = providerLabel(
+    requiredCredential.oauth_provider ?? requiredCredential.service,
+  );
 
   const wrapperClass = nested ? "" : "rounded-lg border p-3";
 
@@ -239,7 +251,7 @@ function OAuthCredentialRow({
           )}
           <div>
             <p className="text-sm font-medium">
-              {providerLabel} (OAuth)
+              {label} (OAuth)
             </p>
             <p className="text-muted-foreground text-xs">
               Recommended — automatic token refresh, no manual key management
@@ -274,7 +286,7 @@ function OAuthCredentialRow({
         <div className="mt-3 border-t pt-3">
           <div className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2">
             <div className="min-w-0">
-              <p className="truncate text-sm">{providerLabel} OAuth</p>
+              <p className="truncate text-sm">{label} OAuth</p>
               <p className="text-muted-foreground text-xs">
                 Connected{" "}
                 {new Date(connection.connected_at).toLocaleDateString()}
@@ -317,7 +329,7 @@ function StaticCredentialRow({
             )}
             <div>
               <p className="text-sm font-medium">
-                {capitalizeService(requiredCredential.service)} ({authTypeLabel(requiredCredential.auth_type)})
+                {providerLabel(requiredCredential.service)} ({authTypeLabel(requiredCredential.auth_type)})
               </p>
               <p className="text-muted-foreground text-xs">
                 Manual setup — you manage the credential directly
