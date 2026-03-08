@@ -347,7 +347,9 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"github"`, `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`github`, `google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"github"`, `"google"`, `"linear"`, `"microsoft"`, `"netlify"`) and optionally `oauth_scopes`. Built-in providers (`github`, `google`, `hubspot`, `intercom`, `kroger`, `linear`, `linkedin`, `meta`, `microsoft`, `netlify`, `salesforce`, `square`, `stripe`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+
+A connector can support multiple auth methods by declaring more than one entry in `RequiredCredentials`. For example, the Netlify and Square connectors support both OAuth (recommended) and API key authentication. Use different `Service` names for each entry (e.g., `"netlify"` for OAuth, `"netlify-api-key"` for API key). The execution layer tries OAuth first and falls back to static credentials.
 
 ```go
 // Example: OAuth2 credential in a manifest
@@ -363,7 +365,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `github`, `google`, `kroger`, `microsoft`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `github`, `google`, `hubspot`, `intercom`, `kroger`, `linkedin`, `meta`, `microsoft`, `netlify`, `salesforce`, `square`, `stripe`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
@@ -382,6 +384,33 @@ Requirements:
 - Any `oauth_provider` referenced in `required_credentials` must either be a built-in provider or declared in `oauth_providers`
 
 **How it works at runtime:** On startup, the platform builds an OAuth Provider Registry (`oauth.Registry`). Built-in providers (Google, Microsoft) are registered first with endpoints and default scopes. Then, providers declared in connector manifests are merged in. The registry uses a priority system (BYOA > Manifest > BuiltIn) so that user-provided "bring your own app" credentials overlay the platform's built-in configuration. When a BYOA user registers credentials for a provider, only their client ID and secret are required — endpoints and scopes are inherited from the built-in or manifest definition.
+
+#### Dual auth: OAuth + API key
+
+A connector can support **both** OAuth and API key authentication by declaring multiple entries in `RequiredCredentials`. Each entry must have a unique `service` name (the `(connector_id, service)` pair is a primary key).
+
+```go
+RequiredCredentials: []connectors.ManifestCredential{
+    {Service: "netlify", AuthType: "oauth2", OAuthProvider: "netlify"},
+    {Service: "netlify-api-key", AuthType: "api_key", InstructionsURL: "https://docs.netlify.com/api/get-started/#authentication"},
+},
+```
+
+At execution time, `resolveCredentialsWithFallback` tries OAuth first. If the user has no OAuth connection, it falls back to static credentials (API key). The `ValidateCredentials` method must accept either credential type:
+
+```go
+func (c *MyConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+    if token, ok := creds.Get("access_token"); ok && token != "" {
+        return nil
+    }
+    if key, ok := creds.Get("api_key"); ok && key != "" {
+        return nil
+    }
+    return &connectors.ValidationError{Message: "missing required credential: access_token or api_key"}
+}
+```
+
+In the UI, OAuth is shown as the "Recommended" option with automatic token refresh, while the API key appears as an alternative. See the Netlify and Intercom connectors for reference implementations.
 
 **Risk levels:** `low`, `medium`, `high`
 

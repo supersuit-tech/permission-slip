@@ -26,6 +26,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -37,6 +39,12 @@ import (
 
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
+
+// shopSubdomainPattern matches valid Shopify store subdomains: lowercase
+// alphanumeric and hyphens, not starting or ending with a hyphen, max 63 chars.
+// Used to validate the "shop" query parameter before substituting it into URLs
+// to prevent URL injection or SSRF.
+var shopSubdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 // isReservedOAuthParam returns true if the parameter name is a reserved
 // OAuth 2.0 param that must not be overridden by AuthorizeParams.
@@ -100,11 +108,15 @@ func oauthStateSecret(deps *Deps) string {
 }
 
 // createOAuthState produces a short-lived signed JWT encoding the user ID,
-// OAuth provider, and requested scopes. This prevents CSRF and state-fixation
-// attacks on the callback endpoint and carries the final scope list so the
-// callback can store exactly what was requested (including any extra scopes
-// from the authorize query params).
-func createOAuthState(deps *Deps, userID, provider string, scopes []string) (string, error) {
+// OAuth provider, requested scopes, and optional shop subdomain. This prevents
+// CSRF and state-fixation attacks on the callback endpoint and carries the
+// final scope list so the callback can store exactly what was requested
+// (including any extra scopes from the authorize query params).
+//
+// The shop parameter is used by providers with per-shop URLs (e.g. Shopify)
+// so the callback can reconstruct the token endpoint. Pass "" for providers
+// with static URLs.
+func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
 		return "", fmt.Errorf("no OAuth state secret configured")
@@ -117,6 +129,9 @@ func createOAuthState(deps *Deps, userID, provider string, scopes []string) (str
 		"iat":      now.Unix(),
 		"exp":      now.Add(oauthStateTTL).Unix(),
 	}
+	if shop != "" {
+		claims["shop"] = shop
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
 }
@@ -126,11 +141,15 @@ type oauthState struct {
 	UserID   string
 	Provider string
 	Scopes   []string
+	// Shop is the Shopify store subdomain, used to reconstruct per-shop
+	// OAuth URLs. Empty for providers with static endpoints.
+	Shop string
 }
 
 // verifyOAuthState validates the signed state JWT and returns the encoded
-// user ID, provider, and requested scopes. Returns an error if the signature
-// is invalid, the token is expired, or the claims are missing.
+// user ID, provider, requested scopes, and optional shop subdomain. Returns
+// an error if the signature is invalid, the token is expired, or the claims
+// are missing.
 func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
@@ -163,7 +182,8 @@ func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 			}
 		}
 	}
-	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes}, nil
+	shop, _ := claims["shop"].(string)
+	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop}, nil
 }
 
 // --- Helpers ---
@@ -211,6 +231,48 @@ func deduplicateScopes(scopes []string) []string {
 	return out
 }
 
+// --- Per-shop URL helpers ---
+
+// providerNeedsShop returns true if the provider's authorize or token URL
+// contains a {shop} placeholder that must be resolved before use.
+func providerNeedsShop(p oauth.Provider) bool {
+	return strings.Contains(p.AuthorizeURL, "{shop}") || strings.Contains(p.TokenURL, "{shop}")
+}
+
+// resolveShopURLs replaces {shop} placeholders in the provider's authorize and
+// token URLs with the given shop subdomain. The shop value must already be
+// validated (see shopSubdomainPattern). Returns a copy of the provider with
+// resolved URLs.
+func resolveShopURLs(p oauth.Provider, shop string) oauth.Provider {
+	p.AuthorizeURL = strings.ReplaceAll(p.AuthorizeURL, "{shop}", shop)
+	p.TokenURL = strings.ReplaceAll(p.TokenURL, "{shop}", shop)
+	return p
+}
+
+// validateShopSubdomain checks that a shop value is a valid Shopify subdomain.
+// Accepts either a bare subdomain ("mystore") or a full domain
+// ("mystore.myshopify.com") and returns the normalized subdomain.
+func validateShopSubdomain(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimRight(raw, "/")
+	raw = strings.ToLower(raw)
+
+	// Accept full domain form.
+	if strings.HasSuffix(raw, ".myshopify.com") {
+		raw = strings.TrimSuffix(raw, ".myshopify.com")
+	} else if strings.Contains(raw, ".") {
+		return "", fmt.Errorf("shop must be a subdomain (e.g. \"mystore\") or full domain (e.g. \"mystore.myshopify.com\")")
+	}
+
+	if raw == "" {
+		return "", fmt.Errorf("shop is required")
+	}
+	if !shopSubdomainPattern.MatchString(raw) {
+		return "", fmt.Errorf("shop contains invalid characters")
+	}
+	return raw, nil
+}
+
 // --- Handlers ---
 
 // handleListOAuthProviders returns all registered OAuth providers with their
@@ -239,6 +301,11 @@ func handleListOAuthProviders(deps *Deps) http.HandlerFunc {
 
 // handleOAuthAuthorize generates the authorization URL for a given provider
 // and redirects the user's browser to the provider's consent screen.
+//
+// For providers with per-shop URLs (e.g. Shopify), the "shop" query parameter
+// is required and specifies the store subdomain. It is validated, used to
+// resolve URL templates, and included in the state token so the callback can
+// reconstruct the token endpoint.
 func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.OAuthProviders == nil {
@@ -263,6 +330,20 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Resolve per-shop URL templates (e.g. Shopify).
+		var shop string
+		if providerNeedsShop(provider) {
+			rawShop := r.URL.Query().Get("shop")
+			var err error
+			shop, err = validateShopSubdomain(rawShop)
+			if err != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+					fmt.Sprintf("invalid shop parameter: %v", err)))
+				return
+			}
+			provider = resolveShopURLs(provider, shop)
+		}
+
 		cfg := newOAuth2Config(deps, provider)
 
 		// Request additional scopes from query params if provided.
@@ -273,7 +354,7 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// Create the CSRF state token after computing the final scope list so
 		// the callback can store exactly which scopes were requested.
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes)
+		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, shop)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
@@ -367,6 +448,11 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Resolve per-shop URL templates using the shop from the state token.
+		if state.Shop != "" && providerNeedsShop(provider) {
+			provider = resolveShopURLs(provider, state.Shop)
+		}
+
 		cfg := newOAuth2Config(deps, provider)
 
 		// Exchange authorization code for tokens.
@@ -385,7 +471,19 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		if len(storedScopes) == 0 {
 			storedScopes = provider.Scopes // fallback for pre-existing state tokens
 		}
-		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token); err != nil {
+
+		// Build extra data to persist alongside the tokens. For providers
+		// with per-shop URLs (e.g. Shopify), store the shop_domain so it's
+		// available at execution time as a credential.
+		var stateExtraData map[string]string
+		// NOTE: state.Shop is validated and normalized during the authorize step
+		// to be a bare subdomain (e.g. "mystore"), so appending ".myshopify.com"
+		// here is intentional and produces the full domain.
+		if state.Shop != "" {
+			stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
+		}
+
+		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection")
 			return
@@ -398,7 +496,12 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 // storeOAuthTokens persists the OAuth tokens in the vault and creates or
 // updates the oauth_connections row. If a connection already exists for this
 // user+provider, it is replaced (re-authorization flow).
-func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token) error {
+//
+// stateExtra contains additional key-value pairs to persist in extra_data
+// alongside any fields extracted from the token response. This is used for
+// data carried through the state token (e.g. shop_domain for Shopify).
+// It may be nil when no state-derived extra data is needed.
+func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string) error {
 	tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -450,8 +553,9 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 
 	// Extract provider-specific extra data from the token response.
 	// For example, Salesforce includes instance_url which connectors
-	// need to construct API base URLs.
-	extraData := extractTokenExtraData(token)
+	// need to construct API base URLs. State-derived extra data (e.g.
+	// Shopify's shop_domain) is merged in after token extraction.
+	extraData := extractTokenExtraData(token, stateExtra)
 
 	_, err = db.CreateOAuthConnection(ctx, tx, db.CreateOAuthConnectionParams{
 		ID:                  connID,
@@ -481,12 +585,15 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 var tokenExtraKeys = []string{"instance_url"}
 
 // extractTokenExtraData pulls known extra fields from an OAuth token response
-// and marshals them as JSON for storage. Returns nil if no relevant extra data
-// is present (keeps the column NULL for most providers).
+// and merges in state-derived extra data, then marshals as JSON for storage.
+// Returns nil if no relevant extra data is present (keeps the column NULL for
+// most providers).
 //
 // Values are validated before storage: URLs must be well-formed HTTPS to prevent
 // storing attacker-controlled values that could be used for SSRF at execution time.
-func extractTokenExtraData(token *oauth2.Token) json.RawMessage {
+// State-derived data (e.g. shop_domain) has already been validated during the
+// authorize step, so it is merged directly.
+func extractTokenExtraData(token *oauth2.Token, stateExtra map[string]string) json.RawMessage {
 	extra := make(map[string]string)
 	for _, key := range tokenExtraKeys {
 		if val := token.Extra(key); val != nil {
@@ -503,6 +610,10 @@ func extractTokenExtraData(token *oauth2.Token) json.RawMessage {
 				extra[key] = s
 			}
 		}
+	}
+	// Merge state-derived extra data (e.g. shop_domain from Shopify OAuth flow).
+	for k, v := range stateExtra {
+		extra[k] = v
 	}
 	if len(extra) == 0 {
 		return nil

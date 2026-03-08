@@ -49,14 +49,15 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
 
+	connectorID := strings.SplitN(actionType, ".", 2)[0]
+
 	var creds connectors.Credentials
-	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, reqCreds)
+	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, connectorID, reqCreds)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate credentials before executing the action.
-	connectorID := strings.SplitN(actionType, ".", 2)[0]
 	if conn, ok := deps.Connectors.Get(connectorID); ok {
 		if err := conn.ValidateCredentials(ctx, creds); err != nil {
 			return nil, err
@@ -222,7 +223,26 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 // For connectors supporting multiple auth methods (e.g. OAuth + API key), it
 // tries OAuth first, then falls back to static credentials if the user hasn't
 // connected their OAuth account.
-func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	// If there's a built-in OAuth provider for this connector but the manifest
+	// only declares static credentials (e.g. Shopify), synthesize an oauth2
+	// entry so OAuth is tried first with static as fallback.
+	hasExplicitOAuth := false
+	for _, rc := range reqCreds {
+		if rc.AuthType == "oauth2" {
+			hasExplicitOAuth = true
+			break
+		}
+	}
+	if !hasExplicitOAuth && deps.OAuthProviders != nil {
+		if _, providerExists := deps.OAuthProviders.Get(connectorID); providerExists {
+			reqCreds = append([]db.RequiredCredential{{
+				AuthType:      "oauth2",
+				OAuthProvider: &connectorID,
+			}}, reqCreds...)
+		}
+	}
+
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
 	}
@@ -529,4 +549,5 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	return nil
 }
+
 

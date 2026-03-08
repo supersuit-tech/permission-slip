@@ -54,18 +54,20 @@ const storedCredentials = {
 };
 
 /**
- * Sets up mockGet to handle /v1/credentials, /v1/oauth/connections,
- * and /v1/oauth/providers. The component fetches all three.
+ * Helper to mock GET responses by endpoint path.
+ * Returns empty data for unrecognized paths.
  */
-function setupMockGet(credentialsData: unknown) {
+function setupMockGet(overrides: Record<string, unknown> = {}) {
+  const defaults: Record<string, unknown> = {
+    "/v1/credentials": { data: { credentials: [] } },
+    "/v1/oauth/connections": { data: { connections: [] } },
+    "/v1/oauth/providers": { data: { providers: [] } },
+    ...overrides,
+  };
   mockGet.mockImplementation((path: string) => {
-    if (path === "/v1/oauth/connections") {
-      return Promise.resolve({ data: { connections: [] } });
-    }
-    if (path === "/v1/oauth/providers") {
-      return Promise.resolve({ data: { providers: [] } });
-    }
-    return Promise.resolve({ data: credentialsData });
+    const match = defaults[path];
+    if (match) return Promise.resolve(match);
+    return Promise.resolve({ data: {} });
   });
 }
 
@@ -78,7 +80,10 @@ describe("ConnectorCredentialsSection", () => {
 
   it("shows no credentials required message when empty", () => {
     renderWithProviders(
-      <ConnectorCredentialsSection requiredCredentials={[]} />,
+      <ConnectorCredentialsSection
+        connectorId="github"
+        requiredCredentials={[]}
+      />,
     );
     expect(
       screen.getByText("This connector does not require any credentials."),
@@ -89,6 +94,7 @@ describe("ConnectorCredentialsSection", () => {
     mockGet.mockReturnValue(new Promise(() => {}));
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -96,10 +102,13 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows connected status with stored credentials", async () => {
-    setupMockGet(storedCredentials);
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -112,10 +121,11 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
-    setupMockGet({ credentials: [] });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -128,10 +138,11 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Add Credential dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet({ credentials: [] });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -148,7 +159,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("stores credential through Add dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet({ credentials: [] });
+    setupMockGet();
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
@@ -159,6 +170,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -184,10 +196,13 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Remove Credential dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet(storedCredentials);
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -208,13 +223,16 @@ describe("ConnectorCredentialsSection", () => {
 
   it("deletes credential through Remove dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet(storedCredentials);
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
     mockDelete.mockResolvedValue({
       data: { id: "cred_123", deleted_at: "2026-02-20T10:00:00Z" },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -241,10 +259,11 @@ describe("ConnectorCredentialsSection", () => {
 
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
-    setupMockGet({ credentials: [] });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="jira"
         requiredCredentials={[
           { service: "jira", auth_type: "basic" as const },
         ]}
@@ -262,11 +281,11 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth connect button for oauth2 credential", async () => {
-    // Mock both endpoints: OAuth connections (no connections) and credentials
-    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={oauthCredentials}
       />,
     );
@@ -279,22 +298,17 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth credential row for Slack oauth2 auth type", async () => {
-    mockGet.mockImplementation((path: string) => {
-      if (path === "/v1/oauth/connections") {
-        return Promise.resolve({ data: { connections: [] } });
-      }
-      if (path === "/v1/oauth/providers") {
-        return Promise.resolve({
-          data: {
-            providers: [{ id: "slack", has_credentials: true }],
-          },
-        });
-      }
-      return Promise.resolve({ data: { credentials: [] } });
+    setupMockGet({
+      "/v1/oauth/providers": {
+        data: {
+          providers: [{ id: "slack", has_credentials: true }],
+        },
+      },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="slack"
         requiredCredentials={[
           {
             service: "slack",
@@ -318,33 +332,29 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth connected status when user has connection", async () => {
-    mockGet.mockImplementation((path: string) => {
-      if (path === "/v1/oauth/connections") {
-        return Promise.resolve({
-          data: {
-            connections: [
-              {
-                provider: "slack",
-                status: "active",
-                scopes: ["chat:write"],
-                connected_at: "2026-03-01T10:00:00Z",
-              },
-            ],
-          },
-        });
-      }
-      if (path === "/v1/oauth/providers") {
-        return Promise.resolve({
-          data: {
-            providers: [{ id: "slack", has_credentials: true }],
-          },
-        });
-      }
-      return Promise.resolve({ data: { credentials: [] } });
+    setupMockGet({
+      "/v1/oauth/connections": {
+        data: {
+          connections: [
+            {
+              provider: "slack",
+              status: "active",
+              scopes: ["chat:write"],
+              connected_at: "2026-03-01T10:00:00Z",
+            },
+          ],
+        },
+      },
+      "/v1/oauth/providers": {
+        data: {
+          providers: [{ id: "slack", has_credentials: true }],
+        },
+      },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="slack"
         requiredCredentials={[
           {
             service: "slack",
@@ -365,10 +375,11 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows both OAuth and API key options for mixed credentials", async () => {
-    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={mixedCredentials}
       />,
     );

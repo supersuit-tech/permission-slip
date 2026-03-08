@@ -56,13 +56,28 @@ func TestLinearConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "lin_oauth_token_abc"}),
+			wantErr: false,
+		},
+		{
+			name:    "both api_key and access_token",
+			creds:   connectors.NewCredentials(map[string]string{"api_key": "key", "access_token": "token"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing all credentials",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
-			name:    "empty api_key",
+			name:    "empty api_key and no access_token",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token and no api_key",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -119,18 +134,35 @@ func TestLinearConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "linear" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "linear")
+
+	// First credential should be OAuth (primary/default).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "linear_oauth" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "linear_oauth")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "linear" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "linear")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want at least one scope")
+	}
+
+	// Second credential should be API key (alternative).
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "linear" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "linear")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {
@@ -206,7 +238,7 @@ func TestDoGraphQL_Success(t *testing.T) {
 	}
 }
 
-func TestDoGraphQL_AuthHeader(t *testing.T) {
+func TestDoGraphQL_AuthHeader_APIKey(t *testing.T) {
 	t.Parallel()
 
 	// Verify the auth header uses the API key directly (no "Bearer" prefix).
@@ -220,6 +252,88 @@ func TestDoGraphQL_AuthHeader(t *testing.T) {
 	creds := connectors.NewCredentials(map[string]string{"api_key": "my-key-no-bearer"})
 
 	_ = conn.doGraphQL(t.Context(), creds, "{ viewer { id } }", nil, nil)
+}
+
+func TestDoGraphQL_AuthHeader_OAuth(t *testing.T) {
+	t.Parallel()
+
+	// Verify the auth header uses "Bearer" prefix for OAuth access tokens.
+	handler := &graphQLHandler{
+		t:        t,
+		response: map[string]any{"data": nil},
+		wantAuth: "Bearer my-oauth-token",
+	}
+
+	conn, _ := newTestServer(t, handler)
+	creds := connectors.NewCredentials(map[string]string{"access_token": "my-oauth-token"})
+
+	_ = conn.doGraphQL(t.Context(), creds, "{ viewer { id } }", nil, nil)
+}
+
+func TestDoGraphQL_AuthHeader_OAuthPreferred(t *testing.T) {
+	t.Parallel()
+
+	// When both api_key and access_token are present, access_token (OAuth) is preferred.
+	handler := &graphQLHandler{
+		t:        t,
+		response: map[string]any{"data": nil},
+		wantAuth: "Bearer my-oauth-token",
+	}
+
+	conn, _ := newTestServer(t, handler)
+	creds := connectors.NewCredentials(map[string]string{
+		"api_key":      "my-api-key",
+		"access_token": "my-oauth-token",
+	})
+
+	_ = conn.doGraphQL(t.Context(), creds, "{ viewer { id } }", nil, nil)
+}
+
+func TestResolveAuthHeader(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		creds   connectors.Credentials
+		want    string
+		wantErr bool
+	}{
+		{
+			name:  "api_key only",
+			creds: connectors.NewCredentials(map[string]string{"api_key": "test-key"}),
+			want:  "test-key",
+		},
+		{
+			name:  "access_token only",
+			creds: connectors.NewCredentials(map[string]string{"access_token": "test-token"}),
+			want:  "Bearer test-token",
+		},
+		{
+			name: "both prefers access_token",
+			creds: connectors.NewCredentials(map[string]string{
+				"api_key":      "test-key",
+				"access_token": "test-token",
+			}),
+			want: "Bearer test-token",
+		},
+		{
+			name:    "neither",
+			creds:   connectors.NewCredentials(map[string]string{}),
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveAuthHeader(tt.creds)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("resolveAuthHeader() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("resolveAuthHeader() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestDoGraphQL_Variables(t *testing.T) {

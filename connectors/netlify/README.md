@@ -6,13 +6,27 @@ The Netlify connector integrates Permission Slip with the [Netlify API](https://
 
 `netlify`
 
-## Credentials
+## Authentication
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `api_key` | Yes | A Netlify personal access token. Create one at **User Settings → Applications → Personal access tokens**. |
+The Netlify connector supports two authentication methods. OAuth is recommended and presented as the default in the UI.
 
-The credential `auth_type` in the database is `api_key`. Tokens are stored encrypted in Supabase Vault and decrypted only at execution time.
+### OAuth (Recommended)
+
+| Service | Auth Type | Provider |
+|---------|-----------|----------|
+| `netlify` | `oauth2` | `netlify` |
+
+OAuth tokens are automatically refreshed. Users connect via the OAuth flow in the connector settings. Requires `NETLIFY_CLIENT_ID` and `NETLIFY_CLIENT_SECRET` environment variables (or BYOA configuration).
+
+Netlify does not use granular OAuth scopes — tokens receive full account access.
+
+### API Key (Alternative)
+
+| Service | Auth Type | Description |
+|---------|-----------|-------------|
+| `netlify-api-key` | `api_key` | A Netlify personal access token. Create one at **User Settings → Applications → Personal access tokens**. |
+
+At execution time, the system tries OAuth first. If the user has no OAuth connection, it falls back to a stored API key. All tokens are encrypted in Supabase Vault and decrypted only at execution time.
 
 ## Actions
 
