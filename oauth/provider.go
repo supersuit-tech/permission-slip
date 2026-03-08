@@ -95,6 +95,15 @@ type TokenSet struct {
 	Scopes []string
 }
 
+// validScopeSeparators is the set of safe scope separators. Only these values
+// are allowed in the ScopeSeparator field to prevent injection attacks (e.g. a
+// separator containing "&" could inject URL parameters).
+var validScopeSeparators = map[string]bool{
+	",": true, // Slack
+	" ": true, // standard OAuth 2.0
+	"+": true, // URL-encoded space (some providers)
+}
+
 // TokenExpiryBuffer is the time before actual expiry at which a token is
 // considered expired. This allows pre-emptive refresh so actions don't fail
 // mid-execution due to an expired token. Used by both the background refresh
@@ -139,21 +148,23 @@ func (p Provider) GoString() string {
 // should access the ClientSecret field directly.
 func (p Provider) MarshalJSON() ([]byte, error) {
 	type safeProvider struct {
-		ID           string         `json:"id"`
-		AuthorizeURL string         `json:"authorize_url"`
-		TokenURL     string         `json:"token_url"`
-		Scopes       []string       `json:"scopes,omitempty"`
-		ClientID     string         `json:"client_id,omitempty"`
-		ClientSecret string         `json:"client_secret,omitempty"`
-		Source       ProviderSource `json:"source"`
+		ID             string         `json:"id"`
+		AuthorizeURL   string         `json:"authorize_url"`
+		TokenURL       string         `json:"token_url"`
+		Scopes         []string       `json:"scopes,omitempty"`
+		ClientID       string         `json:"client_id,omitempty"`
+		ClientSecret   string         `json:"client_secret,omitempty"`
+		ScopeSeparator string         `json:"scope_separator,omitempty"`
+		Source         ProviderSource `json:"source"`
 	}
 	safe := safeProvider{
-		ID:           p.ID,
-		AuthorizeURL: p.AuthorizeURL,
-		TokenURL:     p.TokenURL,
-		Scopes:       p.Scopes,
-		ClientID:     p.ClientID,
-		Source:       p.Source,
+		ID:             p.ID,
+		AuthorizeURL:   p.AuthorizeURL,
+		TokenURL:       p.TokenURL,
+		Scopes:         p.Scopes,
+		ClientID:       p.ClientID,
+		ScopeSeparator: p.ScopeSeparator,
+		Source:         p.Source,
 	}
 	if p.ClientSecret != "" {
 		safe.ClientSecret = "[REDACTED]"
@@ -215,6 +226,9 @@ func (r *Registry) Register(p Provider) error {
 	}
 	if !ProviderIDPattern.MatchString(p.ID) {
 		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, ProviderIDPattern.String())
+	}
+	if p.ScopeSeparator != "" && !validScopeSeparators[p.ScopeSeparator] {
+		return fmt.Errorf("oauth provider %q has invalid scope separator %q; allowed values: space, comma, plus", p.ID, p.ScopeSeparator)
 	}
 
 	// Deep-copy the Scopes slice so the caller cannot mutate the registry's
