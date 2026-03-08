@@ -112,6 +112,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"stripe":     true,
 	"zoom":       true,
 	"pagerduty":  true,
+	"discord":    true,
 }
 
 // ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in

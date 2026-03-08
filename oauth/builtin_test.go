@@ -147,6 +147,28 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("discord", func(t *testing.T) {
+		d, ok := byID["discord"]
+		if !ok {
+			t.Fatal("discord provider not found")
+		}
+		if d.AuthorizeURL != "https://discord.com/oauth2/authorize" {
+			t.Errorf("AuthorizeURL = %q", d.AuthorizeURL)
+		}
+		if d.TokenURL != "https://discord.com/api/oauth2/token" {
+			t.Errorf("TokenURL = %q", d.TokenURL)
+		}
+		if d.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", d.Source, SourceBuiltIn)
+		}
+		if len(d.Scopes) == 0 {
+			t.Error("expected default scopes")
+		}
+		if d.AuthorizeParams["permissions"] != "1099511627775" {
+			t.Errorf("AuthorizeParams[permissions] = %q, want %q", d.AuthorizeParams["permissions"], "1099511627775")
+		}
+	})
+
 	t.Run("stripe", func(t *testing.T) {
 		s, ok := byID["stripe"]
 		if !ok {
@@ -175,6 +197,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 		t.Fatalf("expected at least 2 providers, got %d", len(ids))
 	}
 
+	if _, ok := r.Get("discord"); !ok {
+		t.Error("discord not found in registry")
+	}
 	if _, ok := r.Get("figma"); !ok {
 		t.Error("figma not found in registry")
 	}

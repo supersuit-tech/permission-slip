@@ -259,6 +259,21 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("STRIPE_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "discord",
+			AuthorizeURL: "https://discord.com/oauth2/authorize",
+			TokenURL:     "https://discord.com/api/oauth2/token",
+			Scopes: []string{
+				"bot",
+				"guilds",
+			},
+			AuthorizeParams: map[string]string{
+				"permissions": "1099511627775",
+			},
+			ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
+			ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 
