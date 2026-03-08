@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -39,7 +40,7 @@ func (a *getProductAction) Execute(ctx context.Context, req connectors.ActionReq
 
 	path := fmt.Sprintf("/products/%d.json", params.ProductID)
 	if params.Fields != "" {
-		path += "?fields=" + params.Fields
+		path += "?fields=" + url.QueryEscape(params.Fields)
 	}
 
 	var resp struct {

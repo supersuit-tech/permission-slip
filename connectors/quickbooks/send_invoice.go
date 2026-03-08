@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -44,7 +45,7 @@ func (a *sendInvoiceAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	path := companyPath(req.Credentials) + "/invoice/" + params.InvoiceID + "/send"
 	if params.EmailTo != "" {
-		path += "?sendTo=" + params.EmailTo
+		path += "?sendTo=" + url.QueryEscape(params.EmailTo)
 	}
 
 	var resp map[string]any

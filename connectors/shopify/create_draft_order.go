@@ -31,7 +31,6 @@ type createDraftOrderParams struct {
 	Email      string                   `json:"email,omitempty"`
 	Note       string                   `json:"note,omitempty"`
 	Tags       string                   `json:"tags,omitempty"`
-	UseCustomer bool                    `json:"use_customer_default_address,omitempty"`
 }
 
 func (p *createDraftOrderParams) validate() error {

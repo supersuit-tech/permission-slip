@@ -26,6 +26,9 @@ func (a *listCustomersAction) Execute(ctx context.Context, req connectors.Action
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
+	if params.MaxResults < 0 {
+		return nil, &connectors.ValidationError{Message: "max_results must be a non-negative integer"}
+	}
 
 	query := "SELECT * FROM Customer WHERE Active = true"
 	if params.DisplayName != "" {

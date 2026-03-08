@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 // listCustomersAction implements connectors.Action for square.list_customers.
-// It lists or searches customer profiles via POST /v2/customers/search.
+// It lists customer profiles via GET /v2/customers (no query) or searches
+// via POST /v2/customers/search (when a query string is provided).
 type listCustomersAction struct {
 	conn *SquareConnector
 }
@@ -74,7 +76,7 @@ func (a *listCustomersAction) Execute(ctx context.Context, req connectors.Action
 				sep = "&"
 			}
 			if params.Cursor != "" {
-				path += sep + "cursor=" + params.Cursor
+				path += sep + "cursor=" + url.QueryEscape(params.Cursor)
 			}
 		}
 	}
