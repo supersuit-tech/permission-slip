@@ -106,6 +106,17 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "github",
+			AuthorizeURL: "https://github.com/login/oauth/authorize",
+			TokenURL:     "https://github.com/login/oauth/access_token",
+			Scopes: []string{
+				"repo",
+			},
+			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "hubspot",
 			AuthorizeURL: "https://app.hubspot.com/oauth/authorize",
 			TokenURL:     "https://api.hubapi.com/oauth/v1/token",

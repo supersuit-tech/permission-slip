@@ -239,7 +239,13 @@ paths:
                           description: Pull request number
                 required_credentials:
                   - service: github
+                    auth_type: oauth2
+                    oauth_provider: github
+                    oauth_scopes:
+                      - repo
+                  - service: github_pat
                     auth_type: api_key
+                    instructions_url: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
         '404':
           description: Connector not found
           content:
@@ -7389,6 +7395,11 @@ components:
                   description: Pull request number
         required_credentials:
           - service: github
+            auth_type: oauth2
+            oauth_provider: github
+            oauth_scopes:
+              - repo
+          - service: github_pat
             auth_type: api_key
             instructions_url: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
     ConnectorAction:
