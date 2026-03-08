@@ -5,6 +5,7 @@
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
   hubspot: "HubSpot",
+  intercom: "Intercom",
   kroger: "Kroger",
   linkedin: "LinkedIn",
   meta: "Meta",
