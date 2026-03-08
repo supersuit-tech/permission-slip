@@ -39,6 +39,25 @@ func (p *getCompanyParams) validate() error {
 	return nil
 }
 
+// localizedString is a LinkedIn API localized text envelope. Both name and
+// description fields in organization responses share this structure.
+type localizedString struct {
+	Localized       map[string]string `json:"localized"`
+	PreferredLocale preferredLocale   `json:"preferredLocale"`
+}
+
+// localizedName and localizedDescription are type aliases for localizedString.
+// LinkedIn API fields of both types share the same JSON shape.
+type (
+	localizedName        = localizedString
+	localizedDescription = localizedString
+)
+
+type preferredLocale struct {
+	Country  string `json:"country"`
+	Language string `json:"language"`
+}
+
 // organizationResponse is the LinkedIn organization profile response.
 type organizationResponse struct {
 	ID          string                 `json:"id"`
@@ -49,21 +68,6 @@ type organizationResponse struct {
 	Industries  []industryTag          `json:"industries"`
 	WebsiteURL  string                 `json:"websiteUrl"`
 	FoundedOn   foundedOn              `json:"foundedOn"`
-}
-
-type localizedName struct {
-	Localized        map[string]string `json:"localized"`
-	PreferredLocale  preferredLocale   `json:"preferredLocale"`
-}
-
-type localizedDescription struct {
-	Localized        map[string]string `json:"localized"`
-	PreferredLocale  preferredLocale   `json:"preferredLocale"`
-}
-
-type preferredLocale struct {
-	Country  string `json:"country"`
-	Language string `json:"language"`
 }
 
 type organizationLocation struct {
@@ -96,8 +100,8 @@ func (a *getCompanyAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	// Extract the preferred locale name, falling back to any available name.
-	name := preferredString(resp.Name.Localized, resp.Name.PreferredLocale)
-	description := preferredString(resp.Description.Localized, resp.Description.PreferredLocale)
+	name := preferredString(resp.Name)
+	description := preferredString(resp.Description)
 
 	locations := make([]string, 0, len(resp.Locations))
 	for _, loc := range resp.Locations {
@@ -126,22 +130,22 @@ func (a *getCompanyAction) Execute(ctx context.Context, req connectors.ActionReq
 	})
 }
 
-// preferredString extracts the localized string for the preferred locale,
-// falling back to the lexicographically first key when the preferred locale
-// is not found. Sorting keys ensures a deterministic result regardless of
-// Go map iteration order.
-func preferredString(localized map[string]string, locale preferredLocale) string {
-	key := locale.Language + "_" + locale.Country
-	if v, ok := localized[key]; ok {
+// preferredString extracts the localized string for the preferred locale from
+// a localizedString envelope. Falls back to the lexicographically first key
+// when the preferred locale is not found. Sorting keys ensures a deterministic
+// result regardless of Go map iteration order.
+func preferredString(ls localizedString) string {
+	key := ls.PreferredLocale.Language + "_" + ls.PreferredLocale.Country
+	if v, ok := ls.Localized[key]; ok {
 		return v
 	}
-	keys := make([]string, 0, len(localized))
-	for k := range localized {
+	keys := make([]string, 0, len(ls.Localized))
+	for k := range ls.Localized {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	if len(keys) > 0 {
-		return localized[keys[0]]
+		return ls.Localized[keys[0]]
 	}
 	return ""
 }

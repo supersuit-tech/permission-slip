@@ -139,10 +139,12 @@ func TestGetCompany_InvalidJSON(t *testing.T) {
 func TestPreferredString_FallsBackWhenKeyMissing(t *testing.T) {
 	t.Parallel()
 
-	localized := map[string]string{"fr_FR": "Société Acme"}
-	locale := preferredLocale{Language: "en", Country: "US"}
+	ls := localizedString{
+		Localized:       map[string]string{"fr_FR": "Société Acme"},
+		PreferredLocale: preferredLocale{Language: "en", Country: "US"},
+	}
 
-	result := preferredString(localized, locale)
+	result := preferredString(ls)
 	if result != "Société Acme" {
 		t.Errorf("expected fallback value 'Société Acme', got %q", result)
 	}
@@ -151,8 +153,37 @@ func TestPreferredString_FallsBackWhenKeyMissing(t *testing.T) {
 func TestPreferredString_EmptyMap(t *testing.T) {
 	t.Parallel()
 
-	result := preferredString(map[string]string{}, preferredLocale{Language: "en", Country: "US"})
+	ls := localizedString{
+		Localized:       map[string]string{},
+		PreferredLocale: preferredLocale{Language: "en", Country: "US"},
+	}
+
+	result := preferredString(ls)
 	if result != "" {
 		t.Errorf("expected empty string for empty map, got %q", result)
+	}
+}
+
+func TestPreferredString_Deterministic(t *testing.T) {
+	t.Parallel()
+
+	// Map with multiple locales — fallback should always pick the same key.
+	ls := localizedString{
+		Localized: map[string]string{
+			"de_DE": "Acme GmbH",
+			"en_US": "Acme Inc",
+			"fr_FR": "Acme SA",
+		},
+		PreferredLocale: preferredLocale{Language: "ja", Country: "JP"},
+	}
+
+	result1 := preferredString(ls)
+	result2 := preferredString(ls)
+	if result1 != result2 {
+		t.Errorf("preferredString is not deterministic: %q vs %q", result1, result2)
+	}
+	// Lexicographically first key is "de_DE"
+	if result1 != "Acme GmbH" {
+		t.Errorf("expected 'Acme GmbH' (lexicographically first), got %q", result1)
 	}
 }

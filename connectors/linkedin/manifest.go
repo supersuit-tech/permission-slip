@@ -199,10 +199,10 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"count": {
 							"type": "integer",
-							"minimum": 1,
+							"minimum": 0,
 							"maximum": 50,
 							"default": 10,
-							"description": "Number of results to return (max 50, default 10)"
+							"description": "Number of results to return (max 50, default 10, 0 = use default)"
 						},
 						"start": {
 							"type": "integer",
@@ -228,10 +228,10 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"count": {
 							"type": "integer",
-							"minimum": 1,
+							"minimum": 0,
 							"maximum": 50,
 							"default": 10,
-							"description": "Number of results to return (max 50, default 10)"
+							"description": "Number of results to return (max 50, default 10, 0 = use default)"
 						},
 						"start": {
 							"type": "integer",
@@ -268,10 +268,10 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"count": {
 							"type": "integer",
-							"minimum": 1,
+							"minimum": 0,
 							"maximum": 500,
 							"default": 20,
-							"description": "Number of connections to return (max 500, default 20)"
+							"description": "Number of connections to return (max 500, default 20, 0 = use default)"
 						},
 						"start": {
 							"type": "integer",
