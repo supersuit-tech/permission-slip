@@ -507,6 +507,56 @@ Connectors define what actions agents can perform. If you want to add support fo
 - See [Custom Connectors](docs/custom-connectors.md) for the external plugin system
 - Look at the existing [Slack](connectors/slack/) and [GitHub](connectors/github/) connectors as reference implementations
 
+## Adding Notification Channels
+
+Notification channels self-register via Go's `init()` mechanism — no changes to `main.go` or the approval handler are needed when adding a new channel.
+
+**Steps:**
+
+1. **Implement `notify.Sender`** in a new package, e.g. `notify/slack/`:
+
+   ```go
+   // notify/slack/sender.go
+   package slack
+
+   type Sender struct { /* ... */ }
+   func (s *Sender) Name() string { return "slack" }
+   func (s *Sender) Send(ctx context.Context, a notify.Approval, r notify.Recipient) error { /* ... */ }
+   ```
+
+2. **Add config fields** to `notify.Config` in `notify/config.go` and load them in `LoadConfig()`.
+
+3. **Create `notify/slack/register.go`** with the self-registration factory:
+
+   ```go
+   package slack
+
+   import "github.com/supersuit-tech/permission-slip-web/notify"
+
+   func init() {
+       notify.RegisterSenderFactory("slack", func(ctx context.Context, bc notify.BuildContext) ([]notify.Sender, error) {
+           if bc.Config.SlackWebhookURL == "" {
+               return nil, nil // channel disabled; silently skipped
+           }
+           return []notify.Sender{New(bc.Config.SlackWebhookURL)}, nil
+       })
+   }
+   ```
+
+4. **Add a blank import** to `notify/all/all.go`:
+
+   ```go
+   import _ "github.com/supersuit-tech/permission-slip-web/notify/slack"
+   ```
+
+5. **Write tests** in `notify/slack/` and optionally add registry-level tests in `notify/registry_test.go`.
+
+**`SenderFactory` contract:**
+- Return `(senders, nil)` when the channel is configured and active.
+- Return `(nil, nil)` when the channel is disabled (e.g. env var missing) — silently skipped.
+- Return `(nil, err)` for unexpected setup failures — logged, then skipped.
+- Never call `log.Fatalf` or `os.Exit` inside a factory.
+
 ## Troubleshooting
 
 ### `make test-backend` fails with connection errors

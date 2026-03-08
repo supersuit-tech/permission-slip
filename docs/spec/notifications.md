@@ -17,6 +17,8 @@ This document specifies how Permission Slip notifies users when agents request a
 7. [Deep Linking](#deep-linking)
 8. [Security Considerations](#security-considerations)
 
+> **Note for developers:** For instructions on adding a new notification channel to the server, see the `notify` package documentation and the README's "Adding a notification channel" section.
+
 ---
 
 ## Overview
@@ -63,9 +65,9 @@ Approval requests have a limited lifetime to ensure security and timely resoluti
 
 ## Delivery Mechanisms
 
-Services MUST support webhook notifications. Services MAY additionally support mobile push notifications. This specification defines two delivery mechanisms with different requirements.
+Permission Slip supports four notification channels. Channels are active only when their required configuration is present; multiple channels may be active simultaneously and notifications are fanned out to all of them.
 
-### Primary: Webhook Notifications (Required)
+### Webhook Notifications (Required)
 
 **Webhooks** are HTTP POST requests sent from the service to a URL registered by the approver.
 
@@ -78,18 +80,37 @@ Services MUST support webhook notifications. Services MAY additionally support m
 
 **Requirement Level:** Services MUST support webhook notifications.
 
-### Secondary: Mobile Push Notifications (Optional)
+### Web Push Notifications (Optional)
 
-**Mobile push notifications** deliver alerts directly to iOS and Android devices via Apple Push Notification Service (APNs) and Firebase Cloud Messaging (FCM).
+**Web push** delivers browser notifications via the [Web Push Protocol](https://www.rfc-editor.org/rfc/rfc8030) using VAPID authentication. Subscriptions are stored per browser; the service sends encrypted payloads directly to the browser push service (FCM for Chrome, Mozilla for Firefox, etc.).
 
-**Characteristics:**
-- Native mobile device notifications
-- Instant delivery even when app is closed
-- Better user experience for mobile-first implementations
-- Requires integration with APNs (iOS) and FCM (Android)
-- More complex to implement
+**Configuration:** Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`. Keys are auto-generated in development mode. See the README for key generation instructions.
 
-**Requirement Level:** Services MAY support mobile push notifications as an optional enhancement.
+**Requirement Level:** Services MAY support web push as an optional enhancement.
+
+### Mobile Push Notifications (Optional)
+
+**Mobile push notifications** deliver alerts to iOS and Android devices via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/), which routes to APNs (iOS) and FCM (Android). Device tokens are registered on login via the Permission Slip mobile app.
+
+**Configuration:** Always enabled when a database is available. Set `EXPO_ACCESS_TOKEN` for higher rate limits (authenticated mode); unauthenticated mode is used otherwise.
+
+**Requirement Level:** Services MAY support mobile push as an optional enhancement.
+
+### Email Notifications (Optional)
+
+**Email notifications** deliver approval requests to the approver's registered email address. Two providers are supported: SendGrid and SMTP.
+
+**Configuration:** Set `NOTIFICATION_EMAIL_PROVIDER` to `twilio-sendgrid` or `smtp`, plus the provider-specific credentials. See `.env.example` for all variables.
+
+**Requirement Level:** Services MAY support email as an optional enhancement.
+
+### SMS Notifications (Optional)
+
+**SMS notifications** deliver approval requests as text messages via Twilio. SMS delivery is gated behind paid subscription tiers when billing is enabled.
+
+**Configuration:** Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER`. All three are required; partial configuration disables the channel.
+
+**Requirement Level:** Services MAY support SMS as an optional enhancement.
 
 ---
 

@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"context"
 	"log"
 	"os"
 	"strings"
@@ -57,36 +58,18 @@ func LoadConfig() Config {
 	}
 }
 
-// BuildSenders inspects the config and returns the set of Sender
-// implementations whose required env vars are present. Each channel issue
-// (#275, #276, #277) will add its sender construction here.
+// BuildSenders calls the globally registered sender factories and returns the
+// set of Sender implementations whose required config is present. Each channel
+// registers itself via init() in its own package.
+//
+// This method is provided for backward-compatibility and testing convenience.
+// Production code should prefer calling notify.BuildSenders(ctx, BuildContext{...})
+// with the full build context, including the database handle (required for web
+// push, mobile push, and SMS plan gating).
 //
 // Returns nil when no channels are configured.
 func (c Config) BuildSenders() []Sender {
-	var senders []Sender
-
-	// #275 — Email (SendGrid + SMTP)
-	if s := c.buildEmailSender(); s != nil {
-		senders = append(senders, s)
-	}
-
-	// Channel registrations for future issues:
-	//
-	// #276 — Web Push (VAPID):
-	//   if c.VAPIDPrivateKey != "" { senders = append(senders, webpush.New(...)) }
-
-	// #277 — SMS (Twilio)
-	if c.TwilioAccountSID != "" && c.TwilioAuthToken != "" && c.TwilioFromNumber != "" {
-		senders = append(senders, NewSMSSender(SMSConfig{
-			AccountSID: c.TwilioAccountSID,
-			AuthToken:  c.TwilioAuthToken,
-			FromNumber: c.TwilioFromNumber,
-		}))
-	} else if c.TwilioAccountSID != "" || c.TwilioAuthToken != "" || c.TwilioFromNumber != "" {
-		log.Println("notify: SMS (Twilio) partially configured — set all three: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER")
-	}
-
-	return senders
+	return BuildSenders(context.Background(), BuildContext{Config: c})
 }
 
 // buildEmailSender returns an email Sender based on the configured provider,
