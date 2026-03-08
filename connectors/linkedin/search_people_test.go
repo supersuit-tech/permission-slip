@@ -68,6 +68,13 @@ func TestSearchPeople_Success(t *testing.T) {
 	if person["first_name"] != "Jane" {
 		t.Errorf("expected first_name 'Jane', got %v", person["first_name"])
 	}
+	if person["person_urn"] != "urn:li:person:abc123" {
+		t.Errorf("expected person_urn 'urn:li:person:abc123', got %v", person["person_urn"])
+	}
+	// next_start should equal start (0) + len(results) (1) = 1
+	if ns, ok := data["next_start"].(float64); !ok || ns != 1 {
+		t.Errorf("expected next_start 1, got %v", data["next_start"])
+	}
 }
 
 func TestSearchPeople_NoSearchTerms(t *testing.T) {

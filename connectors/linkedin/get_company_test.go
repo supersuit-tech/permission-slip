@@ -64,6 +64,9 @@ func TestGetCompany_Success(t *testing.T) {
 	if data["id"] != "12345" {
 		t.Errorf("expected id '12345', got %v", data["id"])
 	}
+	if data["organization_urn"] != "urn:li:organization:12345" {
+		t.Errorf("expected organization_urn 'urn:li:organization:12345', got %v", data["organization_urn"])
+	}
 	if data["name"] != "Acme Corp" {
 		t.Errorf("expected name 'Acme Corp', got %v", data["name"])
 	}

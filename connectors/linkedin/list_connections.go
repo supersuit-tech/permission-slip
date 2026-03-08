@@ -91,6 +91,7 @@ func (a *listConnectionsAction) Execute(ctx context.Context, req connectors.Acti
 	for _, el := range resp.Elements {
 		connections = append(connections, map[string]any{
 			"id":         el.ID,
+			"person_urn": "urn:li:person:" + el.ID,
 			"first_name": el.FirstName,
 			"last_name":  el.LastName,
 			"headline":   el.Headline,
@@ -101,6 +102,7 @@ func (a *listConnectionsAction) Execute(ctx context.Context, req connectors.Acti
 		"connections": connections,
 		"total":       resp.Paging.Total,
 		"start":       resp.Paging.Start,
-		"count":       resp.Paging.Count,
+		"count":       len(connections),
+		"next_start":  nextStart(params.Start, len(connections)),
 	})
 }

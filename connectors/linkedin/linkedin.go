@@ -26,6 +26,10 @@ var (
 
 	// numericPattern validates that organization IDs are numeric.
 	numericPattern = regexp.MustCompile(`^\d+$`)
+
+	// personURNPattern validates LinkedIn person URNs specifically.
+	// Only urn:li:person:{numeric_id} is accepted — share/post URNs are rejected.
+	personURNPattern = regexp.MustCompile(`^urn:li:person:\d+$`)
 )
 
 const (
@@ -144,10 +148,10 @@ func validateOrganizationID(id string) error {
 }
 
 // validatePersonURN checks that a recipient URN is a valid LinkedIn person URN
-// (urn:li:person:{numeric_id}). This prevents injection when the URN is sent
-// as a message recipient.
+// (urn:li:person:{numeric_id}). Only person URNs are accepted — share or post
+// URNs are rejected to prevent accidentally messaging the wrong entity type.
 func validatePersonURN(urn string) error {
-	if !urnPattern.MatchString(urn) {
+	if !personURNPattern.MatchString(urn) {
 		return &connectors.ValidationError{Message: "recipient_urn must be a valid LinkedIn person URN (e.g. urn:li:person:123456)"}
 	}
 	return nil

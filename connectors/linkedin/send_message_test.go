@@ -119,6 +119,31 @@ func TestSendMessage_InvalidRecipientURN(t *testing.T) {
 	}
 }
 
+func TestSendMessage_ShareURNRejected(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendMessageAction{conn: conn}
+
+	// share URNs look valid as generic URNs but must be rejected for messaging
+	params, _ := json.Marshal(sendMessageParams{
+		RecipientURN: "urn:li:share:123456",
+		Body:         "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "linkedin.send_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for share URN used as recipient_urn")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSendMessage_MissingBody(t *testing.T) {
 	t.Parallel()
 

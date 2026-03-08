@@ -63,13 +63,6 @@ type companySearchElement struct {
 	StaffCount  int    `json:"staffCount"`
 }
 
-// searchPaging is the shared LinkedIn paging structure used across search endpoints.
-type searchPaging struct {
-	Total int `json:"total"`
-	Start int `json:"start"`
-	Count int  `json:"count"`
-}
-
 // Execute searches LinkedIn company pages by keyword.
 func (a *searchCompaniesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params searchCompaniesParams
@@ -101,17 +94,19 @@ func (a *searchCompaniesAction) Execute(ctx context.Context, req connectors.Acti
 	results := make([]map[string]any, 0, len(resp.Elements))
 	for _, el := range resp.Elements {
 		results = append(results, map[string]any{
-			"id":          el.ID,
-			"name":        el.Name,
-			"description": el.Description,
-			"staff_count": el.StaffCount,
+			"id":               el.ID,
+			"organization_urn": "urn:li:organization:" + el.ID,
+			"name":             el.Name,
+			"description":      el.Description,
+			"staff_count":      el.StaffCount,
 		})
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"results": results,
-		"total":   resp.Paging.Total,
-		"start":   resp.Paging.Start,
-		"count":   resp.Paging.Count,
+		"results":    results,
+		"total":      resp.Paging.Total,
+		"start":      resp.Paging.Start,
+		"count":      len(results),
+		"next_start": nextStart(params.Start, len(results)),
 	})
 }

@@ -66,6 +66,13 @@ func TestListConnections_Success(t *testing.T) {
 	if first["first_name"] != "Alice" {
 		t.Errorf("expected first_name 'Alice', got %v", first["first_name"])
 	}
+	if first["person_urn"] != "urn:li:person:person1" {
+		t.Errorf("expected person_urn 'urn:li:person:person1', got %v", first["person_urn"])
+	}
+	// next_start should equal start (0) + 2 returned = 2
+	if ns, ok := data["next_start"].(float64); !ok || ns != 2 {
+		t.Errorf("expected next_start 2, got %v", data["next_start"])
+	}
 }
 
 func TestListConnections_CountTooLarge(t *testing.T) {

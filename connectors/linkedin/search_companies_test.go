@@ -65,6 +65,12 @@ func TestSearchCompanies_Success(t *testing.T) {
 	if company["name"] != "Acme Corp" {
 		t.Errorf("expected name 'Acme Corp', got %v", company["name"])
 	}
+	if company["organization_urn"] != "urn:li:organization:org123" {
+		t.Errorf("expected organization_urn 'urn:li:organization:org123', got %v", company["organization_urn"])
+	}
+	if ns, ok := data["next_start"].(float64); !ok || ns != 1 {
+		t.Errorf("expected next_start 1, got %v", data["next_start"])
+	}
 }
 
 func TestSearchCompanies_MissingKeywords(t *testing.T) {

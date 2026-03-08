@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -113,26 +114,34 @@ func (a *getCompanyAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"id":              params.OrganizationID,
-		"name":            name,
-		"description":     description,
-		"staff_count":     resp.StaffCount,
-		"locations":       locations,
-		"industries":      industries,
-		"website_url":     resp.WebsiteURL,
-		"founded_year":    resp.FoundedOn.Year,
+		"id":               params.OrganizationID,
+		"organization_urn": "urn:li:organization:" + params.OrganizationID,
+		"name":             name,
+		"description":      description,
+		"staff_count":      resp.StaffCount,
+		"locations":        locations,
+		"industries":       industries,
+		"website_url":      resp.WebsiteURL,
+		"founded_year":     resp.FoundedOn.Year,
 	})
 }
 
 // preferredString extracts the localized string for the preferred locale,
-// falling back to any available value when the preferred locale is not found.
+// falling back to the lexicographically first key when the preferred locale
+// is not found. Sorting keys ensures a deterministic result regardless of
+// Go map iteration order.
 func preferredString(localized map[string]string, locale preferredLocale) string {
 	key := locale.Language + "_" + locale.Country
 	if v, ok := localized[key]; ok {
 		return v
 	}
-	for _, v := range localized {
-		return v
+	keys := make([]string, 0, len(localized))
+	for k := range localized {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	if len(keys) > 0 {
+		return localized[keys[0]]
 	}
 	return ""
 }

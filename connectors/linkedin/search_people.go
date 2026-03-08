@@ -107,6 +107,7 @@ func (a *searchPeopleAction) Execute(ctx context.Context, req connectors.ActionR
 	for _, el := range resp.Elements {
 		results = append(results, map[string]any{
 			"id":         el.ID,
+			"person_urn": "urn:li:person:" + el.ID,
 			"first_name": el.FirstName,
 			"last_name":  el.LastName,
 			"headline":   el.Headline,
@@ -114,9 +115,10 @@ func (a *searchPeopleAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"results": results,
-		"total":   resp.Paging.Total,
-		"start":   resp.Paging.Start,
-		"count":   resp.Paging.Count,
+		"results":    results,
+		"total":      resp.Paging.Total,
+		"start":      resp.Paging.Start,
+		"count":      len(results),
+		"next_start": nextStart(params.Start, len(results)),
 	})
 }
