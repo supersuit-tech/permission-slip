@@ -65,6 +65,32 @@ func TestCalendlyConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
+func TestCalendlyConnector_ValidateCredentials_OAuth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer oauth-access-token" {
+			t.Errorf("unexpected Authorization header: %q", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(usersmeResponse{
+			Resource: struct {
+				URI  string `json:"uri"`
+				Name string `json:"name"`
+			}{URI: "https://api.calendly.com/users/abc123", Name: "Test User"},
+		})
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	oauthCreds := connectors.NewCredentials(map[string]string{"access_token": "oauth-access-token"})
+
+	err := c.ValidateCredentials(t.Context(), oauthCreds)
+	if err != nil {
+		t.Errorf("ValidateCredentials() with OAuth token returned error: %v", err)
+	}
+}
+
 func TestCalendlyConnector_ValidateCredentials_MissingKey(t *testing.T) {
 	t.Parallel()
 	c := New()
@@ -142,15 +168,27 @@ func TestCalendlyConnector_Manifest(t *testing.T) {
 		}
 	}
 
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "calendly" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "calendly")
+	// OAuth2 credential should be listed first (default/recommended).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "calendly_oauth" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "calendly_oauth")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
+	}
+	if oauthCred.OAuthProvider != "calendly" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "calendly")
+	}
+	// API key credential is kept as an alternative.
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "calendly" {
+		t.Errorf("api key credential service = %q, want %q", apiKeyCred.Service, "calendly")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
 	}
 
 	if err := m.Validate(); err != nil {
@@ -242,6 +280,31 @@ func TestDoJSON_PostWithBody(t *testing.T) {
 	}
 	if resp.Resource.BookingURL != "https://calendly.com/d/abc" {
 		t.Errorf("resp.Resource.BookingURL = %q, want %q", resp.Resource.BookingURL, "https://calendly.com/d/abc")
+	}
+}
+
+func TestDoJSON_OAuthTokenPreferredOverAPIKey(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Should use OAuth access_token, not api_key.
+		if r.Header.Get("Authorization") != "Bearer oauth-token" {
+			t.Errorf("expected OAuth token in Authorization header, got: %q", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"resource":{"uri":"https://api.calendly.com/users/abc123","name":"Test User"}}`)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	// Both tokens present — access_token should win.
+	bothCreds := connectors.NewCredentials(map[string]string{
+		"access_token": "oauth-token",
+		"api_key":      "should-not-be-used",
+	})
+	var resp usersmeResponse
+	err := conn.doJSON(t.Context(), bothCreds, http.MethodGet, srv.URL+"/users/me", nil, &resp)
+	if err != nil {
+		t.Fatalf("doJSON() returned error: %v", err)
 	}
 }
 
