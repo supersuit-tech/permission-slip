@@ -87,6 +87,7 @@ describe("Dashboard", () => {
     setupAuthMocks({ authenticated: true });
     mockEmptyResponses();
 
+    const user = userEvent.setup();
     render(<Dashboard />, { wrapper });
 
     await waitFor(() => {
@@ -95,7 +96,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.click(
+    await user.click(
       screen.getByRole("button", { name: "Register Your First Agent" }),
     );
 

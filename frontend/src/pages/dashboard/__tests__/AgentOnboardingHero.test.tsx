@@ -24,10 +24,11 @@ describe("AgentOnboardingHero", () => {
   });
 
   it("calls onRegisterAgent when CTA is clicked", async () => {
+    const user = userEvent.setup();
     const onRegisterAgent = vi.fn();
     render(<AgentOnboardingHero onRegisterAgent={onRegisterAgent} />);
 
-    await userEvent.click(
+    await user.click(
       screen.getByRole("button", { name: "Register Your First Agent" }),
     );
 

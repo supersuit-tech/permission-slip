@@ -11,10 +11,10 @@ import { InviteCodeDialog } from "./InviteCodeDialog";
 
 export function Dashboard() {
   useApprovalEvents();
-  const { agents, isLoading } = useAgents();
+  const { agents, isLoading, error } = useAgents();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
-  const showOnboarding = !isLoading && agents.length === 0;
+  const showOnboarding = !isLoading && !error && agents.length === 0;
 
   return (
     <div className="space-y-6">
