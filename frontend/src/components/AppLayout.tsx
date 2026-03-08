@@ -1,19 +1,35 @@
 import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Activity, CreditCard } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
 import { Footer } from "./Footer";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
 
+interface NavItem {
+  label: string;
+  path: string;
+  icon?: LucideIcon;
+  badge?: number;
+}
+
+function buildNavItems(pendingCount: number): NavItem[] {
+  return [
+    { label: "Dashboard", path: "/", icon: LayoutDashboard, badge: pendingCount },
+    { label: "Activity", path: "/activity", icon: Activity },
+    { label: "Billing", path: "/billing", icon: CreditCard },
+    { label: "Settings", path: "/settings" },
+  ];
+}
+
+const placeholderItems = ["Users", "Roles"];
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
-  const isHome = pathname === "/";
-  const isActivity = pathname === "/activity";
-  const isSettings = pathname === "/settings";
-  const isBilling = pathname === "/billing";
   const { approvals } = useApprovals();
   const pendingCount = approvals.length;
+  const navItems = buildNavItems(pendingCount);
 
   return (
     <div className="min-h-screen bg-background p-3 pb-20 md:p-5 md:pb-5">
@@ -28,51 +44,34 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </span>
         </Link>
         <ul className="hidden list-none gap-6 md:flex">
-          <li className={cn(
-            "pb-1 font-medium",
-            isHome
-              ? "border-b-2 border-secondary text-foreground"
-              : "text-muted-foreground"
-          )}>
-            <Link to="/" aria-current={isHome ? "page" : undefined} className="inline-flex items-center gap-1.5">
-              Dashboard
-              {pendingCount > 0 && (
-                <span className="flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                  {pendingCount > 9 ? "9+" : pendingCount}
-                </span>
-              )}
-            </Link>
-          </li>
-          <li className={cn(
-            "pb-1 font-medium",
-            isActivity
-              ? "border-b-2 border-secondary text-foreground"
-              : "text-muted-foreground"
-          )}>
-            <Link to="/activity" aria-current={isActivity ? "page" : undefined}>Activity</Link>
-          </li>
-          <li className="font-medium text-muted-foreground">
-            Users
-          </li>
-          <li className="font-medium text-muted-foreground">
-            Roles
-          </li>
-          <li className={cn(
-            "pb-1 font-medium",
-            isBilling
-              ? "border-b-2 border-secondary text-foreground"
-              : "text-muted-foreground"
-          )}>
-            <Link to="/billing" aria-current={isBilling ? "page" : undefined}>Billing</Link>
-          </li>
-          <li className={cn(
-            "pb-1 font-medium",
-            isSettings
-              ? "border-b-2 border-secondary text-foreground"
-              : "text-muted-foreground"
-          )}>
-            <Link to="/settings">Settings</Link>
-          </li>
+          {navItems.map((item) => {
+            const isActive = pathname === item.path;
+            return (
+              <li
+                key={item.path}
+                className={cn(
+                  "pb-1 font-medium",
+                  isActive
+                    ? "border-b-2 border-secondary text-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                <Link to={item.path} aria-current={isActive ? "page" : undefined} className="inline-flex items-center gap-1.5">
+                  {item.label}
+                  {item.badge != null && item.badge > 0 && (
+                    <span className="flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+          {placeholderItems.map((label) => (
+            <li key={label} className="font-medium text-muted-foreground">
+              {label}
+            </li>
+          ))}
         </ul>
         <div className="ml-auto">
           <UserMenu />
@@ -88,44 +87,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile bottom navigation */}
       <nav className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-sm md:hidden">
         <div className="mx-auto flex max-w-md items-center justify-around px-4 py-2">
-          <Link
-            to="/"
-            aria-current={isHome ? "page" : undefined}
-            className={cn(
-              "relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
-              isHome ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            <LayoutDashboard className="size-5" aria-hidden="true" />
-            Dashboard
-            {pendingCount > 0 && (
-              <span className="absolute -top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                {pendingCount > 9 ? "9+" : pendingCount}
-              </span>
-            )}
-          </Link>
-          <Link
-            to="/activity"
-            aria-current={isActivity ? "page" : undefined}
-            className={cn(
-              "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
-              isActivity ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            <Activity className="size-5" aria-hidden="true" />
-            Activity
-          </Link>
-          <Link
-            to="/billing"
-            aria-current={isBilling ? "page" : undefined}
-            className={cn(
-              "flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
-              isBilling ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            <CreditCard className="size-5" aria-hidden="true" />
-            Billing
-          </Link>
+          {navItems
+            .filter((item) => item.icon)
+            .map((item) => {
+              const isActive = pathname === item.path;
+              const Icon = item.icon!;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                  {item.label}
+                  {item.badge != null && item.badge > 0 && (
+                    <span className="absolute -top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
         </div>
       </nav>
     </div>
