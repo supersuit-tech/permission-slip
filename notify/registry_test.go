@@ -168,3 +168,13 @@ func TestSenderFactoryCount(t *testing.T) {
 		}
 	})
 }
+
+func TestRegisterSenderFactory_NilPanics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected panic when registering nil factory, got none")
+		}
+	}()
+	RegisterSenderFactory(nil)
+}

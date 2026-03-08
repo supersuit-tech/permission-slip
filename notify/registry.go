@@ -44,7 +44,11 @@ var (
 // RegisterSenderFactory registers a SenderFactory to be called by BuildSenders.
 // Factories are called in registration order. Packages register themselves in
 // their init() function so registration happens automatically on import.
+// Panics if fn is nil so the mistake surfaces immediately at registration time.
 func RegisterSenderFactory(fn SenderFactory) {
+	if fn == nil {
+		panic("notify: RegisterSenderFactory called with nil factory")
+	}
 	senderMu.Lock()
 	defer senderMu.Unlock()
 	senderFactories = append(senderFactories, fn)

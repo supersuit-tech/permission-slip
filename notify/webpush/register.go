@@ -2,6 +2,7 @@ package webpush
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -23,7 +24,11 @@ func init() {
 				log.Printf("Warning: failed to initialize VAPID keys: %v", err)
 				return nil, nil
 			}
-			log.Fatalf("Failed to initialize VAPID keys: %v", err)
+			// Return an error so BuildSenders logs it and skips web push.
+			// In production the startup validator (validateConfig) already
+			// ensures VAPID env vars are present, so this path indicates an
+			// unexpected database failure rather than misconfiguration.
+			return nil, fmt.Errorf("initialize VAPID keys: %w", err)
 		}
 		if vapidKeys == nil {
 			return nil, nil
@@ -39,7 +44,11 @@ func init() {
 				subject = "mailto:admin@example.com"
 				log.Println("Web Push: VAPID_SUBJECT not set, using default mailto:admin@example.com (development mode only)")
 			} else {
-				log.Fatalf("Web Push: VAPID_SUBJECT is required in production (e.g. mailto:admin@mycompany.com or https://example.com/contact)")
+				// Return an error rather than calling log.Fatalf so that
+				// BuildSenders' error-handling contract is respected. In
+				// production validateConfig already catches a missing
+				// VAPID_SUBJECT before the server starts.
+				return nil, fmt.Errorf("VAPID_SUBJECT is required in production (e.g. mailto:admin@mycompany.com or https://example.com/contact)")
 			}
 		}
 
