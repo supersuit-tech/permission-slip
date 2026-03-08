@@ -21,27 +21,13 @@ type listSubscriptionsParams struct {
 	Limit      int    `json:"limit"`
 }
 
-const (
-	defaultSubscriptionLimit = 10
-	maxSubscriptionLimit     = 100
-)
-
 func (p *listSubscriptionsParams) validate() error {
-	validStatuses := map[string]bool{
-		"active": true, "past_due": true, "canceled": true,
-		"unpaid": true, "trialing": true, "all": true, "": true,
+	if err := validateEnum(p.Status, "status", []string{
+		"active", "past_due", "canceled", "unpaid", "trialing", "all",
+	}); err != nil {
+		return err
 	}
-	if !validStatuses[p.Status] {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid status %q: must be one of active, past_due, canceled, unpaid, trialing, all", p.Status),
-		}
-	}
-	if p.Limit < 0 || p.Limit > maxSubscriptionLimit {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("limit must be between 0 and %d (0 uses default of %d)", maxSubscriptionLimit, defaultSubscriptionLimit),
-		}
-	}
-	return nil
+	return validateListLimit(p.Limit)
 }
 
 // Execute lists Stripe subscriptions with optional filters.
@@ -64,19 +50,9 @@ func (a *listSubscriptionsAction) Execute(ctx context.Context, req connectors.Ac
 	if params.PriceID != "" {
 		query["price"] = params.PriceID
 	}
+	query["limit"] = fmt.Sprintf("%d", resolveLimit(params.Limit))
 
-	limit := params.Limit
-	if limit == 0 {
-		limit = defaultSubscriptionLimit
-	}
-	query["limit"] = fmt.Sprintf("%d", limit)
-
-	var resp struct {
-		Data    json.RawMessage `json:"data"`
-		HasMore bool            `json:"has_more"`
-		Object  string          `json:"object"`
-	}
-
+	var resp stripeListResponse
 	if err := a.conn.doGet(ctx, req.Credentials, "/v1/subscriptions", query, &resp); err != nil {
 		return nil, err
 	}

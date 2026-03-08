@@ -21,23 +21,13 @@ type listInvoicesParams struct {
 	StartingAfter string `json:"starting_after"`
 }
 
-const (
-	defaultInvoiceLimit = 10
-	maxInvoiceLimit     = 100
-)
-
 func (p *listInvoicesParams) validate() error {
 	if err := validateEnum(p.Status, "status", []string{
 		"draft", "open", "paid", "uncollectible", "void",
 	}); err != nil {
 		return err
 	}
-	if p.Limit < 0 || p.Limit > maxInvoiceLimit {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("limit must be between 0 and %d (0 uses default of %d)", maxInvoiceLimit, defaultInvoiceLimit),
-		}
-	}
-	return nil
+	return validateListLimit(p.Limit)
 }
 
 // Execute lists Stripe invoices with optional filters.
@@ -60,19 +50,9 @@ func (a *listInvoicesAction) Execute(ctx context.Context, req connectors.ActionR
 	if params.StartingAfter != "" {
 		query["starting_after"] = params.StartingAfter
 	}
+	query["limit"] = fmt.Sprintf("%d", resolveLimit(params.Limit))
 
-	limit := params.Limit
-	if limit == 0 {
-		limit = defaultInvoiceLimit
-	}
-	query["limit"] = fmt.Sprintf("%d", limit)
-
-	var resp struct {
-		Data    json.RawMessage `json:"data"`
-		HasMore bool            `json:"has_more"`
-		Object  string          `json:"object"`
-	}
-
+	var resp stripeListResponse
 	if err := a.conn.doGet(ctx, req.Credentials, "/v1/invoices", query, &resp); err != nil {
 		return nil, err
 	}
