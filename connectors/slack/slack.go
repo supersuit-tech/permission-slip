@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -50,6 +51,8 @@ var OAuthScopes = []string{
 	"mpim:history",
 	"reactions:write",
 	"users:read",
+	"im:write",
+	"search:read",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all
@@ -93,6 +96,11 @@ func (c *SlackConnector) Actions() map[string]connectors.Action {
 		"slack.invite_to_channel":     &inviteToChannelAction{conn: c},
 		"slack.upload_file":           &uploadFileAction{conn: c},
 		"slack.add_reaction":          &addReactionAction{conn: c},
+		"slack.send_dm":               &sendDMAction{conn: c},
+		"slack.update_message":        &updateMessageAction{conn: c},
+		"slack.delete_message":        &deleteMessageAction{conn: c},
+		"slack.list_users":            &listUsersAction{conn: c},
+		"slack.search_messages":       &searchMessagesAction{conn: c},
 	}
 }
 
@@ -162,6 +170,54 @@ func validateChannelID(channel string) error {
 			Message: fmt.Sprintf("invalid channel ID %q: expected a Slack channel ID starting with C, G, or D — did you pass a channel name instead?", channel),
 		}
 	}
+}
+
+// validateUserID checks that a user_id parameter looks like a valid Slack user
+// ID (starts with U or W). This catches common mistakes like passing a username
+// or email instead of an ID before hitting the Slack API.
+func validateUserID(userID string) error {
+	if userID == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
+	}
+	if len(userID) < 2 {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid user ID %q: expected a Slack user ID starting with U or W (e.g. U01234567)", userID),
+		}
+	}
+	switch userID[0] {
+	case 'U', 'W':
+		return nil
+	default:
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid user ID %q: expected a Slack user ID starting with U or W — did you pass a username instead?", userID),
+		}
+	}
+}
+
+// validateMessageTS checks that a message timestamp parameter is non-empty and
+// looks like a valid Slack TS value (exactly two numeric parts separated by a
+// dot, e.g. "1234567890.123456"). This catches typos and wrong-format values
+// before they reach the Slack API.
+func validateMessageTS(ts string) error {
+	if ts == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: ts (message timestamp)"}
+	}
+	parts := strings.SplitN(ts, ".", 3)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid message timestamp %q: expected format like 1234567890.123456", ts),
+		}
+	}
+	for _, part := range parts {
+		for _, c := range part {
+			if c < '0' || c > '9' {
+				return &connectors.ValidationError{
+					Message: fmt.Sprintf("invalid message timestamp %q: expected a numeric Slack timestamp like 1234567890.123456", ts),
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // validateLimit checks that a pagination limit is within the Slack API range (1-1000).
@@ -281,6 +337,16 @@ func mapSlackError(slackErr string) error {
 		return &connectors.ExternalError{StatusCode: 200, Message: "the bot cannot invite itself to a channel"}
 	case "user_not_found":
 		return &connectors.ExternalError{StatusCode: 200, Message: "one or more user IDs were not found — verify the user IDs are correct"}
+
+	// Message edit/delete errors
+	case "message_not_found":
+		return &connectors.ExternalError{StatusCode: 200, Message: "message not found — verify the channel ID and message timestamp are correct"}
+	case "cant_delete_message":
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot delete this message — bots can only delete their own messages"}
+	case "edit_window_closed":
+		return &connectors.ExternalError{StatusCode: 200, Message: "the message editing window has closed — messages can only be edited within a limited time"}
+	case "cant_update_message":
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot update this message — bots can only edit their own messages"}
 
 	// Message errors
 	case "time_in_past":
