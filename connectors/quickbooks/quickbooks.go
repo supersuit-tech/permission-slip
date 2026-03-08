@@ -218,6 +218,25 @@ func validateEmail(field, value string) error {
 	return nil
 }
 
+// qboIDRe validates that a QuickBooks entity ID contains only digits.
+// QBO entity IDs (customer IDs, vendor IDs, etc.) are always positive integers.
+var qboIDRe = regexp.MustCompile(`^\d+$`)
+
+// validateQBOID returns a ValidationError if the given entity ID is non-empty
+// and contains non-digit characters. This prevents query injection in
+// QuickBooks SQL-like queries where IDs are interpolated into queries.
+func validateQBOID(field, value string) error {
+	if value == "" {
+		return nil
+	}
+	if !qboIDRe.MatchString(value) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s must be a numeric QuickBooks entity ID (got %q)", field, value),
+		}
+	}
+	return nil
+}
+
 // escapeQBOString escapes single quotes for use inside QuickBooks SQL-like
 // query string literals by doubling them (standard SQL escaping).
 func escapeQBOString(s string) string {
@@ -226,6 +245,25 @@ func escapeQBOString(s string) string {
 		if s[i] == '\'' {
 			result = append(result, '\'', '\'')
 		} else {
+			result = append(result, s[i])
+		}
+	}
+	return string(result)
+}
+
+// escapeQBOLikeString escapes a string for use in a QuickBooks SQL-like LIKE
+// clause. In addition to single-quote escaping, this also escapes wildcard
+// characters (% and _) with a backslash so they are treated as literals.
+// Use this instead of escapeQBOString when the value appears inside a LIKE pattern.
+func escapeQBOLikeString(s string) string {
+	result := make([]byte, 0, len(s)+8)
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\'':
+			result = append(result, '\'', '\'')
+		case '%', '_', '\\':
+			result = append(result, '\\', s[i])
+		default:
 			result = append(result, s[i])
 		}
 	}

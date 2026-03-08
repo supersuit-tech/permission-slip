@@ -441,3 +441,57 @@ func TestActions_ReturnsMap(t *testing.T) {
 		}
 	}
 }
+
+func TestEscapeQBOLikeString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"normal", "normal"},
+		{"O'Brien", "O''Brien"},
+		{"100%", `100\%`},
+		{"col_name", `col\_name`},
+		{`back\slash`, `back\\slash`},
+		{"100% O'Brien_co", `100\% O''Brien\_co`},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := escapeQBOLikeString(tt.input)
+			if got != tt.want {
+				t.Errorf("escapeQBOLikeString(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateQBOID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		value   string
+		wantErr bool
+	}{
+		{"42", false},
+		{"1", false},
+		{"999999", false},
+		{"", false}, // empty is allowed (optional field)
+		{"abc", true},
+		{"1a2b", true},
+		{"1; DROP TABLE X", true},
+		{"-1", true},
+		{"1.5", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			err := validateQBOID("test_field", tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateQBOID(%q) error = %v, wantErr %v", tt.value, err, tt.wantErr)
+			}
+		})
+	}
+}

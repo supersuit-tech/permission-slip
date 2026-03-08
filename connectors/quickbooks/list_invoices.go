@@ -24,6 +24,9 @@ type listInvoicesParams struct {
 }
 
 func (p *listInvoicesParams) validate() error {
+	if err := validateQBOID("customer_id", p.CustomerID); err != nil {
+		return err
+	}
 	if err := validateDate("start_date", p.StartDate); err != nil {
 		return err
 	}

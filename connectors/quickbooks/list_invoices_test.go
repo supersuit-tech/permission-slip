@@ -152,3 +152,21 @@ func TestListInvoices_ValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestListInvoices_NonNumericCustomerID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["quickbooks.list_invoices"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "quickbooks.list_invoices",
+		Parameters:  json.RawMessage(`{"customer_id": "42; DROP TABLE Invoice"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for non-numeric customer_id, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

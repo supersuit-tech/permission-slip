@@ -131,3 +131,32 @@ func TestListQBCustomers_InvalidJSON(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestListQBCustomers_WildcardEscaping(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		// A percent sign in the display_name should be escaped so it's treated
+		// as a literal character, not a SQL wildcard.
+		if !strings.Contains(query, `\%`) {
+			t.Errorf("percent sign not escaped in query: %q", query)
+		}
+
+		json.NewEncoder(w).Encode(map[string]any{
+			"QueryResponse": map[string]any{},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["quickbooks.list_customers"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "quickbooks.list_customers",
+		Parameters:  json.RawMessage(`{"display_name": "100% Corp"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
