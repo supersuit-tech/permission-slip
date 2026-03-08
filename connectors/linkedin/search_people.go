@@ -35,23 +35,11 @@ type searchPeopleParams struct {
 	Start    int    `json:"start"`
 }
 
-const defaultPeopleCount = 10
-const maxPeopleCount = 50
-
 func (p *searchPeopleParams) validate() error {
 	if p.Keywords == "" && p.Company == "" && p.Title == "" {
 		return &connectors.ValidationError{Message: "at least one of keywords, company, or title is required"}
 	}
-	if p.Count < 0 {
-		return &connectors.ValidationError{Message: "count must be non-negative"}
-	}
-	if p.Count > maxPeopleCount {
-		return &connectors.ValidationError{Message: fmt.Sprintf("count must not exceed %d", maxPeopleCount)}
-	}
-	if p.Start < 0 {
-		return &connectors.ValidationError{Message: "start must be non-negative"}
-	}
-	return nil
+	return validateCountStart(p.Count, maxSearchCount, p.Start)
 }
 
 // peopleSearchResponse is the LinkedIn people search API response.
@@ -77,10 +65,7 @@ func (a *searchPeopleAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	count := params.Count
-	if count == 0 {
-		count = defaultPeopleCount
-	}
+	count := resolveCount(params.Count, defaultSearchCount)
 
 	q := url.Values{}
 	q.Set("q", "search")

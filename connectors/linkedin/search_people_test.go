@@ -104,7 +104,7 @@ func TestSearchPeople_CountTooLarge(t *testing.T) {
 	conn := New()
 	action := &searchPeopleAction{conn: conn}
 
-	params, _ := json.Marshal(searchPeopleParams{Keywords: "engineer", Count: maxPeopleCount + 1})
+	params, _ := json.Marshal(searchPeopleParams{Keywords: "engineer", Count: maxSearchCount + 1})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "linkedin.search_people",

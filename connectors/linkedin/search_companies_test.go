@@ -100,7 +100,7 @@ func TestSearchCompanies_CountTooLarge(t *testing.T) {
 	conn := New()
 	action := &searchCompaniesAction{conn: conn}
 
-	params, _ := json.Marshal(searchCompaniesParams{Keywords: "acme", Count: maxCompanyCount + 1})
+	params, _ := json.Marshal(searchCompaniesParams{Keywords: "acme", Count: maxSearchCount + 1})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "linkedin.search_companies",

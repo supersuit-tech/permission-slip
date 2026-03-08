@@ -35,16 +35,7 @@ const defaultConnectionsCount = 20
 const maxConnectionsCount = 500
 
 func (p *listConnectionsParams) validate() error {
-	if p.Count < 0 {
-		return &connectors.ValidationError{Message: "count must be non-negative"}
-	}
-	if p.Count > maxConnectionsCount {
-		return &connectors.ValidationError{Message: fmt.Sprintf("count must not exceed %d", maxConnectionsCount)}
-	}
-	if p.Start < 0 {
-		return &connectors.ValidationError{Message: "start must be non-negative"}
-	}
-	return nil
+	return validateCountStart(p.Count, maxConnectionsCount, p.Start)
 }
 
 // connectionsResponse is the LinkedIn connections list API response.
@@ -70,10 +61,7 @@ func (a *listConnectionsAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	count := params.Count
-	if count == 0 {
-		count = defaultConnectionsCount
-	}
+	count := resolveCount(params.Count, defaultConnectionsCount)
 
 	q := url.Values{}
 	q.Set("q", "viewer")

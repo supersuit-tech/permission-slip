@@ -31,23 +31,11 @@ type searchCompaniesParams struct {
 	Start    int    `json:"start"`
 }
 
-const defaultCompanyCount = 10
-const maxCompanyCount = 50
-
 func (p *searchCompaniesParams) validate() error {
 	if p.Keywords == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: keywords"}
 	}
-	if p.Count < 0 {
-		return &connectors.ValidationError{Message: "count must be non-negative"}
-	}
-	if p.Count > maxCompanyCount {
-		return &connectors.ValidationError{Message: fmt.Sprintf("count must not exceed %d", maxCompanyCount)}
-	}
-	if p.Start < 0 {
-		return &connectors.ValidationError{Message: "start must be non-negative"}
-	}
-	return nil
+	return validateCountStart(p.Count, maxSearchCount, p.Start)
 }
 
 // companySearchResponse is the LinkedIn organization search API response.
@@ -73,10 +61,7 @@ func (a *searchCompaniesAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	count := params.Count
-	if count == 0 {
-		count = defaultCompanyCount
-	}
+	count := resolveCount(params.Count, defaultSearchCount)
 
 	q := url.Values{}
 	q.Set("q", "search")
