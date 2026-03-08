@@ -40,17 +40,19 @@ import (
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
 
-// shopSubdomainPattern matches valid Shopify store subdomains: lowercase
+// subdomainPattern matches valid RFC 1123-style subdomains: lowercase
 // alphanumeric and hyphens, not starting or ending with a hyphen, max 63 chars.
-// Used to validate the "shop" query parameter before substituting it into URLs
-// to prevent URL injection or SSRF.
-var shopSubdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+// Shared by all per-instance OAuth providers (Shopify, Zendesk, etc.) to
+// prevent URL injection or SSRF when substituting into provider URL templates.
+var subdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// zendeskSubdomainPattern matches valid Zendesk subdomains: lowercase
-// alphanumeric and hyphens, not starting or ending with a hyphen, max 63 chars.
-// Used to validate the "subdomain" query parameter before substituting it into
-// Zendesk OAuth URLs to prevent URL injection or SSRF.
-var zendeskSubdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+// shopSubdomainPattern uses the shared RFC 1123 label rules to validate the
+// "shop" query parameter before substituting it into Shopify OAuth URLs.
+var shopSubdomainPattern = subdomainPattern
+
+// zendeskSubdomainPattern uses the shared RFC 1123 label rules to validate the
+// "subdomain" query parameter before substituting it into Zendesk OAuth URLs.
+var zendeskSubdomainPattern = subdomainPattern
 
 // isReservedOAuthParam returns true if the parameter name is a reserved
 // OAuth 2.0 param that must not be overridden by AuthorizeParams.
@@ -383,27 +385,29 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		}
 
 		// Resolve per-instance URL templates (Shopify: {shop}, Zendesk: {subdomain}).
-		var shop string
+		// instanceID carries the per-instance identifier (subdomain or shop) so it
+		// can be encoded in the CSRF state token for use during the callback.
+		var instanceID string
 		if providerNeedsShop(provider) {
 			rawShop := r.URL.Query().Get("shop")
 			var err error
-			shop, err = validateShopSubdomain(rawShop)
+			instanceID, err = validateShopSubdomain(rawShop)
 			if err != nil {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
 					fmt.Sprintf("invalid shop parameter: %v", err)))
 				return
 			}
-			provider = resolveShopURLs(provider, shop)
+			provider = resolveShopURLs(provider, instanceID)
 		} else if providerNeedsSubdomain(provider) {
 			rawSubdomain := r.URL.Query().Get("subdomain")
 			var err error
-			shop, err = validateZendeskSubdomain(rawSubdomain)
+			instanceID, err = validateZendeskSubdomain(rawSubdomain)
 			if err != nil {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
 					fmt.Sprintf("invalid subdomain parameter: %v", err)))
 				return
 			}
-			provider = resolveSubdomainURLs(provider, shop)
+			provider = resolveSubdomainURLs(provider, instanceID)
 		}
 
 		cfg := newOAuth2Config(deps, provider)
@@ -416,7 +420,7 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// Create the CSRF state token after computing the final scope list so
 		// the callback can store exactly which scopes were requested.
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, shop)
+		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
@@ -511,11 +515,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		}
 
 		// Resolve per-instance URL templates using the instance identifier from
-		// the state token. Check placeholders before resolving so we can
-		// determine the correct extra_data key below.
+		// the state token. Capture the placeholder flags before resolution so
+		// we can determine the correct extra_data key below without re-checking
+		// the (now-resolved) URLs.
+		needsShop := providerNeedsShop(provider)
 		needsSubdomain := providerNeedsSubdomain(provider)
 		if state.Shop != "" {
-			if providerNeedsShop(provider) {
+			if needsShop {
 				provider = resolveShopURLs(provider, state.Shop)
 			} else if needsSubdomain {
 				provider = resolveSubdomainURLs(provider, state.Shop)
@@ -550,12 +556,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 				// Zendesk: store bare subdomain (e.g. "mycompany") so the
 				// connector can build API URLs like mycompany.zendesk.com.
 				stateExtraData = map[string]string{"subdomain": state.Shop}
-			} else {
+			} else if needsShop {
 				// Shopify: store the full shop domain (e.g. "mystore.myshopify.com").
 				// NOTE: state.Shop is validated to be a bare subdomain during
 				// the authorize step, so appending ".myshopify.com" is intentional.
 				stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
 			}
+			// Other per-instance providers: no extra_data needed beyond the token.
 		}
 
 		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
