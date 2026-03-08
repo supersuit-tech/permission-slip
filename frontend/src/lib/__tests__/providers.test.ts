@@ -3,6 +3,7 @@ import { providerLabel, serviceLabel, authTypeLabel } from "../labels";
 
 describe("providerLabel", () => {
   it("returns known provider labels", () => {
+    expect(providerLabel("airtable")).toBe("Airtable");
     expect(providerLabel("google")).toBe("Google");
     expect(providerLabel("netlify")).toBe("Netlify");
     expect(providerLabel("microsoft")).toBe("Microsoft");

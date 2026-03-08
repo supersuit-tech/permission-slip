@@ -78,9 +78,11 @@ func (c *AirtableConnector) Actions() map[string]connectors.Action {
 // OAuth flow) or a personal access token via api_token (starting with "pat").
 func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	// OAuth access_token takes priority (set by resolveOAuthCredentials).
+	// OAuth tokens are opaque and may contain a wider range of characters
+	// than PATs, so only reject control characters that could break HTTP headers.
 	if token, ok := creds.Get(credKeyOAuth); ok && token != "" {
-		if !isTokenSafe(token) {
-			return &connectors.ValidationError{Message: "access_token contains invalid characters"}
+		if hasControlChars(token) {
+			return &connectors.ValidationError{Message: "access_token contains invalid control characters"}
 		}
 		return nil
 	}
@@ -96,6 +98,18 @@ func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connect
 		return &connectors.ValidationError{Message: "api_token contains invalid characters — expected alphanumeric, dots, underscores, or hyphens"}
 	}
 	return nil
+}
+
+// hasControlChars returns true if s contains any ASCII control characters
+// (NUL, CR, LF, etc.) that could break HTTP headers. Used for OAuth tokens
+// which are opaque and may contain characters beyond the PAT whitelist.
+func hasControlChars(s string) bool {
+	for _, c := range s {
+		if c < 0x20 || c == 0x7f {
+			return true
+		}
+	}
+	return false
 }
 
 // isTokenSafe checks that a token contains only safe characters for use in
@@ -216,7 +230,7 @@ func (c *AirtableConnector) doRequest(ctx context.Context, method, url string, c
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return &connectors.AuthError{
-			Message: "Airtable authentication failed — check that your personal access token is valid and not expired",
+			Message: "Airtable authentication failed — check that your access token or personal access token is valid and not expired",
 		}
 	}
 	if resp.StatusCode == http.StatusForbidden {
