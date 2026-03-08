@@ -146,7 +146,7 @@ function OAuthCredentialRow({
   const needsReauth = connection?.status === "needs_reauth";
 
   function handleConnect() {
-    if (!session?.access_token) return;
+    if (!session?.access_token || !providerId) return;
     const baseUrl =
       import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
     const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;

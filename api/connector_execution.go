@@ -291,6 +291,36 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 // resolveStaticCredentialsByService fetches and decrypts static credentials for
 // a specific service. Used when falling back from OAuth to API key.
 func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
+	return decryptServiceCredentials(ctx, deps, userID, service)
+}
+
+// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
+// for the given action type.
+func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
+	}
+
+	credMap := make(map[string]string, len(services))
+	for _, service := range services {
+		creds, err := decryptServiceCredentials(ctx, deps, userID, service)
+		if err != nil {
+			return connectors.Credentials{}, err
+		}
+		// Merge into the combined map (multi-service connectors need all credentials).
+		for k, v := range creds.ToMap() {
+			credMap[k] = v
+		}
+	}
+
+	return connectors.NewCredentials(credMap), nil
+}
+
+// decryptServiceCredentials fetches and decrypts credentials for a single
+// service from the vault. Shared by resolveStaticCredentials (multi-service)
+// and resolveStaticCredentialsByService (single-service fallback).
+func decryptServiceCredentials(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
 	var zero connectors.Credentials
 	if deps.Vault == nil {
 		return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
@@ -318,48 +348,6 @@ func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID, 
 			credMap[k] = string(b)
 		}
 	}
-	return connectors.NewCredentials(credMap), nil
-}
-
-// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
-// for the given action type.
-func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
-	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
-	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
-	}
-
-	var zero connectors.Credentials
-	credMap := make(map[string]string, len(services))
-	for _, service := range services {
-		if deps.Vault == nil {
-			return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
-		}
-		decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
-		if err != nil {
-			var credErr *db.CredentialError
-			if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
-				return zero, &connectors.ValidationError{
-					Message: fmt.Sprintf("no credentials stored for service %q", service),
-				}
-			}
-			return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
-		}
-		// Flatten decrypted JSON map into string values for the Credentials type.
-		for k, v := range decrypted {
-			switch vv := v.(type) {
-			case string:
-				credMap[k] = vv
-			default:
-				b, err := json.Marshal(v)
-				if err != nil {
-					return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
-				}
-				credMap[k] = string(b)
-			}
-		}
-	}
-
 	return connectors.NewCredentials(credMap), nil
 }
 
