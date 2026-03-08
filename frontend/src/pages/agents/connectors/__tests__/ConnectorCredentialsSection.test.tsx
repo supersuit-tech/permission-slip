@@ -369,6 +369,32 @@ describe("ConnectorCredentialsSection", () => {
     });
     expect(screen.getByText("OAuth")).toBeInTheDocument();
     expect(screen.getByText("API Key")).toBeInTheDocument();
+    // UX: "or" divider between auth methods
+    expect(screen.getByText("or")).toBeInTheDocument();
+    // UX: "Recommended" badge on OAuth row
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
+  });
+
+  it("displays friendly service name instead of raw ID for API key rows", async () => {
+    setupMockGet();
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "square_api_key",
+            auth_type: "api_key" as const,
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      // "square_api_key" should render as "Square"
+      expect(screen.getByText("Square")).toBeInTheDocument();
+    });
+    // Raw service ID should not appear
+    expect(screen.queryByText("square_api_key")).not.toBeInTheDocument();
   });
 
   it("displays auth type badges for credential rows", async () => {

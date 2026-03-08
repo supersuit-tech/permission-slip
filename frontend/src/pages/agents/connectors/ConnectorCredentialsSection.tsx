@@ -60,6 +60,13 @@ function providerLabel(id: string): string {
   return labels[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 }
 
+/** Map service IDs like "square_api_key" to a friendlier display name. */
+function serviceDisplayName(service: string): string {
+  // Strip common suffixes to get the base provider name, then titlecase it.
+  const base = service.replace(/_(api_key|oauth|token|creds?)$/i, "");
+  return providerLabel(base);
+}
+
 export function ConnectorCredentialsSection({
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
@@ -108,21 +115,42 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error ?? oauthError}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred) =>
-              cred.auth_type === "oauth2" ? (
-                <OAuthCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  connection={oauthByProvider.get(cred.oauth_provider ?? "")}
-                />
-              ) : (
-                <CredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  storedCredentials={storedByService.get(cred.service) ?? []}
-                />
-              ),
-            )}
+            {requiredCredentials.map((cred, index) => {
+              const hasMixedAuth =
+                requiredCredentials.length > 1 &&
+                requiredCredentials.some((c) => c.auth_type === "oauth2") &&
+                requiredCredentials.some((c) => c.auth_type !== "oauth2");
+              const showDivider = hasMixedAuth && index > 0;
+              return (
+                <div key={cred.service}>
+                  {showDivider && (
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="bg-border h-px flex-1" />
+                      <span className="text-muted-foreground text-xs font-medium uppercase">
+                        or
+                      </span>
+                      <div className="bg-border h-px flex-1" />
+                    </div>
+                  )}
+                  {cred.auth_type === "oauth2" ? (
+                    <OAuthCredentialRow
+                      requiredCredential={cred}
+                      connection={oauthByProvider.get(
+                        cred.oauth_provider ?? "",
+                      )}
+                      recommended={hasMixedAuth}
+                    />
+                  ) : (
+                    <CredentialRow
+                      requiredCredential={cred}
+                      storedCredentials={
+                        storedByService.get(cred.service) ?? []
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -140,9 +168,11 @@ interface OAuthConnection {
 function OAuthCredentialRow({
   requiredCredential,
   connection,
+  recommended,
 }: {
   requiredCredential: RequiredCredential;
   connection?: OAuthConnection;
+  recommended?: boolean;
 }) {
   const { session } = useAuth();
   const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
@@ -181,6 +211,11 @@ function OAuthCredentialRow({
               <Badge variant="secondary" className="text-xs">
                 {authTypeLabel(requiredCredential.auth_type)}
               </Badge>
+              {recommended && (
+                <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">
+                  Recommended
+                </Badge>
+              )}
             </div>
             {isConnected && connection && (
               <p className="text-muted-foreground text-xs">
@@ -265,7 +300,7 @@ function CredentialRow({
             )}
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{requiredCredential.service}</p>
+                <p className="text-sm font-medium">{serviceDisplayName(requiredCredential.service)}</p>
                 <Badge variant="outline" className="text-xs">
                   {authTypeLabel(requiredCredential.auth_type)}
                 </Badge>

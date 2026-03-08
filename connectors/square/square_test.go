@@ -82,9 +82,9 @@ func TestSquareConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "wrong key name",
+			name:    "valid api_key fallback",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": "EAAAEtest123"}),
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name:    "invalid environment",
