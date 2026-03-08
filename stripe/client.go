@@ -264,6 +264,19 @@ func (c *Client) DetachPaymentMethod(ctx context.Context, paymentMethodID string
 	return pm, nil
 }
 
+// RetrieveCheckoutSession fetches an existing Checkout Session by ID.
+// Used to verify payment status when the webhook hasn't arrived yet.
+func (c *Client) RetrieveCheckoutSession(ctx context.Context, sessionID string) (*gostripe.CheckoutSession, error) {
+	params := &gostripe.CheckoutSessionParams{}
+	params.Context = ctx
+
+	sess, err := session.Get(sessionID, params)
+	if err != nil {
+		return nil, fmt.Errorf("stripe: retrieve checkout session: %w", err)
+	}
+	return sess, nil
+}
+
 // CancelSubscription cancels a Stripe subscription immediately.
 func (c *Client) CancelSubscription(ctx context.Context, stripeSubscriptionID string) (*gostripe.Subscription, error) {
 	params := &gostripe.SubscriptionCancelParams{}

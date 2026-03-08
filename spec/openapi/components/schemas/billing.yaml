@@ -489,6 +489,36 @@ UpgradeResponse:
       description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
       example: https://checkout.stripe.com/c/pay/cs_test_...
 
+ActivateRequest:
+  type: object
+  required:
+    - session_id
+  properties:
+    session_id:
+      type: string
+      description: The Stripe Checkout Session ID from the success redirect URL
+      example: cs_test_abc123
+
+ActivateResponse:
+  type: object
+  required:
+    - plan_id
+    - status
+  properties:
+    plan_id:
+      type: string
+      description: The user's plan after activation (free if pending, pay_as_you_go if activated)
+      example: pay_as_you_go
+    status:
+      type: string
+      enum: [activated, already_active, pending]
+      description: |
+        Activation result:
+        - `activated`: Plan was successfully upgraded.
+        - `already_active`: Plan was already upgraded (webhook or previous call).
+        - `pending`: Checkout session is not yet complete (payment still processing).
+      example: activated
+
 DowngradeResponse:
   type: object
   required:

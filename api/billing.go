@@ -171,6 +171,7 @@ func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /billing/upgrade", requireProfile(handleCreateCheckout(deps)))
 	mux.Handle("POST /billing/downgrade", requireProfile(handleDowngrade(deps)))
 	mux.Handle("GET /billing/invoices", requireProfile(handleListInvoices(deps)))
+	mux.Handle("POST /billing/activate", requireProfile(handleActivateUpgrade(deps)))
 }
 
 // ── GET /billing/plan ────────────────────────────────────────────────────────
@@ -340,8 +341,10 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Build success/cancel URLs.
-		successURL := deps.BaseURL + "/billing?upgraded=true"
+		// Build success/cancel URLs. Include {CHECKOUT_SESSION_ID} so the
+		// frontend can call POST /billing/activate to confirm the upgrade
+		// without relying solely on the webhook.
+		successURL := deps.BaseURL + "/billing?upgraded=true&session_id={CHECKOUT_SESSION_ID}"
 		cancelURL := deps.BaseURL + "/billing"
 
 		sess, err := deps.Stripe.CreateCheckoutSession(r.Context(), stripeCustomerID, successURL, cancelURL)

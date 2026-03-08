@@ -387,6 +387,64 @@ downgrade:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
+activate:
+  post:
+    summary: Activate upgrade from checkout
+    description: |
+      Verifies a completed Stripe Checkout Session and activates the paid
+      plan synchronously. Called by the frontend after returning from Stripe
+      checkout as a reliable alternative to waiting for the webhook.
+
+      If the checkout session is complete and paid, the user's plan is
+      atomically upgraded from free to pay-as-you-go (same logic as the
+      webhook handler). If the webhook already processed the upgrade, this
+      endpoint returns `already_active` — both paths are idempotent.
+
+      Only available when `billing_enabled` is `true` and Stripe is configured.
+    operationId: activateUpgrade
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/billing.yaml#/ActivateRequest'
+    responses:
+      '200':
+        description: Activation result
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/ActivateResponse'
+            example:
+              plan_id: pay_as_you_go
+              status: activated
+      '400':
+        description: Missing or invalid session_id
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '403':
+        description: Checkout session does not belong to this account
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
 invoices:
   get:
     summary: List invoices

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
+import { useAuth } from "@/auth/AuthContext";
 import { useBillingPlan } from "@/hooks/useBillingPlan";
 import { PlanCard } from "./PlanCard";
 import { UsageSummaryCard } from "./UsageSummaryCard";
@@ -11,26 +12,58 @@ import { UsageDashboard } from "./UsageDashboard";
 import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "./UpgradeSuccessBanner";
+import { activateUpgrade } from "./activateUpgrade";
+
+// Retry delays (ms) after activate call if plan hasn't changed yet.
+const RETRY_DELAYS = [1000, 2000, 3000];
 
 export function BillingPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
+  const { session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSuccess, setShowSuccess] = useState(
     searchParams.get("upgraded") === "true",
   );
+  const activateRef = useRef(false);
 
-  // Refetch billing data when returning from Stripe with upgraded=true
-  // to ensure the plan card reflects the new subscription.
-  useEffect(() => {
-    if (showSuccess) {
-      void refetch();
+  const isPaidPlan = billingPlan != null && billingPlan.plan.id !== "free";
+
+  // Retry refetch a few times if the plan hasn't changed after activate.
+  const retryUntilUpgraded = useCallback(async () => {
+    for (const delay of RETRY_DELAYS) {
+      await new Promise((r) => setTimeout(r, delay));
+      const result = await refetch();
+      if (result.data?.plan.id !== "free") return;
     }
-  }, [showSuccess, refetch]);
+  }, [refetch]);
+
+  // After returning from Stripe checkout, call the activate endpoint to
+  // confirm the upgrade directly with Stripe. This doesn't rely on
+  // webhooks, so it works even in test/dev environments.
+  useEffect(() => {
+    if (!showSuccess || activateRef.current) return;
+    const sessionId = searchParams.get("session_id");
+    if (!sessionId || !session?.access_token) {
+      // No session ID (old URL format) — fall back to a simple refetch.
+      void refetch();
+      return;
+    }
+    activateRef.current = true;
+    void activateUpgrade(sessionId, session.access_token)
+      .then(() => refetch())
+      .then((result) => {
+        if (result?.data?.plan.id === "free") {
+          void retryUntilUpgraded();
+        }
+      });
+  }, [showSuccess, searchParams, session?.access_token, refetch, retryUntilUpgraded]);
 
   function dismissSuccess() {
     setShowSuccess(false);
-    searchParams.delete("upgraded");
-    setSearchParams(searchParams, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    next.delete("upgraded");
+    next.delete("session_id");
+    setSearchParams(next, { replace: true });
   }
 
   return (
@@ -46,7 +79,9 @@ export function BillingPage() {
         <h1 className="text-2xl font-bold tracking-tight">Billing</h1>
       </div>
 
-      {showSuccess && <UpgradeSuccessBanner onDismiss={dismissSuccess} />}
+      {showSuccess && (
+        <UpgradeSuccessBanner onDismiss={dismissSuccess} upgraded={isPaidPlan} />
+      )}
 
       {isLoading ? (
         <BillingPageSkeleton />

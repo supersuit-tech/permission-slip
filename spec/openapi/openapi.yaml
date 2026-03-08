@@ -268,6 +268,9 @@ paths:
   /v1/billing/plan:
     $ref: './components/paths/billing.yaml#/plan'
 
+  /v1/billing/activate:
+    $ref: './components/paths/billing.yaml#/activate'
+
   /v1/admin/usage:
     $ref: './components/paths/admin_usage.yaml#/adminUsage'
 
@@ -559,6 +562,10 @@ components:
       $ref: './components/schemas/billing.yaml#/ResourceLimitError'
     ResourceLimitDetails:
       $ref: './components/schemas/billing.yaml#/ResourceLimitDetails'
+    ActivateRequest:
+      $ref: './components/schemas/billing.yaml#/ActivateRequest'
+    ActivateResponse:
+      $ref: './components/schemas/billing.yaml#/ActivateResponse'
 
     # Admin Usage
     AdminUsageResponse:
