@@ -47,11 +47,11 @@ var OAuthScopes = []string{
 	"groups:history",
 	"groups:read",
 	"im:history",
-	"im:write",
 	"mpim:history",
 	"reactions:write",
-	"search:read",
 	"users:read",
+	"im:write",
+	"search:read",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all

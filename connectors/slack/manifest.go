@@ -355,7 +355,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.search_messages",
 				Name:        "Search Messages",
-				Description: "Search messages across Slack channels",
+				Description: "Search messages across Slack channels (requires a user token with search:read scope; bot tokens are not supported by Slack for this endpoint)",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

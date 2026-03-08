@@ -8,8 +8,15 @@ import (
 
 // searchMessagesAction implements connectors.Action for slack.search_messages.
 // It searches messages across channels via POST /search.messages.
-// NOTE: This endpoint requires a user token (not a bot token) with the
-// search:read scope.
+//
+// IMPORTANT: This Slack endpoint requires a user token (xoxp-) with the
+// search:read scope. Bot tokens (xoxb-) do NOT support search.messages.
+// For this action to work, the OAuth flow must persist the authed_user
+// access_token (returned alongside the bot token in Slack's OAuth v2
+// response) into the connector's credentials. Until user-token credential
+// support is added, this action will return a missing_scope / not_allowed
+// error when invoked with a bot token. See the manifest description for
+// user-facing guidance.
 type searchMessagesAction struct {
 	conn *SlackConnector
 }
@@ -30,7 +37,10 @@ func (p *searchMessagesParams) validate() error {
 		return &connectors.ValidationError{Message: "count must be between 1 and 100"}
 	}
 	if p.Page < 0 {
-		return &connectors.ValidationError{Message: "page must be non-negative"}
+		return &connectors.ValidationError{Message: "page must be at least 1"}
+	}
+	if p.Page == 0 {
+		p.Page = 1
 	}
 	if p.Sort != "" && p.Sort != "score" && p.Sort != "timestamp" {
 		return &connectors.ValidationError{Message: "sort must be \"score\" (relevance) or \"timestamp\""}
