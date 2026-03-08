@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/oauth"
 )
 
 func TestSquareConnector_ID(t *testing.T) {
@@ -82,9 +83,9 @@ func TestSquareConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "wrong key name",
+			name:    "valid api_key fallback",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": "EAAAEtest123"}),
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name:    "invalid environment",
@@ -147,18 +148,35 @@ func TestSquareConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "square" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "square")
+
+	// First credential: OAuth (primary)
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "square" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "square")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "square" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "square")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want scopes")
+	}
+
+	// Second credential: API key (alternative)
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "square_api_key" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "square_api_key")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {
@@ -175,6 +193,45 @@ func TestSquareConnector_Manifest(t *testing.T) {
 		var schema map[string]interface{}
 		if err := json.Unmarshal(a.ParametersSchema, &schema); err != nil {
 			t.Errorf("action %q has invalid ParametersSchema JSON: %v", a.ActionType, err)
+		}
+	}
+}
+
+func TestSquareConnector_OAuthScopesSubsetOfBuiltin(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	// Find the OAuth credential in the manifest.
+	var manifestScopes []string
+	for _, cred := range m.RequiredCredentials {
+		if cred.AuthType == "oauth2" {
+			manifestScopes = cred.OAuthScopes
+			break
+		}
+	}
+	if len(manifestScopes) == 0 {
+		t.Fatal("no oauth2 credential found in manifest")
+	}
+
+	// Get built-in provider scopes.
+	builtinScopes := make(map[string]bool)
+	for _, p := range oauth.BuiltInProviders() {
+		if p.ID == "square" {
+			for _, s := range p.Scopes {
+				builtinScopes[s] = true
+			}
+			break
+		}
+	}
+	if len(builtinScopes) == 0 {
+		t.Fatal("no square provider found in builtin providers")
+	}
+
+	// Every manifest scope must be registered in the builtin provider.
+	for _, scope := range manifestScopes {
+		if !builtinScopes[scope] {
+			t.Errorf("manifest scope %q is not in builtin provider scopes", scope)
 		}
 	}
 }
