@@ -26,6 +26,30 @@ type listReposParams struct {
 }
 
 func (p *listReposParams) validate() error {
+	if p.Type != "" {
+		switch p.Type {
+		case "all", "public", "private", "forks", "sources", "member":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid type: %q; must be one of: all, public, private, forks, sources, member", p.Type)}
+		}
+	}
+	if p.Visibility != "" {
+		switch p.Visibility {
+		case "all", "public", "private":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid visibility: %q; must be one of: all, public, private", p.Visibility)}
+		}
+	}
+	if p.Sort != "" {
+		switch p.Sort {
+		case "created", "updated", "pushed", "full_name":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort: %q; must be one of: created, updated, pushed, full_name", p.Sort)}
+		}
+	}
+	if err := validatePerPage(p.PerPage); err != nil {
+		return err
+	}
 	return nil
 }
 

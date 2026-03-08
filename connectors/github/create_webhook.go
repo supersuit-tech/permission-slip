@@ -35,6 +35,13 @@ func (p *createWebhookParams) validate() error {
 	if err := requireNonEmptyStrings(p.Events, "events"); err != nil {
 		return err
 	}
+	if p.ContentType != "" {
+		switch p.ContentType {
+		case "json", "form":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid content_type: %q; must be one of: json, form", p.ContentType)}
+		}
+	}
 	return nil
 }
 
@@ -69,10 +76,10 @@ func (a *createWebhookAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	var ghResp struct {
-		ID      int    `json:"id"`
-		URL     string `json:"url"`
-		HTMLURL string `json:"html_url"`
-		Active  bool   `json:"active"`
+		ID      int      `json:"id"`
+		URL     string   `json:"url"`
+		HTMLURL string   `json:"html_url"`
+		Active  bool     `json:"active"`
 		Events  []string `json:"events"`
 	}
 

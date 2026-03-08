@@ -166,6 +166,39 @@ func TestGetFileContents_WithRef(t *testing.T) {
 	}
 }
 
+func TestGetFileContents_PathInjection(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["github.get_file_contents"]
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"query string injection", "README.md?ref=evil"},
+		{"fragment injection", "README.md#evil"},
+		{"absolute path", "/etc/passwd"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := json.RawMessage(`{"owner":"octocat","repo":"hello-world","path":` + `"` + tt.path + `"` + `}`)
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "github.get_file_contents",
+				Parameters:  params,
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error for path injection, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestGetFileContents_MissingParams(t *testing.T) {
 	t.Parallel()
 

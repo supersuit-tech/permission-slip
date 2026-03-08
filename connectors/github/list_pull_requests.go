@@ -28,7 +28,34 @@ type listPullRequestsParams struct {
 }
 
 func (p *listPullRequestsParams) validate() error {
-	return requireOwnerRepo(p.Owner, p.Repo)
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
+	}
+	if p.State != "" {
+		switch p.State {
+		case "open", "closed", "all":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid state: %q; must be one of: open, closed, all", p.State)}
+		}
+	}
+	if p.Sort != "" {
+		switch p.Sort {
+		case "created", "updated", "popularity", "long-running":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort: %q; must be one of: created, updated, popularity, long-running", p.Sort)}
+		}
+	}
+	if p.Direction != "" {
+		switch p.Direction {
+		case "asc", "desc":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid direction: %q; must be one of: asc, desc", p.Direction)}
+		}
+	}
+	if err := validatePerPage(p.PerPage); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Execute lists pull requests for a GitHub repository.

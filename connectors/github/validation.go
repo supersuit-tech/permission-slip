@@ -3,6 +3,7 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -59,6 +60,39 @@ func requireNonEmptyStrings(vals []string, field string) error {
 		if v == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("%s must not contain empty strings", field)}
 		}
+	}
+	return nil
+}
+
+// validateFilePath rejects file paths that would corrupt URL construction.
+// Paths starting with "/" are absolute and invalid for the Contents API.
+// Paths containing "?" or "#" would break URL parsing by injecting a query
+// string or fragment into the request path.
+func validateFilePath(path string) error {
+	if strings.HasPrefix(path, "/") {
+		return &connectors.ValidationError{Message: "invalid path: must be a relative path (must not start with '/')"}
+	}
+	if strings.ContainsAny(path, "?#") {
+		return &connectors.ValidationError{Message: "invalid path: must not contain '?' or '#'"}
+	}
+	return nil
+}
+
+// escapeFilePath URL-encodes each segment of a repository file path while
+// preserving the "/" separator. This prevents special characters in file
+// names (spaces, brackets, etc.) from corrupting the request URL.
+func escapeFilePath(path string) string {
+	segments := strings.Split(path, "/")
+	for i, s := range segments {
+		segments[i] = url.PathEscape(s)
+	}
+	return strings.Join(segments, "/")
+}
+
+// validatePerPage returns a ValidationError if perPage exceeds GitHub's maximum.
+func validatePerPage(perPage int) error {
+	if perPage > 100 {
+		return &connectors.ValidationError{Message: fmt.Sprintf("per_page must not exceed 100 (got %d)", perPage)}
 	}
 	return nil
 }

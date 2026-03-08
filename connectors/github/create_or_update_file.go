@@ -38,6 +38,9 @@ func (p *createOrUpdateFileParams) validate() error {
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
 	}
+	if err := validateFilePath(p.Path); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -73,7 +76,7 @@ func (a *createOrUpdateFileAction) Execute(ctx context.Context, req connectors.A
 	}
 
 	path := fmt.Sprintf("/repos/%s/%s/contents/%s",
-		url.PathEscape(params.Owner), url.PathEscape(params.Repo), params.Path)
+		url.PathEscape(params.Owner), url.PathEscape(params.Repo), escapeFilePath(params.Path))
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPut, path, body, &ghResp); err != nil {
 		return nil, err
 	}

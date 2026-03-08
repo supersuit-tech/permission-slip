@@ -4,9 +4,9 @@
 package github
 
 import (
-	_ "embed"
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,6 +51,7 @@ func (c *GitHubConnector) ID() string { return "github" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -918,16 +919,16 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 // Actions returns the registered action handlers keyed by action_type.
 func (c *GitHubConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"github.create_issue":   &createIssueAction{conn: c},
-		"github.merge_pr":       &mergePRAction{conn: c},
-		"github.create_pr":      &createPRAction{conn: c},
-		"github.add_reviewer":   &addReviewerAction{conn: c},
-		"github.create_release": &createReleaseAction{conn: c},
-		"github.close_issue":    &closeIssueAction{conn: c},
-		"github.add_label":      &addLabelAction{conn: c},
-		"github.add_comment":    &addCommentAction{conn: c},
-		"github.create_branch":        &createBranchAction{conn: c},
-		"github.get_file_contents":    &getFileContentsAction{conn: c},
+		"github.create_issue":          &createIssueAction{conn: c},
+		"github.merge_pr":              &mergePRAction{conn: c},
+		"github.create_pr":             &createPRAction{conn: c},
+		"github.add_reviewer":          &addReviewerAction{conn: c},
+		"github.create_release":        &createReleaseAction{conn: c},
+		"github.close_issue":           &closeIssueAction{conn: c},
+		"github.add_label":             &addLabelAction{conn: c},
+		"github.add_comment":           &addCommentAction{conn: c},
+		"github.create_branch":         &createBranchAction{conn: c},
+		"github.get_file_contents":     &getFileContentsAction{conn: c},
 		"github.create_or_update_file": &createOrUpdateFileAction{conn: c},
 		"github.list_repos":            &listReposAction{conn: c},
 		"github.get_repo":              &getRepoAction{conn: c},
@@ -1013,4 +1014,3 @@ func (c *GitHubConnector) do(ctx context.Context, creds connectors.Credentials, 
 	}
 	return nil
 }
-

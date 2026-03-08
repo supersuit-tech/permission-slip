@@ -32,6 +32,9 @@ func (p *getFileContentsParams) validate() error {
 	if p.Path == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: path"}
 	}
+	if err := validateFilePath(p.Path); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -45,7 +48,7 @@ func (a *getFileContentsAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	path := fmt.Sprintf("/repos/%s/%s/contents/%s",
-		url.PathEscape(params.Owner), url.PathEscape(params.Repo), params.Path)
+		url.PathEscape(params.Owner), url.PathEscape(params.Repo), escapeFilePath(params.Path))
 	if params.Ref != "" {
 		path += "?ref=" + url.QueryEscape(params.Ref)
 	}

@@ -27,6 +27,25 @@ func (p *searchIssuesParams) validate() error {
 	if p.Q == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: q"}
 	}
+	if p.Sort != "" {
+		switch p.Sort {
+		case "comments", "reactions", "reactions-+1", "reactions--1", "reactions-smile",
+			"reactions-thinking_face", "reactions-heart", "reactions-tada",
+			"interactions", "created", "updated":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort: %q", p.Sort)}
+		}
+	}
+	if p.Order != "" {
+		switch p.Order {
+		case "asc", "desc":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid order: %q; must be one of: asc, desc", p.Order)}
+		}
+	}
+	if err := validatePerPage(p.PerPage); err != nil {
+		return err
+	}
 	return nil
 }
 

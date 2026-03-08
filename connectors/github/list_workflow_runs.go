@@ -30,7 +30,22 @@ type listWorkflowRunsParams struct {
 }
 
 func (p *listWorkflowRunsParams) validate() error {
-	return requireOwnerRepo(p.Owner, p.Repo)
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
+	}
+	if p.Status != "" {
+		switch p.Status {
+		case "completed", "action_required", "cancelled", "failure", "neutral",
+			"skipped", "stale", "success", "timed_out", "in_progress",
+			"queued", "requested", "waiting", "pending":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid status: %q", p.Status)}
+		}
+	}
+	if err := validatePerPage(p.PerPage); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Execute lists workflow runs for a GitHub repository.
