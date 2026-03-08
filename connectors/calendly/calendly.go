@@ -1,6 +1,6 @@
 // Package calendly implements the Calendly connector for the Permission Slip
-// connector execution layer. It uses the Calendly REST API v2 with personal
-// access tokens (API key auth).
+// connector execution layer. It uses the Calendly REST API v2 with either
+// OAuth2 access tokens (preferred) or personal access tokens (API key).
 package calendly
 
 import (
@@ -20,7 +20,13 @@ import (
 const (
 	defaultBaseURL = "https://api.calendly.com"
 	defaultTimeout = 30 * time.Second
-	credKeyAPIKey  = "api_key"
+
+	// credKeyAPIKey is the credential key for Calendly personal access tokens.
+	credKeyAPIKey = "api_key"
+
+	// credKeyAccessToken is the credential key for OAuth2 access tokens,
+	// set by the OAuth credential resolution path.
+	credKeyAccessToken = "access_token"
 
 	// defaultRetryAfter is used when Calendly returns a 429 without a
 	// Retry-After header (or an unparseable one).
@@ -69,25 +75,33 @@ func (c *CalendlyConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a non-empty
-// api_key and tests it against GET /users/me.
+// ValidateCredentials checks that the provided credentials contain either a
+// non-empty access_token (OAuth2) or api_key (personal access token), and
+// tests them against GET /users/me.
 func (c *CalendlyConnector) ValidateCredentials(ctx context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		// OAuth path — test against /users/me.
+		var resp usersmeResponse
+		if err := c.doJSON(ctx, creds, http.MethodGet, c.baseURL+"/users/me", nil, &resp); err != nil {
+			return err
+		}
+		if resp.Resource.URI == "" {
+			return &connectors.ValidationError{Message: "Calendly API returned empty user URI"}
+		}
+		return nil
 	}
-
-	// Test the key against /users/me to verify it's valid.
-	var resp usersmeResponse
-	if err := c.doJSON(ctx, creds, http.MethodGet, c.baseURL+"/users/me", nil, &resp); err != nil {
-		return err
+	if key, ok := creds.Get(credKeyAPIKey); ok && key != "" {
+		// API key path — test against /users/me.
+		var resp usersmeResponse
+		if err := c.doJSON(ctx, creds, http.MethodGet, c.baseURL+"/users/me", nil, &resp); err != nil {
+			return err
+		}
+		if resp.Resource.URI == "" {
+			return &connectors.ValidationError{Message: "Calendly API returned empty user URI"}
+		}
+		return nil
 	}
-
-	if resp.Resource.URI == "" {
-		return &connectors.ValidationError{Message: "Calendly API returned empty user URI"}
-	}
-
-	return nil
+	return &connectors.ValidationError{Message: "missing required credential: access_token (OAuth) or api_key"}
 }
 
 // usersmeResponse is the Calendly API response from GET /users/me.
@@ -116,9 +130,13 @@ func (c *CalendlyConnector) getUserURI(ctx context.Context, creds connectors.Cre
 // token auth, handles rate limiting and timeouts, and unmarshals the
 // response into respBody.
 func (c *CalendlyConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, url string, reqBody, respBody any) error {
-	token, ok := creds.Get(credKeyAPIKey)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	// Prefer OAuth access_token; fall back to personal access token (api_key).
+	token, _ := creds.Get(credKeyAccessToken)
+	if token == "" {
+		token, _ = creds.Get(credKeyAPIKey)
+	}
+	if token == "" {
+		return &connectors.ValidationError{Message: "access_token (OAuth) or api_key credential is missing or empty"}
 	}
 
 	var body io.Reader
