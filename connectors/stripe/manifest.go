@@ -449,6 +449,315 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "stripe.create_product",
+				Name:        "Create Product",
+				Description: "Create a product in the Stripe catalog — required before creating prices or subscriptions",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"additionalProperties": false,
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Product name displayed to customers (e.g. \"Pro Plan\")"
+						},
+						"description": {
+							"type": "string",
+							"description": "Optional product description"
+						},
+						"active": {
+							"type": "boolean",
+							"description": "Whether the product is available for purchase (defaults to true)"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.create_price",
+				Name:        "Create Price",
+				Description: "Create a price for a product — one-time or recurring, required before creating subscriptions",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["currency", "product", "unit_amount"],
+					"additionalProperties": false,
+					"properties": {
+						"currency": {
+							"type": "string",
+							"description": "Three-letter ISO 4217 currency code (e.g. \"usd\")"
+						},
+						"product": {
+							"type": "string",
+							"description": "Stripe product ID (e.g. \"prod_ABC123\")"
+						},
+						"unit_amount": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Price amount in smallest currency unit (e.g. 2000 = $20.00)"
+						},
+						"recurring": {
+							"type": "object",
+							"description": "Makes this a recurring price for subscriptions",
+							"required": ["interval"],
+							"additionalProperties": false,
+							"properties": {
+								"interval": {
+									"type": "string",
+									"enum": ["day", "week", "month", "year"],
+									"description": "Billing interval"
+								},
+								"interval_count": {
+									"type": "integer",
+									"minimum": 1,
+									"description": "Number of intervals between billings (e.g. 3 with month = quarterly)"
+								}
+							}
+						},
+						"nickname": {
+							"type": "string",
+							"description": "Internal label for this price (not shown to customers)"
+						},
+						"active": {
+							"type": "boolean",
+							"description": "Whether the price is available for new subscriptions (defaults to true)"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.create_checkout_session",
+				Name:        "Create Checkout Session",
+				Description: "Create a Stripe Checkout session — the most common redirect-based payment flow for SaaS",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["mode", "line_items"],
+					"additionalProperties": false,
+					"properties": {
+						"mode": {
+							"type": "string",
+							"enum": ["payment", "subscription", "setup"],
+							"description": "Checkout mode: payment (one-time), subscription (recurring), or setup (save payment method)"
+						},
+						"line_items": {
+							"type": "array",
+							"minItems": 1,
+							"maxItems": 20,
+							"description": "Products to include in the checkout session",
+							"items": {
+								"type": "object",
+								"required": ["price", "quantity"],
+								"additionalProperties": false,
+								"properties": {
+									"price": {
+										"type": "string",
+										"description": "Stripe price ID (e.g. \"price_ABC123\")"
+									},
+									"quantity": {
+										"type": "integer",
+										"minimum": 1,
+										"description": "Quantity of this item"
+									}
+								}
+							}
+						},
+						"success_url": {
+							"type": "string",
+							"format": "uri",
+							"description": "URL to redirect to after successful payment"
+						},
+						"cancel_url": {
+							"type": "string",
+							"format": "uri",
+							"description": "URL to redirect to if customer cancels checkout"
+						},
+						"customer": {
+							"type": "string",
+							"description": "Stripe customer ID to associate with this session (mutually exclusive with customer_email)"
+						},
+						"customer_email": {
+							"type": "string",
+							"format": "email",
+							"description": "Pre-fill the customer email field (mutually exclusive with customer)"
+						},
+						"allow_promotion_codes": {
+							"type": "boolean",
+							"description": "Allow customers to enter promotion codes at checkout"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.update_subscription",
+				Name:        "Update Subscription",
+				Description: "Upgrade, downgrade, or modify an existing subscription — change plans, quantity, or add coupons",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["subscription_id"],
+					"additionalProperties": false,
+					"properties": {
+						"subscription_id": {
+							"type": "string",
+							"description": "Stripe subscription ID (e.g. \"sub_ABC123\")"
+						},
+						"items": {
+							"type": "array",
+							"description": "Updated subscription items — include id to modify existing items, or just price to add new ones",
+							"items": {
+								"type": "object",
+								"additionalProperties": false,
+								"properties": {
+									"id": {
+										"type": "string",
+										"description": "Subscription item ID (e.g. \"si_ABC123\") — required to update or delete an existing item"
+									},
+									"price": {
+										"type": "string",
+										"description": "New price ID — use to switch plans or add a new item"
+									},
+									"quantity": {
+										"type": "integer",
+										"minimum": 1,
+										"description": "Updated quantity for this item"
+									},
+									"deleted": {
+										"type": "boolean",
+										"description": "Set to true to remove this item from the subscription"
+									}
+								}
+							}
+						},
+						"coupon": {
+							"type": "string",
+							"description": "Coupon ID to apply a discount to the subscription"
+						},
+						"proration_behavior": {
+							"type": "string",
+							"enum": ["create_prorations", "none", "always_invoice"],
+							"description": "How to handle prorations when changing plans mid-cycle"
+						},
+						"metadata": {
+							"type": "object",
+							"description": "Key-value pairs for storing additional information (max 50 keys)",
+							"additionalProperties": { "type": "string" }
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.list_customers",
+				Name:        "List Customers",
+				Description: "List or search customers — use to check for existing customers before creating duplicates",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"email": {
+							"type": "string",
+							"format": "email",
+							"description": "Filter by exact email address"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Number of customers to return (default 10, max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.get_customer",
+				Name:        "Get Customer",
+				Description: "Retrieve a single customer by ID",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["customer_id"],
+					"additionalProperties": false,
+					"properties": {
+						"customer_id": {
+							"type": "string",
+							"description": "Stripe customer ID (e.g. \"cus_ABC123\")"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.list_invoices",
+				Name:        "List Invoices",
+				Description: "List invoices with optional filtering by customer or status — useful for reconciliation and dashboards",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"customer_id": {
+							"type": "string",
+							"description": "Filter by Stripe customer ID (e.g. \"cus_ABC123\")"
+						},
+						"status": {
+							"type": "string",
+							"enum": ["draft", "open", "paid", "uncollectible", "void"],
+							"description": "Filter by invoice status"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Number of invoices to return (default 10, max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "stripe.list_charges",
+				Name:        "List Charges",
+				Description: "List charges with optional filtering by customer or payment intent — useful for reconciliation and reporting",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"customer_id": {
+							"type": "string",
+							"description": "Filter by Stripe customer ID (e.g. \"cus_ABC123\")"
+						},
+						"payment_intent_id": {
+							"type": "string",
+							"description": "Filter by payment intent ID (e.g. \"pi_ABC123\")"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Number of charges to return (default 10, max 100)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -589,6 +898,80 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			Name:        "Issue refunds (any amount)",
 			Description: "Agent can issue refunds of any amount, including full refunds (by omitting amount). High risk — use only for trusted agents with oversight.",
 			Parameters:  json.RawMessage(`{"payment_intent_id":"*","charge_id":"*","amount":"*","reason":"*","metadata":"*"}`),
+		},
+		// --- Catalog management ---
+		{
+			ID:          "tpl_stripe_create_product",
+			ActionType:  "stripe.create_product",
+			Name:        "Create products",
+			Description: "Agent can create new product catalog entries with any name, description, and metadata.",
+			Parameters:  json.RawMessage(`{"name":"*","description":"*","active":"*","metadata":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_create_price_recurring",
+			ActionType:  "stripe.create_price",
+			Name:        "Create recurring prices",
+			Description: "Agent can create recurring prices for subscription billing.",
+			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","recurring":"*","nickname":"*","active":"*","metadata":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_create_price_one_time",
+			ActionType:  "stripe.create_price",
+			Name:        "Create one-time prices",
+			Description: "Agent can create one-time prices. Recurring billing is not blocked, but the template is intended for one-time use.",
+			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","nickname":"*","active":"*","metadata":"*"}`),
+		},
+		// --- Checkout ---
+		{
+			ID:          "tpl_stripe_create_checkout_session_subscription",
+			ActionType:  "stripe.create_checkout_session",
+			Name:        "Create subscription checkout sessions",
+			Description: "Agent can create Checkout sessions for subscription plans. Mode is locked to \"subscription\".",
+			Parameters:  json.RawMessage(`{"mode":"subscription","line_items":"*","success_url":"*","cancel_url":"*","customer":"*","customer_email":"*","allow_promotion_codes":"*","metadata":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_create_checkout_session_payment",
+			ActionType:  "stripe.create_checkout_session",
+			Name:        "Create one-time payment checkout sessions",
+			Description: "Agent can create Checkout sessions for one-time payments. Mode is locked to \"payment\".",
+			Parameters:  json.RawMessage(`{"mode":"payment","line_items":"*","success_url":"*","cancel_url":"*","customer":"*","customer_email":"*","allow_promotion_codes":"*","metadata":"*"}`),
+		},
+		// --- Subscription management ---
+		{
+			ID:          "tpl_stripe_update_subscription",
+			ActionType:  "stripe.update_subscription",
+			Name:        "Update subscriptions",
+			Description: "Agent can update subscriptions — change plans, quantities, add coupons, and manage proration.",
+			Parameters:  json.RawMessage(`{"subscription_id":"*","items":"*","coupon":"*","proration_behavior":"*","metadata":"*"}`),
+		},
+		// --- Read-only: customers, invoices, charges ---
+		{
+			ID:          "tpl_stripe_list_customers",
+			ActionType:  "stripe.list_customers",
+			Name:        "List customers",
+			Description: "Agent can list customers and search by email. Read-only, no financial risk.",
+			Parameters:  json.RawMessage(`{"email":"*","limit":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_get_customer",
+			ActionType:  "stripe.get_customer",
+			Name:        "Get customer by ID",
+			Description: "Agent can retrieve any customer by ID. Read-only, no financial risk.",
+			Parameters:  json.RawMessage(`{"customer_id":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_list_invoices",
+			ActionType:  "stripe.list_invoices",
+			Name:        "List invoices",
+			Description: "Agent can list and filter invoices by customer or status. Read-only, no financial risk.",
+			Parameters:  json.RawMessage(`{"customer_id":"*","status":"*","limit":"*"}`),
+		},
+		{
+			ID:          "tpl_stripe_list_charges",
+			ActionType:  "stripe.list_charges",
+			Name:        "List charges",
+			Description: "Agent can list and filter charges by customer or payment intent. Read-only, no financial risk.",
+			Parameters:  json.RawMessage(`{"customer_id":"*","payment_intent_id":"*","limit":"*"}`),
 		},
 	}
 }

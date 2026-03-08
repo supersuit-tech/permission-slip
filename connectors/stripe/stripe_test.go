@@ -938,8 +938,8 @@ func TestManifest_Valid(t *testing.T) {
 	if m.ID != "stripe" {
 		t.Errorf("Manifest().ID = %q, want %q", m.ID, "stripe")
 	}
-	if len(m.Actions) != 11 {
-		t.Errorf("Manifest().Actions has %d entries, want 11", len(m.Actions))
+	if len(m.Actions) != 19 {
+		t.Errorf("Manifest().Actions has %d entries, want 19", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 2 {
 		t.Errorf("Manifest().RequiredCredentials has %d entries, want 2", len(m.RequiredCredentials))
@@ -955,8 +955,8 @@ func TestManifest_Valid(t *testing.T) {
 	if m.RequiredCredentials[1].AuthType != "api_key" {
 		t.Errorf("RequiredCredentials[1].AuthType = %q, want %q", m.RequiredCredentials[1].AuthType, "api_key")
 	}
-	if len(m.Templates) != 16 {
-		t.Errorf("Manifest().Templates has %d entries, want 16", len(m.Templates))
+	if len(m.Templates) != 26 {
+		t.Errorf("Manifest().Templates has %d entries, want 26", len(m.Templates))
 	}
 }
 
@@ -1015,6 +1015,14 @@ func TestActions_ReturnsMap(t *testing.T) {
 		"stripe.create_coupon",
 		"stripe.create_promotion_code",
 		"stripe.initiate_payout",
+		"stripe.create_checkout_session",
+		"stripe.create_product",
+		"stripe.create_price",
+		"stripe.update_subscription",
+		"stripe.list_customers",
+		"stripe.get_customer",
+		"stripe.list_invoices",
+		"stripe.list_charges",
 	}
 	if len(actions) != len(expectedActions) {
 		t.Errorf("Actions() returned %d actions, want %d", len(actions), len(expectedActions))
