@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	datadogconnector "github.com/supersuit-tech/permission-slip-web/connectors/datadog"
 	discordconnector "github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 )
@@ -261,6 +262,21 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			// Datadog OAuth uses split hostnames by design: authorization
+			// redirects go through app.datadoghq.com, while token exchange
+			// happens on api.datadoghq.com. Both paths use the /oauth2/v1/
+			// prefix and are documented in Datadog's OAuth2 API reference.
+			// Scopes are sourced from the connector package to keep the
+			// manifest credential and this registration in sync.
+			ID:           "datadog",
+			AuthorizeURL: "https://app.datadoghq.com/oauth2/v1/authorize",
+			TokenURL:     "https://api.datadoghq.com/oauth2/v1/token",
+			Scopes:       datadogconnector.OAuthScopes,
+			ClientID:     os.Getenv("DATADOG_CLIENT_ID"),
+			ClientSecret: os.Getenv("DATADOG_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "calendly",
 			AuthorizeURL: "https://auth.calendly.com/oauth/authorize",
 			TokenURL:     "https://auth.calendly.com/oauth/token",
@@ -276,6 +292,22 @@ func BuiltInProviders() []Provider {
 			Scopes:       discordconnector.OAuthScopes,
 			ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
 			ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			// SendGrid is owned by Twilio and uses Twilio's OAuth 2.0
+			// authorization server. The resulting access token is used as a
+			// Bearer token on SendGrid v3 API requests, the same as an API key.
+			ID:           "sendgrid",
+			AuthorizeURL: "https://login.twilio.com/oauth2/authorize",
+			TokenURL:     "https://login.twilio.com/oauth2/token",
+			Scopes: []string{
+				"openid",
+				"profile",
+				"email",
+			},
+			ClientID:     os.Getenv("SENDGRID_CLIENT_ID"),
+			ClientSecret: os.Getenv("SENDGRID_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
 	}

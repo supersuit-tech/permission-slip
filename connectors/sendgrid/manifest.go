@@ -232,6 +232,16 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "sendgrid_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "sendgrid",
+				OAuthScopes: []string{
+					"openid",
+					"profile",
+					"email",
+				},
+			},
+			{
 				Service:         "sendgrid",
 				AuthType:        "api_key",
 				InstructionsURL: "https://docs.sendgrid.com/ui/account-and-settings/api-keys",

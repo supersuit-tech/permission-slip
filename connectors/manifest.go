@@ -112,8 +112,10 @@ var BuiltInOAuthProviders = map[string]bool{
 	"stripe":     true,
 	"zoom":       true,
 	"pagerduty":  true,
+	"datadog":    true,
 	"calendly":   true,
 	"discord":    true,
+	"sendgrid":   true,
 }
 
 // ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in
