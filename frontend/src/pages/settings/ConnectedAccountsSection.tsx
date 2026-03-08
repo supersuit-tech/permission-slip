@@ -13,6 +13,7 @@ import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,19 +36,6 @@ import { Label } from "@/components/ui/label";
 
 /** Providers that require a shop subdomain for per-shop OAuth URLs. */
 const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  intercom: "Intercom",
-  microsoft: "Microsoft",
-  salesforce: "Salesforce",
-  shopify: "Shopify",
-  zoom: "Zoom",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
 
 function statusBadge(status: string) {
   switch (status) {
@@ -115,24 +103,11 @@ export function ConnectedAccountsSection() {
       setShopDialogProvider(providerId);
       return;
     }
-    navigateToOAuth(providerId, session.access_token);
-  }
-
-  function navigateToOAuth(
-    providerId: string,
-    accessToken: string,
-    shop?: string,
-  ) {
-    // Navigate to the OAuth authorize endpoint with the session token.
-    // The backend will redirect to the provider's consent screen.
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    let url = `${baseUrl}/v1/oauth/${providerId}/authorize?access_token=${encodeURIComponent(accessToken)}`;
-    if (shop) {
-      url += `&shop=${encodeURIComponent(shop)}`;
-    }
     // Open in same window — the callback redirects back to settings
-    window.location.href = url;
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+    );
   }
 
   // Providers that are ready to connect but don't have an active connection
@@ -250,7 +225,12 @@ export function ConnectedAccountsSection() {
             if (!open) setShopDialogProvider(null);
           }}
           onSubmit={(shop) => {
-            navigateToOAuth(shopDialogProvider, session.access_token, shop);
+            if (!session?.access_token || !shopDialogProvider) return;
+            const url = getOAuthAuthorizeUrl(
+              shopDialogProvider,
+              session.access_token,
+            );
+            window.location.href = `${url}&shop=${encodeURIComponent(shop)}`;
             setShopDialogProvider(null);
           }}
         />

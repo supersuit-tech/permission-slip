@@ -55,13 +55,28 @@ func TestGitHubConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "gho_test123"}),
+			wantErr: false,
+		},
+		{
+			name:    "both present prefers access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "gho_test", "api_key": "ghp_test"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing all credentials",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
-			name:    "empty api_key",
+			name:    "empty api_key and no access_token",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token and no api_key",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -116,18 +131,33 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "github" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "github")
+	// First credential should be OAuth (primary).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "github" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "github")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "github" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "github")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want at least one scope")
+	}
+	// Second credential should be API key (alternative).
+	patCred := m.RequiredCredentials[1]
+	if patCred.Service != "github_pat" {
+		t.Errorf("pat credential service = %q, want %q", patCred.Service, "github_pat")
+	}
+	if patCred.AuthType != "api_key" {
+		t.Errorf("pat credential auth_type = %q, want %q", patCred.AuthType, "api_key")
+	}
+	if patCred.InstructionsURL == "" {
+		t.Error("pat credential instructions_url is empty, want a URL")
 	}
 
 	// Validate the manifest passes validation.

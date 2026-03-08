@@ -347,7 +347,17 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "github", AuthType: "api_key", InstructionsURL: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"},
+			{
+				Service:       "github",
+				AuthType:      "oauth2",
+				OAuthProvider: "github",
+				OAuthScopes:   []string{"repo"},
+			},
+			{
+				Service:         "github_pat",
+				AuthType:        "api_key",
+				InstructionsURL: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+			},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{
@@ -464,14 +474,17 @@ func (c *GitHubConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key, which is required for all GitHub API calls.
+// ValidateCredentials checks that the provided credentials contain either a
+// non-empty access_token (from OAuth) or a non-empty api_key (PAT). OAuth
+// tokens take precedence when both are present.
 func (c *GitHubConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	if token, ok := creds.Get("access_token"); ok && token != "" {
+		return nil
 	}
-	return nil
+	if key, ok := creds.Get("api_key"); ok && key != "" {
+		return nil
+	}
+	return &connectors.ValidationError{Message: "missing required credential: access_token or api_key"}
 }
 
 // do is the shared request lifecycle for all GitHub actions. It marshals
@@ -498,11 +511,16 @@ func (c *GitHubConnector) do(ctx context.Context, creds connectors.Credentials, 
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	token := ""
+	if t, ok := creds.Get("access_token"); ok && t != "" {
+		token = t
+	} else if k, ok := creds.Get("api_key"); ok && k != "" {
+		token = k
 	}
-	req.Header.Set("Authorization", "Bearer "+key)
+	if token == "" {
+		return &connectors.ValidationError{Message: "access_token or api_key credential is missing or empty"}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
