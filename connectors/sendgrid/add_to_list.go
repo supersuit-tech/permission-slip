@@ -5,14 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
-
-// emailPattern is a basic email validation regex. It does not cover all
-// RFC 5322 edge cases but rejects obviously invalid addresses.
-var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
 // addToListAction implements connectors.Action for sendgrid.add_to_list.
 // It adds a contact to a SendGrid marketing contact list using the
