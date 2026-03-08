@@ -31,6 +31,14 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
+// OAuthScopes is the canonical list of OAuth scopes required by the Discord
+// connector. This is the single source of truth — referenced by both the
+// connector manifest and the built-in OAuth provider registration.
+var OAuthScopes = []string{
+	"bot",
+	"guilds",
+}
+
 // DiscordConnector owns the shared HTTP client and base URL used by all
 // Discord actions. Actions hold a pointer back to the connector to access
 // these shared resources.
@@ -425,7 +433,7 @@ func (c *DiscordConnector) Manifest() *connectors.ConnectorManifest {
 				Service:       "discord",
 				AuthType:      "oauth2",
 				OAuthProvider: "discord",
-				OAuthScopes:   []string{"bot", "guilds"},
+				OAuthScopes:   OAuthScopes,
 			},
 			{Service: "discord_bot", AuthType: "custom", InstructionsURL: "https://discord.com/developers/applications"},
 		},
@@ -607,9 +615,9 @@ func mapDiscordError(statusCode int, errResp discordErrorResponse) error {
 
 	switch {
 	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: "Discord auth error: invalid bot token — generate a new token at https://discord.com/developers/applications"}
+		return &connectors.AuthError{Message: "Discord auth error: invalid token — verify your OAuth connection or bot token at https://discord.com/developers/applications"}
 	case statusCode == http.StatusForbidden:
-		return &connectors.AuthError{Message: fmt.Sprintf("Discord auth error: %s — check the bot's permissions in server settings", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("Discord auth error: %s — check the bot's permissions in server settings or re-authorize the OAuth connection", msg)}
 	default:
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
@@ -618,10 +626,10 @@ func mapDiscordError(statusCode int, errResp discordErrorResponse) error {
 	}
 }
 
-// doRequest is the shared request lifecycle for Discord API calls. It sends
-// the request with Bot auth, handles rate limiting and timeouts, and
-// unmarshals the response into dest (if non-nil, for 2xx with body).
-// For endpoints that return 204 No Content, pass nil for dest.
+// doRequest is the shared request lifecycle for Discord API calls. It resolves
+// the auth method (Bearer for OAuth, Bot for custom tokens), sends the request,
+// handles rate limiting and timeouts, and unmarshals the response into dest
+// (if non-nil, for 2xx with body). For 204 No Content, pass nil for dest.
 func (c *DiscordConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
 	token, authHeader := c.resolveAuth(creds)
 	if token == "" {

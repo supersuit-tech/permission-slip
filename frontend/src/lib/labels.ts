@@ -34,6 +34,7 @@ export function providerLabel(id: string): string {
 }
 
 const SERVICE_LABELS: Record<string, string> = {
+  discord_bot: "Discord Bot Token",
   github_pat: "GitHub Personal Access Token",
   "netlify-api-key": "Netlify API Key",
   square_api_key: "Square API Key",

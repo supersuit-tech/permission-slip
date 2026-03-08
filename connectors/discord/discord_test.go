@@ -187,6 +187,9 @@ func TestDiscordConnector_ManifestCredentials(t *testing.T) {
 	if oauthCred.OAuthProvider != "discord" {
 		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "discord")
 	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want at least one scope")
+	}
 
 	customCred := m.RequiredCredentials[1]
 	if customCred.Service != "discord_bot" {
@@ -284,7 +287,7 @@ func TestMapDiscordError(t *testing.T) {
 			code:       0,
 			message:    "",
 			wantType:   "auth",
-			wantSubstr: "invalid bot token",
+			wantSubstr: "invalid token",
 		},
 		{
 			name:       "generic error",

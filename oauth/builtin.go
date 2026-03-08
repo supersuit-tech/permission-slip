@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	discordconnector "github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 )
 
@@ -263,10 +264,7 @@ func BuiltInProviders() []Provider {
 			ID:           "discord",
 			AuthorizeURL: "https://discord.com/oauth2/authorize",
 			TokenURL:     "https://discord.com/api/oauth2/token",
-			Scopes: []string{
-				"bot",
-				"guilds",
-			},
+			Scopes:       discordconnector.OAuthScopes,
 			AuthorizeParams: map[string]string{
 				"permissions": "1099511627775",
 			},
