@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { CredentialSummary } from "@/hooks/useCredentials";
-import { serviceDisplayName, authTypeLabel } from "@/lib/providerLabels";
+import { serviceDisplayName, authTypeLabel } from "@/lib/oauth-providers";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";

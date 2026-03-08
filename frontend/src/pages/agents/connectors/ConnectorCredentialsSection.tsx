@@ -69,11 +69,17 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error ?? oauthError}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred, index) => {
-              const showDivider = hasMixedAuth && index > 0;
+            {requiredCredentials.map((cred, idx) => {
+              const prevCred =
+                idx > 0 ? requiredCredentials[idx - 1] : undefined;
+              const showOrSeparator =
+                prevCred != null &&
+                prevCred.auth_type === "oauth2" &&
+                cred.auth_type !== "oauth2";
+
               return (
                 <div key={cred.service}>
-                  {showDivider && (
+                  {showOrSeparator && (
                     <div className="flex items-center gap-3 py-1">
                       <div className="bg-border h-px flex-1" />
                       <span className="text-muted-foreground text-xs font-medium uppercase">

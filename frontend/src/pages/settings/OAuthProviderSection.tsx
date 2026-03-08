@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { providerLabel } from "@/lib/providerLabels";
+import { providerLabel } from "@/lib/oauth-providers";
 import { BYOAConfigDialog } from "./BYOAConfigDialog";
 
 export function OAuthProviderSection() {

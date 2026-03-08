@@ -10,13 +10,18 @@ The Stripe connector integrates Permission Slip with the [Stripe REST API](https
 
 ## Credentials
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `api_key` | Yes | A Stripe secret key (`sk_live_...`, `sk_test_...`) or restricted key (`rk_live_...`, `rk_test_...`). |
+The Stripe connector supports two authentication methods. OAuth is preferred; the API key serves as a fallback.
 
-The credential `auth_type` in the database is `api_key`. Keys are stored encrypted in Supabase Vault and decrypted only at execution time. The connector validates that the key starts with a recognized prefix.
+| Method | Key | Auth Type | Description |
+|--------|-----|-----------|-------------|
+| **OAuth (preferred)** | `access_token` | `oauth2` | Obtained via Stripe Connect OAuth. The platform exchanges an authorization code for a secret key that starts with `sk_live_` or `sk_test_`. |
+| **API Key** | `api_key` | `api_key` | A Stripe secret key (`sk_live_...`, `sk_test_...`) or restricted key (`rk_live_...`, `rk_test_...`) entered manually. |
 
-**Setup:** [Stripe API keys documentation](https://docs.stripe.com/keys)
+When both credentials are present, `access_token` (OAuth) takes priority. Keys are stored encrypted in Supabase Vault and decrypted only at execution time. The connector validates that the key starts with a recognized prefix regardless of auth method.
+
+**OAuth setup:** See the [OAuth Setup Guide](../../docs/oauth-setup.md#stripe-oauth-setup) for Stripe Connect configuration.
+
+**API key setup:** [Stripe API keys documentation](https://docs.stripe.com/keys)
 
 **Test mode:** Keys starting with `sk_test_` or `rk_test_` are safe for development — they operate in Stripe's test mode and never touch real money.
 

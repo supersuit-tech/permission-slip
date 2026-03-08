@@ -22,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { providerLabel } from "@/lib/providerLabels";
+import { providerLabel } from "@/lib/oauth-providers";
 
 function statusBadge(status: string) {
   switch (status) {

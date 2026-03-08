@@ -10,7 +10,7 @@ import { useAuth } from "@/auth/AuthContext";
 import type { OAuthConnection } from "@/hooks/useOAuthConnections";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
-import { providerLabel, authTypeLabel } from "@/lib/providerLabels";
+import { providerLabel, authTypeLabel } from "@/lib/oauth-providers";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 
 export function OAuthCredentialRow({
