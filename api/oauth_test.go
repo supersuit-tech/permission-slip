@@ -1318,14 +1318,17 @@ func TestFetchDocuSignUserInfo_InvalidBaseURI(t *testing.T) {
 	}
 }
 
-func TestIsURLExtraKey_IncludesBaseURL(t *testing.T) {
+func TestIsURLExtraKey(t *testing.T) {
 	t.Parallel()
+	// Only keys from tokenExtraKeys should be listed here. stateExtraData
+	// values (e.g. shop_domain, DocuSign's base_url) are validated at the
+	// call site before insertion and must NOT be added to isURLExtraKey.
 	cases := []struct {
 		key  string
 		want bool
 	}{
-		{"base_url", true},
 		{"instance_url", true},
+		{"base_url", false},  // validated in fetchDocuSignUserInfo, not here
 		{"shop_domain", false},
 		{"account_id", false},
 	}

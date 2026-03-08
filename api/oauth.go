@@ -651,8 +651,11 @@ func extractTokenExtraData(token *oauth2.Token, stateExtra map[string]string) js
 
 // isURLExtraKey returns true if the given extra data key is expected to contain
 // a URL value that should be validated before storage.
+// Only keys in tokenExtraKeys are ever passed to this function — stateExtraData
+// values (e.g. shop_domain, DocuSign's base_url) are validated at the call site
+// before being added to stateExtraData and must NOT be added here.
 func isURLExtraKey(key string) bool {
-	return key == "instance_url" || key == "base_url"
+	return key == "instance_url"
 }
 
 // docuSignUserInfoURL is the endpoint used to retrieve the authenticated user's
