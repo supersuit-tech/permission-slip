@@ -32,6 +32,7 @@ type sendMessageParams struct {
 }
 
 const maxMessageBodyLen = 8000
+const maxMessageSubjectLen = 200
 
 func (p *sendMessageParams) validate() error {
 	if p.RecipientURN == "" {
@@ -45,6 +46,9 @@ func (p *sendMessageParams) validate() error {
 	}
 	if len(p.Body) > maxMessageBodyLen {
 		return &connectors.ValidationError{Message: fmt.Sprintf("body exceeds maximum length of %d characters", maxMessageBodyLen)}
+	}
+	if len(p.Subject) > maxMessageSubjectLen {
+		return &connectors.ValidationError{Message: fmt.Sprintf("subject exceeds maximum length of %d characters", maxMessageSubjectLen)}
 	}
 	return nil
 }

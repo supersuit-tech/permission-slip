@@ -165,6 +165,31 @@ func TestSendMessage_MissingBody(t *testing.T) {
 	}
 }
 
+func TestSendMessage_SubjectTooLong(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendMessageAction{conn: conn}
+
+	params, _ := json.Marshal(sendMessageParams{
+		RecipientURN: "urn:li:person:123",
+		Subject:      strings.Repeat("s", maxMessageSubjectLen+1),
+		Body:         "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "linkedin.send_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for subject too long")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSendMessage_BodyTooLong(t *testing.T) {
 	t.Parallel()
 

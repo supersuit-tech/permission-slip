@@ -167,7 +167,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"subject": {
 							"type": "string",
-							"description": "Message subject line (optional)"
+							"maxLength": 200,
+							"description": "Message subject line (optional, max 200 characters)"
 						},
 						"body": {
 							"type": "string",
@@ -294,8 +295,12 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"w_member_social",
 					"r_organization_social",
 					"w_organization_social",
-					"w_messages",
-					"r_network",
+					// Note: w_messages and r_network require LinkedIn Partner Program
+					// approval and are NOT included here. Apps without that approval
+					// would fail the OAuth flow entirely if these scopes were present.
+					// send_message and list_connections document their scope requirements
+					// in their action descriptions; callers using those actions must
+					// obtain partner approval and request those scopes separately.
 				},
 				InstructionsURL: "https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow",
 			},
