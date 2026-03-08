@@ -29,6 +29,16 @@ func TestGitHubConnector_Actions(t *testing.T) {
 		"github.add_label",
 		"github.add_comment",
 		"github.create_branch",
+		"github.get_file_contents",
+		"github.create_or_update_file",
+		"github.list_repos",
+		"github.get_repo",
+		"github.list_pull_requests",
+		"github.trigger_workflow",
+		"github.list_workflow_runs",
+		"github.create_webhook",
+		"github.search_code",
+		"github.search_issues",
 	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
@@ -115,8 +125,8 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 	if m.Name != "GitHub" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "GitHub")
 	}
-	if len(m.Actions) != 9 {
-		t.Fatalf("Manifest().Actions has %d items, want 9", len(m.Actions))
+	if len(m.Actions) != 19 {
+		t.Fatalf("Manifest().Actions has %d items, want 19", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -126,6 +136,10 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 		"github.create_issue", "github.merge_pr", "github.create_pr",
 		"github.add_reviewer", "github.create_release", "github.close_issue",
 		"github.add_label", "github.add_comment", "github.create_branch",
+		"github.get_file_contents", "github.create_or_update_file",
+		"github.list_repos", "github.get_repo", "github.list_pull_requests",
+		"github.trigger_workflow", "github.list_workflow_runs",
+		"github.create_webhook", "github.search_code", "github.search_issues",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

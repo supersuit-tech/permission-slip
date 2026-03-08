@@ -2,7 +2,7 @@
 
 This guide walks through adding a new connector (an integration with an external service) and adding actions to it. It uses the existing GitHub, Slack, PostgreSQL, Amadeus, Square, and Twilio connectors as reference implementations.
 
-**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), dual auth with OAuth + basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), JWT-based auth (DoorDash), and more. The Jira connector (`connectors/jira/`) is a good starting reference for dual OAuth/basic auth support, OAuth cloud ID discovery with caching, dynamic base URLs, and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Slack connector (`connectors/slack/`) is a good reference for custom Bearer token auth, shared response types across similar actions (`messages.go`), input validation helpers (`validateChannelID`, `validateLimit`), and response body size limits. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks). The DoorDash connector (`connectors/doordash/`) is a good reference for self-signed JWT auth (HS256 with base64-decoded secret), status enum validation, and `RequiresPaymentMethod` for financial actions. The Plaid connector (`connectors/plaid/`) is a good reference for custom body-based auth (client_id/secret in request body), sandbox/production environment switching via credentials, API version pinning, shared action types for DRY endpoints, and preventing credential leakage in HTTP helpers. The Datadog connector (`connectors/datadog/`) is a good reference for multi-region site routing via credentials, dual-mode auth (OAuth2 as the primary option with API key + application key as fallback), the single-source-of-truth `OAuthScopes` var pattern (imported by both the manifest and the built-in provider registry to prevent scope drift), deriving validation error messages from configuration maps to avoid hardcoded lists, and high-risk action classification (trigger_runbook). The PagerDuty connector (`connectors/pagerduty/`) is a good reference for incident lifecycle management (triggered → acknowledged → resolved), the `From` email header pattern for audit trails, and read-only vs. write action risk differentiation. The Airtable connector (`connectors/airtable/`) is a good reference for strict ID format validation (alphanumeric-only to prevent URL injection), batch operations with size limits, a generic `parseAndValidate` helper to reduce unmarshal/validate boilerplate, and formula-based search with detailed parameter descriptions for non-developer users. The Zapier connector (`connectors/zapier/`) is a good reference for webhook-based integrations with SSRF-safe URL prefix validation, redirect-disabled HTTP clients, and fire-and-forget vs. synchronous execution modes. The Make connector (`connectors/make/`) is a good reference for region-based multi-datacenter routing via credential allowlists (instead of arbitrary URLs), `url.Values` for safe query string construction, and structured response wrapping for better UX. The QuickBooks connector (`connectors/quickbooks/`) is a good reference for OAuth 2.0 with realm/company-scoped credentials, high-risk financial actions with explicit warnings, allowlist-based query injection prevention, and comprehensive manifest templates for progressive permission levels (read-only → medium-risk → high-risk). The Monday connector (`connectors/monday/`) is a good reference for GraphQL-only APIs (single POST endpoint), API key auth without Bearer prefix, numeric ID validation, stringified JSON column values, variable-based query parameterization (avoiding GraphQL injection), and splitting large manifests into a separate `manifest.go` file.
+**Which reference to follow:** Browse the existing connectors in [`connectors/`](../connectors/) for reference implementations covering API key auth (GitHub, Notion), OAuth 2.0 (Google), dual auth with OAuth + basic auth (Jira), HTTP Basic Auth with form-encoded POSTs (Twilio), custom auth (Slack), JWT-based auth (DoorDash), and more. The Jira connector (`connectors/jira/`) is a good starting reference for dual OAuth/basic auth support, OAuth cloud ID discovery with caching, dynamic base URLs, and SSRF-safe credential validation. The Shopify connector (`connectors/shopify/`) is a good reference for multi-step API flows (create_discount) and comprehensive parameter validation with allowlists. The Twilio connector (`connectors/twilio/`) is a good reference for HTTP Basic Auth, form-encoded write operations, separate read/write HTTP helpers (`doForm`/`doGet`), and using two different API base URLs (REST API + Lookup API). The Slack connector (`connectors/slack/`) is a good reference for custom Bearer token auth, shared response types across similar actions (`messages.go`), input validation helpers (`validateChannelID`, `validateLimit`), and response body size limits. The Notion connector (`connectors/notion/`) is a good reference for API-versioned services, optional JSON parameter fields (`json.RawMessage`), pagination support, and convenience helpers (auto-wrapping text as blocks). The DoorDash connector (`connectors/doordash/`) is a good reference for self-signed JWT auth (HS256 with base64-decoded secret), status enum validation, and `RequiresPaymentMethod` for financial actions. The Plaid connector (`connectors/plaid/`) is a good reference for custom body-based auth (client_id/secret in request body), sandbox/production environment switching via credentials, API version pinning, shared action types for DRY endpoints, and preventing credential leakage in HTTP helpers. The Datadog connector (`connectors/datadog/`) is a good reference for multi-region site routing via credentials, dual-mode auth (OAuth2 as the primary option with API key + application key as fallback), the single-source-of-truth `OAuthScopes` var pattern (imported by both the manifest and the built-in provider registry to prevent scope drift), deriving validation error messages from configuration maps to avoid hardcoded lists, and high-risk action classification (trigger_runbook). The PagerDuty connector (`connectors/pagerduty/`) is a good reference for incident lifecycle management (triggered → acknowledged → resolved), the `From` email header pattern for audit trails, and read-only vs. write action risk differentiation. The Airtable connector (`connectors/airtable/`) is a good reference for strict ID format validation (alphanumeric-only to prevent URL injection), batch operations with size limits, a generic `parseAndValidate` helper to reduce unmarshal/validate boilerplate, and formula-based search with detailed parameter descriptions for non-developer users. The Zapier connector (`connectors/zapier/`) is a good reference for webhook-based integrations with SSRF-safe URL prefix validation, redirect-disabled HTTP clients, and fire-and-forget vs. synchronous execution modes. The Make connector (`connectors/make/`) is a good reference for region-based multi-datacenter routing via credential allowlists (instead of arbitrary URLs), `url.Values` for safe query string construction, and structured response wrapping for better UX. The QuickBooks connector (`connectors/quickbooks/`) is a good reference for OAuth 2.0 with realm/company-scoped credentials, high-risk financial actions with explicit warnings, allowlist-based query injection prevention, and comprehensive manifest templates for progressive permission levels (read-only → medium-risk → high-risk). The Monday connector (`connectors/monday/`) is a good reference for GraphQL-only APIs (single POST endpoint), API key auth without Bearer prefix, numeric ID validation, stringified JSON column values, variable-based query parameterization (avoiding GraphQL injection), and splitting large manifests into a separate `manifest.go` file. The Stripe connector (`connectors/stripe/`) is a good reference for `application/x-www-form-urlencoded` APIs with bracket notation for nested objects (`formEncode`/`flattenInto`), dual OAuth + API-key auth with token priority, deterministic SHA-256 idempotency key derivation from action type + parameters, cursor-based pagination (`starting_after`), shared list helpers (`list_helpers.go` with `validateListLimit`/`resolveLimit`/`stripeListResponse` reused across four list actions), URL scheme validation for redirect parameters, and splitting oversized manifests into `manifest_actions.go` + `manifest_templates.go` + a thin `manifest.go` wiring file. The GitHub connector (`connectors/github/`) is a good reference for a rich shared `validation.go` with reusable helpers (`parseAndValidate`, `requireOwnerRepo`, `validateFilePath`, `escapeFilePath`, `setPagination`, `validateRefName`), decoded content responses for AI-readable file data, and GitHub Actions CI/CD integration (workflow dispatch, run listing).
 
 For architectural context, see [ADR-009: Connector Execution Architecture](adr/009-connector-execution-architecture.md).
 
@@ -703,7 +703,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -722,24 +721,20 @@ type closeIssueParams struct {
 }
 
 func (p *closeIssueParams) validate() error {
-	if p.Owner == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: owner"}
+	// requireOwnerRepo is a shared helper in validation.go — use it instead
+	// of duplicating the owner/repo nil checks in every action.
+	if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+		return err
 	}
-	if p.Repo == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: repo"}
-	}
-	if p.IssueNumber <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid required parameter: issue_number"}
-	}
-	return nil
+	// requirePositiveInt is a shared helper for integer fields that must be > 0.
+	return requirePositiveInt(p.IssueNumber, "issue_number")
 }
 
 func (a *closeIssueAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params closeIssueParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	if err := params.validate(); err != nil {
+	// parseAndValidate unmarshals req.Parameters into the params struct and
+	// calls validate() in one step — no boilerplate needed in Execute.
+	params, err := parseAndValidate[closeIssueParams](req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 
@@ -749,7 +744,8 @@ func (a *closeIssueAction) Execute(ctx context.Context, req connectors.ActionReq
 		HTMLURL string `json:"html_url"`
 	}
 
-	path := fmt.Sprintf("/repos/%s/%s/issues/%d", url.PathEscape(params.Owner), url.PathEscape(params.Repo), params.IssueNumber)
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d",
+		url.PathEscape(params.Owner), url.PathEscape(params.Repo), params.IssueNumber)
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPatch, path, map[string]string{"state": "closed"}, &ghResp); err != nil {
 		return nil, err
 	}
@@ -812,6 +808,7 @@ Use this checklist when adding a new connector or action.
 
 - [ ] Create action file: `connectors/<connector>/<action_name>.go`
 - [ ] Define params struct with `validate()` method
+- [ ] Use shared validation helpers from `validation.go` where applicable (see GitHub connector reference below)
 - [ ] Implement `Execute` following the parse → validate → call → return pattern
 - [ ] Register in connector's `Actions()` map
 - [ ] Add action to connector's `Manifest()` return value with `ParametersSchema` (and `RequiresPaymentMethod: true` if applicable)
@@ -819,6 +816,57 @@ Use this checklist when adding a new connector or action.
 - [ ] Update connector-level test's expected action list
 - [ ] Run `make test-backend` — all tests pass
 - [ ] Run `make build` — compiles cleanly
+
+---
+
+## GitHub Connector Shared Helpers
+
+The GitHub connector (`connectors/github/validation.go`) provides several shared helpers used across all its actions. When adding a new GitHub action, prefer these over writing the same checks by hand.
+
+| Helper | Purpose |
+|---|---|
+| `parseAndValidate[T](raw)` | Unmarshal JSON + call `validate()` in one step — eliminates boilerplate in every `Execute`. |
+| `requireOwnerRepo(owner, repo)` | Validates the `owner` and `repo` fields are non-empty. Used by every repo-scoped action. |
+| `requirePositiveInt(val, field)` | Validates that an integer field is `> 0` (e.g., issue numbers, PR numbers). |
+| `requireNonEmptyStrings(vals, field)` | Validates a string slice has at least one element and no empty strings (e.g., webhook events). |
+| `validateFilePath(path)` | Rejects file paths that would corrupt URL construction: absolute paths (`/`), query injection (`?`), fragment injection (`#`). Use for any action that takes a repo file path. |
+| `escapeFilePath(path)` | URL-encodes each path segment while preserving `/` separators. Always pair with `validateFilePath`. |
+| `validatePerPage(perPage)` | Rejects `per_page > 100` (GitHub's API limit). |
+| `setPagination(q, perPage, page)` | Adds `per_page` (defaulting to 30) and `page` to a `url.Values` map. Use for any list or search action with pagination. |
+| `validateRefName(name, field)` | Validates a git ref name against `git-check-ref-format` rules (no `..`, `~`, `^`, `:`, `?`, `*`, `[`, `\`). |
+
+**Example — action with a file path and pagination:**
+
+```go
+func (p *myParams) validate() error {
+    if err := requireOwnerRepo(p.Owner, p.Repo); err != nil {
+        return err
+    }
+    if p.Path == "" {
+        return &connectors.ValidationError{Message: "missing required parameter: path"}
+    }
+    if err := validateFilePath(p.Path); err != nil {
+        return err
+    }
+    return validatePerPage(p.PerPage)
+}
+
+func (a *myAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+    params, err := parseAndValidate[myParams](req.Parameters)
+    if err != nil {
+        return nil, err
+    }
+
+    query := url.Values{}
+    // ... add other filters ...
+    setPagination(query, params.PerPage, params.Page)
+
+    path := fmt.Sprintf("/repos/%s/%s/contents/%s?%s",
+        url.PathEscape(params.Owner), url.PathEscape(params.Repo),
+        escapeFilePath(params.Path), query.Encode())
+    // ...
+}
+```
 
 ---
 
