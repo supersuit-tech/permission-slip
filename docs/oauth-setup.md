@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -10,6 +10,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 2. **BYOA (Bring Your Own App)**: Users provide their own OAuth client credentials through the Settings UI. Required for self-hosted deployments or custom providers.
 
 ## Environment Variables
+
+### Atlassian OAuth (Jira)
+
+| Variable | Description |
+|---|---|
+| `ATLASSIAN_CLIENT_ID` | OAuth 2.0 Client ID from the Atlassian Developer Console |
+| `ATLASSIAN_CLIENT_SECRET` | OAuth 2.0 Client Secret from the Atlassian Developer Console |
 
 ### GitHub OAuth
 
@@ -88,6 +95,50 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `OAUTH_REDIRECT_BASE_URL` | Base URL for OAuth callbacks (e.g., `https://app.example.com/api`) | Falls back to `BASE_URL` |
 | `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens | Falls back to `SUPABASE_JWT_SECRET` |
 | `OAUTH_REFRESH_INTERVAL` | Interval for background token refresh job | `10m` |
+
+## Atlassian (Jira) OAuth Setup
+
+Atlassian uses OAuth 2.0 with the 3-legged OAuth (3LO) flow for Jira Cloud. This is the recommended authentication method for the Jira connector.
+
+### 1. Create an OAuth 2.0 App
+
+1. Go to the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/)
+2. Click **Create** and select **OAuth 2.0 integration**
+3. Fill in the app name (e.g., "Permission Slip")
+4. Under **Authorization**, add the callback URL:
+   ```
+   https://your-domain.com/api/v1/oauth/atlassian/callback
+   ```
+
+### 2. Configure Scopes
+
+Navigate to **Permissions** and add the following scopes under **Jira API**:
+
+- `read:me` — user profile, required for cloud ID discovery
+- `read:jira-work` — read issues, projects, and search results
+- `write:jira-work` — create/update issues, add comments, transitions
+- `offline_access` — obtain a refresh token for long-lived connections
+
+### 3. Configure Environment
+
+```bash
+ATLASSIAN_CLIENT_ID=your-atlassian-client-id
+ATLASSIAN_CLIENT_SECRET=your-atlassian-client-secret
+```
+
+Find these under **Settings** in your app's page in the Atlassian Developer Console.
+
+### How It Works
+
+Atlassian OAuth uses a cloud ID to route API requests. When a user connects via OAuth:
+1. They are redirected to `auth.atlassian.com/authorize` with `audience=api.atlassian.com` and `prompt=consent`
+2. After authorizing, the platform exchanges the code for access and refresh tokens
+3. On first API call, the connector calls the [accessible-resources endpoint](https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/#2--get-the-cloud-id-for-your-site) to discover the user's Jira Cloud ID
+4. The cloud ID is cached (1 hour TTL) and used to construct API URLs: `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3`
+
+### Alternative: Basic Auth (API Token)
+
+The Jira connector also supports basic authentication with an email and API token. Users can generate an API token from [Atlassian Account Settings](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/). OAuth is recommended for end users; API tokens are useful for service accounts or when OAuth is not available.
 
 ## GitHub OAuth Setup
 
@@ -542,6 +593,7 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 ### Redirect URI mismatch
 
 Ensure the redirect URI in your OAuth app matches exactly:
+- Atlassian: `https://your-domain.com/api/v1/oauth/atlassian/callback`
 - Figma: `https://your-domain.com/api/v1/oauth/figma/callback`
 - GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
