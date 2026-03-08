@@ -198,3 +198,48 @@ func TestCreateOpportunity_NegativeAmount(t *testing.T) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
+
+// TestCreateOpportunity_ExplicitZeroAmount verifies that amount=0 is sent to
+// Salesforce rather than omitted. This is only possible with *float64; a plain
+// float64 with omitempty would silently drop a legitimate zero-amount.
+func TestCreateOpportunity_ExplicitZeroAmount(t *testing.T) {
+	t.Parallel()
+
+	amountSent := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if _, ok := body["Amount"]; ok {
+			amountSent = true
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(sfCreateResponse{ID: "006xx0000001abc", Success: true})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createOpportunityAction{conn: conn}
+
+	zero := 0.0
+	params, _ := json.Marshal(createOpportunityParams{
+		Name:      "Zero Budget Deal",
+		StageName: "Prospecting",
+		CloseDate: "2026-12-31",
+		Amount:    &zero,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_opportunity",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !amountSent {
+		t.Error("expected Amount=0 to be sent to Salesforce, but it was omitted")
+	}
+}

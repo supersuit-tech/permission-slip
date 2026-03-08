@@ -31,7 +31,8 @@ func (a *listReportsAction) Execute(ctx context.Context, req connectors.ActionRe
 	// The analytics reports endpoint is at the same API version base path.
 	apiURL := baseURL + "/analytics/reports"
 
-	var reports []sfReportListItem
+	// Initialize to empty slice so the JSON result is [] not null when empty.
+	reports := make([]sfReportListItem, 0)
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, apiURL, nil, &reports); err != nil {
 		return nil, err
 	}
