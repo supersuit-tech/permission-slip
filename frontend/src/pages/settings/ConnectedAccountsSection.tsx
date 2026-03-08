@@ -13,6 +13,7 @@ import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel } from "@/lib/providerLabels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,17 +23,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  figma: "Figma",
-  google: "Google",
-  intercom: "Intercom",
-  microsoft: "Microsoft",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
 
 function statusBadge(status: string) {
   switch (status) {
