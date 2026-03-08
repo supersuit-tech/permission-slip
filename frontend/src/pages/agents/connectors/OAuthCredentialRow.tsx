@@ -29,9 +29,12 @@ export function OAuthCredentialRow({
 
   function handleConnect() {
     if (!session?.access_token || !requiredCredential.oauth_provider) return;
+    const provider = requiredCredential.oauth_provider;
+    // Validate provider ID contains only safe characters (alphanumeric, hyphens, underscores)
+    if (!/^[a-zA-Z0-9_-]+$/.test(provider)) return;
     const baseUrl =
       import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${requiredCredential.oauth_provider}/authorize`;
+    const url = `${baseUrl}/v1/oauth/${provider}/authorize`;
     window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
   }
 

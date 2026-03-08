@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/oauth"
 )
 
 func TestSquareConnector_ID(t *testing.T) {
@@ -192,6 +193,45 @@ func TestSquareConnector_Manifest(t *testing.T) {
 		var schema map[string]interface{}
 		if err := json.Unmarshal(a.ParametersSchema, &schema); err != nil {
 			t.Errorf("action %q has invalid ParametersSchema JSON: %v", a.ActionType, err)
+		}
+	}
+}
+
+func TestSquareConnector_OAuthScopesSubsetOfBuiltin(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	// Find the OAuth credential in the manifest.
+	var manifestScopes []string
+	for _, cred := range m.RequiredCredentials {
+		if cred.AuthType == "oauth2" {
+			manifestScopes = cred.OAuthScopes
+			break
+		}
+	}
+	if len(manifestScopes) == 0 {
+		t.Fatal("no oauth2 credential found in manifest")
+	}
+
+	// Get built-in provider scopes.
+	builtinScopes := make(map[string]bool)
+	for _, p := range oauth.BuiltInProviders() {
+		if p.ID == "square" {
+			for _, s := range p.Scopes {
+				builtinScopes[s] = true
+			}
+			break
+		}
+	}
+	if len(builtinScopes) == 0 {
+		t.Fatal("no square provider found in builtin providers")
+	}
+
+	// Every manifest scope must be registered in the builtin provider.
+	for _, scope := range manifestScopes {
+		if !builtinScopes[scope] {
+			t.Errorf("manifest scope %q is not in builtin provider scopes", scope)
 		}
 	}
 }
