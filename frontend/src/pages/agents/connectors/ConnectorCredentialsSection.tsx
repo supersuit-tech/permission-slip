@@ -4,9 +4,13 @@ import {
   Circle,
   ExternalLink,
   Loader2,
+  LogIn,
   Plus,
   Trash2,
+  Unplug,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,8 +18,11 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
+import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
+import { useOAuthConnections } from "@/hooks/useOAuthConnections";
+import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
@@ -28,9 +35,18 @@ export function ConnectorCredentialsSection({
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
   const hasRequiredCredentials = requiredCredentials.length > 0;
+  const hasOAuthCredential = requiredCredentials.some(
+    (c) => c.auth_type === "oauth2",
+  );
+  const hasStaticCredential = requiredCredentials.some(
+    (c) => c.auth_type !== "oauth2",
+  );
+
   const { credentials, isLoading, error } = useCredentials({
-    enabled: hasRequiredCredentials,
+    enabled: hasStaticCredential,
   });
+  const { connections: oauthConnections, isLoading: oauthLoading } =
+    useOAuthConnections();
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -38,6 +54,8 @@ export function ConnectorCredentialsSection({
     list.push(cred);
     storedByService.set(cred.service, list);
   }
+
+  const anyLoading = isLoading || (hasOAuthCredential && oauthLoading);
 
   return (
     <Card>
@@ -49,7 +67,7 @@ export function ConnectorCredentialsSection({
           <p className="text-muted-foreground py-4 text-center text-sm">
             This connector does not require any credentials.
           </p>
-        ) : isLoading ? (
+        ) : anyLoading ? (
           <div className="flex items-center justify-center py-4">
             <Loader2
               className="text-muted-foreground size-5 animate-spin"
@@ -60,13 +78,23 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred) => (
-              <CredentialRow
-                key={cred.service}
-                requiredCredential={cred}
-                storedCredentials={storedByService.get(cred.service) ?? []}
-              />
-            ))}
+            {requiredCredentials.map((cred) =>
+              cred.auth_type === "oauth2" ? (
+                <OAuthCredentialRow
+                  key={cred.service}
+                  requiredCredential={cred}
+                  oauthConnections={oauthConnections}
+                />
+              ) : (
+                <StaticCredentialRow
+                  key={cred.service}
+                  requiredCredential={cred}
+                  storedCredentials={
+                    storedByService.get(cred.service) ?? []
+                  }
+                />
+              ),
+            )}
           </div>
         )}
       </CardContent>
@@ -74,7 +102,103 @@ export function ConnectorCredentialsSection({
   );
 }
 
-function CredentialRow({
+function OAuthCredentialRow({
+  requiredCredential,
+  oauthConnections,
+}: {
+  requiredCredential: RequiredCredential;
+  oauthConnections: {
+    provider: string;
+    status: string;
+    connected_at: string;
+    scopes: string[];
+  }[];
+}) {
+  const { session } = useAuth();
+  const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
+
+  const providerId = requiredCredential.oauth_provider ?? "";
+  const connection = oauthConnections.find((c) => c.provider === providerId);
+  const isConnected = connection?.status === "active";
+
+  function handleConnect() {
+    if (!session?.access_token || !providerId) return;
+    const baseUrl =
+      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
+    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
+    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+  }
+
+  async function handleDisconnect() {
+    if (!providerId) return;
+    try {
+      await disconnect(providerId);
+      toast.success(`Disconnected ${providerId}.`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to disconnect.";
+      toast.error(message);
+    }
+  }
+
+  const providerLabel =
+    providerId.charAt(0).toUpperCase() + providerId.slice(1);
+
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {isConnected ? (
+            <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : (
+            <Circle className="text-muted-foreground size-5 shrink-0" />
+          )}
+          <div>
+            <p className="text-sm font-medium">{providerLabel} (OAuth)</p>
+            <p className="text-muted-foreground text-xs">
+              Recommended &mdash; automatic token refresh, no manual key
+              management
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <>
+              <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                Connected
+              </span>
+              <InlineConfirmButton
+                confirmLabel="Disconnect"
+                isProcessing={isDisconnecting}
+                onConfirm={handleDisconnect}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Disconnect ${providerLabel}`}
+                >
+                  <Unplug className="text-muted-foreground size-4" />
+                </Button>
+              </InlineConfirmButton>
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground text-xs font-medium">
+                Not connected
+              </span>
+              <Button variant="outline" size="sm" onClick={handleConnect}>
+                <LogIn className="size-3" />
+                Connect {providerLabel}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
 }: {
@@ -99,7 +223,9 @@ function CredentialRow({
               <Circle className="text-muted-foreground size-5 shrink-0" />
             )}
             <div>
-              <p className="text-sm font-medium">{requiredCredential.service}</p>
+              <p className="text-sm font-medium">
+                {requiredCredential.service}
+              </p>
               <p className="text-muted-foreground text-xs">
                 Auth type: {requiredCredential.auth_type}
               </p>

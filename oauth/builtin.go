@@ -105,6 +105,14 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("KROGER_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "netlify",
+			AuthorizeURL: "https://app.netlify.com/authorize",
+			TokenURL:     "https://api.netlify.com/oauth/token",
+			ClientID:     os.Getenv("NETLIFY_CLIENT_ID"),
+			ClientSecret: os.Getenv("NETLIFY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 
