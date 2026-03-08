@@ -15,9 +15,10 @@ type listInvoicesAction struct {
 }
 
 type listInvoicesParams struct {
-	CustomerID string `json:"customer_id"`
-	Status     string `json:"status"`
-	Limit      int    `json:"limit"`
+	CustomerID    string `json:"customer_id"`
+	Status        string `json:"status"`
+	Limit         int    `json:"limit"`
+	StartingAfter string `json:"starting_after"`
 }
 
 const (
@@ -55,6 +56,9 @@ func (a *listInvoicesAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 	if params.Status != "" {
 		query["status"] = params.Status
+	}
+	if params.StartingAfter != "" {
+		query["starting_after"] = params.StartingAfter
 	}
 
 	limit := params.Limit

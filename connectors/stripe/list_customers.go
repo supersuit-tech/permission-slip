@@ -16,8 +16,9 @@ type listCustomersAction struct {
 }
 
 type listCustomersParams struct {
-	Email string `json:"email"`
-	Limit int    `json:"limit"`
+	Email         string `json:"email"`
+	Limit         int    `json:"limit"`
+	StartingAfter string `json:"starting_after"`
 }
 
 const (
@@ -47,6 +48,9 @@ func (a *listCustomersAction) Execute(ctx context.Context, req connectors.Action
 	query := map[string]string{}
 	if params.Email != "" {
 		query["email"] = params.Email
+	}
+	if params.StartingAfter != "" {
+		query["starting_after"] = params.StartingAfter
 	}
 
 	limit := params.Limit

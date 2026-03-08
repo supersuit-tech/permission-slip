@@ -124,3 +124,65 @@ func TestCreatePrice_InvalidRecurringInterval(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestCreatePrice_WithTaxBehavior(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parsing form: %v", err)
+		}
+		if got := r.FormValue("tax_behavior"); got != "exclusive" {
+			t.Errorf("tax_behavior = %q, want exclusive", got)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":           "price_abc123",
+			"currency":     "usd",
+			"product":      "prod_abc123",
+			"unit_amount":  2000,
+			"tax_behavior": "exclusive",
+			"active":       true,
+			"created":      1709740800,
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.create_price"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_price",
+		Parameters:  json.RawMessage(`{"currency":"usd","product":"prod_abc123","unit_amount":2000,"tax_behavior":"exclusive"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["tax_behavior"] != "exclusive" {
+		t.Errorf("tax_behavior = %v, want exclusive", data["tax_behavior"])
+	}
+}
+
+func TestCreatePrice_InvalidTaxBehavior(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_price"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_price",
+		Parameters:  json.RawMessage(`{"currency":"usd","product":"prod_abc","unit_amount":1000,"tax_behavior":"automatic"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for invalid tax_behavior, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

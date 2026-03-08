@@ -11,7 +11,8 @@ import (
 
 // updateSubscriptionAction implements connectors.Action for stripe.update_subscription.
 // It updates an existing subscription via POST /v1/subscriptions/{id}.
-// Supports plan upgrades/downgrades, quantity changes, and adding coupons.
+// Supports plan upgrades/downgrades, quantity changes, adding coupons,
+// and trial management (extend or end trials early).
 type updateSubscriptionAction struct {
 	conn *StripeConnector
 }
@@ -28,7 +29,14 @@ type updateSubscriptionParams struct {
 	Items             []updateSubscriptionItem `json:"items"`
 	CouponID          string                   `json:"coupon"`
 	ProrationBehavior string                   `json:"proration_behavior"`
-	Metadata          map[string]any           `json:"metadata"`
+	// TrialEnd extends or ends a trial. Accepts a Unix timestamp (to set a new
+	// trial end date) or the string "now" (to end the trial immediately and
+	// begin billing). Sending 0 is treated as unset/omitted.
+	TrialEnd string `json:"trial_end"`
+	// CancelAt schedules the subscription to cancel at a future Unix timestamp.
+	// Set to 0 to clear a previously-scheduled cancellation.
+	CancelAt *int64 `json:"cancel_at"`
+	Metadata map[string]any `json:"metadata"`
 }
 
 func (p *updateSubscriptionParams) validate() error {
@@ -51,6 +59,18 @@ func (p *updateSubscriptionParams) validate() error {
 		"create_prorations", "none", "always_invoice",
 	}); err != nil {
 		return err
+	}
+	if p.TrialEnd != "" && p.TrialEnd != "now" {
+		// Must be a valid positive integer string (Unix timestamp).
+		var ts int64
+		if _, err := fmt.Sscanf(p.TrialEnd, "%d", &ts); err != nil || ts <= 0 {
+			return &connectors.ValidationError{
+				Message: `trial_end must be a Unix timestamp (e.g. "1893456000") or "now" to end the trial immediately`,
+			}
+		}
+	}
+	if p.CancelAt != nil && *p.CancelAt < 0 {
+		return &connectors.ValidationError{Message: "cancel_at must be a non-negative Unix timestamp"}
 	}
 	return validateMetadata(p.Metadata)
 }
@@ -93,6 +113,12 @@ func (a *updateSubscriptionAction) Execute(ctx context.Context, req connectors.A
 	if params.ProrationBehavior != "" {
 		body["proration_behavior"] = params.ProrationBehavior
 	}
+	if params.TrialEnd != "" {
+		body["trial_end"] = params.TrialEnd
+	}
+	if params.CancelAt != nil {
+		body["cancel_at"] = *params.CancelAt
+	}
 	if params.Metadata != nil {
 		body["metadata"] = params.Metadata
 	}
@@ -106,6 +132,8 @@ func (a *updateSubscriptionAction) Execute(ctx context.Context, req connectors.A
 		Customer           string `json:"customer"`
 		CurrentPeriodStart int64  `json:"current_period_start"`
 		CurrentPeriodEnd   int64  `json:"current_period_end"`
+		TrialEnd           *int64 `json:"trial_end"`
+		CancelAt           *int64 `json:"cancel_at"`
 		LatestInvoice      string `json:"latest_invoice"`
 		Created            int64  `json:"created"`
 	}

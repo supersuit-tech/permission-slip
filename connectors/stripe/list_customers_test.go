@@ -101,3 +101,31 @@ func TestListCustomers_InvalidLimit(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestListCustomers_Pagination(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("starting_after"); got != "cus_previous" {
+			t.Errorf("starting_after = %q, want cus_previous", got)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"object":   "list",
+			"data":     []any{},
+			"has_more": false,
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["stripe.list_customers"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.list_customers",
+		Parameters:  json.RawMessage(`{"starting_after":"cus_previous"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}

@@ -144,3 +144,41 @@ func TestCreateCheckoutSession_InvalidMode(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestCreateCheckoutSession_InsecureSuccessURL(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_checkout_session"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_checkout_session",
+		Parameters:  json.RawMessage(`{"mode":"payment","line_items":[{"price":"price_abc","quantity":1}],"success_url":"http://example.com/success"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for http success_url, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestCreateCheckoutSession_InsecureCancelURL(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["stripe.create_checkout_session"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "stripe.create_checkout_session",
+		Parameters:  json.RawMessage(`{"mode":"payment","line_items":[{"price":"price_abc","quantity":1}],"cancel_url":"http://example.com/cancel"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error for http cancel_url, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

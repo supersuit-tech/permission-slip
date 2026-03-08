@@ -528,6 +528,11 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "boolean",
 							"description": "Whether the price is available for new subscriptions (defaults to true)"
 						},
+						"tax_behavior": {
+							"type": "string",
+							"enum": ["inclusive", "exclusive", "unspecified"],
+							"description": "Tax treatment: inclusive (tax in price), exclusive (tax added on top), or unspecified (inherits from product). Required when using Stripe Tax."
+						},
 						"metadata": {
 							"type": "object",
 							"description": "Key-value pairs for storing additional information (max 50 keys)",
@@ -576,12 +581,12 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 						"success_url": {
 							"type": "string",
 							"format": "uri",
-							"description": "URL to redirect to after successful payment"
+							"description": "https URL to redirect to after successful payment (must use https)"
 						},
 						"cancel_url": {
 							"type": "string",
 							"format": "uri",
-							"description": "URL to redirect to if customer cancels checkout"
+							"description": "https URL to redirect to if customer cancels checkout (must use https)"
 						},
 						"customer": {
 							"type": "string",
@@ -654,6 +659,15 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 							"enum": ["create_prorations", "none", "always_invoice"],
 							"description": "How to handle prorations when changing plans mid-cycle"
 						},
+						"trial_end": {
+							"type": "string",
+							"description": "Unix timestamp to set a new trial end date, or \"now\" to end the trial immediately and start billing"
+						},
+						"cancel_at": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Unix timestamp to schedule a future cancellation. Set to 0 to clear a previously-scheduled cancellation."
+						},
 						"metadata": {
 							"type": "object",
 							"description": "Key-value pairs for storing additional information (max 50 keys)",
@@ -682,6 +696,10 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 1,
 							"maximum": 100,
 							"description": "Number of customers to return (default 10, max 100)"
+						},
+						"starting_after": {
+							"type": "string",
+							"description": "Cursor for pagination — the customer ID of the last item from the previous page (from has_more response)"
 						}
 					}
 				}`)),
@@ -727,6 +745,10 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 1,
 							"maximum": 100,
 							"description": "Number of invoices to return (default 10, max 100)"
+						},
+						"starting_after": {
+							"type": "string",
+							"description": "Cursor for pagination — the invoice ID of the last item from the previous page (from has_more response)"
 						}
 					}
 				}`)),
@@ -754,6 +776,10 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 1,
 							"maximum": 100,
 							"description": "Number of charges to return (default 10, max 100)"
+						},
+						"starting_after": {
+							"type": "string",
+							"description": "Cursor for pagination — the charge ID of the last item from the previous page (from has_more response)"
 						}
 					}
 				}`)),
@@ -912,14 +938,14 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ActionType:  "stripe.create_price",
 			Name:        "Create recurring prices",
 			Description: "Agent can create recurring prices for subscription billing.",
-			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","recurring":"*","nickname":"*","active":"*","metadata":"*"}`),
+			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","recurring":"*","nickname":"*","active":"*","tax_behavior":"*","metadata":"*"}`),
 		},
 		{
 			ID:          "tpl_stripe_create_price_one_time",
 			ActionType:  "stripe.create_price",
 			Name:        "Create one-time prices",
 			Description: "Agent can create one-time prices. Recurring billing is not blocked, but the template is intended for one-time use.",
-			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","nickname":"*","active":"*","metadata":"*"}`),
+			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","nickname":"*","active":"*","tax_behavior":"*","metadata":"*"}`),
 		},
 		// --- Checkout ---
 		{
@@ -942,7 +968,7 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ActionType:  "stripe.update_subscription",
 			Name:        "Update subscriptions",
 			Description: "Agent can update subscriptions — change plans, quantities, add coupons, and manage proration.",
-			Parameters:  json.RawMessage(`{"subscription_id":"*","items":"*","coupon":"*","proration_behavior":"*","metadata":"*"}`),
+			Parameters:  json.RawMessage(`{"subscription_id":"*","items":"*","coupon":"*","proration_behavior":"*","trial_end":"*","cancel_at":"*","metadata":"*"}`),
 		},
 		// --- Read-only: customers, invoices, charges ---
 		{
@@ -950,7 +976,7 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ActionType:  "stripe.list_customers",
 			Name:        "List customers",
 			Description: "Agent can list customers and search by email. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"email":"*","limit":"*"}`),
+			Parameters:  json.RawMessage(`{"email":"*","limit":"*","starting_after":"*"}`),
 		},
 		{
 			ID:          "tpl_stripe_get_customer",
@@ -964,14 +990,14 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ActionType:  "stripe.list_invoices",
 			Name:        "List invoices",
 			Description: "Agent can list and filter invoices by customer or status. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"customer_id":"*","status":"*","limit":"*"}`),
+			Parameters:  json.RawMessage(`{"customer_id":"*","status":"*","limit":"*","starting_after":"*"}`),
 		},
 		{
 			ID:          "tpl_stripe_list_charges",
 			ActionType:  "stripe.list_charges",
 			Name:        "List charges",
 			Description: "Agent can list and filter charges by customer or payment intent. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"customer_id":"*","payment_intent_id":"*","limit":"*"}`),
+			Parameters:  json.RawMessage(`{"customer_id":"*","payment_intent_id":"*","limit":"*","starting_after":"*"}`),
 		},
 	}
 }

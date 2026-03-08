@@ -18,6 +18,7 @@ type listChargesParams struct {
 	CustomerID      string `json:"customer_id"`
 	PaymentIntentID string `json:"payment_intent_id"`
 	Limit           int    `json:"limit"`
+	StartingAfter   string `json:"starting_after"`
 }
 
 const (
@@ -50,6 +51,9 @@ func (a *listChargesAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 	if params.PaymentIntentID != "" {
 		query["payment_intent"] = params.PaymentIntentID
+	}
+	if params.StartingAfter != "" {
+		query["starting_after"] = params.StartingAfter
 	}
 
 	limit := params.Limit

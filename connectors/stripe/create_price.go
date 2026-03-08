@@ -21,13 +21,17 @@ type createPriceRecurring struct {
 }
 
 type createPriceParams struct {
-	Currency   string               `json:"currency"`
-	Product    string               `json:"product"`
-	UnitAmount *int64               `json:"unit_amount"`
-	Recurring  *createPriceRecurring `json:"recurring"`
-	Nickname   string               `json:"nickname"`
-	Active     *bool                `json:"active"`
-	Metadata   map[string]any       `json:"metadata"`
+	Currency    string                `json:"currency"`
+	Product     string                `json:"product"`
+	UnitAmount  *int64                `json:"unit_amount"`
+	Recurring   *createPriceRecurring `json:"recurring"`
+	Nickname    string                `json:"nickname"`
+	Active      *bool                 `json:"active"`
+	// TaxBehavior controls whether tax is included in the displayed price
+	// (inclusive), added on top (exclusive), or unspecified (inherits from
+	// the product's tax_behavior setting). Required for Stripe Tax.
+	TaxBehavior string         `json:"tax_behavior"`
+	Metadata    map[string]any `json:"metadata"`
 }
 
 func (p *createPriceParams) validate() error {
@@ -58,6 +62,11 @@ func (p *createPriceParams) validate() error {
 		if p.Recurring.IntervalCount != nil && *p.Recurring.IntervalCount < 1 {
 			return &connectors.ValidationError{Message: "recurring.interval_count must be at least 1"}
 		}
+	}
+	if err := validateEnum(p.TaxBehavior, "tax_behavior", []string{
+		"inclusive", "exclusive", "unspecified",
+	}); err != nil {
+		return err
 	}
 	return validateMetadata(p.Metadata)
 }
@@ -92,6 +101,9 @@ func (a *createPriceAction) Execute(ctx context.Context, req connectors.ActionRe
 	if params.Active != nil {
 		body["active"] = *params.Active
 	}
+	if params.TaxBehavior != "" {
+		body["tax_behavior"] = params.TaxBehavior
+	}
 	if params.Metadata != nil {
 		body["metadata"] = params.Metadata
 	}
@@ -99,13 +111,14 @@ func (a *createPriceAction) Execute(ctx context.Context, req connectors.ActionRe
 	formParams := formEncode(body)
 
 	var resp struct {
-		ID         string `json:"id"`
-		Currency   string `json:"currency"`
-		Product    string `json:"product"`
-		UnitAmount int64  `json:"unit_amount"`
-		Active     bool   `json:"active"`
-		Type       string `json:"type"`
-		Created    int64  `json:"created"`
+		ID          string `json:"id"`
+		Currency    string `json:"currency"`
+		Product     string `json:"product"`
+		UnitAmount  int64  `json:"unit_amount"`
+		Active      bool   `json:"active"`
+		Type        string `json:"type"`
+		TaxBehavior string `json:"tax_behavior"`
+		Created     int64  `json:"created"`
 	}
 
 	if err := a.conn.doPost(ctx, req.Credentials, "/v1/prices", formParams, &resp, req.ActionType, req.Parameters); err != nil {

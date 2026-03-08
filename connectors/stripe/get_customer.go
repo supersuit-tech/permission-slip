@@ -44,7 +44,12 @@ func (a *getCustomerAction) Execute(ctx context.Context, req connectors.ActionRe
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Phone       string `json:"phone"`
-		Created     int64  `json:"created"`
+		// Balance is the customer's credit balance in the smallest currency unit.
+		// Negative = credit (owed to customer), positive = debt.
+		Balance    int64  `json:"balance"`
+		Currency   string `json:"currency"`
+		Delinquent bool   `json:"delinquent"`
+		Created    int64  `json:"created"`
 	}
 
 	if err := a.conn.doGet(ctx, req.Credentials, "/v1/customers/"+escapedID, nil, &resp); err != nil {
