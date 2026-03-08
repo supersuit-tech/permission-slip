@@ -2,7 +2,6 @@ package linear
 
 import (
 	"encoding/json"
-	"sync/atomic"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -10,8 +9,6 @@ import (
 
 func TestAddLabel_Success(t *testing.T) {
 	t.Parallel()
-
-	var callCount atomic.Int32
 
 	// The add_label action makes two GraphQL calls: first to fetch current
 	// labels, then to update with the new label added.
@@ -55,7 +52,6 @@ func TestAddLabel_Success(t *testing.T) {
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
-	_ = callCount // suppress unused
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -23,8 +23,10 @@ type listStatusesParams struct {
 func (a *listStatusesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listStatusesParams
 	if req.Parameters != nil {
-		// Parameters are optional for this action.
-		_ = json.Unmarshal(req.Parameters, &params)
+		// Parameters are optional for this action, but invalid JSON should be reported.
+		if err := json.Unmarshal(req.Parameters, &params); err != nil {
+			return nil, &connectors.ValidationError{Message: "invalid parameters JSON: " + err.Error()}
+		}
 	}
 
 	path := "/status"

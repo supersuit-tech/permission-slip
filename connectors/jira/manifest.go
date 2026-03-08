@@ -245,7 +245,7 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 					"required": ["board_id"],
 					"properties": {
 						"board_id": {
-							"type": "string",
+							"type": "integer",
 							"description": "Board ID to list sprints for"
 						},
 						"state": {

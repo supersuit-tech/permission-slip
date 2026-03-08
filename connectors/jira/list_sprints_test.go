@@ -35,7 +35,7 @@ func TestListSprints_Success(t *testing.T) {
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "jira.list_sprints",
-		Parameters:  json.RawMessage(`{"board_id":"42"}`),
+		Parameters:  json.RawMessage(`{"board_id":42}`),
 		Credentials: validCreds(),
 	})
 	if err != nil {
@@ -73,7 +73,7 @@ func TestListSprints_WithState(t *testing.T) {
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "jira.list_sprints",
-		Parameters:  json.RawMessage(`{"board_id":"42","state":"active"}`),
+		Parameters:  json.RawMessage(`{"board_id":42,"state":"active"}`),
 		Credentials: validCreds(),
 	})
 	if err != nil {
@@ -89,7 +89,7 @@ func TestListSprints_InvalidState(t *testing.T) {
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "jira.list_sprints",
-		Parameters:  json.RawMessage(`{"board_id":"42","state":"invalid"}`),
+		Parameters:  json.RawMessage(`{"board_id":42,"state":"invalid"}`),
 		Credentials: validCreds(),
 	})
 	if err == nil {

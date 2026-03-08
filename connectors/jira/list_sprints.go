@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -18,14 +17,13 @@ type listSprintsAction struct {
 }
 
 type listSprintsParams struct {
-	BoardID string `json:"board_id"`
+	BoardID int    `json:"board_id"`
 	State   string `json:"state"`
 }
 
 func (p *listSprintsParams) validate() error {
-	p.BoardID = strings.TrimSpace(p.BoardID)
-	if p.BoardID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: board_id"}
+	if p.BoardID <= 0 {
+		return &connectors.ValidationError{Message: "missing required parameter: board_id (must be a positive integer)"}
 	}
 	p.State = strings.TrimSpace(p.State)
 	if p.State != "" {
@@ -46,9 +44,9 @@ func (a *listSprintsAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	path := "/board/" + url.PathEscape(params.BoardID) + "/sprint"
+	path := fmt.Sprintf("/board/%d/sprint", params.BoardID)
 	if params.State != "" {
-		path += "?state=" + url.QueryEscape(params.State)
+		path += "?state=" + params.State
 	}
 
 	var resp struct {
