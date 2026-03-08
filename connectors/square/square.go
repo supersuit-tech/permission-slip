@@ -79,8 +79,12 @@ func (c *SquareConnector) Actions() map[string]connectors.Action {
 		"square.issue_refund":        &issueRefundAction{conn: c},
 		"square.update_catalog_item": &updateCatalogItemAction{conn: c},
 		"square.send_invoice":        &sendInvoiceAction{conn: c},
-		"square.get_inventory":       &getInventoryAction{conn: c},
-		"square.adjust_inventory":    &adjustInventoryAction{conn: c},
+		"square.get_inventory":          &getInventoryAction{conn: c},
+		"square.adjust_inventory":       &adjustInventoryAction{conn: c},
+		"square.list_customers":         &listCustomersAction{conn: c},
+		"square.get_customer":           &getCustomerAction{conn: c},
+		"square.list_locations":         &listLocationsAction{conn: c},
+		"square.create_loyalty_reward":  &createLoyaltyRewardAction{conn: c},
 	}
 }
 

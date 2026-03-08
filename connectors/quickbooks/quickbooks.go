@@ -77,6 +77,11 @@ func (c *QuickBooksConnector) Actions() map[string]connectors.Action {
 		"quickbooks.reconcile_transaction":   &reconcileTransactionAction{conn: c},
 		"quickbooks.create_customer":         &createCustomerAction{conn: c},
 		"quickbooks.list_accounts":           &listAccountsAction{conn: c},
+		"quickbooks.create_vendor":           &createVendorAction{conn: c},
+		"quickbooks.create_bill":             &createBillAction{conn: c},
+		"quickbooks.list_invoices":           &listInvoicesAction{conn: c},
+		"quickbooks.list_customers":          &listCustomersAction{conn: c},
+		"quickbooks.send_invoice":            &sendInvoiceAction{conn: c},
 	}
 }
 

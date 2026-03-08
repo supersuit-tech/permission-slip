@@ -357,8 +357,8 @@ func TestManifest_Valid(t *testing.T) {
 	if m.ID != "quickbooks" {
 		t.Errorf("Manifest().ID = %q, want %q", m.ID, "quickbooks")
 	}
-	if len(m.Actions) != 8 {
-		t.Errorf("Manifest().Actions has %d entries, want 8", len(m.Actions))
+	if len(m.Actions) != 13 {
+		t.Errorf("Manifest().Actions has %d entries, want 13", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 1 {
 		t.Errorf("Manifest().RequiredCredentials has %d entries, want 1", len(m.RequiredCredentials))
@@ -426,6 +426,11 @@ func TestActions_ReturnsMap(t *testing.T) {
 		"quickbooks.reconcile_transaction",
 		"quickbooks.create_customer",
 		"quickbooks.list_accounts",
+		"quickbooks.create_vendor",
+		"quickbooks.create_bill",
+		"quickbooks.list_invoices",
+		"quickbooks.list_customers",
+		"quickbooks.send_invoice",
 	}
 	if len(actions) != len(expectedActions) {
 		t.Errorf("Actions() returned %d actions, want %d", len(actions), len(expectedActions))

@@ -129,6 +129,12 @@ func (c *ShopifyConnector) Actions() map[string]connectors.Action {
 		"shopify.create_discount":    &createDiscountAction{conn: c},
 		"shopify.create_collection":  &createCollectionAction{conn: c},
 		"shopify.get_analytics":      &getAnalyticsAction{conn: c},
+		"shopify.list_customers":     &listCustomersAction{conn: c},
+		"shopify.get_customer":       &getCustomerAction{conn: c},
+		"shopify.create_customer":    &createCustomerAction{conn: c},
+		"shopify.list_products":      &listProductsAction{conn: c},
+		"shopify.get_product":        &getProductAction{conn: c},
+		"shopify.create_draft_order": &createDraftOrderAction{conn: c},
 	}
 }
 
