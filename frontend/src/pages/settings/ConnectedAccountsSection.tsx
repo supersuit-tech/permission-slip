@@ -171,6 +171,11 @@ export function ConnectedAccountsSection() {
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">
                     {providerLabel(conn.provider)}
+                    {conn.instance && (
+                      <span className="text-muted-foreground ml-1.5 font-normal">
+                        ({conn.instance})
+                      </span>
+                    )}
                   </p>
                   <p className="text-muted-foreground text-xs">
                     {conn.scopes.length} scope

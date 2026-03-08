@@ -77,6 +77,10 @@ type oauthConnectionResponse struct {
 	Scopes      []string  `json:"scopes"`
 	Status      string    `json:"status"`
 	ConnectedAt time.Time `json:"connected_at"`
+	// Instance is the per-instance identifier for providers with subdomain-based
+	// OAuth URLs (e.g. "mycompany.zendesk.com" for Zendesk, "mystore.myshopify.com"
+	// for Shopify). Empty for providers with static OAuth endpoints.
+	Instance string `json:"instance,omitempty"`
 }
 
 type oauthConnectionListResponse struct {
@@ -702,6 +706,28 @@ func isURLExtraKey(key string) bool {
 	return key == "instance_url"
 }
 
+// instanceFromExtraData extracts a human-readable instance identifier from an
+// OAuth connection's extra_data JSON. For Zendesk connections it returns
+// "{subdomain}.zendesk.com"; for Shopify it returns the raw shop_domain (which
+// already includes ".myshopify.com"). Returns "" for providers with no
+// per-instance data (e.g. Google, Slack).
+func instanceFromExtraData(extraData json.RawMessage) string {
+	if len(extraData) == 0 {
+		return ""
+	}
+	var extra map[string]string
+	if err := json.Unmarshal(extraData, &extra); err != nil {
+		return ""
+	}
+	if subdomain, ok := extra["subdomain"]; ok && subdomain != "" {
+		return subdomain + ".zendesk.com"
+	}
+	if shopDomain, ok := extra["shop_domain"]; ok && shopDomain != "" {
+		return shopDomain
+	}
+	return ""
+}
+
 // handleListOAuthConnections returns all OAuth connections for the authenticated user.
 func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -725,6 +751,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 				Scopes:      c.Scopes,
 				Status:      c.Status,
 				ConnectedAt: c.CreatedAt,
+				Instance:    instanceFromExtraData(c.ExtraData),
 			}
 		}
 

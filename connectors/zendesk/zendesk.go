@@ -88,10 +88,10 @@ func (c *ZendeskConnector) ValidateCredentials(_ context.Context, creds connecto
 	// API token path: requires email and api_token.
 	email, ok := creds.Get(credKeyEmail)
 	if !ok || email == "" {
-		return &connectors.ValidationError{Message: "missing required credential: email or access_token"}
+		return &connectors.ValidationError{Message: "missing required credentials: provide access_token (OAuth) or email + api_token (API token auth)"}
 	}
 	if token, ok := creds.Get(credKeyAPIToken); !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_token"}
+		return &connectors.ValidationError{Message: "missing required credential: api_token (or use OAuth with access_token)"}
 	}
 	return nil
 }
