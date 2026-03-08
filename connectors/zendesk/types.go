@@ -50,7 +50,7 @@ type zendeskUser struct {
 	Email    string `json:"email,omitempty"`
 	Phone    string `json:"phone,omitempty"`
 	Role     string `json:"role,omitempty"`
-	Verified bool   `json:"verified"`
+	Verified bool   `json:"verified"` // omitempty intentionally absent: false must be sent explicitly to skip email verification
 }
 
 // userResponse wraps a single user in the Zendesk API response format.
