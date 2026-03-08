@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -45,7 +45,11 @@ func (a *getContactAction) Execute(ctx context.Context, req connectors.ActionReq
 		props = defaultContactProperties
 	}
 
-	path := fmt.Sprintf("/crm/v3/objects/contacts/%s?properties=%s", params.ContactID, strings.Join(props, ","))
+	q := url.Values{}
+	for _, p := range props {
+		q.Add("properties", p)
+	}
+	path := fmt.Sprintf("/crm/v3/objects/contacts/%s?%s", params.ContactID, q.Encode())
 	var resp hubspotObjectResponse
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {
 		return nil, err

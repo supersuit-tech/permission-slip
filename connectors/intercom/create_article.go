@@ -39,6 +39,12 @@ func (p *createArticleParams) validate() error {
 	if p.State != "" && !validArticleStates[p.State] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid state %q: must be draft or published", p.State)}
 	}
+	if p.ParentType != "" && p.ParentID == 0 {
+		return &connectors.ValidationError{Message: "parent_type requires parent_id to be set"}
+	}
+	if p.ParentID != 0 && p.ParentType != "" && p.ParentType != "collection" {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid parent_type %q: must be collection", p.ParentType)}
+	}
 	return nil
 }
 
@@ -48,7 +54,7 @@ type intercomArticle struct {
 	Title     string `json:"title"`
 	State     string `json:"state"`
 	URL       string `json:"url"`
-	AuthorID  int64  `json:"author_id"`
+	AuthorID  string `json:"author_id"`
 	CreatedAt int64  `json:"created_at"`
 	UpdatedAt int64  `json:"updated_at"`
 }

@@ -49,6 +49,9 @@ func (a *listContactsAction) Execute(ctx context.Context, req connectors.ActionR
 		if !validSingleValueOperators[f.Operator] {
 			return nil, &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: unsupported operator %q", i, f.Operator)}
 		}
+		if f.Value == "" {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: missing value", i)}
+		}
 	}
 
 	limit := params.Limit

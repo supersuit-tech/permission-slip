@@ -10,7 +10,8 @@ import (
 )
 
 // listPipelinesAction implements connectors.Action for hubspot.list_pipelines.
-// It fetches deal pipelines via GET /crm/v3/pipelines/deals.
+// It fetches pipelines for the specified CRM object type (e.g., deals or tickets)
+// via GET /crm/v3/pipelines/{object_type}, defaulting to deals if not specified.
 type listPipelinesAction struct {
 	conn *HubSpotConnector
 }

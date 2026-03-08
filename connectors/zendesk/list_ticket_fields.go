@@ -13,14 +13,21 @@ type listTicketFieldsAction struct {
 	conn *ZendeskConnector
 }
 
+type ticketFieldOption struct {
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	Value   string `json:"raw_name"`
+	Default bool   `json:"default"`
+}
+
 type ticketField struct {
-	ID          int64  `json:"id"`
-	Type        string `json:"type"`
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	Active      bool   `json:"active"`
-	Required    bool   `json:"required"`
-	Custom      bool   `json:"custom_field_options,omitempty"`
+	ID                 int64               `json:"id"`
+	Type               string              `json:"type"`
+	Title              string              `json:"title"`
+	Description        string              `json:"description,omitempty"`
+	Active             bool                `json:"active"`
+	Required           bool                `json:"required"`
+	CustomFieldOptions []ticketFieldOption `json:"custom_field_options,omitempty"`
 }
 
 type ticketFieldsResponse struct {

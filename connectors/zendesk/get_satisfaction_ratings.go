@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -74,16 +76,18 @@ func (a *getSatisfactionRatingsAction) Execute(ctx context.Context, req connecto
 		limit = maxSatisfactionLimit
 	}
 
-	path := fmt.Sprintf("/satisfaction_ratings.json?per_page=%d", limit)
+	q := url.Values{}
+	q.Set("per_page", strconv.Itoa(limit))
 	if params.Score != "" {
-		path += fmt.Sprintf("&score=%s", params.Score)
+		q.Set("score", params.Score)
 	}
 	if params.StartTime > 0 {
-		path += fmt.Sprintf("&start_time=%d", params.StartTime)
+		q.Set("start_time", strconv.FormatInt(params.StartTime, 10))
 	}
 	if params.EndTime > 0 {
-		path += fmt.Sprintf("&end_time=%d", params.EndTime)
+		q.Set("end_time", strconv.FormatInt(params.EndTime, 10))
 	}
+	path := "/satisfaction_ratings.json?" + q.Encode()
 
 	var resp satisfactionRatingsResponse
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {
