@@ -31,8 +31,9 @@ const (
 // X/Twitter actions. Actions hold a pointer back to the connector to access
 // these shared resources.
 type XConnector struct {
-	client  *http.Client
-	baseURL string
+	client        *http.Client
+	baseURL       string
+	uploadBaseURL string // overridden in tests; defaults to uploadBaseURL const
 }
 
 // New creates an XConnector with sensible defaults (30s timeout,
@@ -47,8 +48,9 @@ func New() *XConnector {
 // newForTest creates an XConnector that points at a test server.
 func newForTest(client *http.Client, baseURL string) *XConnector {
 	return &XConnector{
-		client:  client,
-		baseURL: baseURL,
+		client:        client,
+		baseURL:       baseURL,
+		uploadBaseURL: baseURL,
 	}
 }
 
@@ -64,6 +66,15 @@ func (c *XConnector) Actions() map[string]connectors.Action {
 		"x.get_user_tweets": &getUserTweetsAction{conn: c},
 		"x.search_tweets":   &searchTweetsAction{conn: c},
 		"x.get_me":          &getMeAction{conn: c},
+		"x.like_tweet":      &likeTweetAction{conn: c},
+		"x.unlike_tweet":    &unlikeTweetAction{conn: c},
+		"x.retweet":         &retweetAction{conn: c},
+		"x.unretweet":       &unretweetAction{conn: c},
+		"x.follow_user":     &followUserAction{conn: c},
+		"x.unfollow_user":   &unfollowUserAction{conn: c},
+		"x.get_followers":   &getFollowersAction{conn: c},
+		"x.get_following":   &getFollowingAction{conn: c},
+		"x.upload_media":    &uploadMediaAction{conn: c},
 	}
 }
 
@@ -147,7 +158,28 @@ func (c *XConnector) do(ctx context.Context, creds connectors.Credentials, metho
 	return nil
 }
 
-// checkResponse inspects the HTTP status code and returns an appropriate
+// resolveUserID returns userID as-is if non-empty, otherwise fetches the
+// authenticated user's ID via GET /users/me. This lets callers omit user_id
+// for actions that operate on the authenticated user's own account.
+func (c *XConnector) resolveUserID(ctx context.Context, creds connectors.Credentials, userID string) (string, error) {
+	if userID != "" {
+		return userID, nil
+	}
+	var resp struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := c.do(ctx, creds, http.MethodGet, "/users/me?user.fields=id", nil, &resp); err != nil {
+		return "", fmt.Errorf("resolving authenticated user ID: %w", err)
+	}
+	if resp.Data.ID == "" {
+		return "", &connectors.ExternalError{Message: "could not resolve authenticated user ID from /users/me"}
+	}
+	return resp.Data.ID, nil
+}
+
+
 // typed error for non-success responses.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {

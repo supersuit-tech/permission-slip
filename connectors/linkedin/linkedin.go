@@ -26,6 +26,10 @@ var (
 
 	// numericPattern validates that organization IDs are numeric.
 	numericPattern = regexp.MustCompile(`^\d+$`)
+
+	// personURNPattern validates LinkedIn person URNs specifically.
+	// Only urn:li:person:{numeric_id} is accepted — share/post URNs are rejected.
+	personURNPattern = regexp.MustCompile(`^urn:li:person:\d+$`)
 )
 
 const (
@@ -87,6 +91,11 @@ func (c *LinkedInConnector) Actions() map[string]connectors.Action {
 		"linkedin.get_profile":         &getProfileAction{conn: c},
 		"linkedin.get_post_analytics":  &getPostAnalyticsAction{conn: c},
 		"linkedin.create_company_post": &createCompanyPostAction{conn: c},
+		"linkedin.send_message":        &sendMessageAction{conn: c},
+		"linkedin.search_people":       &searchPeopleAction{conn: c},
+		"linkedin.search_companies":    &searchCompaniesAction{conn: c},
+		"linkedin.get_company":         &getCompanyAction{conn: c},
+		"linkedin.list_connections":    &listConnectionsAction{conn: c},
 	}
 }
 
@@ -134,6 +143,16 @@ func validatePostURN(urn string) error {
 func validateOrganizationID(id string) error {
 	if !numericPattern.MatchString(id) {
 		return &connectors.ValidationError{Message: "organization_id must be numeric"}
+	}
+	return nil
+}
+
+// validatePersonURN checks that a recipient URN is a valid LinkedIn person URN
+// (urn:li:person:{numeric_id}). Only person URNs are accepted — share or post
+// URNs are rejected to prevent accidentally messaging the wrong entity type.
+func validatePersonURN(urn string) error {
+	if !personURNPattern.MatchString(urn) {
+		return &connectors.ValidationError{Message: "recipient_urn must be a valid LinkedIn person URN (e.g. urn:li:person:123456)"}
 	}
 	return nil
 }

@@ -27,6 +27,15 @@ func TestXConnector_Actions(t *testing.T) {
 		"x.get_user_tweets",
 		"x.search_tweets",
 		"x.get_me",
+		"x.like_tweet",
+		"x.unlike_tweet",
+		"x.retweet",
+		"x.unretweet",
+		"x.follow_user",
+		"x.unfollow_user",
+		"x.get_followers",
+		"x.get_following",
+		"x.upload_media",
 	}
 	for _, key := range expected {
 		if _, ok := actions[key]; !ok {
@@ -88,11 +97,11 @@ func TestXConnector_Manifest(t *testing.T) {
 	if m.Name != "X (Twitter)" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "X (Twitter)")
 	}
-	if len(m.Actions) != 6 {
-		t.Errorf("Manifest().Actions has %d actions, want 6", len(m.Actions))
+	if len(m.Actions) != 15 {
+		t.Errorf("Manifest().Actions has %d actions, want 15", len(m.Actions))
 	}
-	if len(m.Templates) != 7 {
-		t.Errorf("Manifest().Templates has %d templates, want 7", len(m.Templates))
+	if len(m.Templates) != 16 {
+		t.Errorf("Manifest().Templates has %d templates, want 16", len(m.Templates))
 	}
 	if len(m.OAuthProviders) != 1 {
 		t.Errorf("Manifest().OAuthProviders has %d providers, want 1", len(m.OAuthProviders))

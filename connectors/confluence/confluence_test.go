@@ -219,6 +219,11 @@ func TestConfluenceConnector_Actions(t *testing.T) {
 		"confluence.get_page",
 		"confluence.search",
 		"confluence.add_comment",
+		"confluence.list_spaces",
+		"confluence.list_pages",
+		"confluence.delete_page",
+		"confluence.get_attachments",
+		"confluence.add_attachment",
 	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
@@ -241,8 +246,8 @@ func TestConfluenceConnector_Manifest(t *testing.T) {
 	if m.Name != "Confluence" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Confluence")
 	}
-	if len(m.Actions) != 5 {
-		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
+	if len(m.Actions) != 10 {
+		t.Fatalf("Manifest().Actions has %d items, want 10", len(m.Actions))
 	}
 
 	actionTypes := make(map[string]bool)
@@ -252,6 +257,8 @@ func TestConfluenceConnector_Manifest(t *testing.T) {
 	for _, want := range []string{
 		"confluence.create_page", "confluence.update_page", "confluence.get_page",
 		"confluence.search", "confluence.add_comment",
+		"confluence.list_spaces", "confluence.list_pages", "confluence.delete_page",
+		"confluence.get_attachments", "confluence.add_attachment",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

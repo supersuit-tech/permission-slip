@@ -29,6 +29,12 @@ func TestMetaConnector_Actions(t *testing.T) {
 		"meta.create_instagram_post",
 		"meta.get_instagram_insights",
 		"meta.list_page_posts",
+		"meta.create_instagram_story",
+		"meta.get_page_insights",
+		"meta.list_instagram_posts",
+		"meta.reply_instagram_comment",
+		"meta.create_ad",
+		"meta.create_ad_campaign",
 	}
 
 	for _, name := range expected {
@@ -82,8 +88,8 @@ func TestMetaConnector_Manifest(t *testing.T) {
 	if m.ID != "meta" {
 		t.Errorf("expected manifest ID 'meta', got %q", m.ID)
 	}
-	if len(m.Actions) != 6 {
-		t.Errorf("expected 6 actions, got %d", len(m.Actions))
+	if len(m.Actions) != 12 {
+		t.Errorf("expected 12 actions, got %d", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 1 {
 		t.Fatalf("expected 1 required credential, got %d", len(m.RequiredCredentials))
@@ -115,7 +121,7 @@ func TestCheckResponse_ErrorCode190(t *testing.T) {
 			"code":    190,
 		},
 	})
-	err := checkResponse(401, body)
+	err := checkResponse(401, nil, body)
 	if err == nil {
 		t.Fatal("expected error for code 190")
 	}
@@ -134,12 +140,55 @@ func TestCheckResponse_ErrorCode4(t *testing.T) {
 			"code":    4,
 		},
 	})
-	err := checkResponse(429, body)
+	err := checkResponse(429, nil, body)
 	if err == nil {
 		t.Fatal("expected error for code 4")
 	}
 	if !connectors.IsRateLimitError(err) {
 		t.Errorf("expected RateLimitError, got: %T", err)
+	}
+}
+
+func TestCheckResponse_ErrorCode17_UserRateLimit(t *testing.T) {
+	t.Parallel()
+
+	body, _ := json.Marshal(map[string]any{
+		"error": map[string]any{
+			"message": "User request limit reached",
+			"type":    "OAuthException",
+			"code":    17,
+		},
+	})
+	header := http.Header{"Retry-After": []string{"120"}}
+	err := checkResponse(429, header, body)
+	if err == nil {
+		t.Fatal("expected error for code 17")
+	}
+	if !connectors.IsRateLimitError(err) {
+		t.Errorf("expected RateLimitError, got: %T", err)
+	}
+}
+
+func TestCheckResponse_RateLimitRetryAfterHeader(t *testing.T) {
+	t.Parallel()
+
+	body, _ := json.Marshal(map[string]any{
+		"error": map[string]any{
+			"message": "Too many calls",
+			"code":    4,
+		},
+	})
+	header := http.Header{"Retry-After": []string{"90"}}
+	err := checkResponse(429, header, body)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var rlErr *connectors.RateLimitError
+	if !connectors.AsRateLimitError(err, &rlErr) {
+		t.Fatalf("expected RateLimitError, got: %T", err)
+	}
+	if rlErr.RetryAfter.Seconds() != 90 {
+		t.Errorf("expected RetryAfter=90s, got %v", rlErr.RetryAfter)
 	}
 }
 
@@ -153,7 +202,7 @@ func TestCheckResponse_ErrorCode100(t *testing.T) {
 			"code":    100,
 		},
 	})
-	err := checkResponse(400, body)
+	err := checkResponse(400, nil, body)
 	if err == nil {
 		t.Fatal("expected error for code 100")
 	}
@@ -165,7 +214,7 @@ func TestCheckResponse_ErrorCode100(t *testing.T) {
 func TestCheckResponse_Success(t *testing.T) {
 	t.Parallel()
 
-	err := checkResponse(200, []byte(`{"id":"123"}`))
+	err := checkResponse(200, nil, []byte(`{"id":"123"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
