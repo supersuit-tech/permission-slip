@@ -488,16 +488,22 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		// base_url, which are required for all API calls but are not included in
 		// the OAuth token response. These are stored in extra_data so the
 		// connector can access them at execution time alongside the access token.
+		//
+		// We treat this as a hard failure: without account_id the connector
+		// cannot make any API calls, so a "Connected" status with a missing
+		// account_id would be misleading and frustrating for users.
 		if providerID == "docusign" {
-			if extra, err := fetchDocuSignUserInfo(ctx, token.AccessToken); err != nil {
-				log.Printf("[%s] OAuthCallback: DocuSign userinfo fetch failed (continuing): %v", TraceID(r.Context()), err)
-			} else {
-				if stateExtraData == nil {
-					stateExtraData = make(map[string]string)
-				}
-				for k, v := range extra {
-					stateExtraData[k] = v
-				}
+			extra, err := fetchDocuSignUserInfo(ctx, token.AccessToken, docuSignUserInfoURL)
+			if err != nil {
+				log.Printf("[%s] OAuthCallback: DocuSign userinfo fetch failed: %v", TraceID(r.Context()), err)
+				redirectToFrontend(w, r, deps, providerID, "error", "Connected to DocuSign but could not retrieve account info — please try again")
+				return
+			}
+			if stateExtraData == nil {
+				stateExtraData = make(map[string]string)
+			}
+			for k, v := range extra {
+				stateExtraData[k] = v
 			}
 		}
 
@@ -667,8 +673,11 @@ type docuSignUserInfo struct {
 // The returned map contains account_id and base_url for the user's default account
 // (falling back to the first account if none is marked as default).
 // Both values are required by the DocuSign connector at execution time.
-func fetchDocuSignUserInfo(ctx context.Context, accessToken string) (map[string]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docuSignUserInfoURL, nil)
+//
+// userInfoURL is normally docuSignUserInfoURL; tests pass a local httptest server
+// URL to avoid real network calls.
+func fetchDocuSignUserInfo(ctx context.Context, accessToken, userInfoURL string) (map[string]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, userInfoURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create userinfo request: %w", err)
 	}
