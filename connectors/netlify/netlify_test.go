@@ -54,13 +54,28 @@ func TestNetlifyConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth_token"}),
+			wantErr: false,
+		},
+		{
+			name:    "both credentials present",
+			creds:   connectors.NewCredentials(map[string]string{"api_key": "key", "access_token": "token"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing all credentials",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
-			name:    "empty api_key",
+			name:    "empty api_key and no access_token",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token and no api_key",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -97,15 +112,27 @@ func TestNetlifyConnector_Manifest(t *testing.T) {
 	if len(m.Actions) != 8 {
 		t.Fatalf("Manifest().Actions has %d items, want 8", len(m.Actions))
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "netlify" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "netlify")
+	// First credential should be OAuth (default/primary).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "netlify" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "netlify")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
+	}
+	if oauthCred.OAuthProvider != "netlify" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "netlify")
+	}
+	// Second credential should be API key (alternative).
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "netlify-api-key" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "netlify-api-key")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
 	}
 
 	if err := m.Validate(); err != nil {
@@ -140,4 +167,49 @@ func TestNetlifyConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*NetlifyConnector)(nil)
 	var _ connectors.ManifestProvider = (*NetlifyConnector)(nil)
+}
+
+func TestGetBearerToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		creds connectors.Credentials
+		want  string
+	}{
+		{
+			name:  "access_token only",
+			creds: connectors.NewCredentials(map[string]string{"access_token": "oauth_tok"}),
+			want:  "oauth_tok",
+		},
+		{
+			name:  "api_key only",
+			creds: connectors.NewCredentials(map[string]string{"api_key": "api_tok"}),
+			want:  "api_tok",
+		},
+		{
+			name:  "both present prefers access_token",
+			creds: connectors.NewCredentials(map[string]string{"access_token": "oauth_tok", "api_key": "api_tok"}),
+			want:  "oauth_tok",
+		},
+		{
+			name:  "neither present",
+			creds: connectors.NewCredentials(map[string]string{}),
+			want:  "",
+		},
+		{
+			name:  "empty access_token falls back to api_key",
+			creds: connectors.NewCredentials(map[string]string{"access_token": "", "api_key": "api_tok"}),
+			want:  "api_tok",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getBearerToken(tt.creds)
+			if got != tt.want {
+				t.Errorf("getBearerToken() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

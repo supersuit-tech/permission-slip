@@ -8,3 +8,10 @@ func validCreds() connectors.Credentials {
 		"api_key": "test_netlify_token",
 	})
 }
+
+// oauthCreds returns a Credentials value with a valid OAuth access token for tests.
+func oauthCreds() connectors.Credentials {
+	return connectors.NewCredentials(map[string]string{
+		"access_token": "test_oauth_token",
+	})
+}
