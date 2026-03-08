@@ -132,6 +132,10 @@ func (c *FigmaConnector) Actions() map[string]connectors.Action {
 		"figma.list_comments":  &listCommentsAction{conn: c},
 		"figma.post_comment":   &postCommentAction{conn: c},
 		"figma.get_versions":   &getVersionsAction{conn: c},
+		"figma.get_styles":     &getStylesAction{conn: c},
+		"figma.list_projects":  &listProjectsAction{conn: c},
+		"figma.list_files":     &listFilesAction{conn: c},
+		"figma.get_variables":  &getVariablesAction{conn: c},
 	}
 }
 

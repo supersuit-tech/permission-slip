@@ -30,6 +30,11 @@ func TestSlackConnector_Actions(t *testing.T) {
 		"slack.invite_to_channel",
 		"slack.upload_file",
 		"slack.add_reaction",
+		"slack.send_dm",
+		"slack.update_message",
+		"slack.delete_message",
+		"slack.list_users",
+		"slack.search_messages",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -132,8 +137,8 @@ func TestSlackConnector_Manifest(t *testing.T) {
 	if m.Name != "Slack" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Slack")
 	}
-	if len(m.Actions) != 10 {
-		t.Fatalf("Manifest().Actions has %d items, want 10", len(m.Actions))
+	if len(m.Actions) != 15 {
+		t.Fatalf("Manifest().Actions has %d items, want 15", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -144,6 +149,8 @@ func TestSlackConnector_Manifest(t *testing.T) {
 		"slack.read_channel_messages", "slack.read_thread",
 		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
 		"slack.upload_file", "slack.add_reaction",
+		"slack.send_dm", "slack.update_message", "slack.delete_message",
+		"slack.list_users", "slack.search_messages",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
@@ -213,4 +220,59 @@ func TestSlackConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*SlackConnector)(nil)
 	var _ connectors.ManifestProvider = (*SlackConnector)(nil)
+}
+
+func TestValidateUserID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		userID  string
+		wantErr bool
+	}{
+		{name: "valid U prefix", userID: "U01234567", wantErr: false},
+		{name: "valid W prefix", userID: "W01234567", wantErr: false},
+		{name: "empty", userID: "", wantErr: true},
+		{name: "single char", userID: "U", wantErr: true},
+		{name: "username instead of ID", userID: "john.doe", wantErr: true},
+		{name: "email instead of ID", userID: "john@example.com", wantErr: true},
+		{name: "channel ID", userID: "C01234567", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateUserID(tt.userID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateUserID(%q) error = %v, wantErr %v", tt.userID, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateMessageTS(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		ts      string
+		wantErr bool
+	}{
+		{name: "valid ts", ts: "1234567890.123456", wantErr: false},
+		{name: "empty", ts: "", wantErr: true},
+		{name: "no dot", ts: "1234567890123456", wantErr: true},
+		{name: "letters", ts: "not-a-timestamp", wantErr: true},
+		{name: "mixed", ts: "123abc.456", wantErr: true},
+		{name: "multiple dots", ts: "1.2.3", wantErr: true},
+		{name: "leading dot", ts: ".123456", wantErr: true},
+		{name: "trailing dot", ts: "123456.", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateMessageTS(tt.ts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateMessageTS(%q) error = %v, wantErr %v", tt.ts, err, tt.wantErr)
+			}
+		})
+	}
 }
