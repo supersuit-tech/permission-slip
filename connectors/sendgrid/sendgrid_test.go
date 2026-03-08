@@ -29,6 +29,10 @@ func TestSendGridConnector_Actions(t *testing.T) {
 		"sendgrid.list_segments",
 		"sendgrid.list_senders",
 		"sendgrid.list_lists",
+		"sendgrid.send_transactional_email",
+		"sendgrid.create_contact",
+		"sendgrid.get_bounces",
+		"sendgrid.get_suppressions",
 	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
@@ -111,8 +115,8 @@ func TestSendGridConnector_Manifest(t *testing.T) {
 	if m.Name != "SendGrid" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "SendGrid")
 	}
-	if len(m.Actions) != 9 {
-		t.Fatalf("Manifest().Actions has %d items, want 9", len(m.Actions))
+	if len(m.Actions) != 13 {
+		t.Fatalf("Manifest().Actions has %d items, want 13", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -128,6 +132,10 @@ func TestSendGridConnector_Manifest(t *testing.T) {
 		"sendgrid.list_segments",
 		"sendgrid.list_senders",
 		"sendgrid.list_lists",
+		"sendgrid.send_transactional_email",
+		"sendgrid.create_contact",
+		"sendgrid.get_bounces",
+		"sendgrid.get_suppressions",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

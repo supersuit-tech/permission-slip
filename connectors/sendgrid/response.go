@@ -4,9 +4,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// emailPattern is a basic email validation regex. It does not cover all
+// RFC 5322 edge cases but rejects obviously invalid addresses.
+// Defined here alongside validateEmailAddresses so that all email validation
+// logic lives in one place.
+var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+
+// validateEmailAddresses validates a slice of email addresses for a named field.
+// Returns a ValidationError if any address fails the email pattern check.
+func validateEmailAddresses(field string, addrs []string) error {
+	for _, addr := range addrs {
+		if !emailPattern.MatchString(addr) {
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s email address: %q", field, addr)}
+		}
+	}
+	return nil
+}
+
+// unixToISO converts a Unix timestamp (seconds) to an ISO-8601 string in UTC.
+// Used by get_bounces and get_suppressions to return human-readable timestamps
+// instead of raw integers.
+func unixToISO(ts int64) string {
+	return time.Unix(ts, 0).UTC().Format(time.RFC3339)
+}
 
 // checkResponse inspects the HTTP status code and returns an appropriate
 // typed error for non-success responses.

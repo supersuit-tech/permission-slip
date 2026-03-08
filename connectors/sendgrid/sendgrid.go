@@ -73,7 +73,11 @@ func (c *SendGridConnector) Actions() map[string]connectors.Action {
 		"sendgrid.get_campaign_stats": &getCampaignStatsAction{conn: c},
 		"sendgrid.list_segments":      &listSegmentsAction{conn: c},
 		"sendgrid.list_senders":       &listSendersAction{conn: c},
-		"sendgrid.list_lists":         &listListsAction{conn: c},
+		"sendgrid.list_lists":               &listListsAction{conn: c},
+		"sendgrid.send_transactional_email": &sendTransactionalEmailAction{conn: c},
+		"sendgrid.create_contact":           &createContactAction{conn: c},
+		"sendgrid.get_bounces":              &getBouncesAction{conn: c},
+		"sendgrid.get_suppressions":         &getSuppressionsAction{conn: c},
 	}
 }
 
@@ -94,16 +98,19 @@ func (c *SendGridConnector) ValidateCredentials(_ context.Context, creds connect
 	return nil
 }
 
-// doJSON sends a JSON-encoded request to the SendGrid API and decodes
-// the response. SendGrid's v3 API uses application/json throughout.
-// It accepts either an OAuth2 access_token or an api_key as the Bearer token.
-func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, path string, body any, respBody any) error {
+// doRequest is the shared HTTP dispatch layer for all SendGrid API calls.
+// It handles authentication, request building, error classification, and
+// response body buffering. The response body is fully consumed and closed
+// before return. Both doJSON and doJSONCapturingHeader delegate here so that
+// auth logic and error handling have a single implementation — security fixes
+// and error handling improvements propagate to all callers automatically.
+func (c *SendGridConnector) doRequest(ctx context.Context, creds connectors.Credentials, method, path string, body any) (http.Header, []byte, error) {
 	token, _ := creds.Get(credKeyAccessToken)
 	if token == "" {
 		token, _ = creds.Get(credKeyAPIKey)
 	}
 	if token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
+		return nil, nil, &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
 	}
 
 	reqURL := c.baseURL + path
@@ -112,14 +119,14 @@ func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credent
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return &connectors.ExternalError{Message: fmt.Sprintf("marshaling request body: %v", err)}
+			return nil, nil, &connectors.ExternalError{Message: fmt.Sprintf("marshaling request body: %v", err)}
 		}
 		reqBody = bytes.NewReader(data)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, reqBody)
 	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
+		return nil, nil, &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	if body != nil {
@@ -129,28 +136,57 @@ func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credent
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("SendGrid API request timed out: %v", err)}
+			return nil, nil, &connectors.TimeoutError{Message: fmt.Sprintf("SendGrid API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "SendGrid API request canceled"}
+			return nil, nil, &connectors.TimeoutError{Message: "SendGrid API request canceled"}
 		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("SendGrid API request failed: %v", err)}
+		return nil, nil, &connectors.ExternalError{Message: fmt.Sprintf("SendGrid API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
+	respHeaders := resp.Header
+
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+		return nil, nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
 	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
-		return err
+		return nil, nil, err
 	}
 
+	return respHeaders, respBytes, nil
+}
+
+// doJSON sends a JSON-encoded request to the SendGrid API and decodes
+// the response. SendGrid's v3 API uses application/json throughout.
+// It accepts either an OAuth2 access_token or an api_key as the Bearer token.
+func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, path string, body any, respBody any) error {
+	_, respBytes, err := c.doRequest(ctx, creds, method, path, body)
+	if err != nil {
+		return err
+	}
 	if respBody != nil && len(respBytes) > 0 {
 		if err := json.Unmarshal(respBytes, respBody); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("parsing SendGrid response: %v", err)}
 		}
 	}
 	return nil
+}
+
+// doJSONCapturingHeader is like doJSON but also returns the value of a single
+// named response header. Useful for endpoints like POST /mail/send that return
+// an empty body with useful metadata only in headers (e.g. X-Message-Id).
+func (c *SendGridConnector) doJSONCapturingHeader(ctx context.Context, creds connectors.Credentials, method, path string, body any, respBody any, headerName string) (string, error) {
+	respHeaders, respBytes, err := c.doRequest(ctx, creds, method, path, body)
+	if err != nil {
+		return "", err
+	}
+	if respBody != nil && len(respBytes) > 0 {
+		if err := json.Unmarshal(respBytes, respBody); err != nil {
+			return "", &connectors.ExternalError{Message: fmt.Sprintf("parsing SendGrid response: %v", err)}
+		}
+	}
+	return respHeaders.Get(headerName), nil
 }
