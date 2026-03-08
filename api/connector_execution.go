@@ -449,12 +449,12 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 
 	// Partition credentials by auth type.
 	var oauthCred *db.RequiredCredential
-	var hasStaticCred bool
+	var staticCreds []db.RequiredCredential
 	for i := range reqCreds {
 		if reqCreds[i].AuthType == "oauth2" && oauthCred == nil {
 			oauthCred = &reqCreds[i]
 		} else if reqCreds[i].AuthType != "oauth2" {
-			hasStaticCred = true
+			staticCreds = append(staticCreds, reqCreds[i])
 		}
 	}
 
@@ -466,11 +466,53 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 		}
 		// If there's a static fallback, swallow the OAuth error and try that.
 		// Otherwise, return the OAuth error as-is.
-		if !hasStaticCred {
+		if len(staticCreds) == 0 {
 			return zero, err
 		}
 	}
 
 	// Fall back to static credentials (api_key, basic, custom).
+	// When the connector has both OAuth and static credentials, we resolve
+	// only the static services to avoid trying to fetch credentials for the
+	// OAuth service (which has no static credentials stored).
+	if len(staticCreds) > 0 && oauthCred != nil {
+		return resolveStaticCredentialsByService(ctx, deps, userID, staticCreds)
+	}
 	return resolveStaticCredentials(ctx, deps, userID, actionType)
+}
+
+// resolveStaticCredentialsByService fetches and decrypts credentials for
+// specific services. Used by the multi-credential fallback path to avoid
+// fetching credentials for OAuth services that have no static credentials.
+func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID string, creds []db.RequiredCredential) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+	credMap := make(map[string]string)
+	for _, rc := range creds {
+		if deps.Vault == nil {
+			return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", rc.Service)
+		}
+		decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, rc.Service, nil)
+		if err != nil {
+			var credErr *db.CredentialError
+			if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
+				return zero, &connectors.ValidationError{
+					Message: fmt.Sprintf("no credentials stored for service %q", rc.Service),
+				}
+			}
+			return zero, fmt.Errorf("decrypt credentials for service %q: %w", rc.Service, err)
+		}
+		for k, v := range decrypted {
+			switch vv := v.(type) {
+			case string:
+				credMap[k] = vv
+			default:
+				b, err := json.Marshal(v)
+				if err != nil {
+					return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, rc.Service, err)
+				}
+				credMap[k] = string(b)
+			}
+		}
+	}
+	return connectors.NewCredentials(credMap), nil
 }

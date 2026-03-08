@@ -229,13 +229,13 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
-				Service:       "trello",
+				Service:       "trello_oauth",
 				AuthType:      "oauth2",
 				OAuthProvider: "trello",
 				OAuthScopes:   []string{"read:me:trello", "read:board:trello", "write:board:trello"},
 			},
 			{
-				Service:         "trello_api_key",
+				Service:         "trello",
 				AuthType:        "api_key",
 				InstructionsURL: "https://developer.atlassian.com/cloud/trello/guides/rest-api/api-introduction/#authentication-and-authorization",
 			},

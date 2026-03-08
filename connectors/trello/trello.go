@@ -3,10 +3,12 @@
 // (no third-party SDK) to keep the dependency footprint minimal.
 //
 // Authentication supports two methods:
-//   - OAuth 2.0: Bearer token in the Authorization header (preferred).
-//   - API key: key + token as query parameters (legacy, still supported).
+//   - Atlassian OAuth 2.0 (3LO): Bearer token in the Authorization header (preferred).
+//     Trello is an Atlassian product, so OAuth goes through auth.atlassian.com,
+//     not Trello's legacy OAuth 1.0a endpoints.
+//   - API key + token: key and token as query parameters (still supported).
 //
-// OAuth takes precedence when both credential types are present.
+// The OAuth path takes precedence when both credential types are present.
 package trello
 
 import (

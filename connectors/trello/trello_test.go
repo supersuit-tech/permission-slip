@@ -173,11 +173,17 @@ func TestManifest(t *testing.T) {
 	if m.RequiredCredentials[0].AuthType != "oauth2" {
 		t.Errorf("expected first credential auth type 'oauth2', got %q", m.RequiredCredentials[0].AuthType)
 	}
+	if m.RequiredCredentials[0].Service != "trello_oauth" {
+		t.Errorf("expected first credential service 'trello_oauth', got %q", m.RequiredCredentials[0].Service)
+	}
 	if m.RequiredCredentials[0].OAuthProvider != "trello" {
 		t.Errorf("expected oauth_provider 'trello', got %q", m.RequiredCredentials[0].OAuthProvider)
 	}
 	if m.RequiredCredentials[1].AuthType != "api_key" {
 		t.Errorf("expected second credential auth type 'api_key', got %q", m.RequiredCredentials[1].AuthType)
+	}
+	if m.RequiredCredentials[1].Service != "trello" {
+		t.Errorf("expected second credential service 'trello' (preserves existing users' credentials), got %q", m.RequiredCredentials[1].Service)
 	}
 	if len(m.OAuthProviders) != 1 {
 		t.Errorf("expected 1 OAuth provider, got %d", len(m.OAuthProviders))
@@ -206,6 +212,15 @@ func TestManifest(t *testing.T) {
 		if riskMap[action] != "low" {
 			t.Errorf("expected %s risk=low, got %q", action, riskMap[action])
 		}
+	}
+}
+
+func TestManifest_PassesValidation(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+	if err := m.Validate(); err != nil {
+		t.Fatalf("manifest validation failed: %v", err)
 	}
 }
 
