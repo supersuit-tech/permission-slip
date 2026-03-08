@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"figma"`, `"github"`, `"google"`, `"linear"`, `"microsoft"`, `"netlify"`) and optionally `oauth_scopes`. Built-in providers (`figma`, `github`, `google`, `hubspot`, `intercom`, `kroger`, `linear`, `linkedin`, `meta`, `microsoft`, `netlify`, `salesforce`, `square`, `stripe`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"figma"`, `"github"`, `"google"`, `"linear"`, `"microsoft"`, `"netlify"`) and optionally `oauth_scopes`. The canonical list of built-in providers is the set of files in [`oauth/providers/`](../oauth/providers/) — each file registers one provider. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 A connector can support multiple auth methods by declaring more than one entry in `RequiredCredentials`. For example, the Netlify and Square connectors support both OAuth (recommended) and API key authentication. Use different `Service` names for each entry (e.g., `"netlify"` for OAuth, `"netlify-api-key"` for API key). The execution layer tries OAuth first and falls back to static credentials.
 
@@ -378,7 +378,7 @@ The connector's `ValidateCredentials` and action code should accept either crede
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `github`, `google`, `hubspot`, `kroger`, `linear`, `linkedin`, `meta`, `microsoft`, `netlify`, `notion`, `salesforce`, `square`, `stripe`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not already in [`oauth/providers/`](../oauth/providers/) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{
@@ -396,7 +396,9 @@ Requirements:
 - Provider IDs must be unique within the manifest and must be lowercase alphanumeric with hyphens/underscores (1-63 chars)
 - Any `oauth_provider` referenced in `required_credentials` must either be a built-in provider or declared in `oauth_providers`
 
-**How it works at runtime:** On startup, the platform builds an OAuth Provider Registry (`oauth.Registry`). Built-in providers (Google, Microsoft) are registered first with endpoints and default scopes. Then, providers declared in connector manifests are merged in. The registry uses a priority system (BYOA > Manifest > BuiltIn) so that user-provided "bring your own app" credentials overlay the platform's built-in configuration. When a BYOA user registers credentials for a provider, only their client ID and secret are required — endpoints and scopes are inherited from the built-in or manifest definition.
+**How it works at runtime:** On startup, the platform builds an OAuth Provider Registry (`oauth.Registry`). Built-in providers are registered via `init()` functions in the [`oauth/providers/`](../oauth/providers/) package (blank-imported by `main.go`), so adding a new built-in provider requires only a single new file there — no central list to update. Providers declared in connector manifests are merged in next. The registry uses a priority system (BYOA > Manifest > BuiltIn) so that user-provided "bring your own app" credentials overlay the platform's built-in configuration. When a BYOA user registers credentials for a provider, only their client ID and secret are required — endpoints and scopes are inherited from the built-in or manifest definition.
+
+**Adding a new built-in OAuth provider:** Create two files — `oauth/providers/<name>.go` and `connectors/providers/<name>.go` — following the templates in each package's `doc.go`. A test (`TestProviderRegistryConsistency`) will fail if the files are out of sync.
 
 #### Dual auth: OAuth + API key
 

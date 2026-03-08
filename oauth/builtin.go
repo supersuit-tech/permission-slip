@@ -49,10 +49,17 @@ func RegisterBuiltIn(factory func() Provider) {
 // read from environment variables at call time. This ensures .env files loaded
 // after package init (e.g. via godotenv in main) are reflected correctly.
 func BuiltInProviders() []Provider {
+	// Snapshot the factory slice while holding the lock, then invoke the
+	// factories without the lock. This avoids holding a mutex while calling
+	// external code, which could deadlock if a factory ever calls back into
+	// this package.
 	builtInMu.Lock()
-	defer builtInMu.Unlock()
-	out := make([]Provider, len(builtInFactories))
-	for i, f := range builtInFactories {
+	factories := make([]func() Provider, len(builtInFactories))
+	copy(factories, builtInFactories)
+	builtInMu.Unlock()
+
+	out := make([]Provider, len(factories))
+	for i, f := range factories {
 		out[i] = f()
 	}
 	return out
