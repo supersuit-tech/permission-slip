@@ -463,11 +463,12 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 		if err == nil {
 			return creds, nil
 		}
-		// If there's a static fallback, swallow the OAuth error and try that.
+		// If there's a static fallback, log and swallow the OAuth error.
 		// Otherwise, return the OAuth error as-is.
 		if !hasStaticCred {
 			return zero, err
 		}
+		log.Printf("[credential-resolution] OAuth failed for user %s action %s, falling back to static credentials: %v", userID, actionType, err)
 	}
 
 	// Fall back to static credentials (api_key, basic, custom).

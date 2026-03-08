@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -293,18 +294,19 @@ func (c *PagerDutyConnector) do(ctx context.Context, creds connectors.Credential
 	}
 
 	// Use OAuth access_token (Bearer) if available, otherwise fall back to API key.
+	// sanitizeHeaderValue strips CR/LF to prevent header injection via credential values.
 	if accessToken, ok := creds.Get("access_token"); ok && accessToken != "" {
-		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Authorization", "Bearer "+sanitizeHeaderValue(accessToken))
 	} else {
 		apiKey, _ := creds.Get("api_key")
-		req.Header.Set("Authorization", "Token token="+apiKey)
+		req.Header.Set("Authorization", "Token token="+sanitizeHeaderValue(apiKey))
 	}
 
 	// PagerDuty requires a From header with a valid user email for write
 	// operations. This provides an audit trail of who (or what agent)
 	// performed the action.
 	if email, ok := creds.Get("email"); ok && email != "" {
-		req.Header.Set("From", email)
+		req.Header.Set("From", sanitizeHeaderValue(email))
 	}
 
 	resp, err := c.client.Do(req)
@@ -331,4 +333,11 @@ func (c *PagerDutyConnector) do(ctx context.Context, creds connectors.Credential
 		}
 	}
 	return nil
+}
+
+// sanitizeHeaderValue strips CR and LF characters from a header value to
+// prevent HTTP header injection. Go's net/http already rejects such values
+// since 1.20, but this provides an additional layer of defense-in-depth.
+func sanitizeHeaderValue(v string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(v)
 }
