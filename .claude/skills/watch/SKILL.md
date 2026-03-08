@@ -2,7 +2,7 @@
 name: watch
 description: Poll a GitHub PR for new comments and PR reviews and act on them autonomously. Use when the user wants to monitor a PR for feedback and have Claude implement requested changes automatically.
 disable-model-invocation: true
-argument-hint: "<PR_URL>"
+argument-hint: "<PR_URL> [--automerge]"
 ---
 
 # Watch PR for Comments and Reviews
@@ -11,12 +11,16 @@ Poll a GitHub Pull Request for all comments (general and inline review comments)
 
 ## Setup
 
-Extract the PR number from the provided URL: `$ARGUMENTS`
+Parse the arguments from: `$ARGUMENTS`
+
+Extract the PR URL and any flags. The format is: `<PR_URL> [--automerge]`
 
 Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permission-slip/pull/123` → `123`).
 
 Set these variables for the session:
+- `PR_URL` — the PR URL extracted from the arguments
 - `PR_NUMBER` — the extracted PR number
+- `AUTO_MERGE` — `true` if `--automerge` was passed, `false` otherwise
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 
 ## Pre-Poll: Merge from Main
@@ -346,15 +350,31 @@ Fixed failing checks after watch session ended:
 - **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
 ```
 
-### 12. Trigger Webhook Notification
+### 12. Auto-Merge (if enabled)
 
-After all polling, wrap-up, and check fixes are complete, trigger the webhook workflow to notify that the watch session has finished:
+If `AUTO_MERGE` is `true` and **both** CI and audit workflows passed (`conclusion` is `success`), merge the PR:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml -f pr_url="$ARGUMENTS"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr merge ${PR_NUMBER} --squash --delete-branch
 ```
 
-`$ARGUMENTS` is the original PR URL passed to the `/watch` command. This fires the `trigger-webhook.yml` workflow in the `supersuit-tech/permission-slip` repo, which sends a webhook notification with the PR URL.
+If the merge fails (e.g., branch protection rules, required reviews not met), post a comment on the PR explaining why auto-merge could not complete:
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments" -f body="⚠️ **Auto-merge failed.** The \`--automerge\` flag was set, but the merge could not be completed. Reason: <error details>. Please merge manually."
+```
+
+If `AUTO_MERGE` is `false`, or if CI/audit failed, skip this step.
+
+### 13. Trigger Webhook Notification
+
+After all polling, wrap-up, check fixes, and optional auto-merge are complete, trigger the webhook workflow to notify that the watch session has finished:
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml -f pr_url="${PR_URL}"
+```
+
+`PR_URL` is the PR URL extracted from the arguments during Setup. This fires the `trigger-webhook.yml` workflow in the `supersuit-tech/permission-slip` repo, which sends a webhook notification with the PR URL.
 
 This step runs unconditionally — whether or not changes were made during the session.
 
