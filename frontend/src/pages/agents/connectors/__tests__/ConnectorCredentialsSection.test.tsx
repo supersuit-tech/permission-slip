@@ -80,7 +80,10 @@ describe("ConnectorCredentialsSection", () => {
 
   it("shows no credentials required message when empty", () => {
     renderWithProviders(
-      <ConnectorCredentialsSection requiredCredentials={[]} />,
+      <ConnectorCredentialsSection
+        connectorId="github"
+        requiredCredentials={[]}
+      />,
     );
     expect(
       screen.getByText("This connector does not require any credentials."),
@@ -91,6 +94,7 @@ describe("ConnectorCredentialsSection", () => {
     mockGet.mockReturnValue(new Promise(() => {}));
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -104,6 +108,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -120,6 +125,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -136,6 +142,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -163,6 +170,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -194,6 +202,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -223,6 +232,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
     );
@@ -253,6 +263,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="jira"
         requiredCredentials={[
           { service: "jira", auth_type: "basic" as const },
         ]}
@@ -274,6 +285,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={oauthCredentials}
       />,
     );
@@ -290,6 +302,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        connectorId="github"
         requiredCredentials={mixedCredentials}
       />,
     );

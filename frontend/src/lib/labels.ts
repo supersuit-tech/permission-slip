@@ -14,6 +14,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   microsoft: "Microsoft",
   netlify: "Netlify",
   salesforce: "Salesforce",
+  shopify: "Shopify",
   square: "Square",
   stripe: "Stripe",
   zoom: "Zoom",

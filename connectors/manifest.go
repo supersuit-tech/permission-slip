@@ -102,6 +102,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"microsoft":  true,
 	"netlify":    true,
 	"salesforce": true,
+	"shopify":    true,
 	"square":     true,
 	"stripe":     true,
 	"zoom":       true,
