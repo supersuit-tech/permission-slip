@@ -106,11 +106,27 @@ func (a *convertLeadAction) Execute(ctx context.Context, req connectors.ActionRe
 	}
 
 	result := map[string]any{
-		"lead_id":        resp.LeadID,
-		"account_id":     resp.AccountID,
-		"contact_id":     resp.ContactID,
-		"opportunity_id": resp.OpportunityID,
-		"success":        resp.Success,
+		"lead_id": resp.LeadID,
+		"success": resp.Success,
+	}
+	// Only include IDs that were actually created/used (non-empty).
+	if resp.AccountID != "" {
+		result["account_id"] = resp.AccountID
+		if u := recordURL(req.Credentials, resp.AccountID); u != "" {
+			result["account_url"] = u
+		}
+	}
+	if resp.ContactID != "" {
+		result["contact_id"] = resp.ContactID
+		if u := recordURL(req.Credentials, resp.ContactID); u != "" {
+			result["contact_url"] = u
+		}
+	}
+	if resp.OpportunityID != "" {
+		result["opportunity_id"] = resp.OpportunityID
+		if u := recordURL(req.Credentials, resp.OpportunityID); u != "" {
+			result["opportunity_url"] = u
+		}
 	}
 	return connectors.JSONResult(result)
 }

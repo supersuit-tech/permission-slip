@@ -77,6 +77,16 @@ func TestConvertLead_Success(t *testing.T) {
 	if data["success"] != true {
 		t.Errorf("expected success true, got %v", data["success"])
 	}
+	// Record URLs should be included for non-empty IDs.
+	if data["account_url"] != "https://myorg.salesforce.com/001xx0000001xyz" {
+		t.Errorf("expected account_url, got %v", data["account_url"])
+	}
+	if data["contact_url"] != "https://myorg.salesforce.com/003xx0000001xyz" {
+		t.Errorf("expected contact_url, got %v", data["contact_url"])
+	}
+	if data["opportunity_url"] != "https://myorg.salesforce.com/006xx0000001xyz" {
+		t.Errorf("expected opportunity_url, got %v", data["opportunity_url"])
+	}
 }
 
 func TestConvertLead_MissingLeadID(t *testing.T) {

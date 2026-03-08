@@ -22,6 +22,25 @@ import (
 // sfIDPattern matches Salesforce 15 or 18-character alphanumeric record IDs.
 var sfIDPattern = regexp.MustCompile(`^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$`)
 
+// sfDatePattern matches Salesforce date format: YYYY-MM-DD.
+var sfDatePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// validateDate checks that s is a valid YYYY-MM-DD date and that the date
+// itself is valid (e.g. not 2024-02-30). fieldName is used in error messages.
+func validateDate(s, fieldName string) error {
+	if !sfDatePattern.MatchString(s) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: expected YYYY-MM-DD format, got %q", fieldName, s),
+		}
+	}
+	if _, err := time.Parse("2006-01-02", s); err != nil {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: %q is not a valid date", fieldName, s),
+		}
+	}
+	return nil
+}
+
 const (
 	// apiVersion is the pinned Salesforce REST API version.
 	apiVersion = "v62.0"

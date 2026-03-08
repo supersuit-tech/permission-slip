@@ -33,6 +33,12 @@ func (p *createOpportunityParams) validate() error {
 	if p.CloseDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: close_date"}
 	}
+	if err := validateDate(p.CloseDate, "close_date"); err != nil {
+		return err
+	}
+	if p.Amount < 0 {
+		return &connectors.ValidationError{Message: "invalid amount: must be non-negative"}
+	}
 	if p.AccountID != "" {
 		if err := validateRecordID(p.AccountID, "account_id"); err != nil {
 			return err

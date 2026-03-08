@@ -133,3 +133,67 @@ func TestCreateOpportunity_InvalidAccountID(t *testing.T) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
+
+func TestCreateOpportunity_InvalidCloseDate(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createOpportunityAction{conn: conn}
+
+	tests := []struct {
+		name      string
+		closeDate string
+	}{
+		{"wrong format", "31/12/2026"},
+		{"invalid date", "2026-02-30"},
+		{"just year", "2026"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(map[string]any{
+				"name":       "Deal",
+				"stage_name": "Prospecting",
+				"close_date": tt.closeDate,
+			})
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "salesforce.create_opportunity",
+				Parameters:  params,
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatalf("expected error for invalid close_date %q", tt.closeDate)
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got: %T", err)
+			}
+		})
+	}
+}
+
+func TestCreateOpportunity_NegativeAmount(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createOpportunityAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"name":       "Deal",
+		"stage_name": "Prospecting",
+		"close_date": "2026-12-31",
+		"amount":     -100.0,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_opportunity",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for negative amount")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}

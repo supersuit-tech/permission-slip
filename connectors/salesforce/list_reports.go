@@ -2,8 +2,6 @@ package salesforce
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -24,14 +22,7 @@ type sfReportListItem struct {
 }
 
 func (a *listReportsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	// No parameters required
-	if len(req.Parameters) > 0 && string(req.Parameters) != "null" && string(req.Parameters) != "{}" {
-		var check map[string]any
-		if err := json.Unmarshal(req.Parameters, &check); err != nil {
-			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-		}
-	}
-
+	// No parameters required; ignore any provided.
 	baseURL, err := a.conn.apiBaseURL(req.Credentials)
 	if err != nil {
 		return nil, err

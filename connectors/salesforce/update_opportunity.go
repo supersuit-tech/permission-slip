@@ -34,6 +34,14 @@ func (p *updateOpportunityParams) validate() error {
 	if p.StageName == "" && p.Amount == nil && p.CloseDate == "" && p.Name == "" && p.Description == "" {
 		return &connectors.ValidationError{Message: "at least one field to update is required (stage_name, amount, close_date, name, or description)"}
 	}
+	if p.CloseDate != "" {
+		if err := validateDate(p.CloseDate, "close_date"); err != nil {
+			return err
+		}
+	}
+	if p.Amount != nil && *p.Amount < 0 {
+		return &connectors.ValidationError{Message: "invalid amount: must be non-negative"}
+	}
 	return nil
 }
 

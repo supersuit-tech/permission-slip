@@ -106,3 +106,28 @@ func TestCreateLead_MissingRequiredFields(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateLead_InvalidEmail(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createLeadAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"last_name": "Doe",
+		"company":   "Acme",
+		"email":     "not-an-email",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "salesforce.create_lead",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid email")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -33,6 +34,9 @@ func (p *createLeadParams) validate() error {
 	}
 	if p.Company == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: company"}
+	}
+	if p.Email != "" && !strings.Contains(p.Email, "@") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid email: %q does not appear to be a valid email address", p.Email)}
 	}
 	return nil
 }
