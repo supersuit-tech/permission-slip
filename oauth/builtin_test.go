@@ -73,6 +73,25 @@ func TestBuiltInProviders(t *testing.T) {
 			t.Error("expected default scopes")
 		}
 	})
+
+	t.Run("stripe", func(t *testing.T) {
+		s, ok := byID["stripe"]
+		if !ok {
+			t.Fatal("stripe provider not found")
+		}
+		if s.AuthorizeURL != "https://connect.stripe.com/oauth/authorize" {
+			t.Errorf("AuthorizeURL = %q", s.AuthorizeURL)
+		}
+		if s.TokenURL != "https://connect.stripe.com/oauth/token" {
+			t.Errorf("TokenURL = %q", s.TokenURL)
+		}
+		if s.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", s.Source, SourceBuiltIn)
+		}
+		if len(s.Scopes) != 1 || s.Scopes[0] != "read_write" {
+			t.Errorf("Scopes = %v, want [read_write]", s.Scopes)
+		}
+	})
 }
 
 func TestNewRegistryWithBuiltIns(t *testing.T) {
@@ -91,6 +110,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 	}
 	if _, ok := r.Get("microsoft"); !ok {
 		t.Error("microsoft not found in registry")
+	}
+	if _, ok := r.Get("stripe"); !ok {
+		t.Error("stripe not found in registry")
 	}
 }
 
