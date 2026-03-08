@@ -54,13 +54,19 @@ func (c *IntercomConnector) ID() string { return "intercom" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *IntercomConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"intercom.create_ticket":  &createTicketAction{conn: c},
-		"intercom.reply_ticket":   &replyTicketAction{conn: c},
-		"intercom.update_ticket":  &updateTicketAction{conn: c},
-		"intercom.assign_ticket":  &assignTicketAction{conn: c},
-		"intercom.search_tickets": &searchTicketsAction{conn: c},
-		"intercom.list_tags":      &listTagsAction{conn: c},
-		"intercom.tag_ticket":     &tagTicketAction{conn: c},
+		"intercom.create_ticket":      &createTicketAction{conn: c},
+		"intercom.reply_ticket":       &replyTicketAction{conn: c},
+		"intercom.update_ticket":      &updateTicketAction{conn: c},
+		"intercom.assign_ticket":      &assignTicketAction{conn: c},
+		"intercom.search_tickets":     &searchTicketsAction{conn: c},
+		"intercom.list_tags":          &listTagsAction{conn: c},
+		"intercom.tag_ticket":         &tagTicketAction{conn: c},
+		"intercom.create_contact":     &createContactAction{conn: c},
+		"intercom.update_contact":     &updateContactAction{conn: c},
+		"intercom.search_contacts":    &searchContactsAction{conn: c},
+		"intercom.send_message":       &sendMessageAction{conn: c},
+		"intercom.list_conversations": &listConversationsAction{conn: c},
+		"intercom.create_article":     &createArticleAction{conn: c},
 	}
 }
 

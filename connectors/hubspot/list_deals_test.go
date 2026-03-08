@@ -163,6 +163,29 @@ func TestListDeals_BetweenOperatorRejected(t *testing.T) {
 	}
 }
 
+func TestListDeals_MissingFilterValue(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &listDealsAction{conn: conn}
+
+	params, _ := json.Marshal(listDealsParams{
+		Filters: []searchFilter{{PropertyName: "dealstage", Operator: "EQ", Value: ""}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "hubspot.list_deals",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for missing filter value")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestListDeals_InvalidSortDirection(t *testing.T) {
 	t.Parallel()
 

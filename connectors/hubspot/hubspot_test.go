@@ -26,7 +26,11 @@ func TestHubSpotConnector_Actions(t *testing.T) {
 	expected := []string{
 		"hubspot.create_contact",
 		"hubspot.update_contact",
+		"hubspot.list_contacts",
+		"hubspot.get_contact",
+		"hubspot.delete_contact",
 		"hubspot.create_deal",
+		"hubspot.delete_deal",
 		"hubspot.create_ticket",
 		"hubspot.add_note",
 		"hubspot.search",
@@ -35,6 +39,9 @@ func TestHubSpotConnector_Actions(t *testing.T) {
 		"hubspot.enroll_in_workflow",
 		"hubspot.create_email_campaign",
 		"hubspot.get_analytics",
+		"hubspot.create_company",
+		"hubspot.update_company",
+		"hubspot.list_pipelines",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -153,8 +160,8 @@ func TestHubSpotConnector_Manifest(t *testing.T) {
 		t.Error("API key credential instructions_url is empty, want a URL")
 	}
 
-	if len(m.Actions) != 11 {
-		t.Fatalf("Manifest().Actions has %d items, want 11", len(m.Actions))
+	if len(m.Actions) != 18 {
+		t.Fatalf("Manifest().Actions has %d items, want 18", len(m.Actions))
 	}
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v", err)
