@@ -113,7 +113,9 @@ var BuiltInOAuthProviders = map[string]bool{
 	"stripe":     true,
 	"zoom":       true,
 	"pagerduty":  true,
+	"datadog":    true,
 	"calendly":   true,
+	"discord":    true,
 	"sendgrid":   true,
 }
 

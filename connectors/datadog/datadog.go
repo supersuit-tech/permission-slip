@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -25,6 +27,19 @@ const (
 	// massive time series data).
 	maxResponseBytes = 10 << 20 // 10 MB
 )
+
+// OAuthScopes are the OAuth2 scopes requested from Datadog's authorization
+// server. Defined here (not in oauth/builtin.go) so the manifest and the
+// built-in provider declaration reference the same list — a single source of
+// truth that prevents the two from drifting apart.
+var OAuthScopes = []string{
+	"metrics_read",
+	"incidents_read",
+	"incidents_write",
+	"monitors_read",
+	"monitors_write",
+	"workflows_run",
+}
 
 // siteBaseURLs maps Datadog site identifiers to their API base URLs.
 // Users in non-US1 regions must set the "site" credential to route
@@ -192,6 +207,12 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
+			{
+				Service:       "datadog_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "datadog",
+				OAuthScopes:   OAuthScopes,
+			},
 			{Service: "datadog", AuthType: "custom", InstructionsURL: "https://docs.datadoghq.com/account_management/api-app-keys/"},
 		},
 		Templates: []connectors.ManifestTemplate{
@@ -245,26 +266,53 @@ func (c *DatadogConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain the
-// required api_key and app_key for Datadog API calls. If a "site"
-// credential is provided, it must be a known Datadog site identifier.
+// ValidateCredentials checks that the provided credentials are sufficient for
+// Datadog API calls. Accepts either:
+//   - OAuth: access_token (from the datadog_oauth credential)
+//   - Custom: api_key + app_key (from the datadog credential)
+//
+// If a "site" credential is provided it must be a known Datadog site identifier
+// (applies to both auth methods since API calls are region-specific).
 func (c *DatadogConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+	if accessToken, ok := creds.Get("access_token"); ok && accessToken != "" {
+		// OAuth path — access_token is sufficient.
+		return c.validateSite(creds)
+	}
+	// Custom auth path — both api_key and app_key are required.
 	key, ok := creds.Get("api_key")
 	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token"}
 	}
 	appKey, ok := creds.Get("app_key")
 	if !ok || appKey == "" {
 		return &connectors.ValidationError{Message: "missing required credential: app_key"}
 	}
+	return c.validateSite(creds)
+}
+
+// validateSite checks the optional "site" credential when present.
+// The valid sites are derived from siteBaseURLs so the error message
+// never drifts from the supported set.
+func (c *DatadogConnector) validateSite(creds connectors.Credentials) error {
 	if site, ok := creds.Get("site"); ok && site != "" {
 		if _, known := siteBaseURLs[site]; !known {
 			return &connectors.ValidationError{
-				Message: fmt.Sprintf("unknown Datadog site %q — valid sites: datadoghq.com, us3.datadoghq.com, us5.datadoghq.com, datadoghq.eu, ap1.datadoghq.com, ddog-gov.com", site),
+				Message: fmt.Sprintf("unknown Datadog site %q — valid sites: %s", site, validSites()),
 			}
 		}
 	}
 	return nil
+}
+
+// validSites returns a sorted, comma-separated list of supported Datadog site
+// identifiers, derived from siteBaseURLs so it never drifts from the map.
+func validSites() string {
+	sites := make([]string, 0, len(siteBaseURLs))
+	for s := range siteBaseURLs {
+		sites = append(sites, s)
+	}
+	sort.Strings(sites)
+	return strings.Join(sites, ", ")
 }
 
 // baseURLForCreds returns the API base URL, respecting the optional "site"
@@ -299,10 +347,15 @@ func (c *DatadogConnector) do(ctx context.Context, creds connectors.Credentials,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	apiKey, _ := creds.Get("api_key")
-	appKey, _ := creds.Get("app_key")
-	req.Header.Set("DD-API-KEY", apiKey)
-	req.Header.Set("DD-APPLICATION-KEY", appKey)
+	// Prefer OAuth access_token (Bearer) over api_key + app_key headers.
+	if accessToken, ok := creds.Get("access_token"); ok && accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	} else {
+		apiKey, _ := creds.Get("api_key")
+		appKey, _ := creds.Get("app_key")
+		req.Header.Set("DD-API-KEY", apiKey)
+		req.Header.Set("DD-APPLICATION-KEY", appKey)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {

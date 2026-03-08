@@ -99,6 +99,42 @@ func TestDiscordConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
+func TestDiscordConnector_ManifestCredentials(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	if len(m.RequiredCredentials) != 1 {
+		t.Fatalf("expected 1 required credential, got %d", len(m.RequiredCredentials))
+	}
+
+	cred := m.RequiredCredentials[0]
+	if cred.Service != "discord" {
+		t.Errorf("credential service = %q, want %q", cred.Service, "discord")
+	}
+	if cred.AuthType != "custom" {
+		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "custom")
+	}
+}
+
+func TestDiscordOAuthScopes(t *testing.T) {
+	t.Parallel()
+	if len(OAuthScopes) == 0 {
+		t.Error("OAuthScopes should not be empty")
+	}
+	// Verify expected scopes are present.
+	scopes := make(map[string]bool, len(OAuthScopes))
+	for _, s := range OAuthScopes {
+		scopes[s] = true
+	}
+	if !scopes["bot"] {
+		t.Error("OAuthScopes should include 'bot'")
+	}
+	if !scopes["guilds"] {
+		t.Error("OAuthScopes should include 'guilds'")
+	}
+}
+
 func TestValidateSnowflake(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,7 @@ import { providerLabel } from "../labels";
 
 describe("providerLabel", () => {
   it("returns canonical label for known providers", () => {
+    expect(providerLabel("discord")).toBe("Discord");
     expect(providerLabel("google")).toBe("Google");
     expect(providerLabel("github")).toBe("GitHub");
     expect(providerLabel("linkedin")).toBe("LinkedIn");

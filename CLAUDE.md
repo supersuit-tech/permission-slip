@@ -36,6 +36,30 @@ Before presenting work as done, always perform these review passes:
 5. **Documentation:** update comments, README, docs as needed
 
 Do NOT mark a task complete until all passes are done. If any pass surfaces issues, fix them before presenting.
+
+## Minimizing Merge Conflicts
+
+This codebase is worked on in parallel by multiple agents and developers. Write code with that in mind:
+
+### File & Function Hygiene
+- **Keep files small and focused.** Large files are merge conflict magnets. If a file is growing, split it proactively — don't wait until it's a problem.
+- **Append, don't insert into the middle.** When adding new items to lists, maps, routes, constants, or config arrays, add them at the end rather than alphabetically or in the middle. This avoids conflicts when two branches both insert at the same position.
+- **One concern per file.** Two branches are unlikely to conflict if they're editing different files. Colocating unrelated logic in one file increases collision risk.
+
+### Structural Patterns
+- **Prefer new files over editing shared files.** When adding a new feature (route handler, component, hook, migration), create a new file and wire it in with a single-line import/registration — rather than inlining everything into an existing file.
+- **Use index/registry files for wiring.** If multiple branches need to register routes, components, or middleware, a simple registry pattern (e.g., an array of imports) keeps each addition to a single line, reducing overlap.
+- **Avoid reformatting or reordering existing code.** Don't rearrange imports, reorder functions, or reformat code you didn't change. These cosmetic diffs touch many lines and create unnecessary conflicts with other branches.
+
+### Data & Schema
+- **Migrations are inherently conflict-prone.** Keep each migration small and scoped to one concern. Never combine unrelated schema changes in a single migration file.
+- **Seed data additions should be append-only.** Add new seed entries at the end of insert blocks rather than interleaving with existing data.
+
+### General Practices
+- **Keep diffs minimal.** Only touch lines directly related to your task. Resist the urge to fix nearby style issues, rename unrelated variables, or "clean up while you're in there" — save those for a dedicated cleanup PR.
+- **Avoid touching shared configuration files unnecessarily.** Files like `package.json`, `go.mod`, `tsconfig.json`, and CI configs are edited by almost every branch. Only modify them when your task genuinely requires it.
+- **When you must edit a hot file, make surgical changes.** If you need to add a route to a central router or a column to a shared type, add it in as few lines as possible and avoid reformatting surrounding code.
+
 ## Testing
 
 Always run relevant tests after making changes, before committing. Before pushing, run `make build` to catch TypeScript compilation errors that tests alone may miss (e.g. unused variables, missing interface fields).
