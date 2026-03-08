@@ -464,3 +464,42 @@ func TestParseManifest_TemplateValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestManifestValidation_ReservedAuthorizeParams(t *testing.T) {
+	t.Parallel()
+
+	// Base manifest with a valid OAuth provider. The %s placeholder is for
+	// authorize_params JSON.
+	base := `{
+		"id": "test",
+		"name": "Test",
+		"actions": [{"action_type": "test.do", "name": "Do", "risk_level": "low"}],
+		"required_credentials": [
+			{"service": "test_oauth", "auth_type": "oauth2", "oauth_provider": "test"}
+		],
+		"oauth_providers": [{
+			"id": "test",
+			"authorize_url": "https://auth.example.com/authorize",
+			"token_url": "https://auth.example.com/token",
+			"authorize_params": {%s}
+		}]
+	}`
+
+	t.Run("valid_params_accepted", func(t *testing.T) {
+		input := fmt.Sprintf(base, `"audience": "api.example.com", "prompt": "consent"`)
+		_, err := ParseManifest([]byte(input))
+		if err != nil {
+			t.Fatalf("expected valid params to be accepted, got: %v", err)
+		}
+	})
+
+	for _, reserved := range []string{"redirect_uri", "state", "client_id", "client_secret", "response_type", "code", "grant_type"} {
+		t.Run("rejects_"+reserved, func(t *testing.T) {
+			input := fmt.Sprintf(base, fmt.Sprintf(`"%s": "evil-value"`, reserved))
+			_, err := ParseManifest([]byte(input))
+			if err == nil {
+				t.Errorf("expected error for reserved param %q, got nil", reserved)
+			}
+		})
+	}
+}
