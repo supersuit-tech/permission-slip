@@ -32,50 +32,6 @@ If the merge produces conflicts, follow the same conflict resolution procedure d
 
 CI is manual-only (`workflow_dispatch`), so there are no check runs to inspect at this point. CI will be triggered once at the end of the watch session (see Post-Poll step 11).
 
-## Pre-Poll: Process PR Body Checklist
-
-Before entering the polling loop, fetch the PR body and look for unchecked checklist items that Claude Code can address.
-
-### Fetch the PR body
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body'
-```
-
-### Identify unchecked items
-
-Parse the PR body for unchecked checklist items (`- [ ]`). These may appear under any heading, but pay special attention to items under headings like `### Claude Code`, `### Automated`, or similar sections that indicate tasks meant for Claude Code.
-
-**Skip** items that are clearly meant for humans or for OpenClaw (e.g., items under `### OpenClaw`, `### Manual`, or items that require human judgment like "get stakeholder sign-off", "manually verify in production", "design review").
-
-### Act on each item
-
-For each unchecked item that Claude Code can address:
-
-1. **Read and understand** the checklist item.
-2. **Implement** the requested change — this might be adding tests, fixing lint issues, updating documentation, running checks, adding error handling, etc.
-3. **Run relevant tests** to verify the change doesn't break anything.
-4. **Commit** with a clear message referencing the checklist item.
-5. **Check off the item** in the PR body by updating it via the API:
-
-```bash
-# Fetch current body, update the checkbox, and PATCH it back
-CURRENT_BODY=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body')
-# Replace the specific "- [ ] <item text>" with "- [x] <item text>"
-UPDATED_BODY=$(echo "$CURRENT_BODY" | sed 's/- \[ \] <exact item text>/- [x] <exact item text>/')
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" -X PATCH -f body="$UPDATED_BODY"
-```
-
-**Important:** Update the PR body after each item (not in batch) to avoid race conditions if the PR body is edited concurrently.
-
-### Push changes
-
-After processing all actionable checklist items, push commits:
-
-```bash
-git push -u origin <current-branch>
-```
-
 ## Polling Loop
 
 Poll every **60 seconds**. On each poll cycle:
@@ -210,13 +166,39 @@ For anything you **considered but chose not to do**, or **had questions about**,
 
 ### 7. Process PR Body Checklist
 
-On each poll cycle, re-fetch the PR body and check for any new unchecked items (the PR author or reviewers may add new checklist items between cycles).
+On each poll cycle, fetch the PR body and check for unchecked checklist items that Claude Code can address.
 
-Follow the same procedure as the Pre-Poll checklist processing:
-1. Fetch the current PR body.
-2. Identify unchecked items (`- [ ]`) that Claude Code can address.
-3. Skip items meant for humans or OpenClaw.
-4. Implement each actionable item, run tests, commit, and check it off in the PR body.
+#### Fetch the PR body
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body'
+```
+
+#### Identify unchecked items
+
+Parse the PR body for unchecked checklist items (`- [ ]`). These may appear under any heading, but pay special attention to items under headings like `### Claude Code`, `### Automated`, or similar sections that indicate tasks meant for Claude Code.
+
+**Skip** items that are clearly meant for humans or for OpenClaw (e.g., items under `### OpenClaw`, `### Manual`, or items that require human judgment like "get stakeholder sign-off", "manually verify in production", "design review").
+
+#### Act on each item
+
+For each unchecked item that Claude Code can address:
+
+1. **Read and understand** the checklist item.
+2. **Implement** the requested change — this might be adding tests, fixing lint issues, updating documentation, running checks, adding error handling, etc.
+3. **Run relevant tests** to verify the change doesn't break anything.
+4. **Commit** with a clear message referencing the checklist item.
+5. **Check off the item** in the PR body by updating it via the API:
+
+```bash
+# Fetch current body, update the checkbox, and PATCH it back
+CURRENT_BODY=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body')
+# Replace the specific "- [ ] <item text>" with "- [x] <item text>"
+UPDATED_BODY=$(echo "$CURRENT_BODY" | sed 's/- \[ \] <exact item text>/- [x] <exact item text>/')
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" -X PATCH -f body="$UPDATED_BODY"
+```
+
+**Important:** Update the PR body after each item (not in batch) to avoid race conditions if the PR body is edited concurrently.
 
 If new checklist items were processed, reset the idle counter to 0.
 
