@@ -21,19 +21,24 @@ func TestValidateCredentials_Valid(t *testing.T) {
 
 	conn := New()
 	tests := []struct {
-		name string
-		key  string
+		name  string
+		creds connectors.Credentials
 	}{
-		{"live key", "sk_live_abc123"},
-		{"test key", "sk_test_abc123"},
-		{"restricted live key", "rk_live_abc123"},
-		{"restricted test key", "rk_test_abc123"},
+		{"api_key live", connectors.NewCredentials(map[string]string{"api_key": "sk_live_abc123"})},
+		{"api_key test", connectors.NewCredentials(map[string]string{"api_key": "sk_test_abc123"})},
+		{"api_key restricted live", connectors.NewCredentials(map[string]string{"api_key": "rk_live_abc123"})},
+		{"api_key restricted test", connectors.NewCredentials(map[string]string{"api_key": "rk_test_abc123"})},
+		{"access_token live", connectors.NewCredentials(map[string]string{"access_token": "sk_live_oauth123"})},
+		{"access_token test", connectors.NewCredentials(map[string]string{"access_token": "sk_test_oauth123"})},
+		{"access_token preferred over api_key", connectors.NewCredentials(map[string]string{
+			"access_token": "sk_live_oauth",
+			"api_key":      "sk_live_static",
+		})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			creds := connectors.NewCredentials(map[string]string{"api_key": tt.key})
-			if err := conn.ValidateCredentials(t.Context(), creds); err != nil {
+			if err := conn.ValidateCredentials(t.Context(), tt.creds); err != nil {
 				t.Errorf("ValidateCredentials() unexpected error: %v", err)
 			}
 		})
@@ -49,8 +54,10 @@ func TestValidateCredentials_Invalid(t *testing.T) {
 		creds connectors.Credentials
 	}{
 		{"missing key", connectors.NewCredentials(map[string]string{})},
-		{"empty key", connectors.NewCredentials(map[string]string{"api_key": ""})},
-		{"bad prefix", connectors.NewCredentials(map[string]string{"api_key": "pk_test_abc123"})},
+		{"empty api_key", connectors.NewCredentials(map[string]string{"api_key": ""})},
+		{"empty access_token", connectors.NewCredentials(map[string]string{"access_token": ""})},
+		{"bad prefix api_key", connectors.NewCredentials(map[string]string{"api_key": "pk_test_abc123"})},
+		{"bad prefix access_token", connectors.NewCredentials(map[string]string{"access_token": "pk_live_abc123"})},
 		{"wrong cred name", connectors.NewCredentials(map[string]string{"token": "sk_test_abc123"})},
 	}
 	for _, tt := range tests {
@@ -643,6 +650,52 @@ func TestDo_MissingCredentials(t *testing.T) {
 	}
 }
 
+func TestDo_UsesAccessTokenWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the OAuth access_token is used, not the api_key.
+		if got := r.Header.Get("Authorization"); got != "Bearer sk_test_oauth" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer sk_test_oauth")
+		}
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]string{"id": "ok"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token": "sk_test_oauth",
+		"api_key":      "sk_test_static",
+	})
+	var resp map[string]string
+	err := conn.do(t.Context(), creds, http.MethodGet, "/v1/balance", nil, &resp, "")
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
+func TestDo_FallsBackToAPIKey(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer sk_test_abc123" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer sk_test_abc123")
+		}
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(map[string]string{"id": "ok"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	creds := connectors.NewCredentials(map[string]string{"api_key": "sk_test_abc123"})
+	var resp map[string]string
+	err := conn.do(t.Context(), creds, http.MethodGet, "/v1/balance", nil, &resp, "")
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // doGet / doPost convenience methods
 // ---------------------------------------------------------------------------
@@ -888,11 +941,19 @@ func TestManifest_Valid(t *testing.T) {
 	if len(m.Actions) != 11 {
 		t.Errorf("Manifest().Actions has %d entries, want 11", len(m.Actions))
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Errorf("Manifest().RequiredCredentials has %d entries, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Errorf("Manifest().RequiredCredentials has %d entries, want 2", len(m.RequiredCredentials))
 	}
-	if m.RequiredCredentials[0].AuthType != "api_key" {
-		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "api_key")
+	// OAuth should be first (default/primary auth method).
+	if m.RequiredCredentials[0].AuthType != "oauth2" {
+		t.Errorf("RequiredCredentials[0].AuthType = %q, want %q", m.RequiredCredentials[0].AuthType, "oauth2")
+	}
+	if m.RequiredCredentials[0].OAuthProvider != "stripe" {
+		t.Errorf("RequiredCredentials[0].OAuthProvider = %q, want %q", m.RequiredCredentials[0].OAuthProvider, "stripe")
+	}
+	// API key should be second (alternative auth method).
+	if m.RequiredCredentials[1].AuthType != "api_key" {
+		t.Errorf("RequiredCredentials[1].AuthType = %q, want %q", m.RequiredCredentials[1].AuthType, "api_key")
 	}
 	if len(m.Templates) != 16 {
 		t.Errorf("Manifest().Templates has %d entries, want 16", len(m.Templates))

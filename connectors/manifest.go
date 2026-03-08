@@ -93,12 +93,15 @@ var validAuthTypes = map[string]bool{
 // natively. Connectors referencing these providers don't need to declare them
 // in their oauth_providers section. Add new built-in providers here.
 var BuiltInOAuthProviders = map[string]bool{
+	"github":     true,
 	"google":     true,
+	"hubspot":    true,
 	"kroger":     true,
 	"linkedin":   true,
 	"meta":       true,
 	"microsoft":  true,
 	"salesforce": true,
+	"stripe":     true,
 	"zoom":       true,
 }
 
