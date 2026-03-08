@@ -12,18 +12,19 @@ interface NavItem {
   path: string;
   icon?: LucideIcon;
   badge?: number;
+  disabled?: boolean;
 }
 
 function buildNavItems(pendingCount: number): NavItem[] {
   return [
     { label: "Dashboard", path: "/", icon: LayoutDashboard, badge: pendingCount },
     { label: "Activity", path: "/activity", icon: Activity },
+    { label: "Users", path: "/users", disabled: true },
+    { label: "Roles", path: "/roles", disabled: true },
     { label: "Billing", path: "/billing", icon: CreditCard },
     { label: "Settings", path: "/settings" },
   ];
 }
-
-const placeholderItems = ["Users", "Roles"];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
@@ -45,6 +46,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </Link>
         <ul className="hidden list-none gap-6 md:flex">
           {navItems.map((item) => {
+            if (item.disabled) {
+              return (
+                <li key={item.path} className="font-medium text-muted-foreground">
+                  {item.label}
+                </li>
+              );
+            }
             const isActive = pathname === item.path;
             return (
               <li
@@ -67,11 +75,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </li>
             );
           })}
-          {placeholderItems.map((label) => (
-            <li key={label} className="font-medium text-muted-foreground">
-              {label}
-            </li>
-          ))}
         </ul>
         <div className="ml-auto">
           <UserMenu />
@@ -88,7 +91,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <nav className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-sm md:hidden">
         <div className="mx-auto flex max-w-md items-center justify-around px-4 py-2">
           {navItems
-            .filter((item) => item.icon)
+            .filter((item) => item.icon && !item.disabled)
             .map((item) => {
               const isActive = pathname === item.path;
               const Icon = item.icon!;
