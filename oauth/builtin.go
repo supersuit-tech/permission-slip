@@ -94,6 +94,25 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "hubspot",
+			AuthorizeURL: "https://app.hubspot.com/oauth/authorize",
+			TokenURL:     "https://api.hubapi.com/oauth/v1/token",
+			Scopes: []string{
+				"crm.objects.contacts.read",
+				"crm.objects.contacts.write",
+				"crm.objects.deals.read",
+				"crm.objects.deals.write",
+				"crm.objects.companies.read",
+				"tickets",
+				"automation",
+				"content",
+				"analytics.read",
+			},
+			ClientID:     os.Getenv("HUBSPOT_CLIENT_ID"),
+			ClientSecret: os.Getenv("HUBSPOT_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "kroger",
 			AuthorizeURL: "https://api.kroger.com/v1/connect/oauth2/authorize",
 			TokenURL:     "https://api.kroger.com/v1/connect/oauth2/token",
@@ -134,8 +153,8 @@ func NewRegistryWithBuiltIns() *Registry {
 
 // RegisterFromManifest registers providers declared in a connector manifest's
 // oauth_providers section. These are external providers that the platform
-// doesn't have built-in support for (e.g. HubSpot). They are
-// registered without client credentials — users must supply those via BYOA.
+// doesn't have built-in support for. They are registered without client
+// credentials — users must supply those via BYOA.
 // Returns an error if any provider fails validation.
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {
