@@ -111,7 +111,7 @@ export default function OnboardingPage() {
           />
           <Label
             htmlFor="marketing-opt-in"
-            className="text-sm font-normal leading-snug text-muted-foreground"
+            className="text-sm font-normal leading-snug"
           >
             Keep me in the loop — Get occasional emails about new features,
             platform updates, and tips to get more out of Permission Slip.
