@@ -81,6 +81,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `STRIPE_CLIENT_ID` | OAuth client ID from Stripe Connect settings (starts with `ca_`) |
 | `STRIPE_CLIENT_SECRET` | Stripe secret key used as the client secret for the OAuth token exchange |
 
+### DocuSign OAuth
+
+| Variable | Description |
+|---|---|
+| `DOCUSIGN_CLIENT_ID` | Integration key from [DocuSign Apps & Keys](https://admindemo.docusign.com/apps-and-keys) |
+| `DOCUSIGN_CLIENT_SECRET` | Secret key from DocuSign Apps & Keys |
+
 ### OAuth Infrastructure
 
 | Variable | Description | Default |
@@ -454,6 +461,48 @@ When a user connects their Stripe account:
 
 The Stripe connector also supports manual API key entry as a fallback for users who prefer not to use OAuth.
 
+## DocuSign OAuth Setup
+
+DocuSign OAuth uses the authorization code grant flow, which is the standard approach for user-facing integrations. After connecting, the platform automatically fetches the user's default account ID and API base URL from DocuSign's userinfo endpoint so the connector can make API calls without manual configuration.
+
+> **Note:** DocuSign also supports RSA key / JWT grant (service-to-service) auth. Users who prefer that approach can configure it manually in the connector's credentials section instead.
+
+### 1. Create a DocuSign Integration
+
+1. Log in to [DocuSign Apps & Keys](https://admindemo.docusign.com/apps-and-keys) (use the [production apps page](https://app.docusign.com/integrations/apps-and-keys) for production deployments)
+2. Click **Add App and Integration Key**
+3. Give it a name (e.g., "Permission Slip")
+4. Under **Authentication**, select **Authorization Code Grant**
+5. Under **Redirect URIs**, add:
+   ```
+   https://your-domain.com/api/v1/oauth/docusign/callback
+   ```
+6. Copy the **Integration Key** (this is your Client ID) and generate a **Secret Key** (Client Secret)
+
+### 2. Required Scopes
+
+The DocuSign connector requests the `signature` scope, which covers all eSignature API operations (creating envelopes, sending for signature, checking status, downloading signed documents).
+
+### 3. Configure Environment
+
+```bash
+DOCUSIGN_CLIENT_ID=your-integration-key
+DOCUSIGN_CLIENT_SECRET=your-secret-key
+```
+
+### 4. Account Info Enrichment
+
+Unlike most OAuth providers, DocuSign does not include the user's account ID or API base URL in the access token. After the token exchange, the platform automatically calls DocuSign's userinfo endpoint (`account.docusign.com/oauth/userinfo`) to fetch the user's default account and stores:
+
+- `account_id` — required for all API calls
+- `base_url` — the regional API endpoint (e.g., `https://na2.docusign.net/restapi/v2.1`)
+
+This happens transparently during the OAuth callback. If the userinfo fetch fails, the connection attempt fails cleanly rather than storing a broken connection.
+
+### 5. Production vs. Sandbox
+
+DocuSign's demo environment (used by default) and production environment use the same OAuth endpoints (`account.docusign.com`). When users connect in production, their `base_url` is automatically set to the correct production API URL based on their account region. No additional configuration is needed.
+
 ## X (Twitter) OAuth Setup
 
 The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
@@ -542,6 +591,7 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 ### Redirect URI mismatch
 
 Ensure the redirect URI in your OAuth app matches exactly:
+- DocuSign: `https://your-domain.com/api/v1/oauth/docusign/callback`
 - Figma: `https://your-domain.com/api/v1/oauth/figma/callback`
 - GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`

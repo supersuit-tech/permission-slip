@@ -2,7 +2,23 @@
 
 E-signature integration using the [DocuSign eSignature REST API v2.1](https://developers.docusign.com/docs/esign-rest-api/).
 
-## Credentials
+## Authentication
+
+The connector supports two authentication methods:
+
+### OAuth 2.0 (Recommended)
+
+Connect via **Settings → Connected Accounts → DocuSign**. The platform handles the full OAuth authorization code flow:
+
+1. User clicks **Connect** and authorizes the app on DocuSign's consent screen
+2. After authorization, the platform calls DocuSign's userinfo endpoint to retrieve the user's default account ID and regional API base URL
+3. All three values (`access_token`, `account_id`, `base_url`) are stored securely and used automatically — no manual credential entry required
+
+**Requires:** `DOCUSIGN_CLIENT_ID` and `DOCUSIGN_CLIENT_SECRET` environment variables. See [DocuSign OAuth Setup](../../docs/oauth-setup.md#docusign-oauth-setup) for instructions.
+
+### RSA Key / Custom Auth
+
+For service-to-service integrations or users who prefer manual setup, you can store credentials directly:
 
 | Key | Required | Description |
 |-----|----------|-------------|
