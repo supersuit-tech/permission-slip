@@ -26,6 +26,7 @@ import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
+  intercom: "Intercom",
   microsoft: "Microsoft",
   stripe: "Stripe",
   salesforce: "Salesforce",
@@ -37,6 +38,16 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 function providerLabel(id: string): string {
   return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+const AUTH_TYPE_LABELS: Record<string, string> = {
+  api_key: "API Key",
+  basic: "Username & Password",
+  custom: "Custom Credential",
+};
+
+function authTypeLabel(authType: string): string {
+  return AUTH_TYPE_LABELS[authType] ?? authType;
 }
 
 interface ConnectorCredentialsSectionProps {
@@ -87,25 +98,43 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred) =>
-              cred.auth_type === "oauth2" ? (
-                <OAuthCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  isConnected={connectedOAuthProviders.has(
-                    cred.oauth_provider ?? "",
+            {requiredCredentials.map((cred, idx) => {
+              const prevCred =
+                idx > 0 ? requiredCredentials[idx - 1] : undefined;
+              const showOrSeparator =
+                prevCred != null &&
+                prevCred.auth_type === "oauth2" &&
+                cred.auth_type !== "oauth2";
+
+              return (
+                <div key={cred.service}>
+                  {showOrSeparator && (
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="bg-border h-px flex-1" />
+                      <span className="text-muted-foreground text-xs font-medium uppercase">
+                        or
+                      </span>
+                      <div className="bg-border h-px flex-1" />
+                    </div>
                   )}
-                />
-              ) : (
-                <StaticCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  storedCredentials={
-                    storedByService.get(cred.service) ?? []
-                  }
-                />
-              ),
-            )}
+                  {cred.auth_type === "oauth2" ? (
+                    <OAuthCredentialRow
+                      requiredCredential={cred}
+                      isConnected={connectedOAuthProviders.has(
+                        cred.oauth_provider ?? "",
+                      )}
+                    />
+                  ) : (
+                    <StaticCredentialRow
+                      requiredCredential={cred}
+                      storedCredentials={
+                        storedByService.get(cred.service) ?? []
+                      }
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -165,7 +194,16 @@ function OAuthCredentialRow({
           >
             {isConnected ? "Connected" : "Not connected"}
           </span>
-          {!isConnected && (
+          {isConnected ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              asChild
+            >
+              <a href="/settings#connected-accounts">Manage</a>
+            </Button>
+          ) : (
             <Button variant="outline" size="sm" onClick={handleConnect}>
               <LogIn className="size-3" />
               Connect {providerLabel(provider)}
@@ -202,9 +240,11 @@ function StaticCredentialRow({
               <Circle className="text-muted-foreground size-5 shrink-0" />
             )}
             <div>
-              <p className="text-sm font-medium">{requiredCredential.service}</p>
+              <p className="text-sm font-medium">
+                {authTypeLabel(requiredCredential.auth_type)}
+              </p>
               <p className="text-muted-foreground text-xs">
-                Auth type: {requiredCredential.auth_type}
+                {requiredCredential.service}
               </p>
               {requiredCredential.instructions_url && (
                 <a
