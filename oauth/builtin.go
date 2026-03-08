@@ -310,6 +310,17 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "docusign",
+			AuthorizeURL: "https://account.docusign.com/oauth/auth",
+			TokenURL:     "https://account.docusign.com/oauth/token",
+			Scopes: []string{
+				"signature",
+			},
+			ClientID:     os.Getenv("DOCUSIGN_CLIENT_ID"),
+			ClientSecret: os.Getenv("DOCUSIGN_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "discord",
 			AuthorizeURL: "https://discord.com/oauth2/authorize",
 			TokenURL:     "https://discord.com/api/oauth2/token",

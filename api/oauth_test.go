@@ -1229,6 +1229,207 @@ func TestExtractTokenExtraData_NilStateExtra(t *testing.T) {
 	}
 }
 
+// docuSignTestServer creates a mock DocuSign userinfo server that requires a
+// specific bearer token and returns the provided accounts in the response.
+// The server records the received Authorization header so callers can assert on it.
+func docuSignTestServer(t *testing.T, token string, accounts []map[string]any) (*httptest.Server, *string) {
+	t.Helper()
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		if gotAuth != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"accounts": accounts})
+	}))
+	return srv, &gotAuth
+}
+
+func TestFetchDocuSignUserInfo_DefaultAccount(t *testing.T) {
+	t.Parallel()
+	server, gotAuth := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-non-default", "is_default": false, "base_uri": "https://na1.docusign.net"},
+		{"account_id": "acc-default-456", "is_default": true, "base_uri": "https://na2.docusign.net"},
+	})
+	defer server.Close()
+
+	got, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if *gotAuth != "Bearer test-token" {
+		t.Errorf("Authorization header = %q, want %q", *gotAuth, "Bearer test-token")
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got["account_id"] != "acc-default-456" {
+		t.Errorf("account_id = %q, want %q", got["account_id"], "acc-default-456")
+	}
+	wantBaseURL := "https://na2.docusign.net/restapi/v2.1"
+	if got["base_url"] != wantBaseURL {
+		t.Errorf("base_url = %q, want %q", got["base_url"], wantBaseURL)
+	}
+}
+
+func TestFetchDocuSignUserInfo_FallsBackToFirstAccount(t *testing.T) {
+	t.Parallel()
+	// No account is marked as default → should use the first one.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-first", "is_default": false, "base_uri": "https://na1.docusign.net"},
+		{"account_id": "acc-second", "is_default": false, "base_uri": "https://na2.docusign.net"},
+	})
+	defer server.Close()
+
+	got, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got["account_id"] != "acc-first" {
+		t.Errorf("account_id = %q, want %q", got["account_id"], "acc-first")
+	}
+}
+
+func TestFetchDocuSignUserInfo_NoAccounts(t *testing.T) {
+	t.Parallel()
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for empty accounts list")
+	}
+}
+
+func TestFetchDocuSignUserInfo_HTTPError(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for HTTP 500 response")
+	}
+}
+
+func TestFetchDocuSignUserInfo_InvalidToken(t *testing.T) {
+	t.Parallel()
+	// Wrong token → server returns 401, function should return an error.
+	server, _ := docuSignTestServer(t, "correct-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": "https://na1.docusign.net"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "wrong-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for wrong access token")
+	}
+}
+
+func TestFetchDocuSignUserInfo_InvalidBaseURI(t *testing.T) {
+	t.Parallel()
+	// base_uri doesn't end with .docusign.net — should be rejected for SSRF protection.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": "https://evil.example.com"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for non-DocuSign base_uri")
+	}
+}
+
+func TestFetchDocuSignUserInfo_EmptyAccountID(t *testing.T) {
+	t.Parallel()
+	// Account is present and marked default but account_id is an empty string.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "", "is_default": true, "base_uri": "https://na1.docusign.net"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error when account_id is empty string")
+	}
+}
+
+func TestFetchDocuSignUserInfo_EmptyBaseURI(t *testing.T) {
+	t.Parallel()
+	// Account is present and marked default but base_uri is an empty string.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": ""},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error when base_uri is empty string")
+	}
+}
+
+func TestFetchDocuSignUserInfo_HTTPBaseURI(t *testing.T) {
+	t.Parallel()
+	// base_uri uses HTTP instead of HTTPS — must be rejected to prevent
+	// credential exfiltration to a non-TLS endpoint.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": "http://na1.docusign.net"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for HTTP (non-HTTPS) base_uri")
+	}
+}
+
+func TestFetchDocuSignUserInfo_MalformedJSON(t *testing.T) {
+	t.Parallel()
+	// Server returns 200 but with invalid JSON — should not panic or silently succeed.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("not valid json {{"))
+	}))
+	defer srv.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "any-token", srv.URL)
+	if err == nil {
+		t.Fatal("expected error for malformed JSON response")
+	}
+}
+
+func TestPostOAuthEnrichers_ContainsDocuSign(t *testing.T) {
+	t.Parallel()
+	// Compile-time safety net: verify the "docusign" enricher is registered.
+	// If someone removes it from the map or misspells the key, this test
+	// catches the regression before it silently breaks the OAuth callback.
+	if _, ok := postOAuthEnrichers["docusign"]; !ok {
+		t.Fatal("postOAuthEnrichers is missing the required \"docusign\" entry")
+	}
+}
+
+func TestIsURLExtraKey(t *testing.T) {
+	t.Parallel()
+	// Only keys from tokenExtraKeys should be listed here. stateExtraData
+	// values (e.g. shop_domain, DocuSign's base_url) are validated at the
+	// call site before insertion and must NOT be added to isURLExtraKey.
+	cases := []struct {
+		key  string
+		want bool
+	}{
+		{"instance_url", true},
+		{"base_url", false},  // validated in fetchDocuSignUserInfo, not here
+		{"shop_domain", false},
+		{"account_id", false},
+	}
+	for _, tc := range cases {
+		if got := isURLExtraKey(tc.key); got != tc.want {
+			t.Errorf("isURLExtraKey(%q) = %v, want %v", tc.key, got, tc.want)
+		}
+	}
+}
+
 // ── Zendesk per-subdomain URL helpers ────────────────────────────────────────
 
 func TestValidateZendeskSubdomain(t *testing.T) {

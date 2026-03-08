@@ -98,6 +98,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"calendly":   true,
 	"datadog":    true,
 	"discord":    true,
+	"docusign":   true,
 	"figma":      true,
 	"github":     true,
 	"google":     true,

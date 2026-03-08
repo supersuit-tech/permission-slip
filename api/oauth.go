@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -569,6 +570,27 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			// Other per-instance providers: no extra_data needed beyond the token.
 		}
 
+		// Run the provider's post-exchange enricher (if any). Enrichers fetch
+		// supplemental data not included in the token response (e.g. account IDs,
+		// base URLs) and return it for storage in extra_data so connectors can
+		// access it at execution time. A returned error is treated as a hard
+		// failure: storing a connection without required credentials would leave
+		// the user with a "Connected" status that produces confusing errors on use.
+		if enricher, ok := postOAuthEnrichers[providerID]; ok {
+			extra, err := enricher(ctx, token.AccessToken)
+			if err != nil {
+				log.Printf("[%s] OAuthCallback: post-OAuth enrichment for %q failed: %v", TraceID(r.Context()), providerID, err)
+				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again")
+				return
+			}
+			if stateExtraData == nil {
+				stateExtraData = make(map[string]string)
+			}
+			for k, v := range extra {
+				stateExtraData[k] = v
+			}
+		}
+
 		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection")
@@ -713,8 +735,117 @@ func extractTokenExtraData(token *oauth2.Token, stateExtra map[string]string) js
 
 // isURLExtraKey returns true if the given extra data key is expected to contain
 // a URL value that should be validated before storage.
+// Only keys in tokenExtraKeys are ever passed to this function — stateExtraData
+// values (e.g. shop_domain, DocuSign's base_url) are validated at the call site
+// before being added to stateExtraData and must NOT be added here.
 func isURLExtraKey(key string) bool {
 	return key == "instance_url"
+}
+
+// postOAuthEnricher fetches supplemental data for a provider after a successful
+// token exchange. It receives a context (already deadline-constrained) and the
+// fresh access token, and returns key-value pairs to merge into extra_data.
+// Returning an error aborts the OAuth callback so the connection is not stored.
+//
+// Register enrichers in postOAuthEnrichers below. Any provider that requires
+// account IDs, base URLs, or other data not included in the token response
+// should have an enricher rather than inline logic in the callback handler.
+type postOAuthEnricher func(ctx context.Context, accessToken string) (map[string]string, error)
+
+// postOAuthEnrichers maps provider IDs to their post-exchange enrichers.
+// Add a new entry here when a provider needs supplemental data fetched after
+// the token exchange (see postOAuthEnricher above for the contract).
+var postOAuthEnrichers = map[string]postOAuthEnricher{
+	"docusign": func(ctx context.Context, accessToken string) (map[string]string, error) {
+		return fetchDocuSignUserInfo(ctx, accessToken, docuSignUserInfoURL)
+	},
+}
+
+// docuSignUserInfoURL is the endpoint used to retrieve the authenticated user's
+// account information after a successful OAuth token exchange.
+const docuSignUserInfoURL = "https://account.docusign.com/oauth/userinfo"
+
+// docuSignHTTPClient is the shared HTTP client used by fetchDocuSignUserInfo.
+// A package-level client is used to enable TCP connection reuse via the
+// default transport's connection pool, reducing latency on the userinfo call.
+var docuSignHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+// docuSignUserInfo is the subset of the DocuSign userinfo response we care about.
+type docuSignUserInfo struct {
+	Accounts []struct {
+		AccountID string `json:"account_id"`
+		IsDefault bool   `json:"is_default"`
+		BaseURI   string `json:"base_uri"`
+	} `json:"accounts"`
+}
+
+// fetchDocuSignUserInfo calls DocuSign's userinfo endpoint with the given access
+// token and returns extra credentials to store alongside the OAuth connection.
+// The returned map contains account_id and base_url for the user's default account
+// (falling back to the first account if none is marked as default).
+// Both values are required by the DocuSign connector at execution time.
+//
+// userInfoURL is normally docuSignUserInfoURL; tests pass a local httptest server
+// URL to avoid real network calls.
+func fetchDocuSignUserInfo(ctx context.Context, accessToken, userInfoURL string) (map[string]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, userInfoURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create userinfo request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := docuSignHTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("userinfo request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("userinfo returned HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return nil, fmt.Errorf("read userinfo response: %w", err)
+	}
+
+	var info docuSignUserInfo
+	if err := json.Unmarshal(body, &info); err != nil {
+		return nil, fmt.Errorf("parse userinfo response: %w", err)
+	}
+	if len(info.Accounts) == 0 {
+		return nil, fmt.Errorf("no accounts in DocuSign userinfo response")
+	}
+
+	// Prefer the default account; fall back to the first account.
+	account := info.Accounts[0]
+	for _, a := range info.Accounts {
+		if a.IsDefault {
+			account = a
+			break
+		}
+	}
+
+	if account.AccountID == "" {
+		return nil, fmt.Errorf("account_id missing in DocuSign userinfo response")
+	}
+	if account.BaseURI == "" {
+		return nil, fmt.Errorf("base_uri missing in DocuSign userinfo response")
+	}
+
+	// Validate that base_uri is a DocuSign HTTPS URL before storing it
+	// to prevent SSRF via a compromised or malicious userinfo response.
+	parsed, err := url.Parse(account.BaseURI)
+	if err != nil || parsed.Scheme != "https" || !strings.HasSuffix(strings.ToLower(parsed.Hostname()), ".docusign.net") {
+		return nil, fmt.Errorf("base_uri %q is not a valid DocuSign HTTPS URL", account.BaseURI)
+	}
+
+	return map[string]string{
+		"account_id": account.AccountID,
+		// Append the REST API path so the connector's base_url credential
+		// resolves to the correct versioned endpoint.
+		"base_url": strings.TrimRight(account.BaseURI, "/") + "/restapi/v2.1",
+	}, nil
 }
 
 // instanceFromExtraData extracts a human-readable instance identifier from an
