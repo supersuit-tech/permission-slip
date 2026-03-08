@@ -94,6 +94,17 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "github",
+			AuthorizeURL: "https://github.com/login/oauth/authorize",
+			TokenURL:     "https://github.com/login/oauth/access_token",
+			Scopes: []string{
+				"repo",
+			},
+			ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+			ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "hubspot",
 			AuthorizeURL: "https://app.hubspot.com/oauth/authorize",
 			TokenURL:     "https://api.hubapi.com/oauth/v1/token",
@@ -171,11 +182,12 @@ func NewRegistryWithBuiltIns() *Registry {
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {
 		if err := r.Register(Provider{
-			ID:           mp.ID,
-			AuthorizeURL: mp.AuthorizeURL,
-			TokenURL:     mp.TokenURL,
-			Scopes:       mp.Scopes,
-			Source:       SourceManifest,
+			ID:              mp.ID,
+			AuthorizeURL:    mp.AuthorizeURL,
+			TokenURL:        mp.TokenURL,
+			Scopes:          mp.Scopes,
+			AuthorizeParams: mp.AuthorizeParams,
+			Source:          SourceManifest,
 		}); err != nil {
 			return fmt.Errorf("registering manifest OAuth provider %q: %w", mp.ID, err)
 		}
@@ -186,8 +198,9 @@ func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 // ManifestProvider mirrors the OAuth provider declaration in a connector
 // manifest. This avoids a circular import between oauth/ and connectors/.
 type ManifestProvider struct {
-	ID           string
-	AuthorizeURL string
-	TokenURL     string
-	Scopes       []string
+	ID              string
+	AuthorizeURL    string
+	TokenURL        string
+	Scopes          []string
+	AuthorizeParams map[string]string
 }

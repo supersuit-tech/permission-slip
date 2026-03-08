@@ -14,42 +14,44 @@ import { ConnectorCredentialsSection } from "../ConnectorCredentialsSection";
 vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
-const requiredCredentials = [
-  { service: "github", auth_type: "api_key" as const },
+const apiKeyCredentials = [
+  { service: "github_pat", auth_type: "api_key" as const },
+];
+
+const oauthCredentials = [
+  {
+    service: "github",
+    auth_type: "oauth2" as const,
+    oauth_provider: "github",
+    oauth_scopes: ["repo"],
+  },
+];
+
+const mixedCredentials = [
+  {
+    service: "github",
+    auth_type: "oauth2" as const,
+    oauth_provider: "github",
+    oauth_scopes: ["repo"],
+  },
+  {
+    service: "github_pat",
+    auth_type: "api_key" as const,
+    instructions_url:
+      "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+  },
 ];
 
 const storedCredentials = {
   credentials: [
     {
       id: "cred_123",
-      service: "github",
+      service: "github_pat",
       label: "Personal Access Token",
       created_at: "2026-02-11T10:00:00Z",
     },
   ],
 };
-
-/** Set up mockGet to handle credentials, OAuth connections, and OAuth providers endpoints. */
-function setupMockGet(
-  credentialsResponse: unknown = { data: { credentials: [] } },
-  oauthConnectionsResponse: unknown = {
-    data: { connections: [] },
-  },
-  oauthProvidersResponse: unknown = {
-    data: { providers: [{ id: "linear", has_credentials: true }] },
-  },
-) {
-  mockGet.mockImplementation((url: string) => {
-    if (url === "/v1/oauth/connections") {
-      return Promise.resolve(oauthConnectionsResponse);
-    }
-    if (url === "/v1/oauth/providers") {
-      return Promise.resolve(oauthProvidersResponse);
-    }
-    // Default: credentials endpoint
-    return Promise.resolve(credentialsResponse);
-  });
-}
 
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
@@ -71,18 +73,18 @@ describe("ConnectorCredentialsSection", () => {
     mockGet.mockReturnValue(new Promise(() => {}));
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
     expect(screen.getByText("Credentials")).toBeInTheDocument();
   });
 
   it("shows connected status with stored credentials", async () => {
-    setupMockGet({ data: storedCredentials });
+    mockGet.mockResolvedValue({ data: storedCredentials });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -94,11 +96,11 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
-    setupMockGet();
+    mockGet.mockResolvedValue({ data: { credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -110,11 +112,11 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Add Credential dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet();
+    mockGet.mockResolvedValue({ data: { credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -130,18 +132,18 @@ describe("ConnectorCredentialsSection", () => {
 
   it("stores credential through Add dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet();
+    mockGet.mockResolvedValue({ data: { credentials: [] } });
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
-        service: "github",
+        service: "github_pat",
         created_at: "2026-02-20T10:00:00Z",
       },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -157,7 +159,7 @@ describe("ConnectorCredentialsSection", () => {
       expect(mockPost).toHaveBeenCalledWith("/v1/credentials", {
         headers: { Authorization: "Bearer token" },
         body: {
-          service: "github",
+          service: "github_pat",
           credentials: { api_key: "ghp_test_key" },
         },
       });
@@ -166,11 +168,11 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Remove Credential dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet({ data: storedCredentials });
+    mockGet.mockResolvedValue({ data: storedCredentials });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -190,14 +192,14 @@ describe("ConnectorCredentialsSection", () => {
 
   it("deletes credential through Remove dialog", async () => {
     const user = userEvent.setup();
-    setupMockGet({ data: storedCredentials });
+    mockGet.mockResolvedValue({ data: storedCredentials });
     mockDelete.mockResolvedValue({
       data: { id: "cred_123", deleted_at: "2026-02-20T10:00:00Z" },
     });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={requiredCredentials}
+        requiredCredentials={apiKeyCredentials}
       />,
     );
 
@@ -223,7 +225,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
-    setupMockGet();
+    mockGet.mockResolvedValue({ data: { credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -243,94 +245,40 @@ describe("ConnectorCredentialsSection", () => {
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
   });
 
-  it("shows OAuth credential row with connect button", async () => {
-    setupMockGet(
-      { data: { credentials: [] } },
-      { data: { connections: [] } },
-    );
+  it("shows OAuth connect button for oauth2 credential", async () => {
+    // Mock both endpoints: OAuth connections (no connections) and credentials
+    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={[
-          {
-            service: "linear_oauth",
-            auth_type: "oauth2" as const,
-            oauth_provider: "linear",
-            oauth_scopes: ["read", "write"],
-          },
-        ]}
+        requiredCredentials={oauthCredentials}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("OAuth")).toBeInTheDocument();
+      expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
     });
-    expect(screen.getByText("Not connected")).toBeInTheDocument();
-    expect(screen.getByText("Connect")).toBeInTheDocument();
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
   });
 
-  it("shows OAuth as recommended when both auth types available", async () => {
-    setupMockGet(
-      { data: { credentials: [] } },
-      { data: { connections: [] } },
-    );
+  it("shows both OAuth and API key options for mixed credentials", async () => {
+    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
 
     renderWithProviders(
       <ConnectorCredentialsSection
-        requiredCredentials={[
-          {
-            service: "linear_oauth",
-            auth_type: "oauth2" as const,
-            oauth_provider: "linear",
-            oauth_scopes: ["read", "write"],
-          },
-          {
-            service: "linear",
-            auth_type: "api_key" as const,
-            instructions_url: "https://linear.app/docs",
-          },
-        ]}
+        requiredCredentials={mixedCredentials}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Recommended")).toBeInTheDocument();
+      expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
     });
+    expect(screen.getByText("OAuth")).toBeInTheDocument();
     expect(screen.getByText("Alternative")).toBeInTheDocument();
-  });
-
-  it("shows connected status for active OAuth connection", async () => {
-    setupMockGet(
-      { data: { credentials: [] } },
-      {
-        data: {
-          connections: [
-            {
-              provider: "linear",
-              status: "active",
-              scopes: ["read", "write"],
-              connected_at: "2026-03-01T10:00:00Z",
-            },
-          ],
-        },
-      },
-    );
-
-    renderWithProviders(
-      <ConnectorCredentialsSection
-        requiredCredentials={[
-          {
-            service: "linear_oauth",
-            auth_type: "oauth2" as const,
-            oauth_provider: "linear",
-            oauth_scopes: ["read", "write"],
-          },
-        ]}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Connected")).toBeInTheDocument();
-    });
+    // Service name should be human-readable, not raw ID
+    expect(
+      screen.getByText("GitHub Personal Access Token"),
+    ).toBeInTheDocument();
   });
 });

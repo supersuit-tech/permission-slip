@@ -131,3 +131,70 @@ func TestGetRequiredCredentialByActionType_OAuth(t *testing.T) {
 		t.Errorf("unexpected scopes: %v", rc.OAuthScopes)
 	}
 }
+
+// ── GetRequiredCredentialsByActionType (multi-credential) ────────────────────
+
+func TestGetRequiredCredentialsByActionType_MultipleAuthMethods(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	testhelper.InsertConnector(t, tx, "trello")
+	testhelper.InsertConnectorAction(t, tx, "trello", "trello.create_card", "Create Card")
+	// Insert both OAuth and API key credentials for the same connector.
+	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, "trello", "trello_oauth", "trello", []string{"read:me:trello"})
+	testhelper.InsertConnectorRequiredCredential(t, tx, "trello", "trello", "api_key")
+
+	creds, err := db.GetRequiredCredentialsByActionType(context.Background(), tx, "trello.create_card")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(creds) != 2 {
+		t.Fatalf("expected 2 credentials, got %d", len(creds))
+	}
+	// OAuth should be first (ordering guarantee).
+	if creds[0].AuthType != "oauth2" {
+		t.Errorf("expected first credential to be oauth2, got %q", creds[0].AuthType)
+	}
+	if creds[0].Service != "trello_oauth" {
+		t.Errorf("expected first credential service 'trello_oauth', got %q", creds[0].Service)
+	}
+	if creds[1].AuthType != "api_key" {
+		t.Errorf("expected second credential to be api_key, got %q", creds[1].AuthType)
+	}
+	if creds[1].Service != "trello" {
+		t.Errorf("expected second credential service 'trello', got %q", creds[1].Service)
+	}
+}
+
+func TestGetRequiredCredentialsByActionType_SingleOAuth(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	testhelper.InsertConnector(t, tx, "msft")
+	testhelper.InsertConnectorAction(t, tx, "msft", "msft.send_email", "Send")
+	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, "msft", "msft", "microsoft", []string{"Mail.Send"})
+
+	creds, err := db.GetRequiredCredentialsByActionType(context.Background(), tx, "msft.send_email")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(creds) != 1 {
+		t.Fatalf("expected 1 credential, got %d", len(creds))
+	}
+	if creds[0].AuthType != "oauth2" {
+		t.Errorf("expected oauth2, got %q", creds[0].AuthType)
+	}
+}
+
+func TestGetRequiredCredentialsByActionType_NoResults(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	creds, err := db.GetRequiredCredentialsByActionType(context.Background(), tx, "nonexistent.action")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(creds) != 0 {
+		t.Errorf("expected 0 credentials for nonexistent action, got %d", len(creds))
+	}
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -9,15 +10,16 @@ import {
   Trash2,
   Unplug,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
@@ -27,6 +29,7 @@ import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
+import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
@@ -38,11 +41,11 @@ export function ConnectorCredentialsSection({
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
   const hasRequiredCredentials = requiredCredentials.length > 0;
-  const { credentials, isLoading, error } = useCredentials({
-    enabled: hasRequiredCredentials,
-  });
-
   const hasOAuth = requiredCredentials.some((c) => c.auth_type === "oauth2");
+  const hasStatic = requiredCredentials.some((c) => c.auth_type !== "oauth2");
+  const { credentials, isLoading, error } = useCredentials({
+    enabled: hasStatic,
+  });
   const { connections, isLoading: connectionsLoading } = useOAuthConnections({ enabled: hasOAuth });
   const { providers, isLoading: providersLoading } = useOAuthProviders({ enabled: hasOAuth });
 
@@ -67,6 +70,12 @@ export function ConnectorCredentialsSection({
     <Card>
       <CardHeader>
         <CardTitle>Credentials</CardTitle>
+        {hasOAuth && hasStatic && (
+          <CardDescription>
+            Connect via OAuth (recommended) or use an API key as an
+            alternative.
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent>
         {!hasRequiredCredentials ? (
@@ -145,7 +154,7 @@ function OAuthCredentialRow({
   const needsReauth = connection?.status === "needs_reauth";
 
   function handleConnect() {
-    if (!session?.access_token) return;
+    if (!session?.access_token || !providerId) return;
     window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
   }
 
@@ -166,15 +175,20 @@ function OAuthCredentialRow({
         <div className="flex items-center gap-3">
           {isConnected ? (
             <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : needsReauth ? (
+            <AlertTriangle className="text-destructive size-5 shrink-0" />
           ) : (
             <Circle className="text-muted-foreground size-5 shrink-0" />
           )}
           <div>
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium">
-                OAuth
+                {providerLabel(providerId)}
               </p>
               <Badge variant="secondary" className="text-xs">
+                OAuth
+              </Badge>
+              <Badge variant="outline" className="text-xs">
                 Recommended
               </Badge>
             </div>
@@ -195,7 +209,11 @@ function OAuthCredentialRow({
                 isProcessing={isDisconnecting}
                 onConfirm={handleDisconnect}
               >
-                <Button variant="ghost" size="icon" aria-label="Disconnect OAuth">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Disconnect ${providerLabel(providerId)}`}
+                >
                   <Unplug className="text-muted-foreground size-4" />
                 </Button>
               </InlineConfirmButton>
@@ -203,6 +221,7 @@ function OAuthCredentialRow({
           ) : needsReauth ? (
             <>
               <Badge variant="destructive" className="gap-1 text-xs">
+                <AlertTriangle className="size-3" />
                 Needs Re-auth
               </Badge>
               <Button variant="outline" size="sm" onClick={handleConnect}>
@@ -222,7 +241,7 @@ function OAuthCredentialRow({
                 disabled={!provider?.has_credentials}
               >
                 <LogIn className="size-3" />
-                Connect
+                Connect {providerLabel(providerId)}
               </Button>
             </>
           )}
@@ -266,7 +285,9 @@ function StaticCredentialRow({
             )}
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{requiredCredential.service}</p>
+                <p className="text-sm font-medium">
+                  {serviceLabel(requiredCredential.service)}
+                </p>
                 {isAlternative && (
                   <Badge variant="outline" className="text-xs">
                     Alternative
@@ -274,9 +295,7 @@ function StaticCredentialRow({
                 )}
               </div>
               <p className="text-muted-foreground text-xs">
-                {isAlternative
-                  ? "Use a private app access token instead of OAuth"
-                  : `Auth type: ${requiredCredential.auth_type}`}
+                {authTypeLabel(requiredCredential.auth_type)}
               </p>
               {requiredCredential.instructions_url && (
                 <a
@@ -324,8 +343,7 @@ function StaticCredentialRow({
                     {cred.label ?? cred.service}
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    Added{" "}
-                    {new Date(cred.created_at).toLocaleDateString()}
+                    Added {new Date(cred.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <Button
