@@ -85,12 +85,18 @@ func (c *SquareConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty access_token, which is required for all Square API calls.
+// non-empty access_token (from OAuth) or api_key (from manual entry),
+// which is required for all Square API calls.
 // Optionally validates the environment field if present.
 func (c *SquareConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	token, ok := creds.Get(credKeyAccessToken)
 	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: access_token"}
+		// Fall back to api_key — the AddCredentialDialog stores manual
+		// keys under this name rather than access_token.
+		token, ok = creds.Get("api_key")
+	}
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "missing required credential: access_token or api_key"}
 	}
 	if env, ok := creds.Get(credKeyEnvironment); ok && env != "" {
 		if env != "sandbox" && env != "production" {
@@ -165,6 +171,9 @@ func (c *SquareConnector) do(ctx context.Context, creds connectors.Credentials, 
 	}
 
 	token, ok := creds.Get(credKeyAccessToken)
+	if !ok || token == "" {
+		token, ok = creds.Get("api_key")
+	}
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
 	}

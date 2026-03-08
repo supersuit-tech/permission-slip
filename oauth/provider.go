@@ -54,6 +54,12 @@ type Provider struct {
 	// rules as ClientID.
 	ClientSecret string
 
+	// AuthorizeParams are extra query parameters appended to the authorization
+	// URL. Some providers require additional params beyond the standard OAuth 2.0
+	// set (e.g. Atlassian needs audience=api.atlassian.com for 3LO, Slack needs
+	// comma-separated scopes via a "scope" override).
+	AuthorizeParams map[string]string
+
 	// Source indicates where the provider configuration originated.
 	Source ProviderSource
 }
@@ -211,10 +217,10 @@ func (r *Registry) Register(p Provider) error {
 	if !ProviderIDPattern.MatchString(p.ID) {
 		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, ProviderIDPattern.String())
 	}
-
-	// Deep-copy the Scopes slice so the caller cannot mutate the registry's
+	// Deep-copy slices and maps so the caller cannot mutate the registry's
 	// stored data after registration.
 	p.Scopes = copyStrings(p.Scopes)
+	p.AuthorizeParams = copyStringMap(p.AuthorizeParams)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -244,6 +250,11 @@ func (r *Registry) Register(p Provider) error {
 			// Deep-copy the existing scopes so the merged provider owns its data.
 			merged.Scopes = copyStrings(existing.Scopes)
 		}
+		if len(p.AuthorizeParams) > 0 {
+			merged.AuthorizeParams = p.AuthorizeParams // Already deep-copied above.
+		} else {
+			merged.AuthorizeParams = copyStringMap(existing.AuthorizeParams)
+		}
 		r.providers[p.ID] = merged
 		return nil
 	}
@@ -261,6 +272,7 @@ func (r *Registry) Get(id string) (Provider, bool) {
 	p, ok := r.providers[id]
 	if ok {
 		p.Scopes = copyStrings(p.Scopes)
+		p.AuthorizeParams = copyStringMap(p.AuthorizeParams)
 	}
 	return p, ok
 }
@@ -274,6 +286,7 @@ func (r *Registry) List() []Provider {
 	out := make([]Provider, 0, len(r.providers))
 	for _, p := range r.providers {
 		p.Scopes = copyStrings(p.Scopes)
+		p.AuthorizeParams = copyStringMap(p.AuthorizeParams)
 		out = append(out, p)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -320,6 +333,19 @@ func copyStrings(s []string) []string {
 	}
 	cp := make([]string, len(s))
 	copy(cp, s)
+	return cp
+}
+
+// copyStringMap returns a deep copy of a string map. Returns nil if the input
+// is nil, preserving the distinction between nil and empty maps.
+func copyStringMap(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	cp := make(map[string]string, len(m))
+	for k, v := range m {
+		cp[k] = v
+	}
 	return cp
 }
 

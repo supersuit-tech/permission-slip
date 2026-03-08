@@ -16,6 +16,13 @@ func validCreds() connectors.Credentials {
 	})
 }
 
+// validOAuthCreds returns a Credentials value with an OAuth access token for tests.
+func validOAuthCreds() connectors.Credentials {
+	return connectors.NewCredentials(map[string]string{
+		"access_token": "ntn_test_token_123",
+	})
+}
+
 // notionErrorBody returns a JSON-encoded Notion error response for use in
 // httptest handlers.
 func notionErrorBody(status int, code, message string) []byte {

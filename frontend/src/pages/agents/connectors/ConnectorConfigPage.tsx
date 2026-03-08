@@ -114,6 +114,7 @@ export function ConnectorConfigPage() {
         error={configsError}
       />
       <ConnectorCredentialsSection
+        connectorId={connectorId}
         requiredCredentials={connector.required_credentials}
       />
       <DisableConnectorSection

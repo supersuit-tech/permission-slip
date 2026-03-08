@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -23,6 +23,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+/** Providers that require a shop subdomain for per-shop OAuth URLs. */
+const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
 
 function statusBadge(status: string) {
   switch (status) {
@@ -58,13 +71,20 @@ export function ConnectedAccountsSection() {
         );
         refetch();
       } else {
-        toast.error(
-          `Failed to connect ${oauthProvider ? providerLabel(oauthProvider) : "account"}. Please try again.`,
-        );
+        const oauthError = searchParams.get("oauth_error");
+        const label = oauthProvider
+          ? providerLabel(oauthProvider)
+          : "account";
+        const detail = oauthError
+          ? `Failed to connect ${label}: ${oauthError}`
+          : `Failed to connect ${label}. Please try again.`;
+        toast.error(detail);
       }
       // Remove query params without a full navigation
       searchParams.delete("oauth_status");
       searchParams.delete("oauth_provider");
+      searchParams.delete("oauth_error");
+      searchParams.delete("oauth_tab");
       setSearchParams(searchParams, { replace: true });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
@@ -80,10 +100,21 @@ export function ConnectedAccountsSection() {
     }
   }
 
+  const [shopDialogProvider, setShopDialogProvider] = useState<string | null>(
+    null,
+  );
+
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
+    if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
+      setShopDialogProvider(providerId);
+      return;
+    }
     // Open in same window — the callback redirects back to settings
-    window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+    );
   }
 
   // Providers that are ready to connect but don't have an active connection
@@ -193,6 +224,91 @@ export function ConnectedAccountsSection() {
           </div>
         )}
       </CardContent>
+
+      {shopDialogProvider && session?.access_token && (
+        <ShopDomainDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setShopDialogProvider(null);
+          }}
+          onSubmit={(shop) => {
+            if (!session?.access_token || !shopDialogProvider) return;
+            const url = getOAuthAuthorizeUrl(
+              shopDialogProvider,
+              session.access_token,
+            );
+            window.location.href = `${url}&shop=${encodeURIComponent(shop)}`;
+            setShopDialogProvider(null);
+          }}
+        />
+      )}
     </Card>
+  );
+}
+
+function ShopDomainDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (shop: string) => void;
+}) {
+  const [shop, setShop] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = shop.trim().toLowerCase();
+    if (!trimmed) return;
+    const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
+    onSubmit(subdomain);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect Shopify Store</DialogTitle>
+          <DialogDescription>
+            Enter your Shopify store subdomain to begin the OAuth connection.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="settings-shop-domain">Store subdomain</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="settings-shop-domain"
+                placeholder="mystore"
+                value={shop}
+                onChange={(e) => setShop(e.target.value)}
+                autoFocus
+              />
+              <span className="text-muted-foreground whitespace-nowrap text-sm">
+                .myshopify.com
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              e.g. if your store URL is mystore.myshopify.com, enter
+              &quot;mystore&quot;
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!shop.trim()}>
+              <LogIn className="size-4" />
+              Continue to Shopify
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

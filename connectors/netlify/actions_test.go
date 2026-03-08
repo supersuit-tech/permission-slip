@@ -45,6 +45,37 @@ func TestListSites_Success(t *testing.T) {
 	}
 }
 
+func TestListSites_OAuthCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer test_oauth_token" {
+			t.Errorf("Authorization = %q, want %q", got, "Bearer test_oauth_token")
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode([]map[string]string{
+			{"id": "site_123", "name": "my-site"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["netlify.list_sites"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "netlify.list_sites",
+		Parameters:  json.RawMessage(`{}`),
+		Credentials: oauthCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if result == nil || result.Data == nil {
+		t.Fatal("Execute() returned nil result")
+	}
+}
+
 func TestListDeployments_Success(t *testing.T) {
 	t.Parallel()
 
