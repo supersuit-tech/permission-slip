@@ -383,7 +383,6 @@ func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
 		"BILLING_ENABLED":     "true",
 		"STRIPE_SECRET_KEY":   "",
 		"STRIPE_WEBHOOK_SECRET": "",
-		"STRIPE_TEST_MODE":    "",
 		"BASE_URL":            "",
 		"VAPID_PUBLIC_KEY":    "",
 		"VAPID_PRIVATE_KEY":   "",
@@ -419,7 +418,6 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 		"STRIPE_SECRET_KEY":          "sk_test_xxx",
 		"STRIPE_WEBHOOK_SECRET":      "whsec_xxx",
 		"STRIPE_PRICE_ID_REQUEST":    "price_xxx",
-		"STRIPE_TEST_MODE":           "",
 		"BASE_URL":                   "https://example.com",
 		"INVITE_HMAC_KEY":            "test-key",
 		"VAPID_PUBLIC_KEY":           "",
@@ -459,91 +457,6 @@ func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
 		if e.envVar == "VAPID_SUBJECT" {
 			t.Errorf("unexpected VAPID_SUBJECT error with https:// prefix: %s", e.message)
 		}
-	}
-}
-
-func TestValidateConfig_StripeTestMode_ErrorsInProduction(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                       "",
-		"DATABASE_URL":               "postgres://localhost/test",
-		"SUPABASE_URL":               "http://localhost:54321",
-		"BILLING_ENABLED":            "true",
-		"STRIPE_TEST_MODE":           "true",
-		"STRIPE_SECRET_KEY_TEST":     "sk_test_xxx",
-		"STRIPE_WEBHOOK_SECRET_TEST": "whsec_xxx",
-		"STRIPE_PRICE_ID_REQUEST_TEST": "price_xxx",
-		"BASE_URL":                   "https://example.com",
-		"VAPID_PUBLIC_KEY":           "",
-		"VAPID_PRIVATE_KEY":          "",
-		"VAPID_SUBJECT":              "",
-	})
-
-	errs, _ := validateConfig()
-
-	found := false
-	for _, e := range errs {
-		if e.envVar == "STRIPE_TEST_MODE" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected error for STRIPE_TEST_MODE=true in production")
-	}
-}
-
-func TestValidateConfig_StripeTestMode_ValidatesTestKeysInDev(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                       "development",
-		"BILLING_ENABLED":            "true",
-		"STRIPE_TEST_MODE":           "true",
-		"STRIPE_SECRET_KEY_TEST":     "",
-		"STRIPE_WEBHOOK_SECRET_TEST": "",
-	})
-
-	_, warnings := validateConfig()
-
-	wantWarnings := map[string]bool{
-		"STRIPE_SECRET_KEY_TEST":     false,
-		"STRIPE_WEBHOOK_SECRET_TEST": false,
-	}
-	for _, w := range warnings {
-		if _, ok := wantWarnings[w.envVar]; ok {
-			wantWarnings[w.envVar] = true
-		}
-	}
-	for v, found := range wantWarnings {
-		if !found {
-			t.Errorf("expected warning for missing %s when STRIPE_TEST_MODE=true", v)
-		}
-	}
-}
-
-func TestValidateConfig_StripeTestMode_NoWarningsWhenTestKeysSet(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                         "development",
-		"BILLING_ENABLED":              "true",
-		"STRIPE_TEST_MODE":             "true",
-		"STRIPE_SECRET_KEY_TEST":       "sk_test_xxx",
-		"STRIPE_WEBHOOK_SECRET_TEST":   "whsec_xxx",
-		"STRIPE_PRICE_ID_REQUEST_TEST": "price_xxx",
-		"SUPABASE_SERVICE_ROLE_KEY":    "test-key",
-		"INVITE_HMAC_KEY":              "test-key",
-		"BASE_URL":                     "https://example.com",
-		"GOOGLE_CLIENT_ID":             "test-google-id",
-		"GOOGLE_CLIENT_SECRET":         "test-google-secret",
-		"MICROSOFT_CLIENT_ID":          "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":      "test-msft-secret",
-		"SALESFORCE_CLIENT_ID":         "test-sf-id",
-		"SALESFORCE_CLIENT_SECRET":     "test-sf-secret",
-	})
-
-	errs, warnings := validateConfig()
-	if len(errs) != 0 {
-		t.Errorf("expected no errors, got %d: %v", len(errs), errs)
-	}
-	if len(warnings) != 0 {
-		t.Errorf("expected no warnings, got %d: %v", len(warnings), warnings)
 	}
 }
 
