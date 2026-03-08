@@ -44,6 +44,16 @@ func TestGetBounces_Success(t *testing.T) {
 	if data["count"] != float64(1) {
 		t.Errorf("count = %v, want 1", data["count"])
 	}
+
+	// Timestamps should be ISO-8601 strings, not raw unix integers.
+	bounces := data["bounces"].([]any)
+	first := bounces[0].(map[string]any)
+	if _, ok := first["created_at"].(string); !ok {
+		t.Errorf("bounces[0].created_at should be a string, got %T", first["created_at"])
+	}
+	if _, exists := first["created"]; exists {
+		t.Errorf("bounces[0] should not expose raw 'created' unix timestamp — use 'created_at'")
+	}
 }
 
 func TestGetBounces_WithTimeRange(t *testing.T) {

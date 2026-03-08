@@ -22,12 +22,19 @@ type sendTransactionalEmailParams struct {
 	From        string `json:"from"`
 	FromName    string `json:"from_name"`
 	Subject     string `json:"subject"`
-	HTMLContent string `json:"html_content"`
+	HTMLContent  string `json:"html_content"`
 	PlainContent string `json:"plain_content"`
 	TemplateID  string `json:"template_id"`
 	// DynamicTemplateData is arbitrary key/value pairs passed to a dynamic template.
 	DynamicTemplateData map[string]any `json:"dynamic_template_data"`
 	ReplyTo             string         `json:"reply_to"`
+	// CC and BCC support common transactional patterns (e.g. CC account managers,
+	// BCC compliance inboxes). Each is a comma-separated list of email addresses.
+	CC  []string `json:"cc"`
+	BCC []string `json:"bcc"`
+	// Categories are freeform labels that appear in SendGrid's activity/stats UI,
+	// useful for filtering and analytics (e.g. ["welcome", "onboarding"]).
+	Categories []string `json:"categories"`
 }
 
 func (p *sendTransactionalEmailParams) validate() error {
@@ -52,6 +59,19 @@ func (p *sendTransactionalEmailParams) validate() error {
 	if p.ReplyTo != "" && !emailPattern.MatchString(p.ReplyTo) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid reply_to email: %q", p.ReplyTo)}
 	}
+	for _, addr := range p.CC {
+		if !emailPattern.MatchString(addr) {
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid cc email address: %q", addr)}
+		}
+	}
+	for _, addr := range p.BCC {
+		if !emailPattern.MatchString(addr) {
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid bcc email address: %q", addr)}
+		}
+	}
+	if len(p.Categories) > 10 {
+		return &connectors.ValidationError{Message: "categories must have at most 10 items (SendGrid limit)"}
+	}
 	return nil
 }
 
@@ -70,16 +90,32 @@ func (a *sendTransactionalEmailAction) Execute(ctx context.Context, req connecto
 		toAddr["name"] = params.ToName
 	}
 
+	personalization := map[string]any{
+		"to": []map[string]string{toAddr},
+	}
+	if len(params.CC) > 0 {
+		ccList := make([]map[string]string, len(params.CC))
+		for i, addr := range params.CC {
+			ccList[i] = map[string]string{"email": addr}
+		}
+		personalization["cc"] = ccList
+	}
+	if len(params.BCC) > 0 {
+		bccList := make([]map[string]string, len(params.BCC))
+		for i, addr := range params.BCC {
+			bccList[i] = map[string]string{"email": addr}
+		}
+		personalization["bcc"] = bccList
+	}
+
 	fromAddr := map[string]string{"email": params.From}
 	if params.FromName != "" {
 		fromAddr["name"] = params.FromName
 	}
 
 	body := map[string]any{
-		"personalizations": []map[string]any{
-			{"to": []map[string]string{toAddr}},
-		},
-		"from": fromAddr,
+		"personalizations": []map[string]any{personalization},
+		"from":             fromAddr,
 	}
 
 	// Subject and content are optional when a dynamic template is used.
@@ -112,13 +148,26 @@ func (a *sendTransactionalEmailAction) Execute(ctx context.Context, req connecto
 		body["reply_to"] = map[string]string{"email": params.ReplyTo}
 	}
 
+	if len(params.Categories) > 0 {
+		body["categories"] = params.Categories
+	}
+
 	// POST /mail/send returns 202 Accepted with an empty body on success.
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, "/mail/send", body, nil); err != nil {
+	// We capture X-Message-Id from the response headers — this is SendGrid's
+	// per-message identifier, useful for delivery troubleshooting via the
+	// Activity Feed or email.
+	messageID, err := a.conn.doJSONCapturingHeader(ctx, req.Credentials, http.MethodPost, "/mail/send", body, nil, "X-Message-Id")
+	if err != nil {
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
+	result := map[string]any{
 		"status": "sent",
 		"to":     params.To,
-	})
+	}
+	if messageID != "" {
+		result["message_id"] = messageID
+	}
+
+	return connectors.JSONResult(result)
 }

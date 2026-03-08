@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -32,9 +33,17 @@ func (p *getSuppressionsParams) validate() error {
 	return nil
 }
 
+// suppressionEntry is the raw SendGrid API response shape for an unsubscribe record.
+// created is a Unix timestamp; we convert it to ISO-8601 in the action result.
 type suppressionEntry struct {
 	Created int64  `json:"created"`
 	Email   string `json:"email"`
+}
+
+// suppressionResult is the human-friendly representation returned to callers.
+type suppressionResult struct {
+	CreatedAt string `json:"created_at"` // ISO-8601, e.g. "2026-01-14T10:00:00Z"
+	Email     string `json:"email"`
 }
 
 // Execute retrieves global unsubscribes via GET /suppression/unsubscribes.
@@ -57,13 +66,21 @@ func (a *getSuppressionsAction) Execute(ctx context.Context, req connectors.Acti
 		path += sep + "offset=" + strconv.Itoa(params.Offset)
 	}
 
-	var suppressions []suppressionEntry
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &suppressions); err != nil {
+	var raw []suppressionEntry
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &raw); err != nil {
 		return nil, err
 	}
 
+	results := make([]suppressionResult, len(raw))
+	for i, s := range raw {
+		results[i] = suppressionResult{
+			CreatedAt: time.Unix(s.Created, 0).UTC().Format(time.RFC3339),
+			Email:     s.Email,
+		}
+	}
+
 	return connectors.JSONResult(map[string]any{
-		"suppressions": suppressions,
-		"count":        len(suppressions),
+		"suppressions": results,
+		"count":        len(results),
 	})
 }

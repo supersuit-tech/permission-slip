@@ -45,6 +45,16 @@ func TestGetSuppressions_Success(t *testing.T) {
 	if data["count"] != float64(2) {
 		t.Errorf("count = %v, want 2", data["count"])
 	}
+
+	// Timestamps should be ISO-8601 strings, not raw unix integers.
+	sups := data["suppressions"].([]any)
+	first := sups[0].(map[string]any)
+	if _, ok := first["created_at"].(string); !ok {
+		t.Errorf("suppressions[0].created_at should be a string, got %T", first["created_at"])
+	}
+	if _, exists := first["created"]; exists {
+		t.Errorf("suppressions[0] should not expose raw 'created' unix timestamp — use 'created_at'")
+	}
 }
 
 func TestGetSuppressions_WithPagination(t *testing.T) {

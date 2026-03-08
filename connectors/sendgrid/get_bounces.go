@@ -45,11 +45,21 @@ func (p *getBouncesParams) validate() error {
 	return nil
 }
 
+// bounceEntry is the raw SendGrid API response shape for a bounce record.
+// created is a Unix timestamp; we convert it to ISO-8601 in the action result.
 type bounceEntry struct {
 	Created int64  `json:"created"`
 	Email   string `json:"email"`
 	Reason  string `json:"reason"`
 	Status  string `json:"status"`
+}
+
+// bounceResult is the human-friendly representation returned to callers.
+type bounceResult struct {
+	CreatedAt string `json:"created_at"` // ISO-8601, e.g. "2026-01-14T10:00:00Z"
+	Email     string `json:"email"`
+	Reason    string `json:"reason"`
+	Status    string `json:"status"`
 }
 
 // Execute retrieves bounces via GET /suppression/bounces.
@@ -83,13 +93,23 @@ func (a *getBouncesAction) Execute(ctx context.Context, req connectors.ActionReq
 		path += "?" + q.Encode()
 	}
 
-	var bounces []bounceEntry
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &bounces); err != nil {
+	var raw []bounceEntry
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &raw); err != nil {
 		return nil, err
 	}
 
+	results := make([]bounceResult, len(raw))
+	for i, b := range raw {
+		results[i] = bounceResult{
+			CreatedAt: time.Unix(b.Created, 0).UTC().Format(time.RFC3339),
+			Email:     b.Email,
+			Reason:    b.Reason,
+			Status:    b.Status,
+		}
+	}
+
 	return connectors.JSONResult(map[string]any{
-		"bounces": bounces,
-		"count":   len(bounces),
+		"bounces": results,
+		"count":   len(results),
 	})
 }

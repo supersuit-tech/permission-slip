@@ -282,6 +282,22 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"format": "email",
 							"description": "Reply-to email address (optional)"
+						},
+						"cc": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "CC recipients (optional). Useful for sending copies to account managers, team inboxes, etc."
+						},
+						"bcc": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "BCC recipients (optional). Useful for silent compliance copies or audit trails."
+						},
+						"categories": {
+							"type": "array",
+							"items": {"type": "string"},
+							"maxItems": 10,
+							"description": "Labels for filtering and grouping in the SendGrid Activity Feed and stats (e.g. [\"welcome\", \"onboarding\"]). Maximum 10."
 						}
 					}
 				}`)),
