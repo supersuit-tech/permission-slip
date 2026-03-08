@@ -42,50 +42,19 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	}
 
 	// Check auth_type for this connector's required credentials.
-	reqCred, err := db.GetRequiredCredentialByActionType(ctx, deps.DB, actionType)
+	// A connector may support multiple auth methods (e.g. both oauth2 and api_key).
+	// We try OAuth first; if the user has no OAuth connection, fall back to static credentials.
+	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return nil, fmt.Errorf("look up required credential: %w", err)
+		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
 
 	connectorID := strings.SplitN(actionType, ".", 2)[0]
 
 	var creds connectors.Credentials
-	if reqCred != nil && reqCred.AuthType == "oauth2" {
-		// OAuth2 path: resolve access token from oauth_connections.
-		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// For connectors that declare api_key/basic/custom auth but also have
-		// a matching built-in OAuth provider, try OAuth first. If the user has
-		// connected via OAuth, use that; otherwise fall back to static credentials.
-		// This enables connectors like Shopify to support both OAuth and API key
-		// without changing their manifest auth_type.
-		oauthResolved := false
-		if deps.OAuthProviders != nil {
-			if _, providerExists := deps.OAuthProviders.Get(connectorID); providerExists {
-				oauthReqCred := &db.RequiredCredential{
-					AuthType:      "oauth2",
-					OAuthProvider: &connectorID,
-				}
-				oauthCreds, oauthErr := resolveOAuthCredentials(ctx, deps, userID, oauthReqCred)
-				if oauthErr == nil {
-					creds = oauthCreds
-					oauthResolved = true
-				}
-				// If OAuth failed (no connection, needs_reauth, etc.), silently
-				// fall through to static credentials.
-			}
-		}
-
-		if !oauthResolved {
-			// Static credential path (api_key, basic, custom): existing behavior.
-			creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-			if err != nil {
-				return nil, err
-			}
-		}
+	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, connectorID, reqCreds)
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate credentials before executing the action.
@@ -469,4 +438,58 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	conn.AccessTokenVaultID = newAccessVaultID
 
 	return nil
+}
+
+// resolveCredentialsWithFallback tries to resolve credentials using the preferred
+// auth method (OAuth first), falling back to static credentials if OAuth is
+// unavailable. This supports connectors that offer multiple auth methods (e.g.
+// Intercom supports both OAuth and API key).
+//
+// For connectors that only declare static credentials (api_key, basic) but also
+// have a matching built-in OAuth provider (e.g. Shopify), we synthesize an OAuth
+// credential and try it first. This enables OAuth support without changing the
+// manifest auth_type.
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+
+	// Partition credentials by auth type.
+	var oauthCred *db.RequiredCredential
+	var hasStaticCred bool
+	for i := range reqCreds {
+		if reqCreds[i].AuthType == "oauth2" && oauthCred == nil {
+			oauthCred = &reqCreds[i]
+		} else if reqCreds[i].AuthType != "oauth2" {
+			hasStaticCred = true
+		}
+	}
+
+	// If the connector has no explicit OAuth credential but has a matching
+	// built-in OAuth provider (e.g. Shopify), synthesize one so we can try
+	// OAuth first before falling back to static credentials.
+	if oauthCred == nil && deps.OAuthProviders != nil {
+		if _, providerExists := deps.OAuthProviders.Get(connectorID); providerExists {
+			oauthCred = &db.RequiredCredential{
+				AuthType:      "oauth2",
+				OAuthProvider: &connectorID,
+			}
+			// hasStaticCred remains true (the manifest declared a static cred),
+			// so if OAuth resolution fails we'll fall through to static credentials.
+		}
+	}
+
+	// If the connector has an OAuth credential, try it first.
+	if oauthCred != nil {
+		creds, err := resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+		if err == nil {
+			return creds, nil
+		}
+		// If there's a static fallback, swallow the OAuth error and try that.
+		// Otherwise, return the OAuth error as-is.
+		if !hasStaticCred {
+			return zero, err
+		}
+	}
+
+	// Fall back to static credentials (api_key, basic, custom).
+	return resolveStaticCredentials(ctx, deps, userID, actionType)
 }

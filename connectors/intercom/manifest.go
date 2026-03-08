@@ -199,9 +199,23 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "intercom_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "intercom",
+				OAuthScopes:   []string{},
+			},
+			{
 				Service:         "intercom",
 				AuthType:        "api_key",
 				InstructionsURL: "https://developers.intercom.com/docs/build-an-integration/learn-more/authentication/",
+			},
+		},
+		OAuthProviders: []connectors.ManifestOAuthProvider{
+			{
+				ID:           "intercom",
+				AuthorizeURL: "https://app.intercom.com/oauth",
+				TokenURL:     "https://api.intercom.io/auth/eagle/token",
+				Scopes:       []string{},
 			},
 		},
 		Templates: []connectors.ManifestTemplate{
