@@ -8,15 +8,30 @@ import (
 var (
 	builtInMu        sync.Mutex
 	builtInProviders []Provider
+	builtInIDs       = make(map[string]bool)
 )
 
 // RegisterBuiltIn registers a provider as a built-in platform provider.
 // It is called from init() functions in the oauth/providers package.
-// Duplicate IDs are not checked here — the registry panics on duplicates
-// when NewRegistryWithBuiltIns is called.
+// Panics immediately on duplicate IDs or missing required fields (ID,
+// AuthorizeURL, TokenURL) to surface programming errors at startup rather
+// than silently accumulating bad state.
 func RegisterBuiltIn(p Provider) {
+	if p.ID == "" {
+		panic("oauth.RegisterBuiltIn: provider ID is required")
+	}
+	if p.AuthorizeURL == "" {
+		panic(fmt.Sprintf("oauth.RegisterBuiltIn: provider %q is missing AuthorizeURL", p.ID))
+	}
+	if p.TokenURL == "" {
+		panic(fmt.Sprintf("oauth.RegisterBuiltIn: provider %q is missing TokenURL", p.ID))
+	}
 	builtInMu.Lock()
 	defer builtInMu.Unlock()
+	if builtInIDs[p.ID] {
+		panic(fmt.Sprintf("oauth.RegisterBuiltIn: duplicate built-in provider %q", p.ID))
+	}
+	builtInIDs[p.ID] = true
 	builtInProviders = append(builtInProviders, p)
 }
 
