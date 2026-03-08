@@ -36,33 +36,43 @@ func TestJiraConnector_ValidateCredentials(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name:    "valid credentials",
+			name:    "valid basic auth credentials",
 			creds:   validCreds(),
 			wantErr: false,
 		},
 		{
-			name:    "missing site",
+			name:    "valid oauth credentials",
+			creds:   validOAuthCreds(),
+			wantErr: false,
+		},
+		{
+			name:    "missing site (basic auth)",
 			creds:   connectors.NewCredentials(map[string]string{"email": "user@example.com", "api_token": "tok"}),
 			wantErr: true,
 			errMsg:  "site",
 		},
 		{
-			name:    "missing email",
+			name:    "missing email (basic auth)",
 			creds:   connectors.NewCredentials(map[string]string{"site": "mysite", "api_token": "tok"}),
 			wantErr: true,
 			errMsg:  "email",
 		},
 		{
-			name:    "missing api_token",
+			name:    "missing api_token (basic auth)",
 			creds:   connectors.NewCredentials(map[string]string{"site": "mysite", "email": "user@example.com"}),
 			wantErr: true,
 			errMsg:  "api_token",
 		},
 		{
-			name:    "empty site",
+			name:    "empty site (basic auth)",
 			creds:   connectors.NewCredentials(map[string]string{"site": "", "email": "user@example.com", "api_token": "tok"}),
 			wantErr: true,
 			errMsg:  "site",
+		},
+		{
+			name:    "empty access_token falls back to basic auth validation",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
+			wantErr: true,
 		},
 	}
 
@@ -187,6 +197,30 @@ func TestJiraConnector_Do_MissingCredentials(t *testing.T) {
 	}
 }
 
+func TestJiraConnector_Do_OAuthBearerToken(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantAuth := "Bearer test-oauth-token-456"
+		if got := r.Header.Get("Authorization"); got != wantAuth {
+			t.Errorf("Authorization = %q, want %q", got, wantAuth)
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	err := conn.do(t.Context(), validOAuthCreds(), http.MethodGet, "/test", nil, &resp)
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("response status = %q, want %q", resp["status"], "ok")
+	}
+}
+
 func TestJiraConnector_Actions(t *testing.T) {
 	t.Parallel()
 	c := New()
@@ -238,18 +272,35 @@ func TestJiraConnector_Manifest(t *testing.T) {
 		}
 	}
 
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "jira" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "jira")
+
+	// First credential should be OAuth (default/recommended).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "jira" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "jira")
 	}
-	if cred.AuthType != "basic" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "basic")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "atlassian" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "atlassian")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want scopes")
+	}
+
+	// Second credential should be basic auth (alternative).
+	basicCred := m.RequiredCredentials[1]
+	if basicCred.Service != "jira" {
+		t.Errorf("basic credential service = %q, want %q", basicCred.Service, "jira")
+	}
+	if basicCred.AuthType != "basic" {
+		t.Errorf("basic credential auth_type = %q, want %q", basicCred.AuthType, "basic")
+	}
+	if basicCred.InstructionsURL == "" {
+		t.Error("basic credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {
@@ -334,7 +385,7 @@ func TestJiraConnector_SiteValidation_ValidSites(t *testing.T) {
 			"email":     "user@example.com",
 			"api_token": "token",
 		})
-		_, err := conn.apiBase(creds)
+		_, err := conn.apiBase(t.Context(), creds)
 		if err != nil {
 			t.Errorf("unexpected error for valid site %q: %v", site, err)
 		}

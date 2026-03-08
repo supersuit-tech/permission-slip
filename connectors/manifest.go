@@ -95,6 +95,7 @@ var validAuthTypes = map[string]bool{
 // in their oauth_providers section. Add new built-in providers here.
 var BuiltInOAuthProviders = map[string]bool{
 	"airtable":   true,
+	"atlassian":  true,
 	"calendly":   true,
 	"datadog":    true,
 	"discord":    true,
