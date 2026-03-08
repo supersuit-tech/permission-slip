@@ -431,9 +431,7 @@ function StaticCredentialRow({
   isAlternative: boolean;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(
-    null,
-  );
+  const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(null);
 
   const isConnected = storedCredentials.length > 0;
 
@@ -533,10 +531,8 @@ function StaticCredentialRow({
 
       {removeTarget && (
         <RemoveCredentialDialog
-          open={!!removeTarget}
-          onOpenChange={(open) => {
-            if (!open) setRemoveTarget(null);
-          }}
+          open
+          onOpenChange={() => setRemoveTarget(null)}
           credential={removeTarget}
         />
       )}

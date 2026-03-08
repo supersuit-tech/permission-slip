@@ -97,6 +97,18 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "figma",
+			AuthorizeURL: "https://www.figma.com/oauth",
+			TokenURL:     "https://api.figma.com/v1/oauth/token",
+			Scopes: []string{
+				"files:read",
+				"file_comments:write",
+			},
+			ClientID:     os.Getenv("FIGMA_CLIENT_ID"),
+			ClientSecret: os.Getenv("FIGMA_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "github",
 			AuthorizeURL: "https://github.com/login/oauth/authorize",
 			TokenURL:     "https://github.com/login/oauth/access_token",

@@ -20,12 +20,24 @@ interface AddCredentialDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   credential: RequiredCredential;
+  /** Override the credential key used when storing (default: "api_key"). */
+  credentialKey?: string;
+  /** Override the input field label (default: "API Key"). */
+  fieldLabel?: string;
+  /** Override the input placeholder (default: "Enter API key or token"). */
+  fieldPlaceholder?: string;
+  /** Override the dialog title (default: "Add Credential"). */
+  title?: string;
 }
 
 export function AddCredentialDialog({
   open,
   onOpenChange,
   credential,
+  credentialKey,
+  fieldLabel,
+  fieldPlaceholder,
+  title,
 }: AddCredentialDialogProps) {
   const { storeCredential, isLoading } = useStoreCredential();
   const [label, setLabel] = useState("");
@@ -69,6 +81,11 @@ export function AddCredentialDialog({
     }
   }
 
+  const resolvedKey = credentialKey ?? "api_key";
+  const resolvedFieldLabel = fieldLabel ?? "API Key";
+  const resolvedPlaceholder = fieldPlaceholder ?? "Enter API key or token";
+  const resolvedTitle = title ?? "Add Credential";
+
   function buildCredentials(): Record<string, string> | null {
     if (credential.auth_type === "basic") {
       if (!username.trim() || !password.trim()) {
@@ -77,12 +94,11 @@ export function AddCredentialDialog({
       }
       return { username: username.trim(), password: password.trim() };
     }
-    // api_key and custom both use a single key field
     if (!apiKey.trim()) {
-      toast.error("API key is required");
+      toast.error(`${resolvedFieldLabel} is required`);
       return null;
     }
-    return { api_key: apiKey.trim() };
+    return { [resolvedKey]: apiKey.trim() };
   }
 
   const isBasic = credential.auth_type === "basic";
@@ -92,7 +108,7 @@ export function AddCredentialDialog({
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add Credential</DialogTitle>
+            <DialogTitle>{resolvedTitle}</DialogTitle>
             <DialogDescription>
               Store credentials for <strong>{credential.service}</strong>.
               Credentials are encrypted at rest and never exposed to agents.
@@ -140,11 +156,11 @@ export function AddCredentialDialog({
               </>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="cred-api-key">API Key</Label>
+                <Label htmlFor="cred-api-key">{resolvedFieldLabel}</Label>
                 <Input
                   id="cred-api-key"
                   type="password"
-                  placeholder="Enter API key or token"
+                  placeholder={resolvedPlaceholder}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   disabled={isLoading}
