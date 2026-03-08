@@ -11,6 +11,7 @@ import (
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
+	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 )
 
 func TestSquareConnector_ID(t *testing.T) {

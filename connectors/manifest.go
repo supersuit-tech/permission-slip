@@ -90,39 +90,6 @@ var validAuthTypes = map[string]bool{
 	"oauth2":  true,
 }
 
-// BuiltInOAuthProviders lists OAuth provider IDs that the platform supports
-// natively. Connectors referencing these providers don't need to declare them
-// in their oauth_providers section. Add new built-in providers here.
-var BuiltInOAuthProviders = map[string]bool{
-	"airtable":   true,
-	"atlassian":  true,
-	"calendly":   true,
-	"datadog":    true,
-	"discord":    true,
-	"docusign":   true,
-	"figma":      true,
-	"github":     true,
-	"google":     true,
-	"hubspot":    true,
-	"kroger":     true,
-	"linear":     true,
-	"linkedin":   true,
-	"meta":       true,
-	"microsoft":  true,
-	"notion":     true,
-	"netlify":    true,
-	"pagerduty":  true,
-	"salesforce": true,
-	"sendgrid":   true,
-	"shopify":    true,
-	"slack":      true,
-	"square":     true,
-	"stripe":     true,
-	"vercel":     true,
-	"zendesk":    true,
-	"zoom":       true,
-}
-
 // ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in
 // a manifest's authorize_params or be passed through to the authorization URL.
 // Allowing these to be set by connectors would let a malicious or misconfigured
@@ -296,10 +263,12 @@ func (m *ConnectorManifest) Validate() error {
 	}
 
 	// Collect all known OAuth provider IDs: built-in + declared in this manifest.
-	knownProviders := make(map[string]bool, len(BuiltInOAuthProviders)+len(m.OAuthProviders))
-	for id := range BuiltInOAuthProviders {
+	builtInOAuthMu.Lock()
+	knownProviders := make(map[string]bool, len(builtInOAuthProviders)+len(m.OAuthProviders))
+	for id := range builtInOAuthProviders {
 		knownProviders[id] = true
 	}
+	builtInOAuthMu.Unlock()
 
 	// Validate OAuth providers (optional, used by external connectors).
 	providerIDs := make(map[string]bool, len(m.OAuthProviders))
