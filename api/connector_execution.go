@@ -42,9 +42,9 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	}
 
 	// Check auth_type for this connector's required credentials.
-	// When a connector supports multiple auth methods (e.g. OAuth + API key),
-	// try each in priority order (OAuth first) and use the first that resolves.
-	reqCreds, err := db.GetAllRequiredCredentialsByActionType(ctx, deps.DB, actionType)
+	// A connector may support multiple auth methods (e.g. both oauth2 and api_key).
+	// We try OAuth first; if the user has no OAuth connection, fall back to static credentials.
+	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
 		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
@@ -218,48 +218,6 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 	}, nil
 }
 
-// resolveCredentialsWithFallback tries each required credential in priority order
-// (OAuth first, then static) and returns the first that successfully resolves.
-// This allows connectors to offer multiple auth methods — users connect via
-// whichever method they prefer, and the execution engine uses what's available.
-func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
-	if len(reqCreds) == 0 {
-		// No credential requirements — use static path as legacy default.
-		return resolveStaticCredentials(ctx, deps, userID, actionType)
-	}
-
-	// Single credential entry — use the original direct path (no fallback).
-	if len(reqCreds) == 1 {
-		rc := reqCreds[0]
-		if rc.AuthType == "oauth2" {
-			return resolveOAuthCredentials(ctx, deps, userID, &rc)
-		}
-		return resolveStaticCredentials(ctx, deps, userID, actionType)
-	}
-
-	// Multiple credential entries: try each in order, return first success.
-	// Each entry is resolved independently — OAuth entries use the OAuth
-	// connection, static entries look up credentials for that specific service.
-	var authMethods []string
-	for _, rc := range reqCreds {
-		rc := rc
-		var creds connectors.Credentials
-		var err error
-		if rc.AuthType == "oauth2" {
-			creds, err = resolveOAuthCredentials(ctx, deps, userID, &rc)
-			authMethods = append(authMethods, "OAuth (connect via Settings)")
-		} else {
-			creds, err = resolveStaticCredentialsForService(ctx, deps, userID, rc.Service)
-			authMethods = append(authMethods, fmt.Sprintf("API key (add credentials for service %q)", rc.Service))
-		}
-		if err == nil {
-			return creds, nil
-		}
-	}
-	return connectors.Credentials{}, &connectors.ValidationError{
-		Message: fmt.Sprintf("no credentials found — set up one of: %s", strings.Join(authMethods, " or ")),
-	}
-}
 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
 // for the given action type.
@@ -300,40 +258,6 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 		}
 	}
 
-	return connectors.NewCredentials(credMap), nil
-}
-
-// resolveStaticCredentialsForService fetches and decrypts static credentials
-// for a single specific service. Used by the multi-credential fallback path
-// where each credential entry is resolved independently.
-func resolveStaticCredentialsForService(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
-	var zero connectors.Credentials
-	if deps.Vault == nil {
-		return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
-	}
-	decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
-	if err != nil {
-		var credErr *db.CredentialError
-		if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
-			return zero, &connectors.ValidationError{
-				Message: fmt.Sprintf("no credentials stored for service %q", service),
-			}
-		}
-		return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
-	}
-	credMap := make(map[string]string, len(decrypted))
-	for k, v := range decrypted {
-		switch vv := v.(type) {
-		case string:
-			credMap[k] = vv
-		default:
-			b, err := json.Marshal(v)
-			if err != nil {
-				return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
-			}
-			credMap[k] = string(b)
-		}
-	}
 	return connectors.NewCredentials(credMap), nil
 }
 
@@ -514,4 +438,39 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	conn.AccessTokenVaultID = newAccessVaultID
 
 	return nil
+}
+
+// resolveCredentialsWithFallback tries to resolve credentials using the preferred
+// auth method (OAuth first), falling back to static credentials if OAuth is
+// unavailable. This supports connectors that offer multiple auth methods (e.g.
+// Intercom supports both OAuth and API key).
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+
+	// Partition credentials by auth type.
+	var oauthCred *db.RequiredCredential
+	var hasStaticCred bool
+	for i := range reqCreds {
+		if reqCreds[i].AuthType == "oauth2" && oauthCred == nil {
+			oauthCred = &reqCreds[i]
+		} else if reqCreds[i].AuthType != "oauth2" {
+			hasStaticCred = true
+		}
+	}
+
+	// If the connector has an OAuth credential, try it first.
+	if oauthCred != nil {
+		creds, err := resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+		if err == nil {
+			return creds, nil
+		}
+		// If there's a static fallback, swallow the OAuth error and try that.
+		// Otherwise, return the OAuth error as-is.
+		if !hasStaticCred {
+			return zero, err
+		}
+	}
+
+	// Fall back to static credentials (api_key, basic, custom).
+	return resolveStaticCredentials(ctx, deps, userID, actionType)
 }
