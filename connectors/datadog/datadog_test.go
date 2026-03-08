@@ -207,8 +207,16 @@ func TestDatadogConnector_Manifest(t *testing.T) {
 	if oauthCred.OAuthProvider != "datadog" {
 		t.Errorf("RequiredCredentials[0].OAuthProvider = %q, want %q", oauthCred.OAuthProvider, "datadog")
 	}
-	if len(oauthCred.OAuthScopes) == 0 {
-		t.Error("RequiredCredentials[0].OAuthScopes is empty, want scopes")
+	// OAuthScopes must exactly match the package-level OAuthScopes var —
+	// they share a single source of truth so they can never drift.
+	if len(oauthCred.OAuthScopes) != len(OAuthScopes) {
+		t.Errorf("RequiredCredentials[0].OAuthScopes has %d entries, want %d (OAuthScopes var)", len(oauthCred.OAuthScopes), len(OAuthScopes))
+	} else {
+		for i, s := range OAuthScopes {
+			if oauthCred.OAuthScopes[i] != s {
+				t.Errorf("RequiredCredentials[0].OAuthScopes[%d] = %q, want %q", i, oauthCred.OAuthScopes[i], s)
+			}
+		}
 	}
 	// Custom auth should be second (alternative auth method).
 	customCred := m.RequiredCredentials[1]

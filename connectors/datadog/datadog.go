@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -289,15 +291,28 @@ func (c *DatadogConnector) ValidateCredentials(_ context.Context, creds connecto
 }
 
 // validateSite checks the optional "site" credential when present.
+// The valid sites are derived from siteBaseURLs so the error message
+// never drifts from the supported set.
 func (c *DatadogConnector) validateSite(creds connectors.Credentials) error {
 	if site, ok := creds.Get("site"); ok && site != "" {
 		if _, known := siteBaseURLs[site]; !known {
 			return &connectors.ValidationError{
-				Message: fmt.Sprintf("unknown Datadog site %q — valid sites: datadoghq.com, us3.datadoghq.com, us5.datadoghq.com, datadoghq.eu, ap1.datadoghq.com, ddog-gov.com", site),
+				Message: fmt.Sprintf("unknown Datadog site %q — valid sites: %s", site, validSites()),
 			}
 		}
 	}
 	return nil
+}
+
+// validSites returns a sorted, comma-separated list of supported Datadog site
+// identifiers, derived from siteBaseURLs so it never drifts from the map.
+func validSites() string {
+	sites := make([]string, 0, len(siteBaseURLs))
+	for s := range siteBaseURLs {
+		sites = append(sites, s)
+	}
+	sort.Strings(sites)
+	return strings.Join(sites, ", ")
 }
 
 // baseURLForCreds returns the API base URL, respecting the optional "site"
