@@ -190,6 +190,10 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 		},
+		// Two auth methods: OAuth (recommended) and API key (fallback).
+		// Service names must be unique, so the OAuth entry uses "linear_oauth"
+		// while the API key entry uses "linear". The credential resolver
+		// tries OAuth first and falls back to the API key.
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
 				Service:       "linear_oauth",
