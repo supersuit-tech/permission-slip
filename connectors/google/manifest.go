@@ -941,7 +941,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_google_update_calendar_event",
 				ActionType:  "google.update_calendar_event",
 				Name:        "Update calendar events",
-				Description: "Agent can update any field of any calendar event.",
+				Description: "Agent can update the summary, description, time, attendees, and location of calendar events.",
 				Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","clear_attendees":"*","location":"*"}`),
 			},
 			{

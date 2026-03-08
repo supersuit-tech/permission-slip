@@ -118,7 +118,7 @@ func (a *searchDriveAction) Execute(ctx context.Context, req connectors.ActionRe
 	q := url.Values{}
 	q.Set("q", strings.Join(queryParts, " and "))
 	q.Set("pageSize", strconv.Itoa(params.MaxResults))
-	q.Set("fields", "files(id,name,mimeType,modifiedTime,size,webViewLink,parents)")
+	q.Set("fields", "files(id,name,mimeType,modifiedTime,size,webViewLink)")
 	q.Set("orderBy", "modifiedTime desc")
 
 	var listResp driveListResponse

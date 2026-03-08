@@ -55,22 +55,29 @@ func (a *sendEmailReplyAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	// Fetch the original message to extract From, Subject, and Message-Id headers.
+	// Fetch the original message to extract From, Subject, and Message-ID headers.
+	// Request both Message-Id and Message-ID since the casing varies by provider.
 	var origMsg gmailMessageResponse
 	msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(params.MessageID) +
-		"?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-Id"
+		"?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-Id&metadataHeaders=Message-ID"
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, msgURL, nil, &origMsg); err != nil {
 		return nil, err
 	}
 
+	// Verify the message belongs to the expected thread.
+	if origMsg.ThreadID != params.ThreadID {
+		return nil, &connectors.ValidationError{Message: "message_id does not belong to specified thread_id"}
+	}
+
 	var origFrom, origSubject, origMessageID string
 	for _, h := range origMsg.Payload.Headers {
-		switch h.Name {
-		case "From":
+		// Parse header names case-insensitively to handle provider variations.
+		switch strings.ToLower(h.Name) {
+		case "from":
 			origFrom = h.Value
-		case "Subject":
+		case "subject":
 			origSubject = h.Value
-		case "Message-Id":
+		case "message-id":
 			origMessageID = h.Value
 		}
 	}

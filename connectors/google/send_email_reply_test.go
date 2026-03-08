@@ -1,6 +1,7 @@
 package google
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -83,6 +84,12 @@ func TestSendEmailReply_Success(t *testing.T) {
 	if data["thread_id"] != "thread-abc" {
 		t.Errorf("expected thread_id 'thread-abc', got %q", data["thread_id"])
 	}
+	if data["subject"] != "Re: Hello World" {
+		t.Errorf("expected subject 'Re: Hello World', got %q", data["subject"])
+	}
+	if data["to"] != "sender@example.com" {
+		t.Errorf("expected to 'sender@example.com', got %q", data["to"])
+	}
 }
 
 func TestSendEmailReply_SubjectPrefixed(t *testing.T) {
@@ -138,9 +145,80 @@ func TestSendEmailReply_SubjectPrefixed(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Decode the raw message and check subject not double-prefixed
 	if capturedRaw == "" {
 		t.Fatal("expected raw message to be set")
+	}
+
+	// Decode the base64url message and verify Subject is not double-prefixed.
+	rawBytes, err := base64.RawURLEncoding.DecodeString(capturedRaw)
+	if err != nil {
+		t.Fatalf("failed to decode base64url raw message: %v", err)
+	}
+	rawMsg := string(rawBytes)
+
+	// Find the Subject header line.
+	var subjectLine string
+	for _, line := range strings.Split(rawMsg, "\r\n") {
+		if strings.HasPrefix(line, "Subject:") {
+			subjectLine = line
+			break
+		}
+	}
+	if subjectLine == "" {
+		t.Fatal("no Subject header found in raw message")
+	}
+	// Should be "Re: Already a reply", not "Re: Re: Already a reply"
+	expected := "Subject: Re: Already a reply"
+	if subjectLine != expected {
+		t.Errorf("expected %q, got %q", expected, subjectLine)
+	}
+}
+
+func TestSendEmailReply_ThreadIDMismatch(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Message belongs to a different thread than specified
+		json.NewEncoder(w).Encode(gmailMessageResponse{
+			ID:       "msg-1",
+			ThreadID: "different-thread",
+			Payload: struct {
+				Headers []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				} `json:"headers"`
+			}{
+				Headers: []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				}{
+					{Name: "From", Value: "alice@example.com"},
+					{Name: "Subject", Value: "Hello"},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{client: srv.Client(), gmailBaseURL: srv.URL}
+	action := &sendEmailReplyAction{conn: conn}
+
+	params, _ := json.Marshal(sendEmailReplyParams{
+		ThreadID:  "thread-abc",
+		MessageID: "msg-1",
+		Body:      "Reply",
+	})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.send_email_reply",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when message_id does not belong to thread_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 
