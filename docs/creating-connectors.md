@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"square"`) and optionally `oauth_scopes`. Built-in providers (`google`, `kroger`, `linkedin`, `meta`, `microsoft`, `salesforce`, `square`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"github"`, `"google"`, `"microsoft"`, `"square"`) and optionally `oauth_scopes`. Built-in providers (`github`, `google`, `kroger`, `linkedin`, `meta`, `microsoft`, `salesforce`, `square`, `stripe`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 A connector can support multiple auth methods by declaring more than one entry in `RequiredCredentials`. For example, the Square connector supports both OAuth (recommended) and API key authentication. Use different `Service` names for each entry (e.g., `"square"` for OAuth, `"square_api_key"` for API key). The execution layer tries OAuth first and falls back to static credentials.
 
@@ -365,7 +365,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 
 #### Declaring custom OAuth providers
 
-External connectors that use OAuth providers not built into the platform (anything other than `google`, `kroger`, `linkedin`, `meta`, `microsoft`, `salesforce`, `square`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
+External connectors that use OAuth providers not built into the platform (anything other than `github`, `google`, `kroger`, `linkedin`, `meta`, `microsoft`, `salesforce`, `square`, `stripe`, or `zoom`) must declare them in the manifest's `oauth_providers` section. The platform uses these URLs to drive the OAuth authorization flow.
 
 ```go
 OAuthProviders: []connectors.ManifestOAuthProvider{

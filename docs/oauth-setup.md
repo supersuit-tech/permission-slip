@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), Square, Stripe, and other services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Microsoft, Meta (Facebook/Instagram), Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -10,6 +10,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 2. **BYOA (Bring Your Own App)**: Users provide their own OAuth client credentials through the Settings UI. Required for self-hosted deployments or custom providers.
 
 ## Environment Variables
+
+### GitHub OAuth
+
+| Variable | Description |
+|---|---|
+| `GITHUB_CLIENT_ID` | OAuth App Client ID from GitHub Developer Settings |
+| `GITHUB_CLIENT_SECRET` | OAuth App Client Secret from GitHub Developer Settings |
 
 ### Google OAuth
 
@@ -53,6 +60,33 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `OAUTH_REDIRECT_BASE_URL` | Base URL for OAuth callbacks (e.g., `https://app.example.com/api`) | Falls back to `BASE_URL` |
 | `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens | Falls back to `SUPABASE_JWT_SECRET` |
 | `OAUTH_REFRESH_INTERVAL` | Interval for background token refresh job | `10m` |
+
+## GitHub OAuth Setup
+
+### 1. Create a GitHub OAuth App
+
+1. Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Fill in the required fields:
+   - Application name: Your deployment name (e.g., "Permission Slip")
+   - Homepage URL: Your deployment URL
+   - Authorization callback URL:
+     ```
+     https://your-domain.com/api/v1/oauth/github/callback
+     ```
+
+### 2. Configure Environment
+
+```bash
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+```
+
+### Scopes
+
+The GitHub connector requests the `repo` scope, which provides full access to private and public repositories. This enables all GitHub connector actions (create issues, merge PRs, create releases, manage branches, etc.).
+
+> **Note:** The GitHub connector supports both OAuth and Personal Access Tokens (PATs). OAuth is recommended for end users; PATs can be used as an alternative by configuring a `github_pat` credential with an `api_key` auth type.
 
 ## Google OAuth Setup
 
@@ -341,6 +375,7 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 ### Redirect URI mismatch
 
 Ensure the redirect URI in your OAuth app matches exactly:
+- GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`

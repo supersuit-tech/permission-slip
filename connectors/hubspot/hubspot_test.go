@@ -61,13 +61,28 @@ func TestHubSpotConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-token-abc"}),
+			wantErr: false,
+		},
+		{
+			name:    "both access_token and api_key present",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-token", "api_key": "pat-token"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing all credentials",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
 			name:    "empty api_key",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -107,18 +122,35 @@ func TestHubSpotConnector_Manifest(t *testing.T) {
 	if m.Name != "HubSpot" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "HubSpot")
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "hubspot" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "hubspot")
+
+	// First credential should be OAuth2 (preferred)
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "hubspot_oauth" {
+		t.Errorf("OAuth credential service = %q, want %q", oauthCred.Service, "hubspot_oauth")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("OAuth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "hubspot" {
+		t.Errorf("OAuth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "hubspot")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("OAuth credential oauth_scopes is empty, want at least one scope")
+	}
+
+	// Second credential should be API key (fallback)
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "hubspot" {
+		t.Errorf("API key credential service = %q, want %q", apiKeyCred.Service, "hubspot")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("API key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("API key credential instructions_url is empty, want a URL")
 	}
 
 	if len(m.Actions) != 11 {
@@ -198,6 +230,47 @@ func TestHubSpotConnector_Do_Success(t *testing.T) {
 	}
 	if resp["id"] != "123" {
 		t.Errorf("response id = %v, want %q", resp["id"], "123")
+	}
+}
+
+func TestHubSpotConnector_Do_OAuthCredentials(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer oauth-test-token-456" {
+			t.Errorf("expected OAuth Bearer token, got %q", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	err := conn.do(context.Background(), validOAuthCreds(), http.MethodGet, "/test", nil, nil)
+	if err != nil {
+		t.Fatalf("do() with OAuth creds unexpected error: %v", err)
+	}
+}
+
+func TestHubSpotConnector_Do_OAuthPreferredOverAPIKey(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// When both are present, access_token should be used
+		if got := r.Header.Get("Authorization"); got != "Bearer oauth-token" {
+			t.Errorf("expected OAuth token to be preferred, got %q", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token": "oauth-token",
+		"api_key":      "api-key-token",
+	})
+	err := conn.do(context.Background(), creds, http.MethodGet, "/test", nil, nil)
+	if err != nil {
+		t.Fatalf("do() unexpected error: %v", err)
 	}
 }
 

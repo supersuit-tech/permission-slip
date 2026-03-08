@@ -36,6 +36,25 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("github", func(t *testing.T) {
+		gh, ok := byID["github"]
+		if !ok {
+			t.Fatal("github provider not found")
+		}
+		if gh.AuthorizeURL != "https://github.com/login/oauth/authorize" {
+			t.Errorf("AuthorizeURL = %q", gh.AuthorizeURL)
+		}
+		if gh.TokenURL != "https://github.com/login/oauth/access_token" {
+			t.Errorf("TokenURL = %q", gh.TokenURL)
+		}
+		if gh.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", gh.Source, SourceBuiltIn)
+		}
+		if len(gh.Scopes) == 0 {
+			t.Error("expected default scopes")
+		}
+	})
+
 	t.Run("kroger", func(t *testing.T) {
 		k, ok := byID["kroger"]
 		if !ok {
@@ -121,6 +140,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 		t.Fatalf("expected at least 2 providers, got %d", len(ids))
 	}
 
+	if _, ok := r.Get("github"); !ok {
+		t.Error("github not found in registry")
+	}
 	if _, ok := r.Get("google"); !ok {
 		t.Error("google not found in registry")
 	}
