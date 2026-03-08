@@ -549,6 +549,148 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.update_calendar_event",
+				Name:        "Update Calendar Event",
+				Description: "Update an existing Google Calendar event (time, title, attendees, or location)",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["event_id"],
+					"properties": {
+						"event_id": {
+							"type": "string",
+							"description": "The ID of the calendar event to update"
+						},
+						"calendar_id": {
+							"type": "string",
+							"default": "primary",
+							"description": "Calendar ID (defaults to 'primary')"
+						},
+						"summary": {
+							"type": "string",
+							"description": "New event title"
+						},
+						"description": {
+							"type": "string",
+							"description": "New event description"
+						},
+						"start_time": {
+							"type": "string",
+							"description": "New start time in RFC 3339 format. Must be provided together with end_time."
+						},
+						"end_time": {
+							"type": "string",
+							"description": "New end time in RFC 3339 format. Must be provided together with start_time."
+						},
+						"attendees": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Replacement list of attendee email addresses"
+						},
+						"location": {
+							"type": "string",
+							"description": "Event location"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.delete_calendar_event",
+				Name:        "Delete Calendar Event",
+				Description: "Delete or cancel a Google Calendar event",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["event_id"],
+					"properties": {
+						"event_id": {
+							"type": "string",
+							"description": "The ID of the calendar event to delete"
+						},
+						"calendar_id": {
+							"type": "string",
+							"default": "primary",
+							"description": "Calendar ID (defaults to 'primary')"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.search_drive",
+				Name:        "Search Drive",
+				Description: "Search Google Drive files by name, type, or content",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Search term to match against file names and content"
+						},
+						"file_type": {
+							"type": "string",
+							"enum": ["document", "spreadsheet", "presentation", "folder", "pdf", "image", "video", "audio"],
+							"description": "Filter by file type"
+						},
+						"folder_id": {
+							"type": "string",
+							"description": "Limit search to files within this folder ID"
+						},
+						"max_results": {
+							"type": "integer",
+							"default": 10,
+							"minimum": 1,
+							"maximum": 100,
+							"description": "Maximum number of results to return (1-100, default 10)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.create_drive_folder",
+				Name:        "Create Drive Folder",
+				Description: "Create a new folder in Google Drive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Name of the new folder"
+						},
+						"parent_id": {
+							"type": "string",
+							"description": "Parent folder ID (optional, defaults to Drive root)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "google.send_email_reply",
+				Name:        "Reply to Email",
+				Description: "Reply to an existing Gmail thread",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["thread_id", "message_id", "body"],
+					"properties": {
+						"thread_id": {
+							"type": "string",
+							"description": "The Gmail thread ID to reply to"
+						},
+						"message_id": {
+							"type": "string",
+							"description": "The ID of the specific message to reply to (used to fetch subject and recipient)"
+						},
+						"body": {
+							"type": "string",
+							"description": "Reply body (plain text)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -790,6 +932,55 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Trash Drive files",
 				Description: "Agent can move files to trash in Google Drive.",
 				Parameters:  json.RawMessage(`{"file_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_update_calendar_event",
+				ActionType:  "google.update_calendar_event",
+				Name:        "Update calendar events",
+				Description: "Agent can update any field of any calendar event.",
+				Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","location":"*"}`),
+			},
+			{
+				ID:          "tpl_google_update_calendar_event_time",
+				ActionType:  "google.update_calendar_event",
+				Name:        "Reschedule calendar events",
+				Description: "Agent can reschedule events (change start/end time only).",
+				Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","start_time":"*","end_time":"*"}`),
+			},
+			{
+				ID:          "tpl_google_delete_calendar_event",
+				ActionType:  "google.delete_calendar_event",
+				Name:        "Delete calendar events",
+				Description: "Agent can delete events from any calendar.",
+				Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_search_drive",
+				ActionType:  "google.search_drive",
+				Name:        "Search Drive files",
+				Description: "Agent can search Drive by name, content, or file type.",
+				Parameters:  json.RawMessage(`{"query":"*","file_type":"*","folder_id":"*","max_results":"*"}`),
+			},
+			{
+				ID:          "tpl_google_search_drive_in_folder",
+				ActionType:  "google.search_drive",
+				Name:        "Search Drive within folder",
+				Description: "Agent can search within a specific locked folder.",
+				Parameters:  json.RawMessage(`{"query":"*","file_type":"*","folder_id":"folder-id-here","max_results":"*"}`),
+			},
+			{
+				ID:          "tpl_google_create_drive_folder",
+				ActionType:  "google.create_drive_folder",
+				Name:        "Create Drive folders",
+				Description: "Agent can create folders anywhere in Google Drive.",
+				Parameters:  json.RawMessage(`{"name":"*","parent_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_send_email_reply",
+				ActionType:  "google.send_email_reply",
+				Name:        "Reply to emails",
+				Description: "Agent can reply to any existing Gmail thread.",
+				Parameters:  json.RawMessage(`{"thread_id":"*","message_id":"*","body":"*"}`),
 			},
 		},
 	}

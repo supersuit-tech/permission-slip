@@ -138,6 +138,11 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.send_chat_message":     &sendChatMessageAction{conn: c},
 		"google.list_chat_spaces":      &listChatSpacesAction{conn: c},
 		"google.create_meeting":        &createMeetingAction{conn: c},
+		"google.update_calendar_event": &updateCalendarEventAction{conn: c},
+		"google.delete_calendar_event": &deleteCalendarEventAction{conn: c},
+		"google.search_drive":          &searchDriveAction{conn: c},
+		"google.create_drive_folder":   &createDriveFolderAction{conn: c},
+		"google.send_email_reply":      &sendEmailReplyAction{conn: c},
 	}
 }
 
