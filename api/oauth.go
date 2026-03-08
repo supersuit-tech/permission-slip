@@ -362,7 +362,8 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		}
 
 		// Build auth URL with standard params + any provider-specific params
-		// (e.g. Atlassian's audience=api.atlassian.com for 3LO).
+		// (e.g. Atlassian's audience=api.atlassian.com for 3LO, Slack's
+		// comma-separated scope override).
 		authOpts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
 		for k, v := range provider.AuthorizeParams {
 			if isReservedOAuthParam(k) {

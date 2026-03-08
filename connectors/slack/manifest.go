@@ -265,7 +265,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "slack", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
+			{
+				Service:       "slack",
+				AuthType:      "oauth2",
+				OAuthProvider: "slack",
+				OAuthScopes:   OAuthScopes,
+			},
+			{Service: "slack_bot", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

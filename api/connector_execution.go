@@ -317,9 +317,10 @@ func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID, 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
 // for the given action type.
 func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	var zero connectors.Credentials
 	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
+		return zero, fmt.Errorf("look up required services: %w", err)
 	}
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
@@ -398,8 +399,9 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	}
 	if conn == nil {
 		return zero, &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Message:  fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			Provider:     providerID,
+			Message:      fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			NotConnected: true,
 		}
 	}
 

@@ -57,13 +57,28 @@ func TestSlackConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing bot_token",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "xoxb-oauth-token-value"}),
+			wantErr: false,
+		},
+		{
+			name:    "access_token preferred over bot_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-tok", "bot_token": "xoxb-bot-tok"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing both tokens",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
 			name:    "empty bot_token",
 			creds:   connectors.NewCredentials(map[string]string{"bot_token": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -134,18 +149,35 @@ func TestSlackConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "slack" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "slack")
+
+	// First credential: OAuth2 (primary / recommended)
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "slack" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "slack")
 	}
-	if cred.AuthType != "custom" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "custom")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "slack" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "slack")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want at least one scope")
+	}
+
+	// Second credential: bot token (legacy / alternative)
+	botCred := m.RequiredCredentials[1]
+	if botCred.Service != "slack_bot" {
+		t.Errorf("bot credential service = %q, want %q", botCred.Service, "slack_bot")
+	}
+	if botCred.AuthType != "custom" {
+		t.Errorf("bot credential auth_type = %q, want %q", botCred.AuthType, "custom")
+	}
+	if botCred.InstructionsURL == "" {
+		t.Error("bot credential instructions_url is empty, want a URL")
 	}
 
 	// Validate the manifest passes validation.
