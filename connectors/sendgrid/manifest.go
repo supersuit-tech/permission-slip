@@ -229,6 +229,168 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {}
 				}`)),
 			},
+			{
+				ActionType:  "sendgrid.send_transactional_email",
+				Name:        "Send Transactional Email",
+				Description: "Send a single transactional email (welcome, password reset, order confirmation, etc.) via the SendGrid v3 Mail Send API. Supports dynamic templates with Handlebars substitution.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["to", "from"],
+					"properties": {
+						"to": {
+							"type": "string",
+							"format": "email",
+							"description": "Recipient email address"
+						},
+						"to_name": {
+							"type": "string",
+							"description": "Recipient display name (optional)"
+						},
+						"from": {
+							"type": "string",
+							"format": "email",
+							"description": "Sender email address — must be a verified sender in your SendGrid account"
+						},
+						"from_name": {
+							"type": "string",
+							"description": "Sender display name (optional)"
+						},
+						"subject": {
+							"type": "string",
+							"maxLength": 998,
+							"description": "Email subject line. Required when template_id is not provided."
+						},
+						"html_content": {
+							"type": "string",
+							"description": "HTML body. Required when template_id is not provided and plain_content is also absent."
+						},
+						"plain_content": {
+							"type": "string",
+							"description": "Plain-text body. Required when template_id is not provided and html_content is also absent."
+						},
+						"template_id": {
+							"type": "string",
+							"description": "SendGrid dynamic template ID (e.g. d-xxxx). When set, html_content/plain_content/subject can be omitted if defined in the template."
+						},
+						"dynamic_template_data": {
+							"type": "object",
+							"description": "Key/value pairs substituted into the dynamic template via Handlebars (e.g. {\"first_name\": \"Jane\"}). Only used when template_id is set.",
+							"additionalProperties": true
+						},
+						"reply_to": {
+							"type": "string",
+							"format": "email",
+							"description": "Reply-to email address (optional)"
+						},
+						"cc": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "CC recipients (optional). Useful for sending copies to account managers, team inboxes, etc."
+						},
+						"bcc": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "BCC recipients (optional). Useful for silent compliance copies or audit trails."
+						},
+						"categories": {
+							"type": "array",
+							"items": {"type": "string"},
+							"maxItems": 10,
+							"description": "Labels for filtering and grouping in the SendGrid Activity Feed and stats (e.g. [\"welcome\", \"onboarding\"]). Maximum 10."
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "sendgrid.create_contact",
+				Name:        "Create Contact",
+				Description: "Add or update a contact in SendGrid without assigning them to a specific list. Useful for building a global contact database.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["email"],
+					"properties": {
+						"email": {
+							"type": "string",
+							"format": "email",
+							"description": "Contact email address"
+						},
+						"first_name": {
+							"type": "string",
+							"description": "Contact first name (optional)"
+						},
+						"last_name": {
+							"type": "string",
+							"description": "Contact last name (optional)"
+						},
+						"phone_number": {
+							"type": "string",
+							"description": "Contact phone number (optional)"
+						},
+						"city": {
+							"type": "string",
+							"description": "Contact city (optional)"
+						},
+						"country": {
+							"type": "string",
+							"description": "Contact country (optional)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "sendgrid.get_bounces",
+				Name:        "Get Bounce List",
+				Description: "Retrieve the list of email addresses that have bounced, with bounce reason and status. Useful for deliverability management.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"start_time": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Filter bounces created after this time (ISO 8601, e.g. 2026-01-01T00:00:00Z)"
+						},
+						"end_time": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Filter bounces created before this time (ISO 8601, e.g. 2026-01-31T23:59:59Z)"
+						},
+						"limit": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Maximum number of results to return"
+						},
+						"offset": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Number of results to skip for pagination"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "sendgrid.get_suppressions",
+				Name:        "Get Suppression List",
+				Description: "Retrieve the global unsubscribe list — contacts who have opted out of all email. Useful for compliance and deliverability auditing.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"limit": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Maximum number of results to return"
+						},
+						"offset": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Number of results to skip for pagination"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -324,6 +486,41 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List contact lists",
 				Description: "Agent can list all contact lists to find list IDs.",
 				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_sendgrid_send_transactional_email",
+				ActionType:  "sendgrid.send_transactional_email",
+				Name:        "Send transactional email",
+				Description: "Agent can send transactional emails (welcome, password reset, notifications) to any recipient from any verified sender.",
+				Parameters:  json.RawMessage(`{"to":"*","to_name":"*","from":"*","from_name":"*","subject":"*","html_content":"*","plain_content":"*","template_id":"*","dynamic_template_data":"*","reply_to":"*"}`),
+			},
+			{
+				ID:          "tpl_sendgrid_send_transactional_locked_sender",
+				ActionType:  "sendgrid.send_transactional_email",
+				Name:        "Send transactional email (locked sender)",
+				Description: "Locks the sender address — agent can only send from the specified verified sender. Safer than the unrestricted template.",
+				Parameters:  json.RawMessage(`{"to":"*","to_name":"*","from":"YOUR_VERIFIED_SENDER@example.com","from_name":"*","subject":"*","html_content":"*","plain_content":"*","template_id":"*","dynamic_template_data":"*"}`),
+			},
+			{
+				ID:          "tpl_sendgrid_create_contact",
+				ActionType:  "sendgrid.create_contact",
+				Name:        "Create contact",
+				Description: "Agent can add or update contacts in SendGrid without assigning them to a list.",
+				Parameters:  json.RawMessage(`{"email":"*","first_name":"*","last_name":"*","phone_number":"*","city":"*","country":"*"}`),
+			},
+			{
+				ID:          "tpl_sendgrid_get_bounces",
+				ActionType:  "sendgrid.get_bounces",
+				Name:        "View bounce list",
+				Description: "Agent can retrieve the bounce list for deliverability monitoring.",
+				Parameters:  json.RawMessage(`{"start_time":"*","end_time":"*","limit":"*","offset":"*"}`),
+			},
+			{
+				ID:          "tpl_sendgrid_get_suppressions",
+				ActionType:  "sendgrid.get_suppressions",
+				Name:        "View suppression/unsubscribe list",
+				Description: "Agent can retrieve the global unsubscribe list for compliance and deliverability auditing.",
+				Parameters:  json.RawMessage(`{"limit":"*","offset":"*"}`),
 			},
 		},
 	}

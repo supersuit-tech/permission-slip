@@ -6,6 +6,7 @@ import { useApprovals } from "@/hooks/useApprovals";
 import { Footer } from "./Footer";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
+import { BetaBanner } from "./BetaBanner";
 
 interface NavItem {
   label: string;
@@ -33,7 +34,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navItems = buildNavItems(pendingCount);
 
   return (
-    <div className="min-h-screen bg-background p-3 pb-20 md:p-5 md:pb-5">
+    <div className="min-h-screen bg-background">
+      <BetaBanner />
+      <div className="p-3 pb-20 md:p-5 md:pb-5">
       <nav className="mx-auto mb-6 flex max-w-[1200px] items-center rounded-xl border-b-2 bg-card px-4 py-3 shadow-sm md:mb-8 md:px-10 md:py-4">
         <Link to="/" className="flex items-center gap-2 text-base font-bold md:mr-10 md:gap-2.5 md:text-lg">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground md:h-8 md:w-8 md:text-sm">
@@ -87,6 +90,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       <Footer className="mx-auto mt-12 max-w-[1200px] border-t pt-4" />
 
+      </div>
       {/* Mobile bottom navigation */}
       <nav className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-sm md:hidden">
         <div className="mx-auto flex max-w-md items-center justify-around px-4 py-2">
