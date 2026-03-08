@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
+import { useAuth } from "@/auth/AuthContext";
 import { useBillingPlan } from "@/hooks/useBillingPlan";
 import { PlanCard } from "./PlanCard";
 import { UsageSummaryCard } from "./UsageSummaryCard";
@@ -11,45 +12,33 @@ import { UsageDashboard } from "./UsageDashboard";
 import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "./UpgradeSuccessBanner";
-
-// Delays (in ms) between each poll attempt while waiting for the webhook
-// to activate the paid plan after Stripe checkout.
-const POLL_DELAYS = [1000, 2000, 3000, 5000];
+import { activateUpgrade } from "./activateUpgrade";
 
 export function BillingPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
+  const { session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSuccess, setShowSuccess] = useState(
     searchParams.get("upgraded") === "true",
   );
-  const pollRef = useRef(false);
+  const activateRef = useRef(false);
 
   const isPaidPlan = billingPlan != null && billingPlan.plan.id !== "free";
 
-  // Poll for the plan change after returning from Stripe checkout.
-  // The Stripe webhook that upgrades the plan is async, so we retry a
-  // few times with increasing delays until the plan reflects the upgrade.
-  const pollForUpgrade = useCallback(async () => {
-    if (pollRef.current) return;
-    pollRef.current = true;
-    for (const delay of POLL_DELAYS) {
-      await new Promise((r) => setTimeout(r, delay));
-      const result = await refetch();
-      if (result.data?.plan.id !== "free") break;
-    }
-    pollRef.current = false;
-  }, [refetch]);
-
-  // When returning from Stripe with upgraded=true, kick off an immediate
-  // refetch plus background polling to wait for the webhook.
+  // After returning from Stripe checkout, call the activate endpoint to
+  // confirm the upgrade directly with Stripe. This doesn't rely on
+  // webhooks, so it works even in test/dev environments.
   useEffect(() => {
-    if (!showSuccess) return;
-    void refetch().then((result) => {
-      if (result.data?.plan.id === "free") {
-        void pollForUpgrade();
-      }
-    });
-  }, [showSuccess, refetch, pollForUpgrade]);
+    if (!showSuccess || activateRef.current) return;
+    const sessionId = searchParams.get("session_id");
+    if (!sessionId || !session?.access_token) {
+      // No session ID (old URL format) — fall back to a simple refetch.
+      void refetch();
+      return;
+    }
+    activateRef.current = true;
+    void activateUpgrade(sessionId, session.access_token).then(() => refetch());
+  }, [showSuccess, searchParams, session?.access_token, refetch]);
 
   function dismissSuccess() {
     setShowSuccess(false);
