@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -94,6 +95,14 @@ func (c *JiraConnector) Actions() map[string]connectors.Action {
 		"jira.add_comment":      &addCommentAction{conn: c},
 		"jira.assign_issue":     &assignIssueAction{conn: c},
 		"jira.search":           &searchAction{conn: c},
+		"jira.list_projects":    &listProjectsAction{conn: c},
+		"jira.get_issue":        &getIssueAction{conn: c},
+		"jira.delete_issue":     &deleteIssueAction{conn: c},
+		"jira.list_sprints":     &listSprintsAction{conn: c},
+		"jira.create_sprint":    &createSprintAction{conn: c},
+		"jira.move_to_sprint":   &moveToSprintAction{conn: c},
+		"jira.list_statuses":    &listStatusesAction{conn: c},
+		"jira.list_issue_types": &listIssueTypesAction{conn: c},
 	}
 }
 
@@ -161,16 +170,33 @@ func (c *JiraConnector) basicAuthAPIBase(creds connectors.Credentials) (string, 
 	return "https://" + site + ".atlassian.net/rest/api/3", nil
 }
 
-// do is the shared request lifecycle for all Jira actions. It marshals
-// reqBody as JSON, sets the appropriate auth header (Bearer for OAuth,
-// Basic for legacy), checks the response status, and unmarshals the
-// response into respBody. Either reqBody or respBody may be nil.
+// do is the shared request lifecycle for all Jira REST API v3 actions.
 func (c *JiraConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
 	base, err := c.apiBase(ctx, creds)
 	if err != nil {
 		return err
 	}
+	return c.doRequest(ctx, creds, base+path, method, reqBody, respBody)
+}
 
+// doAgile is like do but targets the Jira Agile REST API (/rest/agile/1.0)
+// instead of the standard REST API v3 (/rest/api/3). Used for sprint and
+// board operations.
+func (c *JiraConnector) doAgile(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
+	base, err := c.apiBase(ctx, creds)
+	if err != nil {
+		return err
+	}
+	// Swap /rest/api/3 for /rest/agile/1.0. In test mode the base URL has no
+	// API suffix, so the replacement is a no-op and paths resolve normally.
+	agileBase := strings.Replace(base, "/rest/api/3", "/rest/agile/1.0", 1)
+	return c.doRequest(ctx, creds, agileBase+path, method, reqBody, respBody)
+}
+
+// doRequest performs the actual HTTP request with auth, body marshaling,
+// response reading, and error classification. Both do and doAgile delegate
+// to this method to avoid duplicating auth and response handling logic.
+func (c *JiraConnector) doRequest(ctx context.Context, creds connectors.Credentials, url, method string, reqBody, respBody interface{}) error {
 	var body io.Reader
 	if reqBody != nil {
 		payload, err := json.Marshal(reqBody)
@@ -180,7 +206,7 @@ func (c *JiraConnector) do(ctx context.Context, creds connectors.Credentials, me
 		body = bytes.NewReader(payload)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, base+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}

@@ -67,6 +67,13 @@ func (c *LinearConnector) Actions() map[string]connectors.Action {
 		"linear.add_comment":    &addCommentAction{conn: c},
 		"linear.create_project": &createProjectAction{conn: c},
 		"linear.search_issues":  &searchIssuesAction{conn: c},
+		"linear.list_teams":     &listTeamsAction{conn: c},
+		"linear.get_issue":      &getIssueAction{conn: c},
+		"linear.assign_issue":   &assignIssueAction{conn: c},
+		"linear.change_state":   &changeStateAction{conn: c},
+		"linear.list_labels":    &listLabelsAction{conn: c},
+		"linear.add_label":      &addLabelAction{conn: c},
+		"linear.list_cycles":    &listCyclesAction{conn: c},
 	}
 }
 

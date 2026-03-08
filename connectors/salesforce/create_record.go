@@ -24,6 +24,9 @@ func (p *createRecordParams) validate() error {
 	if p.SObjectType == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: sobject_type"}
 	}
+	if err := validateSObjectType(p.SObjectType, "sobject_type"); err != nil {
+		return err
+	}
 	if len(p.Fields) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: fields"}
 	}

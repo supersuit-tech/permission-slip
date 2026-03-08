@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -185,6 +186,152 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Fields to include in the response"
 						}
 					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.list_projects",
+				Name:        "List Projects",
+				Description: "List all accessible projects — use to discover project keys for creating issues",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
+			{
+				ActionType:  "jira.get_issue",
+				Name:        "Get Issue",
+				Description: "Get a single issue by key — read before updating to see current state",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["issue_key"],
+					"properties": {
+						"issue_key": {
+							"type": "string",
+							"description": "Issue key (e.g. PROJ-123)"
+						},
+						"fields": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Fields to include in the response"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.delete_issue",
+				Name:        "Delete Issue",
+				Description: "Delete an issue by key",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["issue_key"],
+					"properties": {
+						"issue_key": {
+							"type": "string",
+							"description": "Issue key (e.g. PROJ-123)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.list_sprints",
+				Name:        "List Sprints",
+				Description: "List sprints in a Jira board",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["board_id"],
+					"properties": {
+						"board_id": {
+							"type": "integer",
+							"description": "Board ID to list sprints for"
+						},
+						"state": {
+							"type": "string",
+							"enum": ["future", "active", "closed"],
+							"description": "Filter sprints by state"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.create_sprint",
+				Name:        "Create Sprint",
+				Description: "Create a new sprint in a board",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name", "board_id"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Sprint name"
+						},
+						"board_id": {
+							"type": "integer",
+							"description": "Board ID to create the sprint in"
+						},
+						"goal": {
+							"type": "string",
+							"description": "Sprint goal"
+						},
+						"start_date": {
+							"type": "string",
+							"description": "Sprint start date (ISO 8601, e.g. 2024-01-15T09:00:00.000Z)"
+						},
+						"end_date": {
+							"type": "string",
+							"description": "Sprint end date (ISO 8601, e.g. 2024-01-29T09:00:00.000Z)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.move_to_sprint",
+				Name:        "Move to Sprint",
+				Description: "Move issues to a sprint",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["sprint_id", "issues"],
+					"properties": {
+						"sprint_id": {
+							"type": "integer",
+							"description": "Sprint ID to move issues to"
+						},
+						"issues": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Issue keys to move (e.g. PROJ-1, PROJ-2)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.list_statuses",
+				Name:        "List Statuses",
+				Description: "List workflow statuses — use with transition_issue to discover valid transitions",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"project_key": {
+							"type": "string",
+							"description": "Filter statuses by project key (optional)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "jira.list_issue_types",
+				Name:        "List Issue Types",
+				Description: "List issue types (Bug, Story, Task, etc.) — required for creating issues with valid types",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
 				}`)),
 			},
 		},

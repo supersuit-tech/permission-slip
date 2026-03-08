@@ -168,6 +168,104 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "monday.list_boards",
+				Name:        "List Boards",
+				Description: "List boards accessible to the authenticated user",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"limit": {
+							"type": "integer",
+							"default": 20,
+							"description": "Maximum number of boards to return (default 20)"
+						},
+						"kind": {
+							"type": "string",
+							"enum": ["public", "private", "share"],
+							"description": "Board kind filter"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "monday.get_board",
+				Name:        "Get Board",
+				Description: "Get board details including columns and groups",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["board_id"],
+					"properties": {
+						"board_id": {
+							"type": "string",
+							"description": "The board ID to retrieve"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "monday.create_board",
+				Name:        "Create Board",
+				Description: "Create a new Monday.com board",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Board name"
+						},
+						"kind": {
+							"type": "string",
+							"enum": ["public", "private", "share"],
+							"description": "Board kind (default: public)"
+						},
+						"folder_id": {
+							"type": "string",
+							"description": "Folder ID to create the board in"
+						},
+						"workspace_id": {
+							"type": "string",
+							"description": "Workspace ID to create the board in"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "monday.delete_item",
+				Name:        "Delete Item",
+				Description: "Permanently delete an item from a board",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["item_id"],
+					"properties": {
+						"item_id": {
+							"type": "string",
+							"description": "The item ID to delete"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "monday.list_groups",
+				Name:        "List Groups",
+				Description: "List groups on a board (needed to identify group IDs for move_item_to_group)",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["board_id"],
+					"properties": {
+						"board_id": {
+							"type": "string",
+							"description": "The board ID to list groups for"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -225,6 +323,41 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search items on any board",
 				Description: "Agent can search and filter items. Use query for text search or column_id+column_value for filtering.",
 				Parameters:  json.RawMessage(`{"board_id":"*","query":"*","column_id":"*","column_value":"*","limit":20}`),
+			},
+			{
+				ID:          "tpl_monday_list_boards",
+				ActionType:  "monday.list_boards",
+				Name:        "List boards",
+				Description: "Agent can list all boards accessible to the user.",
+				Parameters:  json.RawMessage(`{"limit":20}`),
+			},
+			{
+				ID:          "tpl_monday_get_board",
+				ActionType:  "monday.get_board",
+				Name:        "Get board details",
+				Description: "Agent can retrieve full details (columns, groups) for any board.",
+				Parameters:  json.RawMessage(`{"board_id":"*"}`),
+			},
+			{
+				ID:          "tpl_monday_create_board",
+				ActionType:  "monday.create_board",
+				Name:        "Create boards",
+				Description: "Agent can create new Monday.com boards.",
+				Parameters:  json.RawMessage(`{"name":"*","kind":"public"}`),
+			},
+			{
+				ID:          "tpl_monday_delete_item",
+				ActionType:  "monday.delete_item",
+				Name:        "Delete any item",
+				Description: "Agent can permanently delete any item.",
+				Parameters:  json.RawMessage(`{"item_id":"*"}`),
+			},
+			{
+				ID:          "tpl_monday_list_groups",
+				ActionType:  "monday.list_groups",
+				Name:        "List groups on any board",
+				Description: "Agent can list all groups on any board to find group IDs.",
+				Parameters:  json.RawMessage(`{"board_id":"*"}`),
 			},
 		},
 	}

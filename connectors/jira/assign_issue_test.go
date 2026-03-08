@@ -46,7 +46,9 @@ func TestAssignIssue_Success(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["status"] != "assigned" {
 		t.Errorf("status = %q, want %q", data["status"], "assigned")
 	}
@@ -88,7 +90,9 @@ func TestAssignIssue_Unassign(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["status"] != "unassigned" {
 		t.Errorf("status = %q, want %q", data["status"], "unassigned")
 	}

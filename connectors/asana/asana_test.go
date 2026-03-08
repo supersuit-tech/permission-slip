@@ -30,6 +30,12 @@ func TestAsanaConnector_Actions(t *testing.T) {
 		"asana.complete_task",
 		"asana.create_subtask",
 		"asana.search_tasks",
+		"asana.list_workspaces",
+		"asana.list_projects",
+		"asana.create_project",
+		"asana.delete_task",
+		"asana.list_sections",
+		"asana.create_section",
 	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
@@ -91,8 +97,8 @@ func TestAsanaConnector_Manifest(t *testing.T) {
 	if m.Name != "Asana" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Asana")
 	}
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 12 {
+		t.Fatalf("Manifest().Actions has %d items, want 12", len(m.Actions))
 	}
 
 	if err := m.Validate(); err != nil {

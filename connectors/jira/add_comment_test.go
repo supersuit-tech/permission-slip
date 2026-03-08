@@ -56,7 +56,9 @@ func TestAddComment_Success(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["id"] != "10001" {
 		t.Errorf("id = %q, want %q", data["id"], "10001")
 	}

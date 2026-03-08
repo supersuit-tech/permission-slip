@@ -65,6 +65,11 @@ func (c *MondayConnector) Actions() map[string]connectors.Action {
 		"monday.create_subitem":     &createSubitemAction{conn: c},
 		"monday.move_item_to_group": &moveItemToGroupAction{conn: c},
 		"monday.search_items":       &searchItemsAction{conn: c},
+		"monday.list_boards":        &listBoardsAction{conn: c},
+		"monday.get_board":          &getBoardAction{conn: c},
+		"monday.create_board":       &createBoardAction{conn: c},
+		"monday.delete_item":        &deleteItemAction{conn: c},
+		"monday.list_groups":        &listGroupsAction{conn: c},
 	}
 }
 
@@ -200,6 +205,20 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 		}
 	}
 
+	return nil
+}
+
+// validBoardKinds is the set of accepted board kind values for the Monday.com API.
+var validBoardKinds = map[string]bool{"public": true, "private": true, "share": true}
+
+// validateBoardKind returns a ValidationError if kind is non-empty and not one
+// of the accepted values. Returns nil when kind is empty (meaning "no filter").
+func validateBoardKind(kind string) error {
+	if kind != "" && !validBoardKinds[kind] {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid kind %q: must be one of public, private, share", kind),
+		}
+	}
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -194,6 +195,123 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "linear.list_teams",
+				Name:        "List Teams",
+				Description: "List all teams — use to discover team IDs for creating issues",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"properties": {}
+			}`)),
+			},
+			{
+				ActionType:  "linear.get_issue",
+				Name:        "Get Issue",
+				Description: "Get a single issue by ID — returns full details including state, assignee, labels, and cycle",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to retrieve"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.assign_issue",
+				Name:        "Assign Issue",
+				Description: "Assign or unassign an issue — pass empty assignee_id to unassign",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to assign"
+					},
+					"assignee_id": {
+						"type": "string",
+						"description": "User ID to assign (empty to unassign)"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.change_state",
+				Name:        "Change State",
+				Description: "Change an issue's workflow state",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id", "state_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to update"
+					},
+					"state_id": {
+						"type": "string",
+						"description": "The target workflow state ID"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.list_labels",
+				Name:        "List Labels",
+				Description: "List available labels — use to discover label IDs for add_label",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"properties": {
+					"team_id": {
+						"type": "string",
+						"description": "Filter labels by team ID (optional)"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.add_label",
+				Name:        "Add Label",
+				Description: "Add a label to an issue",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id", "label_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to label"
+					},
+					"label_id": {
+						"type": "string",
+						"description": "The label ID to add"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.list_cycles",
+				Name:        "List Cycles",
+				Description: "List cycles (sprints) for a team",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["team_id"],
+				"properties": {
+					"team_id": {
+						"type": "string",
+						"description": "Team ID to list cycles for"
+					}
+				}
+			}`)),
+			},
 		},
 		// Two auth methods: OAuth (recommended) and API key (fallback).
 		// Service names must be unique, so the OAuth entry uses "linear_oauth"
@@ -243,6 +361,34 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create projects in teams",
 				Description: "Locks the teams and lets the agent choose project details.",
 				Parameters:  json.RawMessage(`{"team_ids":"TEAM_IDS","name":"*","description":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_list_teams",
+				ActionType:  "linear.list_teams",
+				Name:        "List teams",
+				Description: "Agent can discover available teams in the workspace.",
+				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_linear_get_issue",
+				ActionType:  "linear.get_issue",
+				Name:        "Get issue details",
+				Description: "Agent can read any issue's full details.",
+				Parameters:  json.RawMessage(`{"issue_id":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_list_labels",
+				ActionType:  "linear.list_labels",
+				Name:        "List labels for a team",
+				Description: "Agent can list available labels, optionally filtered by team.",
+				Parameters:  json.RawMessage(`{"team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_list_cycles",
+				ActionType:  "linear.list_cycles",
+				Name:        "List cycles for a team",
+				Description: "Agent can view sprint cycles for a specific team.",
+				Parameters:  json.RawMessage(`{"team_id":"TEAM_ID"}`),
 			},
 		},
 	}

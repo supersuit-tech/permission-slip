@@ -22,6 +22,30 @@ import (
 // sfIDPattern matches Salesforce 15 or 18-character alphanumeric record IDs.
 var sfIDPattern = regexp.MustCompile(`^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$`)
 
+// sfDatePattern matches Salesforce date format: YYYY-MM-DD.
+var sfDatePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// sfObjectTypePattern matches valid Salesforce sObject type names: a letter
+// followed by up to 49 alphanumeric/underscore characters. This covers standard
+// objects (e.g. "Lead"), custom objects ("MyObj__c"), and managed package objects.
+var sfObjectTypePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{0,49}$`)
+
+// validateDate checks that s is a valid YYYY-MM-DD date and that the date
+// itself is valid (e.g. not 2024-02-30). fieldName is used in error messages.
+func validateDate(s, fieldName string) error {
+	if !sfDatePattern.MatchString(s) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: expected YYYY-MM-DD format, got %q", fieldName, s),
+		}
+	}
+	if _, err := time.Parse("2006-01-02", s); err != nil {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: %q is not a valid date", fieldName, s),
+		}
+	}
+	return nil
+}
+
 const (
 	// apiVersion is the pinned Salesforce REST API version.
 	apiVersion = "v62.0"
@@ -69,11 +93,19 @@ func (c *SalesforceConnector) ID() string { return "salesforce" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *SalesforceConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"salesforce.create_record": &createRecordAction{conn: c},
-		"salesforce.update_record": &updateRecordAction{conn: c},
-		"salesforce.query":         &queryAction{conn: c},
-		"salesforce.create_task":   &createTaskAction{conn: c},
-		"salesforce.add_note":      &addNoteAction{conn: c},
+		"salesforce.create_record":      &createRecordAction{conn: c},
+		"salesforce.update_record":      &updateRecordAction{conn: c},
+		"salesforce.query":              &queryAction{conn: c},
+		"salesforce.create_task":        &createTaskAction{conn: c},
+		"salesforce.add_note":           &addNoteAction{conn: c},
+		"salesforce.create_opportunity": &createOpportunityAction{conn: c},
+		"salesforce.update_opportunity": &updateOpportunityAction{conn: c},
+		"salesforce.create_lead":        &createLeadAction{conn: c},
+		"salesforce.convert_lead":       &convertLeadAction{conn: c},
+		"salesforce.delete_record":      &deleteRecordAction{conn: c},
+		"salesforce.describe_object":    &describeObjectAction{conn: c},
+		"salesforce.list_reports":       &listReportsAction{conn: c},
+		"salesforce.run_report":         &runReportAction{conn: c},
 	}
 }
 
@@ -149,6 +181,18 @@ func validateRecordID(id, fieldName string) error {
 	if !sfIDPattern.MatchString(id) {
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("invalid %s: expected 15 or 18 alphanumeric characters, got %q", fieldName, id),
+		}
+	}
+	return nil
+}
+
+// validateSObjectType checks that s is a valid Salesforce sObject type name
+// (a letter followed by up to 49 alphanumeric or underscore characters).
+// fieldName is used in the error message.
+func validateSObjectType(s, fieldName string) error {
+	if !sfObjectTypePattern.MatchString(s) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid %s: expected a valid Salesforce object type name (e.g. Lead, Opportunity, MyObject__c), got %q", fieldName, s),
 		}
 	}
 	return nil

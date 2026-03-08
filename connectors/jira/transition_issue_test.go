@@ -50,7 +50,9 @@ func TestTransitionIssue_WithID(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["transition_id"] != "31" {
 		t.Errorf("transition_id = %q, want %q", data["transition_id"], "31")
 	}
@@ -109,7 +111,9 @@ func TestTransitionIssue_WithName(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["transition_id"] != "21" {
 		t.Errorf("transition_id = %q, want %q", data["transition_id"], "21")
 	}
