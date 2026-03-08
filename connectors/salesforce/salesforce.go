@@ -69,11 +69,19 @@ func (c *SalesforceConnector) ID() string { return "salesforce" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *SalesforceConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"salesforce.create_record": &createRecordAction{conn: c},
-		"salesforce.update_record": &updateRecordAction{conn: c},
-		"salesforce.query":         &queryAction{conn: c},
-		"salesforce.create_task":   &createTaskAction{conn: c},
-		"salesforce.add_note":      &addNoteAction{conn: c},
+		"salesforce.create_record":      &createRecordAction{conn: c},
+		"salesforce.update_record":      &updateRecordAction{conn: c},
+		"salesforce.query":              &queryAction{conn: c},
+		"salesforce.create_task":        &createTaskAction{conn: c},
+		"salesforce.add_note":           &addNoteAction{conn: c},
+		"salesforce.create_opportunity": &createOpportunityAction{conn: c},
+		"salesforce.update_opportunity": &updateOpportunityAction{conn: c},
+		"salesforce.create_lead":        &createLeadAction{conn: c},
+		"salesforce.convert_lead":       &convertLeadAction{conn: c},
+		"salesforce.delete_record":      &deleteRecordAction{conn: c},
+		"salesforce.describe_object":    &describeObjectAction{conn: c},
+		"salesforce.list_reports":       &listReportsAction{conn: c},
+		"salesforce.run_report":         &runReportAction{conn: c},
 	}
 }
 
