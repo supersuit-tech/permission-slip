@@ -1,10 +1,12 @@
 package stripe
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -97,5 +99,30 @@ func TestCreateProduct_InvalidJSON(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestCreateProduct_Timeout(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
+	defer cancel()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	_, err := conn.Actions()["stripe.create_product"].Execute(ctx, connectors.ActionRequest{
+		ActionType:  "stripe.create_product",
+		Parameters:  json.RawMessage(`{"name":"Test Product"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("expected TimeoutError, got %T: %v", err, err)
 	}
 }

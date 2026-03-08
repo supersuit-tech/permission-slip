@@ -1,10 +1,12 @@
 package stripe
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -215,5 +217,30 @@ func TestUpdateSubscription_CancelAt(t *testing.T) {
 	}
 	if data["cancel_at"] != float64(1893456000) {
 		t.Errorf("cancel_at = %v, want 1893456000", data["cancel_at"])
+	}
+}
+
+func TestUpdateSubscription_Timeout(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Millisecond)
+	defer cancel()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	_, err := conn.Actions()["stripe.update_subscription"].Execute(ctx, connectors.ActionRequest{
+		ActionType:  "stripe.update_subscription",
+		Parameters:  json.RawMessage(`{"subscription_id":"sub_abc123"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsTimeoutError(err) {
+		t.Errorf("expected TimeoutError, got %T: %v", err, err)
 	}
 }
