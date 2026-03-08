@@ -42,7 +42,9 @@ func TestListStatuses_Success(t *testing.T) {
 	}
 
 	var data []map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if len(data) != 3 {
 		t.Errorf("got %d statuses, want 3", len(data))
 	}

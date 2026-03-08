@@ -41,7 +41,9 @@ func TestChangeState_Success(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["state_name"] != "Done" {
 		t.Errorf("state_name = %q, want Done", data["state_name"])
 	}

@@ -48,7 +48,9 @@ func TestUpdateIssue_Success(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["issue_key"] != "PROJ-123" {
 		t.Errorf("issue_key = %q, want %q", data["issue_key"], "PROJ-123")
 	}

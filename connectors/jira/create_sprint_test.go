@@ -54,7 +54,9 @@ func TestCreateSprint_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["name"] != "Sprint 1" {
 		t.Errorf("name = %v, want Sprint 1", data["name"])
 	}

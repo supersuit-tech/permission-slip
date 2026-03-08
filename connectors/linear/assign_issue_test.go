@@ -41,7 +41,9 @@ func TestAssignIssue_Success(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["assignee_id"] != "user-1" {
 		t.Errorf("assignee_id = %q, want user-1", data["assignee_id"])
 	}
@@ -81,7 +83,9 @@ func TestAssignIssue_Unassign(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["id"] != "issue-1" {
 		t.Errorf("id = %q, want issue-1", data["id"])
 	}

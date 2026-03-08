@@ -47,7 +47,9 @@ func TestGetIssue_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["identifier"] != "ENG-123" {
 		t.Errorf("identifier = %v, want ENG-123", data["identifier"])
 	}

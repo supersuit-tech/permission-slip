@@ -57,7 +57,9 @@ func TestSearch_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["total"] != float64(2) {
 		t.Errorf("total = %v, want 2", data["total"])
 	}

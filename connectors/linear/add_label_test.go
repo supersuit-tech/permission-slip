@@ -57,7 +57,9 @@ func TestAddLabel_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	labels, ok := data["labels"].([]interface{})
 	if !ok {
 		t.Fatal("expected labels array")

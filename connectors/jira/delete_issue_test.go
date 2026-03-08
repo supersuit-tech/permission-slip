@@ -36,7 +36,9 @@ func TestDeleteIssue_Success(t *testing.T) {
 	}
 
 	var data map[string]string
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["status"] != "deleted" {
 		t.Errorf("status = %q, want deleted", data["status"])
 	}

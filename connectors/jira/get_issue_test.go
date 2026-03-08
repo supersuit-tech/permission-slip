@@ -55,7 +55,9 @@ func TestGetIssue_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["key"] != "PROJ-123" {
 		t.Errorf("key = %v, want PROJ-123", data["key"])
 	}

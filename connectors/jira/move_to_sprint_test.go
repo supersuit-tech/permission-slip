@@ -47,7 +47,9 @@ func TestMoveToSprint_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["status"] != "moved" {
 		t.Errorf("status = %v, want moved", data["status"])
 	}

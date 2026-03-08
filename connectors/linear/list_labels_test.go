@@ -37,7 +37,9 @@ func TestListLabels_Success(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["total_count"] != float64(2) {
 		t.Errorf("total_count = %v, want 2", data["total_count"])
 	}
@@ -72,7 +74,9 @@ func TestListLabels_WithTeamFilter(t *testing.T) {
 	}
 
 	var data map[string]interface{}
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
 	if data["total_count"] != float64(1) {
 		t.Errorf("total_count = %v, want 1", data["total_count"])
 	}
