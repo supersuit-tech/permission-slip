@@ -1,6 +1,7 @@
 package oauth_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/oauth"
@@ -298,6 +299,96 @@ func TestRegisterFromManifest_InvalidID(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected error for invalid provider ID")
+	}
+}
+
+func TestRegisterBuiltIn_PanicsOnEmptyID(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for empty provider ID, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			AuthorizeURL: "https://example.com/auth",
+			TokenURL:     "https://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnMissingAuthorizeURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for missing AuthorizeURL, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:       "test-missing-authorize-url",
+			TokenURL: "https://example.com/token",
+			Source:   oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnHTTPAuthorizeURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for non-HTTPS AuthorizeURL, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:           "test-http-authorize",
+			AuthorizeURL: "http://example.com/auth",
+			TokenURL:     "https://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnHTTPTokenURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for non-HTTPS TokenURL, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:           "test-http-token",
+			AuthorizeURL: "https://example.com/auth",
+			TokenURL:     "http://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnDuplicateID(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for duplicate provider ID, got none")
+		}
+	}()
+	// "google" is already registered via init() in oauth/providers.
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:           "google",
+			AuthorizeURL: "https://example.com/auth",
+			TokenURL:     "https://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestBuiltInProviders_AllUseHTTPS(t *testing.T) {
+	for _, p := range oauth.BuiltInProviders() {
+		if !strings.HasPrefix(p.AuthorizeURL, "https://") {
+			t.Errorf("provider %q AuthorizeURL does not use HTTPS: %q", p.ID, p.AuthorizeURL)
+		}
+		if !strings.HasPrefix(p.TokenURL, "https://") {
+			t.Errorf("provider %q TokenURL does not use HTTPS: %q", p.ID, p.TokenURL)
+		}
 	}
 }
 

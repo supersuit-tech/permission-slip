@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -19,8 +20,8 @@ var (
 // to load .env files — rather than at package init time.
 //
 // The factory is called once at registration time to validate required fields
-// (ID, AuthorizeURL, TokenURL). If any are missing, or if the ID is a
-// duplicate, RegisterBuiltIn panics immediately.
+// (ID, AuthorizeURL, TokenURL). If any are missing, if URLs do not use HTTPS,
+// or if the ID is a duplicate, RegisterBuiltIn panics immediately.
 func RegisterBuiltIn(factory func() Provider) {
 	p := factory() // call once to validate required fields
 	if p.ID == "" {
@@ -29,8 +30,14 @@ func RegisterBuiltIn(factory func() Provider) {
 	if p.AuthorizeURL == "" {
 		panic(fmt.Sprintf("oauth.RegisterBuiltIn: provider %q is missing AuthorizeURL", p.ID))
 	}
+	if !strings.HasPrefix(p.AuthorizeURL, "https://") {
+		panic(fmt.Sprintf("oauth.RegisterBuiltIn: provider %q AuthorizeURL must use https, got %q", p.ID, p.AuthorizeURL))
+	}
 	if p.TokenURL == "" {
 		panic(fmt.Sprintf("oauth.RegisterBuiltIn: provider %q is missing TokenURL", p.ID))
+	}
+	if !strings.HasPrefix(p.TokenURL, "https://") {
+		panic(fmt.Sprintf("oauth.RegisterBuiltIn: provider %q TokenURL must use https, got %q", p.ID, p.TokenURL))
 	}
 	builtInMu.Lock()
 	defer builtInMu.Unlock()
