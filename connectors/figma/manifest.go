@@ -154,7 +154,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 				AuthType:        "oauth2",
 				OAuthProvider:   "figma",
 				OAuthScopes:     []string{"files:read", "file_comments:write"},
-				InstructionsURL: "https://www.figma.com/developers/api#authentication",
+				InstructionsURL: "https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens",
 			},
 		},
 		Templates: []connectors.ManifestTemplate{

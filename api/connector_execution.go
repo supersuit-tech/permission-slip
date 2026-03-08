@@ -52,12 +52,17 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			// If the user has no OAuth connection, fall back to static
+			// If the user has no OAuth connection at all, fall back to static
 			// credentials (e.g. a personal access token stored manually).
 			// This supports connectors like Figma that offer both OAuth and
 			// PAT authentication.
+			//
+			// Only fall back for "not connected" — if the user has a broken
+			// OAuth connection (needs_reauth, refresh failed), surface that
+			// error so they're prompted to reconnect instead of silently
+			// running with weaker credentials.
 			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) {
+			if errors.As(err, &oauthErr) && oauthErr.Reason == connectors.OAuthReasonNotConnected {
 				staticCreds, staticErr := resolveStaticCredentials(ctx, deps, userID, actionType)
 				if staticErr == nil {
 					creds = staticCreds
@@ -313,6 +318,7 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	if conn == nil {
 		return zero, &connectors.OAuthRefreshError{
 			Provider: providerID,
+			Reason:   connectors.OAuthReasonNotConnected,
 			Message:  fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
 		}
 	}
@@ -323,6 +329,7 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	if conn.Status != db.OAuthStatusActive {
 		return zero, &connectors.OAuthRefreshError{
 			Provider: providerID,
+			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", providerID, conn.Status),
 		}
 	}
@@ -374,6 +381,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	if !ok {
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
+			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  fmt.Sprintf("OAuth provider %q is not registered", providerID),
 		}
 	}
@@ -385,6 +393,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
+			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  "token expired and no refresh token available — user must re-authorize",
 		}
 	}
@@ -411,6 +420,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
+			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  "token refresh failed — user must re-authorize",
 		}
 	}

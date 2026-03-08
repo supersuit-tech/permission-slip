@@ -55,7 +55,9 @@ export function ConnectorCredentialsSection({
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasRequiredCredentials,
   });
-  const { connections, isLoading: oauthLoading } = useOAuthConnections();
+  const { connections, isLoading: oauthLoading } = useOAuthConnections({
+    enabled: hasOAuthCredential,
+  });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -135,7 +137,6 @@ function OAuthCredentialRow({
   const connection = connections.find((c) => c.provider === providerId);
   const isOAuthConnected = connection?.status === "active";
   const hasPAT = storedCredentials.length > 0;
-  const isConnected = isOAuthConnected || hasPAT;
 
   function handleConnect() {
     if (!session?.access_token) return;
@@ -162,7 +163,7 @@ function OAuthCredentialRow({
         {/* OAuth connection (primary) */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {isConnected ? (
+            {isOAuthConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
             ) : (
               <Circle className="text-muted-foreground size-5 shrink-0" />
@@ -226,7 +227,11 @@ function OAuthCredentialRow({
         <div className="mt-3 border-t pt-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Key className="text-muted-foreground size-4" />
+              {hasPAT ? (
+                <CheckCircle2 className="size-4 shrink-0 text-green-600 dark:text-green-400" />
+              ) : (
+                <Key className="text-muted-foreground size-4" />
+              )}
               <div>
                 <p className="text-muted-foreground text-xs">
                   Or use a personal access token

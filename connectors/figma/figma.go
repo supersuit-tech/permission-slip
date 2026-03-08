@@ -87,9 +87,10 @@ func New() *FigmaConnector {
 }
 
 // safeRedirectPolicy returns an http.Client CheckRedirect function that strips
-// the X-Figma-Token header when a redirect goes to a different host than the
-// base URL. This prevents credential leakage if the Figma API (or a
-// compromised intermediate) issues a cross-origin redirect.
+// authentication headers (X-Figma-Token for PAT, Authorization for OAuth) when
+// a redirect goes to a different host than the base URL. This prevents
+// credential leakage if the Figma API (or a compromised intermediate) issues a
+// cross-origin redirect.
 func safeRedirectPolicy(baseURL string) func(*http.Request, []*http.Request) error {
 	parsed, _ := url.Parse(baseURL)
 	allowedHost := ""
