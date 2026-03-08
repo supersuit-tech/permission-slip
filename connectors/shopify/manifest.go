@@ -449,6 +449,191 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"additionalProperties": false
 				}`)),
 			},
+			{
+				ActionType:  "shopify.list_customers",
+				Name:        "List Customers",
+				Description: "List or search customers in the Shopify store",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Search query to filter customers by name, email, phone, or other fields"
+						},
+						"limit": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 250,
+							"default": 50,
+							"description": "Maximum number of customers to return"
+						},
+						"fields": {
+							"type": "string",
+							"description": "Comma-separated list of fields to return. Omit for all fields."
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.get_customer",
+				Name:        "Get Customer",
+				Description: "Get full details of a single customer by ID",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["customer_id"],
+					"properties": {
+						"customer_id": {
+							"type": "integer",
+							"description": "The numeric Shopify customer ID"
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.create_customer",
+				Name:        "Create Customer",
+				Description: "Create a new customer record in the Shopify store",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"email": {
+							"type": "string",
+							"format": "email",
+							"description": "Customer email address"
+						},
+						"first_name": {
+							"type": "string",
+							"description": "Customer first name"
+						},
+						"last_name": {
+							"type": "string",
+							"description": "Customer last name"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Customer phone number in E.164 format (e.g. +15551234567)"
+						},
+						"note": {
+							"type": "string",
+							"description": "Internal note about the customer"
+						},
+						"tags": {
+							"type": "string",
+							"description": "Comma-separated tags to attach to the customer"
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.list_products",
+				Name:        "List Products",
+				Description: "List products with optional filtering by status, type, or vendor",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"status": {
+							"type": "string",
+							"enum": ["active", "draft", "archived"],
+							"description": "Filter by product status"
+						},
+						"product_type": {
+							"type": "string",
+							"description": "Filter by product type"
+						},
+						"vendor": {
+							"type": "string",
+							"description": "Filter by product vendor name"
+						},
+						"fields": {
+							"type": "string",
+							"description": "Comma-separated list of fields to return. Omit for all fields."
+						},
+						"limit": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 250,
+							"default": 50,
+							"description": "Maximum number of products to return"
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.get_product",
+				Name:        "Get Product",
+				Description: "Get full details of a single product by ID",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["product_id"],
+					"properties": {
+						"product_id": {
+							"type": "integer",
+							"description": "The numeric Shopify product ID"
+						},
+						"fields": {
+							"type": "string",
+							"description": "Comma-separated list of fields to return. Omit for all fields."
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
+			{
+				ActionType:  "shopify.create_draft_order",
+				Name:        "Create Draft Order",
+				Description: "Create a draft order with line items. Commonly used for B2B workflows and manual order creation. Does not charge the customer until completed.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["line_items"],
+					"properties": {
+						"line_items": {
+							"type": "array",
+							"minItems": 1,
+							"items": {
+								"type": "object",
+								"required": ["quantity"],
+								"properties": {
+									"variant_id": {"type": "integer", "description": "Shopify variant ID"},
+									"product_id": {"type": "integer", "description": "Shopify product ID"},
+									"title": {"type": "string", "description": "Custom line item title"},
+									"price": {"type": "string", "description": "Override price as decimal string"},
+									"quantity": {"type": "integer", "minimum": 1, "description": "Number of units"}
+								},
+								"additionalProperties": false
+							},
+							"description": "Line items for the draft order"
+						},
+						"customer_id": {
+							"type": "integer",
+							"description": "Associate with an existing Shopify customer"
+						},
+						"email": {
+							"type": "string",
+							"format": "email",
+							"description": "Customer email to associate with the draft order"
+						},
+						"note": {
+							"type": "string",
+							"description": "Internal note about the draft order"
+						},
+						"tags": {
+							"type": "string",
+							"description": "Comma-separated tags to attach to the draft order"
+						}
+					},
+					"additionalProperties": false
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{

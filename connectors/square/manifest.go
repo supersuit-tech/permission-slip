@@ -28,7 +28,7 @@ var moneySchema = `{
 }`
 
 // Manifest returns the connector's metadata manifest for DB auto-seeding.
-// Includes full parameter JSON schemas for all 11 actions and configuration
+// Includes full parameter JSON schemas for all 15 actions and configuration
 // templates for common use cases.
 //go:embed logo.svg
 var logoSVG string
@@ -51,6 +51,10 @@ func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 			sendInvoiceManifest(),
 			getInventoryManifest(),
 			adjustInventoryManifest(),
+			listCustomersManifest(),
+			getCustomerManifest(),
+			listLocationsManifest(),
+			createLoyaltyRewardManifest(),
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -603,6 +607,96 @@ func adjustInventoryManifest() connectors.ManifestAction {
 					"type": "string",
 					"enum": ["NONE", "IN_STOCK", "SOLD", "RETURNED_BY_CUSTOMER", "RESERVED_FOR_SALE", "SOLD_ONLINE", "ORDERED_FROM_VENDOR", "RECEIVED_FROM_VENDOR", "IN_TRANSIT_TO", "WASTE", "UNLINKED_RETURN", "COMPOSED", "DECOMPOSED", "SUPPORTED_BY_NEWER_VERSION"],
 					"description": "Target inventory state"
+				}
+			}
+		}`)),
+	}
+}
+func listCustomersManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.list_customers",
+		Name:        "List Customers",
+		Description: "List or search customer profiles. Provide a query to search by email; omit to list all customers.",
+		RiskLevel:   "low",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Search customers by email address (fuzzy match)"
+				},
+				"limit": {
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 100,
+					"description": "Maximum number of customers to return (max 100)"
+				},
+				"cursor": {
+					"type": "string",
+					"description": "Pagination cursor from a previous response"
+				}
+			}
+		}`)),
+	}
+}
+
+func getCustomerManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.get_customer",
+		Name:        "Get Customer",
+		Description: "Get full details of a single customer by ID",
+		RiskLevel:   "low",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+			"type": "object",
+			"required": ["customer_id"],
+			"additionalProperties": false,
+			"properties": {
+				"customer_id": {
+					"type": "string",
+					"description": "Square customer ID"
+				}
+			}
+		}`)),
+	}
+}
+
+func listLocationsManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.list_locations",
+		Name:        "List Locations",
+		Description: "List all business locations for the Square account. Required for multi-location merchants to discover location IDs.",
+		RiskLevel:   "low",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {}
+		}`)),
+	}
+}
+
+func createLoyaltyRewardManifest() connectors.ManifestAction {
+	return connectors.ManifestAction{
+		ActionType:  "square.create_loyalty_reward",
+		Name:        "Create Loyalty Reward",
+		Description: "Create a loyalty reward for a customer's loyalty account. Redeems points from the loyalty account balance.",
+		RiskLevel:   "medium",
+		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+			"type": "object",
+			"required": ["loyalty_account_id", "reward_tier_id"],
+			"additionalProperties": false,
+			"properties": {
+				"loyalty_account_id": {
+					"type": "string",
+					"description": "Square loyalty account ID for the customer"
+				},
+				"reward_tier_id": {
+					"type": "string",
+					"description": "ID of the reward tier to redeem"
+				},
+				"order_id": {
+					"type": "string",
+					"description": "Order ID to associate the reward with (optional)"
 				}
 			}
 		}`)),
