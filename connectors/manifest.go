@@ -108,6 +108,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"netlify":    true,
 	"pagerduty":  true,
 	"salesforce": true,
+	"sendgrid":   true,
 	"shopify":    true,
 	"slack":      true,
 	"square":     true,
