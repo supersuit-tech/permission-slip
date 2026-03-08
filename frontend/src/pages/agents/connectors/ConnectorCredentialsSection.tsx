@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -18,12 +19,14 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
+import { providerLabel, formatServiceName } from "@/lib/providers";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
@@ -45,8 +48,11 @@ export function ConnectorCredentialsSection({
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasStaticCredential,
   });
-  const { connections: oauthConnections, isLoading: oauthLoading } =
-    useOAuthConnections();
+  const {
+    connections: oauthConnections,
+    isLoading: oauthLoading,
+    error: oauthError,
+  } = useOAuthConnections({ enabled: hasOAuthCredential });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -56,6 +62,7 @@ export function ConnectorCredentialsSection({
   }
 
   const anyLoading = isLoading || (hasOAuthCredential && oauthLoading);
+  const anyError = error ?? oauthError;
 
   return (
     <Card>
@@ -74,8 +81,8 @@ export function ConnectorCredentialsSection({
               aria-hidden="true"
             />
           </div>
-        ) : error ? (
-          <p className="text-destructive text-sm">{error}</p>
+        ) : anyError ? (
+          <p className="text-destructive text-sm">{anyError}</p>
         ) : (
           <div className="space-y-3">
             {requiredCredentials.map((cred) =>
@@ -120,6 +127,7 @@ function OAuthCredentialRow({
   const providerId = requiredCredential.oauth_provider ?? "";
   const connection = oauthConnections.find((c) => c.provider === providerId);
   const isConnected = connection?.status === "active";
+  const needsReauth = connection?.status === "needs_reauth";
 
   function handleConnect() {
     if (!session?.access_token || !providerId) return;
@@ -133,7 +141,7 @@ function OAuthCredentialRow({
     if (!providerId) return;
     try {
       await disconnect(providerId);
-      toast.success(`Disconnected ${providerId}.`);
+      toast.success(`Disconnected ${providerLabel(providerId)}.`);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to disconnect.";
@@ -141,8 +149,7 @@ function OAuthCredentialRow({
     }
   }
 
-  const providerLabel =
-    providerId.charAt(0).toUpperCase() + providerId.slice(1);
+  const label = providerLabel(providerId);
 
   return (
     <div className="rounded-lg border p-3">
@@ -150,11 +157,13 @@ function OAuthCredentialRow({
         <div className="flex items-center gap-3">
           {isConnected ? (
             <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : needsReauth ? (
+            <AlertTriangle className="size-5 shrink-0 text-amber-500" />
           ) : (
             <Circle className="text-muted-foreground size-5 shrink-0" />
           )}
           <div>
-            <p className="text-sm font-medium">{providerLabel} (OAuth)</p>
+            <p className="text-sm font-medium">{label} (OAuth)</p>
             <p className="text-muted-foreground text-xs">
               Recommended &mdash; automatic token refresh, no manual key
               management
@@ -175,11 +184,22 @@ function OAuthCredentialRow({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Disconnect ${providerLabel}`}
+                  aria-label={`Disconnect ${label}`}
                 >
                   <Unplug className="text-muted-foreground size-4" />
                 </Button>
               </InlineConfirmButton>
+            </>
+          ) : needsReauth ? (
+            <>
+              <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="size-3" />
+                Needs Re-auth
+              </Badge>
+              <Button variant="outline" size="sm" onClick={handleConnect}>
+                <LogIn className="size-3" />
+                Re-authorize
+              </Button>
             </>
           ) : (
             <>
@@ -188,7 +208,7 @@ function OAuthCredentialRow({
               </span>
               <Button variant="outline" size="sm" onClick={handleConnect}>
                 <LogIn className="size-3" />
-                Connect {providerLabel}
+                Connect {label}
               </Button>
             </>
           )}
@@ -211,6 +231,7 @@ function StaticCredentialRow({
   );
 
   const isConnected = storedCredentials.length > 0;
+  const displayName = formatServiceName(requiredCredential.service);
 
   return (
     <>
@@ -224,10 +245,10 @@ function StaticCredentialRow({
             )}
             <div>
               <p className="text-sm font-medium">
-                {requiredCredential.service}
+                {displayName}
               </p>
               <p className="text-muted-foreground text-xs">
-                Auth type: {requiredCredential.auth_type}
+                Auth type: {requiredCredential.auth_type.replace(/_/g, " ")}
               </p>
               {requiredCredential.instructions_url && (
                 <a

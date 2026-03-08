@@ -354,7 +354,7 @@ func getBearerToken(creds connectors.Credentials) string {
 
 // do is the shared request lifecycle for all Netlify actions. It handles:
 // - JSON marshaling of request bodies
-// - Bearer token authentication via the api_key credential
+// - Bearer token authentication (OAuth access_token preferred, API key fallback)
 // - Response body size limiting (maxResponseBytes) to prevent memory exhaustion
 // - Typed error mapping via checkResponse() (auth, rate limit, validation, timeout)
 // - JSON unmarshaling of response bodies into the caller's target struct
