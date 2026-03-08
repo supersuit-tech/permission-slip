@@ -21,6 +21,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   slack: "Slack",
   square: "Square",
   stripe: "Stripe",
+  vercel: "Vercel",
   zoom: "Zoom",
 };
 
@@ -35,6 +36,7 @@ export function providerLabel(id: string): string {
 const SERVICE_LABELS: Record<string, string> = {
   github_pat: "GitHub Personal Access Token",
   "netlify-api-key": "Netlify API Key",
+  "vercel-api-key": "Vercel API Key",
   square_api_key: "Square API Key",
 };
 

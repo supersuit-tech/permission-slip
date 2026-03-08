@@ -105,13 +105,14 @@ var BuiltInOAuthProviders = map[string]bool{
 	"microsoft":  true,
 	"notion":     true,
 	"netlify":    true,
+	"pagerduty":  true,
 	"salesforce": true,
 	"shopify":    true,
 	"slack":      true,
 	"square":     true,
 	"stripe":     true,
+	"vercel":     true,
 	"zoom":       true,
-	"pagerduty":  true,
 }
 
 // ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in

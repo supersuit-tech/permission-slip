@@ -259,6 +259,14 @@ func BuiltInProviders() []Provider {
 			ClientSecret: os.Getenv("STRIPE_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
+		{
+			ID:           "vercel",
+			AuthorizeURL: "https://vercel.com/integrations/new",
+			TokenURL:     "https://api.vercel.com/v2/oauth/access_token",
+			ClientID:     os.Getenv("VERCEL_CLIENT_ID"),
+			ClientSecret: os.Getenv("VERCEL_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
 	}
 }
 

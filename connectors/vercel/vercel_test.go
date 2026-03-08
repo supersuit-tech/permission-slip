@@ -55,13 +55,28 @@ func TestVercelConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_key",
+			name:    "valid access_token (OAuth)",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth_token"}),
+			wantErr: false,
+		},
+		{
+			name:    "both access_token and api_key",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth_token", "api_key": "test_token"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing all credentials",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
 			name:    "empty api_key",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -84,6 +99,41 @@ func TestVercelConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
+func TestGetBearerToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		creds connectors.Credentials
+		want  string
+	}{
+		{
+			name:  "prefers access_token over api_key",
+			creds: connectors.NewCredentials(map[string]string{"access_token": "oauth", "api_key": "key"}),
+			want:  "oauth",
+		},
+		{
+			name:  "falls back to api_key",
+			creds: connectors.NewCredentials(map[string]string{"api_key": "key"}),
+			want:  "key",
+		},
+		{
+			name:  "returns empty when neither present",
+			creds: connectors.NewCredentials(map[string]string{}),
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getBearerToken(tt.creds)
+			if got != tt.want {
+				t.Errorf("getBearerToken() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestVercelConnector_Manifest(t *testing.T) {
 	t.Parallel()
 	c := New()
@@ -98,15 +148,25 @@ func TestVercelConnector_Manifest(t *testing.T) {
 	if len(m.Actions) != 9 {
 		t.Fatalf("Manifest().Actions has %d items, want 9", len(m.Actions))
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "vercel" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "vercel")
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "vercel" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "vercel")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
+	}
+	if oauthCred.OAuthProvider != "vercel" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "vercel")
+	}
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "vercel-api-key" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "vercel-api-key")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
 	}
 
 	if err := m.Validate(); err != nil {
