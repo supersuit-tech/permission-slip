@@ -944,7 +944,7 @@ func stripeTemplates() []connectors.ManifestTemplate {
 			ID:          "tpl_stripe_create_price_one_time",
 			ActionType:  "stripe.create_price",
 			Name:        "Create one-time prices",
-			Description: "Agent can create one-time prices. Recurring billing is not blocked, but the template is intended for one-time use.",
+			Description: "Agent can create one-time prices. Recurring billing is blocked — use the recurring prices template to allow subscription pricing.",
 			Parameters:  json.RawMessage(`{"currency":"*","product":"*","unit_amount":"*","nickname":"*","active":"*","tax_behavior":"*","metadata":"*"}`),
 		},
 		// --- Checkout ---
