@@ -103,6 +103,7 @@ func (c *MetaConnector) ValidateCredentials(_ context.Context, creds connectors.
 // reqBody as JSON, sends the request with a Bearer token in the Authorization
 // header, handles rate limiting and timeouts, and unmarshals the response into
 // respBody.
+// For GET requests, pass nil for reqBody.
 func (c *MetaConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, rawURL string, reqBody, respBody any) error {
 	token, ok := creds.Get(credKeyAccessToken)
 	if !ok || token == "" {
@@ -138,7 +139,7 @@ func (c *MetaConnector) doJSON(ctx context.Context, creds connectors.Credentials
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
-	if err := checkResponse(resp.StatusCode, respBytes); err != nil {
+	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
 		return err
 	}
 
@@ -187,7 +188,7 @@ type metaAPIError struct {
 
 // checkResponse maps Meta Graph API error codes to typed connector errors.
 // Meta returns errors as JSON: {"error": {"message": "...", "type": "OAuthException", "code": 190}}
-func checkResponse(statusCode int, body []byte) error {
+func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil
 	}
@@ -202,15 +203,17 @@ func checkResponse(statusCode int, body []byte) error {
 
 	// Map Meta-specific error codes:
 	// 190 = invalid/expired access token
-	// 4 = rate limit exceeded
+	// 4 = rate limit exceeded (app-level)
+	// 17 = rate limit exceeded (user-level)
 	// 100 = invalid parameter
 	switch {
 	case code == 190 || statusCode == http.StatusUnauthorized:
 		return &connectors.AuthError{Message: fmt.Sprintf("Meta auth error: %s", msg)}
-	case code == 4 || statusCode == http.StatusTooManyRequests:
+	case code == 4 || code == 17 || statusCode == http.StatusTooManyRequests:
+		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
 		return &connectors.RateLimitError{
 			Message:    fmt.Sprintf("Meta API rate limit exceeded: %s", msg),
-			RetryAfter: defaultRetryAfter,
+			RetryAfter: retryAfter,
 		}
 	case code == 100:
 		return &connectors.ValidationError{Message: fmt.Sprintf("Meta API validation error: %s", msg)}

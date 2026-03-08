@@ -300,13 +300,18 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 							"default": "PAUSED",
 							"description": "Campaign status (default: PAUSED)"
 						},
+						"budget_type": {
+							"type": "string",
+							"enum": ["DAILY", "LIFETIME"],
+							"description": "Budget type — use with daily_budget or lifetime_budget respectively"
+						},
 						"daily_budget": {
 							"type": "integer",
-							"description": "Daily budget in account currency's smallest unit (e.g. cents)"
+							"description": "Daily budget in account currency's smallest unit (e.g. cents) — mutually exclusive with lifetime_budget"
 						},
 						"lifetime_budget": {
 							"type": "integer",
-							"description": "Lifetime budget in account currency's smallest unit"
+							"description": "Lifetime budget in account currency's smallest unit — mutually exclusive with daily_budget"
 						}
 					}
 				}`)),
@@ -460,7 +465,7 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "meta.create_ad_campaign",
 				Name:        "Create ad campaigns",
 				Description: "Agent can create Facebook/Instagram ad campaigns.",
-				Parameters:  json.RawMessage(`{"ad_account_id":"*","name":"*","objective":"*","status":"*","daily_budget":"*","lifetime_budget":"*"}`),
+				Parameters:  json.RawMessage(`{"ad_account_id":"*","name":"*","objective":"*","status":"*","budget_type":"*","daily_budget":"*","lifetime_budget":"*"}`),
 			},
 			{
 				ID:          "tpl_meta_create_ad",

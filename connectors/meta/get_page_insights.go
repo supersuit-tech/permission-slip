@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -91,15 +93,17 @@ func (a *getPageInsightsAction) Execute(ctx context.Context, req connectors.Acti
 		period = "day"
 	}
 
-	reqURL := fmt.Sprintf("%s/%s/insights?metric=%s&period=%s",
-		a.conn.baseURL, params.PageID, metric, period)
-
+	q := url.Values{}
+	q.Set("metric", metric)
+	q.Set("period", period)
 	if params.Since > 0 {
-		reqURL += fmt.Sprintf("&since=%d", params.Since)
+		q.Set("since", strconv.FormatInt(params.Since, 10))
 	}
 	if params.Until > 0 {
-		reqURL += fmt.Sprintf("&until=%d", params.Until)
+		q.Set("until", strconv.FormatInt(params.Until, 10))
 	}
+
+	reqURL := fmt.Sprintf("%s/%s/insights?%s", a.conn.baseURL, params.PageID, q.Encode())
 
 	var resp pageInsightsResponse
 	if err := a.conn.doGet(ctx, req.Credentials, reqURL, &resp); err != nil {

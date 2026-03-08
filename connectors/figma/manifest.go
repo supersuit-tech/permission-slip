@@ -152,7 +152,7 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
-		{
+			{
 				ActionType:  "figma.get_styles",
 				Name:        "Get Styles",
 				Description: "Get design styles/tokens (colors, text, effects) from a Figma file — the foundation of design-to-code workflows",

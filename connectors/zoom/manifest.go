@@ -224,7 +224,7 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
-		{
+			{
 				ActionType:  "zoom.add_registrant",
 				Name:        "Add Meeting Registrant",
 				Description: "Register an attendee for a Zoom meeting or webinar",
@@ -271,7 +271,7 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "zoom.send_chat_message",
 				Name:        "Send Chat Message",
-				Description: "Send a message in Zoom Team Chat to a user or channel",
+				Description: "Send a message in Zoom Team Chat to a user (to_jid) or channel (to_channel) — exactly one recipient is required",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

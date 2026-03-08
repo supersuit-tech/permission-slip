@@ -115,3 +115,56 @@ func TestCreateAdCampaign_MissingAdAccountID(t *testing.T) {
 		t.Fatalf("expected ValidationError, got %T", err)
 	}
 }
+
+func TestCreateAdCampaign_BothBudgetsRejected(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createAdCampaignAction{conn: conn}
+
+	params, _ := json.Marshal(createAdCampaignParams{
+		AdAccountID:    "123456789",
+		Name:           "Test Campaign",
+		Objective:      "OUTCOME_SALES",
+		DailyBudget:    1000,
+		LifetimeBudget: 10000,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "meta.create_ad_campaign",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected validation error when both daily and lifetime budgets are set")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("expected ValidationError, got %T", err)
+	}
+}
+
+func TestCreateAdCampaign_InvalidBudgetType(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createAdCampaignAction{conn: conn}
+
+	params, _ := json.Marshal(createAdCampaignParams{
+		AdAccountID: "123456789",
+		Name:        "Test Campaign",
+		Objective:   "OUTCOME_SALES",
+		BudgetType:  "INVALID",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "meta.create_ad_campaign",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected validation error for invalid budget_type")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("expected ValidationError, got %T", err)
+	}
+}

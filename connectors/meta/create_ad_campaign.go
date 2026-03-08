@@ -26,11 +26,11 @@ type createAdCampaignParams struct {
 }
 
 var validCampaignObjectives = map[string]bool{
-	"OUTCOME_AWARENESS":    true,
-	"OUTCOME_ENGAGEMENT":   true,
-	"OUTCOME_LEADS":        true,
-	"OUTCOME_SALES":        true,
-	"OUTCOME_TRAFFIC":      true,
+	"OUTCOME_AWARENESS":     true,
+	"OUTCOME_ENGAGEMENT":    true,
+	"OUTCOME_LEADS":         true,
+	"OUTCOME_SALES":         true,
+	"OUTCOME_TRAFFIC":       true,
 	"OUTCOME_APP_PROMOTION": true,
 }
 
@@ -38,6 +38,11 @@ var validCampaignStatuses = map[string]bool{
 	"ACTIVE":   true,
 	"PAUSED":   true,
 	"ARCHIVED": true,
+}
+
+var validBudgetTypes = map[string]bool{
+	"DAILY":    true,
+	"LIFETIME": true,
 }
 
 func (p *createAdCampaignParams) validate() error {
@@ -61,21 +66,28 @@ func (p *createAdCampaignParams) validate() error {
 	if p.Status != "" && !validCampaignStatuses[p.Status] {
 		return &connectors.ValidationError{Message: "invalid status — must be one of: ACTIVE, PAUSED, ARCHIVED"}
 	}
+	if p.BudgetType != "" && !validBudgetTypes[p.BudgetType] {
+		return &connectors.ValidationError{Message: "invalid budget_type — must be one of: DAILY, LIFETIME"}
+	}
 	if p.DailyBudget < 0 {
 		return &connectors.ValidationError{Message: "daily_budget must be non-negative"}
 	}
 	if p.LifetimeBudget < 0 {
 		return &connectors.ValidationError{Message: "lifetime_budget must be non-negative"}
 	}
+	// Prevent conflicting budget types: daily_budget and lifetime_budget are mutually exclusive.
+	if p.DailyBudget > 0 && p.LifetimeBudget > 0 {
+		return &connectors.ValidationError{Message: "provide either daily_budget or lifetime_budget, not both"}
+	}
 	return nil
 }
 
 type createAdCampaignRequest struct {
-	Name           string `json:"name"`
-	Objective      string `json:"objective"`
-	Status         string `json:"status,omitempty"`
-	DailyBudget    int64  `json:"daily_budget,omitempty"`
-	LifetimeBudget int64  `json:"lifetime_budget,omitempty"`
+	Name                string   `json:"name"`
+	Objective           string   `json:"objective"`
+	Status              string   `json:"status,omitempty"`
+	DailyBudget         int64    `json:"daily_budget,omitempty"`
+	LifetimeBudget      int64    `json:"lifetime_budget,omitempty"`
 	SpecialAdCategories []string `json:"special_ad_categories"`
 }
 

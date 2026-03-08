@@ -29,7 +29,7 @@ func (p *listInstagramPostsParams) validate() error {
 		return &connectors.ValidationError{Message: "instagram_account_id contains invalid characters"}
 	}
 	if p.Limit < 0 || p.Limit > 100 {
-		return &connectors.ValidationError{Message: "limit must be between 1 and 100"}
+		return &connectors.ValidationError{Message: "limit must be between 0 and 100 (0 uses the default of 10)"}
 	}
 	return nil
 }

@@ -153,7 +153,7 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
-		{
+			{
 				ActionType:  "confluence.list_spaces",
 				Name:        "List Spaces",
 				Description: "List available spaces in Confluence",
