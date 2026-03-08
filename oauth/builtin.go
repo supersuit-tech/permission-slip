@@ -136,12 +136,75 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "linear",
+			AuthorizeURL: "https://linear.app/oauth/authorize",
+			TokenURL:     "https://api.linear.app/oauth/token",
+			Scopes: []string{
+				"read",
+				"write",
+			},
+			ClientID:     os.Getenv("LINEAR_CLIENT_ID"),
+			ClientSecret: os.Getenv("LINEAR_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			ID:           "netlify",
+			AuthorizeURL: "https://app.netlify.com/authorize",
+			TokenURL:     "https://api.netlify.com/oauth/token",
+			ClientID:     os.Getenv("NETLIFY_CLIENT_ID"),
+			ClientSecret: os.Getenv("NETLIFY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "notion",
 			AuthorizeURL: "https://api.notion.com/v1/oauth/authorize",
 			TokenURL:     "https://api.notion.com/v1/oauth/token",
 			Scopes:       []string{},
 			ClientID:     os.Getenv("NOTION_CLIENT_ID"),
 			ClientSecret: os.Getenv("NOTION_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			// Shopify uses per-shop OAuth URLs. The {shop} placeholder is
+			// replaced at authorize/callback time with the user's shop
+			// subdomain (e.g. "mystore"). See api/oauth.go for resolution.
+			ID:           "shopify",
+			AuthorizeURL: "https://{shop}.myshopify.com/admin/oauth/authorize",
+			TokenURL:     "https://{shop}.myshopify.com/admin/oauth/access_token",
+			Scopes: []string{
+				"write_orders",
+				"write_products",
+				"write_inventory",
+				"write_discounts",
+				"read_reports",
+				"read_all_orders",
+			},
+			ClientID:     os.Getenv("SHOPIFY_CLIENT_ID"),
+			ClientSecret: os.Getenv("SHOPIFY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			ID:           "square",
+			AuthorizeURL: "https://connect.squareup.com/oauth2/authorize",
+			TokenURL:     "https://connect.squareup.com/oauth2/token",
+			Scopes: []string{
+				"ORDERS_READ",
+				"ORDERS_WRITE",
+				"PAYMENTS_READ",
+				"PAYMENTS_WRITE",
+				"ITEMS_READ",
+				"ITEMS_WRITE",
+				"CUSTOMERS_READ",
+				"CUSTOMERS_WRITE",
+				"APPOINTMENTS_READ",
+				"APPOINTMENTS_WRITE",
+				"INVOICES_READ",
+				"INVOICES_WRITE",
+				"INVENTORY_READ",
+				"INVENTORY_WRITE",
+			},
+			ClientID:     os.Getenv("SQUARE_CLIENT_ID"),
+			ClientSecret: os.Getenv("SQUARE_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
 		{
@@ -179,11 +242,12 @@ func NewRegistryWithBuiltIns() *Registry {
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {
 		if err := r.Register(Provider{
-			ID:           mp.ID,
-			AuthorizeURL: mp.AuthorizeURL,
-			TokenURL:     mp.TokenURL,
-			Scopes:       mp.Scopes,
-			Source:       SourceManifest,
+			ID:              mp.ID,
+			AuthorizeURL:    mp.AuthorizeURL,
+			TokenURL:        mp.TokenURL,
+			Scopes:          mp.Scopes,
+			AuthorizeParams: mp.AuthorizeParams,
+			Source:          SourceManifest,
 		}); err != nil {
 			return fmt.Errorf("registering manifest OAuth provider %q: %w", mp.ID, err)
 		}
@@ -194,8 +258,9 @@ func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 // ManifestProvider mirrors the OAuth provider declaration in a connector
 // manifest. This avoids a circular import between oauth/ and connectors/.
 type ManifestProvider struct {
-	ID           string
-	AuthorizeURL string
-	TokenURL     string
-	Scopes       []string
+	ID              string
+	AuthorizeURL    string
+	TokenURL        string
+	Scopes          []string
+	AuthorizeParams map[string]string
 }

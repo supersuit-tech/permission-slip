@@ -20,6 +20,16 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
@@ -33,21 +43,34 @@ import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
-interface ConnectorCredentialsSectionProps {
+/** Providers that require a shop subdomain for per-shop OAuth URLs. */
+const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
+
+export interface ConnectorCredentialsSectionProps {
+  connectorId: string;
   requiredCredentials: RequiredCredential[];
 }
 
 export function ConnectorCredentialsSection({
+  connectorId,
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
   const hasRequiredCredentials = requiredCredentials.length > 0;
-  const hasOAuth = requiredCredentials.some((c) => c.auth_type === "oauth2");
+  const hasExplicitOAuth = requiredCredentials.some(
+    (c) => c.auth_type === "oauth2",
+  );
   const hasStatic = requiredCredentials.some((c) => c.auth_type !== "oauth2");
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasStatic,
   });
-  const { connections, isLoading: connectionsLoading } = useOAuthConnections({ enabled: hasOAuth });
-  const { providers, isLoading: providersLoading } = useOAuthProviders({ enabled: hasOAuth });
+  // Also fetch OAuth data when there's a matching built-in provider (e.g.
+  // Shopify declares api_key in manifest but has a built-in OAuth provider).
+  const { connections, isLoading: connectionsLoading } = useOAuthConnections({
+    enabled: true,
+  });
+  const { providers, isLoading: providersLoading } = useOAuthProviders({
+    enabled: true,
+  });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -55,6 +78,12 @@ export function ConnectorCredentialsSection({
     list.push(cred);
     storedByService.set(cred.service, list);
   }
+
+  // Check if there's a matching built-in OAuth provider for this connector
+  // (covers cases like Shopify where the manifest says api_key but OAuth is available).
+  const matchingProvider = providers.find((p) => p.id === connectorId);
+  const hasImplicitOAuth = !hasExplicitOAuth && !!matchingProvider;
+  const hasOAuth = hasExplicitOAuth || hasImplicitOAuth;
 
   // Sort credentials: OAuth first, then static
   const sorted = [...requiredCredentials].sort((a, b) => {
@@ -64,7 +93,7 @@ export function ConnectorCredentialsSection({
   });
 
   const anyLoading =
-    isLoading || (hasOAuth && (connectionsLoading || providersLoading));
+    isLoading || connectionsLoading || providersLoading;
 
   return (
     <Card>
@@ -78,7 +107,7 @@ export function ConnectorCredentialsSection({
         )}
       </CardHeader>
       <CardContent>
-        {!hasRequiredCredentials ? (
+        {!hasRequiredCredentials && !matchingProvider ? (
           <p className="text-muted-foreground py-4 text-center text-sm">
             This connector does not require any credentials.
           </p>
@@ -93,9 +122,33 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
+            {/* Implicit OAuth row for connectors with a matching built-in
+                provider but no explicit oauth2 credential in their manifest */}
+            {hasImplicitOAuth && (
+              <>
+                <OAuthCredentialRow
+                  requiredCredential={{
+                    service: connectorId,
+                    auth_type: "oauth2",
+                    oauth_provider: connectorId,
+                  }}
+                  connections={connections}
+                  providers={providers}
+                />
+                {sorted.length > 0 && (
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="bg-border h-px flex-1" />
+                    <span className="text-muted-foreground text-xs font-medium uppercase">
+                      or
+                    </span>
+                    <div className="bg-border h-px flex-1" />
+                  </div>
+                )}
+              </>
+            )}
+
             {sorted.map((cred, idx) => {
-              const prevCred =
-                idx > 0 ? sorted[idx - 1] : undefined;
+              const prevCred = idx > 0 ? sorted[idx - 1] : undefined;
               const showOrSeparator =
                 prevCred != null &&
                 prevCred.auth_type === "oauth2" &&
@@ -121,7 +174,9 @@ export function ConnectorCredentialsSection({
                   ) : (
                     <StaticCredentialRow
                       requiredCredential={cred}
-                      storedCredentials={storedByService.get(cred.service) ?? []}
+                      storedCredentials={
+                        storedByService.get(cred.service) ?? []
+                      }
                       isAlternative={hasOAuth}
                     />
                   )}
@@ -141,11 +196,17 @@ function OAuthCredentialRow({
   providers,
 }: {
   requiredCredential: RequiredCredential;
-  connections: { provider: string; status: string; scopes: string[]; connected_at: string }[];
+  connections: {
+    provider: string;
+    status: string;
+    scopes: string[];
+    connected_at: string;
+  }[];
   providers: { id: string; has_credentials: boolean }[];
 }) {
   const { session } = useAuth();
   const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
+  const [shopDialogOpen, setShopDialogOpen] = useState(false);
 
   const providerId = requiredCredential.oauth_provider ?? "";
   const connection = connections.find((c) => c.provider === providerId);
@@ -155,7 +216,14 @@ function OAuthCredentialRow({
 
   function handleConnect() {
     if (!session?.access_token || !providerId) return;
-    window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
+    if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
+      setShopDialogOpen(true);
+      return;
+    }
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+    );
   }
 
   async function handleDisconnect() {
@@ -170,90 +238,172 @@ function OAuthCredentialRow({
   }
 
   return (
-    <div className="rounded-lg border p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {isConnected ? (
-            <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
-          ) : needsReauth ? (
-            <AlertTriangle className="text-destructive size-5 shrink-0" />
-          ) : (
-            <Circle className="text-muted-foreground size-5 shrink-0" />
-          )}
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">
-                {providerLabel(providerId)}
+    <>
+      <div className="rounded-lg border p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {isConnected ? (
+              <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+            ) : needsReauth ? (
+              <AlertTriangle className="text-destructive size-5 shrink-0" />
+            ) : (
+              <Circle className="text-muted-foreground size-5 shrink-0" />
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">
+                  {providerLabel(providerId)}
+                </p>
+                <Badge variant="secondary" className="text-xs">
+                  OAuth
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  Recommended
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Connect your {providerLabel(providerId)} account via OAuth for
+                automatic token management
               </p>
-              <Badge variant="secondary" className="text-xs">
-                OAuth
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Recommended
-              </Badge>
             </div>
-            <p className="text-muted-foreground text-xs">
-              Connect your {providerLabel(providerId)} account via OAuth for
-              automatic token management
-            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isConnected ? (
+              <>
+                <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                  Connected
+                </span>
+                <InlineConfirmButton
+                  confirmLabel="Disconnect"
+                  isProcessing={isDisconnecting}
+                  onConfirm={handleDisconnect}
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Disconnect ${providerLabel(providerId)}`}
+                  >
+                    <Unplug className="text-muted-foreground size-4" />
+                  </Button>
+                </InlineConfirmButton>
+              </>
+            ) : needsReauth ? (
+              <>
+                <Badge variant="destructive" className="gap-1 text-xs">
+                  <AlertTriangle className="size-3" />
+                  Needs Re-auth
+                </Badge>
+                <Button variant="outline" size="sm" onClick={handleConnect}>
+                  <LogIn className="size-3" />
+                  Re-authorize
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground text-xs font-medium">
+                  Not connected
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConnect}
+                  disabled={!provider?.has_credentials}
+                >
+                  <LogIn className="size-3" />
+                  Connect {providerLabel(providerId)}
+                </Button>
+              </>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isConnected ? (
-            <>
-              <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                Connected
-              </span>
-              <InlineConfirmButton
-                confirmLabel="Disconnect"
-                isProcessing={isDisconnecting}
-                onConfirm={handleDisconnect}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Disconnect ${providerLabel(providerId)}`}
-                >
-                  <Unplug className="text-muted-foreground size-4" />
-                </Button>
-              </InlineConfirmButton>
-            </>
-          ) : needsReauth ? (
-            <>
-              <Badge variant="destructive" className="gap-1 text-xs">
-                <AlertTriangle className="size-3" />
-                Needs Re-auth
-              </Badge>
-              <Button variant="outline" size="sm" onClick={handleConnect}>
-                <LogIn className="size-3" />
-                Re-authorize
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="text-muted-foreground text-xs font-medium">
-                Not connected
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleConnect}
-                disabled={!provider?.has_credentials}
-              >
-                <LogIn className="size-3" />
-                Connect {providerLabel(providerId)}
-              </Button>
-            </>
-          )}
-        </div>
+        {!isConnected && !needsReauth && !provider?.has_credentials && (
+          <p className="text-muted-foreground mt-2 text-xs">
+            OAuth is not available yet — ask your admin to configure{" "}
+            {providerLabel(providerId)} OAuth credentials.
+          </p>
+        )}
       </div>
-      {!isConnected && !needsReauth && !provider?.has_credentials && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          OAuth is not available yet — ask your admin to configure{" "}
-          {providerLabel(providerId)} OAuth credentials.
-        </p>
+
+      {SHOP_REQUIRED_PROVIDERS.has(providerId) && (
+        <ShopDomainDialog
+          open={shopDialogOpen}
+          onOpenChange={setShopDialogOpen}
+          providerId={providerId}
+        />
       )}
-    </div>
+    </>
+  );
+}
+
+function ShopDomainDialog({
+  open,
+  onOpenChange,
+  providerId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  providerId: string;
+}) {
+  const { session } = useAuth();
+  const [shop, setShop] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!session?.access_token) return;
+    const trimmed = shop.trim().toLowerCase();
+    if (!trimmed) return;
+    const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
+    const url = getOAuthAuthorizeUrl(providerId, session.access_token);
+    window.location.href = `${url}&shop=${encodeURIComponent(subdomain)}`;
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect {providerLabel(providerId)} Store</DialogTitle>
+          <DialogDescription>
+            Enter your {providerLabel(providerId)} store subdomain to begin the
+            OAuth connection.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="shop-domain">Store subdomain</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="shop-domain"
+                placeholder="mystore"
+                value={shop}
+                onChange={(e) => setShop(e.target.value)}
+                autoFocus
+              />
+              <span className="text-muted-foreground whitespace-nowrap text-sm">
+                .myshopify.com
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              e.g. if your store URL is mystore.myshopify.com, enter
+              &quot;mystore&quot;
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!shop.trim()}>
+              <LogIn className="size-4" />
+              Continue to {providerLabel(providerId)}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

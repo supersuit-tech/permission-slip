@@ -145,8 +145,7 @@ func GetRequiredServicesByActionType(ctx context.Context, db DBTX, actionType st
 	// Use a LEFT JOIN so that a matching action with no required credentials
 	// returns a single row with a NULL service (→ empty slice) while a
 	// non-matching action type returns zero rows (→ nil, nil).
-	// OAuth credentials are filtered out because they use the OAuth connection
-	// flow rather than static vault-stored credentials.
+	// Exclude oauth2 services — those are resolved via resolveOAuthCredentials.
 	rows, err := db.Query(ctx, `
 		SELECT crc.service
 		FROM connector_actions ca

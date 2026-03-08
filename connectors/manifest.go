@@ -48,10 +48,11 @@ type ManifestCredential struct {
 // connector. This allows external connectors to register providers that the
 // platform doesn't have built-in support for (e.g. Salesforce, HubSpot).
 type ManifestOAuthProvider struct {
-	ID           string   `json:"id"`
-	AuthorizeURL string   `json:"authorize_url"`
-	TokenURL     string   `json:"token_url"`
-	Scopes       []string `json:"scopes,omitempty"`
+	ID              string            `json:"id"`
+	AuthorizeURL    string            `json:"authorize_url"`
+	TokenURL        string            `json:"token_url"`
+	Scopes          []string          `json:"scopes,omitempty"`
+	AuthorizeParams map[string]string `json:"authorize_params,omitempty"`
 }
 
 // ManifestTemplate describes a predefined configuration preset for an action.
@@ -96,13 +97,32 @@ var BuiltInOAuthProviders = map[string]bool{
 	"google":     true,
 	"hubspot":    true,
 	"kroger":     true,
+	"linear":     true,
 	"linkedin":   true,
 	"meta":       true,
 	"microsoft":  true,
 	"notion":     true,
+	"netlify":    true,
 	"salesforce": true,
+	"shopify":    true,
+	"square":     true,
 	"stripe":     true,
 	"zoom":       true,
+}
+
+// ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in
+// a manifest's authorize_params or be passed through to the authorization URL.
+// Allowing these to be set by connectors would let a malicious or misconfigured
+// manifest override security-critical values (redirect_uri, state, client_id)
+// that the platform manages.
+var ReservedAuthorizeParams = map[string]bool{
+	"redirect_uri":  true,
+	"state":         true,
+	"client_id":     true,
+	"client_secret": true,
+	"response_type": true,
+	"code":          true,
+	"grant_type":    true,
 }
 
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies
@@ -287,6 +307,14 @@ func (m *ConnectorManifest) Validate() error {
 		}
 		if err := validateURL(p.TokenURL, fmt.Sprintf("manifest validation: oauth_providers[%d].token_url", i), "https"); err != nil {
 			return err
+		}
+
+		// Reject reserved OAuth 2.0 parameters in authorize_params to prevent
+		// security issues (e.g. overriding redirect_uri, state, or client_id).
+		for k := range p.AuthorizeParams {
+			if ReservedAuthorizeParams[k] {
+				return fmt.Errorf("manifest validation: oauth_providers[%d].authorize_params contains reserved OAuth parameter %q", i, k)
+			}
 		}
 
 		knownProviders[p.ID] = true

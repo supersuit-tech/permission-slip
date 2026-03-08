@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Microsoft, Meta (Facebook/Instagram), Notion, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -39,12 +39,26 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `META_CLIENT_ID` | App ID from Meta Developer Dashboard |
 | `META_CLIENT_SECRET` | App Secret from Meta Developer Dashboard |
 
+### Linear OAuth
+
+| Variable | Description |
+|---|---|
+| `LINEAR_CLIENT_ID` | OAuth Application ID from Linear Settings |
+| `LINEAR_CLIENT_SECRET` | OAuth Client Secret from Linear Settings |
+
 ### Notion OAuth
 
 | Variable | Description |
 |---|---|
 | `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
 | `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
+
+### Square OAuth
+
+| Variable | Description |
+|---|---|
+| `SQUARE_CLIENT_ID` | Production Application ID from Square Developer Dashboard |
+| `SQUARE_CLIENT_SECRET` | Production Application Secret from Square Developer Dashboard |
 
 ### Stripe OAuth
 
@@ -208,6 +222,38 @@ META_CLIENT_SECRET=your-meta-app-secret
 
 Find these under **App Settings > Basic** in the Meta Developer Dashboard.
 
+## Linear OAuth Setup
+
+### 1. Create a Linear OAuth Application
+
+1. Go to [Linear Settings > API > OAuth Applications](https://linear.app/settings/api/applications)
+2. Click **New OAuth Application**
+3. Fill in the required fields:
+   - Application name: Your deployment name (e.g., "Permission Slip")
+   - Developer URL: Your website URL
+   - Redirect callback URLs: `https://your-domain.com/api/v1/oauth/linear/callback`
+
+### 2. Configure Scopes
+
+The Linear connector requires these scopes:
+- `read` — read issues, projects, teams, and other workspace data
+- `write` — create and update issues, comments, and projects
+
+### 3. Copy Credentials
+
+From the OAuth application settings page, copy:
+- **Client ID** (Application ID)
+- **Client Secret**
+
+### 4. Configure Environment
+
+```bash
+LINEAR_CLIENT_ID=your-linear-client-id
+LINEAR_CLIENT_SECRET=your-linear-client-secret
+```
+
+> **Note:** Linear also supports API key authentication as an alternative. Users who prefer not to use OAuth can generate a personal API key at [Linear Settings > API > Personal API Keys](https://linear.app/docs/graphql/working-with-the-graphql-api#personal-api-keys) and configure it in the connector's credentials section.
+
 ## Notion OAuth Setup
 
 Notion supports both OAuth and internal integration tokens (API keys). OAuth is recommended for end users; API keys are useful for server-to-server integrations or when OAuth is not available.
@@ -248,6 +294,44 @@ If you don't need OAuth, you can use an internal integration token instead:
 4. Share your Notion pages/databases with the integration
 
 The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
+
+## Square OAuth Setup
+
+### 1. Create a Square Developer Application
+
+1. Go to [Square Developer Dashboard](https://developer.squareup.com/apps)
+2. Click **+** to create a new application
+3. Fill in the application name (e.g., "Permission Slip")
+
+### 2. Configure OAuth Settings
+
+1. Navigate to **OAuth** in the left sidebar
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/square/callback
+   ```
+3. Select the required OAuth permissions (scopes):
+   - `ORDERS_READ`, `ORDERS_WRITE`
+   - `PAYMENTS_READ`, `PAYMENTS_WRITE`
+   - `ITEMS_READ`, `ITEMS_WRITE`
+   - `CUSTOMERS_READ`, `CUSTOMERS_WRITE`
+   - `APPOINTMENTS_READ`, `APPOINTMENTS_WRITE`
+   - `INVOICES_READ`, `INVOICES_WRITE`
+   - `INVENTORY_READ`, `INVENTORY_WRITE`
+
+### 3. Get Credentials
+
+1. Navigate to **Credentials** in the left sidebar
+2. Copy the **Production Application ID** and **Production Application Secret**
+
+### 4. Configure Environment
+
+```bash
+SQUARE_CLIENT_ID=your-production-application-id
+SQUARE_CLIENT_SECRET=your-production-application-secret
+```
+
+> **Note:** The Square connector supports both OAuth and API key authentication. OAuth is recommended for production use. API keys can be generated from the Square Developer Dashboard under **Credentials > Production Access Token**.
 
 ## Stripe OAuth Setup
 
@@ -382,7 +466,9 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
+- Linear: `https://your-domain.com/api/v1/oauth/linear/callback`
 - Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
+- Square: `https://your-domain.com/api/v1/oauth/square/callback`
 - Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
