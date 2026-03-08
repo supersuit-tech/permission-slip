@@ -1,6 +1,10 @@
 // Package google implements the Google connector for the Permission Slip
 // connector execution layer. It uses Google REST APIs (Gmail, Calendar, Slides, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
+//
+// The connector exposes 27 actions covering email (send, reply, list), calendar (create,
+// list, update, delete, meetings), Slides, Sheets, Docs, Chat, and Drive (list, get,
+// upload, delete, search, create folder).
 package google
 
 import (
@@ -110,6 +114,24 @@ func newForTestDocs(client *http.Client, docsBaseURL, driveBaseURL string) *Goog
 	}
 }
 
+// newCalendarForTest creates a GoogleConnector with only calendarBaseURL set,
+// for Calendar action tests.
+func newCalendarForTest(client *http.Client, calendarBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:          client,
+		calendarBaseURL: calendarBaseURL,
+	}
+}
+
+// newGmailForTest creates a GoogleConnector with only gmailBaseURL set,
+// for Gmail action tests.
+func newGmailForTest(client *http.Client, gmailBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		gmailBaseURL: gmailBaseURL,
+	}
+}
+
 // ID returns "google", matching the connectors.id in the database.
 func (c *GoogleConnector) ID() string { return "google" }
 
@@ -138,6 +160,11 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.send_chat_message":     &sendChatMessageAction{conn: c},
 		"google.list_chat_spaces":      &listChatSpacesAction{conn: c},
 		"google.create_meeting":        &createMeetingAction{conn: c},
+		"google.update_calendar_event": &updateCalendarEventAction{conn: c},
+		"google.delete_calendar_event": &deleteCalendarEventAction{conn: c},
+		"google.search_drive":          &searchDriveAction{conn: c},
+		"google.create_drive_folder":   &createDriveFolderAction{conn: c},
+		"google.send_email_reply":      &sendEmailReplyAction{conn: c},
 	}
 }
 

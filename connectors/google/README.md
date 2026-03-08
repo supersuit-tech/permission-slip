@@ -26,7 +26,9 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `documents` | `google.create_document`, `google.get_document`, `google.update_document` |
 | `chat.spaces.readonly` | `google.list_chat_spaces` |
 | `chat.messages.create` | `google.send_chat_message` |
-| `drive` | `google.list_drive_files`, `google.get_drive_file`, `google.upload_drive_file`, `google.delete_drive_file`, `google.list_documents` |
+| `drive` | `google.list_drive_files`, `google.get_drive_file`, `google.upload_drive_file`, `google.delete_drive_file`, `google.list_documents`, `google.search_drive`, `google.create_drive_folder` |
+| `calendar.events` (also used for updates/deletes) | `google.update_calendar_event`, `google.delete_calendar_event` |
+| `gmail.send` + `gmail.readonly` (both required) | `google.send_email_reply` |
 
 Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management). The `drive` scope grants full Drive access; a narrower scope like `drive.file` would only allow access to files created by this app, which is too restrictive for file browsing and reading.
 
@@ -746,6 +748,189 @@ Uses multipart upload with JSON metadata in the first part and file content in t
 
 ---
 
+### `google.update_calendar_event`
+
+Updates an existing Google Calendar event using a partial update (PATCH). Only fields that are explicitly provided are changed — omitted fields retain their current values.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `event_id` | string | Yes | — | The ID of the event to update |
+| `calendar_id` | string | No | `primary` | Calendar ID containing the event |
+| `summary` | string | No | — | New event title |
+| `description` | string | No | — | New event description |
+| `start_time` | string | No | — | New start time in RFC 3339 format (must be provided together with `end_time`) |
+| `end_time` | string | No | — | New end time in RFC 3339 format (must be provided together with `start_time`) |
+| `attendees` | string[] | No | — | Replace the attendee list with these email addresses |
+| `clear_attendees` | boolean | No | `false` | Remove all attendees (mutually exclusive with `attendees`) |
+| `location` | string | No | — | New event location |
+
+At least one update field must be provided. `start_time` and `end_time` must always be provided together.
+
+**Response:**
+
+```json
+{
+  "id": "event-123",
+  "summary": "Updated Title",
+  "html_link": "https://calendar.google.com/event?eid=event-123",
+  "status": "confirmed",
+  "updated": "2024-01-15T10:00:00Z"
+}
+```
+
+**Calendar API:** `PATCH /calendars/{calendarId}/events/{eventId}` ([docs](https://developers.google.com/calendar/api/v3/reference/events/patch))
+
+**Implementation notes:**
+- Uses `PATCH` (partial update) via a `map[string]any` request body so that only provided fields are sent. A struct with `omitempty` tags cannot distinguish "not provided" from "intentionally empty" for the attendees list.
+- `clear_attendees: true` sends an explicit empty `attendees: []` array to remove all attendees from the event.
+- `calendar_id` is URL-encoded in the API path to safely handle IDs with special characters (e.g., `group@calendar.google.com`).
+
+---
+
+### `google.delete_calendar_event`
+
+Deletes a Google Calendar event by ID.
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `event_id` | string | Yes | — | The ID of the event to delete |
+| `calendar_id` | string | No | `primary` | Calendar ID containing the event |
+
+**Response:**
+
+```json
+{
+  "event_id": "event-123",
+  "calendar_id": "primary",
+  "status": "deleted"
+}
+```
+
+**Calendar API:** `DELETE /calendars/{calendarId}/events/{eventId}` ([docs](https://developers.google.com/calendar/api/v3/reference/events/delete))
+
+The Google Calendar API returns HTTP 204 No Content on success. The connector synthesizes a response with `status: "deleted"` and the IDs for confirmation.
+
+---
+
+### `google.search_drive`
+
+Searches Google Drive files by name, full-text content, file type, or folder scope. Results are ordered by `modifiedTime desc`.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `query` | string | No | — | Search text (matched against file name and full-text content) |
+| `file_type` | string | No | — | Filter by file type: `document`, `spreadsheet`, `presentation`, `pdf`, `folder`, `image`, `video`, `audio` |
+| `folder_id` | string | No | — | Limit results to files within this folder (alphanumeric Drive ID) |
+| `max_results` | integer | No | `10` | Maximum number of results (1-100) |
+
+At least one of `query`, `file_type`, or `folder_id` must be provided. Trashed files are excluded automatically.
+
+**Response:**
+
+```json
+{
+  "files": [
+    {
+      "id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+      "name": "Q4 Report",
+      "mime_type": "application/vnd.google-apps.document",
+      "modified_time": "2024-01-15T10:00:00.000Z",
+      "size": "",
+      "web_view_link": "https://docs.google.com/document/d/1Bxi.../edit"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Drive API:** `GET /drive/v3/files?q=...` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/list))
+
+**Security notes:**
+- The `query` value is escaped (backslashes and single quotes) before insertion into the Drive query string to prevent query injection.
+- The `folder_id` is validated with an alphanumeric allowlist to prevent path traversal.
+- Image, video, and audio types use a `mimeType contains 'prefix/'` clause (prefix match) since they encompass many subtypes; all other types use an exact `mimeType = '...'` match.
+- The sorted `driveFileTypeNames` slice produces deterministic validation error messages regardless of Go map iteration order.
+
+---
+
+### `google.create_drive_folder`
+
+Creates a folder in Google Drive.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `name` | string | Yes | — | Folder name (max 255 characters) |
+| `parent_id` | string | No | — | Parent folder ID (alphanumeric Drive ID). Omit to create in the root of My Drive. |
+
+**Response:**
+
+```json
+{
+  "id": "1folderIdAbc123",
+  "name": "Project Files",
+  "web_view_link": "https://drive.google.com/drive/folders/1folderIdAbc123"
+}
+```
+
+**Drive API:** `POST /drive/v3/files` with `mimeType: application/vnd.google-apps.folder` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/create))
+
+**Validation:**
+- `name` is required and may not exceed 255 characters (Google Drive allows up to 32,767, but a practical limit prevents oversized API requests).
+- `parent_id`, when provided, must match the alphanumeric Drive ID pattern to prevent injection attacks.
+
+---
+
+### `google.send_email_reply`
+
+Sends a reply to an existing Gmail thread. Fetches the original message headers (From, Subject, Message-ID) and sends a new message in the same thread with correct `In-Reply-To` and `References` headers per RFC 2822.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `thread_id` | string | Yes | The Gmail thread ID to reply to |
+| `message_id` | string | Yes | The specific message ID to reply to (used to fetch headers) |
+| `body` | string | Yes | Reply body text (plain text) |
+
+**Response:**
+
+```json
+{
+  "id": "reply-message-id",
+  "thread_id": "thread123",
+  "subject": "Re: Original Subject",
+  "to": "original-sender@example.com"
+}
+```
+
+**Gmail API:** `GET /gmail/v1/users/me/messages/{id}?format=metadata` (fetch headers) + `POST /gmail/v1/users/me/messages/send` (send reply) ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send))
+
+**Security notes:**
+- `message_id` is verified to belong to `thread_id` before sending — mismatches return a validation error.
+- Gmail-sourced header values (From, Subject, Message-ID) are stripped of CR (`\r`) and LF (`\n`) characters before being written to the RFC 2822 message to prevent MIME header injection. Unlike user-supplied values (which are rejected outright), Gmail-provided values are silently sanitized.
+- Both `Message-Id` and `Message-ID` header casings are requested and parsed case-insensitively to handle variations across email providers.
+- Subject is automatically prefixed with `Re: ` if not already present (case-insensitive check).
+
+---
+
 ### `google.delete_drive_file`
 
 Moves a file to trash in Google Drive (soft delete — not permanent).
@@ -827,6 +1012,13 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, content, and destination |
 | Upload files to specific folder | `upload_drive_file` | `folder_id` locked to a specific folder |
 | Trash Drive files | `delete_drive_file` | Nothing — agent can trash any file |
+| Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location |
+| Reschedule calendar events | `update_calendar_event` | `summary`, `description`, `attendees`, `location` omitted — time changes only |
+| Delete calendar events | `delete_calendar_event` | Nothing — agent can delete events from any calendar |
+| Search Drive files | `search_drive` | Nothing — agent controls query, type, folder |
+| Search Drive within folder | `search_drive` | `folder_id` locked to a specific folder |
+| Create Drive folders | `create_drive_folder` | Nothing — agent controls name and parent |
+| Reply to emails | `send_email_reply` | Nothing — agent controls thread, message, and body |
 
 ## Adding a New Action
 
@@ -839,19 +1031,23 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 5. Validate user-provided IDs (file IDs, folder IDs) with `isValidDriveID()` to prevent injection attacks.
 6. Register the action in `Actions()` inside `google.go`.
 7. Add the action to the `Manifest()` return value inside `manifest.go` with a `ParametersSchema`.
-8. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and `newForTest()` / `newForTestWithSlides()` / `newForTestWithChat()` / `newDriveForTest()` / `newForTestDocs()`.
+8. Add tests in `delete_calendar_event_test.go` using `httptest.NewServer` and the appropriate per-service helper: `newCalendarForTest()`, `newGmailForTest()`, `newDriveForTest()`, `newForTestDocs()`, `newForTestWithSlides()`, `newForTestWithChat()`, or `newForTest()` for mixed Gmail+Calendar tests. Use `validCreds()` from `helpers_test.go` for credentials and `connectors.IsValidationError()` / `connectors.IsExternalError()` for error type assertions.
 
 ## File Structure
 
 ```
 connectors/google/
 ├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
-├── manifest.go                     # Manifest() — actions, credentials, templates
+├── manifest.go                     # Manifest() — 27 action schemas and 39+ templates
 ├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
+├── email_helpers.go                # buildGmailRaw() — shared RFC 2822 message builder used by send_email and send_email_reply
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
+├── send_email_reply.go             # google.send_email_reply action (fetches headers, strips injection chars, sends reply)
 ├── create_calendar_event.go        # google.create_calendar_event action
 ├── list_calendar_events.go         # google.list_calendar_events action
+├── update_calendar_event.go        # google.update_calendar_event action (PATCH with map[string]any for explicit empty arrays)
+├── delete_calendar_event.go        # google.delete_calendar_event action
 ├── create_presentation.go          # google.create_presentation action
 ├── get_presentation.go             # google.get_presentation action
 ├── add_slide.go                    # google.add_slide action (via batchUpdate)
@@ -869,16 +1065,21 @@ connectors/google/
 ├── list_chat_spaces.go             # google.list_chat_spaces action
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
 ├── calendar_helpers.go             # Shared calendar validation (time range, attendees)
-├── list_drive_files.go             # google.list_drive_files action + shared Drive ID validation
+├── list_drive_files.go             # google.list_drive_files action + shared isValidDriveID()
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
 ├── upload_drive_file.go            # google.upload_drive_file action (multipart upload)
 ├── delete_drive_file.go            # google.delete_drive_file action (soft delete via trash)
+├── search_drive.go                 # google.search_drive action (name/fullText/type/folder search)
+├── create_drive_folder.go          # google.create_drive_folder action
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
 ├── list_emails_test.go             # List emails action tests
+├── send_email_reply_test.go        # Send email reply tests (thread validation, header injection, Re: prefix)
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests
+├── update_calendar_event_test.go   # Update event tests (partial update, clear_attendees, conflict validation)
+├── delete_calendar_event_test.go   # Delete event tests
 ├── create_presentation_test.go     # Create presentation tests
 ├── get_presentation_test.go        # Get presentation tests (including URL encoding)
 ├── add_slide_test.go               # Add slide tests (layout validation, insertion index)
@@ -898,6 +1099,8 @@ connectors/google/
 ├── get_drive_file_test.go          # Get Drive file tests (metadata, content export, binary skip)
 ├── upload_drive_file_test.go       # Upload tests (multipart, size limit, folder targeting)
 ├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
+├── search_drive_test.go            # Search Drive tests (query escaping, type filter, deterministic errors)
+├── create_drive_folder_test.go     # Create folder tests (name validation, parent ID)
 └── README.md                       # This file
 ```
 
