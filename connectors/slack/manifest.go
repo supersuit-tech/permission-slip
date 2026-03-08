@@ -1,6 +1,7 @@
 package slack
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "slack",
 		Name:        "Slack",
 		Description: "Slack integration for team communication",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "slack.send_message",

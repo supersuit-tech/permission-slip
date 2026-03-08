@@ -4,6 +4,7 @@
 package twilio
 
 import (
+	_ "embed"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -84,11 +85,15 @@ func (c *TwilioConnector) ID() string { return "twilio" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *TwilioConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "twilio",
 		Name:        "Twilio",
 		Description: "Twilio integration for SMS, voice calls, and WhatsApp messaging",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "twilio.send_sms",

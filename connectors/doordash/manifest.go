@@ -1,6 +1,7 @@
 package doordash
 
 import (
+	_ "embed"
 	"encoding/json"
 	"strings"
 
@@ -17,12 +18,16 @@ func statusEnumJSON() string {
 	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest for DB auto-seeding.
 func (c *DoorDashConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "doordash",
 		Name:        "DoorDash Drive",
 		Description: "DoorDash Drive delivery-as-a-service integration for creating deliveries, getting quotes, and tracking delivery status",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			getQuoteManifest(),
 			createDeliveryManifest(),

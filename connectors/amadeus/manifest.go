@@ -1,6 +1,7 @@
 package amadeus
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "amadeus",
 		Name:        "Amadeus",
 		Description: "Amadeus travel APIs for flights, hotels, and car rentals",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "amadeus.search_airports",

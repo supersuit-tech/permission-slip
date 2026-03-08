@@ -10,6 +10,7 @@
 package postgres
 
 import (
+	_ "embed"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -44,12 +45,16 @@ func New() *PostgresConnector {
 // ID returns "postgres", matching the connectors.id in the database.
 func (c *PostgresConnector) ID() string { return "postgres" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "postgres",
 		Name:        "PostgreSQL",
 		Description: "Read and write PostgreSQL databases with parameterized queries, row limits, and statement timeouts",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "postgres.query",

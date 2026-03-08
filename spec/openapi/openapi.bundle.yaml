@@ -7269,6 +7269,12 @@ components:
           description: |
             Brief description of what this connector does.
           example: GitHub integration for repository management
+        logo_svg:
+          type: string
+          description: |
+            SVG markup for the connector's logo. Defined by the connector itself.
+            May be absent for connectors that have not yet provided a logo.
+          example: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">...</svg>
         actions:
           type: array
           items:
@@ -7340,6 +7346,12 @@ components:
           description: |
             Brief description of what this connector does.
           example: GitHub integration for repository management
+        logo_svg:
+          type: string
+          description: |
+            SVG markup for the connector's logo. Defined by the connector itself.
+            May be absent for connectors that have not yet provided a logo.
+          example: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">...</svg>
         actions:
           type: array
           items:

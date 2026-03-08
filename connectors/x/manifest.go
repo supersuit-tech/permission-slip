@@ -1,6 +1,7 @@
 package x
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "x",
 		Name:        "X (Twitter)",
 		Description: "X/Twitter integration for social media management",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "x.post_tweet",

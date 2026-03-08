@@ -1,6 +1,7 @@
 package asana
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "asana",
 		Name:        "Asana",
 		Description: "Asana integration for project and task management",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "asana.create_task",

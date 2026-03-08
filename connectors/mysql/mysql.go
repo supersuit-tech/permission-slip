@@ -14,6 +14,7 @@
 package mysql
 
 import (
+	_ "embed"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -69,11 +70,15 @@ func (c *MySQLConnector) ID() string { return "mysql" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "mysql",
 		Name:        "MySQL",
 		Description: "MySQL database connector with parameterized queries, table/column allowlists, and read-only enforcement for SELECT operations",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "mysql.query",

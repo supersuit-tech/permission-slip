@@ -1,6 +1,7 @@
 package plaid
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest describing all
 // supported actions, required credentials, and pre-built templates.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "plaid",
 		Name:        "Plaid",
 		Description: "Plaid integration for banking data, account balances, transactions, and identity verification",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "plaid.create_link_token",

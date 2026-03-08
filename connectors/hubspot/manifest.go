@@ -1,6 +1,7 @@
 package hubspot
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "hubspot",
 		Name:        "HubSpot",
 		Description: "HubSpot CRM integration for contacts, deals, tickets, notes, marketing, and analytics",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "hubspot.create_contact",

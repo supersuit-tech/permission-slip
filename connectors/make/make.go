@@ -4,6 +4,7 @@
 package make
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -67,12 +68,16 @@ func newForTest(client *http.Client, baseURL string) *MakeConnector {
 // ID returns "make", matching the connectors.id in the database.
 func (c *MakeConnector) ID() string { return "make" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *MakeConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "make",
 		Name:        "Make",
 		Description: "Make (formerly Integromat) integration for workflow automation — manage and run scenarios via the Make REST API. Supports all Make regions (us1, us2, eu1, eu2) via the region credential.",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "make.list_scenarios",

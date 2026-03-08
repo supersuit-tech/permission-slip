@@ -4,6 +4,7 @@
 package discord
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -56,12 +57,16 @@ func newForTest(client *http.Client, baseURL string) *DiscordConnector {
 // ID returns "discord", matching the connectors.id in the database.
 func (c *DiscordConnector) ID() string { return "discord" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *DiscordConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "discord",
 		Name:        "Discord",
 		Description: "Discord integration for community management and messaging",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "discord.send_message",

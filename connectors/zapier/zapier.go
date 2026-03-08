@@ -5,6 +5,7 @@
 package zapier
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -65,12 +66,16 @@ func newForTest(client *http.Client) *ZapierConnector {
 // ID returns "zapier", matching the connectors.id in the database.
 func (c *ZapierConnector) ID() string { return "zapier" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *ZapierConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "zapier",
 		Name:        "Zapier",
 		Description: "Trigger Zapier workflows (Zaps) via webhooks — one connector that unlocks thousands of integrations",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "zapier.trigger_webhook",

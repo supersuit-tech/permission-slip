@@ -3,6 +3,7 @@
 package vercel
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -50,12 +51,16 @@ func newForTest(client *http.Client, baseURL string) *VercelConnector {
 // ID returns "vercel", matching the connectors.id in the database.
 func (c *VercelConnector) ID() string { return "vercel" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *VercelConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "vercel",
 		Name:        "Vercel",
 		Description: "Vercel deployment management — trigger and promote deployments, rollback, check status, and manage environment variables via the Vercel REST API",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "vercel.list_projects",

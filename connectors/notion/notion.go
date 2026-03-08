@@ -14,6 +14,7 @@
 package notion
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -108,11 +109,15 @@ func (c *NotionConnector) ID() string { return "notion" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "notion",
 		Name:        "Notion",
 		Description: "Notion integration for pages, databases, and content management",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "notion.create_page",
