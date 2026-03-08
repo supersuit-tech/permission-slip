@@ -75,15 +75,11 @@ func (p *sendTransactionalEmailParams) validate() error {
 	if len(p.BCC) > 100 {
 		return &connectors.ValidationError{Message: "bcc must contain at most 100 addresses"}
 	}
-	for _, addr := range p.CC {
-		if !emailPattern.MatchString(addr) {
-			return &connectors.ValidationError{Message: fmt.Sprintf("invalid cc email address: %q", addr)}
-		}
+	if err := validateEmailAddresses("cc", p.CC); err != nil {
+		return err
 	}
-	for _, addr := range p.BCC {
-		if !emailPattern.MatchString(addr) {
-			return &connectors.ValidationError{Message: fmt.Sprintf("invalid bcc email address: %q", addr)}
-		}
+	if err := validateEmailAddresses("bcc", p.BCC); err != nil {
+		return err
 	}
 	if len(p.Categories) > 10 {
 		return &connectors.ValidationError{Message: "categories must have at most 10 items (SendGrid limit)"}

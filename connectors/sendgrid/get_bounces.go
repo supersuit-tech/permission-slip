@@ -108,7 +108,7 @@ func (a *getBouncesAction) Execute(ctx context.Context, req connectors.ActionReq
 	results := make([]bounceResult, len(raw))
 	for i, b := range raw {
 		results[i] = bounceResult{
-			CreatedAt: time.Unix(b.Created, 0).UTC().Format(time.RFC3339),
+			CreatedAt: unixToISO(b.Created),
 			Email:     b.Email,
 			Reason:    b.Reason,
 			Status:    b.Status,

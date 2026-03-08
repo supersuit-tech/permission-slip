@@ -3,6 +3,7 @@ package sendgrid
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"net/http/httptest"
 	"testing"
 
@@ -194,7 +195,7 @@ func TestSendTransactionalEmail_ValidationErrors(t *testing.T) {
 		{name: "invalid bcc email", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","bcc":["bad"]}`},
 		{name: "too many categories", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","categories":["a","b","c","d","e","f","g","h","i","j","k"]}`},
 		{name: "dynamic_template_data without template_id", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","dynamic_template_data":{"key":"value"}}`},
-		{name: "subject too long", params: `{"to":"user@example.com","from":"sender@example.com","subject":"` + string(make([]byte, 999)) + `","html_content":"<p>Hi</p>"}`},
+		{name: "subject too long", params: `{"to":"user@example.com","from":"sender@example.com","subject":"` + strings.Repeat("x", 999) + `","html_content":"<p>Hi</p>"}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

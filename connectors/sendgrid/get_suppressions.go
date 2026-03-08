@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -74,7 +73,7 @@ func (a *getSuppressionsAction) Execute(ctx context.Context, req connectors.Acti
 	results := make([]suppressionResult, len(raw))
 	for i, s := range raw {
 		results[i] = suppressionResult{
-			CreatedAt: time.Unix(s.Created, 0).UTC().Format(time.RFC3339),
+			CreatedAt: unixToISO(s.Created),
 			Email:     s.Email,
 		}
 	}

@@ -4,9 +4,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// unixToISO converts a Unix timestamp (seconds) to an ISO-8601 string in UTC.
+// Used by get_bounces and get_suppressions to return human-readable timestamps
+// instead of raw integers.
+func unixToISO(ts int64) string {
+	return time.Unix(ts, 0).UTC().Format(time.RFC3339)
+}
+
+// validateEmailAddresses validates a slice of email addresses for a named field.
+// Returns a ValidationError if any address fails the email pattern check.
+func validateEmailAddresses(field string, addrs []string) error {
+	for _, addr := range addrs {
+		if !emailPattern.MatchString(addr) {
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid %s email address: %q", field, addr)}
+		}
+	}
+	return nil
+}
 
 // checkResponse inspects the HTTP status code and returns an appropriate
 // typed error for non-success responses.
