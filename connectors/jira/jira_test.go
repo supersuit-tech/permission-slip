@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -524,6 +525,45 @@ func TestJiraConnector_OAuthAPIBase_CachesCloudID(t *testing.T) {
 	}
 	if callCount != 1 {
 		t.Errorf("expected 1 server call (cached), got %d", callCount)
+	}
+}
+
+func TestJiraConnector_OAuthAPIBase_CacheEviction(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]accessibleResource{
+			{ID: "cloud-id", Name: "Site", URL: "https://site.atlassian.net"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newOAuthForTest(srv.Client(), srv.URL+"/accessible-resources")
+
+	// Fill the cache to the limit with expired entries.
+	now := time.Now()
+	conn.cloudIDMu.Lock()
+	for i := 0; i < maxCloudIDCacheSize; i++ {
+		conn.cloudIDCache[fmt.Sprintf("fp-%d", i)] = cloudIDEntry{
+			cloudID:   "old-cloud-id",
+			expiresAt: now.Add(-1 * time.Hour), // expired
+		}
+	}
+	conn.cloudIDMu.Unlock()
+
+	// Next call should trigger eviction of expired entries and succeed.
+	creds := validOAuthCreds()
+	_, err := conn.oauthAPIBase(t.Context(), creds)
+	if err != nil {
+		t.Fatalf("oauthAPIBase() unexpected error after eviction: %v", err)
+	}
+
+	// Cache should have been cleaned: only the new entry remains.
+	conn.cloudIDMu.RLock()
+	size := len(conn.cloudIDCache)
+	conn.cloudIDMu.RUnlock()
+	if size != 1 {
+		t.Errorf("cache size after eviction = %d, want 1", size)
 	}
 }
 

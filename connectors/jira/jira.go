@@ -38,6 +38,12 @@ const defaultAccessibleResourcesURL = atlassianCloudAPIBase + "/oauth/token/acce
 // stable identifiers, so a long TTL is safe.
 const cloudIDCacheTTL = 1 * time.Hour
 
+// maxCloudIDCacheSize limits the number of entries in the cloud ID cache
+// to prevent unbounded memory growth in multi-tenant deployments. When
+// exceeded, expired entries are evicted; if still over limit, the cache
+// is cleared entirely.
+const maxCloudIDCacheSize = 1000
+
 // validSite matches Atlassian site subdomains: alphanumeric with hyphens.
 // Prevents SSRF by ensuring the site value cannot contain path separators,
 // fragments, or other characters that would alter the target host.
@@ -221,8 +227,20 @@ func (c *JiraConnector) oauthAPIBase(ctx context.Context, creds connectors.Crede
 		return "", err
 	}
 
-	// Update cache.
+	// Update cache, evicting stale entries if needed.
 	c.cloudIDMu.Lock()
+	if len(c.cloudIDCache) >= maxCloudIDCacheSize {
+		now := time.Now()
+		for k, v := range c.cloudIDCache {
+			if now.After(v.expiresAt) {
+				delete(c.cloudIDCache, k)
+			}
+		}
+		// If still over limit after evicting expired entries, clear entirely.
+		if len(c.cloudIDCache) >= maxCloudIDCacheSize {
+			c.cloudIDCache = make(map[string]cloudIDEntry)
+		}
+	}
 	c.cloudIDCache[fp] = cloudIDEntry{
 		cloudID:   cloudID,
 		expiresAt: time.Now().Add(cloudIDCacheTTL),
