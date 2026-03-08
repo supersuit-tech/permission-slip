@@ -260,6 +260,15 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "calendly",
+			AuthorizeURL: "https://auth.calendly.com/oauth/authorize",
+			TokenURL:     "https://auth.calendly.com/oauth/token",
+			Scopes:       []string{},
+			ClientID:     os.Getenv("CALENDLY_CLIENT_ID"),
+			ClientSecret: os.Getenv("CALENDLY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			// Zendesk uses per-subdomain OAuth URLs. The {subdomain} placeholder
 			// is replaced at authorize/callback time with the user's Zendesk
 			// subdomain (e.g. "mycompany"). See api/oauth.go for resolution.

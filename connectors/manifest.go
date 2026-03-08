@@ -113,6 +113,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"zendesk":    true,
 	"zoom":       true,
 	"pagerduty":  true,
+	"calendly":   true,
 }
 
 // ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in
