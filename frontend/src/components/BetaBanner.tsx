@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { GITHUB_REPO_URL } from "@/lib/links";
 
 /**
  * Persistent beta banner shown at the top of every authenticated page.
@@ -16,7 +17,7 @@ export function BetaBanner() {
       {" — "}
       This product is in early access. It is up to you to verify the code in our{" "}
       <a
-        href="https://github.com/supersuit-tech/permission-slip-web"
+        href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
         className="underline underline-offset-2 hover:opacity-75"

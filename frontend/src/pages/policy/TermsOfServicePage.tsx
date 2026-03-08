@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { PolicyLayout } from "./PolicyLayout";
+import { GITHUB_REPO_URL } from "@/lib/links";
 
 export function TermsOfServicePage() {
   return (
@@ -196,11 +197,11 @@ export function TermsOfServicePage() {
         Permission Slip&apos;s source code is publicly available under the
         Apache 2.0 license at{" "}
         <a
-          href="https://github.com/supersuit-tech/permission-slip-web"
+          href={GITHUB_REPO_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
-          github.com/supersuit-tech/permission-slip-web
+          github.com/supersuit-tech/permission-slip
         </a>
         .
       </p>
