@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,20 +12,44 @@ import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "./UpgradeSuccessBanner";
 
+// Delays (in ms) between each poll attempt while waiting for the webhook
+// to activate the paid plan after Stripe checkout.
+const POLL_DELAYS = [1000, 2000, 3000, 5000];
+
 export function BillingPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSuccess, setShowSuccess] = useState(
     searchParams.get("upgraded") === "true",
   );
+  const pollRef = useRef(false);
 
-  // Refetch billing data when returning from Stripe with upgraded=true
-  // to ensure the plan card reflects the new subscription.
-  useEffect(() => {
-    if (showSuccess) {
-      void refetch();
+  const isPaidPlan = billingPlan != null && billingPlan.plan.id !== "free";
+
+  // Poll for the plan change after returning from Stripe checkout.
+  // The Stripe webhook that upgrades the plan is async, so we retry a
+  // few times with increasing delays until the plan reflects the upgrade.
+  const pollForUpgrade = useCallback(async () => {
+    if (pollRef.current) return;
+    pollRef.current = true;
+    for (const delay of POLL_DELAYS) {
+      await new Promise((r) => setTimeout(r, delay));
+      const result = await refetch();
+      if (result.data?.plan.id !== "free") break;
     }
-  }, [showSuccess, refetch]);
+    pollRef.current = false;
+  }, [refetch]);
+
+  // When returning from Stripe with upgraded=true, kick off an immediate
+  // refetch plus background polling to wait for the webhook.
+  useEffect(() => {
+    if (!showSuccess) return;
+    void refetch().then((result) => {
+      if (result.data?.plan.id === "free") {
+        void pollForUpgrade();
+      }
+    });
+  }, [showSuccess, refetch, pollForUpgrade]);
 
   function dismissSuccess() {
     setShowSuccess(false);
@@ -46,7 +70,9 @@ export function BillingPage() {
         <h1 className="text-2xl font-bold tracking-tight">Billing</h1>
       </div>
 
-      {showSuccess && <UpgradeSuccessBanner onDismiss={dismissSuccess} />}
+      {showSuccess && (
+        <UpgradeSuccessBanner onDismiss={dismissSuccess} upgraded={isPaidPlan} />
+      )}
 
       {isLoading ? (
         <BillingPageSkeleton />
