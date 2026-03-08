@@ -1,23 +1,9 @@
 /**
- * Shared OAuth utilities for provider labels and URL construction.
+ * Shared OAuth utilities for URL construction.
+ * Provider labels are re-exported from @/lib/labels for convenience.
  */
 
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  hubspot: "HubSpot",
-  intercom: "Intercom",
-  kroger: "Kroger",
-  linkedin: "LinkedIn",
-  meta: "Meta",
-  microsoft: "Microsoft",
-  salesforce: "Salesforce",
-  zoom: "Zoom",
-};
-
-/** Returns a human-readable label for an OAuth provider ID. */
-export function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
+export { providerLabel } from "@/lib/labels";
 
 /**
  * Builds the URL to initiate an OAuth authorization flow for a provider.
