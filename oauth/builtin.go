@@ -155,6 +155,30 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "square",
+			AuthorizeURL: "https://connect.squareup.com/oauth2/authorize",
+			TokenURL:     "https://connect.squareup.com/oauth2/token",
+			Scopes: []string{
+				"ORDERS_READ",
+				"ORDERS_WRITE",
+				"PAYMENTS_READ",
+				"PAYMENTS_WRITE",
+				"ITEMS_READ",
+				"ITEMS_WRITE",
+				"CUSTOMERS_READ",
+				"CUSTOMERS_WRITE",
+				"APPOINTMENTS_READ",
+				"APPOINTMENTS_WRITE",
+				"INVOICES_READ",
+				"INVOICES_WRITE",
+				"INVENTORY_READ",
+				"INVENTORY_WRITE",
+			},
+			ClientID:     os.Getenv("SQUARE_CLIENT_ID"),
+			ClientSecret: os.Getenv("SQUARE_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "stripe",
 			AuthorizeURL: "https://connect.stripe.com/oauth/authorize",
 			TokenURL:     "https://connect.stripe.com/oauth/token",
@@ -189,11 +213,12 @@ func NewRegistryWithBuiltIns() *Registry {
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {
 		if err := r.Register(Provider{
-			ID:           mp.ID,
-			AuthorizeURL: mp.AuthorizeURL,
-			TokenURL:     mp.TokenURL,
-			Scopes:       mp.Scopes,
-			Source:       SourceManifest,
+			ID:              mp.ID,
+			AuthorizeURL:    mp.AuthorizeURL,
+			TokenURL:        mp.TokenURL,
+			Scopes:          mp.Scopes,
+			AuthorizeParams: mp.AuthorizeParams,
+			Source:          SourceManifest,
 		}); err != nil {
 			return fmt.Errorf("registering manifest OAuth provider %q: %w", mp.ID, err)
 		}
@@ -204,8 +229,9 @@ func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 // ManifestProvider mirrors the OAuth provider declaration in a connector
 // manifest. This avoids a circular import between oauth/ and connectors/.
 type ManifestProvider struct {
-	ID           string
-	AuthorizeURL string
-	TokenURL     string
-	Scopes       []string
+	ID              string
+	AuthorizeURL    string
+	TokenURL        string
+	Scopes          []string
+	AuthorizeParams map[string]string
 }

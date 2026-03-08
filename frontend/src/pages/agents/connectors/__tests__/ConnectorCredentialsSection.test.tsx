@@ -53,6 +53,24 @@ const storedCredentials = {
   ],
 };
 
+/**
+ * Helper to mock GET responses by endpoint path.
+ * Returns empty data for unrecognized paths.
+ */
+function setupMockGet(overrides: Record<string, unknown> = {}) {
+  const defaults: Record<string, unknown> = {
+    "/v1/credentials": { data: { credentials: [] } },
+    "/v1/oauth/connections": { data: { connections: [] } },
+    "/v1/oauth/providers": { data: { providers: [] } },
+    ...overrides,
+  };
+  mockGet.mockImplementation((path: string) => {
+    const match = defaults[path];
+    if (match) return Promise.resolve(match);
+    return Promise.resolve({ data: {} });
+  });
+}
+
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -84,7 +102,9 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows connected status with stored credentials", async () => {
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -101,7 +121,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -118,7 +138,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Add Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -139,7 +159,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("stores credential through Add dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
     mockPost.mockResolvedValue({
       data: {
         id: "cred_new",
@@ -176,7 +196,9 @@ describe("ConnectorCredentialsSection", () => {
 
   it("opens Remove Credential dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -201,7 +223,9 @@ describe("ConnectorCredentialsSection", () => {
 
   it("deletes credential through Remove dialog", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: storedCredentials });
+    setupMockGet({
+      "/v1/credentials": { data: storedCredentials },
+    });
     mockDelete.mockResolvedValue({
       data: { id: "cred_123", deleted_at: "2026-02-20T10:00:00Z" },
     });
@@ -235,7 +259,7 @@ describe("ConnectorCredentialsSection", () => {
 
   it("renders basic auth fields for basic auth type", async () => {
     const user = userEvent.setup();
-    mockGet.mockResolvedValue({ data: { credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -257,8 +281,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth connect button for oauth2 credential", async () => {
-    // Mock both endpoints: OAuth connections (no connections) and credentials
-    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -275,7 +298,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows both OAuth and API key options for mixed credentials", async () => {
-    mockGet.mockResolvedValue({ data: { connections: [], credentials: [] } });
+    setupMockGet();
 
     renderWithProviders(
       <ConnectorCredentialsSection

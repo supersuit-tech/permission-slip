@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"golang.org/x/oauth2"
@@ -44,6 +45,13 @@ const oauthStateTTL = 10 * time.Minute
 // Used to validate the "shop" query parameter before substituting it into URLs
 // to prevent URL injection or SSRF.
 var shopSubdomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// isReservedOAuthParam returns true if the parameter name is a reserved
+// OAuth 2.0 param that must not be overridden by AuthorizeParams.
+// Uses the canonical list from connectors.ReservedAuthorizeParams.
+func isReservedOAuthParam(name string) bool {
+	return connectors.ReservedAuthorizeParams[name]
+}
 
 // --- Response types ---
 
@@ -353,7 +361,17 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		authURL := cfg.AuthCodeURL(state, oauth2.AccessTypeOffline)
+		// Build auth URL with standard params + any provider-specific params
+		// (e.g. Atlassian's audience=api.atlassian.com for 3LO).
+		authOpts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+		for k, v := range provider.AuthorizeParams {
+			if isReservedOAuthParam(k) {
+				log.Printf("[%s] OAuthAuthorize: skipping reserved param %q from provider %q AuthorizeParams", TraceID(r.Context()), k, providerID)
+				continue
+			}
+			authOpts = append(authOpts, oauth2.SetAuthURLParam(k, v))
+		}
+		authURL := cfg.AuthCodeURL(state, authOpts...)
 		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 	}
 }
