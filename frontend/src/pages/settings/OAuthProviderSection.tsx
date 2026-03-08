@@ -15,15 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { BYOAConfigDialog } from "./BYOAConfigDialog";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  microsoft: "Microsoft",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
+import { providerLabel } from "@/lib/oauth-providers";
 
 export function OAuthProviderSection() {
   const { providers, isLoading: providersLoading } = useOAuthProviders();

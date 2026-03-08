@@ -20,25 +20,10 @@ import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
+import { providerLabel } from "@/lib/oauth-providers";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  intercom: "Intercom",
-  microsoft: "Microsoft",
-  stripe: "Stripe",
-  salesforce: "Salesforce",
-  meta: "Meta",
-  linkedin: "LinkedIn",
-  zoom: "Zoom",
-  kroger: "Kroger",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
 
 const AUTH_TYPE_LABELS: Record<string, string> = {
   api_key: "API Key",
@@ -152,12 +137,34 @@ function OAuthCredentialRow({
   const { session } = useAuth();
   const provider = requiredCredential.oauth_provider ?? "";
 
-  function handleConnect() {
+  async function handleConnect() {
     if (!session?.access_token) return;
     const baseUrl =
       import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
     const url = `${baseUrl}/v1/oauth/${provider}/authorize`;
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+
+    try {
+      // Use fetch with Authorization header instead of putting the token
+      // in the URL (avoids leaking credentials via browser history, logs,
+      // and Referer headers). redirect: "manual" captures the 302 so we
+      // can read the Location header without the browser following it.
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        redirect: "manual",
+      });
+
+      const location = response.headers.get("Location");
+      if (location) {
+        window.location.href = location;
+      } else {
+        // Fallback: direct navigation (works if the backend reads
+        // access_token from query params or a proxy injects the header).
+        window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+      }
+    } catch {
+      // Network error — fall back to direct navigation.
+      window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    }
   }
 
   return (
