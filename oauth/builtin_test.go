@@ -147,6 +147,25 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("discord", func(t *testing.T) {
+		d, ok := byID["discord"]
+		if !ok {
+			t.Fatal("discord provider not found")
+		}
+		if d.AuthorizeURL != "https://discord.com/oauth2/authorize" {
+			t.Errorf("AuthorizeURL = %q", d.AuthorizeURL)
+		}
+		if d.TokenURL != "https://discord.com/api/oauth2/token" {
+			t.Errorf("TokenURL = %q", d.TokenURL)
+		}
+		if d.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", d.Source, SourceBuiltIn)
+		}
+		if len(d.Scopes) == 0 {
+			t.Error("expected default scopes")
+		}
+	})
+
 	t.Run("stripe", func(t *testing.T) {
 		s, ok := byID["stripe"]
 		if !ok {
@@ -165,6 +184,25 @@ func TestBuiltInProviders(t *testing.T) {
 			t.Errorf("Scopes = %v, want [read_write]", s.Scopes)
 		}
 	})
+
+	t.Run("airtable", func(t *testing.T) {
+		a, ok := byID["airtable"]
+		if !ok {
+			t.Fatal("airtable provider not found")
+		}
+		if a.AuthorizeURL != "https://airtable.com/oauth2/v1/authorize" {
+			t.Errorf("AuthorizeURL = %q", a.AuthorizeURL)
+		}
+		if a.TokenURL != "https://airtable.com/oauth2/v1/token" {
+			t.Errorf("TokenURL = %q", a.TokenURL)
+		}
+		if a.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", a.Source, SourceBuiltIn)
+		}
+		if len(a.Scopes) != 6 {
+			t.Errorf("expected 6 scopes, got %d: %v", len(a.Scopes), a.Scopes)
+		}
+	})
 }
 
 func TestNewRegistryWithBuiltIns(t *testing.T) {
@@ -175,6 +213,12 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 		t.Fatalf("expected at least 2 providers, got %d", len(ids))
 	}
 
+	if _, ok := r.Get("airtable"); !ok {
+		t.Error("airtable not found in registry")
+	}
+	if _, ok := r.Get("discord"); !ok {
+		t.Error("discord not found in registry")
+	}
 	if _, ok := r.Get("figma"); !ok {
 		t.Error("figma not found in registry")
 	}

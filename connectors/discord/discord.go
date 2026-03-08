@@ -30,6 +30,14 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
+// OAuthScopes is the canonical list of OAuth scopes for the Discord bot
+// authorization flow. Referenced by the built-in OAuth provider registration
+// in oauth/builtin.go.
+var OAuthScopes = []string{
+	"bot",
+	"guilds",
+}
+
 // DiscordConnector owns the shared HTTP client and base URL used by all
 // Discord actions. Actions hold a pointer back to the connector to access
 // these shared resources.

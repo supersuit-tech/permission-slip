@@ -50,8 +50,13 @@ func TestSendGridConnector_ValidateCredentials(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid credentials",
+			name:    "valid api_key credentials",
 			creds:   validCreds(),
+			wantErr: false,
+		},
+		{
+			name:    "valid oauth access_token credentials",
+			creds:   validOAuthCreds(),
 			wantErr: false,
 		},
 		{
@@ -62,6 +67,11 @@ func TestSendGridConnector_ValidateCredentials(t *testing.T) {
 		{
 			name:    "empty api_key",
 			creds:   connectors.NewCredentials(map[string]string{"api_key": ""}),
+			wantErr: true,
+		},
+		{
+			name:    "empty access_token falls back to missing api_key",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 		{
@@ -123,18 +133,30 @@ func TestSendGridConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "sendgrid" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "sendgrid")
+	// OAuth credential should be first (default in UI).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "sendgrid_oauth" {
+		t.Errorf("first credential service = %q, want %q", oauthCred.Service, "sendgrid_oauth")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("first credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "sendgrid" {
+		t.Errorf("first credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "sendgrid")
+	}
+	// API key credential should be second.
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "sendgrid" {
+		t.Errorf("second credential service = %q, want %q", apiKeyCred.Service, "sendgrid")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("second credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("second credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {
