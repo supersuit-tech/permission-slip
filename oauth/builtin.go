@@ -262,6 +262,22 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "airtable",
+			AuthorizeURL: "https://airtable.com/oauth2/v1/authorize",
+			TokenURL:     "https://airtable.com/oauth2/v1/token",
+			Scopes: []string{
+				"data.records:read",
+				"data.records:write",
+				"data.recordComments:read",
+				"data.recordComments:write",
+				"schema.bases:read",
+				"schema.bases:write",
+			},
+			ClientID:     os.Getenv("AIRTABLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("AIRTABLE_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			// Datadog OAuth uses split hostnames by design: authorization
 			// redirects go through app.datadoghq.com, while token exchange
 			// happens on api.datadoghq.com. Both paths use the /oauth2/v1/
