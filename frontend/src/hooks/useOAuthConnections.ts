@@ -6,16 +6,11 @@ import type { components } from "@/api/schema";
 
 export type OAuthConnection = components["schemas"]["OAuthConnection"];
 
-interface UseOAuthConnectionsOptions {
-  /** When false the query is disabled entirely (no network request). Defaults to true. */
-  enabled?: boolean;
-}
-
-export function useOAuthConnections(opts: UseOAuthConnectionsOptions = {}) {
-  const { enabled = true } = opts;
+export function useOAuthConnections(options?: { enabled?: boolean }) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const userId = session?.user?.id;
+  const callerEnabled = options?.enabled ?? true;
 
   const tokenRef = useRef(accessToken);
   if (accessToken) {
@@ -33,7 +28,7 @@ export function useOAuthConnections(opts: UseOAuthConnectionsOptions = {}) {
       if (error) throw new Error("Failed to load OAuth connections");
       return data;
     },
-    enabled: !!accessToken && enabled,
+    enabled: !!accessToken && callerEnabled,
   });
 
   return {

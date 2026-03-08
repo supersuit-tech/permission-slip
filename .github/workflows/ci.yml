@@ -41,28 +41,7 @@ jobs:
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
       - name: Run backend tests
-        id: gotest
-        run: |
-          set -o pipefail
-          go test ./... 2>&1 | tee /tmp/gotest.log
-        continue-on-error: true
-
-      - name: Post test error to PR
-        if: steps.gotest.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const log = fs.readFileSync('/tmp/gotest.log', 'utf8').slice(0, 10000);
-            const prNumbers = context.payload.pull_request ? [context.payload.pull_request.number] : [];
-            const issueNumber = prNumbers[0] || 321;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber,
-              body: `## go test failed\n\`\`\`\n${log}\n\`\`\``
-            });
-            core.setFailed('go test ./... failed');
+        run: go test ./...
 
   frontend:
     name: Frontend Tests

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { providerLabel, formatServiceName } from "../providers";
+import { providerLabel, serviceLabel, authTypeLabel } from "../labels";
 
 describe("providerLabel", () => {
   it("returns known provider labels", () => {
@@ -7,11 +7,12 @@ describe("providerLabel", () => {
     expect(providerLabel("netlify")).toBe("Netlify");
     expect(providerLabel("microsoft")).toBe("Microsoft");
     expect(providerLabel("intercom")).toBe("Intercom");
+    expect(providerLabel("github")).toBe("GitHub");
+    expect(providerLabel("hubspot")).toBe("HubSpot");
   });
 
   it("capitalises unknown provider IDs", () => {
-    expect(providerLabel("stripe")).toBe("Stripe");
-    expect(providerLabel("zoom")).toBe("Zoom");
+    expect(providerLabel("unknown")).toBe("Unknown");
   });
 
   it("handles empty string", () => {
@@ -19,22 +20,26 @@ describe("providerLabel", () => {
   });
 });
 
-describe("formatServiceName", () => {
-  it("formats hyphenated service names", () => {
-    expect(formatServiceName("netlify-api-key")).toBe("API Key");
+describe("serviceLabel", () => {
+  it("returns known service labels", () => {
+    expect(serviceLabel("netlify-api-key")).toBe("Netlify API Key");
+    expect(serviceLabel("github_pat")).toBe("GitHub Personal Access Token");
   });
 
-  it("formats underscore service names", () => {
-    expect(formatServiceName("intercom_oauth")).toBe("Intercom OAuth");
+  it("falls back to raw service ID for unknown services", () => {
+    expect(serviceLabel("some-service")).toBe("some-service");
+  });
+});
+
+describe("authTypeLabel", () => {
+  it("returns known auth type labels", () => {
+    expect(authTypeLabel("api_key")).toBe("API Key");
+    expect(authTypeLabel("oauth2")).toBe("OAuth");
+    expect(authTypeLabel("basic")).toBe("Username & Password");
+    expect(authTypeLabel("custom")).toBe("Custom");
   });
 
-  it("handles simple service names", () => {
-    // Single-segment names (no prefix to strip) get title-cased
-    expect(formatServiceName("netlify")).toBe("Netlify");
-  });
-
-  it("preserves API and OAuth casing", () => {
-    expect(formatServiceName("my-api-token")).toBe("API Token");
-    expect(formatServiceName("my-oauth-key")).toBe("OAuth Key");
+  it("falls back to raw auth type for unknown types", () => {
+    expect(authTypeLabel("unknown")).toBe("unknown");
   });
 });

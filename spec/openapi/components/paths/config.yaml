@@ -25,6 +25,5 @@ config:
               $ref: '../schemas/config.yaml#/ConfigResponse'
             example:
               billing_enabled: false
-              stripe_test_mode: false
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
