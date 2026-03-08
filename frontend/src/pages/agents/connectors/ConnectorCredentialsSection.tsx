@@ -20,6 +20,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
+import { providerLabel } from "@/lib/oauthProviders";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
@@ -130,7 +131,7 @@ function OAuthCredentialRow({
     window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
   }
 
-  const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1);
+  const label = providerLabel(provider);
 
   return (
     <div className="rounded-lg border p-3">
@@ -143,7 +144,7 @@ function OAuthCredentialRow({
           )}
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">{providerLabel} OAuth</p>
+              <p className="text-sm font-medium">{label} OAuth</p>
               {hasAlternativeAuth && (
                 <Badge variant="secondary" className="text-xs">
                   Recommended
@@ -151,7 +152,7 @@ function OAuthCredentialRow({
               )}
             </div>
             <p className="text-muted-foreground text-xs">
-              Connect your {providerLabel} account for automatic token management
+              Connect your {label} account for automatic token management
             </p>
           </div>
         </div>
@@ -183,7 +184,7 @@ function OAuthCredentialRow({
               </span>
               <Button variant="outline" size="sm" onClick={handleConnect}>
                 <LogIn className="size-3" />
-                Connect {providerLabel}
+                Connect {label}
               </Button>
             </>
           )}

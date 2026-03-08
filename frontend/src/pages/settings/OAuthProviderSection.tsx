@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useOAuthProviderConfigs } from "@/hooks/useOAuthProviderConfigs";
 import { useDeleteOAuthProviderConfig } from "@/hooks/useDeleteOAuthProviderConfig";
+import { providerLabel } from "@/lib/oauthProviders";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,15 +16,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { BYOAConfigDialog } from "./BYOAConfigDialog";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  microsoft: "Microsoft",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
 
 export function OAuthProviderSection() {
   const { providers, isLoading: providersLoading } = useOAuthProviders();
