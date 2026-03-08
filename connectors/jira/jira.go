@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -94,6 +95,14 @@ func (c *JiraConnector) Actions() map[string]connectors.Action {
 		"jira.add_comment":      &addCommentAction{conn: c},
 		"jira.assign_issue":     &assignIssueAction{conn: c},
 		"jira.search":           &searchAction{conn: c},
+		"jira.list_projects":    &listProjectsAction{conn: c},
+		"jira.get_issue":        &getIssueAction{conn: c},
+		"jira.delete_issue":     &deleteIssueAction{conn: c},
+		"jira.list_sprints":     &listSprintsAction{conn: c},
+		"jira.create_sprint":    &createSprintAction{conn: c},
+		"jira.move_to_sprint":   &moveToSprintAction{conn: c},
+		"jira.list_statuses":    &listStatusesAction{conn: c},
+		"jira.list_issue_types": &listIssueTypesAction{conn: c},
 	}
 }
 
@@ -225,6 +234,77 @@ func (c *JiraConnector) do(ctx context.Context, creds connectors.Credentials, me
 	if respBody != nil {
 		if err := json.Unmarshal(respBytes, respBody); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Jira response: %v", err)}
+		}
+	}
+	return nil
+}
+
+// doAgile is like do but targets the Jira Agile REST API (/rest/agile/1.0)
+// instead of the standard REST API v3 (/rest/api/3). Used for sprint and
+// board operations.
+func (c *JiraConnector) doAgile(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, respBody interface{}) error {
+	base, err := c.apiBase(ctx, creds)
+	if err != nil {
+		return err
+	}
+	// Swap /rest/api/3 for /rest/agile/1.0. In test mode the base URL has no
+	// API suffix, so the replacement is a no-op and paths resolve normally.
+	agileBase := strings.Replace(base, "/rest/api/3", "/rest/agile/1.0", 1)
+
+	var body io.Reader
+	if reqBody != nil {
+		payload, err := json.Marshal(reqBody)
+		if err != nil {
+			return fmt.Errorf("marshaling request body: %w", err)
+		}
+		body = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, agileBase+path, body)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if isOAuth(creds) {
+		accessToken, _ := creds.Get("access_token")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	} else {
+		email, ok := creds.Get("email")
+		if !ok || email == "" {
+			return &connectors.ValidationError{Message: "email credential is missing or empty"}
+		}
+		token, ok := creds.Get("api_token")
+		if !ok || token == "" {
+			return &connectors.ValidationError{Message: "api_token credential is missing or empty"}
+		}
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(email+":"+token)))
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("Jira Agile API request timed out: %v", err)}
+		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Jira Agile API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	if err := checkResponse(resp.StatusCode, resp.Header, respBytes); err != nil {
+		return err
+	}
+
+	if respBody != nil {
+		if err := json.Unmarshal(respBytes, respBody); err != nil {
+			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Jira Agile response: %v", err)}
 		}
 	}
 	return nil

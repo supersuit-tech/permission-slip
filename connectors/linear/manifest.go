@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -193,6 +194,123 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 						}
 					}
 				}`)),
+			},
+			{
+				ActionType:  "linear.list_teams",
+				Name:        "List Teams",
+				Description: "List all teams in the Linear workspace",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"properties": {}
+			}`)),
+			},
+			{
+				ActionType:  "linear.get_issue",
+				Name:        "Get Issue",
+				Description: "Get a single issue by ID",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to retrieve"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.assign_issue",
+				Name:        "Assign Issue",
+				Description: "Assign an issue to a user",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to assign"
+					},
+					"assignee_id": {
+						"type": "string",
+						"description": "User ID to assign (empty to unassign)"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.change_state",
+				Name:        "Change State",
+				Description: "Change an issue's workflow state",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id", "state_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to update"
+					},
+					"state_id": {
+						"type": "string",
+						"description": "The target workflow state ID"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.list_labels",
+				Name:        "List Labels",
+				Description: "List available issue labels",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"properties": {
+					"team_id": {
+						"type": "string",
+						"description": "Filter labels by team ID (optional)"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.add_label",
+				Name:        "Add Label",
+				Description: "Add a label to an issue",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["issue_id", "label_id"],
+				"properties": {
+					"issue_id": {
+						"type": "string",
+						"description": "The issue ID to label"
+					},
+					"label_id": {
+						"type": "string",
+						"description": "The label ID to add"
+					}
+				}
+			}`)),
+			},
+			{
+				ActionType:  "linear.list_cycles",
+				Name:        "List Cycles",
+				Description: "List cycles (sprints) for a team",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+				"type": "object",
+				"required": ["team_id"],
+				"properties": {
+					"team_id": {
+						"type": "string",
+						"description": "Team ID to list cycles for"
+					}
+				}
+			}`)),
 			},
 		},
 		// Two auth methods: OAuth (recommended) and API key (fallback).

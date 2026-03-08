@@ -233,6 +233,14 @@ func TestJiraConnector_Actions(t *testing.T) {
 		"jira.add_comment",
 		"jira.assign_issue",
 		"jira.search",
+		"jira.list_projects",
+		"jira.get_issue",
+		"jira.delete_issue",
+		"jira.list_sprints",
+		"jira.create_sprint",
+		"jira.move_to_sprint",
+		"jira.list_statuses",
+		"jira.list_issue_types",
 	}
 	for _, at := range want {
 		if _, ok := actions[at]; !ok {
@@ -255,8 +263,8 @@ func TestJiraConnector_Manifest(t *testing.T) {
 	if m.Name != "Jira" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Jira")
 	}
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 14 {
+		t.Fatalf("Manifest().Actions has %d items, want 14", len(m.Actions))
 	}
 
 	actionTypes := make(map[string]bool)
@@ -266,6 +274,9 @@ func TestJiraConnector_Manifest(t *testing.T) {
 	for _, want := range []string{
 		"jira.create_issue", "jira.update_issue", "jira.transition_issue",
 		"jira.add_comment", "jira.assign_issue", "jira.search",
+		"jira.list_projects", "jira.get_issue", "jira.delete_issue",
+		"jira.list_sprints", "jira.create_sprint", "jira.move_to_sprint",
+		"jira.list_statuses", "jira.list_issue_types",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

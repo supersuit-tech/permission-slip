@@ -29,6 +29,13 @@ func TestLinearConnector_Actions(t *testing.T) {
 		"linear.add_comment",
 		"linear.create_project",
 		"linear.search_issues",
+		"linear.list_teams",
+		"linear.get_issue",
+		"linear.assign_issue",
+		"linear.change_state",
+		"linear.list_labels",
+		"linear.add_label",
+		"linear.list_cycles",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -116,8 +123,8 @@ func TestLinearConnector_Manifest(t *testing.T) {
 	if m.Name != "Linear" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Linear")
 	}
-	if len(m.Actions) != 5 {
-		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
+	if len(m.Actions) != 12 {
+		t.Fatalf("Manifest().Actions has %d items, want 12", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -129,6 +136,13 @@ func TestLinearConnector_Manifest(t *testing.T) {
 		"linear.add_comment",
 		"linear.create_project",
 		"linear.search_issues",
+		"linear.list_teams",
+		"linear.get_issue",
+		"linear.assign_issue",
+		"linear.change_state",
+		"linear.list_labels",
+		"linear.add_label",
+		"linear.list_cycles",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
