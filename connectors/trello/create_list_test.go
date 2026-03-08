@@ -52,7 +52,9 @@ func TestCreateList_Success(t *testing.T) {
 	}
 
 	var data map[string]any
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 	if data["name"] != "Backlog" {
 		t.Errorf("name = %v, want Backlog", data["name"])
 	}

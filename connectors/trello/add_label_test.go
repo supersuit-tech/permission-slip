@@ -49,7 +49,9 @@ func TestAddLabel_Success(t *testing.T) {
 	}
 
 	var data map[string]any
-	json.Unmarshal(result.Data, &data)
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
 	if data["status"] != "added" {
 		t.Errorf("status = %v, want added", data["status"])
 	}

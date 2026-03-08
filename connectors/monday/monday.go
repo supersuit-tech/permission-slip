@@ -208,6 +208,20 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 	return nil
 }
 
+// validBoardKinds is the set of accepted board kind values for the Monday.com API.
+var validBoardKinds = map[string]bool{"public": true, "private": true, "share": true}
+
+// validateBoardKind returns a ValidationError if kind is non-empty and not one
+// of the accepted values. Returns nil when kind is empty (meaning "no filter").
+func validateBoardKind(kind string) error {
+	if kind != "" && !validBoardKinds[kind] {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid kind %q: must be one of public, private, share", kind),
+		}
+	}
+	return nil
+}
+
 // isValidMondayID checks that an ID is a non-empty numeric string.
 // Monday.com IDs are always numeric, so rejecting non-numeric values
 // prevents unexpected API behavior.

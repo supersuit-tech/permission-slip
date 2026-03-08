@@ -13,9 +13,9 @@ type createBoardAction struct {
 }
 
 type createBoardParams struct {
-	Name      string `json:"name"`
-	Kind      string `json:"kind"`
-	FolderID  string `json:"folder_id"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	FolderID    string `json:"folder_id"`
 	WorkspaceID string `json:"workspace_id"`
 }
 
@@ -23,10 +23,7 @@ func (p *createBoardParams) validate() error {
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}
-	if p.Kind != "" && !validBoardKinds[p.Kind] {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid kind %q: must be one of public, private, share", p.Kind)}
-	}
-	return nil
+	return validateBoardKind(p.Kind)
 }
 
 func (a *createBoardAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

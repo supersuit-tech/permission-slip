@@ -17,16 +17,14 @@ type listBoardsParams struct {
 	Kind  string `json:"kind"`
 }
 
-var validBoardKinds = map[string]bool{"public": true, "private": true, "share": true}
-
 func (a *listBoardsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listBoardsParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 
-	if params.Kind != "" && !validBoardKinds[params.Kind] {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid kind %q: must be one of public, private, share", params.Kind)}
+	if err := validateBoardKind(params.Kind); err != nil {
+		return nil, err
 	}
 
 	limit := params.Limit
