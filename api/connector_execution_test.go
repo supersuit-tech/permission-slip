@@ -586,6 +586,171 @@ func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
 	}
 }
 
+// ── Implicit OAuth provider fallback tests ──────────────────────────────────
+// These test the code path where a connector declares only static credentials
+// (api_key) but has a matching built-in OAuth provider in the registry.
+// resolveCredentialsWithFallback should synthesize an oauth2 entry and try
+// OAuth first, falling back to static credentials if OAuth isn't available.
+
+func TestResolveCredentialsWithFallback_ImplicitOAuth_UsesOAuthWhenConnected(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testshopify"
+	provider := "testshopify"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".list_products", "List Products")
+	// Only declare api_key — no explicit oauth2 credential.
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "shopify_api_key", "api_key")
+
+	v := vault.NewMockVaultStore()
+	accessToken, err := v.CreateSecret(t.Context(), tx, "access", []byte("shpat_oauth_token"))
+	if err != nil {
+		t.Fatalf("vault create: %v", err)
+	}
+
+	// Create an active OAuth connection for the provider.
+	connOAuthID := testhelper.GenerateID(t, "oconn_")
+	testhelper.InsertOAuthConnectionFull(t, tx, connOAuthID, uid, provider, testhelper.OAuthConnectionOpts{
+		Status:              "active",
+		Scopes:              []string{"write_products"},
+		AccessTokenVaultID:  accessToken,
+		TokenExpiry:         func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
+	})
+
+	// Register a matching OAuth provider.
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           provider,
+		AuthorizeURL: "https://test.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://test.myshopify.com/admin/oauth/access_token",
+		ClientID:     "test-id",
+		ClientSecret: "test-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+
+	reqCreds := []db.RequiredCredential{{Service: "shopify_api_key", AuthType: "api_key"}}
+	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
+
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, uid, connID+".list_products", connID, reqCreds)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tok, ok := creds.Get("access_token")
+	if !ok {
+		t.Fatal("expected access_token in credentials (from OAuth)")
+	}
+	if tok != "shpat_oauth_token" {
+		t.Errorf("expected OAuth token %q, got %q", "shpat_oauth_token", tok)
+	}
+}
+
+func TestResolveCredentialsWithFallback_ImplicitOAuth_FallsBackToStatic(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testshopify"
+	provider := "testshopify"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".list_products", "List Products")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "shopify_api_key", "api_key")
+
+	v := vault.NewMockVaultStore()
+	// Store a static API key credential (no OAuth connection).
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "shpat_static_key"})
+	vaultID, err := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	if err != nil {
+		t.Fatalf("vault create: %v", err)
+	}
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "shopify_api_key", vaultID)
+
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           provider,
+		AuthorizeURL: "https://test.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://test.myshopify.com/admin/oauth/access_token",
+		ClientID:     "test-id",
+		ClientSecret: "test-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+
+	reqCreds := []db.RequiredCredential{{Service: "shopify_api_key", AuthType: "api_key"}}
+	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
+
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, uid, connID+".list_products", connID, reqCreds)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tok, ok := creds.Get("api_key")
+	if !ok {
+		t.Fatal("expected api_key in credentials (static fallback)")
+	}
+	if tok != "shpat_static_key" {
+		t.Errorf("expected static key %q, got %q", "shpat_static_key", tok)
+	}
+}
+
+func TestResolveCredentialsWithFallback_ImplicitOAuth_NeedsReauthFallsBack(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testshopify"
+	provider := "testshopify"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".list_products", "List Products")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "shopify_api_key", "api_key")
+
+	v := vault.NewMockVaultStore()
+
+	// Create a needs_reauth OAuth connection.
+	connOAuthID := testhelper.GenerateID(t, "oconn_")
+	testhelper.InsertOAuthConnectionFull(t, tx, connOAuthID, uid, provider, testhelper.OAuthConnectionOpts{
+		Status: "needs_reauth",
+		Scopes: []string{"write_products"},
+	})
+
+	// Store a static API key credential as fallback.
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "shpat_static_key"})
+	vaultID, err := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	if err != nil {
+		t.Fatalf("vault create: %v", err)
+	}
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "shopify_api_key", vaultID)
+
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           provider,
+		AuthorizeURL: "https://test.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://test.myshopify.com/admin/oauth/access_token",
+		ClientID:     "test-id",
+		ClientSecret: "test-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+
+	reqCreds := []db.RequiredCredential{{Service: "shopify_api_key", AuthType: "api_key"}}
+	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
+
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, uid, connID+".list_products", connID, reqCreds)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tok, ok := creds.Get("api_key")
+	if !ok {
+		t.Fatal("expected api_key in credentials (static fallback after needs_reauth)")
+	}
+	if tok != "shpat_static_key" {
+		t.Errorf("expected static key %q, got %q", "shpat_static_key", tok)
+	}
+}
+
 // ── executeConnectorAction: edge cases ──────────────────────────────────────
 
 func TestExecuteConnectorAction_NilConnectorRegistry(t *testing.T) {

@@ -457,6 +457,9 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		// with per-shop URLs (e.g. Shopify), store the shop_domain so it's
 		// available at execution time as a credential.
 		var stateExtraData map[string]string
+		// NOTE: state.Shop is validated and normalized during the authorize step
+		// to be a bare subdomain (e.g. "mystore"), so appending ".myshopify.com"
+		// here is intentional and produces the full domain.
 		if state.Shop != "" {
 			stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
 		}
