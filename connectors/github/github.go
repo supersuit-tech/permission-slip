@@ -350,6 +350,335 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "github.get_file_contents",
+				Name:        "Get File Contents",
+				Description: "Read file contents from a repository",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "path"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"path": {
+							"type": "string",
+							"description": "File path within the repository"
+						},
+						"ref": {
+							"type": "string",
+							"description": "Branch, tag, or commit SHA to read from (defaults to default branch)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.create_or_update_file",
+				Name:        "Create or Update File",
+				Description: "Create or update a file in a repository via the Contents API",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "path", "message", "content"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"path": {
+							"type": "string",
+							"description": "File path within the repository"
+						},
+						"message": {
+							"type": "string",
+							"description": "Commit message"
+						},
+						"content": {
+							"type": "string",
+							"description": "New file content, base64-encoded"
+						},
+						"branch": {
+							"type": "string",
+							"description": "Branch to commit to (defaults to default branch)"
+						},
+						"sha": {
+							"type": "string",
+							"description": "Blob SHA of the file being replaced (required when updating an existing file)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.list_repos",
+				Name:        "List Repositories",
+				Description: "List repositories for the authenticated user or an organization",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"org": {
+							"type": "string",
+							"description": "Organization login to list repos for (omit to list the authenticated user's repos)"
+						},
+						"type": {
+							"type": "string",
+							"enum": ["all", "public", "private", "forks", "sources", "member"],
+							"description": "Repository type filter"
+						},
+						"sort": {
+							"type": "string",
+							"enum": ["created", "updated", "pushed", "full_name"],
+							"description": "Sort field"
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Number of results per page (max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.get_repo",
+				Name:        "Get Repository",
+				Description: "Get repository metadata",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.list_pull_requests",
+				Name:        "List Pull Requests",
+				Description: "List pull requests for a repository with optional filtering",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"state": {
+							"type": "string",
+							"enum": ["open", "closed", "all"],
+							"default": "open",
+							"description": "State filter"
+						},
+						"base": {
+							"type": "string",
+							"description": "Filter by base branch name"
+						},
+						"head": {
+							"type": "string",
+							"description": "Filter by head branch name (user:branch format)"
+						},
+						"sort": {
+							"type": "string",
+							"enum": ["created", "updated", "popularity", "long-running"],
+							"description": "Sort field"
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Number of results per page (max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.trigger_workflow",
+				Name:        "Trigger Workflow",
+				Description: "Trigger a GitHub Actions workflow dispatch event",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "workflow_id", "ref"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"workflow_id": {
+							"type": "string",
+							"description": "Workflow file name (e.g. \"deploy.yml\") or numeric workflow ID"
+						},
+						"ref": {
+							"type": "string",
+							"description": "Branch or tag to run the workflow on"
+						},
+						"inputs": {
+							"type": "object",
+							"description": "Input key-value pairs defined by the workflow's on.workflow_dispatch.inputs",
+							"additionalProperties": true
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.list_workflow_runs",
+				Name:        "List Workflow Runs",
+				Description: "List workflow runs for a repository with optional status filtering",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"workflow_id": {
+							"type": "string",
+							"description": "Workflow file name or ID to filter runs (omit for all workflows)"
+						},
+						"status": {
+							"type": "string",
+							"enum": ["completed", "action_required", "cancelled", "failure", "neutral", "skipped", "stale", "success", "timed_out", "in_progress", "queued", "requested", "waiting", "pending"],
+							"description": "Filter by run status"
+						},
+						"branch": {
+							"type": "string",
+							"description": "Filter by branch name"
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Number of results per page (max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.create_webhook",
+				Name:        "Create Webhook",
+				Description: "Create a repository webhook",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "url", "events"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)"
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"url": {
+							"type": "string",
+							"description": "Payload URL for the webhook"
+						},
+						"events": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Events that trigger the webhook (e.g. [\"push\", \"pull_request\"])"
+						},
+						"content_type": {
+							"type": "string",
+							"enum": ["json", "form"],
+							"default": "json",
+							"description": "Payload content type"
+						},
+						"secret": {
+							"type": "string",
+							"description": "Secret used to sign webhook payloads"
+						},
+						"active": {
+							"type": "boolean",
+							"default": true,
+							"description": "Whether the webhook is active"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.search_code",
+				Name:        "Search Code",
+				Description: "Search code across repositories",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["q"],
+					"properties": {
+						"q": {
+							"type": "string",
+							"description": "Search query (supports GitHub code search qualifiers)"
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Number of results per page (max 100)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "github.search_issues",
+				Name:        "Search Issues",
+				Description: "Search issues and pull requests across repositories",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["q"],
+					"properties": {
+						"q": {
+							"type": "string",
+							"description": "Search query (supports GitHub issue search qualifiers)"
+						},
+						"sort": {
+							"type": "string",
+							"enum": ["comments", "reactions", "reactions-+1", "reactions--1", "reactions-smile", "reactions-thinking_face", "reactions-heart", "reactions-tada", "interactions", "created", "updated"],
+							"description": "Sort field"
+						},
+						"order": {
+							"type": "string",
+							"enum": ["asc", "desc"],
+							"description": "Sort order"
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Number of results per page (max 100)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -460,6 +789,80 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can create branches in any repo.",
 				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","branch_name":"*","from_ref":"*"}`),
 			},
+			// --- File contents templates ---
+			{
+				ID:          "tpl_github_get_file_contents",
+				ActionType:  "github.get_file_contents",
+				Name:        "Read files from any repo",
+				Description: "Agent can read any file from any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","path":"*","ref":"*"}`),
+			},
+			{
+				ID:          "tpl_github_create_or_update_file",
+				ActionType:  "github.create_or_update_file",
+				Name:        "Create or update files",
+				Description: "Agent can create or update files in any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","path":"*","message":"*","content":"*","branch":"*","sha":"*"}`),
+			},
+			// --- Repo discovery templates ---
+			{
+				ID:          "tpl_github_list_repos",
+				ActionType:  "github.list_repos",
+				Name:        "List repositories",
+				Description: "Agent can list repositories for the authenticated user or any organization.",
+				Parameters:  json.RawMessage(`{"org":"*","type":"*","sort":"*","per_page":"*"}`),
+			},
+			{
+				ID:          "tpl_github_get_repo",
+				ActionType:  "github.get_repo",
+				Name:        "Get repository metadata",
+				Description: "Agent can fetch metadata for any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*"}`),
+			},
+			{
+				ID:          "tpl_github_list_pull_requests",
+				ActionType:  "github.list_pull_requests",
+				Name:        "List pull requests",
+				Description: "Agent can list pull requests from any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","state":"*","base":"*","head":"*","sort":"*","per_page":"*"}`),
+			},
+			// --- CI/CD templates ---
+			{
+				ID:          "tpl_github_trigger_workflow",
+				ActionType:  "github.trigger_workflow",
+				Name:        "Trigger any workflow",
+				Description: "Agent can trigger workflow dispatch events in any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","workflow_id":"*","ref":"*","inputs":"*"}`),
+			},
+			{
+				ID:          "tpl_github_list_workflow_runs",
+				ActionType:  "github.list_workflow_runs",
+				Name:        "List workflow runs",
+				Description: "Agent can list workflow run history for any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","workflow_id":"*","status":"*","branch":"*","per_page":"*"}`),
+			},
+			{
+				ID:          "tpl_github_create_webhook",
+				ActionType:  "github.create_webhook",
+				Name:        "Create webhooks",
+				Description: "Agent can create repository webhooks.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","url":"*","events":"*","content_type":"*","secret":"*","active":"*"}`),
+			},
+			// --- Search templates ---
+			{
+				ID:          "tpl_github_search_code",
+				ActionType:  "github.search_code",
+				Name:        "Search code",
+				Description: "Agent can search code across all accessible repositories.",
+				Parameters:  json.RawMessage(`{"q":"*","per_page":"*"}`),
+			},
+			{
+				ID:          "tpl_github_search_issues",
+				ActionType:  "github.search_issues",
+				Name:        "Search issues and PRs",
+				Description: "Agent can search issues and pull requests across all accessible repositories.",
+				Parameters:  json.RawMessage(`{"q":"*","sort":"*","order":"*","per_page":"*"}`),
+			},
 		},
 	}
 }
@@ -475,7 +878,17 @@ func (c *GitHubConnector) Actions() map[string]connectors.Action {
 		"github.close_issue":    &closeIssueAction{conn: c},
 		"github.add_label":      &addLabelAction{conn: c},
 		"github.add_comment":    &addCommentAction{conn: c},
-		"github.create_branch":  &createBranchAction{conn: c},
+		"github.create_branch":        &createBranchAction{conn: c},
+		"github.get_file_contents":    &getFileContentsAction{conn: c},
+		"github.create_or_update_file": &createOrUpdateFileAction{conn: c},
+		"github.list_repos":            &listReposAction{conn: c},
+		"github.get_repo":              &getRepoAction{conn: c},
+		"github.list_pull_requests":    &listPullRequestsAction{conn: c},
+		"github.trigger_workflow":      &triggerWorkflowAction{conn: c},
+		"github.list_workflow_runs":    &listWorkflowRunsAction{conn: c},
+		"github.create_webhook":        &createWebhookAction{conn: c},
+		"github.search_code":           &searchCodeAction{conn: c},
+		"github.search_issues":         &searchIssuesAction{conn: c},
 	}
 }
 
