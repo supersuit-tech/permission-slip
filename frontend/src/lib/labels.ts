@@ -6,13 +6,15 @@
 const PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",
   google: "Google",
-  microsoft: "Microsoft",
-  meta: "Meta",
-  linkedin: "LinkedIn",
-  salesforce: "Salesforce",
-  zoom: "Zoom",
-  kroger: "Kroger",
+  hubspot: "HubSpot",
   intercom: "Intercom",
+  kroger: "Kroger",
+  linkedin: "LinkedIn",
+  meta: "Meta",
+  microsoft: "Microsoft",
+  salesforce: "Salesforce",
+  stripe: "Stripe",
+  zoom: "Zoom",
 };
 
 /**

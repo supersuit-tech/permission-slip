@@ -24,10 +24,12 @@ import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
+import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
-import { providerLabel, serviceLabel, authTypeLabel } from "@/lib/labels";
+import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
@@ -44,7 +46,8 @@ export function ConnectorCredentialsSection({
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasStatic,
   });
-  const { connections, isLoading: oauthLoading } = useOAuthConnections();
+  const { connections, isLoading: connectionsLoading } = useOAuthConnections({ enabled: hasOAuth });
+  const { providers, isLoading: providersLoading } = useOAuthProviders({ enabled: hasOAuth });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -53,27 +56,15 @@ export function ConnectorCredentialsSection({
     storedByService.set(cred.service, list);
   }
 
-  // Sort: OAuth first, then static credentials
+  // Sort credentials: OAuth first, then static
   const sorted = [...requiredCredentials].sort((a, b) => {
     if (a.auth_type === "oauth2" && b.auth_type !== "oauth2") return -1;
     if (a.auth_type !== "oauth2" && b.auth_type === "oauth2") return 1;
     return 0;
   });
 
-  const anyLoading = (hasOAuth && oauthLoading) || (hasStatic && isLoading);
-
-  // Check if OAuth is connected (for display purposes)
-  const oauthCred = requiredCredentials.find((c) => c.auth_type === "oauth2");
-  const oauthConnection = oauthCred?.oauth_provider
-    ? connections.find((c) => c.provider === oauthCred.oauth_provider)
-    : undefined;
-  const hasAnyAuth =
-    (oauthConnection && oauthConnection.status === "active") ||
-    requiredCredentials.some(
-      (c) =>
-        c.auth_type !== "oauth2" &&
-        (storedByService.get(c.service)?.length ?? 0) > 0,
-    );
+  const anyLoading =
+    isLoading || (hasOAuth && (connectionsLoading || providersLoading));
 
   return (
     <Card>
@@ -102,23 +93,41 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {sorted.map((cred) =>
-              cred.auth_type === "oauth2" ? (
-                <OAuthCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  connections={connections}
-                />
-              ) : (
-                <StaticCredentialRow
-                  key={cred.service}
-                  requiredCredential={cred}
-                  storedCredentials={storedByService.get(cred.service) ?? []}
-                  isAlternative={hasOAuth}
-                  oauthConnected={hasAnyAuth && !!oauthConnection}
-                />
-              ),
-            )}
+            {sorted.map((cred, idx) => {
+              const prevCred =
+                idx > 0 ? sorted[idx - 1] : undefined;
+              const showOrSeparator =
+                prevCred != null &&
+                prevCred.auth_type === "oauth2" &&
+                cred.auth_type !== "oauth2";
+
+              return (
+                <div key={cred.service}>
+                  {showOrSeparator && (
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="bg-border h-px flex-1" />
+                      <span className="text-muted-foreground text-xs font-medium uppercase">
+                        or
+                      </span>
+                      <div className="bg-border h-px flex-1" />
+                    </div>
+                  )}
+                  {cred.auth_type === "oauth2" && cred.oauth_provider ? (
+                    <OAuthCredentialRow
+                      requiredCredential={cred}
+                      connections={connections}
+                      providers={providers}
+                    />
+                  ) : (
+                    <StaticCredentialRow
+                      requiredCredential={cred}
+                      storedCredentials={storedByService.get(cred.service) ?? []}
+                      isAlternative={hasOAuth}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -129,28 +138,24 @@ export function ConnectorCredentialsSection({
 function OAuthCredentialRow({
   requiredCredential,
   connections,
+  providers,
 }: {
   requiredCredential: RequiredCredential;
-  connections: Array<{
-    provider: string;
-    status: string;
-    scopes: string[];
-    connected_at: string;
-  }>;
+  connections: { provider: string; status: string; scopes: string[]; connected_at: string }[];
+  providers: { id: string; has_credentials: boolean }[];
 }) {
   const { session } = useAuth();
   const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
+
   const providerId = requiredCredential.oauth_provider ?? "";
   const connection = connections.find((c) => c.provider === providerId);
+  const provider = providers.find((p) => p.id === providerId);
   const isConnected = connection?.status === "active";
   const needsReauth = connection?.status === "needs_reauth";
 
   function handleConnect() {
     if (!session?.access_token || !providerId) return;
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
   }
 
   async function handleDisconnect() {
@@ -188,8 +193,8 @@ function OAuthCredentialRow({
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs">
-              Connect your {providerLabel(providerId)} account for automatic
-              token management
+              Connect your {providerLabel(providerId)} account via OAuth for
+              automatic token management
             </p>
           </div>
         </div>
@@ -215,7 +220,7 @@ function OAuthCredentialRow({
             </>
           ) : needsReauth ? (
             <>
-              <Badge variant="destructive" className="gap-1">
+              <Badge variant="destructive" className="gap-1 text-xs">
                 <AlertTriangle className="size-3" />
                 Needs Re-auth
               </Badge>
@@ -229,7 +234,12 @@ function OAuthCredentialRow({
               <span className="text-muted-foreground text-xs font-medium">
                 Not connected
               </span>
-              <Button variant="default" size="sm" onClick={handleConnect}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleConnect}
+                disabled={!provider?.has_credentials}
+              >
                 <LogIn className="size-3" />
                 Connect {providerLabel(providerId)}
               </Button>
@@ -237,6 +247,12 @@ function OAuthCredentialRow({
           )}
         </div>
       </div>
+      {!isConnected && !needsReauth && !provider?.has_credentials && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          OAuth is not available yet — ask your admin to configure{" "}
+          {providerLabel(providerId)} OAuth credentials.
+        </p>
+      )}
     </div>
   );
 }
@@ -245,12 +261,10 @@ function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
   isAlternative,
-  oauthConnected,
 }: {
   requiredCredential: RequiredCredential;
   storedCredentials: CredentialSummary[];
   isAlternative: boolean;
-  oauthConnected: boolean;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(
@@ -304,11 +318,7 @@ function StaticCredentialRow({
                   : "text-muted-foreground"
               }`}
             >
-              {isConnected
-                ? "Connected"
-                : oauthConnected
-                  ? "Optional"
-                  : "Not configured"}
+              {isConnected ? "Connected" : "Not configured"}
             </span>
             <Button
               variant="outline"
@@ -369,4 +379,3 @@ function StaticCredentialRow({
     </>
   );
 }
-

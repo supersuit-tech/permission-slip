@@ -368,6 +368,22 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "hubspot_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "hubspot",
+				OAuthScopes: []string{
+					"crm.objects.contacts.read",
+					"crm.objects.contacts.write",
+					"crm.objects.deals.read",
+					"crm.objects.deals.write",
+					"crm.objects.companies.read",
+					"tickets",
+					"automation",
+					"content",
+					"analytics.read",
+				},
+			},
+			{
 				Service:         "hubspot",
 				AuthType:        "api_key",
 				InstructionsURL: "https://developers.hubspot.com/docs/api/private-apps",

@@ -94,11 +94,13 @@ var validAuthTypes = map[string]bool{
 var BuiltInOAuthProviders = map[string]bool{
 	"github":     true,
 	"google":     true,
+	"hubspot":    true,
 	"kroger":     true,
 	"linkedin":   true,
 	"meta":       true,
 	"microsoft":  true,
 	"salesforce": true,
+	"stripe":     true,
 	"zoom":       true,
 }
 
