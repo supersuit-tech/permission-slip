@@ -8,9 +8,26 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 )
+
+func init() {
+	RegisterBackgroundJob(BackgroundJob{
+		Name: "card expiry check",
+		Start: func(ctx context.Context, deps *api.Deps, logger *slog.Logger) <-chan struct{} {
+			if deps.DB == nil || deps.Notifier == nil {
+				return nil
+			}
+			return startCardExpiryCheck(ctx, CardExpiryCheckDeps{
+				DB:       deps.DB,
+				Notifier: deps.Notifier,
+				BaseURL:  deps.BaseURL,
+			}, logger)
+		},
+	})
+}
 
 // CardExpiryCheckDeps holds the dependencies for the background card
 // expiration check job.

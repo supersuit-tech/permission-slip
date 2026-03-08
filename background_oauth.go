@@ -8,10 +8,27 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
+
+func init() {
+	RegisterBackgroundJob(BackgroundJob{
+		Name: "oauth refresh",
+		Start: func(ctx context.Context, deps *api.Deps, logger *slog.Logger) <-chan struct{} {
+			if deps.DB == nil || deps.Vault == nil || deps.OAuthProviders == nil {
+				return nil
+			}
+			return startOAuthRefresh(ctx, OAuthRefreshDeps{
+				DB:       deps.DB,
+				Vault:    deps.Vault,
+				Registry: deps.OAuthProviders,
+			}, logger)
+		},
+	})
+}
 
 // oauthRefreshHorizon is the time window before token expiry within which
 // the background job proactively refreshes tokens. This prevents execution-time
