@@ -30,9 +30,9 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
-// OAuthScopes is the canonical list of OAuth scopes required by the Discord
-// connector. This is the single source of truth — referenced by both the
-// connector manifest and the built-in OAuth provider registration.
+// OAuthScopes is the canonical list of OAuth scopes for the Discord bot
+// authorization flow. Referenced by the built-in OAuth provider registration
+// in oauth/builtin.go.
 var OAuthScopes = []string{
 	"bot",
 	"guilds",
