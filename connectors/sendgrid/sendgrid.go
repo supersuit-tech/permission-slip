@@ -102,6 +102,9 @@ func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credent
 	if token == "" {
 		token, _ = creds.Get(credKeyAPIKey)
 	}
+	if token == "" {
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
+	}
 
 	reqURL := c.baseURL + path
 
