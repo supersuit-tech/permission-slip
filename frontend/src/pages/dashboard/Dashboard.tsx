@@ -1,24 +1,44 @@
+import { useState } from "react";
 import { useApprovalEvents } from "@/hooks/useApprovalEvents";
+import { useAgents } from "@/hooks/useAgents";
 import { NotificationBanner } from "./NotificationBanner";
 import { PendingApprovalsCard } from "./PendingApprovalsCard";
 import { RecentActivityCard } from "./RecentActivityCard";
 import { RegisteredAgentsCard } from "./RegisteredAgentsCard";
 import { StandingApprovalsCard } from "./StandingApprovalsCard";
+import { AgentOnboardingHero } from "./AgentOnboardingHero";
+import { InviteCodeDialog } from "./InviteCodeDialog";
 
 export function Dashboard() {
-  // Connect to SSE for real-time approval updates. New approvals
-  // appear instantly instead of waiting for the 30-second poll cycle.
   useApprovalEvents();
+  const { agents, isLoading } = useAgents();
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+
+  const showOnboarding = !isLoading && agents.length === 0;
 
   return (
     <div className="space-y-6">
       <NotificationBanner />
-      <PendingApprovalsCard />
-      <StandingApprovalsCard />
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <RecentActivityCard />
-        <RegisteredAgentsCard />
-      </div>
+      {showOnboarding ? (
+        <>
+          <AgentOnboardingHero
+            onRegisterAgent={() => setInviteDialogOpen(true)}
+          />
+          <InviteCodeDialog
+            open={inviteDialogOpen}
+            onOpenChange={setInviteDialogOpen}
+          />
+        </>
+      ) : (
+        <>
+          <PendingApprovalsCard />
+          <StandingApprovalsCard />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <RecentActivityCard />
+            <RegisteredAgentsCard />
+          </div>
+        </>
+      )}
     </div>
   );
 }
