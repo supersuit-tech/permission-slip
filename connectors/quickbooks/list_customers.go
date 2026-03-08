@@ -29,7 +29,7 @@ func (a *listCustomersAction) Execute(ctx context.Context, req connectors.Action
 
 	query := "SELECT * FROM Customer WHERE Active = true"
 	if params.DisplayName != "" {
-		query += " AND DisplayName LIKE '%" + params.DisplayName + "%'"
+		query += " AND DisplayName LIKE '%" + escapeQBOString(params.DisplayName) + "%'"
 	}
 
 	maxResults := params.MaxResults

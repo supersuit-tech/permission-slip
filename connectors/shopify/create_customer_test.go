@@ -115,3 +115,21 @@ func TestCreateCustomer_HTTPError(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestCreateCustomer_InvalidEmail(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["shopify.create_customer"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "shopify.create_customer",
+		Parameters:  json.RawMessage(`{"email": "not-an-email"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid email, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

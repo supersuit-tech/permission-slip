@@ -128,3 +128,21 @@ func TestCreateVendor_WithOptionalFields(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 }
+
+func TestCreateVendor_InvalidEmail(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["quickbooks.create_vendor"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "quickbooks.create_vendor",
+		Parameters:  json.RawMessage(`{"display_name": "Acme", "email": "not-an-email"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid email, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

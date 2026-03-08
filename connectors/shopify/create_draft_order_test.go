@@ -157,3 +157,21 @@ func TestCreateDraftOrder_HTTPError(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestCreateDraftOrder_CustomItemRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["shopify.create_draft_order"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "shopify.create_draft_order",
+		Parameters:  json.RawMessage(`{"line_items": [{"title": "Custom Widget", "quantity": 1}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for custom item without price, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

@@ -48,7 +48,7 @@ func (a *listInvoicesAction) Execute(ctx context.Context, req connectors.ActionR
 
 	var conditions []string
 	if params.CustomerID != "" {
-		conditions = append(conditions, "CustomerRef = '"+params.CustomerID+"'")
+		conditions = append(conditions, "CustomerRef = '"+escapeQBOString(params.CustomerID)+"'")
 	}
 	if params.StartDate != "" {
 		conditions = append(conditions, "TxnDate >= '"+params.StartDate+"'")

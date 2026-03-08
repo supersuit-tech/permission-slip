@@ -28,6 +28,9 @@ func (p *createCustomerParams) validate() error {
 	if p.Email == "" && p.FirstName == "" && p.LastName == "" && p.Phone == "" {
 		return &connectors.ValidationError{Message: "at least one of email, first_name, last_name, or phone is required"}
 	}
+	if err := validateEmail("email", p.Email); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -138,3 +138,21 @@ func TestSendInvoice_NotFound(t *testing.T) {
 		t.Errorf("expected ValidationError for 404, got %T: %v", err, err)
 	}
 }
+
+func TestSendInvoice_InvalidEmailTo(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["quickbooks.send_invoice"]
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "quickbooks.send_invoice",
+		Parameters:  json.RawMessage(`{"invoice_id": "1001", "email_to": "not-an-email"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid email_to, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

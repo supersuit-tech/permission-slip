@@ -26,6 +26,9 @@ func (p *createVendorParams) validate() error {
 	if p.DisplayName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: display_name"}
 	}
+	if err := validateEmail("email", p.Email); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -201,6 +201,37 @@ func validateDate(field, value string) error {
 	return nil
 }
 
+// emailRe validates a basic email address format (local@domain.tld).
+var emailRe = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]{2,}$`)
+
+// validateEmail returns a ValidationError if the value is a non-empty string
+// that does not look like a valid email address.
+func validateEmail(field, value string) error {
+	if value == "" {
+		return nil
+	}
+	if !emailRe.MatchString(value) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s must be a valid email address (got %q)", field, value),
+		}
+	}
+	return nil
+}
+
+// escapeQBOString escapes single quotes for use inside QuickBooks SQL-like
+// query string literals by doubling them (standard SQL escaping).
+func escapeQBOString(s string) string {
+	result := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\'' {
+			result = append(result, '\'', '\'')
+		} else {
+			result = append(result, s[i])
+		}
+	}
+	return string(result)
+}
+
 // truncate caps s at approximately maxLen bytes, appending "..." if truncated.
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {

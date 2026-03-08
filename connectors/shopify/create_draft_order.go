@@ -45,6 +45,10 @@ func (p *createDraftOrderParams) validate() error {
 		if item.VariantID == 0 && item.ProductID == 0 && item.Title == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d] must include variant_id, product_id, or title", i)}
 		}
+		// Custom line items (title only, no variant_id/product_id) must have a price.
+		if item.VariantID == 0 && item.ProductID == 0 && item.Title != "" && item.Price == "" {
+			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d].price is required for custom line items (when using title without variant_id or product_id)", i)}
+		}
 	}
 	return nil
 }
