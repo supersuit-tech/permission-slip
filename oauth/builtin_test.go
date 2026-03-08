@@ -1,18 +1,22 @@
-package oauth
+package oauth_test
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/supersuit-tech/permission-slip-web/oauth"
+	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 )
 
 func TestBuiltInProviders(t *testing.T) {
-	providers := BuiltInProviders()
+	providers := oauth.BuiltInProviders()
 
 	if len(providers) < 2 {
 		t.Fatalf("expected at least 2 built-in providers, got %d", len(providers))
 	}
 
 	// Build a map for easier lookup.
-	byID := make(map[string]Provider, len(providers))
+	byID := make(map[string]oauth.Provider, len(providers))
 	for _, p := range providers {
 		byID[p.ID] = p
 	}
@@ -28,8 +32,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if g.TokenURL != "https://oauth2.googleapis.com/token" {
 			t.Errorf("TokenURL = %q", g.TokenURL)
 		}
-		if g.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", g.Source, SourceBuiltIn)
+		if g.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", g.Source, oauth.SourceBuiltIn)
 		}
 		if len(g.Scopes) == 0 {
 			t.Error("expected default scopes")
@@ -47,8 +51,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if f.TokenURL != "https://api.figma.com/v1/oauth/token" {
 			t.Errorf("TokenURL = %q", f.TokenURL)
 		}
-		if f.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", f.Source, SourceBuiltIn)
+		if f.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", f.Source, oauth.SourceBuiltIn)
 		}
 		if len(f.Scopes) != 2 {
 			t.Errorf("expected 2 scopes, got %d: %v", len(f.Scopes), f.Scopes)
@@ -66,8 +70,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if gh.TokenURL != "https://github.com/login/oauth/access_token" {
 			t.Errorf("TokenURL = %q", gh.TokenURL)
 		}
-		if gh.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", gh.Source, SourceBuiltIn)
+		if gh.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", gh.Source, oauth.SourceBuiltIn)
 		}
 		if len(gh.Scopes) == 0 {
 			t.Error("expected default scopes")
@@ -85,8 +89,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if k.TokenURL != "https://api.kroger.com/v1/connect/oauth2/token" {
 			t.Errorf("TokenURL = %q", k.TokenURL)
 		}
-		if k.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", k.Source, SourceBuiltIn)
+		if k.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", k.Source, oauth.SourceBuiltIn)
 		}
 		if len(k.Scopes) == 0 {
 			t.Error("expected default scopes")
@@ -104,8 +108,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if n.TokenURL != "https://api.netlify.com/oauth/token" {
 			t.Errorf("TokenURL = %q", n.TokenURL)
 		}
-		if n.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", n.Source, SourceBuiltIn)
+		if n.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", n.Source, oauth.SourceBuiltIn)
 		}
 	})
 
@@ -120,8 +124,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if m.TokenURL != "https://login.microsoftonline.com/common/oauth2/v2.0/token" {
 			t.Errorf("TokenURL = %q", m.TokenURL)
 		}
-		if m.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", m.Source, SourceBuiltIn)
+		if m.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", m.Source, oauth.SourceBuiltIn)
 		}
 		if len(m.Scopes) == 0 {
 			t.Error("expected default scopes")
@@ -139,8 +143,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if s.TokenURL != "https://connect.squareup.com/oauth2/token" {
 			t.Errorf("TokenURL = %q", s.TokenURL)
 		}
-		if s.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", s.Source, SourceBuiltIn)
+		if s.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", s.Source, oauth.SourceBuiltIn)
 		}
 		if len(s.Scopes) == 0 {
 			t.Error("expected default scopes")
@@ -158,8 +162,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if d.TokenURL != "https://discord.com/api/oauth2/token" {
 			t.Errorf("TokenURL = %q", d.TokenURL)
 		}
-		if d.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", d.Source, SourceBuiltIn)
+		if d.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", d.Source, oauth.SourceBuiltIn)
 		}
 		if len(d.Scopes) == 0 {
 			t.Error("expected default scopes")
@@ -177,8 +181,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if s.TokenURL != "https://connect.stripe.com/oauth/token" {
 			t.Errorf("TokenURL = %q", s.TokenURL)
 		}
-		if s.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", s.Source, SourceBuiltIn)
+		if s.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", s.Source, oauth.SourceBuiltIn)
 		}
 		if len(s.Scopes) != 1 || s.Scopes[0] != "read_write" {
 			t.Errorf("Scopes = %v, want [read_write]", s.Scopes)
@@ -196,8 +200,8 @@ func TestBuiltInProviders(t *testing.T) {
 		if a.TokenURL != "https://airtable.com/oauth2/v1/token" {
 			t.Errorf("TokenURL = %q", a.TokenURL)
 		}
-		if a.Source != SourceBuiltIn {
-			t.Errorf("Source = %q, want %q", a.Source, SourceBuiltIn)
+		if a.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", a.Source, oauth.SourceBuiltIn)
 		}
 		if len(a.Scopes) != 6 {
 			t.Errorf("expected 6 scopes, got %d: %v", len(a.Scopes), a.Scopes)
@@ -206,7 +210,7 @@ func TestBuiltInProviders(t *testing.T) {
 }
 
 func TestNewRegistryWithBuiltIns(t *testing.T) {
-	r := NewRegistryWithBuiltIns()
+	r := oauth.NewRegistryWithBuiltIns()
 
 	ids := r.IDs()
 	if len(ids) < 2 {
@@ -246,9 +250,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 }
 
 func TestRegisterFromManifest(t *testing.T) {
-	r := NewRegistry()
+	r := oauth.NewRegistry()
 
-	providers := []ManifestProvider{
+	providers := []oauth.ManifestProvider{
 		{
 			ID:           "salesforce",
 			AuthorizeURL: "https://login.salesforce.com/services/oauth2/authorize",
@@ -262,7 +266,7 @@ func TestRegisterFromManifest(t *testing.T) {
 		},
 	}
 
-	if err := RegisterFromManifest(r, providers); err != nil {
+	if err := oauth.RegisterFromManifest(r, providers); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -274,8 +278,8 @@ func TestRegisterFromManifest(t *testing.T) {
 	if !ok {
 		t.Fatal("salesforce not found")
 	}
-	if sf.Source != SourceManifest {
-		t.Errorf("Source = %q, want %q", sf.Source, SourceManifest)
+	if sf.Source != oauth.SourceManifest {
+		t.Errorf("Source = %q, want %q", sf.Source, oauth.SourceManifest)
 	}
 	if sf.AuthorizeURL != "https://login.salesforce.com/services/oauth2/authorize" {
 		t.Errorf("AuthorizeURL = %q", sf.AuthorizeURL)
@@ -289,8 +293,8 @@ func TestRegisterFromManifest(t *testing.T) {
 }
 
 func TestRegisterFromManifest_InvalidID(t *testing.T) {
-	r := NewRegistry()
-	err := RegisterFromManifest(r, []ManifestProvider{
+	r := oauth.NewRegistry()
+	err := oauth.RegisterFromManifest(r, []oauth.ManifestProvider{
 		{ID: "INVALID", AuthorizeURL: "https://example.com/auth", TokenURL: "https://example.com/token"},
 	})
 	if err == nil {
@@ -298,11 +302,101 @@ func TestRegisterFromManifest_InvalidID(t *testing.T) {
 	}
 }
 
+func TestRegisterBuiltIn_PanicsOnEmptyID(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for empty provider ID, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			AuthorizeURL: "https://example.com/auth",
+			TokenURL:     "https://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnMissingAuthorizeURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for missing AuthorizeURL, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:       "test-missing-authorize-url",
+			TokenURL: "https://example.com/token",
+			Source:   oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnHTTPAuthorizeURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for non-HTTPS AuthorizeURL, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:           "test-http-authorize",
+			AuthorizeURL: "http://example.com/auth",
+			TokenURL:     "https://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnHTTPTokenURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for non-HTTPS TokenURL, got none")
+		}
+	}()
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:           "test-http-token",
+			AuthorizeURL: "https://example.com/auth",
+			TokenURL:     "http://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestRegisterBuiltIn_PanicsOnDuplicateID(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for duplicate provider ID, got none")
+		}
+	}()
+	// "google" is already registered via init() in oauth/providers.
+	oauth.RegisterBuiltIn(func() oauth.Provider {
+		return oauth.Provider{
+			ID:           "google",
+			AuthorizeURL: "https://example.com/auth",
+			TokenURL:     "https://example.com/token",
+			Source:       oauth.SourceBuiltIn,
+		}
+	})
+}
+
+func TestBuiltInProviders_AllUseHTTPS(t *testing.T) {
+	for _, p := range oauth.BuiltInProviders() {
+		if !strings.HasPrefix(p.AuthorizeURL, "https://") {
+			t.Errorf("provider %q AuthorizeURL does not use HTTPS: %q", p.ID, p.AuthorizeURL)
+		}
+		if !strings.HasPrefix(p.TokenURL, "https://") {
+			t.Errorf("provider %q TokenURL does not use HTTPS: %q", p.ID, p.TokenURL)
+		}
+	}
+}
+
 func TestRegisterFromManifest_DoesNotOverrideBuiltIn(t *testing.T) {
-	r := NewRegistryWithBuiltIns()
+	r := oauth.NewRegistryWithBuiltIns()
 
 	// Try to register a manifest provider with the same ID as a built-in.
-	if err := RegisterFromManifest(r, []ManifestProvider{
+	if err := oauth.RegisterFromManifest(r, []oauth.ManifestProvider{
 		{
 			ID:           "google",
 			AuthorizeURL: "https://evil.com/auth",
@@ -315,7 +409,7 @@ func TestRegisterFromManifest_DoesNotOverrideBuiltIn(t *testing.T) {
 	// Manifest has higher priority than built-in, so it should override.
 	// This is intentional — a connector may need different endpoints.
 	g, _ := r.Get("google")
-	if g.Source != SourceManifest {
+	if g.Source != oauth.SourceManifest {
 		t.Errorf("expected manifest to override built-in, got Source = %q", g.Source)
 	}
 }
