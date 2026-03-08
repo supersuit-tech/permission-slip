@@ -60,8 +60,8 @@ func TestSendTransactionalEmail_Success(t *testing.T) {
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("unmarshaling result: %v", err)
 	}
-	if data["status"] != "sent" {
-		t.Errorf("status = %v, want sent", data["status"])
+	if data["status"] != "accepted" {
+		t.Errorf("status = %v, want accepted", data["status"])
 	}
 	if data["to"] != "user@example.com" {
 		t.Errorf("to = %v, want user@example.com", data["to"])
@@ -193,6 +193,7 @@ func TestSendTransactionalEmail_ValidationErrors(t *testing.T) {
 		{name: "invalid cc email", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","cc":["not-an-email"]}`},
 		{name: "invalid bcc email", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","bcc":["bad"]}`},
 		{name: "too many categories", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","categories":["a","b","c","d","e","f","g","h","i","j","k"]}`},
+		{name: "dynamic_template_data without template_id", params: `{"to":"user@example.com","from":"sender@example.com","subject":"Hi","html_content":"<p>Hi</p>","dynamic_template_data":{"key":"value"}}`},
 		{name: "invalid JSON", params: `{invalid}`},
 	}
 

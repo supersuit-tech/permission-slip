@@ -59,6 +59,9 @@ func (p *sendTransactionalEmailParams) validate() error {
 	if p.ReplyTo != "" && !emailPattern.MatchString(p.ReplyTo) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid reply_to email: %q", p.ReplyTo)}
 	}
+	if len(p.DynamicTemplateData) > 0 && p.TemplateID == "" {
+		return &connectors.ValidationError{Message: "dynamic_template_data requires template_id to be set"}
+	}
 	for _, addr := range p.CC {
 		if !emailPattern.MatchString(addr) {
 			return &connectors.ValidationError{Message: fmt.Sprintf("invalid cc email address: %q", addr)}
@@ -161,8 +164,9 @@ func (a *sendTransactionalEmailAction) Execute(ctx context.Context, req connecto
 		return nil, err
 	}
 
+	// SendGrid responds 202 Accepted — the message is queued, not yet delivered.
 	result := map[string]any{
-		"status": "sent",
+		"status": "accepted",
 		"to":     params.To,
 	}
 	if messageID != "" {

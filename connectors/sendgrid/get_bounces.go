@@ -23,18 +23,27 @@ type getBouncesParams struct {
 	EndTime   string `json:"end_time"`
 	Limit     int    `json:"limit"`
 	Offset    int    `json:"offset"`
+
+	// parsedStart/parsedEnd hold the validated time.Time values so Execute
+	// doesn't need to re-parse (and cannot silently discard parse errors).
+	parsedStart time.Time
+	parsedEnd   time.Time
 }
 
 func (p *getBouncesParams) validate() error {
 	if p.StartTime != "" {
-		if _, err := time.Parse(time.RFC3339, p.StartTime); err != nil {
+		t, err := time.Parse(time.RFC3339, p.StartTime)
+		if err != nil {
 			return &connectors.ValidationError{Message: fmt.Sprintf("invalid start_time format (use RFC3339, e.g. 2026-01-01T00:00:00Z): %v", err)}
 		}
+		p.parsedStart = t
 	}
 	if p.EndTime != "" {
-		if _, err := time.Parse(time.RFC3339, p.EndTime); err != nil {
+		t, err := time.Parse(time.RFC3339, p.EndTime)
+		if err != nil {
 			return &connectors.ValidationError{Message: fmt.Sprintf("invalid end_time format (use RFC3339, e.g. 2026-01-31T23:59:59Z): %v", err)}
 		}
+		p.parsedEnd = t
 	}
 	if p.Limit < 0 {
 		return &connectors.ValidationError{Message: "limit must be non-negative"}
@@ -73,13 +82,11 @@ func (a *getBouncesAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	q := url.Values{}
-	if params.StartTime != "" {
-		t, _ := time.Parse(time.RFC3339, params.StartTime)
-		q.Set("start_time", strconv.FormatInt(t.Unix(), 10))
+	if !params.parsedStart.IsZero() {
+		q.Set("start_time", strconv.FormatInt(params.parsedStart.Unix(), 10))
 	}
-	if params.EndTime != "" {
-		t, _ := time.Parse(time.RFC3339, params.EndTime)
-		q.Set("end_time", strconv.FormatInt(t.Unix(), 10))
+	if !params.parsedEnd.IsZero() {
+		q.Set("end_time", strconv.FormatInt(params.parsedEnd.Unix(), 10))
 	}
 	if params.Limit > 0 {
 		q.Set("limit", strconv.Itoa(params.Limit))
