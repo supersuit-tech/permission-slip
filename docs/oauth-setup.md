@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Figma, Meta (Facebook/Instagram), and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Figma, Meta (Facebook/Instagram), Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -38,6 +38,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `META_CLIENT_ID` | App ID from Meta Developer Dashboard |
 | `META_CLIENT_SECRET` | App Secret from Meta Developer Dashboard |
+
+### Stripe OAuth
+
+| Variable | Description |
+|---|---|
+| `STRIPE_CLIENT_ID` | OAuth client ID from Stripe Connect settings (starts with `ca_`) |
+| `STRIPE_CLIENT_SECRET` | Stripe secret key used as the client secret for the OAuth token exchange |
 
 ### OAuth Infrastructure
 
@@ -198,6 +205,47 @@ META_CLIENT_SECRET=your-meta-app-secret
 
 Find these under **App Settings > Basic** in the Meta Developer Dashboard.
 
+## Stripe OAuth Setup
+
+Stripe uses [Stripe Connect](https://docs.stripe.com/connect) OAuth to authorize access to Stripe accounts. This lets users connect their Stripe account without manually creating and pasting API keys.
+
+### 1. Enable Stripe Connect
+
+1. Go to [Stripe Dashboard > Settings > Connect](https://dashboard.stripe.com/settings/connect)
+2. Enable Stripe Connect for your platform
+3. Note your **Client ID** (starts with `ca_`) from the Connect settings page
+
+### 2. Configure Redirect URI
+
+1. In the Connect settings, add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/stripe/callback
+   ```
+2. For development, add `http://localhost:PORT/api/v1/oauth/stripe/callback`
+
+### 3. Configure Environment
+
+```bash
+STRIPE_CLIENT_ID=ca_your-connect-client-id
+STRIPE_CLIENT_SECRET=sk_live_your-secret-key
+```
+
+The `STRIPE_CLIENT_SECRET` is your platform's Stripe secret key — Stripe uses it as the client secret during the OAuth token exchange.
+
+### 4. Scopes
+
+The Stripe connector requests the `read_write` scope, which provides full API access to the connected account. Stripe Connect does not support more granular OAuth scopes.
+
+### 5. How It Works
+
+When a user connects their Stripe account:
+1. They are redirected to `connect.stripe.com/oauth/authorize`
+2. After authorizing, Stripe redirects back with an authorization code
+3. The platform exchanges the code for the connected account's secret key
+4. This key (stored as `access_token`) works like a regular Stripe API key but is scoped to the connected account
+
+The Stripe connector also supports manual API key entry as a fallback for users who prefer not to use OAuth.
+
 ## X (Twitter) OAuth Setup
 
 The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
@@ -290,6 +338,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
+- Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
