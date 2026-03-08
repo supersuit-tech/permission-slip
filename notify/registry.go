@@ -36,22 +36,31 @@ type BuildContext struct {
 // factories from running.
 type SenderFactory func(ctx context.Context, bc BuildContext) ([]Sender, error)
 
+// namedFactory pairs a human-readable channel name with its factory so that
+// error and panic log messages identify which channel failed.
+type namedFactory struct {
+	channel string
+	fn      SenderFactory
+}
+
 var (
 	senderMu        sync.Mutex
-	senderFactories []SenderFactory
+	senderFactories []namedFactory
 )
 
 // RegisterSenderFactory registers a SenderFactory to be called by BuildSenders.
-// Factories are called in registration order. Packages register themselves in
-// their init() function so registration happens automatically on import.
+// channel is a short human-readable name (e.g. "email", "sms") used in log
+// messages to identify which factory failed. Factories are called in
+// registration order. Packages register themselves in their init() function so
+// registration happens automatically on import.
 // Panics if fn is nil so the mistake surfaces immediately at registration time.
-func RegisterSenderFactory(fn SenderFactory) {
+func RegisterSenderFactory(channel string, fn SenderFactory) {
 	if fn == nil {
-		panic("notify: RegisterSenderFactory called with nil factory")
+		panic("notify: RegisterSenderFactory called with nil factory for channel " + channel)
 	}
 	senderMu.Lock()
 	defer senderMu.Unlock()
-	senderFactories = append(senderFactories, fn)
+	senderFactories = append(senderFactories, namedFactory{channel: channel, fn: fn})
 }
 
 // SenderFactoryCount returns the number of registered sender factories.
@@ -71,15 +80,15 @@ func SenderFactoryCount() int {
 // (or import sender packages individually) before calling BuildSenders.
 func BuildSenders(ctx context.Context, bc BuildContext) []Sender {
 	senderMu.Lock()
-	factories := make([]SenderFactory, len(senderFactories))
+	factories := make([]namedFactory, len(senderFactories))
 	copy(factories, senderFactories)
 	senderMu.Unlock()
 
 	var senders []Sender
-	for i, factory := range factories {
-		ss, err := runFactory(ctx, bc, factory)
+	for _, nf := range factories {
+		ss, err := runFactory(ctx, bc, nf.fn)
 		if err != nil {
-			log.Printf("notify: factory[%d] failed: %v", i, err)
+			log.Printf("notify: %s sender factory failed: %v", nf.channel, err)
 			continue
 		}
 		senders = append(senders, ss...)

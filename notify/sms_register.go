@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	RegisterSenderFactory(func(_ context.Context, bc BuildContext) ([]Sender, error) {
+	RegisterSenderFactory("sms", func(_ context.Context, bc BuildContext) ([]Sender, error) {
 		cfg := bc.Config
 		if cfg.TwilioAccountSID == "" || cfg.TwilioAuthToken == "" || cfg.TwilioFromNumber == "" {
 			if cfg.TwilioAccountSID != "" || cfg.TwilioAuthToken != "" || cfg.TwilioFromNumber != "" {

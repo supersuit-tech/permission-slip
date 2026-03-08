@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	notify.RegisterSenderFactory(func(_ context.Context, bc notify.BuildContext) ([]notify.Sender, error) {
+	notify.RegisterSenderFactory("mobile-push", func(_ context.Context, bc notify.BuildContext) ([]notify.Sender, error) {
 		if bc.DB == nil {
 			return nil, nil
 		}

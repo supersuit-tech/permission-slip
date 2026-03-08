@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	notify.RegisterSenderFactory(func(ctx context.Context, bc notify.BuildContext) ([]notify.Sender, error) {
+	notify.RegisterSenderFactory("web-push", func(ctx context.Context, bc notify.BuildContext) ([]notify.Sender, error) {
 		if bc.DB == nil {
 			return nil, nil
 		}
