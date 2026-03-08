@@ -1229,27 +1229,36 @@ func TestExtractTokenExtraData_NilStateExtra(t *testing.T) {
 	}
 }
 
-func docuSignTestServer(t *testing.T, accounts []map[string]any) *httptest.Server {
+// docuSignTestServer creates a mock DocuSign userinfo server that requires a
+// specific bearer token and returns the provided accounts in the response.
+// The server records the received Authorization header so callers can assert on it.
+func docuSignTestServer(t *testing.T, token string, accounts []map[string]any) (*httptest.Server, *string) {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") == "" {
-			http.Error(w, "missing authorization", http.StatusUnauthorized)
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		if gotAuth != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"accounts": accounts})
 	}))
+	return srv, &gotAuth
 }
 
 func TestFetchDocuSignUserInfo_DefaultAccount(t *testing.T) {
 	t.Parallel()
-	server := docuSignTestServer(t, []map[string]any{
+	server, gotAuth := docuSignTestServer(t, "test-token", []map[string]any{
 		{"account_id": "acc-non-default", "is_default": false, "base_uri": "https://na1.docusign.net"},
 		{"account_id": "acc-default-456", "is_default": true, "base_uri": "https://na2.docusign.net"},
 	})
 	defer server.Close()
 
 	got, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if *gotAuth != "Bearer test-token" {
+		t.Errorf("Authorization header = %q, want %q", *gotAuth, "Bearer test-token")
+	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1265,7 +1274,7 @@ func TestFetchDocuSignUserInfo_DefaultAccount(t *testing.T) {
 func TestFetchDocuSignUserInfo_FallsBackToFirstAccount(t *testing.T) {
 	t.Parallel()
 	// No account is marked as default → should use the first one.
-	server := docuSignTestServer(t, []map[string]any{
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
 		{"account_id": "acc-first", "is_default": false, "base_uri": "https://na1.docusign.net"},
 		{"account_id": "acc-second", "is_default": false, "base_uri": "https://na2.docusign.net"},
 	})
@@ -1282,7 +1291,7 @@ func TestFetchDocuSignUserInfo_FallsBackToFirstAccount(t *testing.T) {
 
 func TestFetchDocuSignUserInfo_NoAccounts(t *testing.T) {
 	t.Parallel()
-	server := docuSignTestServer(t, []map[string]any{})
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{})
 	defer server.Close()
 
 	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
@@ -1304,10 +1313,24 @@ func TestFetchDocuSignUserInfo_HTTPError(t *testing.T) {
 	}
 }
 
+func TestFetchDocuSignUserInfo_InvalidToken(t *testing.T) {
+	t.Parallel()
+	// Wrong token → server returns 401, function should return an error.
+	server, _ := docuSignTestServer(t, "correct-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": "https://na1.docusign.net"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "wrong-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for wrong access token")
+	}
+}
+
 func TestFetchDocuSignUserInfo_InvalidBaseURI(t *testing.T) {
 	t.Parallel()
 	// base_uri doesn't end with .docusign.net — should be rejected for SSRF protection.
-	server := docuSignTestServer(t, []map[string]any{
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
 		{"account_id": "acc-123", "is_default": true, "base_uri": "https://evil.example.com"},
 	})
 	defer server.Close()
