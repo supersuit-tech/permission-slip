@@ -43,7 +43,7 @@ func TestActions(t *testing.T) {
 	}
 }
 
-func TestValidateCredentials_Valid(t *testing.T) {
+func TestValidateCredentials_Valid_APIKey(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +60,33 @@ func TestValidateCredentials_Valid(t *testing.T) {
 
 	c := newForTest(srv.Client(), srv.URL)
 	err := c.ValidateCredentials(context.Background(), validCreds())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateCredentials_Valid_OAuth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/members/me" {
+			t.Errorf("expected /members/me, got %s", r.URL.Path)
+		}
+		// OAuth should use Bearer token, not query params.
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-oauth-access-token-789" {
+			t.Errorf("expected Bearer token in Authorization header, got %q", auth)
+		}
+		if r.URL.Query().Get("key") != "" {
+			t.Error("unexpected key in query params for OAuth")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"id": "member123", "username": "testuser"})
+	}))
+	defer srv.Close()
+
+	c := newForTest(srv.Client(), srv.URL)
+	err := c.ValidateCredentials(context.Background(), oauthCreds())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -84,30 +111,32 @@ func TestValidateCredentials_InvalidCreds(t *testing.T) {
 	}
 }
 
-func TestValidateCredentials_MissingAPIKey(t *testing.T) {
+func TestValidateCredentials_MissingAPIKeyAndOAuth(t *testing.T) {
 	t.Parallel()
 	c := New()
+	// Has only a Trello token but no api_key and no access_token.
 	creds := connectors.NewCredentials(map[string]string{
 		"token": "test-token",
 	})
 	err := c.ValidateCredentials(context.Background(), creds)
 	if err == nil {
-		t.Fatal("expected error for missing api_key")
+		t.Fatal("expected error for missing credentials")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 
-func TestValidateCredentials_MissingToken(t *testing.T) {
+func TestValidateCredentials_IncompleteAPIKey(t *testing.T) {
 	t.Parallel()
 	c := New()
+	// Has api_key but missing token (and no access_token).
 	creds := connectors.NewCredentials(map[string]string{
 		"api_key": "test-key",
 	})
 	err := c.ValidateCredentials(context.Background(), creds)
 	if err == nil {
-		t.Fatal("expected error for missing token")
+		t.Fatal("expected error for incomplete API key credentials")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
@@ -138,11 +167,29 @@ func TestManifest(t *testing.T) {
 	if len(m.Actions) != 6 {
 		t.Errorf("expected 6 actions in manifest, got %d", len(m.Actions))
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Errorf("expected 1 required credential, got %d", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Errorf("expected 2 required credentials, got %d", len(m.RequiredCredentials))
 	}
-	if m.RequiredCredentials[0].AuthType != "api_key" {
-		t.Errorf("expected auth type 'api_key', got %q", m.RequiredCredentials[0].AuthType)
+	if m.RequiredCredentials[0].AuthType != "oauth2" {
+		t.Errorf("expected first credential auth type 'oauth2', got %q", m.RequiredCredentials[0].AuthType)
+	}
+	if m.RequiredCredentials[0].Service != "trello_oauth" {
+		t.Errorf("expected first credential service 'trello_oauth', got %q", m.RequiredCredentials[0].Service)
+	}
+	if m.RequiredCredentials[0].OAuthProvider != "trello" {
+		t.Errorf("expected oauth_provider 'trello', got %q", m.RequiredCredentials[0].OAuthProvider)
+	}
+	if m.RequiredCredentials[1].AuthType != "api_key" {
+		t.Errorf("expected second credential auth type 'api_key', got %q", m.RequiredCredentials[1].AuthType)
+	}
+	if m.RequiredCredentials[1].Service != "trello" {
+		t.Errorf("expected second credential service 'trello' (preserves existing users' credentials), got %q", m.RequiredCredentials[1].Service)
+	}
+	if len(m.OAuthProviders) != 1 {
+		t.Errorf("expected 1 OAuth provider, got %d", len(m.OAuthProviders))
+	}
+	if len(m.OAuthProviders) > 0 && m.OAuthProviders[0].ID != "trello" {
+		t.Errorf("expected OAuth provider ID 'trello', got %q", m.OAuthProviders[0].ID)
 	}
 
 	// Verify all action schemas parse as valid JSON.
@@ -165,6 +212,15 @@ func TestManifest(t *testing.T) {
 		if riskMap[action] != "low" {
 			t.Errorf("expected %s risk=low, got %q", action, riskMap[action])
 		}
+	}
+}
+
+func TestManifest_PassesValidation(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+	if err := m.Validate(); err != nil {
+		t.Fatalf("manifest validation failed: %v", err)
 	}
 }
 
@@ -320,5 +376,91 @@ func TestDo_QueryParamAuth(t *testing.T) {
 	}
 	if resp["id"] != "me123" {
 		t.Errorf("expected id=me123, got %q", resp["id"])
+	}
+}
+
+func TestDo_BearerTokenAuth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify auth is in Authorization header, NOT in query params.
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-oauth-access-token-789" {
+			t.Errorf("expected Bearer token, got %q", auth)
+		}
+		if r.URL.Query().Get("key") != "" {
+			t.Error("unexpected key in query params for OAuth")
+		}
+		if r.URL.Query().Get("token") != "" {
+			t.Error("unexpected token in query params for OAuth")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"id": "me123"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	err := conn.do(t.Context(), oauthCreds(), http.MethodGet, "/members/me", nil, &resp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp["id"] != "me123" {
+		t.Errorf("expected id=me123, got %q", resp["id"])
+	}
+}
+
+func TestDoGet_BearerTokenAuth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-oauth-access-token-789" {
+			t.Errorf("expected Bearer token, got %q", auth)
+		}
+		// Extra query params should still be present.
+		if r.URL.Query().Get("fields") != "id,username" {
+			t.Errorf("expected fields query param, got %q", r.URL.Query().Get("fields"))
+		}
+		// No API key query params.
+		if r.URL.Query().Get("key") != "" {
+			t.Error("unexpected key in query params for OAuth")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"id": "me123", "username": "testuser"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	var resp map[string]string
+	err := conn.doGet(t.Context(), oauthCreds(), "/members/me", map[string]string{"fields": "id,username"}, &resp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp["id"] != "me123" {
+		t.Errorf("expected id=me123, got %q", resp["id"])
+	}
+}
+
+func TestResolveAuth_OAuthPreferred(t *testing.T) {
+	t.Parallel()
+
+	// When both OAuth and API key credentials are present, OAuth should win.
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token": "oauth-token",
+		"api_key":      "test-key",
+		"token":        "test-token",
+	})
+	auth, err := resolveAuth(creds)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if auth.bearerToken != "oauth-token" {
+		t.Errorf("expected OAuth token, got bearer=%q", auth.bearerToken)
+	}
+	if auth.queryParams != nil {
+		t.Error("expected nil queryParams when OAuth is used")
 	}
 }

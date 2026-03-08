@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.linear.app/graphql"
-	defaultTimeout = 30 * time.Second
-	credKeyAPIKey  = "api_key"
+	defaultBaseURL      = "https://api.linear.app/graphql"
+	defaultTimeout      = 30 * time.Second
+	credKeyAPIKey       = "api_key"
+	credKeyAccessToken  = "access_token"
 
 	// defaultRetryAfter is used when Linear returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -69,13 +70,15 @@ func (c *LinearConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key. Linear personal API keys are opaque strings with
-// no fixed prefix, so we only validate presence.
+// ValidateCredentials checks that the provided credentials contain either a
+// non-empty api_key (for API key auth) or a non-empty access_token (for OAuth).
+// At least one must be present.
 func (c *LinearConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	apiKey, hasAPIKey := creds.Get(credKeyAPIKey)
+	accessToken, hasAccessToken := creds.Get(credKeyAccessToken)
+
+	if (!hasAPIKey || apiKey == "") && (!hasAccessToken || accessToken == "") {
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
 	}
 	return nil
 }
@@ -107,13 +110,27 @@ type graphQLError struct {
 	Extensions map[string]interface{} `json:"extensions,omitempty"`
 }
 
+// resolveAuthHeader returns the Authorization header value from the provided
+// credentials. OAuth access tokens use "Bearer {token}" format, while API keys
+// use the raw key (no prefix), matching Linear's API conventions.
+func resolveAuthHeader(creds connectors.Credentials) (string, error) {
+	// Prefer OAuth access_token over API key when both are present.
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return "Bearer " + token, nil
+	}
+	if key, ok := creds.Get(credKeyAPIKey); ok && key != "" {
+		return key, nil
+	}
+	return "", &connectors.ValidationError{Message: "api_key or access_token credential is missing or empty"}
+}
+
 // doGraphQL sends a GraphQL request to the Linear API and unmarshals the
 // response data into dest. It handles auth, rate limiting, timeouts, and
 // maps Linear GraphQL errors to connector error types.
 func (c *LinearConnector) doGraphQL(ctx context.Context, creds connectors.Credentials, query string, variables map[string]any, dest any) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	authHeader, err := resolveAuthHeader(creds)
+	if err != nil {
+		return err
 	}
 
 	gqlReq := graphQLRequest{
@@ -130,8 +147,7 @@ func (c *LinearConnector) doGraphQL(ctx context.Context, creds connectors.Creden
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
-	// Linear uses "Authorization: {api_key}" — no "Bearer" prefix.
-	req.Header.Set("Authorization", key)
+	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)

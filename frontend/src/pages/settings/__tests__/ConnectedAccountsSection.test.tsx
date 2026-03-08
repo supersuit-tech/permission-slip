@@ -248,6 +248,47 @@ describe("ConnectedAccountsSection", () => {
     });
   });
 
+  it("renders Linear connection with correct label", async () => {
+    mockApiFetch(
+      [
+        {
+          provider: "linear",
+          scopes: ["read", "write"],
+          status: "active",
+          connected_at: "2026-03-07T10:00:00Z",
+        },
+      ],
+      [
+        { id: "linear", scopes: ["read", "write"], source: "built_in", has_credentials: true },
+      ],
+    );
+
+    render(<ConnectedAccountsSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Linear")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.getByText(/2 scopes granted/)).toBeInTheDocument();
+  });
+
+  it("shows connect button for Linear provider", async () => {
+    mockApiFetch(
+      [],
+      [
+        { id: "linear", scopes: ["read", "write"], source: "built_in", has_credentials: true },
+      ],
+    );
+
+    render(<ConnectedAccountsSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Connect Linear" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("shows connection count badge", async () => {
     mockApiFetch(
       [

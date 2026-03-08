@@ -720,10 +720,11 @@ func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connecto
 		providers := make([]poauth.ManifestProvider, len(manifest.OAuthProviders))
 		for i, p := range manifest.OAuthProviders {
 			providers[i] = poauth.ManifestProvider{
-				ID:           p.ID,
-				AuthorizeURL: p.AuthorizeURL,
-				TokenURL:     p.TokenURL,
-				Scopes:       p.Scopes,
+				ID:              p.ID,
+				AuthorizeURL:    p.AuthorizeURL,
+				TokenURL:        p.TokenURL,
+				Scopes:          p.Scopes,
+				AuthorizeParams: p.AuthorizeParams,
 			}
 		}
 		if err := poauth.RegisterFromManifest(oauthReg, providers); err != nil {

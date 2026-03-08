@@ -49,14 +49,15 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
 
+	connectorID := strings.SplitN(actionType, ".", 2)[0]
+
 	var creds connectors.Credentials
-	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, reqCreds)
+	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, connectorID, reqCreds)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate credentials before executing the action.
-	connectorID := strings.SplitN(actionType, ".", 2)[0]
 	if conn, ok := deps.Connectors.Get(connectorID); ok {
 		if err := conn.ValidateCredentials(ctx, creds); err != nil {
 			return nil, err
@@ -222,7 +223,26 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 // For connectors supporting multiple auth methods (e.g. OAuth + API key), it
 // tries OAuth first, then falls back to static credentials if the user hasn't
 // connected their OAuth account.
-func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	// If there's a built-in OAuth provider for this connector but the manifest
+	// only declares static credentials (e.g. Shopify), synthesize an oauth2
+	// entry so OAuth is tried first with static as fallback.
+	hasExplicitOAuth := false
+	for _, rc := range reqCreds {
+		if rc.AuthType == "oauth2" {
+			hasExplicitOAuth = true
+			break
+		}
+	}
+	if !hasExplicitOAuth && deps.OAuthProviders != nil {
+		if _, providerExists := deps.OAuthProviders.Get(connectorID); providerExists {
+			reqCreds = append([]db.RequiredCredential{{
+				AuthType:      "oauth2",
+				OAuthProvider: &connectorID,
+			}}, reqCreds...)
+		}
+	}
+
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
 	}
@@ -243,12 +263,16 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 			if err == nil {
 				return creds, nil
 			}
-			// If the error is because the user hasn't connected OAuth,
-			// continue to the next credential type (fallback).
-			if connectors.IsOAuthRefreshError(err) {
+			// Only fall back to static credentials when the user has no OAuth
+			// connection at all (NotConnected). If the connection exists but
+			// needs re-auth or refresh failed, we must NOT silently fall back —
+			// that would mask the need to reconnect OAuth.
+			var oauthErr *connectors.OAuthRefreshError
+			if errors.As(err, &oauthErr) && oauthErr.NotConnected {
 				continue
 			}
-			// For other errors (vault misconfigured, etc.), fail immediately.
+			// For other OAuth errors (needs_reauth, refresh failed) or
+			// non-OAuth errors (vault misconfigured), fail immediately.
 			return connectors.Credentials{}, err
 		}
 	}
@@ -297,11 +321,11 @@ func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID, 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
 // for the given action type.
 func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	var zero connectors.Credentials
 	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
+		return zero, fmt.Errorf("look up required services: %w", err)
 	}
-
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
 		creds, err := decryptServiceCredentials(ctx, deps, userID, service)
@@ -313,7 +337,6 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 			credMap[k] = v
 		}
 	}
-
 	return connectors.NewCredentials(credMap), nil
 }
 
@@ -380,9 +403,9 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	}
 	if conn == nil {
 		return zero, &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Reason:   connectors.OAuthReasonNotConnected,
-			Message:  fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			Provider:     providerID,
+			Message:      fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			NotConnected: true,
 		}
 	}
 
@@ -392,7 +415,6 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	if conn.Status != db.OAuthStatusActive {
 		return zero, &connectors.OAuthRefreshError{
 			Provider: providerID,
-			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", providerID, conn.Status),
 		}
 	}
@@ -444,7 +466,6 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	if !ok {
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
-			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  fmt.Sprintf("OAuth provider %q is not registered", providerID),
 		}
 	}
@@ -456,7 +477,6 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
-			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  "token expired and no refresh token available — user must re-authorize",
 		}
 	}
@@ -483,7 +503,6 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
-			Reason:   connectors.OAuthReasonNeedsReauth,
 			Message:  "token refresh failed — user must re-authorize",
 		}
 	}
@@ -534,4 +553,5 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	return nil
 }
+
 

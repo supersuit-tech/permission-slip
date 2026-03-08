@@ -98,24 +98,10 @@ func AsRateLimitError(err error, target **RateLimitError) bool {
 // needs to re-authorize. Maps to HTTP 401 with a message telling the agent
 // the user needs to reconnect the OAuth provider.
 type OAuthRefreshError struct {
-	Provider string          // OAuth provider ID (e.g. "google")
-	Message  string          // human-readable description
-	Reason   OAuthFailReason // categorises why resolution failed
+	Provider     string // OAuth provider ID (e.g. "google")
+	Message      string // human-readable description
+	NotConnected bool   // true when the user has no OAuth connection (vs. refresh failure)
 }
-
-// OAuthFailReason categorises why an OAuth credential resolution failed so
-// callers can decide whether to attempt a fallback (e.g. to static PAT creds).
-type OAuthFailReason int
-
-const (
-	// OAuthReasonNotConnected means no OAuth connection exists for the user.
-	// This is the only case where falling back to static credentials is safe.
-	OAuthReasonNotConnected OAuthFailReason = iota
-	// OAuthReasonNeedsReauth means an OAuth connection exists but is invalid
-	// (expired, revoked, needs_reauth status). The user should re-authorize
-	// rather than silently falling back to weaker credentials.
-	OAuthReasonNeedsReauth
-)
 
 func (e *OAuthRefreshError) Error() string {
 	return fmt.Sprintf("OAuth token refresh failed for provider %q: %s", e.Provider, e.Message)

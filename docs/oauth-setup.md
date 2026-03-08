@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Figma, GitHub, Google, HubSpot, Microsoft, Meta (Facebook/Instagram), Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -39,12 +39,40 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `FIGMA_CLIENT_ID` | OAuth 2.0 Client ID from the Figma Developer settings |
 | `FIGMA_CLIENT_SECRET` | OAuth 2.0 Client Secret from the Figma Developer settings |
 
+### PagerDuty OAuth
+
+| Variable | Description |
+|---|---|
+| `PAGERDUTY_CLIENT_ID` | Client ID from PagerDuty Developer Dashboard |
+| `PAGERDUTY_CLIENT_SECRET` | Client Secret from PagerDuty Developer Dashboard |
+
 ### Meta OAuth
 
 | Variable | Description |
 |---|---|
 | `META_CLIENT_ID` | App ID from Meta Developer Dashboard |
 | `META_CLIENT_SECRET` | App Secret from Meta Developer Dashboard |
+
+### Linear OAuth
+
+| Variable | Description |
+|---|---|
+| `LINEAR_CLIENT_ID` | OAuth Application ID from Linear Settings |
+| `LINEAR_CLIENT_SECRET` | OAuth Client Secret from Linear Settings |
+
+### Notion OAuth
+
+| Variable | Description |
+|---|---|
+| `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
+| `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
+
+### Square OAuth
+
+| Variable | Description |
+|---|---|
+| `SQUARE_CLIENT_ID` | Production Application ID from Square Developer Dashboard |
+| `SQUARE_CLIENT_SECRET` | Production Application Secret from Square Developer Dashboard |
 
 ### Stripe OAuth
 
@@ -200,6 +228,41 @@ FIGMA_CLIENT_SECRET=your-figma-client-secret
 
 The Figma connector supports both OAuth (recommended) and personal access tokens. If a user has not connected via OAuth, the connector will fall back to any stored personal access token. Users can generate a PAT from [Figma's token management page](https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens).
 
+## PagerDuty OAuth Setup
+
+PagerDuty is the first built-in connector to support **both** OAuth 2.0 and API key authentication. Users can choose to connect via OAuth (recommended) or provide an API key manually.
+
+### 1. Create a PagerDuty App
+
+1. Go to the [PagerDuty Developer Dashboard](https://developer.pagerduty.com/)
+2. Navigate to **My Apps** and click **Create New App**
+3. Fill in the app details:
+   - App Name: Your deployment name (e.g., "Permission Slip")
+   - Description: Brief description of the integration
+4. Under **OAuth 2.0**, enable it and add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/pagerduty/callback
+   ```
+
+### 2. Configure OAuth Scopes
+
+The PagerDuty connector requires these scopes:
+- `read` — read incidents, services, schedules, and on-call data
+- `write` — create/update incidents, add notes, and manage escalations
+
+### 3. Configure Environment
+
+```bash
+PAGERDUTY_CLIENT_ID=your-client-id
+PAGERDUTY_CLIENT_SECRET=your-client-secret
+```
+
+Find these in your app's settings under the **OAuth 2.0** section.
+
+### Alternative: API Key Auth
+
+Users who prefer not to use OAuth can still connect PagerDuty with an API key. See [PagerDuty API Access Keys](https://support.pagerduty.com/main/docs/api-access-keys) for instructions on generating a key.
+
 ## Meta (Facebook/Instagram) OAuth Setup
 
 ### 1. Create a Meta App
@@ -238,6 +301,117 @@ META_CLIENT_SECRET=your-meta-app-secret
 ```
 
 Find these under **App Settings > Basic** in the Meta Developer Dashboard.
+
+## Linear OAuth Setup
+
+### 1. Create a Linear OAuth Application
+
+1. Go to [Linear Settings > API > OAuth Applications](https://linear.app/settings/api/applications)
+2. Click **New OAuth Application**
+3. Fill in the required fields:
+   - Application name: Your deployment name (e.g., "Permission Slip")
+   - Developer URL: Your website URL
+   - Redirect callback URLs: `https://your-domain.com/api/v1/oauth/linear/callback`
+
+### 2. Configure Scopes
+
+The Linear connector requires these scopes:
+- `read` — read issues, projects, teams, and other workspace data
+- `write` — create and update issues, comments, and projects
+
+### 3. Copy Credentials
+
+From the OAuth application settings page, copy:
+- **Client ID** (Application ID)
+- **Client Secret**
+
+### 4. Configure Environment
+
+```bash
+LINEAR_CLIENT_ID=your-linear-client-id
+LINEAR_CLIENT_SECRET=your-linear-client-secret
+```
+
+> **Note:** Linear also supports API key authentication as an alternative. Users who prefer not to use OAuth can generate a personal API key at [Linear Settings > API > Personal API Keys](https://linear.app/docs/graphql/working-with-the-graphql-api#personal-api-keys) and configure it in the connector's credentials section.
+
+## Notion OAuth Setup
+
+Notion supports both OAuth and internal integration tokens (API keys). OAuth is recommended for end users; API keys are useful for server-to-server integrations or when OAuth is not available.
+
+### 1. Create a Notion Integration
+
+1. Go to [My Integrations](https://www.notion.so/my-integrations)
+2. Click **New integration**
+3. Fill in the required fields:
+   - Name: Your deployment name (e.g., "Permission Slip")
+   - Associated workspace: Select the workspace to connect
+4. Under **Capabilities**, select the permissions your connectors need (read content, update content, insert content)
+5. Under **Distribution**, enable **Public integration** to use OAuth
+
+### 2. Configure OAuth Settings
+
+1. In the integration settings, go to the **OAuth Domain & URIs** section
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/notion/callback
+   ```
+3. Copy the **OAuth client ID** and **OAuth client secret**
+
+### 3. Configure Environment
+
+```bash
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
+```
+
+### Alternative: API Key (Internal Integration Token)
+
+If you don't need OAuth, you can use an internal integration token instead:
+
+1. Create a **private** integration (not public) at [My Integrations](https://www.notion.so/my-integrations)
+2. Copy the **Internal Integration Secret** (starts with `ntn_`)
+3. In Permission Slip, add it as an API key credential in the connector settings
+4. Share your Notion pages/databases with the integration
+
+The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
+
+## Square OAuth Setup
+
+### 1. Create a Square Developer Application
+
+1. Go to [Square Developer Dashboard](https://developer.squareup.com/apps)
+2. Click **+** to create a new application
+3. Fill in the application name (e.g., "Permission Slip")
+
+### 2. Configure OAuth Settings
+
+1. Navigate to **OAuth** in the left sidebar
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/square/callback
+   ```
+3. Select the required OAuth permissions (scopes):
+   - `ORDERS_READ`, `ORDERS_WRITE`
+   - `PAYMENTS_READ`, `PAYMENTS_WRITE`
+   - `ITEMS_READ`, `ITEMS_WRITE`
+   - `CUSTOMERS_READ`, `CUSTOMERS_WRITE`
+   - `APPOINTMENTS_READ`, `APPOINTMENTS_WRITE`
+   - `INVOICES_READ`, `INVOICES_WRITE`
+   - `INVENTORY_READ`, `INVENTORY_WRITE`
+
+### 3. Get Credentials
+
+1. Navigate to **Credentials** in the left sidebar
+2. Copy the **Production Application ID** and **Production Application Secret**
+
+### 4. Configure Environment
+
+```bash
+SQUARE_CLIENT_ID=your-production-application-id
+SQUARE_CLIENT_SECRET=your-production-application-secret
+```
+
+> **Note:** The Square connector supports both OAuth and API key authentication. OAuth is recommended for production use. API keys can be generated from the Square Developer Dashboard under **Credentials > Production Access Token**.
 
 ## Stripe OAuth Setup
 
@@ -371,8 +545,12 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Figma: `https://your-domain.com/api/v1/oauth/figma/callback`
 - GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
+- Linear: `https://your-domain.com/api/v1/oauth/linear/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
+- Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
+- PagerDuty: `https://your-domain.com/api/v1/oauth/pagerduty/callback`
+- Square: `https://your-domain.com/api/v1/oauth/square/callback`
 - Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 

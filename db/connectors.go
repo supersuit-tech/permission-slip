@@ -145,6 +145,7 @@ func GetRequiredServicesByActionType(ctx context.Context, db DBTX, actionType st
 	// Use a LEFT JOIN so that a matching action with no required credentials
 	// returns a single row with a NULL service (→ empty slice) while a
 	// non-matching action type returns zero rows (→ nil, nil).
+	// Exclude oauth2 services — those are resolved via resolveOAuthCredentials.
 	rows, err := db.Query(ctx, `
 		SELECT crc.service
 		FROM connector_actions ca
@@ -322,14 +323,15 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	}
 
 	// Upsert required credentials.
-	services := make([]string, 0, len(m.Credentials))
+	// Track (service, auth_type) pairs so we can remove stale rows afterwards.
+	type serviceAuthKey struct{ service, authType string }
+	credKeys := make([]serviceAuthKey, 0, len(m.Credentials))
 	for _, c := range m.Credentials {
-		services = append(services, c.Service)
+		credKeys = append(credKeys, serviceAuthKey{c.Service, c.AuthType})
 		_, err := tx.Exec(ctx, `
 			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes)
 			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (connector_id, service) DO UPDATE SET
-				auth_type = EXCLUDED.auth_type,
+			ON CONFLICT (connector_id, service, auth_type) DO UPDATE SET
 				instructions_url = EXCLUDED.instructions_url,
 				oauth_provider = EXCLUDED.oauth_provider,
 				oauth_scopes = EXCLUDED.oauth_scopes`,
@@ -340,10 +342,24 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	}
 
 	// Remove credentials no longer in the manifest.
-	if len(services) > 0 {
-		_, err = tx.Exec(ctx,
-			`DELETE FROM connector_required_credentials WHERE connector_id = $1 AND service != ALL($2)`,
-			m.ID, services)
+	// Build parallel arrays of service and auth_type for the WHERE clause.
+	if len(credKeys) > 0 {
+		services := make([]string, len(credKeys))
+		authTypes := make([]string, len(credKeys))
+		for i, k := range credKeys {
+			services[i] = k.service
+			authTypes[i] = k.authType
+		}
+		_, err = tx.Exec(ctx, `
+			DELETE FROM connector_required_credentials
+			WHERE connector_id = $1
+			  AND NOT EXISTS (
+			    SELECT 1
+			    FROM unnest($2::text[], $3::text[]) AS keep(service, auth_type)
+			    WHERE keep.service = connector_required_credentials.service
+			      AND keep.auth_type = connector_required_credentials.auth_type
+			  )`,
+			m.ID, services, authTypes)
 	} else {
 		_, err = tx.Exec(ctx,
 			`DELETE FROM connector_required_credentials WHERE connector_id = $1`, m.ID)

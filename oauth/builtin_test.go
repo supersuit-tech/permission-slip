@@ -93,6 +93,22 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("netlify", func(t *testing.T) {
+		n, ok := byID["netlify"]
+		if !ok {
+			t.Fatal("netlify provider not found")
+		}
+		if n.AuthorizeURL != "https://app.netlify.com/authorize" {
+			t.Errorf("AuthorizeURL = %q", n.AuthorizeURL)
+		}
+		if n.TokenURL != "https://api.netlify.com/oauth/token" {
+			t.Errorf("TokenURL = %q", n.TokenURL)
+		}
+		if n.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", n.Source, SourceBuiltIn)
+		}
+	})
+
 	t.Run("microsoft", func(t *testing.T) {
 		m, ok := byID["microsoft"]
 		if !ok {
@@ -108,6 +124,25 @@ func TestBuiltInProviders(t *testing.T) {
 			t.Errorf("Source = %q, want %q", m.Source, SourceBuiltIn)
 		}
 		if len(m.Scopes) == 0 {
+			t.Error("expected default scopes")
+		}
+	})
+
+	t.Run("square", func(t *testing.T) {
+		s, ok := byID["square"]
+		if !ok {
+			t.Fatal("square provider not found")
+		}
+		if s.AuthorizeURL != "https://connect.squareup.com/oauth2/authorize" {
+			t.Errorf("AuthorizeURL = %q", s.AuthorizeURL)
+		}
+		if s.TokenURL != "https://connect.squareup.com/oauth2/token" {
+			t.Errorf("TokenURL = %q", s.TokenURL)
+		}
+		if s.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", s.Source, SourceBuiltIn)
+		}
+		if len(s.Scopes) == 0 {
 			t.Error("expected default scopes")
 		}
 	})
@@ -154,6 +189,12 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 	}
 	if _, ok := r.Get("microsoft"); !ok {
 		t.Error("microsoft not found in registry")
+	}
+	if _, ok := r.Get("netlify"); !ok {
+		t.Error("netlify not found in registry")
+	}
+	if _, ok := r.Get("square"); !ok {
+		t.Error("square not found in registry")
 	}
 	if _, ok := r.Get("stripe"); !ok {
 		t.Error("stripe not found in registry")
