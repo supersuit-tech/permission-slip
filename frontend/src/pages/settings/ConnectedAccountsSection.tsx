@@ -22,22 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google",
-  intercom: "Intercom",
-  kroger: "Kroger",
-  linkedin: "LinkedIn",
-  meta: "Meta",
-  microsoft: "Microsoft",
-  salesforce: "Salesforce",
-  slack: "Slack",
-  zoom: "Zoom",
-};
-
-function providerLabel(id: string): string {
-  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
+import { providerLabel } from "@/lib/oauth-providers";
 
 function statusBadge(status: string) {
   switch (status) {

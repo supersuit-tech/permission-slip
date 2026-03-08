@@ -255,7 +255,9 @@ describe("ConnectorCredentialsSection", () => {
     });
     expect(screen.getByText("Recommended")).toBeInTheDocument();
     expect(
-      screen.getByText("Connect via OAuth for automatic token management"),
+      screen.getByText(
+        "Connect your Slack account to authenticate automatically",
+      ),
     ).toBeInTheDocument();
   });
 
