@@ -47,6 +47,8 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		return nil, fmt.Errorf("look up required credential: %w", err)
 	}
 
+	connectorID := strings.SplitN(actionType, ".", 2)[0]
+
 	var creds connectors.Credentials
 	if reqCred != nil && reqCred.AuthType == "oauth2" {
 		// OAuth2 path: resolve access token from oauth_connections.
@@ -55,15 +57,38 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 			return nil, err
 		}
 	} else {
-		// Static credential path (api_key, basic, custom): existing behavior.
-		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-		if err != nil {
-			return nil, err
+		// For connectors that declare api_key/basic/custom auth but also have
+		// a matching built-in OAuth provider, try OAuth first. If the user has
+		// connected via OAuth, use that; otherwise fall back to static credentials.
+		// This enables connectors like Shopify to support both OAuth and API key
+		// without changing their manifest auth_type.
+		oauthResolved := false
+		if deps.OAuthProviders != nil {
+			if _, providerExists := deps.OAuthProviders.Get(connectorID); providerExists {
+				oauthReqCred := &db.RequiredCredential{
+					AuthType:      "oauth2",
+					OAuthProvider: &connectorID,
+				}
+				oauthCreds, oauthErr := resolveOAuthCredentials(ctx, deps, userID, oauthReqCred)
+				if oauthErr == nil {
+					creds = oauthCreds
+					oauthResolved = true
+				}
+				// If OAuth failed (no connection, needs_reauth, etc.), silently
+				// fall through to static credentials.
+			}
+		}
+
+		if !oauthResolved {
+			// Static credential path (api_key, basic, custom): existing behavior.
+			creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	// Validate credentials before executing the action.
-	connectorID := strings.SplitN(actionType, ".", 2)[0]
 	if conn, ok := deps.Connectors.Get(connectorID); ok {
 		if err := conn.ValidateCredentials(ctx, creds); err != nil {
 			return nil, err

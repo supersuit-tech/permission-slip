@@ -205,7 +205,7 @@ func TestCreateAndVerifyOAuthState(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"})
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestVerifyOAuthState_InvalidSignature(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"})
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestVerifyOAuthState_MissingClaims(t *testing.T) {
 func TestVerifyOAuthState_NoSecret(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{}
-	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"})
+	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
 	if err == nil {
 		t.Fatal("expected error when no secret configured")
 	}
@@ -667,7 +667,7 @@ func TestOAuthCallback_ProviderMismatch(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Create state for "microsoft" but hit google callback
-	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"})
+	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -697,7 +697,7 @@ func TestOAuthCallback_UserMismatch(t *testing.T) {
 	router := NewRouter(deps)
 
 	// State is for user1 but session is user2
-	state, err := createOAuthState(deps, uid1, "google", []string{"openid"})
+	state, err := createOAuthState(deps, uid1, "google", []string{"openid"}, "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -749,7 +749,7 @@ func TestOAuthCallback_MissingCode(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"})
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -802,7 +802,7 @@ func TestStoreOAuthTokens_CreateNew(t *testing.T) {
 		TokenType:    "Bearer",
 	}
 
-	err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token)
+	err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil)
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -841,7 +841,7 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -852,7 +852,7 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -866,5 +866,365 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 	}
 	if len(conns[0].Scopes) != 2 {
 		t.Errorf("expected 2 scopes after re-auth, got %d", len(conns[0].Scopes))
+	}
+}
+
+// ── Shopify per-shop URL helpers ──────────────────────────────────────────────
+
+func TestValidateShopSubdomain(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{"bare subdomain", "mystore", "mystore", false},
+		{"full domain", "mystore.myshopify.com", "mystore", false},
+		{"uppercase normalized", "MyStore", "mystore", false},
+		{"with hyphens", "my-cool-store", "my-cool-store", false},
+		{"trailing slash", "mystore/", "mystore", false},
+		{"whitespace", "  mystore  ", "mystore", false},
+		{"full domain uppercase", "MyStore.myshopify.com", "mystore", false},
+		{"empty", "", "", true},
+		{"only whitespace", "   ", "", true},
+		{"invalid domain", "mystore.example.com", "", true},
+		{"starts with hyphen", "-mystore", "", true},
+		{"ends with hyphen", "mystore-", "", true},
+		{"special chars", "my_store!", "", true},
+		{"just .myshopify.com", ".myshopify.com", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := validateShopSubdomain(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateShopSubdomain(%q): err=%v, wantErr=%v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("validateShopSubdomain(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProviderNeedsShop(t *testing.T) {
+	t.Parallel()
+	shopProvider := oauth.Provider{
+		AuthorizeURL: "https://{shop}.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://{shop}.myshopify.com/admin/oauth/access_token",
+	}
+	if !providerNeedsShop(shopProvider) {
+		t.Error("expected providerNeedsShop to return true for Shopify-style URLs")
+	}
+
+	staticProvider := oauth.Provider{
+		AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+	}
+	if providerNeedsShop(staticProvider) {
+		t.Error("expected providerNeedsShop to return false for static URLs")
+	}
+}
+
+func TestResolveShopURLs(t *testing.T) {
+	t.Parallel()
+	p := oauth.Provider{
+		ID:           "shopify",
+		AuthorizeURL: "https://{shop}.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://{shop}.myshopify.com/admin/oauth/access_token",
+	}
+	resolved := resolveShopURLs(p, "mystore")
+	if resolved.AuthorizeURL != "https://mystore.myshopify.com/admin/oauth/authorize" {
+		t.Errorf("unexpected AuthorizeURL: %s", resolved.AuthorizeURL)
+	}
+	if resolved.TokenURL != "https://mystore.myshopify.com/admin/oauth/access_token" {
+		t.Errorf("unexpected TokenURL: %s", resolved.TokenURL)
+	}
+	// Original should be unchanged.
+	if p.AuthorizeURL != "https://{shop}.myshopify.com/admin/oauth/authorize" {
+		t.Error("resolveShopURLs mutated the original provider")
+	}
+}
+
+func TestCreateAndVerifyOAuthState_WithShop(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
+
+	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore")
+	if err != nil {
+		t.Fatalf("createOAuthState: %v", err)
+	}
+
+	verified, err := verifyOAuthState(deps, state)
+	if err != nil {
+		t.Fatalf("verifyOAuthState: %v", err)
+	}
+	if verified.UserID != "user-456" {
+		t.Errorf("expected user-456, got %s", verified.UserID)
+	}
+	if verified.Provider != "shopify" {
+		t.Errorf("expected shopify, got %s", verified.Provider)
+	}
+	if verified.Shop != "mystore" {
+		t.Errorf("expected shop=mystore, got %q", verified.Shop)
+	}
+	if len(verified.Scopes) != 1 || verified.Scopes[0] != "write_orders" {
+		t.Errorf("expected [write_orders], got %v", verified.Scopes)
+	}
+}
+
+func TestCreateAndVerifyOAuthState_EmptyShop(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
+
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
+	if err != nil {
+		t.Fatalf("createOAuthState: %v", err)
+	}
+
+	verified, err := verifyOAuthState(deps, state)
+	if err != nil {
+		t.Fatalf("verifyOAuthState: %v", err)
+	}
+	if verified.Shop != "" {
+		t.Errorf("expected empty shop, got %q", verified.Shop)
+	}
+}
+
+// ── Shopify OAuth authorize ───────────────────────────────────────────────────
+
+func oauthDepsWithShopify(tx db.DBTX) *Deps {
+	reg := oauth.NewRegistry()
+	_ = reg.Register(oauth.Provider{
+		ID:           "shopify",
+		AuthorizeURL: "https://{shop}.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://{shop}.myshopify.com/admin/oauth/access_token",
+		Scopes:       []string{"write_orders", "write_products"},
+		ClientID:     "shopify-client-id",
+		ClientSecret: "shopify-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	_ = reg.Register(oauth.Provider{
+		ID:           "google",
+		AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+		Scopes:       []string{"openid"},
+		ClientID:     "google-client-id",
+		ClientSecret: "google-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	return &Deps{
+		DB:                tx,
+		Vault:             vault.NewMockVaultStore(),
+		SupabaseJWTSecret: testJWTSecret,
+		OAuthProviders:    reg,
+		OAuthStateSecret:  testOAuthStateSecret,
+		BaseURL:           "http://localhost:3000",
+	}
+}
+
+func TestOAuthAuthorize_Shopify_RequiresShopParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithShopify(tx)
+	router := NewRouter(deps)
+
+	// No shop param → 400
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOAuthAuthorize_Shopify_InvalidShop(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithShopify(tx)
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize?shop=-invalid", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOAuthAuthorize_Shopify_ValidShop(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithShopify(tx)
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize?shop=mystore", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+
+	location := w.Header().Get("Location")
+	parsed, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	// Should redirect to mystore.myshopify.com (resolved template)
+	if parsed.Host != "mystore.myshopify.com" {
+		t.Errorf("expected mystore.myshopify.com host, got %s", parsed.Host)
+	}
+	if !strings.Contains(parsed.Path, "/admin/oauth/authorize") {
+		t.Errorf("expected Shopify authorize path, got %s", parsed.Path)
+	}
+	if parsed.Query().Get("client_id") != "shopify-client-id" {
+		t.Errorf("expected shopify-client-id, got %s", parsed.Query().Get("client_id"))
+	}
+	if parsed.Query().Get("state") == "" {
+		t.Error("expected state param in redirect URL")
+	}
+}
+
+func TestOAuthAuthorize_Shopify_FullDomainShop(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithShopify(tx)
+	router := NewRouter(deps)
+
+	// Full domain form should also work
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize?shop=mystore.myshopify.com", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+
+	location := w.Header().Get("Location")
+	parsed, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	if parsed.Host != "mystore.myshopify.com" {
+		t.Errorf("expected mystore.myshopify.com host, got %s", parsed.Host)
+	}
+}
+
+func TestOAuthAuthorize_NonShopProvider_IgnoresShopParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithShopify(tx)
+	router := NewRouter(deps)
+
+	// Google provider should work without shop param and ignore it
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/authorize", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ── storeOAuthTokens with stateExtra ──────────────────────────────────────────
+
+func TestStoreOAuthTokens_WithStateExtra(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+
+	token := &oauth2.Token{
+		AccessToken: "shopify-access-token",
+		TokenType:   "Bearer",
+		// Shopify tokens don't expire
+	}
+
+	stateExtra := map[string]string{"shop_domain": "mystore.myshopify.com"}
+	err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra)
+	if err != nil {
+		t.Fatalf("storeOAuthTokens: %v", err)
+	}
+
+	conn, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "shopify")
+	if err != nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	if conn == nil {
+		t.Fatal("expected connection to exist")
+	}
+	if conn.RefreshTokenVaultID != nil {
+		t.Error("expected no refresh token for Shopify")
+	}
+
+	// Verify extra_data contains shop_domain
+	if len(conn.ExtraData) == 0 {
+		t.Fatal("expected extra_data to be set")
+	}
+	var extra map[string]string
+	if err := json.Unmarshal(conn.ExtraData, &extra); err != nil {
+		t.Fatalf("unmarshal extra_data: %v", err)
+	}
+	if extra["shop_domain"] != "mystore.myshopify.com" {
+		t.Errorf("expected shop_domain=mystore.myshopify.com, got %q", extra["shop_domain"])
+	}
+}
+
+// ── extractTokenExtraData with stateExtra ─────────────────────────────────────
+
+func TestExtractTokenExtraData_MergesStateExtra(t *testing.T) {
+	t.Parallel()
+	token := &oauth2.Token{
+		AccessToken: "test",
+		TokenType:   "Bearer",
+	}
+
+	stateExtra := map[string]string{"shop_domain": "mystore.myshopify.com"}
+	raw := extractTokenExtraData(token, stateExtra)
+	if raw == nil {
+		t.Fatal("expected non-nil extra data")
+	}
+
+	var extra map[string]string
+	if err := json.Unmarshal(raw, &extra); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if extra["shop_domain"] != "mystore.myshopify.com" {
+		t.Errorf("expected shop_domain=mystore.myshopify.com, got %q", extra["shop_domain"])
+	}
+}
+
+func TestExtractTokenExtraData_NilStateExtra(t *testing.T) {
+	t.Parallel()
+	token := &oauth2.Token{
+		AccessToken: "test",
+		TokenType:   "Bearer",
+	}
+
+	raw := extractTokenExtraData(token, nil)
+	// No token extras, no state extras → nil
+	if raw != nil {
+		t.Errorf("expected nil extra data, got %s", string(raw))
 	}
 }
