@@ -4,6 +4,7 @@
 package datadog
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -63,12 +64,16 @@ func newForTest(client *http.Client, baseURL string) *DatadogConnector {
 // ID returns "datadog", matching the connectors.id in the database.
 func (c *DatadogConnector) ID() string { return "datadog" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "datadog",
 		Name:        "Datadog",
 		Description: "Datadog integration for metrics querying, incident management, alert handling, and runbook automation. Supports all Datadog sites (US1, US3, US5, EU, AP1, Gov).",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "datadog.get_metrics",

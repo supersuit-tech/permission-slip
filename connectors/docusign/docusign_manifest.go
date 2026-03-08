@@ -1,10 +1,14 @@
 package docusign
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+//go:embed logo.svg
+var logoSVG string
 
 // Manifest returns the connector's metadata manifest for auto-seeding DB rows.
 func (c *DocuSignConnector) Manifest() *connectors.ConnectorManifest {
@@ -12,6 +16,7 @@ func (c *DocuSignConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "docusign",
 		Name:        "DocuSign",
 		Description: "DocuSign e-signature integration for creating, sending, and managing envelopes",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "docusign.create_envelope",

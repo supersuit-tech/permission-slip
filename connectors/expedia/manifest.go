@@ -6,6 +6,7 @@ package expedia
 // the business logic if inlined in the connector file.
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -14,11 +15,15 @@ import (
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup. Returns action schemas, required credentials,
 // and configuration templates.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "expedia",
 		Name:        "Expedia Rapid",
 		Description: "Expedia Rapid API integration for hotel search and booking",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "expedia.search_hotels",

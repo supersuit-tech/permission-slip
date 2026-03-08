@@ -19,6 +19,7 @@ type ConnectorManifest struct {
 	ID                  string                  `json:"id"`
 	Name                string                  `json:"name"`
 	Description         string                  `json:"description"`
+	LogoSVG             string                  `json:"logo_svg,omitempty"`
 	Actions             []ManifestAction        `json:"actions"`
 	RequiredCredentials []ManifestCredential    `json:"required_credentials"`
 	Templates           []ManifestTemplate      `json:"templates,omitempty"`
@@ -338,6 +339,7 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		ID:          m.ID,
 		Name:        m.Name,
 		Description: m.Description,
+		LogoSVG:     m.LogoSVG,
 	}
 	for _, a := range m.Actions {
 		out.Actions = append(out.Actions, db.ExternalConnectorAction{

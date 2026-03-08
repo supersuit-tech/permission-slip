@@ -1,10 +1,14 @@
 package quickbooks
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+//go:embed logo.svg
+var logoSVG string
 
 // Manifest returns the connector's metadata manifest.
 func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
@@ -12,6 +16,7 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "quickbooks",
 		Name:        "QuickBooks Online",
 		Description: "QuickBooks Online integration for accounting, invoicing, and financial reporting",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "quickbooks.create_invoice",

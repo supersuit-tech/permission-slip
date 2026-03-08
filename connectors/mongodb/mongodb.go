@@ -11,6 +11,7 @@
 package mongodb
 
 import (
+	_ "embed"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -68,11 +69,15 @@ func (c *MongoDBConnector) ID() string { return "mongodb" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *MongoDBConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "mongodb",
 		Name:        "MongoDB",
 		Description: "MongoDB integration for document database operations",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "mongodb.find",

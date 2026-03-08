@@ -4,6 +4,7 @@
 package pagerduty
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -50,12 +51,16 @@ func newForTest(client *http.Client, baseURL string) *PagerDutyConnector {
 // ID returns "pagerduty", matching the connectors.id in the database.
 func (c *PagerDutyConnector) ID() string { return "pagerduty" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *PagerDutyConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "pagerduty",
 		Name:        "PagerDuty",
 		Description: "PagerDuty integration for incident management, alert handling, on-call schedules, and escalations. Supports the full incident lifecycle: triggered → acknowledged → resolved.",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "pagerduty.create_incident",

@@ -1,6 +1,7 @@
 package square
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 
@@ -29,11 +30,15 @@ var moneySchema = `{
 // Manifest returns the connector's metadata manifest for DB auto-seeding.
 // Includes full parameter JSON schemas for all 11 actions and configuration
 // templates for common use cases.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *SquareConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "square",
 		Name:        "Square",
 		Description: "Square integration for orders, payments, catalog, customers, bookings, refunds, invoices, and inventory",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			createOrderManifest(),
 			createPaymentManifest(),

@@ -3,6 +3,7 @@
 package netlify
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -50,12 +51,16 @@ func newForTest(client *http.Client, baseURL string) *NetlifyConnector {
 // ID returns "netlify", matching the connectors.id in the database.
 func (c *NetlifyConnector) ID() string { return "netlify" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *NetlifyConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "netlify",
 		Name:        "Netlify",
 		Description: "Netlify deployment management — trigger builds, rollback to previous deploys, check status, and manage environment variables via the Netlify API",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "netlify.list_sites",

@@ -4,6 +4,7 @@
 package microsoft
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -61,11 +62,15 @@ func (c *MicrosoftConnector) ID() string { return "microsoft" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "microsoft",
 		Name:        "Microsoft",
 		Description: "Microsoft 365 integration for email, calendar, OneDrive, Teams, presentations, and Excel via Microsoft Graph API",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "microsoft.send_email",

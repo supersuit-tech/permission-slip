@@ -5,6 +5,7 @@
 package aws
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -53,11 +54,15 @@ func (c *AWSConnector) ID() string { return "aws" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *AWSConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "aws",
 		Name:        "AWS",
 		Description: "Amazon Web Services integration for cloud infrastructure management",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "aws.describe_instances",

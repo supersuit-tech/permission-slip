@@ -4,6 +4,7 @@
 package github
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -50,11 +51,15 @@ func (c *GitHubConnector) ID() string { return "github" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "github",
 		Name:        "GitHub",
 		Description: "GitHub integration for repository management",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "github.create_issue",

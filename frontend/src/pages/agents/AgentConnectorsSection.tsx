@@ -28,6 +28,7 @@ import {
 import { useDisableAgentConnector } from "@/hooks/useDisableAgentConnector";
 import type { AgentConnector } from "@/hooks/useAgentConnectors";
 import { AddConnectorDialog } from "./AddConnectorDialog";
+import { ConnectorLogo } from "@/components/ConnectorLogo";
 
 interface AgentConnectorsSectionProps {
   agentId: number;
@@ -75,10 +76,7 @@ export function AgentConnectorsSection({
           ) : connectors.length === 0 ? (
             <EmptyConnectors onAdd={() => setAddDialogOpen(true)} />
           ) : (
-            <ConnectorsTable
-              connectors={connectors}
-              agentId={agentId}
-            />
+            <ConnectorsTable connectors={connectors} agentId={agentId} />
           )}
         </CardContent>
       </Card>
@@ -161,8 +159,7 @@ function ConnectorRow({
 }) {
   const navigate = useNavigate();
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const { disableConnector, isLoading: disabling } =
-    useDisableAgentConnector();
+  const { disableConnector, isLoading: disabling } = useDisableAgentConnector();
 
   async function handleRemove() {
     try {
@@ -188,13 +185,20 @@ function ConnectorRow({
     <>
       <TableRow>
         <TableCell>
-          <div>
-            <p className="font-medium">{connector.name}</p>
-            {connector.description && (
-              <p className="text-muted-foreground text-xs">
-                {connector.description}
-              </p>
-            )}
+          <div className="flex items-center gap-2.5">
+            <ConnectorLogo
+              name={connector.name}
+              logoSvg={connector.logo_svg}
+              size="sm"
+            />
+            <div>
+              <p className="font-medium">{connector.name}</p>
+              {connector.description && (
+                <p className="text-muted-foreground text-xs">
+                  {connector.description}
+                </p>
+              )}
+            </div>
           </div>
         </TableCell>
         <TableCell className="text-muted-foreground text-sm">
@@ -211,9 +215,7 @@ function ConnectorRow({
               variant="ghost"
               size="sm"
               onClick={() =>
-                navigate(
-                  `/agents/${agentId}/connectors/${connector.id}`,
-                )
+                navigate(`/agents/${agentId}/connectors/${connector.id}`)
               }
             >
               Configure
@@ -235,9 +237,9 @@ function ConnectorRow({
           <DialogHeader>
             <DialogTitle>Remove {connector.name}</DialogTitle>
             <DialogDescription>
-              This will disable the <strong>{connector.name}</strong>{" "}
-              connector for this agent. Any active standing approvals for
-              actions from this connector will be automatically revoked.
+              This will disable the <strong>{connector.name}</strong> connector
+              for this agent. Any active standing approvals for actions from
+              this connector will be automatically revoked.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

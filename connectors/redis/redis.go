@@ -4,6 +4,7 @@
 package redis
 
 import (
+	_ "embed"
 	"context"
 	"encoding/json"
 	"errors"
@@ -39,12 +40,16 @@ func New() *RedisConnector {
 // ID returns "redis", matching the connectors.id in the database.
 func (c *RedisConnector) ID() string { return "redis" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *RedisConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "redis",
 		Name:        "Redis",
 		Description: "Redis integration for cache, session, and queue data management",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "redis.get",

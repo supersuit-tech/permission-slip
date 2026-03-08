@@ -7,6 +7,7 @@
 package protonmail
 
 import (
+	_ "embed"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -47,12 +48,16 @@ func New() *ProtonMailConnector {
 // ID returns "protonmail", matching the connectors.id in the database.
 func (c *ProtonMailConnector) ID() string { return "protonmail" }
 
+//go:embed logo.svg
+var logoSVG string
+
 // Manifest returns the connector's metadata manifest.
 func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "protonmail",
 		Name:        "Proton Mail",
 		Description: "Send and read emails through Proton Mail via IMAP/SMTP Bridge. Requires Proton Mail Bridge running locally.",
+		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "protonmail.send_email",

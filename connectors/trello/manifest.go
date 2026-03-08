@@ -1,6 +1,7 @@
 package trello
 
 import (
+	_ "embed"
 	"encoding/json"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -8,11 +9,15 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//go:embed logo.svg
+var logoSVG string
+
 func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "trello",
 		Name:        "Trello",
 		Description: "Trello integration for project management and kanban boards",
+		LogoSVG:     logoSVG,
 		OAuthProviders: []connectors.ManifestOAuthProvider{
 			{
 				ID:           "trello",
