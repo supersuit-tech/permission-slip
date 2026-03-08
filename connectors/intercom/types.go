@@ -66,6 +66,19 @@ type tag struct {
 	Name string `json:"name,omitempty"`
 }
 
+// intercomContact represents an Intercom contact (user or lead).
+type intercomContact struct {
+	Type             string         `json:"type,omitempty"`
+	ID               string         `json:"id,omitempty"`
+	Role             string         `json:"role,omitempty"`
+	Email            string         `json:"email,omitempty"`
+	Phone            string         `json:"phone,omitempty"`
+	Name             string         `json:"name,omitempty"`
+	CreatedAt        int64          `json:"created_at,omitempty"`
+	UpdatedAt        int64          `json:"updated_at,omitempty"`
+	CustomAttributes map[string]any `json:"custom_attributes,omitempty"`
+}
+
 // searchTicketsResponse represents the Intercom search API response.
 type searchTicketsResponse struct {
 	Type       string           `json:"type"`

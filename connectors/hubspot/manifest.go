@@ -370,6 +370,172 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "hubspot.list_contacts",
+				Name:        "List Contacts",
+				Description: "Search and list contacts with optional filtering and property selection.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"filters": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["propertyName", "operator", "value"],
+								"properties": {
+									"propertyName": {"type": "string", "description": "Property to filter on"},
+									"operator": {"type": "string", "enum": ["EQ", "NEQ", "LT", "LTE", "GT", "GTE", "CONTAINS_TOKEN", "NOT_CONTAINS_TOKEN"], "description": "Filter operator"},
+									"value": {"type": "string", "description": "Value to compare against"}
+								}
+							},
+							"description": "Array of filter conditions"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 10,
+							"description": "Maximum number of results (default 10, max 200)"
+						},
+						"properties": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Contact properties to include in the response"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.get_contact",
+				Name:        "Get Contact",
+				Description: "Retrieve a single HubSpot contact by ID.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["contact_id"],
+					"properties": {
+						"contact_id": {
+							"type": "string",
+							"description": "HubSpot contact ID (numeric)"
+						},
+						"properties": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Properties to include in the response (defaults to common fields)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.delete_contact",
+				Name:        "Delete Contact",
+				Description: "Archive (soft-delete) a HubSpot contact. The record can be restored from the recycling bin.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["contact_id"],
+					"properties": {
+						"contact_id": {
+							"type": "string",
+							"description": "HubSpot contact ID to archive"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.delete_deal",
+				Name:        "Delete Deal",
+				Description: "Archive (soft-delete) a HubSpot deal. The record can be restored from the recycling bin.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["deal_id"],
+					"properties": {
+						"deal_id": {
+							"type": "string",
+							"description": "HubSpot deal ID to archive"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.create_company",
+				Name:        "Create Company",
+				Description: "Create a new company record in HubSpot CRM.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Company name"
+						},
+						"domain": {
+							"type": "string",
+							"description": "Company website domain (e.g. acme.com)"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Company phone number"
+						},
+						"city": {
+							"type": "string",
+							"description": "City"
+						},
+						"country": {
+							"type": "string",
+							"description": "Country"
+						},
+						"industry": {
+							"type": "string",
+							"description": "Industry (e.g. TECHNOLOGY, FINANCIAL_SERVICES)"
+						},
+						"properties": {
+							"type": "object",
+							"description": "Additional HubSpot company properties",
+							"additionalProperties": {"type": "string"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.update_company",
+				Name:        "Update Company",
+				Description: "Update properties on an existing HubSpot company record.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["company_id", "properties"],
+					"properties": {
+						"company_id": {
+							"type": "string",
+							"description": "HubSpot company ID (numeric)"
+						},
+						"properties": {
+							"type": "object",
+							"description": "Property name to value map to update",
+							"additionalProperties": {"type": "string"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "hubspot.list_pipelines",
+				Name:        "List Pipelines",
+				Description: "List deal or ticket pipelines with their stages. Use this to discover pipeline and stage IDs before creating deals.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"object_type": {
+							"type": "string",
+							"enum": ["deals", "tickets"],
+							"default": "deals",
+							"description": "Object type to list pipelines for (default: deals)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -382,6 +548,7 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"crm.objects.deals.read",
 					"crm.objects.deals.write",
 					"crm.objects.companies.read",
+					"crm.objects.companies.write",
 					"tickets",
 					"automation",
 					"content",

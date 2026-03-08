@@ -31,6 +31,12 @@ func TestIntercomConnector_Actions(t *testing.T) {
 		"intercom.search_tickets",
 		"intercom.list_tags",
 		"intercom.tag_ticket",
+		"intercom.create_contact",
+		"intercom.update_contact",
+		"intercom.search_contacts",
+		"intercom.send_message",
+		"intercom.list_conversations",
+		"intercom.create_article",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -139,8 +145,8 @@ func TestIntercomConnector_Manifest(t *testing.T) {
 		t.Errorf("oauth provider ID = %q, want %q", m.OAuthProviders[0].ID, "intercom")
 	}
 
-	if len(m.Actions) != 7 {
-		t.Fatalf("Manifest().Actions has %d items, want 7", len(m.Actions))
+	if len(m.Actions) != 13 {
+		t.Fatalf("Manifest().Actions has %d items, want 13", len(m.Actions))
 	}
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v", err)

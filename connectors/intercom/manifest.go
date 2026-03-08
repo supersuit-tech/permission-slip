@@ -201,6 +201,201 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "intercom.create_contact",
+				Name:        "Create Contact",
+				Description: "Create a new contact (user or lead) in Intercom.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"email": {
+							"type": "string",
+							"description": "Contact email address"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Contact phone number"
+						},
+						"name": {
+							"type": "string",
+							"description": "Contact full name"
+						},
+						"role": {
+							"type": "string",
+							"enum": ["user", "lead"],
+							"description": "Contact role — 'user' for identified users, 'lead' for anonymous leads (default: lead)"
+						},
+						"custom_attributes": {
+							"type": "object",
+							"description": "Custom attributes to set on the contact",
+							"additionalProperties": true
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "intercom.update_contact",
+				Name:        "Update Contact",
+				Description: "Update attributes on an existing Intercom contact.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["contact_id"],
+					"properties": {
+						"contact_id": {
+							"type": "string",
+							"description": "Intercom contact ID to update"
+						},
+						"email": {
+							"type": "string",
+							"description": "Updated email address"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Updated phone number"
+						},
+						"name": {
+							"type": "string",
+							"description": "Updated full name"
+						},
+						"custom_attributes": {
+							"type": "object",
+							"description": "Custom attributes to update",
+							"additionalProperties": true
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "intercom.search_contacts",
+				Name:        "Search Contacts",
+				Description: "Search contacts by a single field (email, name, phone, etc.).",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["query"],
+					"properties": {
+						"query": {
+							"type": "object",
+							"required": ["field", "operator", "value"],
+							"properties": {
+								"field": {
+									"type": "string",
+									"description": "Field to search on (e.g. 'email', 'name', 'phone')"
+								},
+								"operator": {
+									"type": "string",
+									"enum": ["=", "!=", "IN", "NIN", ">", "<", "~", "!~", "^", "$"],
+									"description": "Search operator"
+								},
+								"value": {
+									"type": "string",
+									"description": "Value to match against"
+								}
+							}
+						},
+						"limit": {
+							"type": "integer",
+							"default": 20,
+							"description": "Maximum number of results (default 20, max 150)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "intercom.send_message",
+				Name:        "Send Message",
+				Description: "Send a proactive outbound message to a contact (in-app or email). This is not a ticket reply — it creates a new outbound conversation.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["body", "from_admin_id", "to_contact_id"],
+					"properties": {
+						"body": {
+							"type": "string",
+							"description": "Message body (HTML supported)"
+						},
+						"message_type": {
+							"type": "string",
+							"enum": ["inapp", "email"],
+							"default": "inapp",
+							"description": "Delivery channel — 'inapp' for in-product messages, 'email' for email delivery"
+						},
+						"subject": {
+							"type": "string",
+							"description": "Email subject line (required when message_type is email)"
+						},
+						"from_admin_id": {
+							"type": "string",
+							"description": "Intercom admin ID to send from (find via Settings > Teammates)"
+						},
+						"to_contact_id": {
+							"type": "string",
+							"description": "Intercom contact ID to send to"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "intercom.list_conversations",
+				Name:        "List Conversations",
+				Description: "List conversations with optional state filter (open, closed, snoozed).",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"state": {
+							"type": "string",
+							"enum": ["open", "closed", "snoozed"],
+							"description": "Filter by conversation state (omit for all states)"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 20,
+							"description": "Maximum number of results (default 20, max 150)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "intercom.create_article",
+				Name:        "Create Article",
+				Description: "Create a help center article. Articles are created as drafts by default — set state to 'published' to make them publicly visible immediately.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["title", "author_id"],
+					"properties": {
+						"title": {
+							"type": "string",
+							"description": "Article title"
+						},
+						"body": {
+							"type": "string",
+							"description": "Article content (HTML supported)"
+						},
+						"author_id": {
+							"type": "string",
+							"description": "Intercom admin ID of the article author"
+						},
+						"state": {
+							"type": "string",
+							"enum": ["draft", "published"],
+							"default": "draft",
+							"description": "Publication state — 'draft' is the safe default; 'published' makes it immediately visible"
+						},
+						"parent_id": {
+							"type": "integer",
+							"description": "Collection ID to place the article in (optional)"
+						},
+						"parent_type": {
+							"type": "string",
+							"description": "Parent type — must be 'collection' when parent_id is set"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{

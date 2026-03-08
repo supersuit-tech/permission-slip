@@ -249,6 +249,95 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "zendesk.create_user",
+				Name:        "Create User",
+				Description: "Create a new end-user or agent in Zendesk.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Full name of the user"
+						},
+						"email": {
+							"type": "string",
+							"description": "User email address"
+						},
+						"phone": {
+							"type": "string",
+							"description": "User phone number"
+						},
+						"role": {
+							"type": "string",
+							"enum": ["end-user", "agent", "admin"],
+							"description": "User role (default: end-user)"
+						},
+						"verified": {
+							"type": "boolean",
+							"description": "Whether to mark the email as verified (default: false)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "zendesk.get_user",
+				Name:        "Get User",
+				Description: "Retrieve details for a Zendesk user by ID.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["user_id"],
+					"properties": {
+						"user_id": {
+							"type": "integer",
+							"description": "Zendesk user ID",
+							"minimum": 1
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "zendesk.list_ticket_fields",
+				Name:        "List Ticket Fields",
+				Description: "List all ticket fields (system and custom) in the Zendesk account. Useful for building dynamic forms or understanding available metadata.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
+			{
+				ActionType:  "zendesk.get_satisfaction_ratings",
+				Name:        "Get Satisfaction Ratings",
+				Description: "Retrieve CSAT (customer satisfaction) ratings with optional score and time-range filters.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"score": {
+							"type": "string",
+							"enum": ["offered", "unoffered", "good", "bad", "good_with_comment", "bad_with_comment"],
+							"description": "Filter by satisfaction score (omit to return all)"
+						},
+						"start_time": {
+							"type": "integer",
+							"description": "Start of time range as Unix timestamp (seconds)"
+						},
+						"end_time": {
+							"type": "integer",
+							"description": "End of time range as Unix timestamp (seconds)"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 25,
+							"description": "Maximum number of results (default 25, max 100)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			// OAuth is the preferred authentication method — better UX,
