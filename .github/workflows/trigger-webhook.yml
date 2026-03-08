@@ -6,6 +6,10 @@ on:
         description: "PR URL (optional — omitted for non-PR notifications)"
         required: false
         default: ""
+      pr_title:
+        description: "PR title (optional — included in SMS when provided)"
+        required: false
+        default: ""
 
 jobs:
   notify:
@@ -14,6 +18,7 @@ jobs:
       - name: Send Twilio SMS
         env:
           PR_URL: ${{ inputs.pr_url }}
+          PR_TITLE: ${{ inputs.pr_title }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_PHONE_FROM: ${{ secrets.TWILIO_PHONE_FROM }}
@@ -36,7 +41,9 @@ jobs:
             exit 1
           fi
 
-          if [ -n "$PR_URL" ]; then
+          if [ -n "$PR_URL" ] && [ -n "$PR_TITLE" ]; then
+            MESSAGE="permission-slip: ${PR_TITLE} — ${PR_URL}"
+          elif [ -n "$PR_URL" ]; then
             MESSAGE="permission-slip: PR needs attention — ${PR_URL}"
           else
             MESSAGE="permission-slip: Claude Code needs your attention"
