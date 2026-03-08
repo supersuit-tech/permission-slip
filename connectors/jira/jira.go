@@ -11,9 +11,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sync"
 	"time"
@@ -210,7 +212,7 @@ func (c *JiraConnector) oauthAPIBase(ctx context.Context, creds connectors.Crede
 	entry, ok := c.cloudIDCache[fp]
 	c.cloudIDMu.RUnlock()
 	if ok && time.Now().Before(entry.expiresAt) {
-		return atlassianCloudAPIBase + "/ex/jira/" + entry.cloudID + "/rest/api/3", nil
+		return cloudAPIBaseURL(entry.cloudID), nil
 	}
 
 	// Cache miss or expired — fetch from Atlassian.
@@ -227,7 +229,14 @@ func (c *JiraConnector) oauthAPIBase(ctx context.Context, creds connectors.Crede
 	}
 	c.cloudIDMu.Unlock()
 
-	return atlassianCloudAPIBase + "/ex/jira/" + cloudID + "/rest/api/3", nil
+	return cloudAPIBaseURL(cloudID), nil
+}
+
+// cloudAPIBaseURL constructs the Jira Cloud REST API base URL for a given
+// cloud ID. The cloud ID is path-escaped to prevent path injection from
+// external input.
+func cloudAPIBaseURL(cloudID string) string {
+	return atlassianCloudAPIBase + "/ex/jira/" + url.PathEscape(cloudID) + "/rest/api/3"
 }
 
 // fetchCloudID calls the Atlassian accessible-resources endpoint and
@@ -242,7 +251,7 @@ func (c *JiraConnector) fetchCloudID(ctx context.Context, accessToken string) (s
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return "", &connectors.TimeoutError{Message: fmt.Sprintf("accessible-resources request timed out: %v", err)}
 		}
 		return "", &connectors.ExternalError{Message: fmt.Sprintf("accessible-resources request failed: %v", err)}
@@ -255,7 +264,7 @@ func (c *JiraConnector) fetchCloudID(ctx context.Context, accessToken string) (s
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", classifyResourcesError(resp.StatusCode, body)
+		return "", classifyResourcesError(resp.StatusCode, resp.Header, body)
 	}
 
 	var resources []accessibleResource
@@ -281,7 +290,7 @@ func (c *JiraConnector) fetchCloudID(ctx context.Context, accessToken string) (s
 // classifyResourcesError maps HTTP error codes from the Atlassian
 // accessible-resources endpoint to specific connector error types so
 // users get actionable error messages.
-func classifyResourcesError(statusCode int, body []byte) error {
+func classifyResourcesError(statusCode int, header http.Header, body []byte) error {
 	detail := truncate(string(body), 200)
 	switch statusCode {
 	case http.StatusUnauthorized:
@@ -291,6 +300,12 @@ func classifyResourcesError(statusCode int, body []byte) error {
 	case http.StatusForbidden:
 		return &connectors.AuthError{
 			Message: "Atlassian OAuth app lacks required permissions — check app scopes and re-authorize",
+		}
+	case http.StatusTooManyRequests:
+		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), 0)
+		return &connectors.RateLimitError{
+			Message:    fmt.Sprintf("Atlassian API rate limit exceeded: %s", detail),
+			RetryAfter: retryAfter,
 		}
 	default:
 		return &connectors.ExternalError{
@@ -344,7 +359,7 @@ func (c *JiraConnector) do(ctx context.Context, creds connectors.Credentials, me
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) {
+		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Jira API request timed out: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Jira API request failed: %v", err)}
