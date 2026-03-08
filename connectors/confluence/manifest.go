@@ -153,6 +153,134 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "confluence.list_spaces",
+				Name:        "List Spaces",
+				Description: "List available spaces in Confluence",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"limit": {
+							"type": "integer",
+							"default": 25,
+							"minimum": 1,
+							"maximum": 250,
+							"description": "Maximum number of spaces to return (1-250, default 25)"
+						},
+						"status": {
+							"type": "string",
+							"enum": ["current", "archived"],
+							"default": "current",
+							"description": "Filter by space status (default: current)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "confluence.list_pages",
+				Name:        "List Pages",
+				Description: "List pages in a Confluence space",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["space_id"],
+					"properties": {
+						"space_id": {
+							"type": "string",
+							"description": "ID of the space to list pages from"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 25,
+							"minimum": 1,
+							"maximum": 250,
+							"description": "Maximum number of pages to return (1-250, default 25)"
+						},
+						"status": {
+							"type": "string",
+							"enum": ["current", "archived", "deleted", "trashed"],
+							"default": "current",
+							"description": "Filter by page status (default: current)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "confluence.delete_page",
+				Name:        "Delete Page",
+				Description: "Delete (move to trash) a Confluence page — can be restored from trash",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["page_id"],
+					"properties": {
+						"page_id": {
+							"type": "string",
+							"description": "ID of the page to delete"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "confluence.get_attachments",
+				Name:        "Get Attachments",
+				Description: "List attachments on a Confluence page",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["page_id"],
+					"properties": {
+						"page_id": {
+							"type": "string",
+							"description": "ID of the page to get attachments for"
+						},
+						"limit": {
+							"type": "integer",
+							"default": 25,
+							"minimum": 1,
+							"maximum": 250,
+							"description": "Maximum number of attachments to return (1-250, default 25)"
+						},
+						"media_type": {
+							"type": "string",
+							"description": "Filter by MIME type (e.g. 'image/png', 'application/pdf')"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "confluence.add_attachment",
+				Name:        "Add Attachment",
+				Description: "Upload a file attachment to a Confluence page. File content must be base64-encoded. Maximum decoded size: 10 MB.",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["page_id", "filename", "content_base64"],
+					"properties": {
+						"page_id": {
+							"type": "string",
+							"description": "ID of the page to attach the file to"
+						},
+						"filename": {
+							"type": "string",
+							"description": "Filename for the attachment (e.g. 'diagram.png')"
+						},
+						"content_base64": {
+							"type": "string",
+							"description": "Base64-encoded file content"
+						},
+						"media_type": {
+							"type": "string",
+							"description": "MIME type (e.g. 'image/png'). Inferred from filename extension if omitted."
+						},
+						"comment": {
+							"type": "string",
+							"description": "Optional comment describing the attachment"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -203,6 +331,48 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Comment on pages",
 				Description: "Agent can add comments to any page.",
 				Parameters:  json.RawMessage(`{"page_id":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_list_spaces",
+				ActionType:  "confluence.list_spaces",
+				Name:        "List spaces",
+				Description: "Agent can list all available Confluence spaces.",
+				Parameters:  json.RawMessage(`{"limit":"*","status":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_list_pages",
+				ActionType:  "confluence.list_pages",
+				Name:        "List pages in a space",
+				Description: "Agent can list pages in any Confluence space.",
+				Parameters:  json.RawMessage(`{"space_id":"*","limit":"*","status":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_list_pages_specific",
+				ActionType:  "confluence.list_pages",
+				Name:        "List pages in specific space",
+				Description: "Locks the space; agent can filter by status.",
+				Parameters:  json.RawMessage(`{"space_id":"YOUR_SPACE_ID","limit":"*","status":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_delete_page",
+				ActionType:  "confluence.delete_page",
+				Name:        "Delete pages",
+				Description: "Agent can delete any page (moves to trash).",
+				Parameters:  json.RawMessage(`{"page_id":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_get_attachments",
+				ActionType:  "confluence.get_attachments",
+				Name:        "List page attachments",
+				Description: "Agent can list attachments on any page.",
+				Parameters:  json.RawMessage(`{"page_id":"*","limit":"*","media_type":"*"}`),
+			},
+			{
+				ID:          "tpl_confluence_add_attachment",
+				ActionType:  "confluence.add_attachment",
+				Name:        "Upload attachments to pages",
+				Description: "Agent can upload file attachments to any page.",
+				Parameters:  json.RawMessage(`{"page_id":"*","filename":"*","content_base64":"*","media_type":"*","comment":"*"}`),
 			},
 		},
 	}

@@ -65,7 +65,11 @@ func (c *ZendeskConnector) Actions() map[string]connectors.Action {
 		"zendesk.merge_tickets":  &mergeTicketsAction{conn: c},
 		"zendesk.search_tickets": &searchTicketsAction{conn: c},
 		"zendesk.list_tags":      &listTagsAction{conn: c},
-		"zendesk.update_tags":    &updateTagsAction{conn: c},
+		"zendesk.update_tags":             &updateTagsAction{conn: c},
+		"zendesk.create_user":             &createUserAction{conn: c},
+		"zendesk.get_user":                &getUserAction{conn: c},
+		"zendesk.list_ticket_fields":      &listTicketFieldsAction{conn: c},
+		"zendesk.get_satisfaction_ratings": &getSatisfactionRatingsAction{conn: c},
 	}
 }
 

@@ -31,6 +31,10 @@ func TestFigmaConnector_Actions(t *testing.T) {
 		"figma.list_comments",
 		"figma.post_comment",
 		"figma.get_versions",
+		"figma.get_styles",
+		"figma.list_projects",
+		"figma.list_files",
+		"figma.get_variables",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -124,8 +128,8 @@ func TestFigmaConnector_Manifest(t *testing.T) {
 		t.Error("credential oauth_scopes is empty, want at least one scope")
 	}
 
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 10 {
+		t.Fatalf("Manifest().Actions has %d items, want 10", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -134,6 +138,7 @@ func TestFigmaConnector_Manifest(t *testing.T) {
 	for _, want := range []string{
 		"figma.get_file", "figma.get_components", "figma.export_images",
 		"figma.list_comments", "figma.post_comment", "figma.get_versions",
+		"figma.get_styles", "figma.list_projects", "figma.list_files", "figma.get_variables",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

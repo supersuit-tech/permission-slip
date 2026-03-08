@@ -32,6 +32,9 @@ func TestZoomConnector_Actions(t *testing.T) {
 		"zoom.delete_meeting",
 		"zoom.list_recordings",
 		"zoom.get_meeting_participants",
+		"zoom.add_registrant",
+		"zoom.get_recording_transcript",
+		"zoom.send_chat_message",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -105,8 +108,8 @@ func TestZoomConnector_Manifest(t *testing.T) {
 	if m.Name != "Zoom" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Zoom")
 	}
-	if len(m.Actions) != 7 {
-		t.Fatalf("Manifest().Actions has %d items, want 7", len(m.Actions))
+	if len(m.Actions) != 10 {
+		t.Fatalf("Manifest().Actions has %d items, want 10", len(m.Actions))
 	}
 
 	actionTypes := make(map[string]bool)
@@ -121,6 +124,9 @@ func TestZoomConnector_Manifest(t *testing.T) {
 		"zoom.delete_meeting",
 		"zoom.list_recordings",
 		"zoom.get_meeting_participants",
+		"zoom.add_registrant",
+		"zoom.get_recording_transcript",
+		"zoom.send_chat_message",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
@@ -140,8 +146,8 @@ func TestZoomConnector_Manifest(t *testing.T) {
 	if cred.OAuthProvider != "zoom" {
 		t.Errorf("credential oauth_provider = %q, want %q", cred.OAuthProvider, "zoom")
 	}
-	if len(cred.OAuthScopes) != 4 {
-		t.Errorf("credential oauth_scopes has %d items, want 4", len(cred.OAuthScopes))
+	if len(cred.OAuthScopes) != 5 {
+		t.Errorf("credential oauth_scopes has %d items, want 5", len(cred.OAuthScopes))
 	}
 
 	if err := m.Validate(); err != nil {

@@ -152,6 +152,70 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "figma.get_styles",
+				Name:        "Get Styles",
+				Description: "Get design styles/tokens (colors, text, effects) from a Figma file — the foundation of design-to-code workflows",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_key"],
+					"properties": {
+						"file_key": {
+							"type": "string",
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "figma.list_projects",
+				Name:        "List Projects",
+				Description: "List projects in a Figma team",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["team_id"],
+					"properties": {
+						"team_id": {
+							"type": "string",
+							"description": "The Figma team ID"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "figma.list_files",
+				Name:        "List Files",
+				Description: "List files in a Figma project",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["project_id"],
+					"properties": {
+						"project_id": {
+							"type": "string",
+							"description": "The project ID to list files from"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "figma.get_variables",
+				Name:        "Get Variables",
+				Description: "Get design system variables (tokens) from a Figma file — supports multi-mode values for light/dark, brand themes, etc.",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["file_key"],
+					"properties": {
+						"file_key": {
+							"type": "string",
+							"description": "The file key or full Figma URL (key is extracted automatically from URLs)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -203,6 +267,34 @@ func (c *FigmaConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "figma.get_versions",
 				Name:        "View version history",
 				Description: "Agent can view version history of any Figma file.",
+				Parameters:  json.RawMessage(`{"file_key":"*"}`),
+			},
+			{
+				ID:          "tpl_figma_get_styles",
+				ActionType:  "figma.get_styles",
+				Name:        "Get design styles",
+				Description: "Agent can get design styles/tokens from any Figma file.",
+				Parameters:  json.RawMessage(`{"file_key":"*"}`),
+			},
+			{
+				ID:          "tpl_figma_list_projects",
+				ActionType:  "figma.list_projects",
+				Name:        "List team projects",
+				Description: "Agent can list projects in a Figma team.",
+				Parameters:  json.RawMessage(`{"team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_figma_list_files",
+				ActionType:  "figma.list_files",
+				Name:        "List project files",
+				Description: "Agent can list files in any Figma project.",
+				Parameters:  json.RawMessage(`{"project_id":"*"}`),
+			},
+			{
+				ID:          "tpl_figma_get_variables",
+				ActionType:  "figma.get_variables",
+				Name:        "Get design variables",
+				Description: "Agent can get design system variables from any Figma file.",
 				Parameters:  json.RawMessage(`{"file_key":"*"}`),
 			},
 		},
