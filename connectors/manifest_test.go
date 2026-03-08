@@ -99,7 +99,7 @@ func TestParseManifest_ValidationErrors(t *testing.T) {
 		{"duplicate action_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"},{"action_type":"x.a","name":"B"}]}`},
 		{"missing action name", `{"id":"x","name":"X","actions":[{"action_type":"x.a"}]}`},
 		{"invalid risk_level", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A","risk_level":"extreme"}]}`},
-		{"duplicate cred service", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"api_key"},{"service":"s","auth_type":"basic"}]}`},
+		{"duplicate cred service+auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"api_key"},{"service":"s","auth_type":"api_key"}]}`},
 		{"missing cred service", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"auth_type":"api_key"}]}`},
 		{"missing auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s"}]}`},
 		{"invalid auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"magic"}]}`},
@@ -118,6 +118,32 @@ func TestParseManifest_ValidationErrors(t *testing.T) {
 }
 
 // ── OAuth Validation ─────────────────────────────────────────────────────
+
+func TestParseManifest_MultipleAuthTypesForSameService(t *testing.T) {
+	input := `{
+		"id": "pagerduty",
+		"name": "PagerDuty",
+		"actions": [{"action_type": "pagerduty.create_incident", "name": "Create Incident"}],
+		"required_credentials": [
+			{"service": "pagerduty", "auth_type": "oauth2", "oauth_provider": "pagerduty"},
+			{"service": "pagerduty", "auth_type": "api_key"}
+		]
+	}`
+
+	m, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("len(RequiredCredentials) = %d, want 2", len(m.RequiredCredentials))
+	}
+	if m.RequiredCredentials[0].AuthType != "oauth2" {
+		t.Errorf("first credential auth_type = %q, want %q", m.RequiredCredentials[0].AuthType, "oauth2")
+	}
+	if m.RequiredCredentials[1].AuthType != "api_key" {
+		t.Errorf("second credential auth_type = %q, want %q", m.RequiredCredentials[1].AuthType, "api_key")
+	}
+}
 
 func TestParseManifest_OAuth2Credential(t *testing.T) {
 	input := `{

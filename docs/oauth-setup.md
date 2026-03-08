@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -31,6 +31,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `MICROSOFT_CLIENT_ID` | Application (client) ID from Azure Portal |
 | `MICROSOFT_CLIENT_SECRET` | Client secret value from Azure Portal |
+
+### PagerDuty OAuth
+
+| Variable | Description |
+|---|---|
+| `PAGERDUTY_CLIENT_ID` | Client ID from PagerDuty Developer Dashboard |
+| `PAGERDUTY_CLIENT_SECRET` | Client Secret from PagerDuty Developer Dashboard |
 
 ### Meta OAuth
 
@@ -182,6 +189,41 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 MICROSOFT_CLIENT_ID=your-application-client-id
 MICROSOFT_CLIENT_SECRET=your-client-secret-value
 ```
+
+## PagerDuty OAuth Setup
+
+PagerDuty is the first built-in connector to support **both** OAuth 2.0 and API key authentication. Users can choose to connect via OAuth (recommended) or provide an API key manually.
+
+### 1. Create a PagerDuty App
+
+1. Go to the [PagerDuty Developer Dashboard](https://developer.pagerduty.com/)
+2. Navigate to **My Apps** and click **Create New App**
+3. Fill in the app details:
+   - App Name: Your deployment name (e.g., "Permission Slip")
+   - Description: Brief description of the integration
+4. Under **OAuth 2.0**, enable it and add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/pagerduty/callback
+   ```
+
+### 2. Configure OAuth Scopes
+
+The PagerDuty connector requires these scopes:
+- `read` — read incidents, services, schedules, and on-call data
+- `write` — create/update incidents, add notes, and manage escalations
+
+### 3. Configure Environment
+
+```bash
+PAGERDUTY_CLIENT_ID=your-client-id
+PAGERDUTY_CLIENT_SECRET=your-client-secret
+```
+
+Find these in your app's settings under the **OAuth 2.0** section.
+
+### Alternative: API Key Auth
+
+Users who prefer not to use OAuth can still connect PagerDuty with an API key. See [PagerDuty API Access Keys](https://support.pagerduty.com/main/docs/api-access-keys) for instructions on generating a key.
 
 ## Meta (Facebook/Instagram) OAuth Setup
 
@@ -465,6 +507,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
+- PagerDuty: `https://your-domain.com/api/v1/oauth/pagerduty/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
 - Linear: `https://your-domain.com/api/v1/oauth/linear/callback`
 - Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
