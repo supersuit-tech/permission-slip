@@ -36,11 +36,11 @@ type executeActionStandingResponse struct {
 
 // ── Route registration ─────────────────────────────────────────────────────
 
-// RegisterActionExecuteRoutes adds the action execution endpoint to the mux.
 func init() {
 	RegisterRouteGroup(RegisterActionExecuteRoutes)
 }
 
+// RegisterActionExecuteRoutes adds the action execution endpoint to the mux.
 func RegisterActionExecuteRoutes(mux *http.ServeMux, deps *Deps) {
 	requireAgent := RequireAgentSignature(deps)
 	mux.Handle("POST /actions/execute", requireAgent(handleExecuteAction(deps)))

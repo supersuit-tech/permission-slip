@@ -20,11 +20,11 @@ type agentStandingApprovalListResponse struct {
 
 // ── Route registration ──────────────────────────────────────────────────────
 
-// RegisterAgentStandingApprovalRoutes adds agent-authenticated standing approval endpoints.
 func init() {
 	RegisterRouteGroup(RegisterAgentStandingApprovalRoutes)
 }
 
+// RegisterAgentStandingApprovalRoutes adds agent-authenticated standing approval endpoints.
 func RegisterAgentStandingApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("GET /agents/{agent_id}/standing-approvals", handleAgentListStandingApprovals(deps))
 }

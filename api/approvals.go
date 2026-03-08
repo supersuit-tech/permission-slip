@@ -50,11 +50,11 @@ type denyResponse struct {
 	DeniedAt   time.Time `json:"denied_at"`
 }
 
-// RegisterApprovalRoutes adds approval-related endpoints to the mux.
 func init() {
 	RegisterRouteGroup(RegisterApprovalRoutes)
 }
 
+// RegisterApprovalRoutes adds approval-related endpoints to the mux.
 func RegisterApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /approvals", requireProfile(handleListApprovals(deps)))

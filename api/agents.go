@@ -32,11 +32,11 @@ type agentListResponse struct {
 	NextCursor *string         `json:"next_cursor,omitempty"`
 }
 
-// RegisterAgentRoutes adds agent-related endpoints to the mux.
 func init() {
 	RegisterRouteGroup(RegisterAgentRoutes)
 }
 
+// RegisterAgentRoutes adds agent-related endpoints to the mux.
 func RegisterAgentRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /agents", requireProfile(handleListAgents(deps)))

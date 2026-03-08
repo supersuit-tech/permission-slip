@@ -82,11 +82,11 @@ type auditLogExportResponse struct {
 	EffectiveSince *time.Time                    `json:"effective_since,omitempty"`
 }
 
-// RegisterAuditEventRoutes adds audit event endpoints to the mux.
 func init() {
 	RegisterRouteGroup(RegisterAuditEventRoutes)
 }
 
+// RegisterAuditEventRoutes adds audit event endpoints to the mux.
 func RegisterAuditEventRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /audit-events", requireProfile(handleListAuditEvents(deps)))
