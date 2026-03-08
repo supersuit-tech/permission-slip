@@ -109,6 +109,7 @@ func TestTriggerWorkflow_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "github.trigger_workflow",
 				Parameters:  json.RawMessage(tt.params),

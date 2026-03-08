@@ -183,6 +183,7 @@ func TestGetFileContents_PathInjection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			params := json.RawMessage(`{"owner":"octocat","repo":"hello-world","path":` + `"` + tt.path + `"` + `}`)
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "github.get_file_contents",
@@ -216,6 +217,7 @@ func TestGetFileContents_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := action.Execute(t.Context(), connectors.ActionRequest{
 				ActionType:  "github.get_file_contents",
 				Parameters:  json.RawMessage(tt.params),

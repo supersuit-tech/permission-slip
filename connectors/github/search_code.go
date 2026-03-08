@@ -26,6 +26,16 @@ func (p *searchCodeParams) validate() error {
 	if p.Q == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: q"}
 	}
+	if p.Order != "" {
+		switch p.Order {
+		case "asc", "desc":
+		default:
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid order: %q; must be one of: asc, desc", p.Order)}
+		}
+	}
+	if err := validatePerPage(p.PerPage); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -41,14 +51,7 @@ func (a *searchCodeAction) Execute(ctx context.Context, req connectors.ActionReq
 	if params.Order != "" {
 		query.Set("order", params.Order)
 	}
-	perPage := params.PerPage
-	if perPage <= 0 {
-		perPage = 30
-	}
-	query.Set("per_page", fmt.Sprintf("%d", perPage))
-	if params.Page > 1 {
-		query.Set("page", fmt.Sprintf("%d", params.Page))
-	}
+	setPagination(query, params.PerPage, params.Page)
 
 	path := "/search/code?" + query.Encode()
 

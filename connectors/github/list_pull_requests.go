@@ -81,14 +81,7 @@ func (a *listPullRequestsAction) Execute(ctx context.Context, req connectors.Act
 	if params.Direction != "" {
 		query.Set("direction", params.Direction)
 	}
-	perPage := params.PerPage
-	if perPage <= 0 {
-		perPage = 30
-	}
-	query.Set("per_page", fmt.Sprintf("%d", perPage))
-	if params.Page > 1 {
-		query.Set("page", fmt.Sprintf("%d", params.Page))
-	}
+	setPagination(query, params.PerPage, params.Page)
 
 	path := fmt.Sprintf("/repos/%s/%s/pulls?%s",
 		url.PathEscape(params.Owner), url.PathEscape(params.Repo), query.Encode())

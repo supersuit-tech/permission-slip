@@ -97,6 +97,19 @@ func validatePerPage(perPage int) error {
 	return nil
 }
 
+// setPagination adds per_page and page query parameters to q.
+// perPage defaults to 30 if <= 0; page is omitted when <= 1.
+// This centralises the repeated pagination-building pattern across list/search actions.
+func setPagination(q url.Values, perPage, page int) {
+	if perPage <= 0 {
+		perPage = 30
+	}
+	q.Set("per_page", fmt.Sprintf("%d", perPage))
+	if page > 1 {
+		q.Set("page", fmt.Sprintf("%d", page))
+	}
+}
+
 // invalidRefChars contains characters forbidden in git ref names.
 // See: https://git-scm.com/docs/git-check-ref-format
 var invalidRefChars = strings.NewReplacer(

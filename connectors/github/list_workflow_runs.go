@@ -77,14 +77,7 @@ func (a *listWorkflowRunsAction) Execute(ctx context.Context, req connectors.Act
 	if params.Actor != "" {
 		query.Set("actor", params.Actor)
 	}
-	perPage := params.PerPage
-	if perPage <= 0 {
-		perPage = 30
-	}
-	query.Set("per_page", fmt.Sprintf("%d", perPage))
-	if params.Page > 1 {
-		query.Set("page", fmt.Sprintf("%d", params.Page))
-	}
+	setPagination(query, params.PerPage, params.Page)
 
 	path := basePath + "?" + query.Encode()
 
