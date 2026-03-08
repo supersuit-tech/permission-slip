@@ -39,9 +39,6 @@ func (p *searchMessagesParams) validate() error {
 	if p.Page < 0 {
 		return &connectors.ValidationError{Message: "page must be at least 1"}
 	}
-	if p.Page == 0 {
-		p.Page = 1
-	}
 	if p.Sort != "" && p.Sort != "score" && p.Sort != "timestamp" {
 		return &connectors.ValidationError{Message: "sort must be \"score\" (relevance) or \"timestamp\""}
 	}
@@ -116,6 +113,9 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 	}
 	if body.Count == 0 {
 		body.Count = 20
+	}
+	if body.Page == 0 {
+		body.Page = 1
 	}
 
 	var resp searchMessagesResponse

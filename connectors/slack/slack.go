@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -194,25 +195,26 @@ func validateUserID(userID string) error {
 }
 
 // validateMessageTS checks that a message timestamp parameter is non-empty and
-// looks like a valid Slack TS value (contains a dot, e.g. "1234567890.123456").
-// This catches typos and wrong-format values before they reach the Slack API.
+// looks like a valid Slack TS value (exactly two numeric parts separated by a
+// dot, e.g. "1234567890.123456"). This catches typos and wrong-format values
+// before they reach the Slack API.
 func validateMessageTS(ts string) error {
 	if ts == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: ts (message timestamp)"}
 	}
-	dotFound := false
-	for _, c := range ts {
-		if c == '.' {
-			dotFound = true
-		} else if c < '0' || c > '9' {
-			return &connectors.ValidationError{
-				Message: fmt.Sprintf("invalid message timestamp %q: expected a numeric Slack timestamp like 1234567890.123456", ts),
-			}
+	parts := strings.SplitN(ts, ".", 3)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid message timestamp %q: expected format like 1234567890.123456", ts),
 		}
 	}
-	if !dotFound {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("invalid message timestamp %q: expected a Slack timestamp with a dot separator (e.g. 1234567890.123456)", ts),
+	for _, part := range parts {
+		for _, c := range part {
+			if c < '0' || c > '9' {
+				return &connectors.ValidationError{
+					Message: fmt.Sprintf("invalid message timestamp %q: expected a numeric Slack timestamp like 1234567890.123456", ts),
+				}
+			}
 		}
 	}
 	return nil

@@ -141,7 +141,9 @@ func TestSendDM_MissingMessage(t *testing.T) {
 func TestSendDM_ConversationsOpenError(t *testing.T) {
 	t.Parallel()
 
+	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		callCount++
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":    false,
@@ -168,6 +170,9 @@ func TestSendDM_ConversationsOpenError(t *testing.T) {
 	}
 	if !connectors.IsExternalError(err) {
 		t.Errorf("expected ExternalError, got: %T", err)
+	}
+	if callCount != 1 {
+		t.Errorf("expected 1 API call (conversations.open only), got %d", callCount)
 	}
 }
 

@@ -262,6 +262,9 @@ func TestValidateMessageTS(t *testing.T) {
 		{name: "no dot", ts: "1234567890123456", wantErr: true},
 		{name: "letters", ts: "not-a-timestamp", wantErr: true},
 		{name: "mixed", ts: "123abc.456", wantErr: true},
+		{name: "multiple dots", ts: "1.2.3", wantErr: true},
+		{name: "leading dot", ts: ".123456", wantErr: true},
+		{name: "trailing dot", ts: "123456.", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
