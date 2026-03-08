@@ -17,6 +17,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
@@ -24,6 +25,7 @@ import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
@@ -126,17 +128,17 @@ function OAuthCredentialRow({
 
   function handleConnect() {
     if (!session?.access_token) return;
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
   }
 
   async function handleDisconnect() {
     try {
       await disconnect(providerId);
-    } catch {
-      // Error handling is in the hook
+      toast.success(`${providerLabel(providerId)} disconnected.`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to disconnect.";
+      toast.error(message);
     }
   }
 
@@ -208,6 +210,12 @@ function OAuthCredentialRow({
           )}
         </div>
       </div>
+      {!isConnected && !needsReauth && !provider?.has_credentials && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          OAuth is not available yet — ask your admin to configure{" "}
+          {providerLabel(providerId)} OAuth credentials.
+        </p>
+      )}
     </div>
   );
 }
@@ -248,7 +256,9 @@ function StaticCredentialRow({
                 )}
               </div>
               <p className="text-muted-foreground text-xs">
-                Auth type: {requiredCredential.auth_type}
+                {isAlternative
+                  ? "Use a private app access token instead of OAuth"
+                  : `Auth type: ${requiredCredential.auth_type}`}
               </p>
               {requiredCredential.instructions_url && (
                 <a
@@ -332,14 +342,4 @@ function StaticCredentialRow({
       )}
     </>
   );
-}
-
-function providerLabel(id: string): string {
-  const labels: Record<string, string> = {
-    google: "Google",
-    hubspot: "HubSpot",
-    microsoft: "Microsoft",
-    salesforce: "Salesforce",
-  };
-  return labels[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 }

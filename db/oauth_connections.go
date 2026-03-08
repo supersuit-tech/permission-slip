@@ -287,10 +287,11 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 	return &rc, nil
 }
 
-// HasStaticCredentialByActionType checks whether the connector that owns the
-// given action type has a non-OAuth2 required credential (api_key, basic, custom).
-// Used to determine if a static credential fallback is available when OAuth fails.
-func HasStaticCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
+// GetStaticCredentialByActionType returns the non-OAuth2 required credential
+// (api_key, basic, custom) for the connector that owns the given action type.
+// Returns (nil, nil) if no static credential exists. Used to check whether a
+// static credential fallback is available when OAuth resolution fails.
+func GetStaticCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
 		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes

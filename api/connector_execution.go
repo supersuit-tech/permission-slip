@@ -52,17 +52,20 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			// If OAuth fails because the user hasn't connected, check for a
-			// static credential fallback (e.g. HubSpot supports both OAuth and API key).
-			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) {
-				fallback, fbErr := db.HasStaticCredentialByActionType(ctx, deps.DB, actionType)
-				if fbErr == nil && fallback != nil {
-					creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-				}
+			// OAuth resolution failed. Before giving up, check if this connector
+			// also supports a static credential (e.g. HubSpot has both OAuth and API key).
+			// This covers all failure modes: user hasn't connected, vault not configured,
+			// provider registry missing, token refresh failed, etc.
+			oauthErr := err
+			fallback, fbErr := db.GetStaticCredentialByActionType(ctx, deps.DB, actionType)
+			if fbErr == nil && fallback != nil {
+				creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
 			}
 			if err != nil {
-				return nil, err
+				// Static fallback also failed (or wasn't available).
+				// Return the original OAuth error — it's more informative
+				// about the primary auth path.
+				return nil, oauthErr
 			}
 		}
 	} else {
