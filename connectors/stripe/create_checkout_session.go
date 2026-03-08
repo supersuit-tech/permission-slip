@@ -32,6 +32,9 @@ type createCheckoutSessionParams struct {
 	Metadata       map[string]any     `json:"metadata"`
 }
 
+// maxCheckoutLineItems mirrors the Stripe API limit of 20 line items per
+// Checkout session. Enforcing it client-side gives a clearer error message
+// than letting Stripe reject the request.
 const maxCheckoutLineItems = 20
 
 // validateCheckoutURL checks that a redirect URL is safe to use with Stripe Checkout.

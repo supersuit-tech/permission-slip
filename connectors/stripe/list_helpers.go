@@ -1,3 +1,7 @@
+// This file contains shared helpers for Stripe list (GET) actions.
+// All four list endpoints (customers, invoices, charges, subscriptions)
+// use the same Stripe cursor-based pagination model and the same list
+// response envelope, so these are centralized here rather than duplicated.
 package stripe
 
 import (
