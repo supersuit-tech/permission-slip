@@ -114,6 +114,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"pagerduty":  true,
 	"datadog":    true,
 	"calendly":   true,
+	"discord":    true,
 	"sendgrid":   true,
 }
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	datadogconnector "github.com/supersuit-tech/permission-slip-web/connectors/datadog"
+	discordconnector "github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 )
 
@@ -282,6 +283,15 @@ func BuiltInProviders() []Provider {
 			Scopes:       []string{},
 			ClientID:     os.Getenv("CALENDLY_CLIENT_ID"),
 			ClientSecret: os.Getenv("CALENDLY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			ID:           "discord",
+			AuthorizeURL: "https://discord.com/oauth2/authorize",
+			TokenURL:     "https://discord.com/api/oauth2/token",
+			Scopes:       discordconnector.OAuthScopes,
+			ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
+			ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
 		{
