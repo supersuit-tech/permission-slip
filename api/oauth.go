@@ -484,19 +484,17 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
 		}
 
-		// For DocuSign, fetch the user's account info to obtain account_id and
-		// base_url, which are required for all API calls but are not included in
-		// the OAuth token response. These are stored in extra_data so the
-		// connector can access them at execution time alongside the access token.
-		//
-		// We treat this as a hard failure: without account_id the connector
-		// cannot make any API calls, so a "Connected" status with a missing
-		// account_id would be misleading and frustrating for users.
-		if providerID == "docusign" {
-			extra, err := fetchDocuSignUserInfo(ctx, token.AccessToken, docuSignUserInfoURL)
+		// Run the provider's post-exchange enricher (if any). Enrichers fetch
+		// supplemental data not included in the token response (e.g. account IDs,
+		// base URLs) and return it for storage in extra_data so connectors can
+		// access it at execution time. A returned error is treated as a hard
+		// failure: storing a connection without required credentials would leave
+		// the user with a "Connected" status that produces confusing errors on use.
+		if enricher, ok := postOAuthEnrichers[providerID]; ok {
+			extra, err := enricher(ctx, token.AccessToken)
 			if err != nil {
-				log.Printf("[%s] OAuthCallback: DocuSign userinfo fetch failed: %v", TraceID(r.Context()), err)
-				redirectToFrontend(w, r, deps, providerID, "error", "Connected to DocuSign but could not retrieve account info — please try again")
+				log.Printf("[%s] OAuthCallback: post-OAuth enrichment for %q failed: %v", TraceID(r.Context()), providerID, err)
+				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again")
 				return
 			}
 			if stateExtraData == nil {
@@ -656,6 +654,25 @@ func extractTokenExtraData(token *oauth2.Token, stateExtra map[string]string) js
 // before being added to stateExtraData and must NOT be added here.
 func isURLExtraKey(key string) bool {
 	return key == "instance_url"
+}
+
+// postOAuthEnricher fetches supplemental data for a provider after a successful
+// token exchange. It receives a context (already deadline-constrained) and the
+// fresh access token, and returns key-value pairs to merge into extra_data.
+// Returning an error aborts the OAuth callback so the connection is not stored.
+//
+// Register enrichers in postOAuthEnrichers below. Any provider that requires
+// account IDs, base URLs, or other data not included in the token response
+// should have an enricher rather than inline logic in the callback handler.
+type postOAuthEnricher func(ctx context.Context, accessToken string) (map[string]string, error)
+
+// postOAuthEnrichers maps provider IDs to their post-exchange enrichers.
+// Add a new entry here when a provider needs supplemental data fetched after
+// the token exchange (see postOAuthEnricher above for the contract).
+var postOAuthEnrichers = map[string]postOAuthEnricher{
+	"docusign": func(ctx context.Context, accessToken string) (map[string]string, error) {
+		return fetchDocuSignUserInfo(ctx, accessToken, docuSignUserInfoURL)
+	},
 }
 
 // docuSignUserInfoURL is the endpoint used to retrieve the authenticated user's
