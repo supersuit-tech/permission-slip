@@ -245,7 +245,7 @@ paths:
                       - repo
                   - service: github_pat
                     auth_type: api_key
-                    instructions_url: 'https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens'
+                    instructions_url: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
         '404':
           description: Connector not found
           content:
