@@ -32,6 +32,10 @@ func TestZendeskConnector_Actions(t *testing.T) {
 		"zendesk.search_tickets",
 		"zendesk.list_tags",
 		"zendesk.update_tags",
+		"zendesk.create_user",
+		"zendesk.get_user",
+		"zendesk.list_ticket_fields",
+		"zendesk.get_satisfaction_ratings",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -145,8 +149,8 @@ func TestZendeskConnector_Manifest(t *testing.T) {
 		t.Error("api credential instructions_url is empty, want a URL")
 	}
 
-	if len(m.Actions) != 8 {
-		t.Fatalf("Manifest().Actions has %d items, want 8", len(m.Actions))
+	if len(m.Actions) != 12 {
+		t.Fatalf("Manifest().Actions has %d items, want 12", len(m.Actions))
 	}
 	if err := m.Validate(); err != nil {
 		t.Errorf("Manifest().Validate() = %v", err)

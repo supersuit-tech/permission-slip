@@ -66,6 +66,19 @@ type tag struct {
 	Name string `json:"name,omitempty"`
 }
 
+// intercomContact represents an Intercom contact (user or lead).
+type intercomContact struct {
+	Type             string         `json:"type,omitempty"`
+	ID               string         `json:"id,omitempty"`
+	Role             string         `json:"role,omitempty"`
+	Email            string         `json:"email,omitempty"`
+	Phone            string         `json:"phone,omitempty"`
+	Name             string         `json:"name,omitempty"`
+	CreatedAt        int64          `json:"created_at,omitempty"`
+	UpdatedAt        int64          `json:"updated_at,omitempty"`
+	CustomAttributes map[string]any `json:"custom_attributes,omitempty"`
+}
+
 // searchTicketsResponse represents the Intercom search API response.
 type searchTicketsResponse struct {
 	Type       string           `json:"type"`
@@ -77,6 +90,52 @@ type searchTicketsResponse struct {
 type tagsListResponse struct {
 	Type string `json:"type"`
 	Data []tag  `json:"data"`
+}
+
+// contactsSearchResponse represents the Intercom contacts search API response.
+type contactsSearchResponse struct {
+	Type       string           `json:"type"`
+	TotalCount int              `json:"total_count"`
+	Data       []intercomContact `json:"data"`
+}
+
+// intercomConversation represents a single Intercom conversation summary.
+type intercomConversation struct {
+	Type         string `json:"type"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	State        string `json:"state"`
+	CreatedAt    int64  `json:"created_at"`
+	UpdatedAt    int64  `json:"updated_at"`
+	WaitingSince int64  `json:"waiting_since"`
+	SnoozedUntil int64  `json:"snoozed_until"`
+}
+
+// conversationsResponse represents the Intercom conversations list API response.
+type conversationsResponse struct {
+	Type          string                 `json:"type"`
+	TotalCount    int                    `json:"total_count"`
+	Conversations []intercomConversation `json:"conversations"`
+}
+
+// outboundMessageResponse represents the Intercom outbound message API response.
+type outboundMessageResponse struct {
+	Type        string `json:"type"`
+	ID          string `json:"id"`
+	MessageType string `json:"message_type"`
+	Body        string `json:"body"`
+}
+
+// intercomArticle represents a help center article in Intercom.
+type intercomArticle struct {
+	Type      string `json:"type"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	State     string `json:"state"`
+	URL       string `json:"url"`
+	AuthorID  string `json:"author_id"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
 }
 
 // isValidIntercomID checks that an Intercom string ID is safe to embed in a
