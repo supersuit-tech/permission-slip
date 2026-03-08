@@ -26,6 +26,11 @@ func TestMondayConnector_Actions(t *testing.T) {
 		"monday.create_subitem",
 		"monday.move_item_to_group",
 		"monday.search_items",
+		"monday.list_boards",
+		"monday.get_board",
+		"monday.create_board",
+		"monday.delete_item",
+		"monday.list_groups",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -93,8 +98,8 @@ func TestMondayConnector_Manifest(t *testing.T) {
 	if m.Name != "Monday.com" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Monday.com")
 	}
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
+	if len(m.Actions) != 11 {
+		t.Fatalf("Manifest().Actions has %d items, want 11", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {

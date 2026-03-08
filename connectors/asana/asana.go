@@ -54,12 +54,18 @@ func (c *AsanaConnector) ID() string { return "asana" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *AsanaConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"asana.create_task":    &createTaskAction{conn: c},
-		"asana.update_task":    &updateTaskAction{conn: c},
-		"asana.add_comment":    &addCommentAction{conn: c},
-		"asana.complete_task":  &completeTaskAction{conn: c},
-		"asana.create_subtask": &createSubtaskAction{conn: c},
-		"asana.search_tasks":   &searchTasksAction{conn: c},
+		"asana.create_task":     &createTaskAction{conn: c},
+		"asana.update_task":     &updateTaskAction{conn: c},
+		"asana.add_comment":     &addCommentAction{conn: c},
+		"asana.complete_task":   &completeTaskAction{conn: c},
+		"asana.create_subtask":  &createSubtaskAction{conn: c},
+		"asana.search_tasks":    &searchTasksAction{conn: c},
+		"asana.list_workspaces": &listWorkspacesAction{conn: c},
+		"asana.list_projects":   &listProjectsAction{conn: c},
+		"asana.create_project":  &createProjectAction{conn: c},
+		"asana.delete_task":     &deleteTaskAction{conn: c},
+		"asana.list_sections":   &listSectionsAction{conn: c},
+		"asana.create_section":  &createSectionAction{conn: c},
 	}
 }
 

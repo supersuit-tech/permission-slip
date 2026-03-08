@@ -93,6 +93,14 @@ func (c *TrelloConnector) Actions() map[string]connectors.Action {
 		"trello.move_card":        &moveCardAction{conn: c},
 		"trello.create_checklist": &createChecklistAction{conn: c},
 		"trello.search_cards":     &searchCardsAction{conn: c},
+		"trello.list_boards":      &listBoardsAction{conn: c},
+		"trello.create_board":     &createBoardAction{conn: c},
+		"trello.list_lists":       &listListsAction{conn: c},
+		"trello.create_list":      &createListAction{conn: c},
+		"trello.delete_card":      &deleteCardAction{conn: c},
+		"trello.add_label":        &addLabelAction{conn: c},
+		"trello.list_labels":      &listLabelsAction{conn: c},
+		"trello.add_member":       &addMemberAction{conn: c},
 	}
 }
 
