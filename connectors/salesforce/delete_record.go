@@ -24,6 +24,9 @@ func (p *deleteRecordParams) validate() error {
 	if p.SObjectType == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: sobject_type"}
 	}
+	if err := validateSObjectType(p.SObjectType, "sobject_type"); err != nil {
+		return err
+	}
 	if p.RecordID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: record_id"}
 	}
