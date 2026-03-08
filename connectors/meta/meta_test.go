@@ -29,6 +29,12 @@ func TestMetaConnector_Actions(t *testing.T) {
 		"meta.create_instagram_post",
 		"meta.get_instagram_insights",
 		"meta.list_page_posts",
+		"meta.create_instagram_story",
+		"meta.get_page_insights",
+		"meta.list_instagram_posts",
+		"meta.reply_instagram_comment",
+		"meta.create_ad",
+		"meta.create_ad_campaign",
 	}
 
 	for _, name := range expected {
@@ -82,8 +88,8 @@ func TestMetaConnector_Manifest(t *testing.T) {
 	if m.ID != "meta" {
 		t.Errorf("expected manifest ID 'meta', got %q", m.ID)
 	}
-	if len(m.Actions) != 6 {
-		t.Errorf("expected 6 actions, got %d", len(m.Actions))
+	if len(m.Actions) != 12 {
+		t.Errorf("expected 12 actions, got %d", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 1 {
 		t.Fatalf("expected 1 required credential, got %d", len(m.RequiredCredentials))

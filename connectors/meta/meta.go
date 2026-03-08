@@ -73,12 +73,18 @@ func (c *MetaConnector) ID() string { return "meta" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *MetaConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"meta.create_page_post":      &createPagePostAction{conn: c},
-		"meta.delete_page_post":      &deletePagePostAction{conn: c},
-		"meta.reply_page_comment":    &replyPageCommentAction{conn: c},
-		"meta.create_instagram_post": &createInstagramPostAction{conn: c},
-		"meta.get_instagram_insights": &getInstagramInsightsAction{conn: c},
-		"meta.list_page_posts":       &listPagePostsAction{conn: c},
+		"meta.create_page_post":          &createPagePostAction{conn: c},
+		"meta.delete_page_post":          &deletePagePostAction{conn: c},
+		"meta.reply_page_comment":        &replyPageCommentAction{conn: c},
+		"meta.create_instagram_post":     &createInstagramPostAction{conn: c},
+		"meta.get_instagram_insights":    &getInstagramInsightsAction{conn: c},
+		"meta.list_page_posts":           &listPagePostsAction{conn: c},
+		"meta.create_instagram_story":    &createInstagramStoryAction{conn: c},
+		"meta.get_page_insights":         &getPageInsightsAction{conn: c},
+		"meta.list_instagram_posts":      &listInstagramPostsAction{conn: c},
+		"meta.reply_instagram_comment":   &replyInstagramCommentAction{conn: c},
+		"meta.create_ad":                 &createAdAction{conn: c},
+		"meta.create_ad_campaign":        &createAdCampaignAction{conn: c},
 	}
 }
 
