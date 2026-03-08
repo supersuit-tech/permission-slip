@@ -33,7 +33,8 @@ func VerifyWebhook(r *http.Request, webhookSecret string, maxBodyBytes int64) (*
 		return nil, fmt.Errorf("stripe webhook: missing Stripe-Signature header")
 	}
 
-	event, err := webhook.ConstructEvent(body, sig, webhookSecret)
+	event, err := webhook.ConstructEventWithOptions(body, sig, webhookSecret,
+		webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true})
 	if err != nil {
 		return nil, fmt.Errorf("stripe webhook: verify signature: %w", err)
 	}
