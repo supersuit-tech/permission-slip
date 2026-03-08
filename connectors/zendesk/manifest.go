@@ -277,7 +277,8 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"verified": {
 							"type": "boolean",
-							"description": "Whether to mark the email as verified (default: false)"
+							"default": false,
+							"description": "Set true to bypass email verification (default: false). Use with caution — skips the Zendesk email confirmation flow, immediately granting the user access."
 						}
 					}
 				}`)),
@@ -425,7 +426,7 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "zendesk.create_user",
 				Name:        "Create end-user",
 				Description: "Create a new end-user account. Role is locked to end-user to prevent accidental agent or admin creation.",
-				Parameters:  json.RawMessage(`{"name":"*","email":"*","role":"end-user"}`),
+				Parameters:  json.RawMessage(`{"name":"*","email":"*","role":"end-user","verified":false}`),
 			},
 		},
 	}

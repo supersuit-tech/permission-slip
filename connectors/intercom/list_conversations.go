@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -72,10 +74,12 @@ func (a *listConversationsAction) Execute(ctx context.Context, req connectors.Ac
 		limit = maxConversationLimit
 	}
 
-	path := fmt.Sprintf("/conversations?per_page=%d", limit)
+	q := url.Values{}
+	q.Set("per_page", strconv.Itoa(limit))
 	if params.State != "" {
-		path += fmt.Sprintf("&state=%s", params.State)
+		q.Set("state", params.State)
 	}
+	path := "/conversations?" + q.Encode()
 
 	var resp conversationsResponse
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {

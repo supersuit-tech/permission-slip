@@ -45,7 +45,7 @@ type zendeskUser struct {
 	Email    string `json:"email,omitempty"`
 	Phone    string `json:"phone,omitempty"`
 	Role     string `json:"role,omitempty"`
-	Verified bool   `json:"verified,omitempty"`
+	Verified bool   `json:"verified"`
 }
 
 type userResponse struct {
