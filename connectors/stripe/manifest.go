@@ -665,8 +665,8 @@ func (c *StripeConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"cancel_at": {
 							"type": "integer",
-							"minimum": 0,
-							"description": "Unix timestamp to schedule a future cancellation. Set to 0 to clear a previously-scheduled cancellation."
+							"minimum": 1,
+							"description": "Unix timestamp to schedule a future cancellation (must be positive/in the future)."
 						},
 						"metadata": {
 							"type": "object",

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -29,12 +30,12 @@ type updateSubscriptionParams struct {
 	Items             []updateSubscriptionItem `json:"items"`
 	CouponID          string                   `json:"coupon"`
 	ProrationBehavior string                   `json:"proration_behavior"`
-	// TrialEnd extends or ends a trial. Accepts a Unix timestamp (to set a new
-	// trial end date) or the string "now" (to end the trial immediately and
-	// begin billing). Sending 0 is treated as unset/omitted.
+	// TrialEnd extends or ends a trial. Accepts a Unix timestamp string (e.g.
+	// "1893456000") to set a new trial end date, or the string "now" to end
+	// the trial immediately and begin billing.
 	TrialEnd string `json:"trial_end"`
 	// CancelAt schedules the subscription to cancel at a future Unix timestamp.
-	// Set to 0 to clear a previously-scheduled cancellation.
+	// Must be a positive integer — 0 or negative values are rejected.
 	CancelAt *int64 `json:"cancel_at"`
 	Metadata map[string]any `json:"metadata"`
 }
@@ -61,16 +62,18 @@ func (p *updateSubscriptionParams) validate() error {
 		return err
 	}
 	if p.TrialEnd != "" && p.TrialEnd != "now" {
-		// Must be a valid positive integer string (Unix timestamp).
-		var ts int64
-		if _, err := fmt.Sscanf(p.TrialEnd, "%d", &ts); err != nil || ts <= 0 {
+		// Use strconv.ParseInt rather than fmt.Sscanf: Sscanf stops at the first
+		// non-numeric character and returns success (e.g. "123abc" parses as 123).
+		// ParseInt requires the entire string to be a valid integer.
+		ts, err := strconv.ParseInt(p.TrialEnd, 10, 64)
+		if err != nil || ts <= 0 {
 			return &connectors.ValidationError{
-				Message: `trial_end must be a Unix timestamp (e.g. "1893456000") or "now" to end the trial immediately`,
+				Message: `trial_end must be a positive Unix timestamp string (e.g. "1893456000") or "now" to end the trial immediately`,
 			}
 		}
 	}
-	if p.CancelAt != nil && *p.CancelAt < 0 {
-		return &connectors.ValidationError{Message: "cancel_at must be a non-negative Unix timestamp"}
+	if p.CancelAt != nil && *p.CancelAt <= 0 {
+		return &connectors.ValidationError{Message: "cancel_at must be a positive Unix timestamp (seconds since epoch)"}
 	}
 	return validateMetadata(p.Metadata)
 }
@@ -116,7 +119,7 @@ func (a *updateSubscriptionAction) Execute(ctx context.Context, req connectors.A
 	if params.TrialEnd != "" {
 		body["trial_end"] = params.TrialEnd
 	}
-	if params.CancelAt != nil {
+	if params.CancelAt != nil && *params.CancelAt > 0 {
 		body["cancel_at"] = *params.CancelAt
 	}
 	if params.Metadata != nil {

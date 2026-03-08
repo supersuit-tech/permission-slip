@@ -152,16 +152,24 @@ func TestUpdateSubscription_InvalidTrialEnd(t *testing.T) {
 	conn := New()
 	action := conn.Actions()["stripe.update_subscription"]
 
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "stripe.update_subscription",
-		Parameters:  json.RawMessage(`{"subscription_id":"sub_abc","trial_end":"tomorrow"}`),
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("Execute() expected error for invalid trial_end, got nil")
-	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	cases := []string{"tomorrow", "123abc", "0", "-1"}
+	for _, tc := range cases {
+		params, _ := json.Marshal(map[string]any{
+			"subscription_id": "sub_abc",
+			"trial_end":       tc,
+		})
+		_, err := action.Execute(t.Context(), connectors.ActionRequest{
+			ActionType:  "stripe.update_subscription",
+			Parameters:  json.RawMessage(params),
+			Credentials: validCreds(),
+		})
+		if err == nil {
+			t.Errorf("trial_end=%q: expected error, got nil", tc)
+			continue
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("trial_end=%q: expected ValidationError, got %T: %v", tc, err, err)
+		}
 	}
 }
 
