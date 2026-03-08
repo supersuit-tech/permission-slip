@@ -23,7 +23,9 @@ func TestMoveToSprint_Success(t *testing.T) {
 
 		body, _ := io.ReadAll(r.Body)
 		var reqBody map[string]interface{}
-		json.Unmarshal(body, &reqBody)
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshal request body: %v", err)
+		}
 
 		issues, ok := reqBody["issues"].([]interface{})
 		if !ok || len(issues) != 2 {

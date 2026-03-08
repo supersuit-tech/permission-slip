@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -46,7 +47,7 @@ func (a *listSprintsAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	path := fmt.Sprintf("/board/%d/sprint", params.BoardID)
 	if params.State != "" {
-		path += "?state=" + params.State
+		path += "?state=" + url.QueryEscape(params.State)
 	}
 
 	var resp struct {

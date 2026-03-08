@@ -23,7 +23,9 @@ func TestCreateSprint_Success(t *testing.T) {
 
 		body, _ := io.ReadAll(r.Body)
 		var reqBody map[string]interface{}
-		json.Unmarshal(body, &reqBody)
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshal request body: %v", err)
+		}
 
 		if reqBody["name"] != "Sprint 1" {
 			t.Errorf("name = %v, want Sprint 1", reqBody["name"])
