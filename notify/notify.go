@@ -2,15 +2,15 @@
 // Permission Slip. It defines the Sender interface that individual channels
 // (email, web-push, SMS) implement, a Dispatcher that fans out to all
 // configured senders, and the shared types (Approval, Recipient) that
-// senders receive. Additional channels (for example, mobile push) can be
-// added by implementing the Sender interface.
+// senders receive.
 //
-// Adding a new channel requires three steps:
-//  1. Implement the Sender interface.
-//  2. Add env-var loading for the channel's config.
-//  3. Register the sender in main.go.
+// Adding a new notification channel requires three steps:
+//  1. Implement the Sender interface in a new package (e.g. notify/mynewchannel).
+//  2. Add any required env-var fields to Config in notify/config.go.
+//  3. Create notify/mynewchannel/register.go with an init() that calls
+//     notify.RegisterSenderFactory(...), then add a blank import to notify/all/all.go.
 //
-// No changes to the Dispatcher or approval handler are needed.
+// No changes to main.go, the Dispatcher, or the approval handler are needed.
 package notify
 
 import (

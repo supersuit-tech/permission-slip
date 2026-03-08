@@ -24,8 +24,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
-	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
-	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
+	_ "github.com/supersuit-tech/permission-slip-web/notify/all"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
 	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
@@ -231,63 +230,18 @@ func main() {
 	}
 
 	// Initialize notification dispatcher.
-	// Channel senders are built from environment variables; each channel
-	// issue (#275 Email, #276 Web Push, #277 SMS) adds its own env vars
-	// and sender construction to notify.Config.BuildSenders().
+	// Each channel registers itself via init() in its own package (imported via
+	// notify/all). BuildSenders calls all registered factories with the runtime
+	// context so each channel can inspect its required config and dependencies.
 	notifyCfg := notify.LoadConfig()
-	senders := notifyCfg.BuildSenders()
-
-	// #17 — Gate SMS behind paid tier: wrap SMS senders with plan checking
-	// and usage tracking. When the DB is available, free-tier users are blocked
-	// and paid-tier SMS usage is recorded in usage_periods.
-	if deps.DB != nil {
-		smsGate := &notify.DBSMSGate{DB: deps.DB}
-		for i, s := range senders {
-			if s.Name() == "sms" {
-				senders[i] = notify.NewPlanGatedSender(s, smsGate)
-			}
-		}
-	}
-
-	// #276 — Web Push (VAPID): Initialize VAPID keys and register sender.
-	// VAPID keys require the database for auto-generation + persistence,
-	// so this is wired here rather than in BuildSenders().
-	if deps.DB != nil {
-		vapidCtx, vapidCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		vapidKeys, err := webpush.InitVAPIDKeys(vapidCtx, deps.DB, deps.DevMode)
-		vapidCancel()
-		if err != nil {
-			if deps.DevMode {
-				log.Printf("Warning: failed to initialize VAPID keys: %v", err)
-			} else {
-				log.Fatalf("Failed to initialize VAPID keys: %v", err)
-			}
-		} else if vapidKeys != nil {
-			deps.VAPIDPublicKey = vapidKeys.PublicKey
-			subject := strings.TrimSpace(notifyCfg.VAPIDSubject)
-			if subject == "" {
-				if deps.DevMode {
-					subject = "mailto:admin@example.com"
-					log.Println("Web Push: VAPID_SUBJECT not set, using default mailto:admin@example.com (development mode only)")
-				} else {
-					log.Fatalf("Web Push: VAPID_SUBJECT is required in production (e.g. mailto:admin@mycompany.com or https://example.com/contact)")
-				}
-			}
-			senders = append(senders, webpush.New(vapidKeys, subject, deps.DB))
-		}
-	}
-
-	// Mobile Push (Expo): Register sender when the database is available.
-	// The Expo access token is optional — unauthenticated requests work
-	// but have lower rate limits.
-	if deps.DB != nil {
-		if notifyCfg.ExpoAccessToken != "" {
-			log.Println("Mobile Push: Expo access token configured (authenticated mode)")
-		} else {
-			log.Println("Mobile Push: no EXPO_ACCESS_TOKEN set, using unauthenticated mode (lower rate limits)")
-		}
-		senders = append(senders, mobilepush.New(deps.DB, notifyCfg.ExpoAccessToken))
-	}
+	senders := notify.BuildSenders(context.Background(), notify.BuildContext{
+		DB:      deps.DB,
+		Config:  notifyCfg,
+		DevMode: deps.DevMode,
+		OnVAPIDPublicKey: func(key string) {
+			deps.VAPIDPublicKey = key
+		},
+	})
 
 	notify.LogChannelSummary(senders)
 	if deps.DB != nil && len(senders) > 0 {
