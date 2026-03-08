@@ -30,13 +30,16 @@ const storedCredentials = {
 };
 
 /**
- * Sets up mockGet to handle both /v1/credentials and /v1/oauth/connections.
- * The component now fetches OAuth connections alongside static credentials.
+ * Sets up mockGet to handle /v1/credentials, /v1/oauth/connections,
+ * and /v1/oauth/providers. The component fetches all three.
  */
 function setupMockGet(credentialsData: unknown) {
   mockGet.mockImplementation((path: string) => {
     if (path === "/v1/oauth/connections") {
       return Promise.resolve({ data: { connections: [] } });
+    }
+    if (path === "/v1/oauth/providers") {
+      return Promise.resolve({ data: { providers: [] } });
     }
     return Promise.resolve({ data: credentialsData });
   });
@@ -235,7 +238,19 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth credential row for oauth2 auth type", async () => {
-    setupMockGet({ credentials: [] });
+    mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/oauth/connections") {
+        return Promise.resolve({ data: { connections: [] } });
+      }
+      if (path === "/v1/oauth/providers") {
+        return Promise.resolve({
+          data: {
+            providers: [{ id: "slack", has_credentials: true }],
+          },
+        });
+      }
+      return Promise.resolve({ data: { credentials: [] } });
+    });
 
     renderWithProviders(
       <ConnectorCredentialsSection
@@ -256,7 +271,7 @@ describe("ConnectorCredentialsSection", () => {
     expect(screen.getByText("Recommended")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Connect your Slack account to authenticate automatically",
+        "Connect your Slack account via OAuth for automatic token management",
       ),
     ).toBeInTheDocument();
   });
@@ -274,6 +289,13 @@ describe("ConnectorCredentialsSection", () => {
                 connected_at: "2026-03-01T10:00:00Z",
               },
             ],
+          },
+        });
+      }
+      if (path === "/v1/oauth/providers") {
+        return Promise.resolve({
+          data: {
+            providers: [{ id: "slack", has_credentials: true }],
           },
         });
       }
@@ -296,6 +318,8 @@ describe("ConnectorCredentialsSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
-    expect(screen.getByText("Manage")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Disconnect OAuth"),
+    ).toBeInTheDocument();
   });
 });
