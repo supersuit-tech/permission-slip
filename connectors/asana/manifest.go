@@ -226,6 +226,116 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "asana.list_workspaces",
+				Name:        "List Workspaces",
+				Description: "List all workspaces accessible to the authenticated user",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
+			{
+				ActionType:  "asana.list_projects",
+				Name:        "List Projects",
+				Description: "List projects in a workspace",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["workspace_id"],
+					"properties": {
+						"workspace_id": {
+							"type": "string",
+							"description": "Workspace GID to list projects for"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "asana.create_project",
+				Name:        "Create Project",
+				Description: "Create a new project in a workspace",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["workspace_id", "name"],
+					"properties": {
+						"workspace_id": {
+							"type": "string",
+							"description": "Workspace GID to create the project in"
+						},
+						"name": {
+							"type": "string",
+							"description": "Project name"
+						},
+						"notes": {
+							"type": "string",
+							"description": "Project description"
+						},
+						"color": {
+							"type": "string",
+							"description": "Project color (e.g. light-green, light-red)"
+						},
+						"privacy": {
+							"type": "string",
+							"description": "Privacy setting: public_to_workspace or private"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "asana.delete_task",
+				Name:        "Delete Task",
+				Description: "Permanently delete a task",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["task_id"],
+					"properties": {
+						"task_id": {
+							"type": "string",
+							"description": "Task GID to delete"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "asana.list_sections",
+				Name:        "List Sections",
+				Description: "List sections in a project",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["project_id"],
+					"properties": {
+						"project_id": {
+							"type": "string",
+							"description": "Project GID to list sections for"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "asana.create_section",
+				Name:        "Create Section",
+				Description: "Create a new section in a project",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["project_id", "name"],
+					"properties": {
+						"project_id": {
+							"type": "string",
+							"description": "Project GID to create the section in"
+						},
+						"name": {
+							"type": "string",
+							"description": "Section name"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{Service: "asana", AuthType: "api_key", InstructionsURL: "https://developers.asana.com/docs/personal-access-token"},
@@ -272,6 +382,48 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search my incomplete tasks",
 				Description: "Agent can search for incomplete tasks in a workspace.",
 				Parameters:  json.RawMessage(`{"workspace_id":"*","text":"*","assignee":"*","completed":false,"limit":20}`),
+			},
+			{
+				ID:          "tpl_asana_list_workspaces",
+				ActionType:  "asana.list_workspaces",
+				Name:        "List workspaces",
+				Description: "Agent can list all workspaces accessible to the user.",
+				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_asana_list_projects",
+				ActionType:  "asana.list_projects",
+				Name:        "List projects in a workspace",
+				Description: "Agent can list all projects in a workspace.",
+				Parameters:  json.RawMessage(`{"workspace_id":"*"}`),
+			},
+			{
+				ID:          "tpl_asana_create_project",
+				ActionType:  "asana.create_project",
+				Name:        "Create a project",
+				Description: "Agent can create new projects in a workspace.",
+				Parameters:  json.RawMessage(`{"workspace_id":"*","name":"*","notes":"*"}`),
+			},
+			{
+				ID:          "tpl_asana_delete_task",
+				ActionType:  "asana.delete_task",
+				Name:        "Delete any task",
+				Description: "Agent can permanently delete any task.",
+				Parameters:  json.RawMessage(`{"task_id":"*"}`),
+			},
+			{
+				ID:          "tpl_asana_list_sections",
+				ActionType:  "asana.list_sections",
+				Name:        "List sections in a project",
+				Description: "Agent can list all sections in a project.",
+				Parameters:  json.RawMessage(`{"project_id":"*"}`),
+			},
+			{
+				ID:          "tpl_asana_create_section",
+				ActionType:  "asana.create_section",
+				Name:        "Create a section",
+				Description: "Agent can create sections in any project.",
+				Parameters:  json.RawMessage(`{"project_id":"*","name":"*"}`),
 			},
 		},
 	}

@@ -231,6 +231,169 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "trello.list_boards",
+				Name:        "List Boards",
+				Description: "List boards accessible to the authenticated user",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {
+						"filter": {
+							"type": "string",
+							"description": "Filter boards: \"open\" (default), \"closed\", \"starred\", \"all\""
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.create_board",
+				Name:        "Create Board",
+				Description: "Create a new Trello board",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Board name"
+						},
+						"desc": {
+							"type": "string",
+							"description": "Board description"
+						},
+						"defaultLists": {
+							"type": "boolean",
+							"description": "Whether to create default lists (To Do, Doing, Done). Defaults to true"
+						},
+						"idOrganization": {
+							"type": "string",
+							"description": "Organization or workspace ID to create the board in"
+						},
+						"prefs_permissionLevel": {
+							"type": "string",
+							"description": "Permission level: \"private\", \"org\", or \"public\""
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.list_lists",
+				Name:        "List Lists",
+				Description: "List lists on a board",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["board_id"],
+					"properties": {
+						"board_id": {
+							"type": "string",
+							"description": "Board ID to list lists for (24-character hex string)"
+						},
+						"filter": {
+							"type": "string",
+							"description": "Filter lists: \"open\" (default), \"closed\", \"all\""
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.create_list",
+				Name:        "Create List",
+				Description: "Create a new list on a board",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["board_id", "name"],
+					"properties": {
+						"board_id": {
+							"type": "string",
+							"description": "Board ID to create the list on (24-character hex string)"
+						},
+						"name": {
+							"type": "string",
+							"description": "List name"
+						},
+						"pos": {
+							"type": "string",
+							"description": "Position: \"top\", \"bottom\", or a positive number"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.delete_card",
+				Name:        "Delete Card",
+				Description: "Permanently delete a card",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["card_id"],
+					"properties": {
+						"card_id": {
+							"type": "string",
+							"description": "ID of the card to delete (24-character hex string)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.list_labels",
+				Name:        "List Labels",
+				Description: "List available labels on a board",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["board_id"],
+					"properties": {
+						"board_id": {
+							"type": "string",
+							"description": "Board ID to list labels for (24-character hex string)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.add_label",
+				Name:        "Add Label",
+				Description: "Add a label to a card",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["card_id", "label_id"],
+					"properties": {
+						"card_id": {
+							"type": "string",
+							"description": "ID of the card to add the label to (24-character hex string)"
+						},
+						"label_id": {
+							"type": "string",
+							"description": "ID of the label to add (24-character hex string)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "trello.add_member",
+				Name:        "Add Member",
+				Description: "Add a member to a card",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["card_id", "member_id"],
+					"properties": {
+						"card_id": {
+							"type": "string",
+							"description": "ID of the card (24-character hex string)"
+						},
+						"member_id": {
+							"type": "string",
+							"description": "ID of the member to add (24-character hex string)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -301,6 +464,62 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search cards",
 				Description: "Agent can search for cards across boards.",
 				Parameters:  json.RawMessage(`{"query":"*","board_id":"*","list_id":"*","members":"*","due":"*","limit":"*"}`),
+			},
+			{
+				ID:          "tpl_trello_list_boards",
+				ActionType:  "trello.list_boards",
+				Name:        "List boards",
+				Description: "Agent can list all boards accessible to the user.",
+				Parameters:  json.RawMessage(`{"filter":"open"}`),
+			},
+			{
+				ID:          "tpl_trello_create_board",
+				ActionType:  "trello.create_board",
+				Name:        "Create boards",
+				Description: "Agent can create new Trello boards.",
+				Parameters:  json.RawMessage(`{"name":"*","desc":"*","defaultLists":true}`),
+			},
+			{
+				ID:          "tpl_trello_list_lists",
+				ActionType:  "trello.list_lists",
+				Name:        "List lists on any board",
+				Description: "Agent can list all lists on any board.",
+				Parameters:  json.RawMessage(`{"board_id":"*","filter":"open"}`),
+			},
+			{
+				ID:          "tpl_trello_create_list",
+				ActionType:  "trello.create_list",
+				Name:        "Create lists on boards",
+				Description: "Agent can create new lists on any board.",
+				Parameters:  json.RawMessage(`{"board_id":"*","name":"*","pos":"*"}`),
+			},
+			{
+				ID:          "tpl_trello_delete_card",
+				ActionType:  "trello.delete_card",
+				Name:        "Delete any card",
+				Description: "Agent can permanently delete any card.",
+				Parameters:  json.RawMessage(`{"card_id":"*"}`),
+			},
+			{
+				ID:          "tpl_trello_list_labels",
+				ActionType:  "trello.list_labels",
+				Name:        "List labels on a board",
+				Description: "Agent can list all labels available on any board.",
+				Parameters:  json.RawMessage(`{"board_id":"*"}`),
+			},
+			{
+				ID:          "tpl_trello_add_label",
+				ActionType:  "trello.add_label",
+				Name:        "Add labels to cards",
+				Description: "Agent can add any label to any card.",
+				Parameters:  json.RawMessage(`{"card_id":"*","label_id":"*"}`),
+			},
+			{
+				ID:          "tpl_trello_add_member",
+				ActionType:  "trello.add_member",
+				Name:        "Add members to cards",
+				Description: "Agent can add any member to any card.",
+				Parameters:  json.RawMessage(`{"card_id":"*","member_id":"*"}`),
 			},
 		},
 	}

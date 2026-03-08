@@ -65,6 +65,11 @@ func (c *MondayConnector) Actions() map[string]connectors.Action {
 		"monday.create_subitem":     &createSubitemAction{conn: c},
 		"monday.move_item_to_group": &moveItemToGroupAction{conn: c},
 		"monday.search_items":       &searchItemsAction{conn: c},
+		"monday.list_boards":        &listBoardsAction{conn: c},
+		"monday.get_board":          &getBoardAction{conn: c},
+		"monday.create_board":       &createBoardAction{conn: c},
+		"monday.delete_item":        &deleteItemAction{conn: c},
+		"monday.list_groups":        &listGroupsAction{conn: c},
 	}
 }
 

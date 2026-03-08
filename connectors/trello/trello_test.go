@@ -30,6 +30,14 @@ func TestActions(t *testing.T) {
 		"trello.move_card",
 		"trello.create_checklist",
 		"trello.search_cards",
+		"trello.list_boards",
+		"trello.create_board",
+		"trello.list_lists",
+		"trello.create_list",
+		"trello.delete_card",
+		"trello.add_label",
+		"trello.list_labels",
+		"trello.add_member",
 	}
 
 	for _, name := range expected {
@@ -164,8 +172,8 @@ func TestManifest(t *testing.T) {
 	if m.Name != "Trello" {
 		t.Errorf("expected manifest name 'Trello', got %q", m.Name)
 	}
-	if len(m.Actions) != 6 {
-		t.Errorf("expected 6 actions in manifest, got %d", len(m.Actions))
+	if len(m.Actions) != 14 {
+		t.Errorf("expected 14 actions in manifest, got %d", len(m.Actions))
 	}
 	if len(m.RequiredCredentials) != 2 {
 		t.Errorf("expected 2 required credentials, got %d", len(m.RequiredCredentials))
