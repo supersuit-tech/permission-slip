@@ -4,6 +4,7 @@ import {
   Circle,
   ExternalLink,
   Loader2,
+  LogIn,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -14,11 +15,29 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
+import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
+
+const PROVIDER_LABELS: Record<string, string> = {
+  google: "Google",
+  microsoft: "Microsoft",
+  stripe: "Stripe",
+  salesforce: "Salesforce",
+  meta: "Meta",
+  linkedin: "LinkedIn",
+  zoom: "Zoom",
+  kroger: "Kroger",
+};
+
+function providerLabel(id: string): string {
+  return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+}
 
 interface ConnectorCredentialsSectionProps {
   requiredCredentials: RequiredCredential[];
@@ -31,6 +50,7 @@ export function ConnectorCredentialsSection({
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasRequiredCredentials,
   });
+  const { connections } = useOAuthConnections();
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -38,6 +58,13 @@ export function ConnectorCredentialsSection({
     list.push(cred);
     storedByService.set(cred.service, list);
   }
+
+  // Build a set of connected OAuth providers for quick lookup.
+  const connectedOAuthProviders = new Set(
+    connections
+      .filter((c) => c.status === "active")
+      .map((c) => c.provider),
+  );
 
   return (
     <Card>
@@ -60,13 +87,25 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred) => (
-              <CredentialRow
-                key={cred.service}
-                requiredCredential={cred}
-                storedCredentials={storedByService.get(cred.service) ?? []}
-              />
-            ))}
+            {requiredCredentials.map((cred) =>
+              cred.auth_type === "oauth2" ? (
+                <OAuthCredentialRow
+                  key={cred.service}
+                  requiredCredential={cred}
+                  isConnected={connectedOAuthProviders.has(
+                    cred.oauth_provider ?? "",
+                  )}
+                />
+              ) : (
+                <StaticCredentialRow
+                  key={cred.service}
+                  requiredCredential={cred}
+                  storedCredentials={
+                    storedByService.get(cred.service) ?? []
+                  }
+                />
+              ),
+            )}
           </div>
         )}
       </CardContent>
@@ -74,7 +113,71 @@ export function ConnectorCredentialsSection({
   );
 }
 
-function CredentialRow({
+function OAuthCredentialRow({
+  requiredCredential,
+  isConnected,
+}: {
+  requiredCredential: RequiredCredential;
+  isConnected: boolean;
+}) {
+  const { session } = useAuth();
+  const provider = requiredCredential.oauth_provider ?? "";
+
+  function handleConnect() {
+    if (!session?.access_token) return;
+    const baseUrl =
+      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
+    const url = `${baseUrl}/v1/oauth/${provider}/authorize`;
+    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+  }
+
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {isConnected ? (
+            <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : (
+            <Circle className="text-muted-foreground size-5 shrink-0" />
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">
+                {providerLabel(provider)}
+              </p>
+              <Badge variant="secondary" className="text-xs">
+                OAuth
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Connect your {providerLabel(provider)} account to
+              authenticate automatically
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-xs font-medium ${
+              isConnected
+                ? "text-green-600 dark:text-green-400"
+                : "text-muted-foreground"
+            }`}
+          >
+            {isConnected ? "Connected" : "Not connected"}
+          </span>
+          {!isConnected && (
+            <Button variant="outline" size="sm" onClick={handleConnect}>
+              <LogIn className="size-3" />
+              Connect {providerLabel(provider)}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
 }: {

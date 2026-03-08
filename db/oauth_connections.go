@@ -283,3 +283,60 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 	}
 	return &rc, nil
 }
+
+// GetAllRequiredCredentialsByActionType returns all required credentials for the
+// connector that owns the given action type. Used when a connector supports
+// multiple auth methods (e.g. both OAuth and API key). Results are ordered with
+// oauth2 credentials first so callers can try OAuth before falling back.
+func GetAllRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType string) ([]RequiredCredential, error) {
+	rows, err := db.Query(ctx, `
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
+		FROM connector_actions ca
+		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
+		WHERE ca.action_type = $1
+		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END, crc.service`,
+		actionType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var creds []RequiredCredential
+	for rows.Next() {
+		var rc RequiredCredential
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
+			return nil, err
+		}
+		creds = append(creds, rc)
+	}
+	return creds, rows.Err()
+}
+
+// GetStaticRequiredServicesByActionType returns service names for non-OAuth
+// credentials only. Used when falling back from OAuth to static credentials
+// to avoid trying to fetch OAuth services from the credential vault.
+func GetStaticRequiredServicesByActionType(ctx context.Context, db DBTX, actionType string) ([]string, error) {
+	rows, err := db.Query(ctx, `
+		SELECT crc.service
+		FROM connector_actions ca
+		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
+		WHERE ca.action_type = $1 AND crc.auth_type != 'oauth2'
+		ORDER BY crc.service`,
+		actionType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []string
+	for rows.Next() {
+		var service string
+		if err := rows.Scan(&service); err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
+	return services, rows.Err()
+}

@@ -41,25 +41,12 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		return nil, nil
 	}
 
-	// Check auth_type for this connector's required credentials.
-	reqCred, err := db.GetRequiredCredentialByActionType(ctx, deps.DB, actionType)
+	// Resolve credentials. Connectors that support multiple auth methods
+	// (e.g. Stripe with both OAuth and API key) are handled by trying OAuth
+	// first and falling back to static credentials.
+	creds, err := resolveCredentials(ctx, deps, userID, actionType)
 	if err != nil {
-		return nil, fmt.Errorf("look up required credential: %w", err)
-	}
-
-	var creds connectors.Credentials
-	if reqCred != nil && reqCred.AuthType == "oauth2" {
-		// OAuth2 path: resolve access token from oauth_connections.
-		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Static credential path (api_key, basic, custom): existing behavior.
-		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	// Validate credentials before executing the action.
@@ -225,6 +212,65 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 	}, nil
 }
 
+// resolveCredentials determines which auth method to use for the given action type.
+// For connectors that support multiple auth methods (e.g. both OAuth and API key),
+// it tries OAuth first and falls back to static credentials if the user hasn't
+// connected their OAuth account.
+func resolveCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	allCreds, err := db.GetAllRequiredCredentialsByActionType(ctx, deps.DB, actionType)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up required credentials: %w", err)
+	}
+
+	// Partition into OAuth and non-OAuth credentials.
+	var oauthCred *db.RequiredCredential
+	hasStaticCred := false
+	for i := range allCreds {
+		if allCreds[i].AuthType == "oauth2" {
+			oauthCred = &allCreds[i]
+		} else {
+			hasStaticCred = true
+		}
+	}
+
+	// Try OAuth first if available.
+	if oauthCred != nil {
+		creds, oauthErr := resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+		if oauthErr == nil {
+			return creds, nil
+		}
+		// If there's no static fallback, return the OAuth error directly.
+		if !hasStaticCred {
+			return connectors.Credentials{}, oauthErr
+		}
+		// Fall through to static credentials only for "not connected" errors.
+		// Real errors (refresh failed, provider misconfigured) should propagate
+		// even when a static fallback exists, because the user explicitly connected
+		// OAuth and needs to know it's broken.
+		if !connectors.IsOAuthRefreshError(oauthErr) {
+			return connectors.Credentials{}, oauthErr
+		}
+		// Check if this is a "no connection" vs "needs reauth" OAuthRefreshError.
+		// Only fall back for "no connection" — if the user connected OAuth but
+		// needs reauth, surface that error instead of silently using the API key.
+		var refreshErr *connectors.OAuthRefreshError
+		if errors.As(oauthErr, &refreshErr) {
+			if !strings.Contains(refreshErr.Message, "no OAuth connection") {
+				return connectors.Credentials{}, oauthErr
+			}
+		}
+	}
+
+	// Static credential path (api_key, basic, custom).
+	// When OAuth credentials also exist for this connector, only fetch the
+	// non-OAuth services to avoid errors from missing OAuth credential entries
+	// in the vault.
+	if oauthCred != nil {
+		return resolveStaticCredentialsFiltered(ctx, deps, userID, actionType)
+	}
+	return resolveStaticCredentials(ctx, deps, userID, actionType)
+}
+
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
 // for the given action type.
 func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
@@ -232,7 +278,22 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
 	}
+	return fetchStaticCredentials(ctx, deps, userID, services)
+}
 
+// resolveStaticCredentialsFiltered fetches static credentials excluding OAuth
+// services. Used when falling back from OAuth to avoid trying to fetch OAuth
+// service credentials from the vault.
+func resolveStaticCredentialsFiltered(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	services, err := db.GetStaticRequiredServicesByActionType(ctx, deps.DB, actionType)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up static required services: %w", err)
+	}
+	return fetchStaticCredentials(ctx, deps, userID, services)
+}
+
+// fetchStaticCredentials fetches and decrypts credentials for the given service list.
+func fetchStaticCredentials(ctx context.Context, deps *Deps, userID string, services []string) (connectors.Credentials, error) {
 	var zero connectors.Credentials
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
