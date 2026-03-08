@@ -9,3 +9,10 @@ func validCreds() connectors.Credentials {
 		"app_key": "dd_test_app_key_456",
 	})
 }
+
+// validOAuthCreds returns a Credentials value with a valid OAuth access_token for tests.
+func validOAuthCreds() connectors.Credentials {
+	return connectors.NewCredentials(map[string]string{
+		"access_token": "dd_oauth_test_token_abc",
+	})
+}

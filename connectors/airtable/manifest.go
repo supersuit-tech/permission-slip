@@ -265,6 +265,19 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
+			{
+				Service:       "airtable",
+				AuthType:      "oauth2",
+				OAuthProvider: "airtable",
+				OAuthScopes: []string{
+					"data.records:read",
+					"data.records:write",
+					"data.recordComments:read",
+					"data.recordComments:write",
+					"schema.bases:read",
+					"schema.bases:write",
+				},
+			},
 			{Service: "airtable", AuthType: "api_key", InstructionsURL: "https://airtable.com/create/tokens"},
 		},
 		Templates: []connectors.ManifestTemplate{

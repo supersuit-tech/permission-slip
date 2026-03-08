@@ -4,11 +4,30 @@ Discord integration for community management and messaging. Uses the
 [Discord REST API v10](https://discord.com/developers/docs/reference)
 with a plain `net/http` client (no third-party SDK).
 
-## Credentials
+## Authentication
+
+### Bot token (required for actions)
+
+All connector actions (send messages, manage roles, ban/kick, etc.) use a
+**bot token** via Discord's `Bot` authorization header. This is the only
+credential needed for action execution.
 
 | Key         | Description                          |
 |-------------|--------------------------------------|
 | `bot_token` | Discord bot token (from the [Developer Portal](https://discord.com/developers/applications)) |
+
+### OAuth provider (bot authorization flow)
+
+Discord is also registered as a **built-in OAuth provider** (`discord`) in the
+platform's OAuth registry. This enables the standard bot authorization flow —
+users can install the bot into their servers via the OAuth consent screen. The
+OAuth access token is **not** used for executing connector actions (Discord bot
+actions require `Bot` auth, not `Bearer` auth).
+
+OAuth scopes: `bot`, `guilds`
+
+To enable the OAuth flow, set `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET`
+environment variables (from the Discord Developer Portal > OAuth2 section).
 
 ### Setup steps
 

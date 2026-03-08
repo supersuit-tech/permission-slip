@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -17,6 +17,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `ATLASSIAN_CLIENT_ID` | OAuth 2.0 Client ID from the Atlassian Developer Console |
 | `ATLASSIAN_CLIENT_SECRET` | OAuth 2.0 Client Secret from the Atlassian Developer Console |
+
+### Datadog OAuth
+
+| Variable | Description |
+|---|---|
+| `DATADOG_CLIENT_ID` | Client ID from the Datadog OAuth application |
+| `DATADOG_CLIENT_SECRET` | Client Secret from the Datadog OAuth application |
 
 ### GitHub OAuth
 
@@ -88,6 +95,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `STRIPE_CLIENT_ID` | OAuth client ID from Stripe Connect settings (starts with `ca_`) |
 | `STRIPE_CLIENT_SECRET` | Stripe secret key used as the client secret for the OAuth token exchange |
 
+### DocuSign OAuth
+
+| Variable | Description |
+|---|---|
+| `DOCUSIGN_CLIENT_ID` | Integration key from [DocuSign Apps & Keys](https://admindemo.docusign.com/apps-and-keys) |
+| `DOCUSIGN_CLIENT_SECRET` | Secret key from DocuSign Apps & Keys |
+
 ### OAuth Infrastructure
 
 | Variable | Description | Default |
@@ -139,6 +153,64 @@ Atlassian OAuth uses a cloud ID to route API requests. When a user connects via 
 ### Alternative: Basic Auth (API Token)
 
 The Jira connector also supports basic authentication with an email and API token. Users can generate an API token from [Atlassian Account Settings](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/). OAuth is recommended for end users; API tokens are useful for service accounts or when OAuth is not available.
+
+## Datadog OAuth Setup
+
+Datadog OAuth is designed for marketplace-style integrations. The connector supports both OAuth (recommended) and API key + application key authentication.
+
+> **Note:** Datadog's OAuth implementation uses split hostnames by design: authorization redirects go through `app.datadoghq.com` and token exchange happens on `api.datadoghq.com`. This is intentional per Datadog's OAuth2 API reference.
+
+### 1. Create a Datadog OAuth Application
+
+1. Log in to your Datadog account and go to [OAuth Apps](https://app.datadoghq.com/organization-settings/oauth-apps)
+2. Click **+ New OAuth App**
+3. Fill in the required fields:
+   - Application name: Your deployment name (e.g., "Permission Slip")
+   - Description: Brief description of the integration
+4. Under **Redirect URIs**, add:
+   ```
+   https://your-domain.com/api/v1/oauth/datadog/callback
+   ```
+5. Copy the **Client ID** and **Client Secret**
+
+### 2. Configure OAuth Scopes
+
+The Datadog connector requests these scopes:
+- `metrics_read` — query time series metrics data
+- `incidents_read` — read incident details
+- `incidents_write` — create and update incidents
+- `monitors_read` — read monitor configuration and status
+- `monitors_write` — mute/unmute monitors (required for snooze_alert)
+- `workflows_run` — trigger Workflow automations (required for trigger_runbook)
+
+### 3. Configure Environment
+
+```bash
+DATADOG_CLIENT_ID=your-datadog-client-id
+DATADOG_CLIENT_SECRET=your-datadog-client-secret
+```
+
+### 4. Multi-Region Support
+
+The Datadog connector supports all Datadog sites. If your organization uses a non-US1 site, users should set the optional `site` credential when configuring the connector:
+
+| Site | Identifier |
+|---|---|
+| US1 (default) | `datadoghq.com` |
+| US3 | `us3.datadoghq.com` |
+| US5 | `us5.datadoghq.com` |
+| EU | `datadoghq.eu` |
+| AP1 | `ap1.datadoghq.com` |
+| US1-Fed | `ddog-gov.com` |
+
+The `site` credential is optional for OAuth users — if omitted, requests are routed to the US1 API.
+
+### Alternative: API Key + Application Key Auth
+
+Users who prefer not to use OAuth can connect Datadog with an API key and application key:
+1. Go to [Datadog API Keys](https://app.datadoghq.com/organization-settings/api-keys) and create an API key
+2. Go to [Datadog Application Keys](https://app.datadoghq.com/organization-settings/application-keys) and create an application key
+3. In Permission Slip, add both as a `custom` credential in the connector settings
 
 ## GitHub OAuth Setup
 
@@ -505,6 +577,48 @@ When a user connects their Stripe account:
 
 The Stripe connector also supports manual API key entry as a fallback for users who prefer not to use OAuth.
 
+## DocuSign OAuth Setup
+
+DocuSign OAuth uses the authorization code grant flow, which is the standard approach for user-facing integrations. After connecting, the platform automatically fetches the user's default account ID and API base URL from DocuSign's userinfo endpoint so the connector can make API calls without manual configuration.
+
+> **Note:** DocuSign also supports RSA key / JWT grant (service-to-service) auth. Users who prefer that approach can configure it manually in the connector's credentials section instead.
+
+### 1. Create a DocuSign Integration
+
+1. Log in to [DocuSign Apps & Keys](https://admindemo.docusign.com/apps-and-keys) (use the [production apps page](https://app.docusign.com/integrations/apps-and-keys) for production deployments)
+2. Click **Add App and Integration Key**
+3. Give it a name (e.g., "Permission Slip")
+4. Under **Authentication**, select **Authorization Code Grant**
+5. Under **Redirect URIs**, add:
+   ```
+   https://your-domain.com/api/v1/oauth/docusign/callback
+   ```
+6. Copy the **Integration Key** (this is your Client ID) and generate a **Secret Key** (Client Secret)
+
+### 2. Required Scopes
+
+The DocuSign connector requests the `signature` scope, which covers all eSignature API operations (creating envelopes, sending for signature, checking status, downloading signed documents).
+
+### 3. Configure Environment
+
+```bash
+DOCUSIGN_CLIENT_ID=your-integration-key
+DOCUSIGN_CLIENT_SECRET=your-secret-key
+```
+
+### 4. Account Info Enrichment
+
+Unlike most OAuth providers, DocuSign does not include the user's account ID or API base URL in the access token. After the token exchange, the platform automatically calls DocuSign's userinfo endpoint (`account.docusign.com/oauth/userinfo`) to fetch the user's default account and stores:
+
+- `account_id` — required for all API calls
+- `base_url` — the regional API endpoint (e.g., `https://na2.docusign.net/restapi/v2.1`)
+
+This happens transparently during the OAuth callback. If the userinfo fetch fails, the connection attempt fails cleanly rather than storing a broken connection.
+
+### 5. Production vs. Sandbox
+
+DocuSign's demo environment (used by default) and production environment use the same OAuth endpoints (`account.docusign.com`). When users connect in production, their `base_url` is automatically set to the correct production API URL based on their account region. No additional configuration is needed.
+
 ## X (Twitter) OAuth Setup
 
 The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
@@ -594,6 +708,8 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 
 Ensure the redirect URI in your OAuth app matches exactly:
 - Atlassian: `https://your-domain.com/api/v1/oauth/atlassian/callback`
+- Datadog: `https://your-domain.com/api/v1/oauth/datadog/callback`
+- DocuSign: `https://your-domain.com/api/v1/oauth/docusign/callback`
 - Figma: `https://your-domain.com/api/v1/oauth/figma/callback`
 - GitHub: `https://your-domain.com/api/v1/oauth/github/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`

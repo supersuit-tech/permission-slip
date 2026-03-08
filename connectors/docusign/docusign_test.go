@@ -32,6 +32,43 @@ func TestManifest_Valid(t *testing.T) {
 	}
 }
 
+func TestManifest_Credentials(t *testing.T) {
+	t.Parallel()
+	c := New()
+	m := c.Manifest()
+
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("expected 2 required credentials, got %d", len(m.RequiredCredentials))
+	}
+
+	// First credential: OAuth2 (primary / recommended)
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "docusign" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "docusign")
+	}
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
+	}
+	if oauthCred.OAuthProvider != "docusign" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "docusign")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want at least one scope")
+	}
+
+	// Second credential: custom / RSA key auth (alternative)
+	customCred := m.RequiredCredentials[1]
+	if customCred.Service != "docusign" {
+		t.Errorf("custom credential service = %q, want %q", customCred.Service, "docusign")
+	}
+	if customCred.AuthType != "custom" {
+		t.Errorf("custom credential auth_type = %q, want %q", customCred.AuthType, "custom")
+	}
+	if customCred.InstructionsURL == "" {
+		t.Error("custom credential instructions_url is empty, want a URL")
+	}
+}
+
 func TestValidateCredentials_Valid(t *testing.T) {
 	t.Parallel()
 	c := New()
