@@ -1,0 +1,117 @@
+package linkedin
+
+// searchCompaniesAction implements connectors.Action for linkedin.search_companies.
+//
+// # Access tier requirements
+//
+// LinkedIn's Organization Search API requires Marketing Developer Platform
+// (MDP) access. Standard OAuth apps may receive HTTP 403 for search queries.
+//
+// LinkedIn API reference:
+// https://learn.microsoft.com/en-us/linkedin/marketing/integrations/community-management/organizations/organization-lookup-api
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+type searchCompaniesAction struct {
+	conn *LinkedInConnector
+}
+
+type searchCompaniesParams struct {
+	Keywords string `json:"keywords"`
+	Count    int    `json:"count"`
+	Start    int    `json:"start"`
+}
+
+const defaultCompanyCount = 10
+const maxCompanyCount = 50
+
+func (p *searchCompaniesParams) validate() error {
+	if p.Keywords == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: keywords"}
+	}
+	if p.Count < 0 {
+		return &connectors.ValidationError{Message: "count must be non-negative"}
+	}
+	if p.Count > maxCompanyCount {
+		return &connectors.ValidationError{Message: fmt.Sprintf("count must not exceed %d", maxCompanyCount)}
+	}
+	if p.Start < 0 {
+		return &connectors.ValidationError{Message: "start must be non-negative"}
+	}
+	return nil
+}
+
+// companySearchResponse is the LinkedIn organization search API response.
+type companySearchResponse struct {
+	Elements []companySearchElement `json:"elements"`
+	Paging   searchPaging           `json:"paging"`
+}
+
+type companySearchElement struct {
+	ID          string `json:"id"`
+	Name        string `json:"localizedName"`
+	Description string `json:"localizedDescription"`
+	StaffCount  int    `json:"staffCount"`
+}
+
+// searchPaging is the shared LinkedIn paging structure used across search endpoints.
+type searchPaging struct {
+	Total int `json:"total"`
+	Start int `json:"start"`
+	Count int  `json:"count"`
+}
+
+// Execute searches LinkedIn company pages by keyword.
+func (a *searchCompaniesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params searchCompaniesParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := params.validate(); err != nil {
+		return nil, err
+	}
+
+	count := params.Count
+	if count == 0 {
+		count = defaultCompanyCount
+	}
+
+	q := url.Values{}
+	q.Set("q", "search")
+	q.Set("keywords", params.Keywords)
+	q.Set("count", strconv.Itoa(count))
+	q.Set("start", strconv.Itoa(params.Start))
+
+	apiURL := a.conn.restBaseURL + "/organizations?" + q.Encode()
+
+	var resp companySearchResponse
+	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, apiURL, nil, &resp, true); err != nil {
+		return nil, err
+	}
+
+	results := make([]map[string]any, 0, len(resp.Elements))
+	for _, el := range resp.Elements {
+		results = append(results, map[string]any{
+			"id":          el.ID,
+			"name":        el.Name,
+			"description": el.Description,
+			"staff_count": el.StaffCount,
+		})
+	}
+
+	return connectors.JSONResult(map[string]any{
+		"results": results,
+		"total":   resp.Paging.Total,
+		"start":   resp.Paging.Start,
+		"count":   resp.Paging.Count,
+	})
+}

@@ -87,6 +87,11 @@ func (c *LinkedInConnector) Actions() map[string]connectors.Action {
 		"linkedin.get_profile":         &getProfileAction{conn: c},
 		"linkedin.get_post_analytics":  &getPostAnalyticsAction{conn: c},
 		"linkedin.create_company_post": &createCompanyPostAction{conn: c},
+		"linkedin.send_message":        &sendMessageAction{conn: c},
+		"linkedin.search_people":       &searchPeopleAction{conn: c},
+		"linkedin.search_companies":    &searchCompaniesAction{conn: c},
+		"linkedin.get_company":         &getCompanyAction{conn: c},
+		"linkedin.list_connections":    &listConnectionsAction{conn: c},
 	}
 }
 
@@ -134,6 +139,16 @@ func validatePostURN(urn string) error {
 func validateOrganizationID(id string) error {
 	if !numericPattern.MatchString(id) {
 		return &connectors.ValidationError{Message: "organization_id must be numeric"}
+	}
+	return nil
+}
+
+// validatePersonURN checks that a recipient URN is a valid LinkedIn person URN
+// (urn:li:person:{numeric_id}). This prevents injection when the URN is sent
+// as a message recipient.
+func validatePersonURN(urn string) error {
+	if !urnPattern.MatchString(urn) {
+		return &connectors.ValidationError{Message: "recipient_urn must be a valid LinkedIn person URN (e.g. urn:li:person:123456)"}
 	}
 	return nil
 }
