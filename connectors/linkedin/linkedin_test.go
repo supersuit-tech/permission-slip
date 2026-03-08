@@ -27,6 +27,11 @@ func TestActions_AllRegistered(t *testing.T) {
 		"linkedin.get_profile",
 		"linkedin.get_post_analytics",
 		"linkedin.create_company_post",
+		"linkedin.send_message",
+		"linkedin.search_people",
+		"linkedin.search_companies",
+		"linkedin.get_company",
+		"linkedin.list_connections",
 	}
 
 	for _, name := range expected {

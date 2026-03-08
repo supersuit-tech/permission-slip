@@ -224,6 +224,74 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "zoom.add_registrant",
+				Name:        "Add Meeting Registrant",
+				Description: "Register an attendee for a Zoom meeting or webinar",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["meeting_id", "email", "first_name"],
+					"properties": {
+						"meeting_id": {
+							"type": "string",
+							"description": "The meeting ID to register the attendee for"
+						},
+						"email": {
+							"type": "string",
+							"description": "Attendee email address"
+						},
+						"first_name": {
+							"type": "string",
+							"description": "Attendee first name"
+						},
+						"last_name": {
+							"type": "string",
+							"description": "Attendee last name (optional)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "zoom.get_recording_transcript",
+				Name:        "Get Recording Transcript",
+				Description: "Get the text transcript for a recorded Zoom meeting — requires automatic transcription to have been enabled",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["meeting_id"],
+					"properties": {
+						"meeting_id": {
+							"type": "string",
+							"description": "The meeting ID to get the transcript for"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "zoom.send_chat_message",
+				Name:        "Send Chat Message",
+				Description: "Send a message in Zoom Team Chat to a user (to_jid) or channel (to_channel) — exactly one recipient is required",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message"],
+					"properties": {
+						"message": {
+							"type": "string",
+							"description": "Message text to send"
+						},
+						"to_jid": {
+							"type": "string",
+							"description": "JID of the user or channel to send the message to (use this OR to_channel)"
+						},
+						"to_channel": {
+							"type": "string",
+							"description": "Channel ID to send the message to (use this OR to_jid)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -235,6 +303,7 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"meeting:write",
 					"recording:read",
 					"user:read",
+					"chat_message:write",
 				},
 			},
 		},
@@ -294,6 +363,27 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "View meeting participants",
 				Description: "Agent can view participant lists for past meetings.",
 				Parameters:  json.RawMessage(`{"meeting_id":"*"}`),
+			},
+			{
+				ID:          "tpl_zoom_add_registrant",
+				ActionType:  "zoom.add_registrant",
+				Name:        "Register meeting attendees",
+				Description: "Agent can register attendees for any meeting.",
+				Parameters:  json.RawMessage(`{"meeting_id":"*","email":"*","first_name":"*","last_name":"*"}`),
+			},
+			{
+				ID:          "tpl_zoom_get_recording_transcript",
+				ActionType:  "zoom.get_recording_transcript",
+				Name:        "Get meeting transcript",
+				Description: "Agent can retrieve transcripts for any recorded meeting.",
+				Parameters:  json.RawMessage(`{"meeting_id":"*"}`),
+			},
+			{
+				ID:          "tpl_zoom_send_chat_message",
+				ActionType:  "zoom.send_chat_message",
+				Name:        "Send Zoom chat messages",
+				Description: "Agent can send messages in Zoom Team Chat.",
+				Parameters:  json.RawMessage(`{"message":"*","to_jid":"*","to_channel":"*"}`),
 			},
 		},
 	}

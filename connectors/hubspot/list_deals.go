@@ -69,6 +69,9 @@ func (p *listDealsParams) validate() error {
 		if !validSingleValueOperators[f.Operator] {
 			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: unsupported operator %q (supported: EQ, NEQ, LT, LTE, GT, GTE, CONTAINS_TOKEN, NOT_CONTAINS_TOKEN)", i, f.Operator)}
 		}
+		if f.Value == "" {
+			return &connectors.ValidationError{Message: fmt.Sprintf("filters[%d]: missing value", i)}
+		}
 	}
 	for i, s := range p.Sorts {
 		if s.PropertyName == "" {
