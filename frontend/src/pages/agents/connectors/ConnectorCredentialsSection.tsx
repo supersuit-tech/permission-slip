@@ -163,8 +163,8 @@ function OAuthCredentialRow({
                 Connected
               </span>
               <Badge variant="outline" className="text-xs">
-                {oauthConnection?.scopes.length} scope
-                {oauthConnection?.scopes.length !== 1 ? "s" : ""}
+                {oauthConnection?.scopes?.length ?? 0} scope
+                {(oauthConnection?.scopes?.length ?? 0) !== 1 ? "s" : ""}
               </Badge>
             </>
           ) : needsReauth ? (
