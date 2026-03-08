@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"github"`, `"google"`, `"microsoft"`, `"netlify"`) and optionally `oauth_scopes`. Built-in providers (`github`, `google`, `hubspot`, `intercom`, `kroger`, `linkedin`, `meta`, `microsoft`, `netlify`, `salesforce`, `square`, `stripe`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"github"`, `"google"`, `"linear"`, `"microsoft"`, `"netlify"`) and optionally `oauth_scopes`. Built-in providers (`github`, `google`, `hubspot`, `intercom`, `kroger`, `linear`, `linkedin`, `meta`, `microsoft`, `netlify`, `salesforce`, `square`, `stripe`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 A connector can support multiple auth methods by declaring more than one entry in `RequiredCredentials`. For example, the Netlify and Square connectors support both OAuth (recommended) and API key authentication. Use different `Service` names for each entry (e.g., `"netlify"` for OAuth, `"netlify-api-key"` for API key). The execution layer tries OAuth first and falls back to static credentials.
 

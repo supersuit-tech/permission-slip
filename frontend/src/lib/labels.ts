@@ -9,6 +9,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   hubspot: "HubSpot",
   intercom: "Intercom",
   kroger: "Kroger",
+  linear: "Linear",
   linkedin: "LinkedIn",
   meta: "Meta",
   microsoft: "Microsoft",

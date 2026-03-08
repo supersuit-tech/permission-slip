@@ -136,6 +136,18 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "linear",
+			AuthorizeURL: "https://linear.app/oauth/authorize",
+			TokenURL:     "https://api.linear.app/oauth/token",
+			Scopes: []string{
+				"read",
+				"write",
+			},
+			ClientID:     os.Getenv("LINEAR_CLIENT_ID"),
+			ClientSecret: os.Getenv("LINEAR_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "netlify",
 			AuthorizeURL: "https://app.netlify.com/authorize",
 			TokenURL:     "https://api.netlify.com/oauth/token",
