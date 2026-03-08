@@ -301,7 +301,6 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
 	}
-
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
 		creds, err := decryptServiceCredentials(ctx, deps, userID, service)
@@ -313,7 +312,6 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 			credMap[k] = v
 		}
 	}
-
 	return connectors.NewCredentials(credMap), nil
 }
 
