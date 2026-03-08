@@ -42,8 +42,8 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	}
 
 	// Look up all required credentials for this action's connector.
-	// Connectors may support multiple auth methods (e.g. OAuth + API key).
-	// We try OAuth first, falling back to static credentials.
+	// A connector may support multiple auth methods (e.g. both oauth2 and api_key).
+	// We try OAuth first; if the user has no OAuth connection, fall back to static credentials.
 	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
 		return nil, fmt.Errorf("look up required credentials: %w", err)
@@ -529,3 +529,4 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	return nil
 }
+

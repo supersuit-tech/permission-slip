@@ -111,9 +111,8 @@ export function ConnectedAccountsSection() {
           )}
         </div>
         <CardDescription>
-          Connect your GitHub, Google, or Microsoft account to enable connectors
-          that use OAuth for authentication. Tokens are encrypted and
-          automatically refreshed.
+          Connect your accounts to enable connectors that use OAuth for
+          authentication. Tokens are encrypted and automatically refreshed.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -193,8 +192,8 @@ export function ConnectedAccountsSection() {
 
             {connections.length === 0 && availableProviders.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
-                No OAuth providers are configured yet. Set up GitHub, Google, or
-                Microsoft client credentials to enable OAuth connections.
+                No OAuth providers are configured yet. Set up client credentials
+                to enable OAuth connections.
               </p>
             )}
           </div>

@@ -12,6 +12,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   salesforce: "Salesforce",
   zoom: "Zoom",
   kroger: "Kroger",
+  intercom: "Intercom",
 };
 
 /**
