@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -15,6 +16,14 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+const (
+	// maxAttachmentBytes is the maximum decoded attachment size we will accept
+	// before uploading. Confluence's own limit is 250 MB, but we cap at 10 MB
+	// to avoid OOM from large base64 payloads decoding entirely into memory.
+	// Base64 encoding inflates size by ~33%, so a 10 MB file → ~13.5 MB base64.
+	maxAttachmentBytes = 10 << 20 // 10 MB
 )
 
 // addAttachmentAction implements connectors.Action for confluence.add_attachment.
@@ -47,6 +56,24 @@ func (p *addAttachmentParams) validate() error {
 	}
 	if p.ContentB64 == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content_base64"}
+	}
+	// Enforce a hard cap on the base64 payload length (~13.5 MB → 10 MB decoded).
+	// base64 expands data by ~33%, so maxAttachmentBytes * 4/3 covers the encoded size.
+	maxB64Len := maxAttachmentBytes * 4 / 3
+	if len(p.ContentB64) > maxB64Len {
+		return &connectors.ValidationError{
+			Message: "content_base64 exceeds maximum allowed size (decoded limit: 10 MB)",
+		}
+	}
+	// Validate media_type if provided: must be a parseable MIME type with no
+	// CR/LF characters (which could inject headers into the multipart body).
+	if p.MediaType != "" {
+		if strings.ContainsAny(p.MediaType, "\r\n") {
+			return &connectors.ValidationError{Message: "media_type must not contain newline characters"}
+		}
+		if _, _, err := mime.ParseMediaType(p.MediaType); err != nil {
+			return &connectors.ValidationError{Message: fmt.Sprintf("media_type is not a valid MIME type: %v", err)}
+		}
 	}
 	return nil
 }

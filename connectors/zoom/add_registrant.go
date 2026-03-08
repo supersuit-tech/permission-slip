@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -73,7 +74,7 @@ func (a *addRegistrantAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	var resp addRegistrantResponse
-	reqURL := fmt.Sprintf("%s/meetings/%s/registrants", a.conn.baseURL, params.MeetingID)
+	reqURL := fmt.Sprintf("%s/meetings/%s/registrants", a.conn.baseURL, url.PathEscape(params.MeetingID))
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, reqURL, body, &resp); err != nil {
 		return nil, err
 	}

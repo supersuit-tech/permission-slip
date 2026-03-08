@@ -3,6 +3,7 @@ package figma
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -48,7 +49,7 @@ func (a *getStylesAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}
 
 	var resp getStylesResponse
-	path := fmt.Sprintf("/files/%s/styles", params.FileKey)
+	path := fmt.Sprintf("/files/%s/styles", url.PathEscape(params.FileKey))
 	if err := a.conn.doGet(ctx, path, req.Credentials, &resp); err != nil {
 		return nil, err
 	}

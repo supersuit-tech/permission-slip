@@ -3,6 +3,7 @@ package figma
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -47,7 +48,7 @@ func (a *listProjectsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	var resp listProjectsResponse
-	path := fmt.Sprintf("/teams/%s/projects", params.TeamID)
+	path := fmt.Sprintf("/teams/%s/projects", url.PathEscape(params.TeamID))
 	if err := a.conn.doGet(ctx, path, req.Credentials, &resp); err != nil {
 		return nil, err
 	}

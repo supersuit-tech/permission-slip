@@ -169,3 +169,59 @@ func TestAddAttachment_PathTraversalFilename(t *testing.T) {
 		t.Fatalf("expected ValidationError, got %T", err)
 	}
 }
+
+func TestAddAttachment_ExceedsMaxSize(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &addAttachmentAction{conn: conn}
+
+	// Create a base64 string that exceeds the encoded size limit.
+	// maxAttachmentBytes = 10 MB, max base64 = ~13.5 MB; use 14 MB of 'A's.
+	oversized := make([]byte, 14*1024*1024)
+	contentB64 := base64.StdEncoding.EncodeToString(oversized)
+
+	params, _ := json.Marshal(addAttachmentParams{
+		PageID:     "123456",
+		Filename:   "big.bin",
+		ContentB64: contentB64,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "confluence.add_attachment",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected validation error for oversized attachment, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("expected ValidationError, got %T", err)
+	}
+}
+
+func TestAddAttachment_InvalidMediaType(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &addAttachmentAction{conn: conn}
+
+	params, _ := json.Marshal(addAttachmentParams{
+		PageID:     "123456",
+		Filename:   "doc.pdf",
+		ContentB64: base64.StdEncoding.EncodeToString([]byte("content")),
+		MediaType:  "not/valid\r\ninjected-header: value",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "confluence.add_attachment",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected validation error for header-injecting media_type, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("expected ValidationError, got %T", err)
+	}
+}

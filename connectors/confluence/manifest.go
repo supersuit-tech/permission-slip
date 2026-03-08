@@ -252,7 +252,7 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "confluence.add_attachment",
 				Name:        "Add Attachment",
-				Description: "Upload a file attachment to a Confluence page. File content must be base64-encoded.",
+				Description: "Upload a file attachment to a Confluence page. File content must be base64-encoded. Maximum decoded size: 10 MB.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -62,7 +63,7 @@ func (a *getRecordingTranscriptAction) Execute(ctx context.Context, req connecto
 
 	// Step 1: Get the list of recording files.
 	var recordings zoomMeetingRecordingsResponse
-	recordingsURL := fmt.Sprintf("%s/meetings/%s/recordings", a.conn.baseURL, params.MeetingID)
+	recordingsURL := fmt.Sprintf("%s/meetings/%s/recordings", a.conn.baseURL, url.PathEscape(params.MeetingID))
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, recordingsURL, nil, &recordings); err != nil {
 		return nil, err
 	}
@@ -88,16 +89,26 @@ func (a *getRecordingTranscriptAction) Execute(ctx context.Context, req connecto
 	}
 
 	// Step 3: Download the transcript content using the access token.
+	// Zoom transcript download URLs may already include query parameters, so
+	// we use url.Parse to safely merge the access_token rather than
+	// appending blindly. We also send the token via the Authorization header
+	// to avoid it appearing in request logs or URL metrics.
 	token, ok := req.Credentials.Get(credKeyAccessToken)
 	if !ok || token == "" {
 		return nil, &connectors.ValidationError{Message: "access_token credential is missing or empty"}
 	}
 
-	downloadURL := transcriptFile.DownloadURL + "?access_token=" + token
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	parsedDL, err := url.Parse(transcriptFile.DownloadURL)
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("parsing transcript download URL: %v", err)}
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedDL.String(), nil)
 	if err != nil {
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("creating transcript download request: %v", err)}
 	}
+	// Zoom accepts the access token via Authorization header for file downloads.
+	httpReq.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := a.conn.client.Do(httpReq)
 	if err != nil {
