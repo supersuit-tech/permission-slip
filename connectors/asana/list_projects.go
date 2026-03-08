@@ -29,6 +29,12 @@ func (a *listProjectsAction) Execute(ctx context.Context, req connectors.ActionR
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
+	// Fall back to workspace_id from credentials if not provided in parameters.
+	if params.WorkspaceID == "" {
+		if wsID, ok := req.Credentials.Get("workspace_id"); ok && wsID != "" {
+			params.WorkspaceID = wsID
+		}
+	}
 	if err := params.validate(); err != nil {
 		return nil, err
 	}

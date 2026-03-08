@@ -41,13 +41,16 @@ func (a *addLabelAction) Execute(ctx context.Context, req connectors.ActionReque
 		"value": params.LabelID,
 	}
 
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/cards/"+params.CardID+"/idLabels", body, nil); err != nil {
+	// Trello returns the updated list of all label IDs on the card.
+	var labelIDs []string
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/cards/"+params.CardID+"/idLabels", body, &labelIDs); err != nil {
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
-		"card_id":  params.CardID,
-		"label_id": params.LabelID,
-		"status":   "added",
+	return connectors.JSONResult(map[string]any{
+		"card_id":   params.CardID,
+		"label_id":  params.LabelID,
+		"status":    "added",
+		"id_labels": labelIDs,
 	})
 }

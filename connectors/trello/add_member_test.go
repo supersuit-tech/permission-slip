@@ -30,7 +30,9 @@ func TestAddMember_Success(t *testing.T) {
 			t.Errorf("value = %v, want %s", reqBody["value"], testMemberID)
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode([]string{testMemberID})
 	}))
 	defer srv.Close()
 
@@ -50,6 +52,10 @@ func TestAddMember_Success(t *testing.T) {
 	json.Unmarshal(result.Data, &data)
 	if data["status"] != "added" {
 		t.Errorf("status = %v, want added", data["status"])
+	}
+	members, ok := data["id_members"].([]any)
+	if !ok || len(members) != 1 {
+		t.Errorf("id_members = %v, want 1 item", data["id_members"])
 	}
 }
 

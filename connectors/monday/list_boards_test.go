@@ -57,3 +57,22 @@ func TestListBoards_Success(t *testing.T) {
 		t.Errorf("expected name=Board A, got %v", data[0]["name"])
 	}
 }
+
+func TestListBoards_InvalidKind(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["monday.list_boards"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.list_boards",
+		Parameters:  json.RawMessage(`{"kind":"invalid"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

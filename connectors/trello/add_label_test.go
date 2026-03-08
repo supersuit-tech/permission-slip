@@ -30,7 +30,9 @@ func TestAddLabel_Success(t *testing.T) {
 			t.Errorf("value = %v, want %s", reqBody["value"], testLabelID)
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode([]string{testLabelID, "507f1f77bcf86cd799439066"})
 	}))
 	defer srv.Close()
 
@@ -50,6 +52,10 @@ func TestAddLabel_Success(t *testing.T) {
 	json.Unmarshal(result.Data, &data)
 	if data["status"] != "added" {
 		t.Errorf("status = %v, want added", data["status"])
+	}
+	labels, ok := data["id_labels"].([]any)
+	if !ok || len(labels) != 2 {
+		t.Errorf("id_labels = %v, want 2 items", data["id_labels"])
 	}
 }
 

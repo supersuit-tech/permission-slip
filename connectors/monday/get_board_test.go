@@ -99,3 +99,33 @@ func TestGetBoard_InvalidBoardID(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestGetBoard_NotFound(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				"boards": []any{},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["monday.get_board"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "monday.get_board",
+		Parameters:  json.RawMessage(`{"board_id":"99999"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	}
+}

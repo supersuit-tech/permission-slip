@@ -183,7 +183,8 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"kind": {
 							"type": "string",
-							"description": "Board kind: \"public\", \"private\", or \"share\""
+							"enum": ["public", "private", "share"],
+							"description": "Board kind filter"
 						}
 					}
 				}`)),
@@ -219,7 +220,8 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"kind": {
 							"type": "string",
-							"description": "Board kind: \"public\" (default), \"private\", or \"share\""
+							"enum": ["public", "private", "share"],
+							"description": "Board kind (default: public)"
 						},
 						"folder_id": {
 							"type": "string",

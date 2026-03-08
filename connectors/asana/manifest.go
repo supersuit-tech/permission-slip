@@ -279,7 +279,8 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"privacy": {
 							"type": "string",
-							"description": "Privacy setting: public_to_workspace or private"
+							"enum": ["public_to_workspace", "private"],
+							"description": "Privacy setting"
 						}
 					}
 				}`)),

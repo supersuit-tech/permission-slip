@@ -23,6 +23,9 @@ func (p *createBoardParams) validate() error {
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}
+	if p.Kind != "" && !validBoardKinds[p.Kind] {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid kind %q: must be one of public, private, share", p.Kind)}
+	}
 	return nil
 }
 

@@ -41,13 +41,16 @@ func (a *addMemberAction) Execute(ctx context.Context, req connectors.ActionRequ
 		"value": params.MemberID,
 	}
 
-	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/cards/"+params.CardID+"/idMembers", body, nil); err != nil {
+	// Trello returns the updated list of all member IDs on the card.
+	var memberIDs []string
+	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/cards/"+params.CardID+"/idMembers", body, &memberIDs); err != nil {
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
-		"card_id":   params.CardID,
-		"member_id": params.MemberID,
-		"status":    "added",
+	return connectors.JSONResult(map[string]any{
+		"card_id":    params.CardID,
+		"member_id":  params.MemberID,
+		"status":     "added",
+		"id_members": memberIDs,
 	})
 }

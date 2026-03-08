@@ -88,7 +88,10 @@ func (a *getBoardAction) Execute(ctx context.Context, req connectors.ActionReque
 	}
 
 	if len(data.Boards) == 0 {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("board %s not found", params.BoardID)}
+		return nil, &connectors.ExternalError{
+			StatusCode: 404,
+			Message:    fmt.Sprintf("board %s not found", params.BoardID),
+		}
 	}
 
 	return connectors.JSONResult(data.Boards[0])

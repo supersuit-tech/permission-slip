@@ -241,7 +241,8 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"filter": {
 							"type": "string",
-							"description": "Filter boards: \"open\" (default), \"closed\", \"starred\", \"all\""
+							"enum": ["open", "closed", "starred", "members", "all"],
+							"description": "Filter boards (default: open)"
 						}
 					}
 				}`)),
@@ -293,7 +294,8 @@ func (c *TrelloConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"filter": {
 							"type": "string",
-							"description": "Filter lists: \"open\" (default), \"closed\", \"all\""
+							"enum": ["open", "closed", "all"],
+							"description": "Filter lists (default: open)"
 						}
 					}
 				}`)),
