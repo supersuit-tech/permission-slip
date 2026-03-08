@@ -23,6 +23,9 @@ func (p *getSquareCustomerParams) validate() error {
 	if p.CustomerID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: customer_id"}
 	}
+	if err := validateSquareID("customer_id", p.CustomerID); err != nil {
+		return err
+	}
 	return nil
 }
 

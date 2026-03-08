@@ -83,6 +83,32 @@ func TestGetSquareCustomer_MissingID(t *testing.T) {
 	}
 }
 
+func TestGetSquareCustomer_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["square.get_customer"]
+
+	malicious := []string{
+		"../other-customer",
+		"CUST123/../../admin",
+		"CUST%2F..%2Fsecret",
+	}
+	for _, id := range malicious {
+		_, err := action.Execute(t.Context(), connectors.ActionRequest{
+			ActionType:  "square.get_customer",
+			Parameters:  []byte(`{"customer_id": "` + id + `"}`),
+			Credentials: validCreds(),
+		})
+		if err == nil {
+			t.Errorf("customer_id %q: expected error, got nil", id)
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("customer_id %q: expected ValidationError, got %T: %v", id, err, err)
+		}
+	}
+}
+
 func TestGetSquareCustomer_NotFound(t *testing.T) {
 	t.Parallel()
 

@@ -109,6 +109,32 @@ func TestSendInvoice_MissingInvoiceID(t *testing.T) {
 	}
 }
 
+func TestSendInvoice_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["quickbooks.send_invoice"]
+
+	malicious := []string{
+		"1001/../../admin",
+		"../secret",
+		"1001'; DROP TABLE invoices--",
+	}
+	for _, id := range malicious {
+		_, err := action.Execute(t.Context(), connectors.ActionRequest{
+			ActionType:  "quickbooks.send_invoice",
+			Parameters:  []byte(`{"invoice_id": "` + id + `"}`),
+			Credentials: validCreds(),
+		})
+		if err == nil {
+			t.Errorf("invoice_id %q: expected error, got nil", id)
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("invoice_id %q: expected ValidationError, got %T: %v", id, err, err)
+		}
+	}
+}
+
 func TestSendInvoice_NotFound(t *testing.T) {
 	t.Parallel()
 

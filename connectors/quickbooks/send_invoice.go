@@ -23,6 +23,9 @@ func (p *sendInvoiceParams) validate() error {
 	if p.InvoiceID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: invoice_id"}
 	}
+	if err := validateQBOID("invoice_id", p.InvoiceID); err != nil {
+		return err
+	}
 	if err := validateEmail("email_to", p.EmailTo); err != nil {
 		return err
 	}
