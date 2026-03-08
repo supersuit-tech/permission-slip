@@ -250,7 +250,7 @@ func TestParseManifest_OAuthProviderCrossReference(t *testing.T) {
 			"name": "X",
 			"actions": [{"action_type": "x.a", "name": "A"}],
 			"required_credentials": [
-				{"service": "s", "auth_type": "oauth2", "oauth_provider": "hubspot"}
+				{"service": "s", "auth_type": "oauth2", "oauth_provider": "unknown-custom-provider"}
 			]
 		}`
 		_, err := ParseManifest([]byte(input))

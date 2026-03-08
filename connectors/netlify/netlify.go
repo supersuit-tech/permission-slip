@@ -270,7 +270,8 @@ func (c *NetlifyConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "netlify", AuthType: "api_key", InstructionsURL: "https://docs.netlify.com/api/get-started/#authentication"},
+			{Service: "netlify", AuthType: "oauth2", OAuthProvider: "netlify"},
+			{Service: "netlify-api-key", AuthType: "api_key", InstructionsURL: "https://docs.netlify.com/api/get-started/#authentication"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{
@@ -326,19 +327,34 @@ func (c *NetlifyConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key.
+// ValidateCredentials checks that the provided credentials contain either
+// a non-empty access_token (OAuth) or api_key. OAuth is preferred when both
+// are present.
 func (c *NetlifyConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	if token, ok := creds.Get("access_token"); ok && token != "" {
+		return nil
 	}
-	return nil
+	if key, ok := creds.Get("api_key"); ok && key != "" {
+		return nil
+	}
+	return &connectors.ValidationError{Message: "missing required credential: access_token or api_key"}
+}
+
+// getBearerToken returns the bearer token from credentials, preferring
+// access_token (OAuth) over api_key.
+func getBearerToken(creds connectors.Credentials) string {
+	if token, ok := creds.Get("access_token"); ok && token != "" {
+		return token
+	}
+	if key, ok := creds.Get("api_key"); ok && key != "" {
+		return key
+	}
+	return ""
 }
 
 // do is the shared request lifecycle for all Netlify actions. It handles:
 // - JSON marshaling of request bodies
-// - Bearer token authentication via the api_key credential
+// - Bearer token authentication (OAuth access_token preferred, API key fallback)
 // - Response body size limiting (maxResponseBytes) to prevent memory exhaustion
 // - Typed error mapping via checkResponse() (auth, rate limit, validation, timeout)
 // - JSON unmarshaling of response bodies into the caller's target struct
@@ -361,11 +377,11 @@ func (c *NetlifyConnector) do(ctx context.Context, creds connectors.Credentials,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	key, ok := creds.Get("api_key")
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	token := getBearerToken(creds)
+	if token == "" {
+		return &connectors.ValidationError{Message: "access_token or api_key credential is missing or empty"}
 	}
-	req.Header.Set("Authorization", "Bearer "+key)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := c.client.Do(req)
 	if err != nil {

@@ -136,6 +136,14 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "netlify",
+			AuthorizeURL: "https://app.netlify.com/authorize",
+			TokenURL:     "https://api.netlify.com/oauth/token",
+			ClientID:     os.Getenv("NETLIFY_CLIENT_ID"),
+			ClientSecret: os.Getenv("NETLIFY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "square",
 			AuthorizeURL: "https://connect.squareup.com/oauth2/authorize",
 			TokenURL:     "https://connect.squareup.com/oauth2/token",

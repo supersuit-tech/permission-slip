@@ -74,6 +74,22 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 	})
 
+	t.Run("netlify", func(t *testing.T) {
+		n, ok := byID["netlify"]
+		if !ok {
+			t.Fatal("netlify provider not found")
+		}
+		if n.AuthorizeURL != "https://app.netlify.com/authorize" {
+			t.Errorf("AuthorizeURL = %q", n.AuthorizeURL)
+		}
+		if n.TokenURL != "https://api.netlify.com/oauth/token" {
+			t.Errorf("TokenURL = %q", n.TokenURL)
+		}
+		if n.Source != SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", n.Source, SourceBuiltIn)
+		}
+	})
+
 	t.Run("microsoft", func(t *testing.T) {
 		m, ok := byID["microsoft"]
 		if !ok {
@@ -151,6 +167,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 	}
 	if _, ok := r.Get("microsoft"); !ok {
 		t.Error("microsoft not found in registry")
+	}
+	if _, ok := r.Get("netlify"); !ok {
+		t.Error("netlify not found in registry")
 	}
 	if _, ok := r.Get("square"); !ok {
 		t.Error("square not found in registry")

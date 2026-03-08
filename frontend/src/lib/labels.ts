@@ -12,6 +12,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   linkedin: "LinkedIn",
   meta: "Meta",
   microsoft: "Microsoft",
+  netlify: "Netlify",
   salesforce: "Salesforce",
   square: "Square",
   stripe: "Stripe",
@@ -28,6 +29,7 @@ export function providerLabel(id: string): string {
 
 const SERVICE_LABELS: Record<string, string> = {
   github_pat: "GitHub Personal Access Token",
+  "netlify-api-key": "Netlify API Key",
   square_api_key: "Square API Key",
 };
 
