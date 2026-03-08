@@ -24,8 +24,8 @@ func (p *addReactionParams) validate() error {
 	if err := validateChannelID(p.Channel); err != nil {
 		return err
 	}
-	if p.Timestamp == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: timestamp"}
+	if err := validateMessageTS(p.Timestamp); err != nil {
+		return err
 	}
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}

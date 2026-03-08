@@ -9,24 +9,23 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// addToListAction implements connectors.Action for sendgrid.add_to_list.
-// It adds a contact to a SendGrid marketing contact list using the
-// PUT /marketing/contacts endpoint.
-type addToListAction struct {
+// createContactAction implements connectors.Action for sendgrid.create_contact.
+// It upserts a contact in SendGrid without requiring a list, using the
+// PUT /marketing/contacts endpoint with no list_ids.
+type createContactAction struct {
 	conn *SendGridConnector
 }
 
-type addToListParams struct {
-	ListID    string `json:"list_id"`
+type createContactParams struct {
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	Phone     string `json:"phone_number"`
+	City      string `json:"city"`
+	Country   string `json:"country"`
 }
 
-func (p *addToListParams) validate() error {
-	if p.ListID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: list_id"}
-	}
+func (p *createContactParams) validate() error {
 	if p.Email == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: email"}
 	}
@@ -36,9 +35,9 @@ func (p *addToListParams) validate() error {
 	return nil
 }
 
-// Execute adds a contact to the specified list.
-func (a *addToListAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params addToListParams
+// Execute upserts a contact via PUT /marketing/contacts.
+func (a *createContactAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params createContactParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
@@ -53,9 +52,17 @@ func (a *addToListAction) Execute(ctx context.Context, req connectors.ActionRequ
 	if params.LastName != "" {
 		contact["last_name"] = params.LastName
 	}
+	if params.Phone != "" {
+		contact["phone_number"] = params.Phone
+	}
+	if params.City != "" {
+		contact["city"] = params.City
+	}
+	if params.Country != "" {
+		contact["country"] = params.Country
+	}
 
 	body := map[string]any{
-		"list_ids": []string{params.ListID},
 		"contacts": []map[string]string{contact},
 	}
 
