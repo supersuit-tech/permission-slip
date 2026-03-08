@@ -212,6 +212,12 @@ func (c *DocuSignConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "docusign",
+				AuthType:      "oauth2",
+				OAuthProvider: "docusign",
+				OAuthScopes:   []string{"signature"},
+			},
+			{
 				Service:         "docusign",
 				AuthType:        "custom",
 				InstructionsURL: "https://developers.docusign.com/docs/esign-rest-api/esign101/auth/",

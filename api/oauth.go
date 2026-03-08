@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -483,6 +484,23 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
 		}
 
+		// For DocuSign, fetch the user's account info to obtain account_id and
+		// base_url, which are required for all API calls but are not included in
+		// the OAuth token response. These are stored in extra_data so the
+		// connector can access them at execution time alongside the access token.
+		if providerID == "docusign" {
+			if extra, err := fetchDocuSignUserInfo(ctx, token.AccessToken); err != nil {
+				log.Printf("[%s] OAuthCallback: DocuSign userinfo fetch failed (continuing): %v", TraceID(r.Context()), err)
+			} else {
+				if stateExtraData == nil {
+					stateExtraData = make(map[string]string)
+				}
+				for k, v := range extra {
+					stateExtraData[k] = v
+				}
+			}
+		}
+
 		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection")
@@ -628,7 +646,87 @@ func extractTokenExtraData(token *oauth2.Token, stateExtra map[string]string) js
 // isURLExtraKey returns true if the given extra data key is expected to contain
 // a URL value that should be validated before storage.
 func isURLExtraKey(key string) bool {
-	return key == "instance_url"
+	return key == "instance_url" || key == "base_url"
+}
+
+// docuSignUserInfoURL is the endpoint used to retrieve the authenticated user's
+// account information after a successful OAuth token exchange.
+const docuSignUserInfoURL = "https://account.docusign.com/oauth/userinfo"
+
+// docuSignUserInfo is the subset of the DocuSign userinfo response we care about.
+type docuSignUserInfo struct {
+	Accounts []struct {
+		AccountID string `json:"account_id"`
+		IsDefault bool   `json:"is_default"`
+		BaseURI   string `json:"base_uri"`
+	} `json:"accounts"`
+}
+
+// fetchDocuSignUserInfo calls DocuSign's userinfo endpoint with the given access
+// token and returns extra credentials to store alongside the OAuth connection.
+// The returned map contains account_id and base_url for the user's default account
+// (falling back to the first account if none is marked as default).
+// Both values are required by the DocuSign connector at execution time.
+func fetchDocuSignUserInfo(ctx context.Context, accessToken string) (map[string]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docuSignUserInfoURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create userinfo request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("userinfo request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("userinfo returned HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return nil, fmt.Errorf("read userinfo response: %w", err)
+	}
+
+	var info docuSignUserInfo
+	if err := json.Unmarshal(body, &info); err != nil {
+		return nil, fmt.Errorf("parse userinfo response: %w", err)
+	}
+	if len(info.Accounts) == 0 {
+		return nil, fmt.Errorf("no accounts in DocuSign userinfo response")
+	}
+
+	// Prefer the default account; fall back to the first account.
+	account := info.Accounts[0]
+	for _, a := range info.Accounts {
+		if a.IsDefault {
+			account = a
+			break
+		}
+	}
+
+	if account.AccountID == "" {
+		return nil, fmt.Errorf("account_id missing in DocuSign userinfo response")
+	}
+	if account.BaseURI == "" {
+		return nil, fmt.Errorf("base_uri missing in DocuSign userinfo response")
+	}
+
+	// Validate that base_uri is a DocuSign HTTPS URL before storing it
+	// to prevent SSRF via a compromised or malicious userinfo response.
+	parsed, err := url.Parse(account.BaseURI)
+	if err != nil || parsed.Scheme != "https" || !strings.HasSuffix(strings.ToLower(parsed.Hostname()), ".docusign.net") {
+		return nil, fmt.Errorf("base_uri %q is not a valid DocuSign HTTPS URL", account.BaseURI)
+	}
+
+	return map[string]string{
+		"account_id": account.AccountID,
+		// Append the REST API path so the connector's base_url credential
+		// resolves to the correct versioned endpoint.
+		"base_url": strings.TrimRight(account.BaseURI, "/") + "/restapi/v2.1",
+	}, nil
 }
 
 // handleListOAuthConnections returns all OAuth connections for the authenticated user.
