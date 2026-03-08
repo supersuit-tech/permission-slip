@@ -26,6 +26,7 @@ import {
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
+  intercom: "Intercom",
   microsoft: "Microsoft",
   notion: "Notion",
 };
@@ -195,8 +196,8 @@ export function ConnectedAccountsSection() {
 
             {connections.length === 0 && availableProviders.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
-                No OAuth providers are configured yet. Set up client
-                credentials to enable OAuth connections.
+                No OAuth providers are configured yet. Set up client credentials
+                to enable OAuth connections.
               </p>
             )}
           </div>

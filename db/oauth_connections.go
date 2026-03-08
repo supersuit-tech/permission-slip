@@ -263,10 +263,10 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 	return conns, rows.Err()
 }
 
-// GetRequiredCredentialByActionType returns the preferred required credential for
-// the connector that owns the given action type. When multiple credentials exist
-// (e.g. oauth2 + api_key), oauth2 is preferred. Used to determine auth_type at
-// execution time.
+// GetRequiredCredentialByActionType returns the required credential for the connector
+// that owns the given action type. Used to determine auth_type at execution time.
+// When a connector has multiple credentials (e.g. both oauth2 and api_key),
+// this returns the oauth2 credential preferentially.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
@@ -287,26 +287,31 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 	return &rc, nil
 }
 
-// GetFallbackCredentialByActionType returns a non-OAuth credential for the
-// connector that owns the given action type. Used when the preferred OAuth
-// credential cannot be resolved (e.g. user has no OAuth connection but has
-// an API key configured).
-func GetFallbackCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
-	var rc RequiredCredential
-	err := db.QueryRow(ctx, `
+// GetRequiredCredentialsByActionType returns all required credentials for the
+// connector that owns the given action type. Used when a connector supports
+// multiple auth methods (e.g. both oauth2 and api_key) and the execution layer
+// needs to try OAuth first then fall back to static credentials.
+func GetRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType string) ([]RequiredCredential, error) {
+	rows, err := db.Query(ctx, `
 		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
-		WHERE ca.action_type = $1 AND crc.auth_type != 'oauth2'
-		ORDER BY crc.service
-		LIMIT 1`,
+		WHERE ca.action_type = $1
+		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END`,
 		actionType,
-	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
+	)
 	if err != nil {
 		return nil, err
 	}
-	return &rc, nil
+	defer rows.Close()
+
+	var creds []RequiredCredential
+	for rows.Next() {
+		var rc RequiredCredential
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
+			return nil, err
+		}
+		creds = append(creds, rc)
+	}
+	return creds, rows.Err()
 }
