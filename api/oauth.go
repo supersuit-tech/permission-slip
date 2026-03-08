@@ -679,6 +679,11 @@ var postOAuthEnrichers = map[string]postOAuthEnricher{
 // account information after a successful OAuth token exchange.
 const docuSignUserInfoURL = "https://account.docusign.com/oauth/userinfo"
 
+// docuSignHTTPClient is the shared HTTP client used by fetchDocuSignUserInfo.
+// A package-level client is used to enable TCP connection reuse via the
+// default transport's connection pool, reducing latency on the userinfo call.
+var docuSignHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
 // docuSignUserInfo is the subset of the DocuSign userinfo response we care about.
 type docuSignUserInfo struct {
 	Accounts []struct {
@@ -703,8 +708,7 @@ func fetchDocuSignUserInfo(ctx context.Context, accessToken, userInfoURL string)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := docuSignHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("userinfo request failed: %w", err)
 	}

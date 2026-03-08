@@ -1341,6 +1341,74 @@ func TestFetchDocuSignUserInfo_InvalidBaseURI(t *testing.T) {
 	}
 }
 
+func TestFetchDocuSignUserInfo_EmptyAccountID(t *testing.T) {
+	t.Parallel()
+	// Account is present and marked default but account_id is an empty string.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "", "is_default": true, "base_uri": "https://na1.docusign.net"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error when account_id is empty string")
+	}
+}
+
+func TestFetchDocuSignUserInfo_EmptyBaseURI(t *testing.T) {
+	t.Parallel()
+	// Account is present and marked default but base_uri is an empty string.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": ""},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error when base_uri is empty string")
+	}
+}
+
+func TestFetchDocuSignUserInfo_HTTPBaseURI(t *testing.T) {
+	t.Parallel()
+	// base_uri uses HTTP instead of HTTPS — must be rejected to prevent
+	// credential exfiltration to a non-TLS endpoint.
+	server, _ := docuSignTestServer(t, "test-token", []map[string]any{
+		{"account_id": "acc-123", "is_default": true, "base_uri": "http://na1.docusign.net"},
+	})
+	defer server.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "test-token", server.URL)
+	if err == nil {
+		t.Fatal("expected error for HTTP (non-HTTPS) base_uri")
+	}
+}
+
+func TestFetchDocuSignUserInfo_MalformedJSON(t *testing.T) {
+	t.Parallel()
+	// Server returns 200 but with invalid JSON — should not panic or silently succeed.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("not valid json {{"))
+	}))
+	defer srv.Close()
+
+	_, err := fetchDocuSignUserInfo(t.Context(), "any-token", srv.URL)
+	if err == nil {
+		t.Fatal("expected error for malformed JSON response")
+	}
+}
+
+func TestPostOAuthEnrichers_ContainsDocuSign(t *testing.T) {
+	t.Parallel()
+	// Compile-time safety net: verify the "docusign" enricher is registered.
+	// If someone removes it from the map or misspells the key, this test
+	// catches the regression before it silently breaks the OAuth callback.
+	if _, ok := postOAuthEnrichers["docusign"]; !ok {
+		t.Fatal("postOAuthEnrichers is missing the required \"docusign\" entry")
+	}
+}
+
 func TestIsURLExtraKey(t *testing.T) {
 	t.Parallel()
 	// Only keys from tokenExtraKeys should be listed here. stateExtraData
