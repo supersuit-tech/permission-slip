@@ -54,7 +54,17 @@ func TestAirtableConnector_ValidateCredentials(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "missing api_token",
+			name:    "valid OAuth access_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-test-token-123"}),
+			wantErr: false,
+		},
+		{
+			name:    "OAuth access_token takes priority over api_token",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-token", "api_token": "patABC123"}),
+			wantErr: false,
+		},
+		{
+			name:    "missing both tokens",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
@@ -62,6 +72,11 @@ func TestAirtableConnector_ValidateCredentials(t *testing.T) {
 			name:    "empty api_token",
 			creds:   connectors.NewCredentials(map[string]string{"api_token": ""}),
 			wantErr: true,
+		},
+		{
+			name:    "empty access_token falls back to api_token check",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "", "api_token": "patABC123"}),
+			wantErr: false,
 		},
 		{
 			name:    "wrong prefix sk",
@@ -81,6 +96,11 @@ func TestAirtableConnector_ValidateCredentials(t *testing.T) {
 		{
 			name:    "token with spaces",
 			creds:   connectors.NewCredentials(map[string]string{"api_token": "pat token with spaces"}),
+			wantErr: true,
+		},
+		{
+			name:    "OAuth token with unsafe characters",
+			creds:   connectors.NewCredentials(map[string]string{"access_token": "token\x00injected"}),
 			wantErr: true,
 		},
 		{
@@ -134,18 +154,33 @@ func TestAirtableConnector_Manifest(t *testing.T) {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}
 	}
-	if len(m.RequiredCredentials) != 1 {
-		t.Fatalf("Manifest().RequiredCredentials has %d items, want 1", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 2 {
+		t.Fatalf("Manifest().RequiredCredentials has %d items, want 2", len(m.RequiredCredentials))
 	}
-	cred := m.RequiredCredentials[0]
-	if cred.Service != "airtable" {
-		t.Errorf("credential service = %q, want %q", cred.Service, "airtable")
+	// First credential should be OAuth (primary/recommended).
+	oauthCred := m.RequiredCredentials[0]
+	if oauthCred.Service != "airtable" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "airtable")
 	}
-	if cred.AuthType != "api_key" {
-		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "api_key")
+	if oauthCred.AuthType != "oauth2" {
+		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
 	}
-	if cred.InstructionsURL == "" {
-		t.Error("credential instructions_url is empty, want a URL")
+	if oauthCred.OAuthProvider != "airtable" {
+		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "airtable")
+	}
+	if len(oauthCred.OAuthScopes) == 0 {
+		t.Error("oauth credential oauth_scopes is empty, want scopes")
+	}
+	// Second credential should be API key (alternative).
+	apiKeyCred := m.RequiredCredentials[1]
+	if apiKeyCred.Service != "airtable" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "airtable")
+	}
+	if apiKeyCred.AuthType != "api_key" {
+		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")
+	}
+	if apiKeyCred.InstructionsURL == "" {
+		t.Error("api_key credential instructions_url is empty, want a URL")
 	}
 
 	if err := m.Validate(); err != nil {

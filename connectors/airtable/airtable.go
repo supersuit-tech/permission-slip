@@ -20,6 +20,7 @@ const (
 	metaBaseURL    = "https://api.airtable.com/v0/meta"
 	defaultTimeout = 30 * time.Second
 	credKeyToken   = "api_token"
+	credKeyOAuth   = "access_token"
 	tokenPrefix    = "pat"
 
 	// defaultRetryAfter is used when the Airtable API returns a rate limit
@@ -72,13 +73,21 @@ func (c *AirtableConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain a
-// non-empty personal access token with the required pat prefix and
-// only safe characters (alphanumeric, dots, underscores, hyphens).
+// ValidateCredentials checks that the provided credentials contain a valid
+// token. Accepts either an OAuth access_token (provided by the platform's
+// OAuth flow) or a personal access token via api_token (starting with "pat").
 func (c *AirtableConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+	// OAuth access_token takes priority (set by resolveOAuthCredentials).
+	if token, ok := creds.Get(credKeyOAuth); ok && token != "" {
+		if !isTokenSafe(token) {
+			return &connectors.ValidationError{Message: "access_token contains invalid characters"}
+		}
+		return nil
+	}
+	// Fall back to static api_token (personal access token).
 	token, ok := creds.Get(credKeyToken)
 	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_token"}
+		return &connectors.ValidationError{Message: "missing required credential: connect via OAuth or provide an api_token"}
 	}
 	if len(token) < len(tokenPrefix) || token[:len(tokenPrefix)] != tokenPrefix {
 		return &connectors.ValidationError{Message: "api_token must be a personal access token starting with \"pat\""}
@@ -151,12 +160,24 @@ func parseAndValidate[T interface{ validate() error }](raw json.RawMessage, dest
 	return (*dest).validate()
 }
 
+// resolveToken extracts the bearer token from credentials. OAuth access_token
+// is preferred; falls back to static api_token.
+func resolveToken(creds connectors.Credentials) (string, error) {
+	if token, ok := creds.Get(credKeyOAuth); ok && token != "" {
+		return token, nil
+	}
+	if token, ok := creds.Get(credKeyToken); ok && token != "" {
+		return token, nil
+	}
+	return "", &connectors.ValidationError{Message: "no credential available: connect via OAuth or provide an api_token"}
+}
+
 // doRequest executes an HTTP request against the Airtable API with auth headers,
 // handles rate limiting and timeouts, and unmarshals the response into dest.
 func (c *AirtableConnector) doRequest(ctx context.Context, method, url string, creds connectors.Credentials, body io.Reader, dest any) error {
-	token, ok := creds.Get(credKeyToken)
-	if !ok || token == "" {
-		return &connectors.ValidationError{Message: "api_token credential is missing or empty"}
+	token, err := resolveToken(creds)
+	if err != nil {
+		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
