@@ -88,8 +88,8 @@ func (a *searchDriveAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	var queryParts []string
 
-	// Full-text / name search: use the fullText contains operator for broad search,
-	// or combine name contains if the query looks like a simple name search.
+	// Full-text / name search: match both the file name and full-text content so
+	// the query works whether the user provides a file name or a content keyword.
 	if params.Query != "" {
 		escaped := strings.ReplaceAll(params.Query, `\`, `\\`)
 		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
