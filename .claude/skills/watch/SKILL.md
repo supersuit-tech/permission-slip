@@ -295,10 +295,11 @@ If no changes were made during the session (e.g., all comments were already addr
 
 CI is manual-only, so after posting the wrap-up comment, **trigger CI once** against the final state of the branch, wait for it to complete, and fix any failures.
 
-#### a) Trigger the CI workflow
+#### a) Trigger the CI and audit workflows
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run ci.yml --ref "$(git branch --show-current)"
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run audit.yml --ref "$(git branch --show-current)"
 ```
 
 #### b) Wait for the run to appear and complete
@@ -310,7 +311,13 @@ Poll until the run triggered above finishes. First, wait ~5 seconds for the run 
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run list --workflow=ci.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
 ```
 
-Poll every 30 seconds until `status` is `completed`.
+Poll every 30 seconds until `status` is `completed`. Do the same for the audit workflow:
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run list --workflow=audit.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
+```
+
+Wait for both workflows to complete before proceeding.
 
 #### c) Check results
 
