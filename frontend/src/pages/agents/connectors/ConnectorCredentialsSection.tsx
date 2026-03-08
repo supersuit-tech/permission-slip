@@ -345,7 +345,7 @@ function CredentialRow({
               </div>
               <p className="text-muted-foreground text-xs">
                 {isAlternative
-                  ? "Manually provide an access token and shop domain"
+                  ? `Use a ${requiredCredential.auth_type === "basic" ? "username and password" : "manually-created API key"} instead`
                   : `Auth type: ${requiredCredential.auth_type}`}
               </p>
               {requiredCredential.instructions_url && (

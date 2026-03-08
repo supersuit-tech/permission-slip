@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -22,11 +22,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+/** Providers that require a shop subdomain for per-shop OAuth URLs. */
+const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
   intercom: "Intercom",
   microsoft: "Microsoft",
+  salesforce: "Salesforce",
+  shopify: "Shopify",
+  zoom: "Zoom",
 };
 
 function providerLabel(id: string): string {
@@ -89,16 +105,34 @@ export function ConnectedAccountsSection() {
     }
   }
 
+  const [shopDialogProvider, setShopDialogProvider] = useState<string | null>(
+    null,
+  );
+
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
+    if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
+      setShopDialogProvider(providerId);
+      return;
+    }
+    navigateToOAuth(providerId, session.access_token);
+  }
+
+  function navigateToOAuth(
+    providerId: string,
+    accessToken: string,
+    shop?: string,
+  ) {
     // Navigate to the OAuth authorize endpoint with the session token.
     // The backend will redirect to the provider's consent screen.
     const baseUrl =
       import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
-
+    let url = `${baseUrl}/v1/oauth/${providerId}/authorize?access_token=${encodeURIComponent(accessToken)}`;
+    if (shop) {
+      url += `&shop=${encodeURIComponent(shop)}`;
+    }
     // Open in same window — the callback redirects back to settings
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    window.location.href = url;
   }
 
   // Providers that are ready to connect but don't have an active connection
@@ -208,6 +242,86 @@ export function ConnectedAccountsSection() {
           </div>
         )}
       </CardContent>
+
+      {shopDialogProvider && session?.access_token && (
+        <ShopDomainDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setShopDialogProvider(null);
+          }}
+          onSubmit={(shop) => {
+            navigateToOAuth(shopDialogProvider, session.access_token, shop);
+            setShopDialogProvider(null);
+          }}
+        />
+      )}
     </Card>
+  );
+}
+
+function ShopDomainDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (shop: string) => void;
+}) {
+  const [shop, setShop] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = shop.trim().toLowerCase();
+    if (!trimmed) return;
+    const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
+    onSubmit(subdomain);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect Shopify Store</DialogTitle>
+          <DialogDescription>
+            Enter your Shopify store subdomain to begin the OAuth connection.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="settings-shop-domain">Store subdomain</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="settings-shop-domain"
+                placeholder="mystore"
+                value={shop}
+                onChange={(e) => setShop(e.target.value)}
+                autoFocus
+              />
+              <span className="text-muted-foreground whitespace-nowrap text-sm">
+                .myshopify.com
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              e.g. if your store URL is mystore.myshopify.com, enter
+              &quot;mystore&quot;
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!shop.trim()}>
+              <LogIn className="size-4" />
+              Continue to Shopify
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
