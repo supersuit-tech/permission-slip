@@ -34,11 +34,45 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** Providers that require a shop subdomain for per-shop OAuth URLs. */
-const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
-
-/** Providers that require a subdomain for per-instance OAuth URLs (e.g. Zendesk). */
-const SUBDOMAIN_REQUIRED_PROVIDERS = new Set(["zendesk"]);
+/**
+ * Config for providers that need a per-instance subdomain before the OAuth
+ * redirect can be constructed. Each entry maps a provider ID to the dialog
+ * display config and the query parameter name to attach to the authorize URL.
+ */
+const INSTANCE_SUBDOMAIN_PROVIDERS: Record<
+  string,
+  {
+    title: string;
+    domainSuffix: string;
+    placeholder: string;
+    inputLabel: string;
+    inputId: string;
+    stripSuffix: RegExp;
+    queryParam: string;
+    buttonLabel: string;
+  }
+> = {
+  shopify: {
+    title: "Connect Shopify Store",
+    domainSuffix: ".myshopify.com",
+    placeholder: "mystore",
+    inputLabel: "Store subdomain",
+    inputId: "settings-shop-domain",
+    stripSuffix: /\.myshopify\.com$/,
+    queryParam: "shop",
+    buttonLabel: "Continue to Shopify",
+  },
+  zendesk: {
+    title: "Connect Zendesk",
+    domainSuffix: ".zendesk.com",
+    placeholder: "mycompany",
+    inputLabel: "Subdomain",
+    inputId: "settings-zendesk-subdomain",
+    stripSuffix: /\.zendesk\.com$/,
+    queryParam: "subdomain",
+    buttonLabel: "Continue to Zendesk",
+  },
+};
 
 function statusBadge(status: string) {
   switch (status) {
@@ -103,21 +137,14 @@ export function ConnectedAccountsSection() {
     }
   }
 
-  const [shopDialogProvider, setShopDialogProvider] = useState<string | null>(
-    null,
-  );
-  const [subdomainDialogProvider, setSubdomainDialogProvider] = useState<string | null>(
-    null,
-  );
+  const [instanceDialogProvider, setInstanceDialogProvider] = useState<
+    string | null
+  >(null);
 
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
-    if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
-      setShopDialogProvider(providerId);
-      return;
-    }
-    if (SUBDOMAIN_REQUIRED_PROVIDERS.has(providerId)) {
-      setSubdomainDialogProvider(providerId);
+    if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
+      setInstanceDialogProvider(providerId);
       return;
     }
     // Open in same window — the callback redirects back to settings
@@ -240,91 +267,85 @@ export function ConnectedAccountsSection() {
         )}
       </CardContent>
 
-      {shopDialogProvider && session?.access_token && (
-        <ShopDomainDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setShopDialogProvider(null);
-          }}
-          onSubmit={(shop) => {
-            if (!session?.access_token || !shopDialogProvider) return;
-            const url = getOAuthAuthorizeUrl(
-              shopDialogProvider,
-              session.access_token,
-            );
-            window.location.href = `${url}&shop=${encodeURIComponent(shop)}`;
-            setShopDialogProvider(null);
-          }}
-        />
-      )}
-
-      {subdomainDialogProvider && session?.access_token && (
-        <ZendeskSubdomainDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setSubdomainDialogProvider(null);
-          }}
-          onSubmit={(subdomain) => {
-            if (!session?.access_token || !subdomainDialogProvider) return;
-            const url = getOAuthAuthorizeUrl(
-              subdomainDialogProvider,
-              session.access_token,
-            );
-            window.location.href = `${url}&subdomain=${encodeURIComponent(subdomain)}`;
-            setSubdomainDialogProvider(null);
-          }}
-        />
-      )}
+      {instanceDialogProvider &&
+        session?.access_token &&
+        instanceDialogProvider in INSTANCE_SUBDOMAIN_PROVIDERS && (
+          <InstanceSubdomainDialog
+            open
+            config={INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!}
+            onOpenChange={(open) => {
+              if (!open) setInstanceDialogProvider(null);
+            }}
+            onSubmit={(value) => {
+              if (!session?.access_token || !instanceDialogProvider) return;
+              const cfg =
+                INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!;
+              const url = getOAuthAuthorizeUrl(
+                instanceDialogProvider,
+                session.access_token,
+              );
+              window.location.href = `${url}&${cfg.queryParam}=${encodeURIComponent(value)}`;
+              setInstanceDialogProvider(null);
+            }}
+          />
+        )}
     </Card>
   );
 }
 
-function ZendeskSubdomainDialog({
+/**
+ * Generic dialog for providers that require a per-instance subdomain before
+ * an OAuth redirect can be constructed (e.g. Zendesk, Shopify). Driven by
+ * INSTANCE_SUBDOMAIN_PROVIDERS config — no provider-specific JSX needed.
+ */
+function InstanceSubdomainDialog({
   open,
+  config,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
+  config: (typeof INSTANCE_SUBDOMAIN_PROVIDERS)[string];
   onOpenChange: (open: boolean) => void;
-  onSubmit: (subdomain: string) => void;
+  onSubmit: (value: string) => void;
 }) {
-  const [subdomain, setSubdomain] = useState("");
+  const [value, setValue] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = subdomain.trim().toLowerCase();
+    const trimmed = value.trim().toLowerCase();
     if (!trimmed) return;
-    const bare = trimmed.replace(/\.zendesk\.com$/, "");
-    onSubmit(bare);
+    onSubmit(trimmed.replace(config.stripSuffix, ""));
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect Zendesk</DialogTitle>
+          <DialogTitle>{config.title}</DialogTitle>
           <DialogDescription>
-            Enter your Zendesk subdomain to begin the OAuth connection.
+            Enter your {config.inputLabel.toLowerCase()} to begin the OAuth
+            connection.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-2 py-4">
-            <Label htmlFor="settings-zendesk-subdomain">Subdomain</Label>
+            <Label htmlFor={config.inputId}>{config.inputLabel}</Label>
             <div className="flex items-center gap-2">
               <Input
-                id="settings-zendesk-subdomain"
-                placeholder="mycompany"
-                value={subdomain}
-                onChange={(e) => setSubdomain(e.target.value)}
+                id={config.inputId}
+                placeholder={config.placeholder}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
                 autoFocus
               />
               <span className="text-muted-foreground whitespace-nowrap text-sm">
-                .zendesk.com
+                {config.domainSuffix}
               </span>
             </div>
             <p className="text-muted-foreground text-xs">
-              e.g. if your Zendesk URL is mycompany.zendesk.com, enter
-              &quot;mycompany&quot;
+              e.g. if your URL is {config.placeholder}
+              {config.domainSuffix}, enter &quot;{config.placeholder}&quot;
             </p>
           </div>
           <DialogFooter>
@@ -335,76 +356,9 @@ function ZendeskSubdomainDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!subdomain.trim()}>
+            <Button type="submit" disabled={!value.trim()}>
               <LogIn className="size-4" />
-              Continue to Zendesk
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ShopDomainDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (shop: string) => void;
-}) {
-  const [shop, setShop] = useState("");
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = shop.trim().toLowerCase();
-    if (!trimmed) return;
-    const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
-    onSubmit(subdomain);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Connect Shopify Store</DialogTitle>
-          <DialogDescription>
-            Enter your Shopify store subdomain to begin the OAuth connection.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-2 py-4">
-            <Label htmlFor="settings-shop-domain">Store subdomain</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="settings-shop-domain"
-                placeholder="mystore"
-                value={shop}
-                onChange={(e) => setShop(e.target.value)}
-                autoFocus
-              />
-              <span className="text-muted-foreground whitespace-nowrap text-sm">
-                .myshopify.com
-              </span>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              e.g. if your store URL is mystore.myshopify.com, enter
-              &quot;mystore&quot;
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!shop.trim()}>
-              <LogIn className="size-4" />
-              Continue to Shopify
+              {config.buttonLabel}
             </Button>
           </DialogFooter>
         </form>

@@ -120,14 +120,15 @@ func oauthStateSecret(deps *Deps) string {
 }
 
 // createOAuthState produces a short-lived signed JWT encoding the user ID,
-// OAuth provider, requested scopes, and optional shop subdomain. This prevents
-// CSRF and state-fixation attacks on the callback endpoint and carries the
-// final scope list so the callback can store exactly what was requested
-// (including any extra scopes from the authorize query params).
+// OAuth provider, requested scopes, and optional per-instance identifier.
+// This prevents CSRF and state-fixation attacks on the callback endpoint
+// and carries the final scope list so the callback can store exactly what
+// was requested (including any extra scopes from the authorize query params).
 //
-// The shop parameter is used by providers with per-shop URLs (e.g. Shopify)
-// so the callback can reconstruct the token endpoint. Pass "" for providers
-// with static URLs.
+// The shop parameter carries the per-instance identifier for providers with
+// dynamic OAuth URLs — the Shopify store subdomain (e.g. "mystore") or the
+// Zendesk subdomain (e.g. "mycompany"). Pass "" for providers with static
+// OAuth endpoints (e.g. Google, Slack).
 func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
@@ -153,15 +154,18 @@ type oauthState struct {
 	UserID   string
 	Provider string
 	Scopes   []string
-	// Shop is the Shopify store subdomain, used to reconstruct per-shop
-	// OAuth URLs. Empty for providers with static endpoints.
+	// Shop holds the per-instance identifier for providers with dynamic
+	// OAuth URLs: the Shopify store subdomain (e.g. "mystore") or the
+	// Zendesk subdomain (e.g. "mycompany"). Empty for providers with
+	// static OAuth endpoints (e.g. Google, Slack). The JWT claim key is
+	// "shop" for backward compatibility with in-flight tokens.
 	Shop string
 }
 
 // verifyOAuthState validates the signed state JWT and returns the encoded
-// user ID, provider, requested scopes, and optional shop subdomain. Returns
-// an error if the signature is invalid, the token is expired, or the claims
-// are missing.
+// user ID, provider, requested scopes, and optional per-instance identifier
+// (Shop field). Returns an error if the signature is invalid, the token is
+// expired, or the required claims are missing.
 func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
