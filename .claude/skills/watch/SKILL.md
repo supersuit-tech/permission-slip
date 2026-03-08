@@ -30,7 +30,51 @@ git merge origin/main --no-edit
 
 If the merge produces conflicts, follow the same conflict resolution procedure described in Polling Loop step 2. Run tests and build after resolving.
 
-CI is manual-only (`workflow_dispatch`), so there are no check runs to inspect at this point. CI will be triggered once at the end of the watch session (see Post-Poll step 10).
+CI is manual-only (`workflow_dispatch`), so there are no check runs to inspect at this point. CI will be triggered once at the end of the watch session (see Post-Poll step 11).
+
+## Pre-Poll: Process PR Body Checklist
+
+Before entering the polling loop, fetch the PR body and look for unchecked checklist items that Claude Code can address.
+
+### Fetch the PR body
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body'
+```
+
+### Identify unchecked items
+
+Parse the PR body for unchecked checklist items (`- [ ]`). These may appear under any heading, but pay special attention to items under headings like `### Claude Code`, `### Automated`, or similar sections that indicate tasks meant for Claude Code.
+
+**Skip** items that are clearly meant for humans or for OpenClaw (e.g., items under `### OpenClaw`, `### Manual`, or items that require human judgment like "get stakeholder sign-off", "manually verify in production", "design review").
+
+### Act on each item
+
+For each unchecked item that Claude Code can address:
+
+1. **Read and understand** the checklist item.
+2. **Implement** the requested change — this might be adding tests, fixing lint issues, updating documentation, running checks, adding error handling, etc.
+3. **Run relevant tests** to verify the change doesn't break anything.
+4. **Commit** with a clear message referencing the checklist item.
+5. **Check off the item** in the PR body by updating it via the API:
+
+```bash
+# Fetch current body, update the checkbox, and PATCH it back
+CURRENT_BODY=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body')
+# Replace the specific "- [ ] <item text>" with "- [x] <item text>"
+UPDATED_BODY=$(echo "$CURRENT_BODY" | sed 's/- \[ \] <exact item text>/- [x] <exact item text>/')
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" -X PATCH -f body="$UPDATED_BODY"
+```
+
+**Important:** Update the PR body after each item (not in batch) to avoid race conditions if the PR body is edited concurrently.
+
+### Push changes
+
+After processing all actionable checklist items, push commits:
+
+```bash
+git push -u origin <current-branch>
+```
 
 ## Polling Loop
 
@@ -164,23 +208,35 @@ For anything you **considered but chose not to do**, or **had questions about**,
   - `- [ ] Considered X but chose Y because Z (commit abc123)`
   - `- [ ] Question: Should we also handle edge case X?`
 
-### 7. Push Changes
+### 7. Process PR Body Checklist
 
-After processing all new comments in a poll cycle, push your commits:
+On each poll cycle, re-fetch the PR body and check for any new unchecked items (the PR author or reviewers may add new checklist items between cycles).
+
+Follow the same procedure as the Pre-Poll checklist processing:
+1. Fetch the current PR body.
+2. Identify unchecked items (`- [ ]`) that Claude Code can address.
+3. Skip items meant for humans or OpenClaw.
+4. Implement each actionable item, run tests, commit, and check it off in the PR body.
+
+If new checklist items were processed, reset the idle counter to 0.
+
+### 8. Push Changes
+
+After processing all new comments and checklist items in a poll cycle, push your commits:
 
 ```bash
 git push -u origin <current-branch>
 ```
 
-### 8. Continue Polling
+### 9. Continue Polling
 
 After each cycle, wait 60 seconds and poll again.
 
-**Idle timeout:** Track the number of consecutive poll cycles with **no new comments, reviews, or merge conflicts**. If **3 consecutive cycles** pass with no new activity (i.e., 3 minutes of inactivity), **stop polling** and post a wrap-up comment on the PR before exiting (see step 9).
+**Idle timeout:** Track the number of consecutive poll cycles with **no new comments, reviews, merge conflicts, or checklist items processed**. If **3 consecutive cycles** pass with no new activity (i.e., 3 minutes of inactivity), **stop polling** and post a wrap-up comment on the PR before exiting (see step 10).
 
-If any cycle finds new comments, reviews, merge conflicts that needed resolution, or new commits merged in from main, reset the idle counter to 0.
+If any cycle finds new comments, reviews, merge conflicts that needed resolution, new commits merged in from main, or unchecked checklist items that were processed, reset the idle counter to 0.
 
-### 9. Post Wrap-Up Comment on Idle Exit
+### 10. Post Wrap-Up Comment on Idle Exit
 
 When stopping due to the idle timeout, post a comment on the PR summarizing the entire watch session. Use the following command:
 
@@ -197,7 +253,11 @@ The comment must include these sections:
 - What the competing changes were (branch vs. base)
 - How the conflict was resolved and why
 
-**c) Decision Log** — A record of key choices made during the session:
+**c) PR Checklist Items** — A summary of checklist items processed from the PR body:
+- Which items were completed (checked off) and what was done for each.
+- Which items were skipped because they require human action or are meant for OpenClaw.
+
+**d) Decision Log** — A record of key choices made during the session:
 - **Implemented:** What review comments were acted on and how.
 - **Declined / Disagreed:** Any review comments you chose not to implement, with reasoning.
 - **Judgment Calls:** Ambiguous requests where you picked an approach — explain what you chose and why.
@@ -217,6 +277,13 @@ Format the comment in markdown. Example structure:
 - ...
 
 *(Omit this section if no merge conflicts occurred.)*
+
+### PR Checklist Items
+- ✅ **`<item text>`** — <what was done> (`<commit hash>`)
+- ⏭️ **`<item text>`** — skipped (requires human action / OpenClaw task)
+- ...
+
+*(Omit this section if no checklist items were in the PR body.)*
 
 ### Decision Log
 
@@ -242,7 +309,7 @@ Format the comment in markdown. Example structure:
 
 If no changes were made during the session (e.g., all comments were already addressed before watching started, or no comments existed), still post the comment noting that no action was needed.
 
-### 10. Post-Poll: Trigger CI and Fix Failing Checks
+### 11. Post-Poll: Trigger CI and Fix Failing Checks
 
 CI is manual-only, so after posting the wrap-up comment, **trigger CI once** against the final state of the branch, wait for it to complete, and fix any failures.
 
@@ -290,7 +357,7 @@ Fixed failing checks after watch session ended:
 - **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
 ```
 
-### 11. Trigger Webhook Notification
+### 12. Trigger Webhook Notification
 
 After all polling, wrap-up, and check fixes are complete, trigger the webhook workflow to notify that the watch session has finished:
 
