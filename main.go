@@ -178,8 +178,10 @@ func main() {
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	defer bgCancel()
 	var auditPurgeDone <-chan struct{}
-	var oauthRefreshDone <-chan struct{}
-	var cardExpiryCheckDone <-chan struct{}
+	var bgJobDone []struct {
+		name string
+		done <-chan struct{}
+	}
 
 	// Connect to Postgres if DATABASE_URL is set
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
@@ -302,22 +304,14 @@ func main() {
 		loadBYOAProviderConfigs(oauthRegistry, deps.DB, deps.Vault)
 	}
 
-	// Start background OAuth token refresh job (requires DB, vault, and OAuth registry).
-	if deps.DB != nil && deps.Vault != nil {
-		oauthRefreshDone = startOAuthRefresh(bgCtx, OAuthRefreshDeps{
-			DB:       deps.DB,
-			Vault:    deps.Vault,
-			Registry: oauthRegistry,
-		}, logger)
-	}
-
-	// Start background card expiration check (requires DB + notifier).
-	if deps.DB != nil && deps.Notifier != nil {
-		cardExpiryCheckDone = startCardExpiryCheck(bgCtx, CardExpiryCheckDeps{
-			DB:       deps.DB,
-			Notifier: deps.Notifier,
-			BaseURL:  deps.BaseURL,
-		}, logger)
+	// Start all registered background jobs.
+	for _, job := range backgroundJobs {
+		if done := job.Start(bgCtx, &deps, logger); done != nil {
+			bgJobDone = append(bgJobDone, struct {
+				name string
+				done <-chan struct{}
+			}{name: job.Name, done: done})
+		}
 	}
 
 	log.Printf("Connector registry: %d connector(s) registered", len(registry.IDs()))
@@ -458,18 +452,11 @@ func main() {
 			logger.Warn("audit purge goroutine did not exit in time")
 		}
 	}
-	if oauthRefreshDone != nil {
+	for _, j := range bgJobDone {
 		select {
-		case <-oauthRefreshDone:
+		case <-j.done:
 		case <-time.After(5 * time.Second):
-			logger.Warn("oauth refresh goroutine did not exit in time")
-		}
-	}
-	if cardExpiryCheckDone != nil {
-		select {
-		case <-cardExpiryCheckDone:
-		case <-time.After(5 * time.Second):
-			logger.Warn("card expiry check goroutine did not exit in time")
+			logger.Warn("background job did not exit in time", "job", j.name)
 		}
 	}
 
