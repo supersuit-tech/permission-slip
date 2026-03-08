@@ -25,9 +25,10 @@ const (
 	maxResponseBody = 10 << 20 // 10 MB
 
 	// Credential keys — keep in sync with ValidateCredentials and do().
-	credKeySubdomain = "subdomain"
-	credKeyAPIToken  = "api_token"
-	credKeyEmail     = "email"
+	credKeySubdomain    = "subdomain"
+	credKeyAPIToken     = "api_token"
+	credKeyEmail        = "email"
+	credKeyAccessToken  = "access_token" // OAuth bearer token
 )
 
 // subdomainPattern validates Zendesk subdomains: alphanumeric with hyphens.
@@ -68,8 +69,10 @@ func (c *ZendeskConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain subdomain,
-// email, and api_token which are required for all Zendesk API calls.
+// ValidateCredentials checks that the provided credentials are sufficient for
+// Zendesk API calls. Accepts either:
+//   - OAuth path: access_token + subdomain
+//   - API token path: email + api_token + subdomain
 func (c *ZendeskConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	subdomain, ok := creds.Get(credKeySubdomain)
 	if !ok || subdomain == "" {
@@ -78,12 +81,16 @@ func (c *ZendeskConnector) ValidateCredentials(_ context.Context, creds connecto
 	if !subdomainPattern.MatchString(subdomain) {
 		return &connectors.ValidationError{Message: "invalid subdomain format: must be alphanumeric with hyphens"}
 	}
+	// OAuth path: access_token is sufficient alongside subdomain.
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return nil
+	}
+	// API token path: requires email and api_token.
 	email, ok := creds.Get(credKeyEmail)
 	if !ok || email == "" {
-		return &connectors.ValidationError{Message: "missing required credential: email"}
+		return &connectors.ValidationError{Message: "missing required credential: email or access_token"}
 	}
-	token, ok := creds.Get(credKeyAPIToken)
-	if !ok || token == "" {
+	if token, ok := creds.Get(credKeyAPIToken); !ok || token == "" {
 		return &connectors.ValidationError{Message: "missing required credential: api_token"}
 	}
 	return nil
@@ -121,10 +128,15 @@ func (c *ZendeskConnector) do(ctx context.Context, creds connectors.Credentials,
 	}
 	req.Header.Set("Accept", "application/json")
 
-	// Zendesk API token auth: {email}/token:{api_token}
-	email, _ := creds.Get(credKeyEmail)
-	token, _ := creds.Get(credKeyAPIToken)
-	req.SetBasicAuth(email+"/token", token)
+	// Set auth header: OAuth bearer token or API token basic auth.
+	if accessToken, ok := creds.Get(credKeyAccessToken); ok && accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	} else {
+		// API token auth: {email}/token:{api_token}
+		email, _ := creds.Get(credKeyEmail)
+		apiToken, _ := creds.Get(credKeyAPIToken)
+		req.SetBasicAuth(email+"/token", apiToken)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
