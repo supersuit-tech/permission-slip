@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"golang.org/x/oauth2"
@@ -37,27 +38,11 @@ import (
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
 
-// reservedOAuthParams lists OAuth 2.0 authorization request parameters that
-// must not be overridden by provider-specific AuthorizeParams. Allowing these
-// to be overridden would create security vulnerabilities:
-//   - redirect_uri: could redirect the callback to an attacker-controlled URL
-//   - state: could bypass CSRF protection
-//   - client_id/client_secret: could impersonate a different OAuth app
-//   - response_type/code: could alter the authorization grant type
-var reservedOAuthParams = map[string]bool{
-	"redirect_uri":  true,
-	"state":         true,
-	"client_id":     true,
-	"client_secret": true,
-	"response_type": true,
-	"code":          true,
-	"grant_type":    true,
-}
-
 // isReservedOAuthParam returns true if the parameter name is a reserved
 // OAuth 2.0 param that must not be overridden by AuthorizeParams.
+// Uses the canonical list from connectors.ReservedAuthorizeParams.
 func isReservedOAuthParam(name string) bool {
-	return reservedOAuthParams[name]
+	return connectors.ReservedAuthorizeParams[name]
 }
 
 // --- Response types ---
