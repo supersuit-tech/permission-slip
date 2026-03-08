@@ -2,7 +2,7 @@
 // connector execution layer. It uses the HubSpot CRM API v3 with plain net/http
 // (no third-party SDK) to keep the dependency footprint minimal.
 //
-// Auth: HubSpot private app access tokens (API key auth).
+// Auth: OAuth2 access tokens (preferred) or HubSpot private app access tokens (API key).
 // Base URL: https://api.hubapi.com
 package hubspot
 
@@ -24,8 +24,11 @@ const (
 	maxResponseBody = 10 << 20 // 10 MB — guard against unexpectedly large responses
 
 	// credKeyAPIKey is the credential key for HubSpot private app access tokens.
-	// Used in ValidateCredentials and do() — keep in sync.
 	credKeyAPIKey = "api_key"
+
+	// credKeyAccessToken is the credential key for OAuth2 access tokens,
+	// set by the OAuth credential resolution path.
+	credKeyAccessToken = "access_token"
 )
 
 // HubSpotConnector owns the shared HTTP client and base URL used by all
@@ -83,13 +86,16 @@ func (c *HubSpotConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty api_key, which is required for all HubSpot API calls.
+// non-empty access token. Accepts either an OAuth2 access_token or a
+// private app api_key — both are used as Bearer tokens against the HubSpot API.
 func (c *HubSpotConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return nil
 	}
-	return nil
+	if key, ok := creds.Get(credKeyAPIKey); ok && key != "" {
+		return nil
+	}
+	return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
 }
 
 // maxAssociations limits the number of associations per request to prevent
@@ -135,11 +141,15 @@ func (c *HubSpotConnector) do(ctx context.Context, creds connectors.Credentials,
 	}
 	req.Header.Set("Accept", "application/json")
 
-	key, ok := creds.Get(credKeyAPIKey)
-	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+	// Prefer OAuth access_token; fall back to private app api_key.
+	token, _ := creds.Get(credKeyAccessToken)
+	if token == "" {
+		token, _ = creds.Get(credKeyAPIKey)
 	}
-	req.Header.Set("Authorization", "Bearer "+key)
+	if token == "" {
+		return &connectors.ValidationError{Message: "api_key or access_token credential is missing or empty"}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := c.client.Do(req)
 	if err != nil {

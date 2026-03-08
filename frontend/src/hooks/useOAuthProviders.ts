@@ -6,9 +6,10 @@ import type { components } from "@/api/schema";
 
 export type OAuthProvider = components["schemas"]["OAuthProvider"];
 
-export function useOAuthProviders() {
+export function useOAuthProviders(options?: { enabled?: boolean }) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
+  const callerEnabled = options?.enabled ?? true;
 
   const tokenRef = useRef(accessToken);
   if (accessToken) {
@@ -26,7 +27,7 @@ export function useOAuthProviders() {
       if (error) throw new Error("Failed to load OAuth providers");
       return data;
     },
-    enabled: !!accessToken,
+    enabled: !!accessToken && callerEnabled,
     staleTime: 5 * 60 * 1000,
   });
 

@@ -239,7 +239,13 @@ paths:
                           description: Pull request number
                 required_credentials:
                   - service: github
+                    auth_type: oauth2
+                    oauth_provider: github
+                    oauth_scopes:
+                      - repo
+                  - service: github_pat
                     auth_type: api_key
+                    instructions_url: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
         '404':
           description: Connector not found
           content:
@@ -5953,7 +5959,6 @@ paths:
                 $ref: '#/components/schemas/ConfigResponse'
               example:
                 billing_enabled: false
-                stripe_test_mode: false
         '401':
           $ref: '#/components/responses/Unauthorized'
   /v1/config/vapid-key:
@@ -7390,6 +7395,11 @@ components:
                   description: Pull request number
         required_credentials:
           - service: github
+            auth_type: oauth2
+            oauth_provider: github
+            oauth_scopes:
+              - repo
+          - service: github_pat
             auth_type: api_key
             instructions_url: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
     ConnectorAction:
@@ -10491,7 +10501,6 @@ components:
         fetch this once at startup to determine which UI features to show.
       required:
         - billing_enabled
-        - stripe_test_mode
         - google_oauth_configured
         - microsoft_oauth_configured
       properties:
@@ -10502,14 +10511,6 @@ components:
             limits) are active. When `false` (the default), all users have the
             unlimited `pay_as_you_go` plan and billing UI should be hidden.
             Controlled by the `BILLING_ENABLED` server environment variable.
-          example: false
-        stripe_test_mode:
-          type: boolean
-          description: |
-            Whether the server is using Stripe test-mode keys. When `true`, the
-            frontend should use `VITE_STRIPE_PUBLISHABLE_KEY_TEST` instead of
-            `VITE_STRIPE_PUBLISHABLE_KEY`. Only enabled when `STRIPE_TEST_MODE=true`
-            and `BILLING_ENABLED=true` on the server.
           example: false
         google_oauth_configured:
           type: boolean
