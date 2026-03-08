@@ -95,6 +95,9 @@ var validAuthTypes = map[string]bool{
 // in their oauth_providers section. Add new built-in providers here.
 var BuiltInOAuthProviders = map[string]bool{
 	"airtable":   true,
+	"calendly":   true,
+	"datadog":    true,
+	"discord":    true,
 	"figma":      true,
 	"github":     true,
 	"google":     true,
@@ -106,18 +109,16 @@ var BuiltInOAuthProviders = map[string]bool{
 	"microsoft":  true,
 	"notion":     true,
 	"netlify":    true,
+	"pagerduty":  true,
 	"salesforce": true,
+	"sendgrid":   true,
 	"shopify":    true,
 	"slack":      true,
 	"square":     true,
 	"stripe":     true,
+	"vercel":     true,
 	"zendesk":    true,
 	"zoom":       true,
-	"pagerduty":  true,
-	"datadog":    true,
-	"calendly":   true,
-	"discord":    true,
-	"sendgrid":   true,
 }
 
 // ReservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in
