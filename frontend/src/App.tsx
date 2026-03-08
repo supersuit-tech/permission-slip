@@ -97,11 +97,11 @@ function App() {
     <Sentry.ErrorBoundary fallback={<AppCrashFallback />} showDialog>
       <AppLayout>
         <SentryRoutes>
-          {appRoutes.map(({ path, element: Element }) => (
+          {appRoutes.map(({ path, Component }) => (
             <Route
               key={path}
               path={path}
-              element={<RouteWithBoundary><Element /></RouteWithBoundary>}
+              element={<RouteWithBoundary><Component /></RouteWithBoundary>}
             />
           ))}
           <Route path="*" element={<Navigate to="/" replace />} />

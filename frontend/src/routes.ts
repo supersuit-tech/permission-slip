@@ -8,7 +8,8 @@ import { BillingPage } from "./pages/billing/BillingPage";
 
 export interface RouteConfig {
   path: string;
-  element: ComponentType;
+  /** The page component type (not a React element). Used as `<Component />` in App.tsx. */
+  Component: ComponentType;
 }
 
 /**
@@ -18,10 +19,10 @@ export interface RouteConfig {
  * Append new routes at the end to minimize merge conflicts.
  */
 export const appRoutes: RouteConfig[] = [
-  { path: "/", element: Dashboard },
-  { path: "/agents/:agentId", element: AgentConfigPage },
-  { path: "/agents/:agentId/connectors/:connectorId", element: ConnectorConfigPage },
-  { path: "/activity", element: ActivityPage },
-  { path: "/settings", element: SettingsPage },
-  { path: "/billing", element: BillingPage },
+  { path: "/", Component: Dashboard },
+  { path: "/agents/:agentId", Component: AgentConfigPage },
+  { path: "/agents/:agentId/connectors/:connectorId", Component: ConnectorConfigPage },
+  { path: "/activity", Component: ActivityPage },
+  { path: "/settings", Component: SettingsPage },
+  { path: "/billing", Component: BillingPage },
 ];
