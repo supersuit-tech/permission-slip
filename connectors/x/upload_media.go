@@ -16,6 +16,14 @@ import (
 
 const uploadBaseURL = "https://upload.twitter.com/1.1"
 
+// maxMediaDataBytes caps the base64-encoded media_data string length at ~27 MB,
+// which covers the X API's 15 MB GIF limit plus encoding overhead (~33%).
+// Requests above this limit are rejected early without touching the network.
+const maxMediaDataBytes = 27 * 1024 * 1024
+
+// maxAltTextBytes matches the X API's documented 1000-character alt-text limit.
+const maxAltTextBytes = 1000
+
 // uploadMediaAction implements connectors.Action for x.upload_media.
 // It uploads media via POST https://upload.twitter.com/1.1/media/upload.json
 // using the simple upload method (base64-encoded media data).
@@ -33,7 +41,10 @@ type uploadMediaParams struct {
 
 func (p *uploadMediaParams) validate() error {
 	if p.MediaData == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: media_data"}
+		return errMissingParam("media_data")
+	}
+	if len(p.MediaData) > maxMediaDataBytes {
+		return errInvalidParam(fmt.Sprintf("media_data exceeds maximum allowed size (%d MB)", maxMediaDataBytes/(1024*1024)))
 	}
 	if p.MediaCategory != "" {
 		valid := map[string]bool{
@@ -42,8 +53,11 @@ func (p *uploadMediaParams) validate() error {
 			"tweet_video": true,
 		}
 		if !valid[p.MediaCategory] {
-			return &connectors.ValidationError{Message: "media_category must be one of: tweet_image, tweet_gif, tweet_video"}
+			return errInvalidParam("media_category must be one of: tweet_image, tweet_gif, tweet_video")
 		}
+	}
+	if len(p.AltText) > maxAltTextBytes {
+		return errInvalidParam(fmt.Sprintf("alt_text exceeds maximum length of %d characters", maxAltTextBytes))
 	}
 	return nil
 }
@@ -52,7 +66,7 @@ func (p *uploadMediaParams) validate() error {
 func (a *uploadMediaAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params uploadMediaParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
@@ -60,7 +74,7 @@ func (a *uploadMediaAction) Execute(ctx context.Context, req connectors.ActionRe
 
 	token, ok := req.Credentials.Get(credKeyToken)
 	if !ok || token == "" {
-		return nil, &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+		return nil, errMissingParam("access_token")
 	}
 
 	// Build form-encoded body for the v1.1 simple upload endpoint.

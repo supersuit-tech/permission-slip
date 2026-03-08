@@ -84,6 +84,60 @@ func TestUploadMedia_MissingMediaData(t *testing.T) {
 	}
 }
 
+func TestUploadMedia_OversizedMediaData(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["x.upload_media"]
+
+	// Build a media_data string that exceeds maxMediaDataBytes.
+	huge := make([]byte, maxMediaDataBytes+1)
+	for i := range huge {
+		huge[i] = 'A'
+	}
+	params, _ := json.Marshal(map[string]string{"media_data": string(huge)})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.upload_media",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestUploadMedia_AltTextTooLong(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["x.upload_media"]
+
+	longAlt := make([]byte, maxAltTextBytes+1)
+	for i := range longAlt {
+		longAlt[i] = 'x'
+	}
+	params, _ := json.Marshal(map[string]string{
+		"media_data": "abc",
+		"alt_text":   string(longAlt),
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "x.upload_media",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestUploadMedia_InvalidCategory(t *testing.T) {
 	t.Parallel()
 

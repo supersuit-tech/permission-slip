@@ -3,7 +3,6 @@ package x
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -16,25 +15,11 @@ type retweetAction struct {
 	conn *XConnector
 }
 
-// retweetParams are the parameters parsed from ActionRequest.Parameters.
-type retweetParams struct {
-	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
-	UserID  string `json:"user_id"`
-	TweetID string `json:"tweet_id"`
-}
-
-func (p *retweetParams) validate() error {
-	if p.TweetID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: tweet_id"}
-	}
-	return nil
-}
-
 // Execute retweets a tweet and returns the result.
 func (a *retweetAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params retweetParams
+	var params userTweetParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
@@ -69,9 +54,9 @@ type unretweetAction struct {
 
 // Execute undoes a retweet and returns the result.
 func (a *unretweetAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params retweetParams
+	var params userTweetParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err

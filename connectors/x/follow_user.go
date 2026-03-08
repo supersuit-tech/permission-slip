@@ -3,7 +3,6 @@ package x
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -16,25 +15,11 @@ type followUserAction struct {
 	conn *XConnector
 }
 
-// followUserParams are the parameters parsed from ActionRequest.Parameters.
-type followUserParams struct {
-	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
-	UserID       string `json:"user_id"`
-	TargetUserID string `json:"target_user_id"`
-}
-
-func (p *followUserParams) validate() error {
-	if p.TargetUserID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: target_user_id"}
-	}
-	return nil
-}
-
 // Execute follows a user and returns the result.
 func (a *followUserAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params followUserParams
+	var params userFollowParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
@@ -70,9 +55,9 @@ type unfollowUserAction struct {
 
 // Execute unfollows a user and returns the result.
 func (a *unfollowUserAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params followUserParams
+	var params userFollowParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err

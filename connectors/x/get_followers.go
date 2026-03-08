@@ -3,7 +3,6 @@ package x
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,26 +16,11 @@ type getFollowersAction struct {
 	conn *XConnector
 }
 
-// getFollowersParams are the parameters parsed from ActionRequest.Parameters.
-type getFollowersParams struct {
-	// UserID is optional; if omitted the authenticated user's ID is resolved via /users/me.
-	UserID          string `json:"user_id"`
-	MaxResults      int    `json:"max_results"`
-	PaginationToken string `json:"pagination_token"`
-}
-
-func (p *getFollowersParams) validate() error {
-	if p.MaxResults != 0 && (p.MaxResults < 1 || p.MaxResults > 1000) {
-		return &connectors.ValidationError{Message: "max_results must be between 1 and 1000"}
-	}
-	return nil
-}
-
 // Execute fetches a user's followers list.
 func (a *getFollowersAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params getFollowersParams
+	var params userListParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
@@ -75,9 +59,9 @@ type getFollowingAction struct {
 
 // Execute fetches the list of users that a user follows.
 func (a *getFollowingAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params getFollowersParams
+	var params userListParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return nil, errBadJSON(err)
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
