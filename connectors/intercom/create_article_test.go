@@ -44,7 +44,7 @@ func TestCreateArticle_Success(t *testing.T) {
 	params, _ := json.Marshal(createArticleParams{
 		Title:    "Getting Started",
 		Body:     "<p>Welcome!</p>",
-		AuthorID: "admin_1",
+		AuthorID: 12345,
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -71,7 +71,7 @@ func TestCreateArticle_MissingTitle(t *testing.T) {
 	conn := New()
 	action := &createArticleAction{conn: conn}
 
-	params, _ := json.Marshal(createArticleParams{AuthorID: "admin_1"})
+	params, _ := json.Marshal(createArticleParams{AuthorID: 12345})
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "intercom.create_article",
 		Parameters:  params,
@@ -93,7 +93,7 @@ func TestCreateArticle_InvalidState(t *testing.T) {
 
 	params, _ := json.Marshal(createArticleParams{
 		Title:    "Test",
-		AuthorID: "admin_1",
+		AuthorID: 12345,
 		State:    "archived",
 	})
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{

@@ -501,19 +501,43 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "hubspot.update_company",
 				Name:        "Update Company",
-				Description: "Update properties on an existing HubSpot company record.",
+				Description: "Update an existing HubSpot company record. Provide any combination of named fields (name, domain, phone, city, country, industry) or use the 'properties' map for custom fields. At least one field must be supplied.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["company_id", "properties"],
+					"required": ["company_id"],
 					"properties": {
 						"company_id": {
 							"type": "string",
 							"description": "HubSpot company ID (numeric)"
 						},
+						"name": {
+							"type": "string",
+							"description": "Updated company name"
+						},
+						"domain": {
+							"type": "string",
+							"description": "Updated website domain (e.g. acme.com)"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Updated company phone number"
+						},
+						"city": {
+							"type": "string",
+							"description": "Updated city"
+						},
+						"country": {
+							"type": "string",
+							"description": "Updated country"
+						},
+						"industry": {
+							"type": "string",
+							"description": "Updated industry (e.g. TECHNOLOGY, FINANCIAL_SERVICES)"
+						},
 						"properties": {
 							"type": "object",
-							"description": "Property name to value map to update",
+							"description": "Additional HubSpot company properties to update (property name to value map)",
 							"additionalProperties": {"type": "string"}
 						}
 					}
@@ -624,6 +648,34 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Full marketing admin",
 				Description: "Allow the agent to create and send email campaigns.",
 				Parameters:  json.RawMessage(`{"name":"*","subject":"*","content":"*","list_ids":"*","send_now":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_list_contacts",
+				ActionType:  "hubspot.list_contacts",
+				Name:        "List and search contacts",
+				Description: "Allow the agent to search and filter contacts in HubSpot CRM.",
+				Parameters:  json.RawMessage(`{"filters":"*","limit":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_view_contact",
+				ActionType:  "hubspot.get_contact",
+				Name:        "Look up a contact",
+				Description: "Fetch full details for a specific HubSpot contact by ID.",
+				Parameters:  json.RawMessage(`{"contact_id":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_create_company",
+				ActionType:  "hubspot.create_company",
+				Name:        "Create company",
+				Description: "Allow the agent to create new company records in HubSpot.",
+				Parameters:  json.RawMessage(`{"name":"*","domain":"*","phone":"*","city":"*","country":"*"}`),
+			},
+			{
+				ID:          "tpl_hubspot_view_pipelines",
+				ActionType:  "hubspot.list_pipelines",
+				Name:        "View deal pipelines",
+				Description: "List all deal pipelines and their stages. Read-only — useful for discovering stage IDs before creating or moving deals.",
+				Parameters:  json.RawMessage(`{"object_type":"deals"}`),
 			},
 		},
 	}

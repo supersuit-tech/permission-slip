@@ -36,8 +36,14 @@ func (p *sendMessageParams) validate() error {
 	if p.FromAdminID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: from_admin_id"}
 	}
+	if !isValidIntercomID(p.FromAdminID) {
+		return &connectors.ValidationError{Message: "from_admin_id contains invalid characters"}
+	}
 	if p.ToContactID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: to_contact_id"}
+	}
+	if !isValidIntercomID(p.ToContactID) {
+		return &connectors.ValidationError{Message: "to_contact_id contains invalid characters"}
 	}
 	msgType := p.MessageType
 	if msgType == "" {

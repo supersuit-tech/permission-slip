@@ -392,6 +392,41 @@ func (c *ZendeskConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Raise a ticket's priority to urgent. Agent chooses the ticket; priority is locked to 'urgent' to ensure only true escalations use this template.",
 				Parameters:  json.RawMessage(`{"ticket_id":"*","priority":"urgent"}`),
 			},
+			{
+				ID:          "tpl_zendesk_csat_report",
+				ActionType:  "zendesk.get_satisfaction_ratings",
+				Name:        "View CSAT ratings",
+				Description: "Fetch all customer satisfaction ratings. Agent can filter by score. Read-only — useful for support quality reviews.",
+				Parameters:  json.RawMessage(`{"score":"*","limit":25}`),
+			},
+			{
+				ID:          "tpl_zendesk_good_csat",
+				ActionType:  "zendesk.get_satisfaction_ratings",
+				Name:        "View positive CSAT responses",
+				Description: "Fetch only 'good' satisfaction ratings. Score is locked to 'good' so the agent always sees positive feedback.",
+				Parameters:  json.RawMessage(`{"score":"good","limit":25}`),
+			},
+			{
+				ID:          "tpl_zendesk_bad_csat",
+				ActionType:  "zendesk.get_satisfaction_ratings",
+				Name:        "View negative CSAT responses",
+				Description: "Fetch only 'bad' satisfaction ratings. Score is locked to 'bad' so the agent sees tickets that need follow-up.",
+				Parameters:  json.RawMessage(`{"score":"bad","limit":25}`),
+			},
+			{
+				ID:          "tpl_zendesk_list_ticket_fields",
+				ActionType:  "zendesk.list_ticket_fields",
+				Name:        "View ticket fields",
+				Description: "List all ticket fields (system and custom) in the Zendesk workspace. Read-only — useful for discovering field IDs when configuring automations.",
+				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_zendesk_create_end_user",
+				ActionType:  "zendesk.create_user",
+				Name:        "Create end-user",
+				Description: "Create a new end-user account. Role is locked to end-user to prevent accidental agent or admin creation.",
+				Parameters:  json.RawMessage(`{"name":"*","email":"*","role":"end-user"}`),
+			},
 		},
 	}
 }

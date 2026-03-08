@@ -376,8 +376,8 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Article content (HTML supported)"
 						},
 						"author_id": {
-							"type": "string",
-							"description": "Intercom admin ID of the article author"
+							"type": "integer",
+							"description": "Intercom admin ID of the article author (integer, e.g. 1234567)"
 						},
 						"state": {
 							"type": "string",
@@ -446,6 +446,27 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Resolve ticket",
 				Description: "Mark a ticket as resolved. Agent chooses which ticket to resolve; the state is locked to 'resolved' to prevent accidental state changes.",
 				Parameters:  json.RawMessage(`{"ticket_id":"*","state":"resolved"}`),
+			},
+			{
+				ID:          "tpl_intercom_search_contacts",
+				ActionType:  "intercom.search_contacts",
+				Name:        "Search contacts by email",
+				Description: "Look up an Intercom contact by email address. Returns matching contact IDs needed for other actions like creating tickets.",
+				Parameters:  json.RawMessage(`{"query":{"field":"email","operator":"=","value":"*"}}`),
+			},
+			{
+				ID:          "tpl_intercom_send_message_approval",
+				ActionType:  "intercom.send_message",
+				Name:        "Send message to customer (with approval)",
+				Description: "Send a proactive in-app message to a contact. Agent fills in the content and recipient; each message requires approval before sending.",
+				Parameters:  json.RawMessage(`{"body":"*","message_type":"inapp","from_admin_id":"*","to_contact_id":"*"}`),
+			},
+			{
+				ID:          "tpl_intercom_list_open_conversations",
+				ActionType:  "intercom.list_conversations",
+				Name:        "List open conversations",
+				Description: "List all open conversations in the Intercom workspace. State is locked to 'open' so the agent always sees the live queue.",
+				Parameters:  json.RawMessage(`{"state":"open","limit":20}`),
 			},
 		},
 	}

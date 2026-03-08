@@ -16,12 +16,12 @@ type createArticleAction struct {
 }
 
 type createArticleParams struct {
-	Title       string `json:"title"`
-	Body        string `json:"body"`
-	AuthorID    string `json:"author_id"`
-	State       string `json:"state"`       // "published" or "draft" (default)
-	ParentID    int64  `json:"parent_id"`   // optional collection ID
-	ParentType  string `json:"parent_type"` // "collection" when parent_id is set
+	Title      string `json:"title"`
+	Body       string `json:"body"`
+	AuthorID   int64  `json:"author_id"`
+	State      string `json:"state"`       // "published" or "draft" (default)
+	ParentID   int64  `json:"parent_id"`   // optional collection ID
+	ParentType string `json:"parent_type"` // "collection" when parent_id is set
 }
 
 var validArticleStates = map[string]bool{
@@ -33,8 +33,8 @@ func (p *createArticleParams) validate() error {
 	if p.Title == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: title"}
 	}
-	if p.AuthorID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: author_id"}
+	if p.AuthorID == 0 {
+		return &connectors.ValidationError{Message: "missing required parameter: author_id (must be a non-zero integer admin ID)"}
 	}
 	if p.State != "" && !validArticleStates[p.State] {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid state %q: must be draft or published", p.State)}

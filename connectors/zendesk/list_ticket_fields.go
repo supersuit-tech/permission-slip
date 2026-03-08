@@ -2,8 +2,6 @@ package zendesk
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -31,14 +29,6 @@ type ticketFieldsResponse struct {
 }
 
 func (a *listTicketFieldsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	// No parameters needed for this action — it lists all ticket fields.
-	var ignored map[string]any
-	if len(req.Parameters) > 0 && string(req.Parameters) != "null" {
-		if err := json.Unmarshal(req.Parameters, &ignored); err != nil {
-			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-		}
-	}
-
 	var resp ticketFieldsResponse
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, "/ticket_fields.json", nil, &resp); err != nil {
 		return nil, err
