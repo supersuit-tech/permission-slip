@@ -261,7 +261,7 @@ func BuiltInProviders() []Provider {
 		},
 		{
 			ID:           "vercel",
-			AuthorizeURL: "https://vercel.com/integrations/new",
+			AuthorizeURL: "https://vercel.com/oauth/authorize",
 			TokenURL:     "https://api.vercel.com/v2/oauth/access_token",
 			ClientID:     os.Getenv("VERCEL_CLIENT_ID"),
 			ClientSecret: os.Getenv("VERCEL_CLIENT_SECRET"),
