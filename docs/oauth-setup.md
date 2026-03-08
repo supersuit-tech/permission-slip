@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -45,6 +45,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `LINEAR_CLIENT_ID` | OAuth Application ID from Linear Settings |
 | `LINEAR_CLIENT_SECRET` | OAuth Client Secret from Linear Settings |
+
+### Notion OAuth
+
+| Variable | Description |
+|---|---|
+| `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
+| `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
 
 ### Square OAuth
 
@@ -247,6 +254,47 @@ LINEAR_CLIENT_SECRET=your-linear-client-secret
 
 > **Note:** Linear also supports API key authentication as an alternative. Users who prefer not to use OAuth can generate a personal API key at [Linear Settings > API > Personal API Keys](https://linear.app/docs/graphql/working-with-the-graphql-api#personal-api-keys) and configure it in the connector's credentials section.
 
+## Notion OAuth Setup
+
+Notion supports both OAuth and internal integration tokens (API keys). OAuth is recommended for end users; API keys are useful for server-to-server integrations or when OAuth is not available.
+
+### 1. Create a Notion Integration
+
+1. Go to [My Integrations](https://www.notion.so/my-integrations)
+2. Click **New integration**
+3. Fill in the required fields:
+   - Name: Your deployment name (e.g., "Permission Slip")
+   - Associated workspace: Select the workspace to connect
+4. Under **Capabilities**, select the permissions your connectors need (read content, update content, insert content)
+5. Under **Distribution**, enable **Public integration** to use OAuth
+
+### 2. Configure OAuth Settings
+
+1. In the integration settings, go to the **OAuth Domain & URIs** section
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/notion/callback
+   ```
+3. Copy the **OAuth client ID** and **OAuth client secret**
+
+### 3. Configure Environment
+
+```bash
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
+```
+
+### Alternative: API Key (Internal Integration Token)
+
+If you don't need OAuth, you can use an internal integration token instead:
+
+1. Create a **private** integration (not public) at [My Integrations](https://www.notion.so/my-integrations)
+2. Copy the **Internal Integration Secret** (starts with `ntn_`)
+3. In Permission Slip, add it as an API key credential in the connector settings
+4. Share your Notion pages/databases with the integration
+
+The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
+
 ## Square OAuth Setup
 
 ### 1. Create a Square Developer Application
@@ -419,6 +467,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
 - Linear: `https://your-domain.com/api/v1/oauth/linear/callback`
+- Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
 - Square: `https://your-domain.com/api/v1/oauth/square/callback`
 - Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`

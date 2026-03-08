@@ -263,12 +263,16 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 			if err == nil {
 				return creds, nil
 			}
-			// If the error is because the user hasn't connected OAuth,
-			// continue to the next credential type (fallback).
-			if connectors.IsOAuthRefreshError(err) {
+			// Only fall back to static credentials when the user has no OAuth
+			// connection at all (NotConnected). If the connection exists but
+			// needs re-auth or refresh failed, we must NOT silently fall back —
+			// that would mask the need to reconnect OAuth.
+			var oauthErr *connectors.OAuthRefreshError
+			if errors.As(err, &oauthErr) && oauthErr.NotConnected {
 				continue
 			}
-			// For other errors (vault misconfigured, etc.), fail immediately.
+			// For other OAuth errors (needs_reauth, refresh failed) or
+			// non-OAuth errors (vault misconfigured), fail immediately.
 			return connectors.Credentials{}, err
 		}
 	}
