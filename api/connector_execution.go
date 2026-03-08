@@ -42,43 +42,17 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	}
 
 	// Check auth_type for this connector's required credentials.
-	reqCred, err := db.GetRequiredCredentialByActionType(ctx, deps.DB, actionType)
+	// A connector may support multiple auth methods (e.g. both oauth2 and api_key).
+	// We try OAuth first; if the user has no OAuth connection, fall back to static credentials.
+	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return nil, fmt.Errorf("look up required credential: %w", err)
+		return nil, fmt.Errorf("look up required credentials: %w", err)
 	}
 
 	var creds connectors.Credentials
-	if reqCred != nil && reqCred.AuthType == "oauth2" {
-		// OAuth2 path: resolve access token from oauth_connections.
-		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
-		if err != nil {
-			// If OAuth fails (e.g., user hasn't connected), fall back to
-			// non-OAuth static credentials. This supports connectors with
-			// dual auth such as Slack (OAuth + bot token).
-			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) && oauthErr.NotConnected {
-				// Only fall back to static credentials when the user has no
-				// OAuth connection at all. Refresh failures (expired/revoked
-				// tokens) should surface to the user so they re-authorize,
-				// not silently degrade to a different credential.
-				fallbackCreds, fbErr := resolveNonOAuthCredentials(ctx, deps, userID, actionType)
-				if fbErr == nil {
-					log.Printf("[%s] OAuth not connected for %s (provider %s), falling back to static credentials",
-						actionType, userID, oauthErr.Provider)
-					creds = fallbackCreds
-					err = nil
-				}
-			}
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		// Static credential path (api_key, basic, custom): existing behavior.
-		creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
-		if err != nil {
-			return nil, err
-		}
+	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, reqCreds)
+	if err != nil {
+		return nil, err
 	}
 
 	// Validate credentials before executing the action.
@@ -244,24 +218,15 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 	}, nil
 }
 
-// resolveNonOAuthCredentials fetches static credentials for only the non-OAuth
-// services of a connector. Used as a fallback when OAuth resolution fails but
-// the connector also supports static credentials (e.g., Slack bot token).
-func resolveNonOAuthCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
-	services, err := db.GetNonOAuthServicesByActionType(ctx, deps.DB, actionType)
-	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up non-OAuth services: %w", err)
-	}
-	if len(services) == 0 {
-		return connectors.Credentials{}, fmt.Errorf("no non-OAuth credentials available")
-	}
-	return resolveStaticCredentialsForServices(ctx, deps, userID, services)
-}
-
-// resolveStaticCredentialsForServices fetches and decrypts static credentials
-// for the given list of services.
-func resolveStaticCredentialsForServices(ctx context.Context, deps *Deps, userID string, services []string) (connectors.Credentials, error) {
+// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
+// for the given action type.
+func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
 	var zero connectors.Credentials
+	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
+	if err != nil {
+		return zero, fmt.Errorf("look up required services: %w", err)
+	}
+
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
 		if deps.Vault == nil {
@@ -291,16 +256,6 @@ func resolveStaticCredentialsForServices(ctx context.Context, deps *Deps, userID
 		}
 	}
 	return connectors.NewCredentials(credMap), nil
-}
-
-// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
-// for the given action type.
-func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
-	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
-	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
-	}
-	return resolveStaticCredentialsForServices(ctx, deps, userID, services)
 }
 
 // resolveOAuthCredentials looks up the user's OAuth connection for the required
@@ -481,4 +436,45 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	conn.AccessTokenVaultID = newAccessVaultID
 
 	return nil
+}
+
+// resolveCredentialsWithFallback tries to resolve credentials using the preferred
+// auth method (OAuth first), falling back to static credentials if OAuth is
+// unavailable. This supports connectors that offer multiple auth methods (e.g.
+// Intercom supports both OAuth and API key).
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+
+	// Partition credentials by auth type.
+	var oauthCred *db.RequiredCredential
+	var hasStaticCred bool
+	for i := range reqCreds {
+		if reqCreds[i].AuthType == "oauth2" && oauthCred == nil {
+			oauthCred = &reqCreds[i]
+		} else if reqCreds[i].AuthType != "oauth2" {
+			hasStaticCred = true
+		}
+	}
+
+	// If the connector has an OAuth credential, try it first.
+	if oauthCred != nil {
+		creds, err := resolveOAuthCredentials(ctx, deps, userID, oauthCred)
+		if err == nil {
+			return creds, nil
+		}
+		// Only fall back to static credentials when the user has no OAuth
+		// connection at all (NotConnected). Other failures (expired token,
+		// refresh error, needs_reauth) should surface to the user so they
+		// can re-authorize, rather than silently degrading to a less-capable
+		// auth method.
+		var oauthErr *connectors.OAuthRefreshError
+		if hasStaticCred && errors.As(err, &oauthErr) && oauthErr.NotConnected {
+			log.Printf("[oauth-fallback] user %s has no OAuth connection for %q, falling back to static credentials", userID, oauthErr.Provider)
+		} else {
+			return zero, err
+		}
+	}
+
+	// Fall back to static credentials (api_key, basic, custom).
+	return resolveStaticCredentials(ctx, deps, userID, actionType)
 }

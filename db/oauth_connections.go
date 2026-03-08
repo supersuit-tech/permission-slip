@@ -265,8 +265,10 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 
 // GetRequiredCredentialByActionType returns the required credential for the connector
 // that owns the given action type. Used to determine auth_type at execution time.
-// When a connector has multiple credentials (e.g., both OAuth2 and bot token),
-// oauth2 is preferred so the execution engine tries the better auth path first.
+// When a connector has multiple credentials (e.g. both oauth2 and api_key),
+// this returns the oauth2 credential preferentially. The secondary sort by
+// crc.service ensures deterministic results when multiple credentials share
+// the same auth_type.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
@@ -287,16 +289,18 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 	return &rc, nil
 }
 
-// GetNonOAuthServicesByActionType returns the credential services for the connector
-// that owns the given action type, excluding oauth2 credentials. Used as a fallback
-// when the user hasn't connected via OAuth but has static credentials (e.g., bot token).
-func GetNonOAuthServicesByActionType(ctx context.Context, db DBTX, actionType string) ([]string, error) {
+// GetRequiredCredentialsByActionType returns all required credentials for the
+// connector that owns the given action type. Used when a connector supports
+// multiple auth methods (e.g. both oauth2 and api_key) and the execution layer
+// needs to try OAuth first then fall back to static credentials. The secondary
+// sort by crc.service ensures deterministic ordering within each auth_type.
+func GetRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType string) ([]RequiredCredential, error) {
 	rows, err := db.Query(ctx, `
-		SELECT crc.service
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
-		WHERE ca.action_type = $1 AND crc.auth_type != 'oauth2'
-		ORDER BY crc.service`,
+		WHERE ca.action_type = $1
+		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END, crc.service`,
 		actionType,
 	)
 	if err != nil {
@@ -304,13 +308,13 @@ func GetNonOAuthServicesByActionType(ctx context.Context, db DBTX, actionType st
 	}
 	defer rows.Close()
 
-	var services []string
+	var creds []RequiredCredential
 	for rows.Next() {
-		var s string
-		if err := rows.Scan(&s); err != nil {
+		var rc RequiredCredential
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
 			return nil, err
 		}
-		services = append(services, s)
+		creds = append(creds, rc)
 	}
-	return services, rows.Err()
+	return creds, rows.Err()
 }
