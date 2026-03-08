@@ -451,43 +451,32 @@ When this flag is set:
 - The action implementation can use `req.Payment` to pass billing details to the external service
 - A transaction record is created after successful execution for monthly spend tracking
 
-### Step 5: Register in main.go
+### Step 5: Self-register via init()
 
-Add a line to `main.go`. Because the connector implements `ManifestProvider`, its DB rows will be auto-seeded on startup:
-
-```go
-import (
-	// ...existing imports...
-	jiraconnector "github.com/supersuit-tech/permission-slip-web/connectors/jira"
-)
-
-// In the startup section:
-registry := connectors.NewRegistry()
-registry.Register(ghconnector.New())
-registry.Register(slack.New())
-registry.Register(amadeus.New())
-registry.Register(jiraconnector.New())  // ← add this
-```
-
-### Step 6: Register in the seed runner
-
-Add the manifest to `cmd/seed/main.go` in the `seedConnectors` function's `builtins` slice:
+Create `connectors/jira/register.go` so the connector registers itself at startup. No changes to `main.go` are needed — the connector is auto-discovered.
 
 ```go
-import (
-	// ...existing imports...
-	jiraconnector "github.com/supersuit-tech/permission-slip-web/connectors/jira"
-)
+package jira
 
-// In seedConnectors():
-builtins := []struct {
-	manifest *connectors.ConnectorManifest
-}{
-	{ghconnector.New().Manifest()},
-	{slackconnector.New().Manifest()},
-	{jiraconnector.New().Manifest()},  // ← add this
+import "github.com/supersuit-tech/permission-slip-web/connectors"
+
+func init() {
+	connectors.RegisterBuiltIn(New())
 }
 ```
+
+### Step 6: Add blank import to connectors/all
+
+Add one line to `connectors/all/all.go` so the import triggers the `init()` above. Append to the end of the import block to minimise merge conflicts:
+
+```go
+import (
+	// ...existing imports...
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/jira"
+)
+```
+
+Because the connector implements `ManifestProvider`, its DB rows (connector, actions, credentials, templates) are auto-seeded on startup — no manual seed step is required.
 
 ### Step 7: Write tests
 
@@ -811,8 +800,8 @@ Use this checklist when adding a new connector or action.
 - [ ] Add shared `do()` / `doPost()` helper for HTTP lifecycle
 - [ ] Add `New()` constructor and `newForTest()` for testing
 - [ ] Implement at least one action (one file per action)
-- [ ] Register connector in `main.go`: `registry.Register(yourconnector.New())`
-- [ ] Add manifest to `cmd/seed/main.go` `seedConnectors` builtins slice
+- [ ] Add `register.go` with `init()` calling `connectors.RegisterBuiltIn(New())`
+- [ ] Add blank import to `connectors/all/all.go`
 - [ ] Write connector-level tests (`ID`, `Actions`, `ValidateCredentials`, `Manifest`, interface check)
 - [ ] Write action tests (success, missing params, API errors, auth failures, timeouts)
 - [ ] Add `helpers_test.go` with `validCreds()` test helper
