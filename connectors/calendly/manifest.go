@@ -164,6 +164,11 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
+				Service:       "calendly_oauth",
+				AuthType:      "oauth2",
+				OAuthProvider: "calendly",
+			},
+			{
 				Service:         "calendly",
 				AuthType:        "api_key",
 				InstructionsURL: "https://developer.calendly.com/how-to-authenticate-with-personal-access-tokens",
