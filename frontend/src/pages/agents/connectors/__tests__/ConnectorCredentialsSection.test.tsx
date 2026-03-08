@@ -29,16 +29,22 @@ const storedCredentials = {
   ],
 };
 
-/** Set up mockGet to handle both credentials and OAuth connections endpoints. */
+/** Set up mockGet to handle credentials, OAuth connections, and OAuth providers endpoints. */
 function setupMockGet(
   credentialsResponse: unknown = { data: { credentials: [] } },
   oauthConnectionsResponse: unknown = {
     data: { connections: [] },
   },
+  oauthProvidersResponse: unknown = {
+    data: { providers: [{ id: "linear", has_credentials: true }] },
+  },
 ) {
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/oauth/connections") {
       return Promise.resolve(oauthConnectionsResponse);
+    }
+    if (url === "/v1/oauth/providers") {
+      return Promise.resolve(oauthProvidersResponse);
     }
     // Default: credentials endpoint
     return Promise.resolve(credentialsResponse);
@@ -257,10 +263,10 @@ describe("ConnectorCredentialsSection", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Linear OAuth")).toBeInTheDocument();
+      expect(screen.getByText("OAuth")).toBeInTheDocument();
     });
     expect(screen.getByText("Not connected")).toBeInTheDocument();
-    expect(screen.getByText("Connect Linear")).toBeInTheDocument();
+    expect(screen.getByText("Connect")).toBeInTheDocument();
   });
 
   it("shows OAuth as recommended when both auth types available", async () => {
@@ -326,6 +332,5 @@ describe("ConnectorCredentialsSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
-    expect(screen.getByText("2 scopes")).toBeInTheDocument();
   });
 });

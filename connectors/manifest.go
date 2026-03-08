@@ -93,12 +93,14 @@ var validAuthTypes = map[string]bool{
 // in their oauth_providers section. Add new built-in providers here.
 var BuiltInOAuthProviders = map[string]bool{
 	"google":     true,
+	"hubspot":    true,
 	"kroger":     true,
 	"linear":     true,
 	"linkedin":   true,
 	"meta":       true,
 	"microsoft":  true,
 	"salesforce": true,
+	"stripe":     true,
 	"zoom":       true,
 }
 

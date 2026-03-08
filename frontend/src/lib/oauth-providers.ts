@@ -1,7 +1,8 @@
 /**
- * Canonical display labels for known OAuth provider IDs.
- * Centralised here to avoid inconsistent capitalisation across pages
- * (e.g. "linkedin" → "Linkedin" vs "LinkedIn").
+ * Shared OAuth provider display labels. Used across settings pages and
+ * connector credential sections to render human-friendly provider names.
+ *
+ * Add new providers here rather than in individual components.
  */
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
@@ -12,13 +13,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   meta: "Meta",
   microsoft: "Microsoft",
   salesforce: "Salesforce",
+  stripe: "Stripe",
   zoom: "Zoom",
 };
 
 /**
  * Returns a human-friendly label for an OAuth provider ID.
- * Uses the canonical map for known providers and falls back to
- * title-casing the first character for unknown ones.
+ * Falls back to title-casing the ID if no label is defined.
  */
 export function providerLabel(id: string): string {
   return PROVIDER_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);

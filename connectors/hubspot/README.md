@@ -8,13 +8,27 @@ The HubSpot connector integrates Permission Slip with the [HubSpot CRM API v3](h
 
 ## Credentials
 
+HubSpot supports two authentication methods. OAuth is recommended and is the default in the UI.
+
+### OAuth (recommended)
+
+| Key | Source | Description |
+|-----|--------|-------------|
+| `access_token` | OAuth flow | Automatically managed via OAuth2 connection |
+
+Connect your HubSpot account via **Settings > Connected Accounts**. The platform handles token issuance, refresh, and encryption automatically. Required scopes are requested during the OAuth consent flow.
+
+### API Key (alternative)
+
 | Key | Required | Description |
 |-----|----------|-------------|
 | `api_key` | Yes | A HubSpot private app access token with appropriate scopes for the actions being executed. |
 
-The credential `auth_type` in the database is `api_key`. Tokens are stored encrypted in Supabase Vault and decrypted only at execution time.
+Create a [private app](https://developers.hubspot.com/docs/api/private-apps) in your HubSpot account. Select the scopes needed for your use case (see individual action docs below). Copy the access token — it starts with `pat-`.
 
-**Getting a token:** Create a [private app](https://developers.hubspot.com/docs/api/private-apps) in your HubSpot account. Select the scopes needed for your use case (see individual action docs below). Copy the access token — it starts with `pat-`.
+### Auth resolution
+
+At execution time, the system prefers OAuth credentials when available. If the user has an active OAuth connection for HubSpot, it is used. Otherwise, the system falls back to the stored API key. Both token types are passed as `Authorization: Bearer` headers — the HubSpot API accepts either format.
 
 ## Actions
 

@@ -12,8 +12,8 @@ import { useAuth } from "@/auth/AuthContext";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
-import { providerLabel } from "@/lib/oauthProviders";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,14 +82,8 @@ export function ConnectedAccountsSection() {
 
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
-    // Navigate to the OAuth authorize endpoint with the session token.
-    // The backend will redirect to the provider's consent screen.
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
-
     // Open in same window — the callback redirects back to settings
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    window.location.href = getOAuthAuthorizeUrl(providerId, session.access_token);
   }
 
   // Providers that are ready to connect but don't have an active connection

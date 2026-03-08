@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { providerLabel } from "../oauthProviders";
+import { providerLabel } from "../oauth-providers";
 
 describe("providerLabel", () => {
   it("returns canonical label for known providers", () => {
