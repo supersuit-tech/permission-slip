@@ -1,6 +1,7 @@
 /** Canonical display names for OAuth provider IDs. */
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
+  intercom: "Intercom",
   microsoft: "Microsoft",
   square: "Square",
   zoom: "Zoom",
