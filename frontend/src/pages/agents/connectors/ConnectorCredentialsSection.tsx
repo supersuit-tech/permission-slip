@@ -27,6 +27,41 @@ interface ConnectorCredentialsSectionProps {
   requiredCredentials: RequiredCredential[];
 }
 
+/** Human-readable labels for auth types. */
+const AUTH_TYPE_LABELS: Record<string, string> = {
+  api_key: "API Key",
+  basic: "Username & Password",
+  custom: "Custom Credentials",
+  oauth2: "OAuth",
+};
+
+/** Returns a human-readable label for an auth type. */
+function authTypeLabel(authType: string): string {
+  return AUTH_TYPE_LABELS[authType] ?? authType;
+}
+
+/** Capitalize a service name for display (e.g. "pagerduty" → "Pagerduty"). */
+function capitalizeService(service: string): string {
+  return service.charAt(0).toUpperCase() + service.slice(1);
+}
+
+/**
+ * Group required credentials by service so that connectors offering multiple
+ * auth methods (e.g. PagerDuty with OAuth + API key) are presented as a single
+ * group with an "or" separator instead of two independent rows.
+ */
+function groupByService(
+  creds: RequiredCredential[],
+): Map<string, RequiredCredential[]> {
+  const groups = new Map<string, RequiredCredential[]>();
+  for (const c of creds) {
+    const list = groups.get(c.service) ?? [];
+    list.push(c);
+    groups.set(c.service, list);
+  }
+  return groups;
+}
+
 export function ConnectorCredentialsSection({
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
@@ -51,6 +86,7 @@ export function ConnectorCredentialsSection({
   );
 
   const loading = (hasStatic && isLoading) || (hasOAuth && oauthLoading);
+  const serviceGroups = groupByService(requiredCredentials);
 
   return (
     <Card>
@@ -73,21 +109,36 @@ export function ConnectorCredentialsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-3">
-            {requiredCredentials.map((cred) =>
-              cred.auth_type === "oauth2" ? (
-                <OAuthCredentialRow
-                  key={`${cred.service}-${cred.auth_type}`}
-                  requiredCredential={cred}
-                  connection={oauthByProvider.get(cred.oauth_provider ?? "")}
-                />
+            {[...serviceGroups.entries()].map(([service, creds]) => {
+              const first = creds[0];
+              return first != null && creds.length === 1 ? (
+                // Single auth type — render standalone row.
+                first.auth_type === "oauth2" ? (
+                  <OAuthCredentialRow
+                    key={`${service}-oauth2`}
+                    requiredCredential={first}
+                    connection={oauthByProvider.get(
+                      first.oauth_provider ?? "",
+                    )}
+                  />
+                ) : (
+                  <StaticCredentialRow
+                    key={`${service}-${first.auth_type}`}
+                    requiredCredential={first}
+                    storedCredentials={storedByService.get(service) ?? []}
+                  />
+                )
               ) : (
-                <StaticCredentialRow
-                  key={`${cred.service}-${cred.auth_type}`}
-                  requiredCredential={cred}
-                  storedCredentials={storedByService.get(cred.service) ?? []}
+                // Multiple auth types for the same service — group them.
+                <CredentialGroup
+                  key={service}
+                  service={service}
+                  credentials={creds}
+                  oauthByProvider={oauthByProvider}
+                  storedCredentials={storedByService.get(service) ?? []}
                 />
-              ),
-            )}
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -95,12 +146,67 @@ export function ConnectorCredentialsSection({
   );
 }
 
+/** Groups multiple auth options for the same service with an "or" divider. */
+function CredentialGroup({
+  service,
+  credentials,
+  oauthByProvider,
+  storedCredentials,
+}: {
+  service: string;
+  credentials: RequiredCredential[];
+  oauthByProvider: Map<
+    string,
+    { provider: string; status: string; connected_at: string }
+  >;
+  storedCredentials: CredentialSummary[];
+}) {
+  return (
+    <div className="rounded-lg border p-3">
+      <p className="text-muted-foreground mb-2 text-xs font-medium">
+        {capitalizeService(service)} — connect with one of the following:
+      </p>
+      <div className="space-y-2">
+        {credentials.map((cred, idx) => (
+          <div key={`${cred.service}-${cred.auth_type}`}>
+            {idx > 0 && (
+              <div className="relative my-3">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card text-muted-foreground px-2">or</span>
+                </div>
+              </div>
+            )}
+            {cred.auth_type === "oauth2" ? (
+              <OAuthCredentialRow
+                requiredCredential={cred}
+                connection={oauthByProvider.get(cred.oauth_provider ?? "")}
+                nested
+              />
+            ) : (
+              <StaticCredentialRow
+                requiredCredential={cred}
+                storedCredentials={storedCredentials}
+                nested
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OAuthCredentialRow({
   requiredCredential,
   connection,
+  nested,
 }: {
   requiredCredential: RequiredCredential;
   connection?: { provider: string; status: string; connected_at: string };
+  nested?: boolean;
 }) {
   const { session } = useAuth();
   const isConnected = connection?.status === "active";
@@ -120,8 +226,10 @@ function OAuthCredentialRow({
       .toUpperCase() +
     (requiredCredential.oauth_provider ?? requiredCredential.service).slice(1);
 
+  const wrapperClass = nested ? "" : "rounded-lg border p-3";
+
   return (
-    <div className="rounded-lg border p-3">
+    <div className={wrapperClass}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {isConnected ? (
@@ -182,9 +290,11 @@ function OAuthCredentialRow({
 function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
+  nested,
 }: {
   requiredCredential: RequiredCredential;
   storedCredentials: CredentialSummary[];
+  nested?: boolean;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(
@@ -193,9 +303,11 @@ function StaticCredentialRow({
 
   const isConnected = storedCredentials.length > 0;
 
+  const wrapperClass = nested ? "" : "rounded-lg border p-3";
+
   return (
     <>
-      <div className="rounded-lg border p-3">
+      <div className={wrapperClass}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isConnected ? (
@@ -204,9 +316,11 @@ function StaticCredentialRow({
               <Circle className="text-muted-foreground size-5 shrink-0" />
             )}
             <div>
-              <p className="text-sm font-medium">{requiredCredential.service}</p>
+              <p className="text-sm font-medium">
+                {capitalizeService(requiredCredential.service)} ({authTypeLabel(requiredCredential.auth_type)})
+              </p>
               <p className="text-muted-foreground text-xs">
-                Auth type: {requiredCredential.auth_type}
+                Manual setup — you manage the credential directly
               </p>
               {requiredCredential.instructions_url && (
                 <a

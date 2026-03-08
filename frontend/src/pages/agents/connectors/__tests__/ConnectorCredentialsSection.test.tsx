@@ -243,4 +243,55 @@ describe("ConnectorCredentialsSection", () => {
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password / API Token")).toBeInTheDocument();
   });
+
+  it("groups multiple auth types for the same service with 'or' divider", async () => {
+    mockGet.mockResolvedValue({
+      data: { credentials: [], connections: [] },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          {
+            service: "pagerduty",
+            auth_type: "oauth2" as const,
+            oauth_provider: "pagerduty",
+            oauth_scopes: ["read", "write"],
+          },
+          {
+            service: "pagerduty",
+            auth_type: "api_key" as const,
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Pagerduty — connect with one of the following:"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("or")).toBeInTheDocument();
+    expect(screen.getByText("Pagerduty (OAuth)")).toBeInTheDocument();
+    expect(screen.getByText("Pagerduty (API Key)")).toBeInTheDocument();
+  });
+
+  it("shows human-readable auth type labels", async () => {
+    mockGet.mockResolvedValue({ data: { credentials: [] } });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        requiredCredentials={[
+          { service: "github", auth_type: "api_key" as const },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Github (API Key)")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("Manual setup — you manage the credential directly"),
+    ).toBeInTheDocument();
+  });
 });
