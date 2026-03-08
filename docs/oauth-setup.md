@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Meta (Facebook/Instagram), and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Google, Microsoft, Figma, Meta (Facebook/Instagram), and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -24,6 +24,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `MICROSOFT_CLIENT_ID` | Application (client) ID from Azure Portal |
 | `MICROSOFT_CLIENT_SECRET` | Client secret value from Azure Portal |
+
+### Figma OAuth
+
+| Variable | Description |
+|---|---|
+| `FIGMA_CLIENT_ID` | OAuth 2.0 Client ID from the Figma Developer settings |
+| `FIGMA_CLIENT_SECRET` | OAuth 2.0 Client Secret from the Figma Developer settings |
 
 ### Meta OAuth
 
@@ -120,6 +127,37 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 MICROSOFT_CLIENT_ID=your-application-client-id
 MICROSOFT_CLIENT_SECRET=your-client-secret-value
 ```
+
+## Figma OAuth Setup
+
+### 1. Create a Figma App
+
+1. Go to the [Figma Developer Settings](https://www.figma.com/developers/apps)
+2. Click **Create a new app**
+3. Fill in:
+   - App name: Your deployment name (e.g., "Permission Slip")
+   - Website URL: Your deployment URL
+4. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/figma/callback
+   ```
+
+### 2. Required Scopes
+
+The Figma connector requests these scopes:
+- `files:read` — read design files, components, and version history
+- `file_comments:write` — post comments on design files
+
+### 3. Configure Environment
+
+```bash
+FIGMA_CLIENT_ID=your-figma-client-id
+FIGMA_CLIENT_SECRET=your-figma-client-secret
+```
+
+### Authentication Fallback
+
+The Figma connector supports both OAuth (recommended) and personal access tokens. If a user has not connected via OAuth, the connector will fall back to any stored personal access token. Users can generate a PAT from [Figma's token management page](https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens).
 
 ## Meta (Facebook/Instagram) OAuth Setup
 
@@ -248,9 +286,10 @@ The refresh token has expired or been revoked. Click **Re-authorize** in Setting
 ### Redirect URI mismatch
 
 Ensure the redirect URI in your OAuth app matches exactly:
+- Figma: `https://your-domain.com/api/v1/oauth/figma/callback`
 - Google: `https://your-domain.com/api/v1/oauth/google/callback`
-- Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Meta: `https://your-domain.com/api/v1/oauth/meta/callback`
+- Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.

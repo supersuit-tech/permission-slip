@@ -347,7 +347,7 @@ Use `connectors.TrimIndent()` to keep inline JSON readable while stripping the s
 
 **Auth types:** `api_key`, `basic`, `custom`, `oauth2`
 
-When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"zoom"`) and optionally `oauth_scopes`. Built-in providers (`google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
+When using `oauth2`, the credential entry must include `oauth_provider` (e.g., `"google"`, `"microsoft"`, `"figma"`) and optionally `oauth_scopes`. Built-in providers (`figma`, `google`, `kroger`, `microsoft`, `zoom`) are supported out of the box. External connectors can declare custom providers in the manifest's `oauth_providers` section (see below).
 
 ```go
 // Example: OAuth2 credential in a manifest
