@@ -110,7 +110,10 @@ func safeRedirectPolicy(baseURL string) func(*http.Request, []*http.Request) err
 }
 
 // newForTest creates a FigmaConnector that points at a test server.
+// It applies safeRedirectPolicy to the provided client to match production
+// behavior (preventing credential leakage on cross-origin redirects).
 func newForTest(client *http.Client, baseURL string) *FigmaConnector {
+	client.CheckRedirect = safeRedirectPolicy(baseURL)
 	return &FigmaConnector{
 		client:  client,
 		baseURL: baseURL,
