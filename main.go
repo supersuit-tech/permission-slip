@@ -20,60 +20,13 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/supersuit-tech/permission-slip-web/api"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/connectors/airtable"
-	awsconnector "github.com/supersuit-tech/permission-slip-web/connectors/aws"
-	"github.com/supersuit-tech/permission-slip-web/connectors/amadeus"
-	asanaconnector "github.com/supersuit-tech/permission-slip-web/connectors/asana"
-	"github.com/supersuit-tech/permission-slip-web/connectors/calendly"
-	"github.com/supersuit-tech/permission-slip-web/connectors/confluence"
-	"github.com/supersuit-tech/permission-slip-web/connectors/datadog"
-	"github.com/supersuit-tech/permission-slip-web/connectors/discord"
-	"github.com/supersuit-tech/permission-slip-web/connectors/docusign"
-	"github.com/supersuit-tech/permission-slip-web/connectors/doordash"
-	"github.com/supersuit-tech/permission-slip-web/connectors/expedia"
-	"github.com/supersuit-tech/permission-slip-web/connectors/figma"
-	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
-	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
-	"github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
-	"github.com/supersuit-tech/permission-slip-web/connectors/intercom"
-	"github.com/supersuit-tech/permission-slip-web/connectors/jira"
-	krogerconnector "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
-	"github.com/supersuit-tech/permission-slip-web/connectors/linear"
-	linkedinconnector "github.com/supersuit-tech/permission-slip-web/connectors/linkedin"
-	makeconnector "github.com/supersuit-tech/permission-slip-web/connectors/make"
-	metaconnector "github.com/supersuit-tech/permission-slip-web/connectors/meta"
-	plaidconnector "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
-	quickbooksconnector "github.com/supersuit-tech/permission-slip-web/connectors/quickbooks"
-	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
-	"github.com/supersuit-tech/permission-slip-web/connectors/monday"
-	"github.com/supersuit-tech/permission-slip-web/connectors/mongodb"
-	mysqlconnector "github.com/supersuit-tech/permission-slip-web/connectors/mysql"
-	"github.com/supersuit-tech/permission-slip-web/connectors/netlify"
-	notionconnector "github.com/supersuit-tech/permission-slip-web/connectors/notion"
-	"github.com/supersuit-tech/permission-slip-web/connectors/pagerduty"
-	pgconnector "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
-	"github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
-	redisconnector "github.com/supersuit-tech/permission-slip-web/connectors/redis"
-	"github.com/supersuit-tech/permission-slip-web/connectors/salesforce"
-	"github.com/supersuit-tech/permission-slip-web/connectors/sendgrid"
-	"github.com/supersuit-tech/permission-slip-web/connectors/shopify"
-	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
-	"github.com/supersuit-tech/permission-slip-web/connectors/square"
-	stripeconnector "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
-	"github.com/supersuit-tech/permission-slip-web/connectors/trello"
-	"github.com/supersuit-tech/permission-slip-web/connectors/twilio"
-	vercelconnector "github.com/supersuit-tech/permission-slip-web/connectors/vercel"
-	"github.com/supersuit-tech/permission-slip-web/connectors/walmart"
-	xconnector "github.com/supersuit-tech/permission-slip-web/connectors/x"
-	"github.com/supersuit-tech/permission-slip-web/connectors/zapier"
-	"github.com/supersuit-tech/permission-slip-web/connectors/zendesk"
-	"github.com/supersuit-tech/permission-slip-web/connectors/zoom"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/all"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
 	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"
@@ -344,60 +297,13 @@ func main() {
 	}
 	// deps.Notifier is nil when no senders are configured — Dispatch is a no-op.
 
-	// Initialize connector registry.
+	// Initialize connector registry from self-registered built-in connectors.
+	// Each connector package registers itself via init() + connectors.RegisterBuiltIn().
+	// The blank import of connectors/all triggers all init() functions.
 	registry := connectors.NewRegistry()
-	registry.Register(airtable.New())
-	registry.Register(ghconnector.New())
-	registry.Register(googleconnector.New())
-	registry.Register(confluence.New())
-	registry.Register(hubspot.New())
-	registry.Register(jira.New())
-	registry.Register(linear.New())
-	registry.Register(linkedinconnector.New())
-	registry.Register(metaconnector.New())
-	registry.Register(microsoft.New())
-	registry.Register(monday.New())
-	registry.Register(mongodb.New())
-	registry.Register(mysqlconnector.New())
-	registry.Register(notionconnector.New())
-	registry.Register(pgconnector.New())
-	registry.Register(plaidconnector.New())
-	registry.Register(shopify.New())
-	registry.Register(slack.New())
-	// Proton Mail connector depends on a local Proton Mail Bridge daemon and is
-	// not cloud-safe. Only register when explicitly enabled.
-	if v := os.Getenv("ENABLE_PROTONMAIL_CONNECTOR"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") {
-		registry.Register(protonmail.New())
+	for _, c := range connectors.BuiltInConnectors() {
+		registry.Register(c)
 	}
-	registry.Register(quickbooksconnector.New())
-	registry.Register(redisconnector.New())
-	registry.Register(salesforce.New())
-	registry.Register(sendgrid.New())
-	registry.Register(square.New())
-	registry.Register(stripeconnector.New())
-	registry.Register(trello.New())
-	registry.Register(twilio.New())
-	registry.Register(walmart.New())
-	registry.Register(xconnector.New())
-	registry.Register(krogerconnector.New())
-	registry.Register(amadeus.New())
-	registry.Register(asanaconnector.New())
-	registry.Register(docusign.New())
-	registry.Register(awsconnector.New())
-	registry.Register(discord.New())
-	registry.Register(datadog.New())
-	registry.Register(doordash.New())
-	registry.Register(expedia.New())
-	registry.Register(figma.New())
-	registry.Register(netlify.New())
-	registry.Register(pagerduty.New())
-	registry.Register(vercelconnector.New())
-	registry.Register(zendesk.New())
-	registry.Register(intercom.New())
-	registry.Register(zoom.New())
-	registry.Register(zapier.New())
-	registry.Register(makeconnector.New())
-	registry.Register(calendly.New())
 
 	// Auto-seed built-in connectors from their manifests.
 	if deps.DB != nil {
