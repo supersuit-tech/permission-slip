@@ -11,7 +11,7 @@ export function UpgradeSuccessBanner({ onDismiss, upgraded }: UpgradeSuccessBann
       <button
         onClick={onDismiss}
         className="absolute top-3 right-3 text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200"
-        aria-label="Dismiss success message"
+        aria-label={upgraded ? "Dismiss success message" : "Dismiss upgrade notification"}
       >
         <X className="size-4" aria-hidden="true" />
       </button>

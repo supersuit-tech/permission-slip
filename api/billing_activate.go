@@ -71,6 +71,14 @@ func handleActivateUpgrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Require a Stripe subscription — a session without one (e.g.,
+		// payment mode or wrong product) shouldn't grant plan access.
+		if sess.Subscription == nil {
+			log.Printf("[%s] ActivateUpgrade: session %s has no subscription", TraceID(r.Context()), req.SessionID)
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Checkout session has no subscription"))
+			return
+		}
+
 		// Verify the session belongs to this user's Stripe customer.
 		if sub == nil || sub.StripeCustomerID == nil || sess.Customer == nil || *sub.StripeCustomerID != sess.Customer.ID {
 			log.Printf("[%s] ActivateUpgrade: customer mismatch for session %s", TraceID(r.Context()), req.SessionID)
@@ -78,14 +86,12 @@ func handleActivateUpgrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Store the Stripe subscription ID if present.
-		if sess.Subscription != nil {
-			subID := sess.Subscription.ID
-			custID := sess.Customer.ID
-			if _, err := db.UpdateSubscriptionStripe(r.Context(), deps.DB, profile.ID, &custID, &subID); err != nil {
-				log.Printf("[%s] ActivateUpgrade: save stripe IDs: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-			}
+		// Store the Stripe subscription ID.
+		subID := sess.Subscription.ID
+		custID := sess.Customer.ID
+		if _, err := db.UpdateSubscriptionStripe(r.Context(), deps.DB, profile.ID, &custID, &subID); err != nil {
+			log.Printf("[%s] ActivateUpgrade: save stripe IDs: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 
 		// Atomically upgrade — same logic as the webhook handler.

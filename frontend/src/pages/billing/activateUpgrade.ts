@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+import client from "@/api/client";
 
 /**
  * Calls POST /billing/activate to confirm a Stripe checkout session and
@@ -13,13 +13,9 @@ export async function activateUpgrade(
   accessToken: string,
 ): Promise<void> {
   try {
-    await fetch(`${API_BASE}/billing/activate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ session_id: sessionId }),
+    await client.POST("/v1/billing/activate", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: { session_id: sessionId },
     });
   } catch {
     // Best-effort — if this fails, the webhook may still activate the plan.
