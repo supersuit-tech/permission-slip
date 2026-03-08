@@ -110,6 +110,24 @@ func newForTestDocs(client *http.Client, docsBaseURL, driveBaseURL string) *Goog
 	}
 }
 
+// newCalendarForTest creates a GoogleConnector with only calendarBaseURL set,
+// for Calendar action tests.
+func newCalendarForTest(client *http.Client, calendarBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:          client,
+		calendarBaseURL: calendarBaseURL,
+	}
+}
+
+// newGmailForTest creates a GoogleConnector with only gmailBaseURL set,
+// for Gmail action tests.
+func newGmailForTest(client *http.Client, gmailBaseURL string) *GoogleConnector {
+	return &GoogleConnector{
+		client:       client,
+		gmailBaseURL: gmailBaseURL,
+	}
+}
+
 // ID returns "google", matching the connectors.id in the database.
 func (c *GoogleConnector) ID() string { return "google" }
 

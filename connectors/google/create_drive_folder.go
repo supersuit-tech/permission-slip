@@ -22,9 +22,17 @@ type createDriveFolderParams struct {
 	ParentID string `json:"parent_id"`
 }
 
+// maxDriveFolderNameLen is the maximum length of a Drive folder name.
+// Google Drive allows up to 32,767 characters, but we enforce a practical
+// limit to prevent unreasonably large API requests.
+const maxDriveFolderNameLen = 255
+
 func (p *createDriveFolderParams) validate() error {
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
+	}
+	if len(p.Name) > maxDriveFolderNameLen {
+		return &connectors.ValidationError{Message: fmt.Sprintf("name exceeds maximum length of %d characters", maxDriveFolderNameLen)}
 	}
 	if p.ParentID != "" && !isValidDriveID(p.ParentID) {
 		return &connectors.ValidationError{Message: "parent_id contains invalid characters; expected alphanumeric ID"}

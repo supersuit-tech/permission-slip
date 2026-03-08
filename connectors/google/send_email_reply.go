@@ -2,7 +2,6 @@ package google
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -43,6 +42,14 @@ func (p *sendEmailReplyParams) validate() error {
 type gmailSendReplyRequest struct {
 	Raw      string `json:"raw"`
 	ThreadID string `json:"threadId"`
+}
+
+// stripHeaderNewlines removes CR and LF from a Gmail-sourced header value to
+// prevent MIME header injection. Unlike user-supplied headers (which are
+// rejected on newlines), Gmail-provided values are silently sanitized because
+// the agent cannot control the original sender's content.
+func stripHeaderNewlines(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r", ""), "\n", "")
 }
 
 // Execute fetches the original message headers and sends a reply in the same thread.
@@ -86,11 +93,10 @@ func (a *sendEmailReplyAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, &connectors.ExternalError{Message: "could not determine reply-to address from original message; check message_id"}
 	}
 
-	// Strip newlines from header values sourced from the original message to
-	// prevent MIME header injection if the original sender crafted a malicious From/Subject.
-	origFrom = strings.ReplaceAll(strings.ReplaceAll(origFrom, "\r", ""), "\n", "")
-	origSubject = strings.ReplaceAll(strings.ReplaceAll(origSubject, "\r", ""), "\n", "")
-	origMessageID = strings.ReplaceAll(strings.ReplaceAll(origMessageID, "\r", ""), "\n", "")
+	// Sanitize Gmail-sourced header values to prevent MIME header injection.
+	origFrom = stripHeaderNewlines(origFrom)
+	origSubject = stripHeaderNewlines(origSubject)
+	origMessageID = stripHeaderNewlines(origMessageID)
 
 	// Build Re: subject if not already prefixed.
 	replySubject := origSubject
@@ -98,19 +104,11 @@ func (a *sendEmailReplyAction) Execute(ctx context.Context, req connectors.Actio
 		replySubject = "Re: " + replySubject
 	}
 
-	// Build RFC 2822 reply message.
-	var msg strings.Builder
-	msg.WriteString("To: " + origFrom + "\r\n")
-	msg.WriteString("Subject: " + replySubject + "\r\n")
-	if origMessageID != "" {
-		msg.WriteString("In-Reply-To: " + origMessageID + "\r\n")
-		msg.WriteString("References: " + origMessageID + "\r\n")
-	}
-	msg.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-	msg.WriteString("\r\n")
-	msg.WriteString(params.Body)
-
-	raw := base64.RawURLEncoding.EncodeToString([]byte(msg.String()))
+	// Build and encode the RFC 2822 reply using the shared helper.
+	raw := buildGmailRaw(origFrom, replySubject, params.Body, [][2]string{
+		{"In-Reply-To", origMessageID},
+		{"References", origMessageID},
+	})
 
 	body := gmailSendReplyRequest{
 		Raw:      raw,

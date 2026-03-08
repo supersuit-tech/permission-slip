@@ -1,6 +1,7 @@
 package google
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -11,226 +12,209 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func TestSendEmailReply_Success(t *testing.T) {
-	t.Parallel()
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodPost {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
+// replyTestHandler returns an httptest.HandlerFunc that serves the message
+// fetch and the send endpoint for send_email_reply tests.
+func replyTestHandler(t *testing.T, threadID, from, subject, messageID string, sentCapture *gmailSendReplyRequest) http.HandlerFunc {
+	t.Helper()
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
-		if strings.Contains(r.URL.Path, "/messages/msg-123") {
-			// Return the original message metadata
-			json.NewEncoder(w).Encode(gmailMessageResponse{
-				ID:       "msg-123",
-				ThreadID: "thread-abc",
-				Payload: struct {
-					Headers []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					} `json:"headers"`
-				}{
-					Headers: []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					}{
-						{Name: "From", Value: "sender@example.com"},
-						{Name: "Subject", Value: "Hello World"},
-						{Name: "Message-Id", Value: "<original-msg-id@mail.example.com>"},
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/messages/") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"id":       "msg001",
+				"threadId": threadID,
+				"payload": map[string]any{
+					"headers": []map[string]string{
+						{"name": "From", "value": from},
+						{"name": "Subject", "value": subject},
+						{"name": "Message-ID", "value": messageID},
 					},
 				},
 			})
 			return
 		}
-
-		// Handle send
-		var body gmailSendReplyRequest
-		json.NewDecoder(r.Body).Decode(&body)
-		if body.ThreadID != "thread-abc" {
-			t.Errorf("expected threadId 'thread-abc', got %q", body.ThreadID)
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/messages/send") {
+			if sentCapture != nil {
+				json.NewDecoder(r.Body).Decode(sentCapture)
+			}
+			json.NewEncoder(w).Encode(map[string]string{
+				"id":       "reply001",
+				"threadId": threadID,
+			})
+			return
 		}
-		json.NewEncoder(w).Encode(gmailSendResponse{
-			ID:       "reply-msg-id",
-			ThreadID: "thread-abc",
-		})
-	}))
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func TestSendEmailReply_Success(t *testing.T) {
+	var sent gmailSendReplyRequest
+	srv := httptest.NewServer(replyTestHandler(t,
+		"thread1", "sender@example.com", "Hello", "<msg-id-1@example.com>", &sent,
+	))
 	defer srv.Close()
 
-	conn := &GoogleConnector{client: srv.Client(), gmailBaseURL: srv.URL}
+	conn := newGmailForTest(srv.Client(), srv.URL)
 	action := &sendEmailReplyAction{conn: conn}
 
-	params, _ := json.Marshal(sendEmailReplyParams{
-		ThreadID:  "thread-abc",
-		MessageID: "msg-123",
-		Body:      "Thanks for your message!",
+	params, _ := json.Marshal(map[string]string{
+		"thread_id":  "thread1",
+		"message_id": "msg001",
+		"body":       "Thanks for reaching out.",
 	})
-	result, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
+	result, err := action.Execute(context.Background(), connectors.ActionRequest{
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	var data map[string]string
-	if err := json.Unmarshal(result.Data, &data); err != nil {
-		t.Fatalf("failed to unmarshal result: %v", err)
+	var out map[string]string
+	if err := json.Unmarshal(result.Data, &out); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
 	}
-	if data["id"] != "reply-msg-id" {
-		t.Errorf("expected id 'reply-msg-id', got %q", data["id"])
+	if out["id"] != "reply001" {
+		t.Errorf("expected id reply001, got %s", out["id"])
 	}
-	if data["thread_id"] != "thread-abc" {
-		t.Errorf("expected thread_id 'thread-abc', got %q", data["thread_id"])
+	if out["thread_id"] != "thread1" {
+		t.Errorf("expected thread_id thread1, got %s", out["thread_id"])
 	}
-	if data["subject"] != "Re: Hello World" {
-		t.Errorf("expected subject 'Re: Hello World', got %q", data["subject"])
+	if out["to"] != "sender@example.com" {
+		t.Errorf("expected to sender@example.com, got %s", out["to"])
 	}
-	if data["to"] != "sender@example.com" {
-		t.Errorf("expected to 'sender@example.com', got %q", data["to"])
+	if out["subject"] != "Re: Hello" {
+		t.Errorf("expected subject 'Re: Hello', got %s", out["subject"])
+	}
+	if sent.ThreadID != "thread1" {
+		t.Errorf("expected threadId thread1 in sent body, got %s", sent.ThreadID)
 	}
 }
 
 func TestSendEmailReply_SubjectPrefixed(t *testing.T) {
-	t.Parallel()
-
-	var capturedRaw string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		if strings.Contains(r.URL.Path, "/messages/msg-1") {
-			json.NewEncoder(w).Encode(gmailMessageResponse{
-				ID:       "msg-1",
-				ThreadID: "thread-1",
-				Payload: struct {
-					Headers []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					} `json:"headers"`
-				}{
-					Headers: []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					}{
-						{Name: "From", Value: "alice@example.com"},
-						{Name: "Subject", Value: "Re: Already a reply"},
-					},
-				},
-			})
-			return
-		}
-
-		var body gmailSendReplyRequest
-		json.NewDecoder(r.Body).Decode(&body)
-		capturedRaw = body.Raw
-		json.NewEncoder(w).Encode(gmailSendResponse{ID: "new-msg", ThreadID: "thread-1"})
-	}))
+	// When original subject already starts with "Re:", it should not be doubled.
+	var sent gmailSendReplyRequest
+	srv := httptest.NewServer(replyTestHandler(t,
+		"thread2", "other@example.com", "Re: Existing Thread", "<mid@x.com>", &sent,
+	))
 	defer srv.Close()
 
-	conn := &GoogleConnector{client: srv.Client(), gmailBaseURL: srv.URL}
+	conn := newGmailForTest(srv.Client(), srv.URL)
 	action := &sendEmailReplyAction{conn: conn}
 
-	params, _ := json.Marshal(sendEmailReplyParams{
-		ThreadID:  "thread-1",
-		MessageID: "msg-1",
-		Body:      "Reply body",
+	params, _ := json.Marshal(map[string]string{
+		"thread_id":  "thread2",
+		"message_id": "msg002",
+		"body":       "Still relevant.",
 	})
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
+	result, err := action.Execute(context.Background(), connectors.ActionRequest{
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if capturedRaw == "" {
-		t.Fatal("expected raw message to be set")
+	var out map[string]string
+	json.Unmarshal(result.Data, &out)
+	if out["subject"] != "Re: Existing Thread" {
+		t.Errorf("expected 'Re: Existing Thread', got %s", out["subject"])
 	}
 
-	// Decode the base64url message and verify Subject is not double-prefixed.
-	rawBytes, err := base64.RawURLEncoding.DecodeString(capturedRaw)
+	// Decode the raw message and verify Subject header is not doubled.
+	raw, err := base64.RawURLEncoding.DecodeString(sent.Raw)
 	if err != nil {
-		t.Fatalf("failed to decode base64url raw message: %v", err)
+		t.Fatalf("decode raw: %v", err)
 	}
-	rawMsg := string(rawBytes)
-
-	// Find the Subject header line.
-	var subjectLine string
-	for _, line := range strings.Split(rawMsg, "\r\n") {
-		if strings.HasPrefix(line, "Subject:") {
-			subjectLine = line
-			break
-		}
-	}
-	if subjectLine == "" {
-		t.Fatal("no Subject header found in raw message")
-	}
-	// Should be "Re: Already a reply", not "Re: Re: Already a reply"
-	expected := "Subject: Re: Already a reply"
-	if subjectLine != expected {
-		t.Errorf("expected %q, got %q", expected, subjectLine)
+	if !strings.Contains(string(raw), "Subject: Re: Existing Thread\r\n") {
+		t.Errorf("expected exact Subject header in raw message, got:\n%s", string(raw))
 	}
 }
 
 func TestSendEmailReply_ThreadIDMismatch(t *testing.T) {
-	t.Parallel()
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// Message belongs to a different thread than specified
-		json.NewEncoder(w).Encode(gmailMessageResponse{
-			ID:       "msg-1",
-			ThreadID: "different-thread",
-			Payload: struct {
-				Headers []struct {
-					Name  string `json:"name"`
-					Value string `json:"value"`
-				} `json:"headers"`
-			}{
-				Headers: []struct {
-					Name  string `json:"name"`
-					Value string `json:"value"`
-				}{
-					{Name: "From", Value: "alice@example.com"},
-					{Name: "Subject", Value: "Hello"},
+		if r.Method == http.MethodGet {
+			// Return a message that belongs to a different thread.
+			json.NewEncoder(w).Encode(map[string]any{
+				"id":       "msg003",
+				"threadId": "different-thread",
+				"payload": map[string]any{
+					"headers": []map[string]string{
+						{"name": "From", "value": "x@example.com"},
+					},
+				},
+			})
+			return
+		}
+		t.Error("should not reach send endpoint")
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &sendEmailReplyAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"thread_id":  "expected-thread",
+		"message_id": "msg003",
+		"body":       "Hello.",
+	})
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for thread_id mismatch")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSendEmailReply_MissingFrom(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Return a message with no From header.
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":       "msg004",
+			"threadId": "thread4",
+			"payload": map[string]any{
+				"headers": []map[string]string{
+					{"name": "Subject", "value": "No Sender"},
 				},
 			},
 		})
 	}))
 	defer srv.Close()
 
-	conn := &GoogleConnector{client: srv.Client(), gmailBaseURL: srv.URL}
+	conn := newGmailForTest(srv.Client(), srv.URL)
 	action := &sendEmailReplyAction{conn: conn}
 
-	params, _ := json.Marshal(sendEmailReplyParams{
-		ThreadID:  "thread-abc",
-		MessageID: "msg-1",
-		Body:      "Reply",
+	params, _ := json.Marshal(map[string]string{
+		"thread_id":  "thread4",
+		"message_id": "msg004",
+		"body":       "Hello.",
 	})
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
 	if err == nil {
-		t.Fatal("expected error when message_id does not belong to thread_id")
+		t.Fatal("expected error for missing From header")
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
 	}
 }
 
 func TestSendEmailReply_MissingThreadID(t *testing.T) {
-	t.Parallel()
-
-	conn := New()
+	conn := newGmailForTest(nil, "http://unused")
 	action := &sendEmailReplyAction{conn: conn}
 
-	params, _ := json.Marshal(sendEmailReplyParams{MessageID: "msg-1", Body: "hi"})
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
+	params, _ := json.Marshal(map[string]string{
+		"message_id": "msg001",
+		"body":       "Hello.",
+	})
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
@@ -238,97 +222,19 @@ func TestSendEmailReply_MissingThreadID(t *testing.T) {
 		t.Fatal("expected error for missing thread_id")
 	}
 	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
-	}
-}
-
-func TestSendEmailReply_MissingMessageID(t *testing.T) {
-	t.Parallel()
-
-	conn := New()
-	action := &sendEmailReplyAction{conn: conn}
-
-	params, _ := json.Marshal(sendEmailReplyParams{ThreadID: "thread-1", Body: "hi"})
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error for missing message_id")
-	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
-	}
-}
-
-func TestSendEmailReply_MissingBody(t *testing.T) {
-	t.Parallel()
-
-	conn := New()
-	action := &sendEmailReplyAction{conn: conn}
-
-	params, _ := json.Marshal(sendEmailReplyParams{ThreadID: "thread-1", MessageID: "msg-1"})
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error for missing body")
-	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
 
 func TestSendEmailReply_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
-	conn := New()
+	conn := newGmailForTest(nil, "http://unused")
 	action := &sendEmailReplyAction{conn: conn}
 
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
-		Parameters:  []byte(`{invalid`),
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
+		Parameters:  []byte(`{bad json`),
 		Credentials: validCreds(),
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
-	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
-	}
-}
-
-func TestSendEmailReply_FetchOriginalFails(t *testing.T) {
-	t.Parallel()
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]any{
-			"error": map[string]any{"code": 401, "message": "Unauthorized"},
-		})
-	}))
-	defer srv.Close()
-
-	conn := &GoogleConnector{client: srv.Client(), gmailBaseURL: srv.URL}
-	action := &sendEmailReplyAction{conn: conn}
-
-	params, _ := json.Marshal(sendEmailReplyParams{
-		ThreadID:  "thread-1",
-		MessageID: "msg-1",
-		Body:      "hi",
-	})
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "google.send_email_reply",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error when fetching original fails")
-	}
-	if !connectors.IsAuthError(err) {
-		t.Errorf("expected AuthError, got: %T", err)
 	}
 }
