@@ -2,7 +2,6 @@ package google
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -71,15 +70,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
-	// Build RFC 2822 message and base64url-encode it for the Gmail API.
-	var msg strings.Builder
-	msg.WriteString("To: " + params.To + "\r\n")
-	msg.WriteString("Subject: " + params.Subject + "\r\n")
-	msg.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-	msg.WriteString("\r\n")
-	msg.WriteString(params.Body)
-
-	raw := base64.RawURLEncoding.EncodeToString([]byte(msg.String()))
+	raw := buildGmailRaw(params.To, params.Subject, params.Body, nil)
 
 	body := gmailSendRequest{Raw: raw}
 	var resp gmailSendResponse
