@@ -23,20 +23,21 @@ import {
   useCreateSetupIntent,
   useConfirmPaymentMethod,
 } from "@/hooks/usePaymentMethods";
-import { useConfig } from "@/hooks/useConfig";
 
-const stripePromiseCache: Record<string, Promise<Stripe | null>> = {};
+const isDev = import.meta.env.MODE === "development";
 
-function getStripe(testMode: boolean): Promise<Stripe | null> {
-  const key = testMode
-    ? (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_TEST as string | undefined)
-    : (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined);
-  if (!key) return Promise.resolve(null);
-  const cached = stripePromiseCache[key];
-  if (cached) return cached;
-  const promise = loadStripe(key);
-  stripePromiseCache[key] = promise;
-  return promise;
+const stripePublishableKey = isDev
+  ? (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_TEST as string | undefined)
+  : (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined);
+
+let stripePromise: Promise<Stripe | null> | null = null;
+
+function getStripe(): Promise<Stripe | null> {
+  if (!stripePublishableKey) return Promise.resolve(null);
+  if (!stripePromise) {
+    stripePromise = loadStripe(stripePublishableKey);
+  }
+  return stripePromise;
 }
 
 interface AddCardDialogProps {
@@ -45,11 +46,7 @@ interface AddCardDialogProps {
 }
 
 export function AddCardDialog({ open, onOpenChange }: AddCardDialogProps) {
-  const { config } = useConfig();
-  const testMode = config?.stripe_test_mode ?? false;
-  const key = testMode
-    ? (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY_TEST as string | undefined)
-    : (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined);
+  const key = stripePublishableKey;
 
   if (!key) {
     return (
@@ -81,7 +78,7 @@ export function AddCardDialog({ open, onOpenChange }: AddCardDialogProps) {
             never touches our servers.
           </DialogDescription>
         </DialogHeader>
-        <Elements stripe={getStripe(testMode)}>
+        <Elements stripe={getStripe()}>
           <CardForm onSuccess={() => onOpenChange(false)} />
         </Elements>
       </DialogContent>

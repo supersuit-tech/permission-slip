@@ -76,50 +76,29 @@ func validateConfig() (errs []configError, warnings []configError) {
 
 	// Stripe — required when BILLING_ENABLED=true and in production.
 	// If billing is enabled but keys are missing, warn (dev) or error (prod).
-	//
-	// When STRIPE_TEST_MODE=true (dev only), the server reads _TEST-suffixed
-	// env vars instead. Validate whichever set will actually be used.
+	// In dev, just set STRIPE_SECRET_KEY etc. to your test-mode keys (sk_test_...).
 	billingEnabled := os.Getenv("BILLING_ENABLED") == "true"
 	if billingEnabled {
-		stripeTestMode := os.Getenv("STRIPE_TEST_MODE") == "true"
-
-		// Determine which env vars to validate based on test mode.
-		keyVar := "STRIPE_SECRET_KEY"
-		webhookVar := "STRIPE_WEBHOOK_SECRET"
-		priceVar := "STRIPE_PRICE_ID_REQUEST"
-		if stripeTestMode {
-			keyVar = "STRIPE_SECRET_KEY_TEST"
-			webhookVar = "STRIPE_WEBHOOK_SECRET_TEST"
-			priceVar = "STRIPE_PRICE_ID_REQUEST_TEST"
-		}
-		hasStripeKey := os.Getenv(keyVar) != ""
-		hasWebhookSecret := os.Getenv(webhookVar) != ""
-		hasPriceID := os.Getenv(priceVar) != ""
-
-		// STRIPE_TEST_MODE should only be used in development.
-		if stripeTestMode && !devMode {
-			errs = append(errs, configError{
-				envVar:  "STRIPE_TEST_MODE",
-				message: "must not be set to true in production — use live Stripe keys instead",
-			})
-		}
+		hasStripeKey := os.Getenv("STRIPE_SECRET_KEY") != ""
+		hasWebhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET") != ""
+		hasPriceID := os.Getenv("STRIPE_PRICE_ID_REQUEST") != ""
 
 		if !devMode {
 			if !hasStripeKey {
 				errs = append(errs, configError{
-					envVar:  keyVar,
+					envVar:  "STRIPE_SECRET_KEY",
 					message: "required when BILLING_ENABLED=true (Stripe API key for billing)",
 				})
 			}
 			if !hasWebhookSecret {
 				errs = append(errs, configError{
-					envVar:  webhookVar,
+					envVar:  "STRIPE_WEBHOOK_SECRET",
 					message: "required when BILLING_ENABLED=true (webhook signature verification prevents spoofed events)",
 				})
 			}
 			if !hasPriceID {
 				warnings = append(warnings, configError{
-					envVar:  priceVar,
+					envVar:  "STRIPE_PRICE_ID_REQUEST",
 					message: "not set; checkout session creation will fail without a metered price ID",
 				})
 			}
@@ -127,20 +106,6 @@ func validateConfig() (errs []configError, warnings []configError) {
 				errs = append(errs, configError{
 					envVar:  "BASE_URL",
 					message: "required when BILLING_ENABLED=true (checkout session success/cancel redirect URLs need a base URL)",
-				})
-			}
-		} else if stripeTestMode {
-			// In dev mode with test mode, warn about missing test keys.
-			if !hasStripeKey {
-				warnings = append(warnings, configError{
-					envVar:  keyVar,
-					message: "not set; STRIPE_TEST_MODE is true but test secret key is missing",
-				})
-			}
-			if !hasWebhookSecret {
-				warnings = append(warnings, configError{
-					envVar:  webhookVar,
-					message: "not set; STRIPE_TEST_MODE is true but test webhook secret is missing",
 				})
 			}
 		}
