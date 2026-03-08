@@ -33,7 +33,7 @@ func (p *searchIssuesParams) validate() error {
 			"reactions-thinking_face", "reactions-heart", "reactions-tada",
 			"interactions", "created", "updated":
 		default:
-			return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort: %q", p.Sort)}
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort: %q; must be one of: comments, reactions, reactions-+1, reactions--1, reactions-smile, reactions-thinking_face, reactions-heart, reactions-tada, interactions, created, updated", p.Sort)}
 		}
 	}
 	if p.Order != "" {

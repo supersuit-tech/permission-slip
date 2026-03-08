@@ -45,6 +45,40 @@ func TestListRepos_UserRepos(t *testing.T) {
 	}
 }
 
+func TestListRepos_InvalidParams(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["github.list_repos"]
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{"invalid type", `{"type":"invalid"}`},
+		{"invalid visibility", `{"visibility":"unknown"}`},
+		{"invalid sort", `{"sort":"badfield"}`},
+		{"per_page too large", `{"per_page":101}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "github.list_repos",
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestListRepos_OrgRepos(t *testing.T) {
 	t.Parallel()
 

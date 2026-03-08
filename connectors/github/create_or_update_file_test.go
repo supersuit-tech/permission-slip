@@ -147,3 +147,37 @@ func TestCreateOrUpdateFile_MissingParams(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateOrUpdateFile_PathInjection(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["github.create_or_update_file"]
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"query string injection", "file.txt?ref=evil"},
+		{"fragment injection", "file.txt#evil"},
+		{"absolute path", "/etc/passwd"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params := json.RawMessage(`{"owner":"o","repo":"r","path":"` + tt.path + `","message":"m","content":"Yg=="}`)
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "github.create_or_update_file",
+				Parameters:  params,
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error for path injection, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}

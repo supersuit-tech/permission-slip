@@ -57,6 +57,40 @@ func TestListPullRequests_Success(t *testing.T) {
 	}
 }
 
+func TestListPullRequests_InvalidParams(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := conn.Actions()["github.list_pull_requests"]
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{"invalid state", `{"owner":"o","repo":"r","state":"deleted"}`},
+		{"invalid sort", `{"owner":"o","repo":"r","sort":"stars"}`},
+		{"invalid direction", `{"owner":"o","repo":"r","direction":"sideways"}`},
+		{"per_page too large", `{"owner":"o","repo":"r","per_page":101}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				ActionType:  "github.list_pull_requests",
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("Execute() expected error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestListPullRequests_MissingParams(t *testing.T) {
 	t.Parallel()
 
