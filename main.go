@@ -73,6 +73,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
 	"github.com/supersuit-tech/permission-slip-web/notify/webpush"
 	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
 	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
 	"github.com/supersuit-tech/permission-slip-web/vault"

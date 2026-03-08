@@ -7,11 +7,13 @@
 //
 // # Adding a New Provider
 //
-// 1. Create a new file named after the provider (e.g., "acme.go").
+// 1. Create a new file named after the provider (e.g., "acme.go") in this
+//    package AND a matching file in connectors/providers/ (see that package's
+//    doc.go for its template). Both files are small and mechanical.
 // 2. Copy the template below and fill in the fields.
 // 3. Set the ACME_CLIENT_ID and ACME_CLIENT_SECRET environment variables in
 //    the server config.
-// 4. That's it — no other files need editing.
+// 4. No other files need editing.
 //
 // Template:
 //
@@ -20,25 +22,30 @@
 //	import (
 //		"os"
 //
-//		"github.com/supersuit-tech/permission-slip-web/connectors"
 //		"github.com/supersuit-tech/permission-slip-web/oauth"
 //	)
 //
 //	func init() {
-//		oauth.RegisterBuiltIn(oauth.Provider{
-//			ID:           "acme",
-//			AuthorizeURL: "https://acme.example.com/oauth/authorize",
-//			TokenURL:     "https://acme.example.com/oauth/token",
-//			Scopes: []string{
-//				"read",
-//				"write",
-//			},
-//			ClientID:     os.Getenv("ACME_CLIENT_ID"),
-//			ClientSecret: os.Getenv("ACME_CLIENT_SECRET"),
-//			Source:       oauth.SourceBuiltIn,
+//		oauth.RegisterBuiltIn(func() oauth.Provider {
+//			return oauth.Provider{
+//				ID:           "acme",
+//				AuthorizeURL: "https://acme.example.com/oauth/authorize",
+//				TokenURL:     "https://acme.example.com/oauth/token",
+//				Scopes: []string{
+//					"read",
+//					"write",
+//				},
+//				ClientID:     os.Getenv("ACME_CLIENT_ID"),
+//				ClientSecret: os.Getenv("ACME_CLIENT_SECRET"),
+//				Source:       oauth.SourceBuiltIn,
+//			}
 //		})
-//		connectors.RegisterBuiltInOAuthProvider("acme")
 //	}
+//
+// The factory function (rather than a plain Provider value) ensures that
+// ClientID and ClientSecret are read from environment variables at
+// BuiltInProviders() call time — after any .env file loading in main() —
+// rather than at package init time.
 //
 // If your provider sources its OAuth scopes from the connector package (e.g.,
 // because the connector manifest and the OAuth registration must stay in sync),

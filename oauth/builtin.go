@@ -7,16 +7,22 @@ import (
 
 var (
 	builtInMu        sync.Mutex
-	builtInProviders []Provider
+	builtInFactories []func() Provider
 	builtInIDs       = make(map[string]bool)
 )
 
-// RegisterBuiltIn registers a provider as a built-in platform provider.
-// It is called from init() functions in the oauth/providers package.
-// Panics immediately on duplicate IDs or missing required fields (ID,
-// AuthorizeURL, TokenURL) to surface programming errors at startup rather
-// than silently accumulating bad state.
-func RegisterBuiltIn(p Provider) {
+// RegisterBuiltIn registers a provider factory as a built-in platform provider.
+// It is called from init() functions in the oauth/providers package. Passing a
+// factory (rather than a Provider value) ensures that environment variable
+// lookups for client credentials happen at BuiltInProviders()/
+// NewRegistryWithBuiltIns() call time — after the application has had a chance
+// to load .env files — rather than at package init time.
+//
+// The factory is called once at registration time to validate required fields
+// (ID, AuthorizeURL, TokenURL). If any are missing, or if the ID is a
+// duplicate, RegisterBuiltIn panics immediately.
+func RegisterBuiltIn(factory func() Provider) {
+	p := factory() // call once to validate required fields
 	if p.ID == "" {
 		panic("oauth.RegisterBuiltIn: provider ID is required")
 	}
@@ -32,21 +38,24 @@ func RegisterBuiltIn(p Provider) {
 		panic(fmt.Sprintf("oauth.RegisterBuiltIn: duplicate built-in provider %q", p.ID))
 	}
 	builtInIDs[p.ID] = true
-	builtInProviders = append(builtInProviders, p)
+	builtInFactories = append(builtInFactories, factory)
 }
 
 // BuiltInProviders returns the platform's pre-configured OAuth providers.
 // Providers are registered via init() in the oauth/providers package, which
 // must be blank-imported by the binary entrypoint or test setup.
-// Client credentials are read from environment variables; if not set, the
-// providers are still registered (so manifest validation passes) but cannot
-// initiate OAuth flows until BYOA credentials are supplied.
+//
+// Each call re-invokes the provider factories so that client credentials are
+// read from environment variables at call time. This ensures .env files loaded
+// after package init (e.g. via godotenv in main) are reflected correctly.
 func BuiltInProviders() []Provider {
 	builtInMu.Lock()
 	defer builtInMu.Unlock()
-	cp := make([]Provider, len(builtInProviders))
-	copy(cp, builtInProviders)
-	return cp
+	out := make([]Provider, len(builtInFactories))
+	for i, f := range builtInFactories {
+		out[i] = f()
+	}
+	return out
 }
 
 // NewRegistryWithBuiltIns creates a new provider registry pre-populated with
