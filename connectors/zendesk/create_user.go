@@ -23,12 +23,6 @@ type createUserParams struct {
 	Verified bool   `json:"verified"`
 }
 
-var validZendeskUserRoles = map[string]bool{
-	"end-user": true,
-	"agent":    true,
-	"admin":    true,
-}
-
 func (p *createUserParams) validate() error {
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
@@ -37,19 +31,6 @@ func (p *createUserParams) validate() error {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid role %q: must be end-user, agent, or admin", p.Role)}
 	}
 	return nil
-}
-
-type zendeskUser struct {
-	ID       int64  `json:"id,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Phone    string `json:"phone,omitempty"`
-	Role     string `json:"role,omitempty"`
-	Verified bool   `json:"verified"`
-}
-
-type userResponse struct {
-	User zendeskUser `json:"user"`
 }
 
 func (a *createUserAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

@@ -26,12 +26,6 @@ type intercomSearchQuery struct {
 	Value    string `json:"value"`
 }
 
-type contactsSearchResponse struct {
-	Type       string           `json:"type"`
-	TotalCount int              `json:"total_count"`
-	Data       []intercomContact `json:"data"`
-}
-
 var validIntercomContactOperators = map[string]bool{
 	"=":            true,
 	"!=":           true,

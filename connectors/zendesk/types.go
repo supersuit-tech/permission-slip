@@ -42,6 +42,29 @@ type jobStatus struct {
 	URL    string `json:"url"`
 }
 
+// zendeskUser represents a Zendesk user (end-user, agent, or admin).
+// Shared between create_user and get_user actions.
+type zendeskUser struct {
+	ID       int64  `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Phone    string `json:"phone,omitempty"`
+	Role     string `json:"role,omitempty"`
+	Verified bool   `json:"verified"`
+}
+
+// userResponse wraps a single user in the Zendesk API response format.
+type userResponse struct {
+	User zendeskUser `json:"user"`
+}
+
+// validZendeskUserRoles are the allowed Zendesk user roles.
+var validZendeskUserRoles = map[string]bool{
+	"end-user": true,
+	"agent":    true,
+	"admin":    true,
+}
+
 // isValidZendeskID checks that an ID is positive (valid Zendesk ticket ID).
 func isValidZendeskID(id int64) bool {
 	return id > 0

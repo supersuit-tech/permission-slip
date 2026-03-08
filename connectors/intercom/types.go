@@ -92,6 +92,52 @@ type tagsListResponse struct {
 	Data []tag  `json:"data"`
 }
 
+// contactsSearchResponse represents the Intercom contacts search API response.
+type contactsSearchResponse struct {
+	Type       string           `json:"type"`
+	TotalCount int              `json:"total_count"`
+	Data       []intercomContact `json:"data"`
+}
+
+// intercomConversation represents a single Intercom conversation summary.
+type intercomConversation struct {
+	Type         string `json:"type"`
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	State        string `json:"state"`
+	CreatedAt    int64  `json:"created_at"`
+	UpdatedAt    int64  `json:"updated_at"`
+	WaitingSince int64  `json:"waiting_since"`
+	SnoozedUntil int64  `json:"snoozed_until"`
+}
+
+// conversationsResponse represents the Intercom conversations list API response.
+type conversationsResponse struct {
+	Type          string                 `json:"type"`
+	TotalCount    int                    `json:"total_count"`
+	Conversations []intercomConversation `json:"conversations"`
+}
+
+// outboundMessageResponse represents the Intercom outbound message API response.
+type outboundMessageResponse struct {
+	Type        string `json:"type"`
+	ID          string `json:"id"`
+	MessageType string `json:"message_type"`
+	Body        string `json:"body"`
+}
+
+// intercomArticle represents a help center article in Intercom.
+type intercomArticle struct {
+	Type      string `json:"type"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	State     string `json:"state"`
+	URL       string `json:"url"`
+	AuthorID  string `json:"author_id"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
 // isValidIntercomID checks that an Intercom string ID is safe to embed in a
 // URL path — it must be non-empty and not contain path separators or query
 // characters that could cause path traversal or injection.

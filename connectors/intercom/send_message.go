@@ -58,13 +58,6 @@ func (p *sendMessageParams) validate() error {
 	return nil
 }
 
-type outboundMessageResponse struct {
-	Type        string `json:"type"`
-	ID          string `json:"id"`
-	MessageType string `json:"message_type"`
-	Body        string `json:"body"`
-}
-
 func (a *sendMessageAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params sendMessageParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {

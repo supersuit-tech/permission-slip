@@ -22,23 +22,6 @@ type listConversationsParams struct {
 	Limit int    `json:"limit"`
 }
 
-type intercomConversation struct {
-	Type          string `json:"type"`
-	ID            string `json:"id"`
-	Title         string `json:"title"`
-	State         string `json:"state"`
-	CreatedAt     int64  `json:"created_at"`
-	UpdatedAt     int64  `json:"updated_at"`
-	WaitingSince  int64  `json:"waiting_since"`
-	SnoozedUntil  int64  `json:"snoozed_until"`
-}
-
-type conversationsResponse struct {
-	Type          string                 `json:"type"`
-	TotalCount    int                    `json:"total_count"`
-	Conversations []intercomConversation `json:"conversations"`
-}
-
 var validConversationStates = map[string]bool{
 	"open":    true,
 	"closed":  true,

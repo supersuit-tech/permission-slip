@@ -48,17 +48,6 @@ func (p *createArticleParams) validate() error {
 	return nil
 }
 
-type intercomArticle struct {
-	Type      string `json:"type"`
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	State     string `json:"state"`
-	URL       string `json:"url"`
-	AuthorID  string `json:"author_id"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
-}
-
 func (a *createArticleAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createArticleParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
