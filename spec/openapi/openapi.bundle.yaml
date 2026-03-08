@@ -7496,6 +7496,9 @@ components:
           description: |
             Authentication type required by the external service. When `oauth2`, the user
             must connect their account via the OAuth flow instead of providing static credentials.
+            A connector may declare multiple credentials for the same service with different
+            auth types (e.g. both `oauth2` and `api_key`). In that case, the platform tries
+            OAuth first and falls back to static credentials if OAuth is not configured.
           example: api_key
         instructions_url:
           type: string
