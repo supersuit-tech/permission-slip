@@ -13,6 +13,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   meta: "Meta",
   microsoft: "Microsoft",
   salesforce: "Salesforce",
+  square: "Square",
   stripe: "Stripe",
   zoom: "Zoom",
 };
@@ -27,6 +28,7 @@ export function providerLabel(id: string): string {
 
 const SERVICE_LABELS: Record<string, string> = {
   github_pat: "GitHub Personal Access Token",
+  square_api_key: "Square API Key",
 };
 
 /**
