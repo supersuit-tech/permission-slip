@@ -285,6 +285,160 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "quickbooks.create_vendor",
+				Name:        "Create Vendor",
+				Description: "Create a new vendor record in QuickBooks",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["display_name"],
+					"additionalProperties": false,
+					"properties": {
+						"display_name": {
+							"type": "string",
+							"description": "Vendor display name (must be unique in QuickBooks)"
+						},
+						"given_name": {
+							"type": "string",
+							"description": "Vendor contact first name"
+						},
+						"family_name": {
+							"type": "string",
+							"description": "Vendor contact last name"
+						},
+						"email": {
+							"type": "string",
+							"format": "email",
+							"description": "Vendor email address"
+						},
+						"phone": {
+							"type": "string",
+							"description": "Vendor phone number"
+						},
+						"company_name": {
+							"type": "string",
+							"description": "Vendor company name"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "quickbooks.create_bill",
+				Name:        "Create Bill",
+				Description: "Create a bill (accounts payable) for a vendor. WARNING: creates a financial liability entry.",
+				RiskLevel:   "high",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["vendor_id", "line_items"],
+					"additionalProperties": false,
+					"properties": {
+						"vendor_id": {
+							"type": "string",
+							"description": "QuickBooks vendor ID"
+						},
+						"line_items": {
+							"type": "array",
+							"minItems": 1,
+							"items": {
+								"type": "object",
+								"required": ["amount"],
+								"additionalProperties": false,
+								"properties": {
+									"amount": {"type": "number", "minimum": 0.01, "description": "Line item amount in dollars"},
+									"description": {"type": "string", "description": "Line item description"},
+									"account_id": {"type": "string", "description": "Expense account ID"}
+								}
+							},
+							"description": "Bill line items"
+						},
+						"due_date": {
+							"type": "string",
+							"description": "Payment due date in YYYY-MM-DD format"
+						},
+						"txn_date": {
+							"type": "string",
+							"description": "Bill date in YYYY-MM-DD format (defaults to today)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "quickbooks.list_invoices",
+				Name:        "List Invoices",
+				Description: "List invoices with optional filtering by customer or date range — read-only",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"customer_id": {
+							"type": "string",
+							"description": "Filter invoices by customer ID"
+						},
+						"start_date": {
+							"type": "string",
+							"description": "Filter invoices on or after this date (YYYY-MM-DD)"
+						},
+						"end_date": {
+							"type": "string",
+							"description": "Filter invoices on or before this date (YYYY-MM-DD)"
+						},
+						"max_results": {
+							"type": "integer",
+							"default": 100,
+							"minimum": 1,
+							"maximum": 1000,
+							"description": "Maximum number of invoices to return (default 100, max 1000)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "quickbooks.list_customers",
+				Name:        "List Customers",
+				Description: "List customer records from QuickBooks — read-only",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"display_name": {
+							"type": "string",
+							"description": "Filter customers by display name (partial match)"
+						},
+						"max_results": {
+							"type": "integer",
+							"default": 100,
+							"minimum": 1,
+							"maximum": 1000,
+							"description": "Maximum number of customers to return (default 100, max 1000)"
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:  "quickbooks.send_invoice",
+				Name:        "Send Invoice",
+				Description: "Email an invoice to a customer via QuickBooks",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["invoice_id"],
+					"additionalProperties": false,
+					"properties": {
+						"invoice_id": {
+							"type": "string",
+							"description": "QuickBooks invoice ID to send"
+						},
+						"email_to": {
+							"type": "string",
+							"format": "email",
+							"description": "Override recipient email address. Omit to use the customer's email on file."
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{

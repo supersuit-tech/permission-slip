@@ -38,6 +38,23 @@ const (
 // and hyphens, not starting or ending with a hyphen.
 var validSubdomain = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
+// validEmail matches a basic email address (local@domain.tld).
+var validEmail = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]{2,}$`)
+
+// validateEmail returns a ValidationError if value is non-empty and not a
+// valid email address format.
+func validateEmail(field, value string) error {
+	if value == "" {
+		return nil
+	}
+	if !validEmail.MatchString(value) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s must be a valid email address (got %q)", field, value),
+		}
+	}
+	return nil
+}
+
 // ShopifyConnector owns the shared HTTP client used by all Shopify actions.
 // Unlike GitHub/Slack, the base URL is dynamic — it's derived from the
 // shop_domain credential at request time.
@@ -129,6 +146,12 @@ func (c *ShopifyConnector) Actions() map[string]connectors.Action {
 		"shopify.create_discount":    &createDiscountAction{conn: c},
 		"shopify.create_collection":  &createCollectionAction{conn: c},
 		"shopify.get_analytics":      &getAnalyticsAction{conn: c},
+		"shopify.list_customers":     &listCustomersAction{conn: c},
+		"shopify.get_customer":       &getCustomerAction{conn: c},
+		"shopify.create_customer":    &createCustomerAction{conn: c},
+		"shopify.list_products":      &listProductsAction{conn: c},
+		"shopify.get_product":        &getProductAction{conn: c},
+		"shopify.create_draft_order": &createDraftOrderAction{conn: c},
 	}
 }
 

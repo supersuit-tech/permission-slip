@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -79,8 +80,12 @@ func (c *SquareConnector) Actions() map[string]connectors.Action {
 		"square.issue_refund":        &issueRefundAction{conn: c},
 		"square.update_catalog_item": &updateCatalogItemAction{conn: c},
 		"square.send_invoice":        &sendInvoiceAction{conn: c},
-		"square.get_inventory":       &getInventoryAction{conn: c},
-		"square.adjust_inventory":    &adjustInventoryAction{conn: c},
+		"square.get_inventory":          &getInventoryAction{conn: c},
+		"square.adjust_inventory":       &adjustInventoryAction{conn: c},
+		"square.list_customers":         &listCustomersAction{conn: c},
+		"square.get_customer":           &getCustomerAction{conn: c},
+		"square.list_locations":         &listLocationsAction{conn: c},
+		"square.create_loyalty_reward":  &createLoyaltyRewardAction{conn: c},
 	}
 }
 
@@ -210,3 +215,22 @@ func (c *SquareConnector) do(ctx context.Context, creds connectors.Credentials, 
 	}
 	return nil
 }
+// squareIDRe validates that a Square entity ID contains only alphanumeric characters,
+// hyphens, and underscores — the characters used by Square for all entity IDs.
+// This prevents path traversal when IDs are interpolated into URL paths.
+var squareIDRe = regexp.MustCompile(`^[A-Za-z0-9_\-]+$`)
+
+// validateSquareID returns a ValidationError if the given entity ID is non-empty
+// and contains characters outside the expected Square ID character set.
+func validateSquareID(field, value string) error {
+	if value == "" {
+		return nil
+	}
+	if !squareIDRe.MatchString(value) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s contains invalid characters for a Square ID (got %q)", field, value),
+		}
+	}
+	return nil
+}
+
