@@ -102,6 +102,20 @@ var BuiltInOAuthProviders = map[string]bool{
 	"zoom":       true,
 }
 
+// reservedAuthorizeParams lists OAuth 2.0 parameters that must not appear in
+// a manifest's authorize_params. Allowing these to be set by connectors would
+// let a malicious or misconfigured manifest override security-critical values
+// (redirect_uri, state, client_id) that the platform manages.
+var reservedAuthorizeParams = map[string]bool{
+	"redirect_uri":  true,
+	"state":         true,
+	"client_id":     true,
+	"client_secret": true,
+	"response_type": true,
+	"code":          true,
+	"grant_type":    true,
+}
+
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies
 // which schemes are accepted. Returns a descriptive error if invalid.
 func validateURL(raw, fieldName string, allowedSchemes ...string) error {
@@ -284,6 +298,14 @@ func (m *ConnectorManifest) Validate() error {
 		}
 		if err := validateURL(p.TokenURL, fmt.Sprintf("manifest validation: oauth_providers[%d].token_url", i), "https"); err != nil {
 			return err
+		}
+
+		// Reject reserved OAuth 2.0 parameters in authorize_params to prevent
+		// security issues (e.g. overriding redirect_uri, state, or client_id).
+		for k := range p.AuthorizeParams {
+			if reservedAuthorizeParams[k] {
+				return fmt.Errorf("manifest validation: oauth_providers[%d].authorize_params contains reserved OAuth parameter %q", i, k)
+			}
 		}
 
 		knownProviders[p.ID] = true

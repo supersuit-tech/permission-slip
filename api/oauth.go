@@ -37,6 +37,29 @@ import (
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
 
+// reservedOAuthParams lists OAuth 2.0 authorization request parameters that
+// must not be overridden by provider-specific AuthorizeParams. Allowing these
+// to be overridden would create security vulnerabilities:
+//   - redirect_uri: could redirect the callback to an attacker-controlled URL
+//   - state: could bypass CSRF protection
+//   - client_id/client_secret: could impersonate a different OAuth app
+//   - response_type/code: could alter the authorization grant type
+var reservedOAuthParams = map[string]bool{
+	"redirect_uri":  true,
+	"state":         true,
+	"client_id":     true,
+	"client_secret": true,
+	"response_type": true,
+	"code":          true,
+	"grant_type":    true,
+}
+
+// isReservedOAuthParam returns true if the parameter name is a reserved
+// OAuth 2.0 param that must not be overridden by AuthorizeParams.
+func isReservedOAuthParam(name string) bool {
+	return reservedOAuthParams[name]
+}
+
 // --- Response types ---
 
 type oauthProviderResponse struct {
@@ -276,6 +299,10 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// (e.g. Atlassian's audience=api.atlassian.com for 3LO).
 		authOpts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
 		for k, v := range provider.AuthorizeParams {
+			if isReservedOAuthParam(k) {
+				log.Printf("[%s] OAuthAuthorize: skipping reserved param %q from provider %q AuthorizeParams", TraceID(r.Context()), k, providerID)
+				continue
+			}
 			authOpts = append(authOpts, oauth2.SetAuthURLParam(k, v))
 		}
 		authURL := cfg.AuthCodeURL(state, authOpts...)
