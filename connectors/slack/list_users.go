@@ -62,6 +62,7 @@ type listUserSummary struct {
 	DisplayName string `json:"display_name,omitempty"`
 	Email       string `json:"email,omitempty"`
 	IsBot       bool   `json:"is_bot"`
+	IsAdmin     bool   `json:"is_admin"`
 	Deleted     bool   `json:"deleted"`
 }
 
@@ -100,6 +101,7 @@ func (a *listUsersAction) Execute(ctx context.Context, req connectors.ActionRequ
 			DisplayName: u.Profile.DisplayName,
 			Email:       u.Profile.Email,
 			IsBot:       u.IsBot,
+			IsAdmin:     u.IsAdmin,
 			Deleted:     u.Deleted,
 		})
 	}

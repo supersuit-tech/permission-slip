@@ -478,7 +478,7 @@ Lists workspace users visible to the bot, with cursor-based pagination.
 
 **Slack API:** `POST /users.list` ([docs](https://api.slack.com/methods/users.list))
 
-**Required bot token scopes:** `users:read`
+**Required bot token scopes:** `users:read` (add `users:read.email` for email addresses)
 
 ---
 
