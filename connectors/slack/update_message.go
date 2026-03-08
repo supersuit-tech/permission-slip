@@ -23,8 +23,8 @@ func (p *updateMessageParams) validate() error {
 	if err := validateChannelID(p.Channel); err != nil {
 		return err
 	}
-	if p.TS == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: ts"}
+	if err := validateMessageTS(p.TS); err != nil {
+		return err
 	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}

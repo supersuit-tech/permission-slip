@@ -171,6 +171,30 @@ func TestSendDM_ConversationsOpenError(t *testing.T) {
 	}
 }
 
+func TestSendDM_InvalidUserIDFormat(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &sendDMAction{conn: conn}
+
+	params, _ := json.Marshal(sendDMParams{
+		UserID:  "john.doe",
+		Message: "Hello",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.send_dm",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid user_id format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSendDM_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

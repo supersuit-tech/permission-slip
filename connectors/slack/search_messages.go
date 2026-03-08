@@ -32,6 +32,9 @@ func (p *searchMessagesParams) validate() error {
 	if p.Page < 0 {
 		return &connectors.ValidationError{Message: "page must be non-negative"}
 	}
+	if p.Sort != "" && p.Sort != "score" && p.Sort != "timestamp" {
+		return &connectors.ValidationError{Message: "sort must be \"score\" (relevance) or \"timestamp\""}
+	}
 	return nil
 }
 

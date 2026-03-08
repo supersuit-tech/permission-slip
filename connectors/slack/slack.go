@@ -171,6 +171,53 @@ func validateChannelID(channel string) error {
 	}
 }
 
+// validateUserID checks that a user_id parameter looks like a valid Slack user
+// ID (starts with U or W). This catches common mistakes like passing a username
+// or email instead of an ID before hitting the Slack API.
+func validateUserID(userID string) error {
+	if userID == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
+	}
+	if len(userID) < 2 {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid user ID %q: expected a Slack user ID starting with U or W (e.g. U01234567)", userID),
+		}
+	}
+	switch userID[0] {
+	case 'U', 'W':
+		return nil
+	default:
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid user ID %q: expected a Slack user ID starting with U or W — did you pass a username instead?", userID),
+		}
+	}
+}
+
+// validateMessageTS checks that a message timestamp parameter is non-empty and
+// looks like a valid Slack TS value (contains a dot, e.g. "1234567890.123456").
+// This catches typos and wrong-format values before they reach the Slack API.
+func validateMessageTS(ts string) error {
+	if ts == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: ts (message timestamp)"}
+	}
+	dotFound := false
+	for _, c := range ts {
+		if c == '.' {
+			dotFound = true
+		} else if c < '0' || c > '9' {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf("invalid message timestamp %q: expected a numeric Slack timestamp like 1234567890.123456", ts),
+			}
+		}
+	}
+	if !dotFound {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid message timestamp %q: expected a Slack timestamp with a dot separator (e.g. 1234567890.123456)", ts),
+		}
+	}
+	return nil
+}
+
 // validateLimit checks that a pagination limit is within the Slack API range (1-1000).
 // A zero value means "use default" and is always valid.
 func validateLimit(limit int) error {

@@ -20,8 +20,8 @@ type sendDMParams struct {
 }
 
 func (p *sendDMParams) validate() error {
-	if p.UserID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: user_id"}
+	if err := validateUserID(p.UserID); err != nil {
+		return err
 	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}

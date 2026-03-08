@@ -180,6 +180,30 @@ func TestSearchMessages_SlackAPIError(t *testing.T) {
 	}
 }
 
+func TestSearchMessages_InvalidSort(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &searchMessagesAction{conn: conn}
+
+	params, _ := json.Marshal(searchMessagesParams{
+		Query: "test",
+		Sort:  "invalid_sort",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.search_messages",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid sort value")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSearchMessages_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

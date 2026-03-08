@@ -148,6 +148,30 @@ func TestDeleteMessage_SlackAPIError(t *testing.T) {
 	}
 }
 
+func TestDeleteMessage_InvalidTSFormat(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &deleteMessageAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"channel": "C01234567",
+		"ts":      "abc123",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.delete_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid ts format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestDeleteMessage_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

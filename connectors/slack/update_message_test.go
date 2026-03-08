@@ -204,6 +204,31 @@ func TestUpdateMessage_InvalidChannelID(t *testing.T) {
 	}
 }
 
+func TestUpdateMessage_InvalidTSFormat(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateMessageAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"channel": "C01234567",
+		"ts":      "not-a-timestamp",
+		"message": "Updated",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.update_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid ts format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestUpdateMessage_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
