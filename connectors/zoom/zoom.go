@@ -59,13 +59,16 @@ func (c *ZoomConnector) ID() string { return "zoom" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *ZoomConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"zoom.list_meetings":            &listMeetingsAction{conn: c},
-		"zoom.create_meeting":           &createMeetingAction{conn: c},
-		"zoom.get_meeting":              &getMeetingAction{conn: c},
-		"zoom.update_meeting":           &updateMeetingAction{conn: c},
-		"zoom.delete_meeting":           &deleteMeetingAction{conn: c},
-		"zoom.list_recordings":          &listRecordingsAction{conn: c},
-		"zoom.get_meeting_participants": &getMeetingParticipantsAction{conn: c},
+		"zoom.list_meetings":              &listMeetingsAction{conn: c},
+		"zoom.create_meeting":             &createMeetingAction{conn: c},
+		"zoom.get_meeting":                &getMeetingAction{conn: c},
+		"zoom.update_meeting":             &updateMeetingAction{conn: c},
+		"zoom.delete_meeting":             &deleteMeetingAction{conn: c},
+		"zoom.list_recordings":            &listRecordingsAction{conn: c},
+		"zoom.get_meeting_participants":   &getMeetingParticipantsAction{conn: c},
+		"zoom.add_registrant":             &addRegistrantAction{conn: c},
+		"zoom.get_recording_transcript":   &getRecordingTranscriptAction{conn: c},
+		"zoom.send_chat_message":          &sendChatMessageAction{conn: c},
 	}
 }
 

@@ -59,11 +59,16 @@ func (c *ConfluenceConnector) ID() string { return "confluence" }
 // Actions returns the registered action handlers keyed by action_type.
 func (c *ConfluenceConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"confluence.create_page":  &createPageAction{conn: c},
-		"confluence.update_page":  &updatePageAction{conn: c},
-		"confluence.get_page":     &getPageAction{conn: c},
-		"confluence.search":       &searchAction{conn: c},
-		"confluence.add_comment":  &addCommentAction{conn: c},
+		"confluence.create_page":     &createPageAction{conn: c},
+		"confluence.update_page":     &updatePageAction{conn: c},
+		"confluence.get_page":        &getPageAction{conn: c},
+		"confluence.search":          &searchAction{conn: c},
+		"confluence.add_comment":     &addCommentAction{conn: c},
+		"confluence.list_spaces":     &listSpacesAction{conn: c},
+		"confluence.list_pages":      &listPagesAction{conn: c},
+		"confluence.delete_page":     &deletePageAction{conn: c},
+		"confluence.get_attachments": &getAttachmentsAction{conn: c},
+		"confluence.add_attachment":  &addAttachmentAction{conn: c},
 	}
 }
 
