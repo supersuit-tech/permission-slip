@@ -297,6 +297,83 @@ describe("ConnectorCredentialsSection", () => {
     expect(screen.getByText("Recommended")).toBeInTheDocument();
   });
 
+  it("shows OAuth credential row for Slack oauth2 auth type", async () => {
+    setupMockGet({
+      "/v1/oauth/providers": {
+        data: {
+          providers: [{ id: "slack", has_credentials: true }],
+        },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2" as const,
+            oauth_provider: "slack",
+            oauth_scopes: ["chat:write", "channels:read"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("OAuth")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Connect your Slack account via OAuth for automatic token management",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows OAuth connected status when user has connection", async () => {
+    setupMockGet({
+      "/v1/oauth/connections": {
+        data: {
+          connections: [
+            {
+              provider: "slack",
+              status: "active",
+              scopes: ["chat:write"],
+              connected_at: "2026-03-01T10:00:00Z",
+            },
+          ],
+        },
+      },
+      "/v1/oauth/providers": {
+        data: {
+          providers: [{ id: "slack", has_credentials: true }],
+        },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2" as const,
+            oauth_provider: "slack",
+            oauth_scopes: ["chat:write"],
+          },
+        ]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByLabelText("Disconnect Slack"),
+    ).toBeInTheDocument();
+  });
+
   it("shows both OAuth and API key options for mixed credentials", async () => {
     setupMockGet();
 

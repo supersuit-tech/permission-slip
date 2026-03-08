@@ -56,7 +56,8 @@ type Provider struct {
 
 	// AuthorizeParams are extra query parameters appended to the authorization
 	// URL. Some providers require additional params beyond the standard OAuth 2.0
-	// set (e.g. Atlassian needs audience=api.atlassian.com for 3LO).
+	// set (e.g. Atlassian needs audience=api.atlassian.com for 3LO, Slack needs
+	// comma-separated scopes via a "scope" override).
 	AuthorizeParams map[string]string
 
 	// Source indicates where the provider configuration originated.
@@ -216,7 +217,6 @@ func (r *Registry) Register(p Provider) error {
 	if !ProviderIDPattern.MatchString(p.ID) {
 		return fmt.Errorf("oauth provider ID %q must match %s", p.ID, ProviderIDPattern.String())
 	}
-
 	// Deep-copy slices and maps so the caller cannot mutate the registry's
 	// stored data after registration.
 	p.Scopes = copyStrings(p.Scopes)

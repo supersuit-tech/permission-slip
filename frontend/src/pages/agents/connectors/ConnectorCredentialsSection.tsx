@@ -65,9 +65,11 @@ export function ConnectorCredentialsSection({
   });
   // Also fetch OAuth data when there's a matching built-in provider (e.g.
   // Shopify declares api_key in manifest but has a built-in OAuth provider).
-  const { connections, isLoading: connectionsLoading } = useOAuthConnections({
-    enabled: true,
-  });
+  const {
+    connections,
+    isLoading: connectionsLoading,
+    error: oauthError,
+  } = useOAuthConnections({ enabled: true });
   const { providers, isLoading: providersLoading } = useOAuthProviders({
     enabled: true,
   });
@@ -118,8 +120,8 @@ export function ConnectorCredentialsSection({
               aria-hidden="true"
             />
           </div>
-        ) : error ? (
-          <p className="text-destructive text-sm">{error}</p>
+        ) : error || oauthError ? (
+          <p className="text-destructive text-sm">{error ?? oauthError}</p>
         ) : (
           <div className="space-y-3">
             {/* Implicit OAuth row for connectors with a matching built-in
@@ -237,6 +239,8 @@ function OAuthCredentialRow({
     }
   }
 
+  const scopes = requiredCredential.oauth_scopes ?? [];
+
   return (
     <>
       <div className="rounded-lg border p-3">
@@ -245,7 +249,7 @@ function OAuthCredentialRow({
             {isConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
             ) : needsReauth ? (
-              <AlertTriangle className="text-destructive size-5 shrink-0" />
+              <AlertTriangle className="size-5 shrink-0 text-amber-500" />
             ) : (
               <Circle className="text-muted-foreground size-5 shrink-0" />
             )}
@@ -262,8 +266,11 @@ function OAuthCredentialRow({
                 </Badge>
               </div>
               <p className="text-muted-foreground text-xs">
-                Connect your {providerLabel(providerId)} account via OAuth for
-                automatic token management
+                {isConnected
+                  ? `Connected ${new Date(connection.connected_at).toLocaleDateString()}`
+                  : needsReauth
+                    ? "Connection expired or was revoked \u2014 re-authorize to restore access"
+                    : `Connect your ${providerLabel(providerId)} account via OAuth for automatic token management`}
               </p>
             </div>
           </div>
@@ -316,6 +323,13 @@ function OAuthCredentialRow({
             )}
           </div>
         </div>
+        {scopes.length > 0 && !isConnected && (
+          <div className="mt-2 pl-8">
+            <p className="text-muted-foreground text-[11px]">
+              Permissions requested: {scopes.join(", ")}
+            </p>
+          </div>
+        )}
         {!isConnected && !needsReauth && !provider?.has_credentials && (
           <p className="text-muted-foreground mt-2 text-xs">
             OAuth is not available yet — ask your admin to configure{" "}

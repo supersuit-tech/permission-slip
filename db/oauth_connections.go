@@ -276,7 +276,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
-		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END
+		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END, crc.service
 		LIMIT 1`,
 		actionType,
 	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)

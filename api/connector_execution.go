@@ -264,11 +264,11 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 				return creds, nil
 			}
 			// Only fall back to static credentials when the user has no OAuth
-			// connection at all (MissingConnection). If the connection exists but
+			// connection at all (NotConnected). If the connection exists but
 			// needs re-auth or refresh failed, we must NOT silently fall back —
 			// that would mask the need to reconnect OAuth.
 			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) && oauthErr.MissingConnection {
+			if errors.As(err, &oauthErr) && oauthErr.NotConnected {
 				continue
 			}
 			// For other OAuth errors (needs_reauth, refresh failed) or
@@ -321,9 +321,10 @@ func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID, 
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
 // for the given action type.
 func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
+	var zero connectors.Credentials
 	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
 	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
+		return zero, fmt.Errorf("look up required services: %w", err)
 	}
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
@@ -402,9 +403,9 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	}
 	if conn == nil {
 		return zero, &connectors.OAuthRefreshError{
-			Provider:          providerID,
-			Message:           fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
-			MissingConnection: true,
+			Provider:     providerID,
+			Message:      fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			NotConnected: true,
 		}
 	}
 
