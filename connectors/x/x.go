@@ -31,8 +31,9 @@ const (
 // X/Twitter actions. Actions hold a pointer back to the connector to access
 // these shared resources.
 type XConnector struct {
-	client  *http.Client
-	baseURL string
+	client        *http.Client
+	baseURL       string
+	uploadBaseURL string // overridden in tests; defaults to uploadBaseURL const
 }
 
 // New creates an XConnector with sensible defaults (30s timeout,
@@ -47,8 +48,9 @@ func New() *XConnector {
 // newForTest creates an XConnector that points at a test server.
 func newForTest(client *http.Client, baseURL string) *XConnector {
 	return &XConnector{
-		client:  client,
-		baseURL: baseURL,
+		client:        client,
+		baseURL:       baseURL,
+		uploadBaseURL: baseURL,
 	}
 }
 
@@ -64,6 +66,15 @@ func (c *XConnector) Actions() map[string]connectors.Action {
 		"x.get_user_tweets": &getUserTweetsAction{conn: c},
 		"x.search_tweets":   &searchTweetsAction{conn: c},
 		"x.get_me":          &getMeAction{conn: c},
+		"x.like_tweet":      &likeTweetAction{conn: c},
+		"x.unlike_tweet":    &unlikeTweetAction{conn: c},
+		"x.retweet":         &retweetAction{conn: c},
+		"x.unretweet":       &unretweetAction{conn: c},
+		"x.follow_user":     &followUserAction{conn: c},
+		"x.unfollow_user":   &unfollowUserAction{conn: c},
+		"x.get_followers":   &getFollowersAction{conn: c},
+		"x.get_following":   &getFollowingAction{conn: c},
+		"x.upload_media":    &uploadMediaAction{conn: c},
 	}
 }
 
