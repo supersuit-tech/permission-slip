@@ -265,6 +265,8 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 
 // GetRequiredCredentialByActionType returns the required credential for the connector
 // that owns the given action type. Used to determine auth_type at execution time.
+// When a connector declares multiple auth methods (e.g. oauth2 + api_key),
+// oauth2 is preferred so tokens are resolved automatically.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
@@ -272,6 +274,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
+		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END
 		LIMIT 1`,
 		actionType,
 	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)

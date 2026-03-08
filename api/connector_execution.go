@@ -52,7 +52,13 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			return nil, err
+			// If OAuth resolution fails, fall back to static credentials.
+			// This supports dual-auth connectors where the user may have
+			// configured an API key instead of connecting via OAuth.
+			creds, err = resolveStaticCredentials(ctx, deps, userID, actionType)
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		// Static credential path (api_key, basic, custom): existing behavior.

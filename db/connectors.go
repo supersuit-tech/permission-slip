@@ -137,17 +137,21 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 // GetRequiredServicesByActionType returns the list of credential services
 // required by the connector that owns the given action type.
+// Only returns non-OAuth services (auth_type != 'oauth2') since OAuth
+// credentials are resolved separately via oauth_connections.
 // Returns an empty slice if the action type has no required credentials.
 // Returns nil, nil if the action type is not found in the database.
 func GetRequiredServicesByActionType(ctx context.Context, db DBTX, actionType string) ([]string, error) {
 	// Use a LEFT JOIN so that a matching action with no required credentials
 	// returns a single row with a NULL service (→ empty slice) while a
 	// non-matching action type returns zero rows (→ nil, nil).
+	// Exclude oauth2 services — those are resolved via resolveOAuthCredentials.
 	rows, err := db.Query(ctx, `
 		SELECT crc.service
 		FROM connector_actions ca
 		LEFT JOIN connector_required_credentials crc
 		       ON crc.connector_id = ca.connector_id
+		      AND (crc.auth_type IS NULL OR crc.auth_type != 'oauth2')
 		WHERE ca.action_type = $1
 		ORDER BY crc.service`,
 		actionType,

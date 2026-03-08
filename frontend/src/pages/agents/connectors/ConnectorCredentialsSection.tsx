@@ -21,8 +21,10 @@ import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
+import type { OAuthConnection } from "@/hooks/useOAuthConnections";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
+import { providerLabel, serviceDisplayName } from "@/lib/providerLabels";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
@@ -44,27 +46,6 @@ function authTypeLabel(authType: string): string {
     default:
       return authType;
   }
-}
-
-function providerLabel(id: string): string {
-  const labels: Record<string, string> = {
-    google: "Google",
-    microsoft: "Microsoft",
-    square: "Square",
-    zoom: "Zoom",
-    salesforce: "Salesforce",
-    meta: "Meta",
-    linkedin: "LinkedIn",
-    kroger: "Kroger",
-  };
-  return labels[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
-}
-
-/** Map service IDs like "square_api_key" to a friendlier display name. */
-function serviceDisplayName(service: string): string {
-  // Strip common suffixes to get the base provider name, then titlecase it.
-  const base = service.replace(/_(api_key|oauth|token|creds?)$/i, "");
-  return providerLabel(base);
 }
 
 export function ConnectorCredentialsSection({
@@ -111,7 +92,7 @@ export function ConnectorCredentialsSection({
               aria-hidden="true"
             />
           </div>
-        ) : error || oauthError ? (
+        ) : error || (hasOAuth && oauthError) ? (
           <p className="text-destructive text-sm">{error ?? oauthError}</p>
         ) : (
           <div className="space-y-3">
@@ -156,13 +137,6 @@ export function ConnectorCredentialsSection({
       </CardContent>
     </Card>
   );
-}
-
-interface OAuthConnection {
-  provider: string;
-  status: string;
-  scopes: string[];
-  connected_at: string;
 }
 
 function OAuthCredentialRow({
