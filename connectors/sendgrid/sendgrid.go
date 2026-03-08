@@ -22,6 +22,10 @@ const (
 
 	credKeyAPIKey = "api_key"
 
+	// credKeyAccessToken is the credential key for OAuth2 access tokens,
+	// set by the OAuth credential resolution path.
+	credKeyAccessToken = "access_token"
+
 	// maxResponseBody is the maximum response body size we'll read from SendGrid.
 	maxResponseBody = 1 << 20 // 1 MiB
 
@@ -74,11 +78,15 @@ func (c *SendGridConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// valid SendGrid API key.
+// non-empty access token. Accepts either an OAuth2 access_token or an
+// api_key — both are used as Bearer tokens against the SendGrid v3 API.
 func (c *SendGridConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
+	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
+		return nil
+	}
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
 	}
 	if len(key) < minAPIKeyLen {
 		return &connectors.ValidationError{Message: fmt.Sprintf("api_key is too short (minimum %d characters)", minAPIKeyLen)}
@@ -88,8 +96,15 @@ func (c *SendGridConnector) ValidateCredentials(_ context.Context, creds connect
 
 // doJSON sends a JSON-encoded request to the SendGrid API and decodes
 // the response. SendGrid's v3 API uses application/json throughout.
+// It accepts either an OAuth2 access_token or an api_key as the Bearer token.
 func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, path string, body any, respBody any) error {
-	apiKey, _ := creds.Get(credKeyAPIKey)
+	token, _ := creds.Get(credKeyAccessToken)
+	if token == "" {
+		token, _ = creds.Get(credKeyAPIKey)
+	}
+	if token == "" {
+		return &connectors.ValidationError{Message: "missing required credential: api_key or access_token (OAuth)"}
+	}
 
 	reqURL := c.baseURL + path
 
@@ -106,7 +121,7 @@ func (c *SendGridConnector) doJSON(ctx context.Context, creds connectors.Credent
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("creating request: %v", err)}
 	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+token)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
