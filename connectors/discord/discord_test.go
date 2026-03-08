@@ -72,33 +72,18 @@ func TestDiscordConnector_ValidateCredentials(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid bot_token",
+			name:    "valid token",
 			creds:   connectors.NewCredentials(map[string]string{"bot_token": "test-token"}),
 			wantErr: false,
 		},
 		{
-			name:    "valid access_token (OAuth)",
-			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-token-value"}),
-			wantErr: false,
-		},
-		{
-			name:    "access_token preferred over bot_token",
-			creds:   connectors.NewCredentials(map[string]string{"access_token": "oauth-tok", "bot_token": "bot-tok"}),
-			wantErr: false,
-		},
-		{
-			name:    "missing both tokens",
+			name:    "missing token",
 			creds:   connectors.NewCredentials(map[string]string{}),
 			wantErr: true,
 		},
 		{
-			name:    "empty bot_token",
+			name:    "empty token",
 			creds:   connectors.NewCredentials(map[string]string{"bot_token": ""}),
-			wantErr: true,
-		},
-		{
-			name:    "empty access_token",
-			creds:   connectors.NewCredentials(map[string]string{"access_token": ""}),
 			wantErr: true,
 		},
 	}
@@ -114,89 +99,39 @@ func TestDiscordConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
-func TestDiscordConnector_ResolveAuth(t *testing.T) {
-	t.Parallel()
-	c := New()
-
-	tests := []struct {
-		name       string
-		creds      connectors.Credentials
-		wantToken  string
-		wantPrefix string
-	}{
-		{
-			name:       "access_token uses Bearer",
-			creds:      connectors.NewCredentials(map[string]string{"access_token": "oauth-tok"}),
-			wantToken:  "oauth-tok",
-			wantPrefix: "Bearer ",
-		},
-		{
-			name:       "bot_token uses Bot",
-			creds:      connectors.NewCredentials(map[string]string{"bot_token": "bot-tok"}),
-			wantToken:  "bot-tok",
-			wantPrefix: "Bot ",
-		},
-		{
-			name:       "access_token preferred over bot_token",
-			creds:      connectors.NewCredentials(map[string]string{"access_token": "oauth-tok", "bot_token": "bot-tok"}),
-			wantToken:  "oauth-tok",
-			wantPrefix: "Bearer ",
-		},
-		{
-			name:       "no credentials returns empty",
-			creds:      connectors.NewCredentials(map[string]string{}),
-			wantToken:  "",
-			wantPrefix: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			token, header := c.resolveAuth(tt.creds)
-			if token != tt.wantToken {
-				t.Errorf("token = %q, want %q", token, tt.wantToken)
-			}
-			if tt.wantPrefix != "" {
-				if header != tt.wantPrefix+tt.wantToken {
-					t.Errorf("header = %q, want %q", header, tt.wantPrefix+tt.wantToken)
-				}
-			} else if header != "" {
-				t.Errorf("header = %q, want empty", header)
-			}
-		})
-	}
-}
-
 func TestDiscordConnector_ManifestCredentials(t *testing.T) {
 	t.Parallel()
 	c := New()
 	m := c.Manifest()
 
-	if len(m.RequiredCredentials) != 2 {
-		t.Fatalf("expected 2 required credentials, got %d", len(m.RequiredCredentials))
+	if len(m.RequiredCredentials) != 1 {
+		t.Fatalf("expected 1 required credential, got %d", len(m.RequiredCredentials))
 	}
 
-	oauthCred := m.RequiredCredentials[0]
-	if oauthCred.Service != "discord" {
-		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "discord")
+	cred := m.RequiredCredentials[0]
+	if cred.Service != "discord" {
+		t.Errorf("credential service = %q, want %q", cred.Service, "discord")
 	}
-	if oauthCred.AuthType != "oauth2" {
-		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
+	if cred.AuthType != "custom" {
+		t.Errorf("credential auth_type = %q, want %q", cred.AuthType, "custom")
 	}
-	if oauthCred.OAuthProvider != "discord" {
-		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "discord")
-	}
-	if len(oauthCred.OAuthScopes) == 0 {
-		t.Error("oauth credential oauth_scopes is empty, want at least one scope")
-	}
+}
 
-	customCred := m.RequiredCredentials[1]
-	if customCred.Service != "discord_bot" {
-		t.Errorf("custom credential service = %q, want %q", customCred.Service, "discord_bot")
+func TestDiscordOAuthScopes(t *testing.T) {
+	t.Parallel()
+	if len(OAuthScopes) == 0 {
+		t.Error("OAuthScopes should not be empty")
 	}
-	if customCred.AuthType != "custom" {
-		t.Errorf("custom credential auth_type = %q, want %q", customCred.AuthType, "custom")
+	// Verify expected scopes are present.
+	scopes := make(map[string]bool, len(OAuthScopes))
+	for _, s := range OAuthScopes {
+		scopes[s] = true
+	}
+	if !scopes["bot"] {
+		t.Error("OAuthScopes should include 'bot'")
+	}
+	if !scopes["guilds"] {
+		t.Error("OAuthScopes should include 'guilds'")
 	}
 }
 
@@ -287,7 +222,7 @@ func TestMapDiscordError(t *testing.T) {
 			code:       0,
 			message:    "",
 			wantType:   "auth",
-			wantSubstr: "invalid token",
+			wantSubstr: "invalid bot token",
 		},
 		{
 			name:       "generic error",

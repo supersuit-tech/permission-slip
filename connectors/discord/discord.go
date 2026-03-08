@@ -20,8 +20,7 @@ import (
 const (
 	defaultBaseURL = "https://discord.com/api/v10"
 	defaultTimeout = 30 * time.Second
-	credKeyToken       = "bot_token"
-	credKeyAccessToken = "access_token"
+	credKeyToken = "bot_token"
 
 	// defaultRetryAfter is used when Discord returns a rate limit response
 	// without a Retry-After header (or an unparseable one).
@@ -429,13 +428,7 @@ func (c *DiscordConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{
-				Service:       "discord",
-				AuthType:      "oauth2",
-				OAuthProvider: "discord",
-				OAuthScopes:   OAuthScopes,
-			},
-			{Service: "discord_bot", AuthType: "custom", InstructionsURL: "https://discord.com/developers/applications"},
+			{Service: "discord", AuthType: "custom", InstructionsURL: "https://discord.com/developers/applications"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{
@@ -545,29 +538,13 @@ func (c *DiscordConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials checks that the provided credentials contain a
-// non-empty access_token (OAuth) or bot_token (custom).
+// non-empty bot_token.
 func (c *DiscordConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	// Prefer access_token (OAuth path).
-	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
-		return nil
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "missing required credential: bot_token"}
 	}
-	// Fall back to bot_token (legacy custom path).
-	if token, ok := creds.Get(credKeyToken); ok && token != "" {
-		return nil
-	}
-	return &connectors.ValidationError{Message: "missing required credential: access_token or bot_token"}
-}
-
-// resolveAuth returns the token and the full Authorization header value.
-// OAuth access_token is preferred; falls back to bot_token.
-func (c *DiscordConnector) resolveAuth(creds connectors.Credentials) (token, header string) {
-	if t, ok := creds.Get(credKeyAccessToken); ok && t != "" {
-		return t, "Bearer " + t
-	}
-	if t, ok := creds.Get(credKeyToken); ok && t != "" {
-		return t, "Bot " + t
-	}
-	return "", ""
+	return nil
 }
 
 // discordErrorResponse is the standard Discord API error envelope.
@@ -615,9 +592,9 @@ func mapDiscordError(statusCode int, errResp discordErrorResponse) error {
 
 	switch {
 	case statusCode == http.StatusUnauthorized:
-		return &connectors.AuthError{Message: "Discord auth error: invalid token — verify your OAuth connection or bot token at https://discord.com/developers/applications"}
+		return &connectors.AuthError{Message: "Discord auth error: invalid bot token — generate a new token at https://discord.com/developers/applications"}
 	case statusCode == http.StatusForbidden:
-		return &connectors.AuthError{Message: fmt.Sprintf("Discord auth error: %s — check the bot's permissions in server settings or re-authorize the OAuth connection", msg)}
+		return &connectors.AuthError{Message: fmt.Sprintf("Discord auth error: %s — check the bot's permissions in server settings", msg)}
 	default:
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
@@ -626,14 +603,14 @@ func mapDiscordError(statusCode int, errResp discordErrorResponse) error {
 	}
 }
 
-// doRequest is the shared request lifecycle for Discord API calls. It resolves
-// the auth method (Bearer for OAuth, Bot for custom tokens), sends the request,
-// handles rate limiting and timeouts, and unmarshals the response into dest
-// (if non-nil, for 2xx with body). For 204 No Content, pass nil for dest.
+// doRequest is the shared request lifecycle for Discord API calls. It sends
+// the request with Bot auth, handles rate limiting and timeouts, and
+// unmarshals the response into dest (if non-nil, for 2xx with body).
+// For endpoints that return 204 No Content, pass nil for dest.
 func (c *DiscordConnector) doRequest(ctx context.Context, method, path string, creds connectors.Credentials, body any, dest any) error {
-	token, authHeader := c.resolveAuth(creds)
-	if token == "" {
-		return &connectors.ValidationError{Message: "access_token or bot_token credential is missing or empty"}
+	token, ok := creds.Get(credKeyToken)
+	if !ok || token == "" {
+		return &connectors.ValidationError{Message: "bot_token credential is missing or empty"}
 	}
 
 	var bodyReader io.Reader
@@ -649,7 +626,7 @@ func (c *DiscordConnector) doRequest(ctx context.Context, method, path string, c
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
-	req.Header.Set("Authorization", authHeader)
+	req.Header.Set("Authorization", "Bot "+token)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

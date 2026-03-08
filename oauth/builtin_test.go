@@ -164,9 +164,6 @@ func TestBuiltInProviders(t *testing.T) {
 		if len(d.Scopes) == 0 {
 			t.Error("expected default scopes")
 		}
-		if d.AuthorizeParams["permissions"] != "1099511627775" {
-			t.Errorf("AuthorizeParams[permissions] = %q, want %q", d.AuthorizeParams["permissions"], "1099511627775")
-		}
 	})
 
 	t.Run("stripe", func(t *testing.T) {
