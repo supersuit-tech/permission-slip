@@ -267,8 +267,8 @@ func (c *NotionConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "notion", AuthType: "oauth2", OAuthProvider: "notion"},
-			{Service: "notion_api_key", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
+			{Service: "notion_oauth", AuthType: "oauth2", OAuthProvider: "notion"},
+			{Service: "notion", AuthType: "api_key", InstructionsURL: "https://developers.notion.com/docs/create-a-notion-integration"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

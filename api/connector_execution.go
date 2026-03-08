@@ -52,11 +52,14 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 		// OAuth2 path: resolve access token from oauth_connections.
 		creds, err = resolveOAuthCredentials(ctx, deps, userID, reqCred)
 		if err != nil {
-			// If OAuth resolution failed because the user has no connection,
-			// check for a fallback static credential (e.g. api_key) for
-			// connectors that support both auth methods.
+			// If OAuth resolution failed because the user has no connection
+			// (not because a refresh failed), check for a fallback static
+			// credential (e.g. api_key) for connectors that support both auth
+			// methods. We intentionally do NOT fall back when the connection
+			// exists but needs re-auth — that would silently mask the need
+			// to reconnect OAuth.
 			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) {
+			if errors.As(err, &oauthErr) && oauthErr.MissingConnection {
 				fallbackCred, fbErr := db.GetFallbackCredentialByActionType(ctx, deps.DB, actionType)
 				if fbErr != nil {
 					return nil, fmt.Errorf("look up fallback credential: %w", fbErr)
@@ -290,7 +293,7 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 
 // resolveStaticCredentialsForService fetches and decrypts static credentials for
 // a single specific service. Used by the OAuth-to-API-key fallback path where we
-// know the exact service name (e.g. "notion_api_key") and don't want to resolve
+// know the exact service name (e.g. "notion") and don't want to resolve
 // all services for the connector (which would include the OAuth service that has
 // no static credentials).
 func resolveStaticCredentialsForService(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
@@ -353,8 +356,9 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 	}
 	if conn == nil {
 		return zero, &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Message:  fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			Provider:          providerID,
+			Message:           fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
+			MissingConnection: true,
 		}
 	}
 

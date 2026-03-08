@@ -25,11 +25,14 @@ import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
 /** Derive a human-friendly label from a service identifier.
- *  e.g. "notion_api_key" → "API Key", "github" → "github" */
-function serviceDisplayName(service: string, authType: string): string {
-  // If the service name ends with "_api_key", show "API Key (alternative)"
-  // to distinguish from the primary OAuth credential.
-  if (service.endsWith("_api_key") && authType === "api_key") {
+ *  When a connector supports both OAuth and API key, the static credential
+ *  row is labeled "API Key (alternative)" to clarify it's the fallback. */
+function serviceDisplayName(
+  service: string,
+  authType: string,
+  hasOAuthSibling: boolean,
+): string {
+  if (authType === "api_key" && hasOAuthSibling) {
     return "API Key (alternative)";
   }
   return service;
@@ -43,11 +46,14 @@ export function ConnectorCredentialsSection({
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
   const hasRequiredCredentials = requiredCredentials.length > 0;
+  const hasOAuthCredentials = requiredCredentials.some(
+    (c) => c.auth_type === "oauth2",
+  );
   const { credentials, isLoading, error } = useCredentials({
     enabled: hasRequiredCredentials,
   });
   const { connections: oauthConnections, isLoading: oauthLoading } =
-    useOAuthConnections();
+    useOAuthConnections({ enabled: hasOAuthCredentials });
 
   const storedByService = new Map<string, CredentialSummary[]>();
   for (const cred of credentials) {
@@ -99,6 +105,7 @@ export function ConnectorCredentialsSection({
                   key={cred.service}
                   requiredCredential={cred}
                   storedCredentials={storedByService.get(cred.service) ?? []}
+                  hasOAuthSibling={hasOAuthCredentials}
                 />
               ),
             )}
@@ -176,9 +183,11 @@ function OAuthCredentialRow({
 function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
+  hasOAuthSibling,
 }: {
   requiredCredential: RequiredCredential;
   storedCredentials: CredentialSummary[];
+  hasOAuthSibling: boolean;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(
@@ -199,7 +208,7 @@ function StaticCredentialRow({
             )}
             <div>
               <p className="text-sm font-medium">
-                {serviceDisplayName(requiredCredential.service, requiredCredential.auth_type)}
+                {serviceDisplayName(requiredCredential.service, requiredCredential.auth_type, hasOAuthSibling)}
               </p>
               <p className="text-muted-foreground text-xs">
                 {requiredCredential.auth_type === "api_key"

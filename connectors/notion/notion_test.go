@@ -114,8 +114,8 @@ func TestNotionConnector_Manifest(t *testing.T) {
 	}
 	// First credential: OAuth (preferred)
 	oauthCred := m.RequiredCredentials[0]
-	if oauthCred.Service != "notion" {
-		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "notion")
+	if oauthCred.Service != "notion_oauth" {
+		t.Errorf("oauth credential service = %q, want %q", oauthCred.Service, "notion_oauth")
 	}
 	if oauthCred.AuthType != "oauth2" {
 		t.Errorf("oauth credential auth_type = %q, want %q", oauthCred.AuthType, "oauth2")
@@ -123,10 +123,11 @@ func TestNotionConnector_Manifest(t *testing.T) {
 	if oauthCred.OAuthProvider != "notion" {
 		t.Errorf("oauth credential oauth_provider = %q, want %q", oauthCred.OAuthProvider, "notion")
 	}
-	// Second credential: API key (fallback)
+	// Second credential: API key (fallback) — uses "notion" for backward
+	// compatibility with existing users who stored credentials under this name.
 	apiKeyCred := m.RequiredCredentials[1]
-	if apiKeyCred.Service != "notion_api_key" {
-		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "notion_api_key")
+	if apiKeyCred.Service != "notion" {
+		t.Errorf("api_key credential service = %q, want %q", apiKeyCred.Service, "notion")
 	}
 	if apiKeyCred.AuthType != "api_key" {
 		t.Errorf("api_key credential auth_type = %q, want %q", apiKeyCred.AuthType, "api_key")

@@ -98,8 +98,9 @@ func AsRateLimitError(err error, target **RateLimitError) bool {
 // needs to re-authorize. Maps to HTTP 401 with a message telling the agent
 // the user needs to reconnect the OAuth provider.
 type OAuthRefreshError struct {
-	Provider string // OAuth provider ID (e.g. "google")
-	Message  string // human-readable description
+	Provider          string // OAuth provider ID (e.g. "google")
+	Message           string // human-readable description
+	MissingConnection bool   // true when no OAuth connection exists (vs. refresh failure)
 }
 
 func (e *OAuthRefreshError) Error() string {

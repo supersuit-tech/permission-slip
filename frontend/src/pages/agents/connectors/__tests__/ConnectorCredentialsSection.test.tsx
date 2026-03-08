@@ -250,7 +250,7 @@ describe("ConnectorCredentialsSection", () => {
       <ConnectorCredentialsSection
         requiredCredentials={[
           {
-            service: "notion",
+            service: "notion_oauth",
             auth_type: "oauth2" as const,
             oauth_provider: "notion",
           },
@@ -285,7 +285,7 @@ describe("ConnectorCredentialsSection", () => {
       <ConnectorCredentialsSection
         requiredCredentials={[
           {
-            service: "notion",
+            service: "notion_oauth",
             auth_type: "oauth2" as const,
             oauth_provider: "notion",
           },
@@ -309,12 +309,12 @@ describe("ConnectorCredentialsSection", () => {
       <ConnectorCredentialsSection
         requiredCredentials={[
           {
-            service: "notion",
+            service: "notion_oauth",
             auth_type: "oauth2" as const,
             oauth_provider: "notion",
           },
           {
-            service: "notion_api_key",
+            service: "notion",
             auth_type: "api_key" as const,
             instructions_url:
               "https://developers.notion.com/docs/create-a-notion-integration",
