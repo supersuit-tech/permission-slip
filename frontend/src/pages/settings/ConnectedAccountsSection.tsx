@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
+import { buildOAuthAuthorizeUrl } from "@/lib/oauth";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
@@ -91,14 +92,7 @@ export function ConnectedAccountsSection() {
 
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
-    // Navigate to the OAuth authorize endpoint with the session token.
-    // The backend will redirect to the provider's consent screen.
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${providerId}/authorize`;
-
-    // Open in same window — the callback redirects back to settings
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    window.location.href = buildOAuthAuthorizeUrl(providerId, session.access_token);
   }
 
   // Providers that are ready to connect but don't have an active connection

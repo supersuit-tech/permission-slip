@@ -260,31 +260,8 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 	var zero connectors.Credentials
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
-		if deps.Vault == nil {
-			return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
-		}
-		decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
-		if err != nil {
-			var credErr *db.CredentialError
-			if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
-				return zero, &connectors.ValidationError{
-					Message: fmt.Sprintf("no credentials stored for service %q", service),
-				}
-			}
-			return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
-		}
-		// Flatten decrypted JSON map into string values for the Credentials type.
-		for k, v := range decrypted {
-			switch vv := v.(type) {
-			case string:
-				credMap[k] = vv
-			default:
-				b, err := json.Marshal(v)
-				if err != nil {
-					return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
-				}
-				credMap[k] = string(b)
-			}
+		if err := decryptAndMerge(ctx, deps, userID, service, credMap); err != nil {
+			return zero, err
 		}
 	}
 
@@ -297,34 +274,43 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 // all services for the connector (which would include the OAuth service that has
 // no static credentials).
 func resolveStaticCredentialsForService(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
-	var zero connectors.Credentials
+	credMap := make(map[string]string)
+	if err := decryptAndMerge(ctx, deps, userID, service, credMap); err != nil {
+		return connectors.Credentials{}, err
+	}
+	return connectors.NewCredentials(credMap), nil
+}
+
+// decryptAndMerge fetches credentials for a single service from the vault,
+// flattens them to string values, and merges them into dest. This is the
+// shared core of resolveStaticCredentials and resolveStaticCredentialsForService.
+func decryptAndMerge(ctx context.Context, deps *Deps, userID, service string, dest map[string]string) error {
 	if deps.Vault == nil {
-		return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
+		return fmt.Errorf("credential vault is not configured but connector requires service %q", service)
 	}
 	decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
 	if err != nil {
 		var credErr *db.CredentialError
 		if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
-			return zero, &connectors.ValidationError{
+			return &connectors.ValidationError{
 				Message: fmt.Sprintf("no credentials stored for service %q", service),
 			}
 		}
-		return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
+		return fmt.Errorf("decrypt credentials for service %q: %w", service, err)
 	}
-	credMap := make(map[string]string, len(decrypted))
 	for k, v := range decrypted {
 		switch vv := v.(type) {
 		case string:
-			credMap[k] = vv
+			dest[k] = vv
 		default:
 			b, err := json.Marshal(v)
 			if err != nil {
-				return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
+				return fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
 			}
-			credMap[k] = string(b)
+			dest[k] = string(b)
 		}
 	}
-	return connectors.NewCredentials(credMap), nil
+	return nil
 }
 
 // resolveOAuthCredentials looks up the user's OAuth connection for the required

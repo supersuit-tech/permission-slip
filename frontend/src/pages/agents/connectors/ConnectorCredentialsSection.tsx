@@ -17,6 +17,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { useAuth } from "@/auth/AuthContext";
+import { buildOAuthAuthorizeUrl } from "@/lib/oauth";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
@@ -129,10 +130,7 @@ function OAuthCredentialRow({
 
   function handleConnect() {
     if (!session?.access_token) return;
-    const baseUrl =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-    const url = `${baseUrl}/v1/oauth/${provider}/authorize`;
-    window.location.href = `${url}?access_token=${encodeURIComponent(session.access_token)}`;
+    window.location.href = buildOAuthAuthorizeUrl(provider, session.access_token);
   }
 
   return (
