@@ -4,6 +4,8 @@
  */
 
 const PROVIDER_LABELS: Record<string, string> = {
+  airtable: "Airtable",
+  discord: "Discord",
   figma: "Figma",
   github: "GitHub",
   google: "Google",
