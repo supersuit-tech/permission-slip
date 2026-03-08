@@ -16,13 +16,15 @@ type listPullRequestsAction struct {
 }
 
 type listPullRequestsParams struct {
-	Owner   string `json:"owner"`
-	Repo    string `json:"repo"`
-	State   string `json:"state"`
-	Base    string `json:"base"`
-	Head    string `json:"head"`
-	Sort    string `json:"sort"`
-	PerPage int    `json:"per_page"`
+	Owner     string `json:"owner"`
+	Repo      string `json:"repo"`
+	State     string `json:"state"`
+	Base      string `json:"base"`
+	Head      string `json:"head"`
+	Sort      string `json:"sort"`
+	Direction string `json:"direction"`
+	PerPage   int    `json:"per_page"`
+	Page      int    `json:"page"`
 }
 
 func (p *listPullRequestsParams) validate() error {
@@ -49,11 +51,17 @@ func (a *listPullRequestsAction) Execute(ctx context.Context, req connectors.Act
 	if params.Sort != "" {
 		query.Set("sort", params.Sort)
 	}
+	if params.Direction != "" {
+		query.Set("direction", params.Direction)
+	}
 	perPage := params.PerPage
 	if perPage <= 0 {
 		perPage = 30
 	}
 	query.Set("per_page", fmt.Sprintf("%d", perPage))
+	if params.Page > 1 {
+		query.Set("page", fmt.Sprintf("%d", params.Page))
+	}
 
 	path := fmt.Sprintf("/repos/%s/%s/pulls?%s",
 		url.PathEscape(params.Owner), url.PathEscape(params.Repo), query.Encode())
@@ -64,8 +72,13 @@ func (a *listPullRequestsAction) Execute(ctx context.Context, req connectors.Act
 		State   string `json:"state"`
 		HTMLURL string `json:"html_url"`
 		Draft   bool   `json:"draft"`
-		Head    struct {
+		Body    string `json:"body"`
+		User    struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Head struct {
 			Ref string `json:"ref"`
+			SHA string `json:"sha"`
 		} `json:"head"`
 		Base struct {
 			Ref string `json:"ref"`

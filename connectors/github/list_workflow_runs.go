@@ -23,7 +23,10 @@ type listWorkflowRunsParams struct {
 	WorkflowID string `json:"workflow_id"`
 	Status     string `json:"status"`
 	Branch     string `json:"branch"`
+	Event      string `json:"event"`
+	Actor      string `json:"actor"`
 	PerPage    int    `json:"per_page"`
+	Page       int    `json:"page"`
 }
 
 func (p *listWorkflowRunsParams) validate() error {
@@ -53,11 +56,20 @@ func (a *listWorkflowRunsAction) Execute(ctx context.Context, req connectors.Act
 	if params.Branch != "" {
 		query.Set("branch", params.Branch)
 	}
+	if params.Event != "" {
+		query.Set("event", params.Event)
+	}
+	if params.Actor != "" {
+		query.Set("actor", params.Actor)
+	}
 	perPage := params.PerPage
 	if perPage <= 0 {
 		perPage = 30
 	}
 	query.Set("per_page", fmt.Sprintf("%d", perPage))
+	if params.Page > 1 {
+		query.Set("page", fmt.Sprintf("%d", params.Page))
+	}
 
 	path := basePath + "?" + query.Encode()
 
@@ -66,11 +78,14 @@ func (a *listWorkflowRunsAction) Execute(ctx context.Context, req connectors.Act
 		WorkflowRuns []struct {
 			ID         int    `json:"id"`
 			Name       string `json:"name"`
+			Event      string `json:"event"`
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
 			HTMLURL    string `json:"html_url"`
 			HeadBranch string `json:"head_branch"`
 			HeadSHA    string `json:"head_sha"`
+			CreatedAt  string `json:"created_at"`
+			UpdatedAt  string `json:"updated_at"`
 		} `json:"workflow_runs"`
 	}
 

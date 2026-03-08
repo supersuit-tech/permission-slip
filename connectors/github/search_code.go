@@ -17,7 +17,9 @@ type searchCodeAction struct {
 
 type searchCodeParams struct {
 	Q       string `json:"q"`
+	Order   string `json:"order"`
 	PerPage int    `json:"per_page"`
+	Page    int    `json:"page"`
 }
 
 func (p *searchCodeParams) validate() error {
@@ -36,11 +38,17 @@ func (a *searchCodeAction) Execute(ctx context.Context, req connectors.ActionReq
 
 	query := url.Values{}
 	query.Set("q", params.Q)
+	if params.Order != "" {
+		query.Set("order", params.Order)
+	}
 	perPage := params.PerPage
 	if perPage <= 0 {
 		perPage = 30
 	}
 	query.Set("per_page", fmt.Sprintf("%d", perPage))
+	if params.Page > 1 {
+		query.Set("page", fmt.Sprintf("%d", params.Page))
+	}
 
 	path := "/search/code?" + query.Encode()
 

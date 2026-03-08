@@ -54,6 +54,86 @@ func TestGetFileContents_Success(t *testing.T) {
 	if data["content"] != "SGVsbG8gV29ybGQ=" {
 		t.Errorf("content = %v", data["content"])
 	}
+	// "SGVsbG8gV29ybGQ=" is base64 for "Hello World"
+	if data["decoded_content"] != "Hello World" {
+		t.Errorf("decoded_content = %v, want \"Hello World\"", data["decoded_content"])
+	}
+}
+
+func TestGetFileContents_DecodedContentWithNewlines(t *testing.T) {
+	t.Parallel()
+
+	// GitHub wraps base64 at 60 chars — simulate that here.
+	// "Hello World" = "SGVsbG8gV29ybGQ=" but GitHub would wrap longer content.
+	// "Hello\nWorld\n" in base64 is "SGVsbG8KV29ybGQK"
+	wrappedBase64 := "SGVsbG8K\nV29ybGQK\n"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"name":    "file.txt",
+			"path":    "file.txt",
+			"sha":     "abc",
+			"content": wrappedBase64,
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.get_file_contents"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.get_file_contents",
+		Parameters:  json.RawMessage(`{"owner":"octocat","repo":"hello-world","path":"file.txt"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["decoded_content"] != "Hello\nWorld\n" {
+		t.Errorf("decoded_content = %q, want %q", data["decoded_content"], "Hello\nWorld\n")
+	}
+}
+
+func TestGetFileContents_BinaryFileEmptyDecodedContent(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Invalid UTF-8 bytes as base64 → decoded_content should be empty.
+		json.NewEncoder(w).Encode(map[string]any{
+			"name":    "image.png",
+			"path":    "image.png",
+			"sha":     "abc",
+			"content": "/9j/4AAQ", // truncated JPEG header bytes — not valid UTF-8
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.get_file_contents"]
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.get_file_contents",
+		Parameters:  json.RawMessage(`{"owner":"octocat","repo":"hello-world","path":"image.png"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshaling result: %v", err)
+	}
+	if data["decoded_content"] != "" {
+		t.Errorf("decoded_content = %q for binary file, want empty string", data["decoded_content"])
+	}
 }
 
 func TestGetFileContents_WithRef(t *testing.T) {

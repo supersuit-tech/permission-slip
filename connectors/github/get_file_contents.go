@@ -2,9 +2,12 @@ package github
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -33,6 +36,8 @@ func (p *getFileContentsParams) validate() error {
 }
 
 // Execute retrieves file contents from a GitHub repository.
+// The response includes both the raw base64 content from GitHub and a
+// decoded_content field with the UTF-8 text (empty for binary files).
 func (a *getFileContentsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	params, err := parseAndValidate[getFileContentsParams](req.Parameters)
 	if err != nil {
@@ -58,5 +63,33 @@ func (a *getFileContentsAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	return connectors.JSONResult(ghResp)
+	// Decode the base64 content for AI agents that need to read the file as text.
+	// GitHub wraps base64 at 60 chars — strip whitespace before decoding.
+	decodedContent := ""
+	if ghResp.Content != "" {
+		b64 := strings.ReplaceAll(ghResp.Content, "\n", "")
+		if decoded, err := base64.StdEncoding.DecodeString(b64); err == nil && utf8.Valid(decoded) {
+			decodedContent = string(decoded)
+		}
+	}
+
+	result := struct {
+		Name           string `json:"name"`
+		Path           string `json:"path"`
+		SHA            string `json:"sha"`
+		Size           int    `json:"size"`
+		Content        string `json:"content"`
+		DecodedContent string `json:"decoded_content"`
+		HTMLURL        string `json:"html_url"`
+	}{
+		Name:           ghResp.Name,
+		Path:           ghResp.Path,
+		SHA:            ghResp.SHA,
+		Size:           ghResp.Size,
+		Content:        ghResp.Content,
+		DecodedContent: decodedContent,
+		HTMLURL:        ghResp.HTMLURL,
+	}
+
+	return connectors.JSONResult(result)
 }

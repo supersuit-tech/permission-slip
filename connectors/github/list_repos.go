@@ -17,10 +17,12 @@ type listReposAction struct {
 }
 
 type listReposParams struct {
-	Org      string `json:"org"`
-	Type     string `json:"type"`
-	Sort     string `json:"sort"`
-	PerPage  int    `json:"per_page"`
+	Org        string `json:"org"`
+	Type       string `json:"type"`
+	Sort       string `json:"sort"`
+	Visibility string `json:"visibility"`
+	PerPage    int    `json:"per_page"`
+	Page       int    `json:"page"`
 }
 
 func (p *listReposParams) validate() error {
@@ -48,21 +50,29 @@ func (a *listReposAction) Execute(ctx context.Context, req connectors.ActionRequ
 	if params.Sort != "" {
 		query.Set("sort", params.Sort)
 	}
+	if params.Visibility != "" {
+		query.Set("visibility", params.Visibility)
+	}
 	perPage := params.PerPage
 	if perPage <= 0 {
 		perPage = 30
 	}
 	query.Set("per_page", fmt.Sprintf("%d", perPage))
+	if params.Page > 1 {
+		query.Set("page", fmt.Sprintf("%d", params.Page))
+	}
 
 	path := basePath + "?" + query.Encode()
 
 	var ghResp []struct {
-		ID       int    `json:"id"`
-		Name     string `json:"name"`
-		FullName string `json:"full_name"`
-		Private  bool   `json:"private"`
-		HTMLURL  string `json:"html_url"`
-		Fork     bool   `json:"fork"`
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		FullName    string `json:"full_name"`
+		Private     bool   `json:"private"`
+		HTMLURL     string `json:"html_url"`
+		Fork        bool   `json:"fork"`
+		Description string `json:"description"`
+		Language    string `json:"language"`
 	}
 
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &ghResp); err != nil {

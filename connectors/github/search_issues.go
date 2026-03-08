@@ -20,6 +20,7 @@ type searchIssuesParams struct {
 	Sort    string `json:"sort"`
 	Order   string `json:"order"`
 	PerPage int    `json:"per_page"`
+	Page    int    `json:"page"`
 }
 
 func (p *searchIssuesParams) validate() error {
@@ -49,6 +50,9 @@ func (a *searchIssuesAction) Execute(ctx context.Context, req connectors.ActionR
 		perPage = 30
 	}
 	query.Set("per_page", fmt.Sprintf("%d", perPage))
+	if params.Page > 1 {
+		query.Set("page", fmt.Sprintf("%d", params.Page))
+	}
 
 	path := "/search/issues?" + query.Encode()
 

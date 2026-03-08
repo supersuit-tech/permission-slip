@@ -435,6 +435,11 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 							"enum": ["all", "public", "private", "forks", "sources", "member"],
 							"description": "Repository type filter"
 						},
+						"visibility": {
+							"type": "string",
+							"enum": ["all", "public", "private"],
+							"description": "Visibility filter — useful for org repos (all, public, private)"
+						},
 						"sort": {
 							"type": "string",
 							"enum": ["created", "updated", "pushed", "full_name"],
@@ -444,6 +449,11 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"default": 30,
 							"description": "Number of results per page (max 100)"
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number for pagination (starts at 1)"
 						}
 					}
 				}`)),
@@ -504,10 +514,20 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 							"enum": ["created", "updated", "popularity", "long-running"],
 							"description": "Sort field"
 						},
+						"direction": {
+							"type": "string",
+							"enum": ["asc", "desc"],
+							"description": "Sort direction"
+						},
 						"per_page": {
 							"type": "integer",
 							"default": 30,
 							"description": "Number of results per page (max 100)"
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number for pagination (starts at 1)"
 						}
 					}
 				}`)),
@@ -548,7 +568,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "github.list_workflow_runs",
 				Name:        "List Workflow Runs",
-				Description: "List workflow runs for a repository with optional status filtering",
+				Description: "List workflow runs for a repository with optional status, event, and actor filtering",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -575,10 +595,23 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"description": "Filter by branch name"
 						},
+						"event": {
+							"type": "string",
+							"description": "Filter by triggering event (e.g. \"push\", \"pull_request\", \"workflow_dispatch\", \"schedule\")"
+						},
+						"actor": {
+							"type": "string",
+							"description": "Filter by the GitHub username that triggered the run"
+						},
 						"per_page": {
 							"type": "integer",
 							"default": 30,
 							"description": "Number of results per page (max 100)"
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number for pagination (starts at 1)"
 						}
 					}
 				}`)),
@@ -638,12 +671,22 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"q": {
 							"type": "string",
-							"description": "Search query (supports GitHub code search qualifiers)"
+							"description": "Search query (supports GitHub code search qualifiers, e.g. \"myFunc language:go repo:owner/repo\")"
+						},
+						"order": {
+							"type": "string",
+							"enum": ["asc", "desc"],
+							"description": "Sort order for results"
 						},
 						"per_page": {
 							"type": "integer",
 							"default": 30,
 							"description": "Number of results per page (max 100)"
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number for pagination (starts at 1)"
 						}
 					}
 				}`)),
@@ -659,7 +702,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"q": {
 							"type": "string",
-							"description": "Search query (supports GitHub issue search qualifiers)"
+							"description": "Search query (supports GitHub issue search qualifiers, e.g. \"is:open label:bug repo:owner/repo\")"
 						},
 						"sort": {
 							"type": "string",
@@ -675,6 +718,11 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"default": 30,
 							"description": "Number of results per page (max 100)"
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number for pagination (starts at 1)"
 						}
 					}
 				}`)),
