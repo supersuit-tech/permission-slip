@@ -3,8 +3,7 @@ name: Dependency Audit
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
   schedule:
     # Run weekly on Monday at 9am UTC
     - cron: "0 9 * * 1"
