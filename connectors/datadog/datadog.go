@@ -26,6 +26,19 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
+// OAuthScopes are the OAuth2 scopes requested from Datadog's authorization
+// server. Defined here (not in oauth/builtin.go) so the manifest and the
+// built-in provider declaration reference the same list — a single source of
+// truth that prevents the two from drifting apart.
+var OAuthScopes = []string{
+	"metrics_read",
+	"incidents_read",
+	"incidents_write",
+	"monitors_read",
+	"monitors_write",
+	"workflows_run",
+}
+
 // siteBaseURLs maps Datadog site identifiers to their API base URLs.
 // Users in non-US1 regions must set the "site" credential to route
 // requests to the correct Datadog datacenter.
@@ -196,14 +209,7 @@ func (c *DatadogConnector) Manifest() *connectors.ConnectorManifest {
 				Service:       "datadog_oauth",
 				AuthType:      "oauth2",
 				OAuthProvider: "datadog",
-				OAuthScopes: []string{
-					"metrics_read",
-					"incidents_read",
-					"incidents_write",
-					"monitors_read",
-					"monitors_write",
-					"workflows_run",
-				},
+				OAuthScopes:   OAuthScopes,
 			},
 			{Service: "datadog", AuthType: "custom", InstructionsURL: "https://docs.datadoghq.com/account_management/api-app-keys/"},
 		},
