@@ -17,11 +17,11 @@ type createSprintAction struct {
 }
 
 type createSprintParams struct {
-	Name          string `json:"name"`
-	BoardID       int    `json:"board_id"`
-	Goal          string `json:"goal"`
-	StartDate     string `json:"start_date"`
-	EndDate       string `json:"end_date"`
+	Name      string `json:"name"`
+	BoardID   int    `json:"board_id"`
+	Goal      string `json:"goal"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
 func (p *createSprintParams) validate() error {
@@ -45,8 +45,8 @@ func (a *createSprintAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	body := map[string]interface{}{
-		"name":            params.Name,
-		"originBoardId":   params.BoardID,
+		"name":          params.Name,
+		"originBoardId": params.BoardID,
 	}
 	if params.Goal != "" {
 		body["goal"] = params.Goal
@@ -58,10 +58,24 @@ func (a *createSprintAction) Execute(ctx context.Context, req connectors.ActionR
 		body["endDate"] = params.EndDate
 	}
 
-	var resp json.RawMessage
+	var resp struct {
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		State     string `json:"state"`
+		Goal      string `json:"goal"`
+		StartDate string `json:"startDate"`
+		EndDate   string `json:"endDate"`
+	}
 	if err := a.conn.doAgile(ctx, req.Credentials, http.MethodPost, "/sprint", body, &resp); err != nil {
 		return nil, err
 	}
 
-	return &connectors.ActionResult{Data: resp}, nil
+	return connectors.JSONResult(map[string]interface{}{
+		"id":         resp.ID,
+		"name":       resp.Name,
+		"state":      resp.State,
+		"goal":       resp.Goal,
+		"start_date": resp.StartDate,
+		"end_date":   resp.EndDate,
+	})
 }

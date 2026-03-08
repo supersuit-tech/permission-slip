@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -45,15 +46,39 @@ func (a *listSprintsAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	path := "/board/" + params.BoardID + "/sprint"
+	path := "/board/" + url.PathEscape(params.BoardID) + "/sprint"
 	if params.State != "" {
-		path += "?state=" + params.State
+		path += "?state=" + url.QueryEscape(params.State)
 	}
 
-	var resp json.RawMessage
+	var resp struct {
+		Values []struct {
+			ID        int    `json:"id"`
+			Name      string `json:"name"`
+			State     string `json:"state"`
+			Goal      string `json:"goal"`
+			StartDate string `json:"startDate"`
+			EndDate   string `json:"endDate"`
+		} `json:"values"`
+	}
 	if err := a.conn.doAgile(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {
 		return nil, err
 	}
 
-	return &connectors.ActionResult{Data: resp}, nil
+	sprints := make([]map[string]interface{}, 0, len(resp.Values))
+	for _, s := range resp.Values {
+		sprints = append(sprints, map[string]interface{}{
+			"id":         s.ID,
+			"name":       s.Name,
+			"state":      s.State,
+			"goal":       s.Goal,
+			"start_date": s.StartDate,
+			"end_date":   s.EndDate,
+		})
+	}
+
+	return connectors.JSONResult(map[string]interface{}{
+		"sprints":     sprints,
+		"total_count": len(sprints),
+	})
 }

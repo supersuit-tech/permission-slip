@@ -40,11 +40,15 @@ func TestListProjects_Success(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	var data []map[string]interface{}
+	var data map[string]interface{}
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if len(data) != 2 {
-		t.Errorf("got %d projects, want 2", len(data))
+	if data["total_count"] != float64(2) {
+		t.Errorf("total_count = %v, want 2", data["total_count"])
+	}
+	projects, ok := data["projects"].([]interface{})
+	if !ok || len(projects) != 2 {
+		t.Errorf("got %v projects, want 2", len(projects))
 	}
 }

@@ -44,12 +44,15 @@ func TestListSprints_Success(t *testing.T) {
 
 	var data map[string]interface{}
 	json.Unmarshal(result.Data, &data)
-	values, ok := data["values"].([]interface{})
-	if !ok {
-		t.Fatal("expected values array")
+	if data["total_count"] != float64(2) {
+		t.Errorf("total_count = %v, want 2", data["total_count"])
 	}
-	if len(values) != 2 {
-		t.Errorf("got %d sprints, want 2", len(values))
+	sprints, ok := data["sprints"].([]interface{})
+	if !ok {
+		t.Fatal("expected sprints array")
+	}
+	if len(sprints) != 2 {
+		t.Errorf("got %d sprints, want 2", len(sprints))
 	}
 }
 

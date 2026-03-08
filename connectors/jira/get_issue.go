@@ -44,10 +44,60 @@ func (a *getIssueAction) Execute(ctx context.Context, req connectors.ActionReque
 		path += "?fields=" + url.QueryEscape(strings.Join(params.Fields, ","))
 	}
 
-	var resp json.RawMessage
+	var resp jiraIssueResponse
 	if err := a.conn.do(ctx, req.Credentials, http.MethodGet, path, nil, &resp); err != nil {
 		return nil, err
 	}
 
-	return &connectors.ActionResult{Data: resp}, nil
+	result := map[string]interface{}{
+		"id":      resp.ID,
+		"key":     resp.Key,
+		"self":    resp.Self,
+		"summary": resp.Fields.Summary,
+		"created": resp.Fields.Created,
+		"updated": resp.Fields.Updated,
+	}
+	if resp.Fields.Status != nil {
+		result["status"] = resp.Fields.Status.Name
+	}
+	if resp.Fields.Assignee != nil {
+		result["assignee"] = resp.Fields.Assignee.DisplayName
+		result["assignee_account_id"] = resp.Fields.Assignee.AccountID
+	}
+	if resp.Fields.Priority != nil {
+		result["priority"] = resp.Fields.Priority.Name
+	}
+	if resp.Fields.IssueType != nil {
+		result["issue_type"] = resp.Fields.IssueType.Name
+	}
+	if len(resp.Fields.Labels) > 0 {
+		result["labels"] = resp.Fields.Labels
+	}
+
+	return connectors.JSONResult(result)
+}
+
+type jiraIssueResponse struct {
+	ID     string `json:"id"`
+	Key    string `json:"key"`
+	Self   string `json:"self"`
+	Fields struct {
+		Summary string   `json:"summary"`
+		Created string   `json:"created"`
+		Updated string   `json:"updated"`
+		Labels  []string `json:"labels"`
+		Status  *struct {
+			Name string `json:"name"`
+		} `json:"status"`
+		Assignee *struct {
+			DisplayName string `json:"displayName"`
+			AccountID   string `json:"accountId"`
+		} `json:"assignee"`
+		Priority *struct {
+			Name string `json:"name"`
+		} `json:"priority"`
+		IssueType *struct {
+			Name string `json:"name"`
+		} `json:"issuetype"`
+	} `json:"fields"`
 }

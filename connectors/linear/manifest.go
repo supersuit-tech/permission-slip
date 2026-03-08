@@ -198,7 +198,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "linear.list_teams",
 				Name:        "List Teams",
-				Description: "List all teams in the Linear workspace",
+				Description: "List all teams — use to discover team IDs for creating issues",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 				"type": "object",
@@ -208,7 +208,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "linear.get_issue",
 				Name:        "Get Issue",
-				Description: "Get a single issue by ID",
+				Description: "Get a single issue by ID — returns full details including state, assignee, labels, and cycle",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 				"type": "object",
@@ -224,7 +224,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "linear.assign_issue",
 				Name:        "Assign Issue",
-				Description: "Assign an issue to a user",
+				Description: "Assign or unassign an issue — pass empty assignee_id to unassign",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 				"type": "object",
@@ -264,7 +264,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "linear.list_labels",
 				Name:        "List Labels",
-				Description: "List available issue labels",
+				Description: "List available labels — use to discover label IDs for add_label",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 				"type": "object",
@@ -361,6 +361,34 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create projects in teams",
 				Description: "Locks the teams and lets the agent choose project details.",
 				Parameters:  json.RawMessage(`{"team_ids":"TEAM_IDS","name":"*","description":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_list_teams",
+				ActionType:  "linear.list_teams",
+				Name:        "List teams",
+				Description: "Agent can discover available teams in the workspace.",
+				Parameters:  json.RawMessage(`{}`),
+			},
+			{
+				ID:          "tpl_linear_get_issue",
+				ActionType:  "linear.get_issue",
+				Name:        "Get issue details",
+				Description: "Agent can read any issue's full details.",
+				Parameters:  json.RawMessage(`{"issue_id":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_list_labels",
+				ActionType:  "linear.list_labels",
+				Name:        "List labels for a team",
+				Description: "Agent can list available labels, optionally filtered by team.",
+				Parameters:  json.RawMessage(`{"team_id":"*"}`),
+			},
+			{
+				ID:          "tpl_linear_list_cycles",
+				ActionType:  "linear.list_cycles",
+				Name:        "List cycles for a team",
+				Description: "Agent can view sprint cycles for a specific team.",
+				Parameters:  json.RawMessage(`{"team_id":"TEAM_ID"}`),
 			},
 		},
 	}

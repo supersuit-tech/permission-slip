@@ -191,7 +191,7 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "jira.list_projects",
 				Name:        "List Projects",
-				Description: "List all accessible projects in the Jira instance",
+				Description: "List all accessible projects — use to discover project keys for creating issues",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -201,7 +201,7 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "jira.get_issue",
 				Name:        "Get Issue",
-				Description: "Get a single issue by key",
+				Description: "Get a single issue by key — read before updating to see current state",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -312,7 +312,7 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "jira.list_statuses",
 				Name:        "List Statuses",
-				Description: "List available workflow statuses",
+				Description: "List workflow statuses — use with transition_issue to discover valid transitions",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -327,7 +327,7 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "jira.list_issue_types",
 				Name:        "List Issue Types",
-				Description: "List available issue types",
+				Description: "List issue types (Bug, Story, Task, etc.) — required for creating issues with valid types",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
