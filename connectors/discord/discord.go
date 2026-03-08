@@ -20,7 +20,7 @@ import (
 const (
 	defaultBaseURL = "https://discord.com/api/v10"
 	defaultTimeout = 30 * time.Second
-	credKeyToken = "bot_token"
+	credKeyToken   = "bot_token"
 
 	// defaultRetryAfter is used when Discord returns a rate limit response
 	// without a Retry-After header (or an unparseable one).
