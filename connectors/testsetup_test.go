@@ -1,19 +1,22 @@
 package connectors_test
 
 import (
-	"os"
 	"testing"
 
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+
 	// Blank-import connectors/providers to trigger init() registration of all
-	// built-in OAuth provider IDs before any test runs. This replaces the
-	// previous hardcoded list in testmain_test.go. See connectors/providers/
-	// doc.go for the registration pattern.
+	// built-in OAuth provider IDs. See connectors/providers/doc.go for the
+	// registration pattern.
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
 )
 
-// TestMain sets up the test environment by ensuring all built-in OAuth
-// provider IDs are registered (via the connectors/providers blank import
-// above) before any test runs.
-func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+// TestBuiltInProvidersAreRegistered verifies that the blank import of
+// connectors/providers above caused all built-in provider IDs to be
+// registered. If this test fails, the blank import mechanism is not working.
+func TestBuiltInProvidersAreRegistered(t *testing.T) {
+	ids := connectors.BuiltInOAuthProviderIDs()
+	if len(ids) == 0 {
+		t.Fatal("no built-in OAuth providers registered — connectors/providers blank import may not have run")
+	}
 }
