@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -29,15 +30,26 @@ type searchDriveParams struct {
 
 // driveFileTypeMap maps friendly type names to Drive MIME types.
 var driveFileTypeMap = map[string]string{
-	"document":     "application/vnd.google-apps.document",
-	"spreadsheet":  "application/vnd.google-apps.spreadsheet",
-	"presentation": "application/vnd.google-apps.presentation",
-	"folder":       "application/vnd.google-apps.folder",
-	"pdf":          "application/pdf",
-	"image":        "image/",
-	"video":        "video/",
 	"audio":        "audio/",
+	"document":     "application/vnd.google-apps.document",
+	"folder":       "application/vnd.google-apps.folder",
+	"image":        "image/",
+	"pdf":          "application/pdf",
+	"presentation": "application/vnd.google-apps.presentation",
+	"spreadsheet":  "application/vnd.google-apps.spreadsheet",
+	"video":        "video/",
 }
+
+// driveFileTypeNames is a sorted list of valid file_type values, used for
+// deterministic error messages regardless of map iteration order.
+var driveFileTypeNames = func() []string {
+	names := make([]string, 0, len(driveFileTypeMap))
+	for k := range driveFileTypeMap {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}()
 
 func (p *searchDriveParams) validate() error {
 	if p.Query == "" && p.FileType == "" && p.FolderID == "" {
@@ -45,11 +57,7 @@ func (p *searchDriveParams) validate() error {
 	}
 	if p.FileType != "" {
 		if _, ok := driveFileTypeMap[p.FileType]; !ok {
-			validTypes := make([]string, 0, len(driveFileTypeMap))
-			for k := range driveFileTypeMap {
-				validTypes = append(validTypes, k)
-			}
-			return &connectors.ValidationError{Message: fmt.Sprintf("invalid file_type; valid options: %s", strings.Join(validTypes, ", "))}
+			return &connectors.ValidationError{Message: fmt.Sprintf("invalid file_type; valid options: %s", strings.Join(driveFileTypeNames, ", "))}
 		}
 	}
 	if p.FolderID != "" && !isValidDriveID(p.FolderID) {

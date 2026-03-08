@@ -18,22 +18,28 @@ type updateCalendarEventAction struct {
 
 // updateCalendarEventParams is the user-facing parameter schema.
 type updateCalendarEventParams struct {
-	EventID     string   `json:"event_id"`
-	CalendarID  string   `json:"calendar_id"`
-	Summary     string   `json:"summary"`
-	Description string   `json:"description"`
-	StartTime   string   `json:"start_time"`
-	EndTime     string   `json:"end_time"`
-	Attendees   []string `json:"attendees"`
-	Location    string   `json:"location"`
+	EventID        string   `json:"event_id"`
+	CalendarID     string   `json:"calendar_id"`
+	Summary        string   `json:"summary"`
+	Description    string   `json:"description"`
+	StartTime      string   `json:"start_time"`
+	EndTime        string   `json:"end_time"`
+	Attendees      []string `json:"attendees"`
+	Location       string   `json:"location"`
+	ClearAttendees bool     `json:"clear_attendees"`
 }
 
 func (p *updateCalendarEventParams) validate() error {
 	if p.EventID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: event_id"}
 	}
-	if p.StartTime == "" && p.EndTime == "" && p.Summary == "" && p.Description == "" && p.Location == "" && len(p.Attendees) == 0 {
+	hasUpdate := p.Summary != "" || p.Description != "" || p.Location != "" ||
+		p.StartTime != "" || p.EndTime != "" || len(p.Attendees) > 0 || p.ClearAttendees
+	if !hasUpdate {
 		return &connectors.ValidationError{Message: "at least one field to update must be provided"}
+	}
+	if p.ClearAttendees && len(p.Attendees) > 0 {
+		return &connectors.ValidationError{Message: "clear_attendees and attendees are mutually exclusive"}
 	}
 	if (p.StartTime != "") != (p.EndTime != "") {
 		return &connectors.ValidationError{Message: "start_time and end_time must both be provided when updating event time"}
@@ -52,17 +58,6 @@ func (p *updateCalendarEventParams) normalize() {
 	}
 }
 
-// calendarEventPatchRequest is the Google Calendar API request body for events.patch.
-// All fields are pointers so omitempty works correctly for partial updates.
-type calendarEventPatchRequest struct {
-	Summary     string                 `json:"summary,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	Location    string                 `json:"location,omitempty"`
-	Start       *calendarEventDateTime `json:"start,omitempty"`
-	End         *calendarEventDateTime `json:"end,omitempty"`
-	Attendees   []calendarAttendee     `json:"attendees,omitempty"`
-}
-
 // Execute patches an existing Google Calendar event and returns its updated metadata.
 func (a *updateCalendarEventAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params updateCalendarEventParams
@@ -74,15 +69,28 @@ func (a *updateCalendarEventAction) Execute(ctx context.Context, req connectors.
 	}
 	params.normalize()
 
-	body := calendarEventPatchRequest{
-		Summary:     params.Summary,
-		Description: params.Description,
-		Location:    params.Location,
-		Attendees:   buildAttendees(params.Attendees),
+	// Use map[string]any so we can include an explicit empty attendees array
+	// when clear_attendees is true. Struct-based marshaling with omitempty
+	// cannot distinguish "not provided" from "empty list".
+	body := map[string]any{}
+	if params.Summary != "" {
+		body["summary"] = params.Summary
+	}
+	if params.Description != "" {
+		body["description"] = params.Description
+	}
+	if params.Location != "" {
+		body["location"] = params.Location
 	}
 	if params.StartTime != "" {
-		body.Start = &calendarEventDateTime{DateTime: params.StartTime}
-		body.End = &calendarEventDateTime{DateTime: params.EndTime}
+		body["start"] = calendarEventDateTime{DateTime: params.StartTime}
+		body["end"] = calendarEventDateTime{DateTime: params.EndTime}
+	}
+	switch {
+	case params.ClearAttendees:
+		body["attendees"] = []calendarAttendee{}
+	case len(params.Attendees) > 0:
+		body["attendees"] = buildAttendees(params.Attendees)
 	}
 
 	var resp calendarEventResponse
@@ -91,10 +99,14 @@ func (a *updateCalendarEventAction) Execute(ctx context.Context, req connectors.
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
+	result := map[string]string{
 		"id":        resp.ID,
 		"html_link": resp.HTMLLink,
 		"status":    resp.Status,
 		"updated":   resp.Updated,
-	})
+	}
+	if resp.Summary != "" {
+		result["summary"] = resp.Summary
+	}
+	return connectors.JSONResult(result)
 }

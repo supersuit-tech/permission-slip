@@ -586,7 +586,11 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"attendees": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Replacement list of attendee email addresses"
+							"description": "Replacement list of attendee email addresses. Cannot be used together with clear_attendees."
+						},
+						"clear_attendees": {
+							"type": "boolean",
+							"description": "Set to true to remove all attendees from the event. Cannot be used together with attendees."
 						},
 						"location": {
 							"type": "string",
@@ -938,7 +942,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "google.update_calendar_event",
 				Name:        "Update calendar events",
 				Description: "Agent can update any field of any calendar event.",
-				Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","location":"*"}`),
+				Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","clear_attendees":"*","location":"*"}`),
 			},
 			{
 				ID:          "tpl_google_update_calendar_event_time",

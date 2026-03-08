@@ -21,10 +21,11 @@ func TestUpdateCalendarEvent_Success(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(calendarEventResponse{
-			ID:      "evt-abc",
+			ID:       "evt-abc",
 			HTMLLink: "https://calendar.google.com/event?eid=abc",
-			Status:  "confirmed",
-			Updated: "2024-01-15T10:00:00Z",
+			Status:   "confirmed",
+			Updated:  "2024-01-15T10:00:00Z",
+			Summary:  "Updated Meeting",
 		})
 	}))
 	defer srv.Close()
@@ -54,6 +55,78 @@ func TestUpdateCalendarEvent_Success(t *testing.T) {
 	}
 	if data["id"] != "evt-abc" {
 		t.Errorf("expected id 'evt-abc', got %q", data["id"])
+	}
+	if data["summary"] != "Updated Meeting" {
+		t.Errorf("expected summary in result, got %q", data["summary"])
+	}
+}
+
+func TestUpdateCalendarEvent_ClearAttendees(t *testing.T) {
+	t.Parallel()
+
+	var capturedBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarEventResponse{
+			ID:     "evt-abc",
+			Status: "confirmed",
+		})
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{client: srv.Client(), calendarBaseURL: srv.URL}
+	action := &updateCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(updateCalendarEventParams{
+		EventID:        "evt-abc",
+		ClearAttendees: true,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.update_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify attendees key is present in body with empty array (not omitted)
+	attendees, ok := capturedBody["attendees"]
+	if !ok {
+		t.Fatal("expected 'attendees' key in request body when clear_attendees=true")
+	}
+	arr, ok := attendees.([]any)
+	if !ok {
+		t.Fatalf("expected attendees to be an array, got %T", attendees)
+	}
+	if len(arr) != 0 {
+		t.Errorf("expected empty attendees array, got %v", arr)
+	}
+}
+
+func TestUpdateCalendarEvent_ClearAttendeesAndAttendeesConflict(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(updateCalendarEventParams{
+		EventID:        "evt-abc",
+		ClearAttendees: true,
+		Attendees:      []string{"a@example.com"},
+	})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.update_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when both clear_attendees and attendees are set")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 

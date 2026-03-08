@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -80,7 +81,7 @@ func TestSearchDrive_ByFileType(t *testing.T) {
 	}
 	// Verify it filters by document MIME type
 	expected := "application/vnd.google-apps.document"
-	if !containsStr(capturedQuery, expected) {
+	if !strings.Contains(capturedQuery, expected) {
 		t.Errorf("query %q should contain MIME type %q", capturedQuery, expected)
 	}
 }
@@ -122,6 +123,10 @@ func TestSearchDrive_InvalidFileType(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+	// Error message should list valid options in sorted order
+	if !strings.Contains(err.Error(), "audio") || !strings.Contains(err.Error(), "document") {
+		t.Errorf("expected error to list valid file types, got: %v", err)
 	}
 }
 
@@ -190,18 +195,4 @@ func TestSearchDrive_InvalidJSON(t *testing.T) {
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
-}
-
-// containsStr is a helper to check substring containment in tests.
-func containsStr(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && searchContains(s, substr))
-}
-
-func searchContains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

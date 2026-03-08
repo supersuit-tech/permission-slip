@@ -76,8 +76,14 @@ func (a *sendEmailReplyAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	if origFrom == "" {
-		return nil, &connectors.ExternalError{Message: "could not determine reply-to address from original message"}
+		return nil, &connectors.ExternalError{Message: "could not determine reply-to address from original message; check message_id"}
 	}
+
+	// Strip newlines from header values sourced from the original message to
+	// prevent MIME header injection if the original sender crafted a malicious From/Subject.
+	origFrom = strings.ReplaceAll(strings.ReplaceAll(origFrom, "\r", ""), "\n", "")
+	origSubject = strings.ReplaceAll(strings.ReplaceAll(origSubject, "\r", ""), "\n", "")
+	origMessageID = strings.ReplaceAll(strings.ReplaceAll(origMessageID, "\r", ""), "\n", "")
 
 	// Build Re: subject if not already prefixed.
 	replySubject := origSubject
@@ -113,5 +119,7 @@ func (a *sendEmailReplyAction) Execute(ctx context.Context, req connectors.Actio
 	return connectors.JSONResult(map[string]string{
 		"id":        resp.ID,
 		"thread_id": resp.ThreadID,
+		"subject":   replySubject,
+		"to":        origFrom,
 	})
 }
