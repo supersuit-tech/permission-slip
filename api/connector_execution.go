@@ -259,42 +259,6 @@ func resolveCredentials(ctx context.Context, deps *Deps, userID, actionType stri
 	}
 }
 
-// resolveStaticCredentialsForServices fetches and decrypts static credentials for
-// a specific set of services. Used when falling back from OAuth to API key auth,
-// to avoid trying to resolve OAuth service entries as static credentials.
-func resolveStaticCredentialsForServices(ctx context.Context, deps *Deps, userID string, services []string) (connectors.Credentials, error) {
-	var zero connectors.Credentials
-	credMap := make(map[string]string, len(services))
-	for _, service := range services {
-		if deps.Vault == nil {
-			return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
-		}
-		decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
-		if err != nil {
-			var credErr *db.CredentialError
-			if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
-				return zero, &connectors.ValidationError{
-					Message: fmt.Sprintf("no credentials stored for service %q", service),
-				}
-			}
-			return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
-		}
-		for k, v := range decrypted {
-			switch vv := v.(type) {
-			case string:
-				credMap[k] = vv
-			default:
-				b, err := json.Marshal(v)
-				if err != nil {
-					return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, err)
-				}
-				credMap[k] = string(b)
-			}
-		}
-	}
-	return connectors.NewCredentials(credMap), nil
-}
-
 // resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
 // for the given action type.
 func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
@@ -302,7 +266,13 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("look up required services: %w", err)
 	}
+	return resolveStaticCredentialsForServices(ctx, deps, userID, services)
+}
 
+// resolveStaticCredentialsForServices fetches and decrypts static credentials for
+// a specific set of services. Used when falling back from OAuth to API key auth,
+// to avoid trying to resolve OAuth service entries as static credentials.
+func resolveStaticCredentialsForServices(ctx context.Context, deps *Deps, userID string, services []string) (connectors.Credentials, error) {
 	var zero connectors.Credentials
 	credMap := make(map[string]string, len(services))
 	for _, service := range services {
@@ -333,7 +303,6 @@ func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionTyp
 			}
 		}
 	}
-
 	return connectors.NewCredentials(credMap), nil
 }
 
