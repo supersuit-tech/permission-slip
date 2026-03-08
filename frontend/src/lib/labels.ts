@@ -4,6 +4,8 @@
  */
 
 const PROVIDER_LABELS: Record<string, string> = {
+  airtable: "Airtable",
+  discord: "Discord",
   figma: "Figma",
   github: "GitHub",
   google: "Google",
@@ -22,6 +24,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   square: "Square",
   stripe: "Stripe",
   vercel: "Vercel",
+  zendesk: "Zendesk",
   zoom: "Zoom",
 };
 

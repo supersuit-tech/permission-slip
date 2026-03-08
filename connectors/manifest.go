@@ -94,7 +94,10 @@ var validAuthTypes = map[string]bool{
 // natively. Connectors referencing these providers don't need to declare them
 // in their oauth_providers section. Add new built-in providers here.
 var BuiltInOAuthProviders = map[string]bool{
+	"airtable":   true,
 	"calendly":   true,
+	"datadog":    true,
+	"discord":    true,
 	"figma":      true,
 	"github":     true,
 	"google":     true,
@@ -114,6 +117,7 @@ var BuiltInOAuthProviders = map[string]bool{
 	"square":     true,
 	"stripe":     true,
 	"vercel":     true,
+	"zendesk":    true,
 	"zoom":       true,
 }
 

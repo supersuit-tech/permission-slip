@@ -1228,3 +1228,272 @@ func TestExtractTokenExtraData_NilStateExtra(t *testing.T) {
 		t.Errorf("expected nil extra data, got %s", string(raw))
 	}
 }
+
+// ── Zendesk per-subdomain URL helpers ────────────────────────────────────────
+
+func TestValidateZendeskSubdomain(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{"bare subdomain", "mycompany", "mycompany", false},
+		{"full domain", "mycompany.zendesk.com", "mycompany", false},
+		{"uppercase normalized", "MyCompany", "mycompany", false},
+		{"with hyphens", "my-cool-company", "my-cool-company", false},
+		{"trailing slash", "mycompany/", "mycompany", false},
+		{"whitespace", "  mycompany  ", "mycompany", false},
+		{"full domain uppercase", "MyCompany.zendesk.com", "mycompany", false},
+		{"empty", "", "", true},
+		{"only whitespace", "   ", "", true},
+		{"invalid domain", "mycompany.example.com", "", true},
+		{"starts with hyphen", "-mycompany", "", true},
+		{"ends with hyphen", "mycompany-", "", true},
+		{"special chars", "my_company!", "", true},
+		{"just .zendesk.com", ".zendesk.com", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := validateZendeskSubdomain(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateZendeskSubdomain(%q): err=%v, wantErr=%v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("validateZendeskSubdomain(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProviderNeedsSubdomain(t *testing.T) {
+	t.Parallel()
+	zendeskProvider := oauth.Provider{
+		AuthorizeURL: "https://{subdomain}.zendesk.com/oauth/authorizations/new",
+		TokenURL:     "https://{subdomain}.zendesk.com/oauth/tokens",
+	}
+	if !providerNeedsSubdomain(zendeskProvider) {
+		t.Error("expected providerNeedsSubdomain to return true for Zendesk-style URLs")
+	}
+
+	staticProvider := oauth.Provider{
+		AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+	}
+	if providerNeedsSubdomain(staticProvider) {
+		t.Error("expected providerNeedsSubdomain to return false for static URLs")
+	}
+
+	shopifyProvider := oauth.Provider{
+		AuthorizeURL: "https://{shop}.myshopify.com/admin/oauth/authorize",
+		TokenURL:     "https://{shop}.myshopify.com/admin/oauth/access_token",
+	}
+	if providerNeedsSubdomain(shopifyProvider) {
+		t.Error("expected providerNeedsSubdomain to return false for Shopify-style {shop} URLs")
+	}
+}
+
+func TestResolveSubdomainURLs(t *testing.T) {
+	t.Parallel()
+	p := oauth.Provider{
+		ID:           "zendesk",
+		AuthorizeURL: "https://{subdomain}.zendesk.com/oauth/authorizations/new",
+		TokenURL:     "https://{subdomain}.zendesk.com/oauth/tokens",
+	}
+	resolved := resolveSubdomainURLs(p, "mycompany")
+	if resolved.AuthorizeURL != "https://mycompany.zendesk.com/oauth/authorizations/new" {
+		t.Errorf("unexpected AuthorizeURL: %s", resolved.AuthorizeURL)
+	}
+	if resolved.TokenURL != "https://mycompany.zendesk.com/oauth/tokens" {
+		t.Errorf("unexpected TokenURL: %s", resolved.TokenURL)
+	}
+	// Original should be unchanged.
+	if p.AuthorizeURL != "https://{subdomain}.zendesk.com/oauth/authorizations/new" {
+		t.Error("resolveSubdomainURLs mutated the original provider")
+	}
+}
+
+func oauthDepsWithZendesk(tx db.DBTX) *Deps {
+	reg := oauth.NewRegistry()
+	_ = reg.Register(oauth.Provider{
+		ID:           "zendesk",
+		AuthorizeURL: "https://{subdomain}.zendesk.com/oauth/authorizations/new",
+		TokenURL:     "https://{subdomain}.zendesk.com/oauth/tokens",
+		Scopes:       []string{"read", "write"},
+		ClientID:     "zendesk-client-id",
+		ClientSecret: "zendesk-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	_ = reg.Register(oauth.Provider{
+		ID:           "google",
+		AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+		Scopes:       []string{"openid"},
+		ClientID:     "google-client-id",
+		ClientSecret: "google-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	return &Deps{
+		DB:                tx,
+		Vault:             vault.NewMockVaultStore(),
+		SupabaseJWTSecret: testJWTSecret,
+		OAuthProviders:    reg,
+		OAuthStateSecret:  testOAuthStateSecret,
+		BaseURL:           "http://localhost:3000",
+	}
+}
+
+func TestOAuthAuthorize_Zendesk_RequiresSubdomainParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithZendesk(tx)
+	router := NewRouter(deps)
+
+	// No subdomain param → 400
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOAuthAuthorize_Zendesk_InvalidSubdomain(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithZendesk(tx)
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize?subdomain=-invalid", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOAuthAuthorize_Zendesk_ValidSubdomain(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithZendesk(tx)
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize?subdomain=mycompany", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+
+	location := w.Header().Get("Location")
+	parsed, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	// Should redirect to mycompany.zendesk.com (resolved template)
+	if parsed.Host != "mycompany.zendesk.com" {
+		t.Errorf("expected mycompany.zendesk.com host, got %s", parsed.Host)
+	}
+	if !strings.Contains(parsed.Path, "/oauth/authorizations/new") {
+		t.Errorf("expected Zendesk authorize path, got %s", parsed.Path)
+	}
+	if parsed.Query().Get("client_id") != "zendesk-client-id" {
+		t.Errorf("expected zendesk-client-id, got %s", parsed.Query().Get("client_id"))
+	}
+	if parsed.Query().Get("state") == "" {
+		t.Error("expected state param in redirect URL")
+	}
+	// Verify state token encodes subdomain in shop field
+	stateStr := parsed.Query().Get("state")
+	deps2 := &Deps{OAuthStateSecret: testOAuthStateSecret}
+	verified, err := verifyOAuthState(deps2, stateStr)
+	if err != nil {
+		t.Fatalf("verify state: %v", err)
+	}
+	if verified.Shop != "mycompany" {
+		t.Errorf("expected shop=mycompany in state, got %q", verified.Shop)
+	}
+}
+
+func TestOAuthAuthorize_Zendesk_FullDomainSubdomain(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithZendesk(tx)
+	router := NewRouter(deps)
+
+	// Full domain form should also work
+	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize?subdomain=mycompany.zendesk.com", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+
+	location := w.Header().Get("Location")
+	parsed, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	if parsed.Host != "mycompany.zendesk.com" {
+		t.Errorf("expected mycompany.zendesk.com host, got %s", parsed.Host)
+	}
+}
+
+func TestStoreOAuthTokens_WithZendeskSubdomain(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+
+	token := &oauth2.Token{
+		AccessToken:  "zendesk-access-token",
+		RefreshToken: "zendesk-refresh-token",
+		TokenType:    "Bearer",
+	}
+
+	stateExtra := map[string]string{"subdomain": "mycompany"}
+	err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra)
+	if err != nil {
+		t.Fatalf("storeOAuthTokens: %v", err)
+	}
+
+	conn, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "zendesk")
+	if err != nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	if conn == nil {
+		t.Fatal("expected connection to exist")
+	}
+
+	// Verify extra_data contains subdomain
+	if len(conn.ExtraData) == 0 {
+		t.Fatal("expected extra_data to be set")
+	}
+	var extra map[string]string
+	if err := json.Unmarshal(conn.ExtraData, &extra); err != nil {
+		t.Fatalf("unmarshal extra_data: %v", err)
+	}
+	if extra["subdomain"] != "mycompany" {
+		t.Errorf("expected subdomain=mycompany, got %q", extra["subdomain"])
+	}
+}

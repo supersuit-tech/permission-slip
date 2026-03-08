@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	datadogconnector "github.com/supersuit-tech/permission-slip-web/connectors/datadog"
+	discordconnector "github.com/supersuit-tech/permission-slip-web/connectors/discord"
 	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 )
 
@@ -268,12 +270,52 @@ func BuiltInProviders() []Provider {
 			Source:       SourceBuiltIn,
 		},
 		{
+			ID:           "airtable",
+			AuthorizeURL: "https://airtable.com/oauth2/v1/authorize",
+			TokenURL:     "https://airtable.com/oauth2/v1/token",
+			Scopes: []string{
+				"data.records:read",
+				"data.records:write",
+				"data.recordComments:read",
+				"data.recordComments:write",
+				"schema.bases:read",
+				"schema.bases:write",
+			},
+			ClientID:     os.Getenv("AIRTABLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("AIRTABLE_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			// Datadog OAuth uses split hostnames by design: authorization
+			// redirects go through app.datadoghq.com, while token exchange
+			// happens on api.datadoghq.com. Both paths use the /oauth2/v1/
+			// prefix and are documented in Datadog's OAuth2 API reference.
+			// Scopes are sourced from the connector package to keep the
+			// manifest credential and this registration in sync.
+			ID:           "datadog",
+			AuthorizeURL: "https://app.datadoghq.com/oauth2/v1/authorize",
+			TokenURL:     "https://api.datadoghq.com/oauth2/v1/token",
+			Scopes:       datadogconnector.OAuthScopes,
+			ClientID:     os.Getenv("DATADOG_CLIENT_ID"),
+			ClientSecret: os.Getenv("DATADOG_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
 			ID:           "calendly",
 			AuthorizeURL: "https://auth.calendly.com/oauth/authorize",
 			TokenURL:     "https://auth.calendly.com/oauth/token",
 			Scopes:       []string{},
 			ClientID:     os.Getenv("CALENDLY_CLIENT_ID"),
 			ClientSecret: os.Getenv("CALENDLY_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			ID:           "discord",
+			AuthorizeURL: "https://discord.com/oauth2/authorize",
+			TokenURL:     "https://discord.com/api/oauth2/token",
+			Scopes:       discordconnector.OAuthScopes,
+			ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
+			ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
 		{
@@ -290,6 +332,21 @@ func BuiltInProviders() []Provider {
 			},
 			ClientID:     os.Getenv("SENDGRID_CLIENT_ID"),
 			ClientSecret: os.Getenv("SENDGRID_CLIENT_SECRET"),
+			Source:       SourceBuiltIn,
+		},
+		{
+			// Zendesk uses per-subdomain OAuth URLs. The {subdomain} placeholder
+			// is replaced at authorize/callback time with the user's Zendesk
+			// subdomain (e.g. "mycompany"). See api/oauth.go for resolution.
+			ID:           "zendesk",
+			AuthorizeURL: "https://{subdomain}.zendesk.com/oauth/authorizations/new",
+			TokenURL:     "https://{subdomain}.zendesk.com/oauth/tokens",
+			Scopes: []string{
+				"read",
+				"write",
+			},
+			ClientID:     os.Getenv("ZENDESK_CLIENT_ID"),
+			ClientSecret: os.Getenv("ZENDESK_CLIENT_SECRET"),
 			Source:       SourceBuiltIn,
 		},
 	}

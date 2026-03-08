@@ -34,8 +34,45 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-/** Providers that require a shop subdomain for per-shop OAuth URLs. */
-const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
+/**
+ * Config for providers that need a per-instance subdomain before the OAuth
+ * redirect can be constructed. Each entry maps a provider ID to the dialog
+ * display config and the query parameter name to attach to the authorize URL.
+ */
+const INSTANCE_SUBDOMAIN_PROVIDERS: Record<
+  string,
+  {
+    title: string;
+    domainSuffix: string;
+    placeholder: string;
+    inputLabel: string;
+    inputId: string;
+    stripSuffix: RegExp;
+    queryParam: string;
+    buttonLabel: string;
+  }
+> = {
+  shopify: {
+    title: "Connect Shopify Store",
+    domainSuffix: ".myshopify.com",
+    placeholder: "mystore",
+    inputLabel: "Store subdomain",
+    inputId: "settings-shop-domain",
+    stripSuffix: /\.myshopify\.com$/,
+    queryParam: "shop",
+    buttonLabel: "Continue to Shopify",
+  },
+  zendesk: {
+    title: "Connect Zendesk",
+    domainSuffix: ".zendesk.com",
+    placeholder: "mycompany",
+    inputLabel: "Subdomain",
+    inputId: "settings-zendesk-subdomain",
+    stripSuffix: /\.zendesk\.com$/,
+    queryParam: "subdomain",
+    buttonLabel: "Continue to Zendesk",
+  },
+};
 
 function statusBadge(status: string) {
   switch (status) {
@@ -100,14 +137,14 @@ export function ConnectedAccountsSection() {
     }
   }
 
-  const [shopDialogProvider, setShopDialogProvider] = useState<string | null>(
-    null,
-  );
+  const [instanceDialogProvider, setInstanceDialogProvider] = useState<
+    string | null
+  >(null);
 
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
-    if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
-      setShopDialogProvider(providerId);
+    if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
+      setInstanceDialogProvider(providerId);
       return;
     }
     // Open in same window — the callback redirects back to settings
@@ -161,6 +198,11 @@ export function ConnectedAccountsSection() {
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">
                     {providerLabel(conn.provider)}
+                    {conn.instance && (
+                      <span className="text-muted-foreground ml-1.5 font-normal">
+                        ({conn.instance})
+                      </span>
+                    )}
                   </p>
                   <p className="text-muted-foreground text-xs">
                     {conn.scopes.length} scope
@@ -225,73 +267,85 @@ export function ConnectedAccountsSection() {
         )}
       </CardContent>
 
-      {shopDialogProvider && session?.access_token && (
-        <ShopDomainDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setShopDialogProvider(null);
-          }}
-          onSubmit={(shop) => {
-            if (!session?.access_token || !shopDialogProvider) return;
-            const url = getOAuthAuthorizeUrl(
-              shopDialogProvider,
-              session.access_token,
-            );
-            window.location.href = `${url}&shop=${encodeURIComponent(shop)}`;
-            setShopDialogProvider(null);
-          }}
-        />
-      )}
+      {instanceDialogProvider &&
+        session?.access_token &&
+        instanceDialogProvider in INSTANCE_SUBDOMAIN_PROVIDERS && (
+          <InstanceSubdomainDialog
+            open
+            config={INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!}
+            onOpenChange={(open) => {
+              if (!open) setInstanceDialogProvider(null);
+            }}
+            onSubmit={(value) => {
+              if (!session?.access_token || !instanceDialogProvider) return;
+              const cfg =
+                INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!;
+              const url = getOAuthAuthorizeUrl(
+                instanceDialogProvider,
+                session.access_token,
+              );
+              window.location.href = `${url}&${cfg.queryParam}=${encodeURIComponent(value)}`;
+              setInstanceDialogProvider(null);
+            }}
+          />
+        )}
     </Card>
   );
 }
 
-function ShopDomainDialog({
+/**
+ * Generic dialog for providers that require a per-instance subdomain before
+ * an OAuth redirect can be constructed (e.g. Zendesk, Shopify). Driven by
+ * INSTANCE_SUBDOMAIN_PROVIDERS config — no provider-specific JSX needed.
+ */
+function InstanceSubdomainDialog({
   open,
+  config,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
+  config: (typeof INSTANCE_SUBDOMAIN_PROVIDERS)[string];
   onOpenChange: (open: boolean) => void;
-  onSubmit: (shop: string) => void;
+  onSubmit: (value: string) => void;
 }) {
-  const [shop, setShop] = useState("");
+  const [value, setValue] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = shop.trim().toLowerCase();
+    const trimmed = value.trim().toLowerCase();
     if (!trimmed) return;
-    const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
-    onSubmit(subdomain);
+    onSubmit(trimmed.replace(config.stripSuffix, ""));
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect Shopify Store</DialogTitle>
+          <DialogTitle>{config.title}</DialogTitle>
           <DialogDescription>
-            Enter your Shopify store subdomain to begin the OAuth connection.
+            Enter your {config.inputLabel.toLowerCase()} to begin the OAuth
+            connection.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-2 py-4">
-            <Label htmlFor="settings-shop-domain">Store subdomain</Label>
+            <Label htmlFor={config.inputId}>{config.inputLabel}</Label>
             <div className="flex items-center gap-2">
               <Input
-                id="settings-shop-domain"
-                placeholder="mystore"
-                value={shop}
-                onChange={(e) => setShop(e.target.value)}
+                id={config.inputId}
+                placeholder={config.placeholder}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
                 autoFocus
               />
               <span className="text-muted-foreground whitespace-nowrap text-sm">
-                .myshopify.com
+                {config.domainSuffix}
               </span>
             </div>
             <p className="text-muted-foreground text-xs">
-              e.g. if your store URL is mystore.myshopify.com, enter
-              &quot;mystore&quot;
+              e.g. if your URL is {config.placeholder}
+              {config.domainSuffix}, enter &quot;{config.placeholder}&quot;
             </p>
           </div>
           <DialogFooter>
@@ -302,9 +356,9 @@ function ShopDomainDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!shop.trim()}>
+            <Button type="submit" disabled={!value.trim()}>
               <LogIn className="size-4" />
-              Continue to Shopify
+              {config.buttonLabel}
             </Button>
           </DialogFooter>
         </form>
