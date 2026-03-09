@@ -28,10 +28,12 @@ func TestInsert_Success(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		var rows []map[string]any
 		if err := json.Unmarshal(body, &rows); err != nil {
-			t.Fatalf("failed to unmarshal request body: %v", err)
+			t.Errorf("failed to unmarshal request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		if len(rows) != 1 {
-			t.Fatalf("expected 1 row in body, got %d", len(rows))
+			t.Errorf("expected 1 row in body, got %d", len(rows))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -134,6 +136,95 @@ func TestInsert_TableNotInAllowlist(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for table not in allowlist")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestInsert_Unauthorized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": "Invalid API key",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client())
+	action := &insertAction{conn: conn}
+
+	params, _ := json.Marshal(insertParams{
+		Table: "users",
+		Rows:  []map[string]any{{"name": "Alice"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.insert",
+		Parameters:  params,
+		Credentials: validCredsWithURL(srv.URL),
+	})
+	if err == nil {
+		t.Fatal("expected error for unauthorized")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got: %T", err)
+	}
+}
+
+func TestInsert_APIError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": "Relation \"nonexistent\" does not exist",
+			"code":    "42P01",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client())
+	action := &insertAction{conn: conn}
+
+	params, _ := json.Marshal(insertParams{
+		Table: "nonexistent",
+		Rows:  []map[string]any{{"name": "Alice"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.insert",
+		Parameters:  params,
+		Credentials: validCredsWithURL(srv.URL),
+	})
+	if err == nil {
+		t.Fatal("expected error for API error")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError for undefined table, got: %T", err)
+	}
+}
+
+func TestInsert_InvalidTableName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &insertAction{conn: conn}
+
+	params, _ := json.Marshal(insertParams{
+		Table: "../etc/passwd",
+		Rows:  []map[string]any{{"name": "Alice"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.insert",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for unsafe table name")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

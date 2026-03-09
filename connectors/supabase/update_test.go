@@ -27,7 +27,9 @@ func TestUpdate_Success(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		var set map[string]any
 		if err := json.Unmarshal(body, &set); err != nil {
-			t.Fatalf("failed to unmarshal request body: %v", err)
+			t.Errorf("failed to unmarshal request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		if set["name"] != "Alice Updated" {
 			t.Errorf("expected name 'Alice Updated', got %v", set["name"])
@@ -110,6 +112,89 @@ func TestUpdate_MissingSet(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for missing set")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdate_Unauthorized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": "Invalid API key",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client())
+	action := &updateAction{conn: conn}
+
+	params, _ := json.Marshal(updateParams{
+		Table:   "users",
+		Set:     map[string]any{"name": "Hacked"},
+		Filters: map[string]string{"id": "eq.1"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.update",
+		Parameters:  params,
+		Credentials: validCredsWithURL(srv.URL),
+	})
+	if err == nil {
+		t.Fatal("expected error for unauthorized")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got: %T", err)
+	}
+}
+
+func TestUpdate_InvalidFilterOperator(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateAction{conn: conn}
+
+	params, _ := json.Marshal(updateParams{
+		Table:   "users",
+		Set:     map[string]any{"name": "Alice"},
+		Filters: map[string]string{"status": "badop.active"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.update",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid filter operator")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUpdate_InvalidTableName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateAction{conn: conn}
+
+	params, _ := json.Marshal(updateParams{
+		Table:   "users;DROP TABLE",
+		Set:     map[string]any{"name": "Alice"},
+		Filters: map[string]string{"id": "eq.1"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.update",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for unsafe table name")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

@@ -128,6 +128,62 @@ func TestDelete_TableNotInAllowlist(t *testing.T) {
 	}
 }
 
+func TestDelete_Unauthorized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": "Invalid API key",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client())
+	action := &deleteAction{conn: conn}
+
+	params, _ := json.Marshal(deleteParams{
+		Table:   "users",
+		Filters: map[string]string{"id": "eq.1"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.delete",
+		Parameters:  params,
+		Credentials: validCredsWithURL(srv.URL),
+	})
+	if err == nil {
+		t.Fatal("expected error for unauthorized")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Errorf("expected AuthError, got: %T", err)
+	}
+}
+
+func TestDelete_InvalidFilterOperator(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &deleteAction{conn: conn}
+
+	params, _ := json.Marshal(deleteParams{
+		Table:   "users",
+		Filters: map[string]string{"status": "badop.active"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.delete",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid filter operator")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestDelete_Forbidden(t *testing.T) {
 	t.Parallel()
 
