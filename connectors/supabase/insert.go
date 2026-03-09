@@ -53,12 +53,7 @@ func (a *insertAction) Execute(ctx context.Context, req connectors.ActionRequest
 
 	q := url.Values{}
 
-	// Column selection for returned rows.
-	ret := params.Returning
-	if ret == "" {
-		ret = "*"
-	}
-	q.Set("select", ret)
+	returningSelect(q, params.Returning)
 
 	// Upsert: on_conflict triggers PostgREST's upsert behavior.
 	// PostgREST requires both the on_conflict query param and the

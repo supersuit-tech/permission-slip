@@ -46,12 +46,7 @@ func (a *deleteAction) Execute(ctx context.Context, req connectors.ActionRequest
 
 	q := url.Values{}
 
-	// Column selection for returned rows.
-	ret := params.Returning
-	if ret == "" {
-		ret = "*"
-	}
-	q.Set("select", ret)
+	returningSelect(q, params.Returning)
 
 	// Apply filters to scope the delete.
 	if err := applyFilters(q, params.Filters); err != nil {
