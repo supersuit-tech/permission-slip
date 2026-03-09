@@ -41,6 +41,7 @@ func FindProfileByAuthEmail(ctx context.Context, db DBTX, email string) (*Profil
 		}
 		return nil, err
 	}
+	p.CreatedAt = p.CreatedAt.UTC().Truncate(time.Millisecond)
 	return &p, nil
 }
 

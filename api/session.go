@@ -312,6 +312,9 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 					if old != nil && old.ID != userID {
 						if rlErr := db.RelinkProfile(r.Context(), deps.DB, old.ID, userID); rlErr != nil {
 							log.Printf("[%s] RequireProfile: re-link profile %s→%s: %v", TraceID(r.Context()), old.ID, userID, rlErr)
+							// A concurrent request may have already completed the re-link.
+							// Re-fetch by the new user ID before falling through to 404.
+							profile, _ = db.GetProfileByUserID(r.Context(), deps.DB, userID)
 						} else {
 							log.Printf("[%s] RequireProfile: re-linked profile %s→%s", TraceID(r.Context()), old.ID, userID)
 							old.ID = userID
