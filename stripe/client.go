@@ -183,18 +183,22 @@ type InvoiceSummary struct {
 
 // ListInvoices returns up to `limit` invoices for the given Stripe customer,
 // filtered to only paid invoices. Returns an empty slice if the customer has
-// no invoices.
-func (c *Client) ListInvoices(ctx context.Context, stripeCustomerID string, limit int) ([]InvoiceSummary, error) {
+// no invoices. hasMore is true when additional invoices exist beyond the limit.
+func (c *Client) ListInvoices(ctx context.Context, stripeCustomerID string, limit int) (invoices []InvoiceSummary, hasMore bool, err error) {
 	params := &gostripe.InvoiceListParams{
 		Customer: gostripe.String(stripeCustomerID),
 		Status:   gostripe.String("paid"),
 	}
-	params.Limit = gostripe.Int64(int64(limit))
+	// Fetch one extra to detect whether more pages exist.
+	params.Limit = gostripe.Int64(int64(limit + 1))
 	params.Context = ctx
 
-	var invoices []InvoiceSummary
 	iter := invoice.List(params)
 	for iter.Next() {
+		if len(invoices) == limit {
+			hasMore = true
+			break
+		}
 		inv := iter.Invoice()
 		summary := InvoiceSummary{
 			ID:          inv.ID,
@@ -215,10 +219,10 @@ func (c *Client) ListInvoices(ctx context.Context, stripeCustomerID string, limi
 		}
 		invoices = append(invoices, summary)
 	}
-	if err := iter.Err(); err != nil {
-		return nil, fmt.Errorf("stripe: list invoices: %w", err)
+	if iterErr := iter.Err(); iterErr != nil {
+		return nil, false, fmt.Errorf("stripe: list invoices: %w", iterErr)
 	}
-	return invoices, nil
+	return invoices, hasMore, nil
 }
 
 // ── Payment Method operations ─────────────────────────────────────────────
