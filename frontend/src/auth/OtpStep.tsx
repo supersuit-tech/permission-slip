@@ -43,10 +43,10 @@ export default function OtpStep({
     setResendSuccess(false);
     setIsResending(true);
     try {
-      const { error } = await onResend();
-      if (error) {
+      const { error: resendResultError } = await onResend();
+      if (resendResultError) {
         setResendError(
-          safeErrorMessage(error, {
+          safeErrorMessage(resendResultError, {
             over_email_send_rate_limit:
               "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again.",
           })

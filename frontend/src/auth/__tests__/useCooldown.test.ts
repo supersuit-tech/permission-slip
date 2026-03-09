@@ -2,6 +2,8 @@ import { renderHook, act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCooldown } from "../useCooldown";
 
+let clearIntervalSpy: ReturnType<typeof vi.spyOn> | null = null;
+
 describe("useCooldown", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -9,6 +11,8 @@ describe("useCooldown", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    clearIntervalSpy?.mockRestore();
+    clearIntervalSpy = null;
   });
 
   it("starts inactive with secondsLeft at 0", () => {
@@ -92,7 +96,7 @@ describe("useCooldown", () => {
   });
 
   it("cleans up interval on unmount mid-countdown", () => {
-    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
     const { result, unmount } = renderHook(() => useCooldown());
 
     act(() => {
@@ -102,6 +106,5 @@ describe("useCooldown", () => {
     unmount();
 
     expect(clearIntervalSpy).toHaveBeenCalled();
-    clearIntervalSpy.mockRestore();
   });
 });
