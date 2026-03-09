@@ -103,13 +103,24 @@ export default function OtpStep({
           size="sm"
           onClick={handleResend}
           disabled={resendCooldownSeconds > 0 || isResending}
+          aria-label={
+            resendCooldownSeconds > 0
+              ? "Resend code (on cooldown)"
+              : isResending
+                ? "Resending code"
+                : "Resend code"
+          }
           className="opacity-70"
         >
-          {resendCooldownSeconds > 0
-            ? `Resend in ${resendCooldownSeconds}s`
-            : isResending
-              ? "Resending…"
-              : "Resend code"}
+          {resendCooldownSeconds > 0 ? (
+            <>
+              Resend in <span aria-hidden="true">{resendCooldownSeconds}s</span>
+            </>
+          ) : isResending ? (
+            "Resending…"
+          ) : (
+            "Resend code"
+          )}
         </Button>
         {resendError && (
           <p className="text-xs text-destructive">{resendError}</p>
