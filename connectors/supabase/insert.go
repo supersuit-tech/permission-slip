@@ -61,8 +61,14 @@ func (a *insertAction) Execute(ctx context.Context, req connectors.ActionRequest
 	q.Set("select", ret)
 
 	// Upsert: on_conflict triggers PostgREST's upsert behavior.
+	// PostgREST requires both the on_conflict query param and the
+	// Prefer: resolution=merge-duplicates header for upsert to work.
+	var extraHeaders map[string]string
 	if params.OnConflict != "" {
 		q.Set("on_conflict", params.OnConflict)
+		extraHeaders = map[string]string{
+			"Prefer": "return=representation,resolution=merge-duplicates",
+		}
 	}
 
 	reqURL += "?" + q.Encode()
@@ -72,10 +78,9 @@ func (a *insertAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, fmt.Errorf("marshaling request body: %w", err)
 	}
 
-	method := http.MethodPost
-
 	var rows []map[string]any
-	if err := a.conn.doRequest(ctx, method, reqURL, apiKey, bytes.NewReader(body), &rows); err != nil {
+	_, err = a.conn.doRequestWithHeaders(ctx, http.MethodPost, reqURL, apiKey, bytes.NewReader(body), &rows, extraHeaders)
+	if err != nil {
 		return nil, err
 	}
 

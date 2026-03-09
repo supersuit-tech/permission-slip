@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -145,6 +146,17 @@ func TestInsert_WithOnConflict(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("on_conflict") != "email" {
 			t.Errorf("expected on_conflict=email, got %q", r.URL.Query().Get("on_conflict"))
+		}
+		// PostgREST requires the resolution directive for upsert behavior.
+		prefer := r.Header.Get("Prefer")
+		if prefer == "" {
+			t.Error("expected Prefer header to be set for upsert")
+		}
+		if !strings.Contains(prefer, "resolution=merge-duplicates") {
+			t.Errorf("expected Prefer to contain resolution=merge-duplicates, got %q", prefer)
+		}
+		if !strings.Contains(prefer, "return=representation") {
+			t.Errorf("expected Prefer to contain return=representation, got %q", prefer)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
