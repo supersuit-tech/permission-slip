@@ -186,9 +186,16 @@ func (c *DropboxConnector) doContent(ctx context.Context, endpoint string, creds
 		}
 	}
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	// Read up to maxResponseBytes+1 to detect responses that exceed our cap.
+	// LimitReader alone would silently truncate, corrupting downloaded content.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+	if int64(len(respBody)) > maxResponseBytes {
+		return nil, &connectors.ExternalError{
+			Message: fmt.Sprintf("Dropbox API response too large (>%d bytes) — for files larger than 10 MB, use chunked download", maxResponseBytes),
+		}
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

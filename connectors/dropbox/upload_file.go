@@ -24,6 +24,10 @@ type uploadFileParams struct {
 	Content    string `json:"content"`
 	Mode       string `json:"mode,omitempty"`
 	Autorename *bool  `json:"autorename,omitempty"` // defaults to true when omitted
+
+	// decoded holds the base64-decoded content after validation.
+	// Avoids decoding twice (once in validate, once in Execute).
+	decoded []byte
 }
 
 func (p *uploadFileParams) validate() error {
@@ -45,6 +49,7 @@ func (p *uploadFileParams) validate() error {
 	if p.Mode != "" && p.Mode != "add" && p.Mode != "overwrite" {
 		return &connectors.ValidationError{Message: "mode must be \"add\" or \"overwrite\""}
 	}
+	p.decoded = decoded
 	return nil
 }
 
@@ -69,8 +74,6 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
-	decoded, _ := base64.StdEncoding.DecodeString(params.Content)
-
 	mode := params.Mode
 	if mode == "" {
 		mode = "add"
@@ -89,7 +92,7 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	var resp uploadResponse
-	if err := a.conn.doContentUpload(ctx, "files/upload", req.Credentials, apiArg, bytes.NewReader(decoded), &resp); err != nil {
+	if err := a.conn.doContentUpload(ctx, "files/upload", req.Credentials, apiArg, bytes.NewReader(params.decoded), &resp); err != nil {
 		return nil, err
 	}
 

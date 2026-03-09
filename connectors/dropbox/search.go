@@ -92,19 +92,20 @@ func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest
 	}
 
 	body := searchRequest{Query: params.Query}
-	if params.Path != "" || params.MaxResults != 0 || len(params.FileExtensions) > 0 {
-		opts := &searchOptions{}
-		if params.Path != "" {
-			opts.Path = params.Path
-		}
-		if params.MaxResults != 0 {
-			opts.MaxResults = params.MaxResults
-		}
-		if len(params.FileExtensions) > 0 {
-			opts.FileExtensions = params.FileExtensions
-		}
-		body.Options = opts
+	opts := &searchOptions{}
+	if params.Path != "" {
+		opts.Path = params.Path
 	}
+	if len(params.FileExtensions) > 0 {
+		opts.FileExtensions = params.FileExtensions
+	}
+	if params.MaxResults != 0 {
+		opts.MaxResults = params.MaxResults
+	} else {
+		// Default max_results to 20 when not provided, to match the manifest.
+		opts.MaxResults = 20
+	}
+	body.Options = opts
 
 	var resp searchResponse
 	if err := a.conn.doRPC(ctx, "files/search_v2", req.Credentials, body, &resp); err != nil {
