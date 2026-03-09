@@ -196,7 +196,14 @@ func main() {
 			log.Fatalf("Failed to run migrations: %v", err)
 		}
 
-		pool, err := db.Connect(ctx, dbURL)
+		// Use least-privilege app role for runtime queries, falling back to
+		// the superuser DATABASE_URL for backward compatibility.
+		appURL := os.Getenv("DATABASE_URL_APP")
+		if appURL == "" {
+			appURL = dbURL
+		}
+
+		pool, err := db.Connect(ctx, appURL)
 		if err != nil {
 			sentry.CaptureException(err)
 			sentry.Flush(2 * time.Second)
