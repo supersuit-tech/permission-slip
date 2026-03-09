@@ -107,7 +107,7 @@ export default function OtpStep({
             resendCooldownSeconds > 0
               ? "Resend code (on cooldown)"
               : isResending
-                ? "Resending code"
+                ? "Resending…"
                 : "Resend code"
           }
           className="opacity-70"
