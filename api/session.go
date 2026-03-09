@@ -313,7 +313,7 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 						if rlErr := db.RelinkProfile(r.Context(), deps.DB, old.ID, userID); rlErr != nil {
 							log.Printf("[%s] RequireProfile: re-link profile %s→%s: %v", TraceID(r.Context()), old.ID, userID, rlErr)
 						} else {
-							log.Printf("[%s] RequireProfile: re-linked profile %s→%s (email=%s)", TraceID(r.Context()), old.ID, userID, email)
+							log.Printf("[%s] RequireProfile: re-linked profile %s→%s", TraceID(r.Context()), old.ID, userID)
 							old.ID = userID
 							profile = old
 						}
