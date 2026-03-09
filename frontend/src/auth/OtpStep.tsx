@@ -32,7 +32,10 @@ export default function OtpStep({
   // Clear the success banner when the cooldown expires so it doesn't
   // linger indefinitely alongside an active "Resend code" button.
   useEffect(() => {
-    if (resendCooldownSeconds === 0) setResendSuccess(false);
+    if (resendCooldownSeconds === 0) {
+      setResendSuccess(false);
+      setResendError(null);
+    }
   }, [resendCooldownSeconds]);
 
   const handleResend = async () => {
