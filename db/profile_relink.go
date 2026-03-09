@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // FindProfileByAuthEmail looks up a profile whose auth.users entry has the
@@ -32,23 +33,32 @@ func FindProfileByAuthEmail(ctx context.Context, db DBTX, email string) (*Profil
 		return nil, nil
 	}
 	if err != nil {
-		// Gracefully handle missing email column in local-dev auth.users stub.
-		// The column is added by a migration but may not exist in older envs.
-		return nil, nil
+		// 42703 = undefined_column: the auth.users table lacks an email
+		// column in environments that haven't run the migration yet.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42703" {
+			return nil, nil
+		}
+		return nil, err
 	}
 	return &p, nil
 }
 
-// RelinkProfile atomically updates a profile's primary key from oldID to
-// newID. All child tables with ON UPDATE CASCADE follow automatically.
+// RelinkProfile updates a profile's primary key from oldID to newID.
+// All child tables with ON UPDATE CASCADE follow automatically.
 // The new user must already exist in auth.users (Supabase creates it on login).
+//
+// In local dev, auth.users may not have the new ID yet, so we insert it
+// first (id only, no email — avoids unique constraint conflicts on email).
+// If step 1 succeeds but step 2 fails, the orphaned auth.users row is
+// harmless and the next request will retry the full operation.
 func RelinkProfile(ctx context.Context, db DBTX, oldID, newID string) error {
 	// Ensure the new auth.users entry exists (Supabase manages this in prod;
-	// in local dev we upsert it ourselves).
+	// in local dev we create a minimal row ourselves). We omit the email
+	// to avoid colliding with the old user's unique email constraint.
 	_, err := db.Exec(ctx,
-		`INSERT INTO auth.users (id, email) VALUES ($1, (SELECT email FROM auth.users WHERE id = $2))
-		 ON CONFLICT (id) DO NOTHING`,
-		newID, oldID,
+		`INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING`,
+		newID,
 	)
 	if err != nil {
 		return err
