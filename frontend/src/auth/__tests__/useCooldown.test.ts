@@ -84,6 +84,17 @@ describe("useCooldown", () => {
     expect(result.current.isActive).toBe(false);
   });
 
+  it("uses DEFAULT_SECONDS (60) when start() is called with no arguments", () => {
+    const { result } = renderHook(() => useCooldown());
+
+    act(() => {
+      result.current.start();
+    });
+
+    expect(result.current.secondsLeft).toBe(60);
+    expect(result.current.isActive).toBe(true);
+  });
+
   it("does nothing when start(0) is called", () => {
     const { result } = renderHook(() => useCooldown());
 
