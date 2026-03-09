@@ -17,7 +17,7 @@ describe("safeErrorMessage", () => {
       "over_email_send_rate_limit"
     );
     expect(safeErrorMessage(error)).toBe(
-      "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again."
+      "Too many login emails sent. Please wait a few minutes and try again."
     );
   });
 
