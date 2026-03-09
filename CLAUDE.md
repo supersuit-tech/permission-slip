@@ -5,13 +5,14 @@
 - When asked a question, just answer it. Do not write or modify code unless explicitly asked.
 - Always ask for permission before writing any code.
 - Do not git push without confirming first
-- After making the first commit on a branch, do NOT automatically create a pull request. Instead, provide a pre-filled GitHub PR creation link so the user can create it themselves. Keep the URL short so it's clickable on mobile — only include the title parameter, NOT the body. Format: `Click here to create PR: https://github.com/supersuit-tech/permission-slip/compare/main...BRANCH?expand=1&title=URL_ENCODED_TITLE` — then write the suggested PR body inside a markdown code block in your message so the user can easily copy-paste it into the PR description. For subsequent commits, push to the existing PR branch.
+- After making the first commit on a branch, automatically create a pull request using `gh pr create`. Use a concise title and include a descriptive body with a summary and test plan. For subsequent commits, push to the existing PR branch.
 - When suggesting a PR body that includes a checklist, **split the checklist into two sections** based on who should handle each item:
   - `### Claude Code` — items that Claude Code can address autonomously (e.g., add tests, fix lint, update docs, add error handling, run checks). The `/watch` command will pick these up and check them off.
   - `### OpenClaw` — items that require human judgment, manual verification, design review, stakeholder input, or access to systems Claude Code can't reach.
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
+- **Train the reviewer:** When you address a PR review comment, react to it (👍 if you agree and fixed it, 👎 if you disagree and explain why) and leave a threaded reply explaining what you changed and why. This builds context over time and helps the reviewer calibrate their feedback.
 - If a file is getting large enough that splitting it would improve maintainability, just go ahead and split it — don't ask first.
 - When you need to ask questions, just ask them in regular chat text. Do NOT use the AskUserQuestion tool — it doesn't work reliably.
 
