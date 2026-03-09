@@ -21,6 +21,7 @@ type readParams struct {
 	Order         string            `json:"order,omitempty"`
 	Limit         int               `json:"limit,omitempty"`
 	Offset        int               `json:"offset,omitempty"`
+	CountTotal    bool              `json:"count_total,omitempty"`
 	AllowedTables []string          `json:"allowed_tables,omitempty"`
 }
 
@@ -34,7 +35,7 @@ func (p readParams) validate() error {
 	if p.Offset < 0 {
 		return &connectors.ValidationError{Message: fmt.Sprintf("offset must be non-negative, got %d", p.Offset)}
 	}
-	return nil
+	return validateFilters(p.Filters)
 }
 
 // Execute reads rows from a Supabase table via PostgREST GET.
@@ -61,7 +62,9 @@ func (a *readAction) Execute(ctx context.Context, req connectors.ActionRequest) 
 	q.Set("select", sel)
 
 	// Apply filters.
-	applyFilters(q, params.Filters)
+	if err := applyFilters(q, params.Filters); err != nil {
+		return nil, err
+	}
 
 	// Ordering.
 	if params.Order != "" {
@@ -81,13 +84,29 @@ func (a *readAction) Execute(ctx context.Context, req connectors.ActionRequest) 
 
 	reqURL += "?" + q.Encode()
 
+	// Build extra headers for exact count if requested.
+	var extraHeaders map[string]string
+	if params.CountTotal {
+		extraHeaders = map[string]string{"Prefer": "count=exact"}
+	}
+
 	var rows []map[string]any
-	if err := a.conn.doRequest(ctx, "GET", reqURL, apiKey, nil, &rows); err != nil {
+	contentRange, err := a.conn.doRequestWithHeaders(ctx, "GET", reqURL, apiKey, nil, &rows, extraHeaders)
+	if err != nil {
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]any{
+	result := map[string]any{
 		"rows":  rows,
 		"count": len(rows),
-	})
+	}
+
+	// Parse total count from Content-Range header (e.g., "0-9/42").
+	if params.CountTotal && contentRange != "" {
+		if total := parseTotalFromContentRange(contentRange); total >= 0 {
+			result["total_count"] = total
+		}
+	}
+
+	return connectors.JSONResult(result)
 }

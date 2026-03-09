@@ -261,6 +261,156 @@ func TestRead_Unauthorized(t *testing.T) {
 	}
 }
 
+func TestRead_InvalidFilterOperator(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readAction{conn: conn}
+
+	params, _ := json.Marshal(readParams{
+		Table:   "users",
+		Filters: map[string]string{"status": "badop.active"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid filter operator")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestRead_FilterMissingDot(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readAction{conn: conn}
+
+	params, _ := json.Marshal(readParams{
+		Table:   "users",
+		Filters: map[string]string{"status": "active"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for filter without operator")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestRead_InvalidTableName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readAction{conn: conn}
+
+	params, _ := json.Marshal(readParams{
+		Table: "../etc/passwd",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for unsafe table name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestRead_CountTotal(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the Prefer header requests exact count.
+		if r.Header.Get("Prefer") != "count=exact" {
+			t.Errorf("expected Prefer: count=exact, got %q", r.Header.Get("Prefer"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Range", "0-1/42")
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"id": 1, "name": "Alice"},
+			{"id": 2, "name": "Bob"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client())
+	action := &readAction{conn: conn}
+
+	params, _ := json.Marshal(readParams{
+		Table:      "users",
+		CountTotal: true,
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCredsWithURL(srv.URL),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	totalCount, ok := data["total_count"].(float64)
+	if !ok {
+		t.Fatal("expected total_count in result")
+	}
+	if int(totalCount) != 42 {
+		t.Errorf("expected total_count 42, got %v", totalCount)
+	}
+}
+
+func TestRead_NotFilterOperator(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("status") != "not.eq.deleted" {
+			t.Errorf("expected filter not.eq.deleted, got %q", r.URL.Query().Get("status"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]map[string]any{})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client())
+	action := &readAction{conn: conn}
+
+	params, _ := json.Marshal(readParams{
+		Table:   "users",
+		Filters: map[string]string{"status": "not.eq.deleted"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCredsWithURL(srv.URL),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRead_InvalidJSON(t *testing.T) {
 	t.Parallel()
 

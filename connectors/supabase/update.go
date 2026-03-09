@@ -34,7 +34,7 @@ func (p updateParams) validate() error {
 	if len(p.Filters) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: filters — at least one filter is required to prevent accidental full-table updates"}
 	}
-	return nil
+	return validateFilters(p.Filters)
 }
 
 // Execute updates rows in a Supabase table via PostgREST PATCH.
@@ -61,7 +61,9 @@ func (a *updateAction) Execute(ctx context.Context, req connectors.ActionRequest
 	q.Set("select", ret)
 
 	// Apply filters to scope the update.
-	applyFilters(q, params.Filters)
+	if err := applyFilters(q, params.Filters); err != nil {
+		return nil, err
+	}
 
 	reqURL += "?" + q.Encode()
 

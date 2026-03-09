@@ -27,7 +27,7 @@ func (p deleteParams) validate() error {
 	if len(p.Filters) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: filters — at least one filter is required to prevent accidental full-table deletes"}
 	}
-	return nil
+	return validateFilters(p.Filters)
 }
 
 // Execute deletes rows from a Supabase table via PostgREST DELETE.
@@ -54,7 +54,9 @@ func (a *deleteAction) Execute(ctx context.Context, req connectors.ActionRequest
 	q.Set("select", ret)
 
 	// Apply filters to scope the delete.
-	applyFilters(q, params.Filters)
+	if err := applyFilters(q, params.Filters); err != nil {
+		return nil, err
+	}
 
 	reqURL += "?" + q.Encode()
 

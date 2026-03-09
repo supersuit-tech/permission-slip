@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,6 +101,10 @@ func (c *SupabaseConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"minimum": 0,
 							"description": "Number of rows to skip for pagination"
+						},
+						"count_total": {
+							"type": "boolean",
+							"description": "If true, returns total_count (the total number of matching rows before limit/offset). Useful for building paginated UIs."
 						},
 						"allowed_tables": {
 							"type": "array",
@@ -307,9 +312,17 @@ func restURL(baseURL, table string) string {
 
 // doRequest executes an HTTP request against the Supabase PostgREST API.
 func (c *SupabaseConnector) doRequest(ctx context.Context, method, reqURL, apiKey string, body io.Reader, dest any) error {
+	_, err := c.doRequestWithHeaders(ctx, method, reqURL, apiKey, body, dest, nil)
+	return err
+}
+
+// doRequestWithHeaders is the core HTTP method. It accepts optional extra
+// headers and returns the Content-Range response header (useful for exact
+// count queries).
+func (c *SupabaseConnector) doRequestWithHeaders(ctx context.Context, method, reqURL, apiKey string, body io.Reader, dest any, extraHeaders map[string]string) (contentRange string, err error) {
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return "", fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("apikey", apiKey)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
@@ -324,21 +337,25 @@ func (c *SupabaseConnector) doRequest(ctx context.Context, method, reqURL, apiKe
 		req.Header.Set("Prefer", "return=representation")
 	}
 
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Supabase API request timed out: %v", err)}
+			return "", &connectors.TimeoutError{Message: fmt.Sprintf("Supabase API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Supabase API request canceled"}
+			return "", &connectors.TimeoutError{Message: "Supabase API request canceled"}
 		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Supabase API request failed: %v", err)}
+		return "", &connectors.ExternalError{Message: fmt.Sprintf("Supabase API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
+		return "", &connectors.RateLimitError{
 			Message:    "Supabase API rate limit exceeded",
 			RetryAfter: retryAfter,
 		}
@@ -346,34 +363,52 @@ func (c *SupabaseConnector) doRequest(ctx context.Context, method, reqURL, apiKe
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+		return "", &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return &connectors.AuthError{
+		return "", &connectors.AuthError{
 			Message: "Supabase authentication failed — check that your API key is valid",
 		}
 	}
 	if resp.StatusCode == http.StatusForbidden {
-		return &connectors.AuthError{
+		return "", &connectors.AuthError{
 			Message: "Supabase permission denied — the API key may lack access to this table (check RLS policies)",
 		}
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return mapSupabaseError(resp.StatusCode, respBody)
+		return "", mapSupabaseError(resp.StatusCode, respBody)
 	}
 
 	if dest != nil {
 		if err := json.Unmarshal(respBody, dest); err != nil {
-			return &connectors.ExternalError{
+			return "", &connectors.ExternalError{
 				StatusCode: resp.StatusCode,
 				Message:    "failed to decode Supabase PostgREST response",
 			}
 		}
 	}
 
-	return nil
+	return resp.Header.Get("Content-Range"), nil
+}
+
+// parseTotalFromContentRange extracts the total count from a PostgREST
+// Content-Range header (e.g., "0-9/42" → 42). Returns -1 if unparseable.
+func parseTotalFromContentRange(header string) int {
+	slashIdx := strings.LastIndexByte(header, '/')
+	if slashIdx < 0 || slashIdx+1 >= len(header) {
+		return -1
+	}
+	total := header[slashIdx+1:]
+	if total == "*" {
+		return -1
+	}
+	n, err := strconv.Atoi(total)
+	if err != nil {
+		return -1
+	}
+	return n
 }
 
 // postgrestErrorResponse is the error envelope from PostgREST.
@@ -447,11 +482,16 @@ func parseAndValidate[T interface{ validate() error }](raw json.RawMessage, dest
 	return (*dest).validate()
 }
 
-// validateTable checks the table name is non-empty and, if an allowlist is
-// provided, that the table is in the allowlist.
+// validateTable checks the table name is non-empty, contains only safe
+// characters, and (if an allowlist is provided) that the table is allowed.
 func validateTable(table string, allowedTables []string) error {
 	if table == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: table"}
+	}
+	if !isTableNameSafe(table) {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("invalid table name %q: must contain only letters, digits, underscores, hyphens, or dots", table),
+		}
 	}
 	if len(allowedTables) > 0 {
 		for _, t := range allowedTables {
@@ -460,17 +500,86 @@ func validateTable(table string, allowedTables []string) error {
 			}
 		}
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("table %q is not in the allowed tables list", table),
+			Message: fmt.Sprintf("table %q is not in the allowed tables list: %v", table, allowedTables),
 		}
 	}
 	return nil
 }
 
-// applyFilters adds PostgREST filter query parameters to the URL values.
-// Filters are key-value pairs where the key is the column name and the value
-// is an "operator.value" string (e.g., "eq.active", "gte.18").
-func applyFilters(q url.Values, filters map[string]string) {
+// isTableNameSafe checks that a table name contains only characters safe for
+// use in PostgREST URL paths: ASCII letters, digits, underscores, hyphens,
+// and dots (for schema-qualified names like "public.users").
+func isTableNameSafe(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == '_' || c == '-' || c == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// validFilterOperators lists the PostgREST filter operators that are
+// recognized and safe to pass through.
+var validFilterOperators = map[string]bool{
+	"eq": true, "neq": true, "gt": true, "gte": true,
+	"lt": true, "lte": true, "like": true, "ilike": true,
+	"is": true, "in": true, "cs": true, "cd": true,
+	"sl": true, "sr": true, "nxl": true, "nxr": true,
+	"adj": true, "ov": true, "fts": true, "plfts": true,
+	"phfts": true, "wfts": true, "not.eq": true, "not.neq": true,
+	"not.gt": true, "not.gte": true, "not.lt": true, "not.lte": true,
+	"not.like": true, "not.ilike": true, "not.is": true, "not.in": true,
+	"not.cs": true, "not.cd": true, "not.sl": true, "not.sr": true,
+	"not.nxl": true, "not.nxr": true, "not.adj": true, "not.ov": true,
+	"not.fts": true, "not.plfts": true, "not.phfts": true, "not.wfts": true,
+}
+
+// validateFilters checks that all filter values use valid PostgREST operator
+// prefixes. Returns a helpful error if an invalid operator is found.
+func validateFilters(filters map[string]string) error {
+	for col, opVal := range filters {
+		dotIdx := strings.IndexByte(opVal, '.')
+		if dotIdx < 0 {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf(
+					"invalid filter for column %q: value %q must use PostgREST operator syntax like 'eq.value', 'gte.18', 'in.(a,b,c)' — see https://postgrest.org/en/stable/references/api/tables_views.html#operators",
+					col, opVal,
+				),
+			}
+		}
+		op := opVal[:dotIdx]
+		// Handle "not.op.value" by extracting "not.op".
+		if op == "not" {
+			secondDot := strings.IndexByte(opVal[dotIdx+1:], '.')
+			if secondDot >= 0 {
+				op = opVal[:dotIdx+1+secondDot]
+			}
+		}
+		if !validFilterOperators[op] {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf(
+					"unknown filter operator %q for column %q: valid operators are eq, neq, gt, gte, lt, lte, like, ilike, is, in, cs, cd, ov (and not.* variants) — see https://postgrest.org/en/stable/references/api/tables_views.html#operators",
+					op, col,
+				),
+			}
+		}
+	}
+	return nil
+}
+
+// applyFilters validates and adds PostgREST filter query parameters to the
+// URL values. Filters are key-value pairs where the key is the column name
+// and the value is an "operator.value" string (e.g., "eq.active", "gte.18").
+func applyFilters(q url.Values, filters map[string]string) error {
+	if err := validateFilters(filters); err != nil {
+		return err
+	}
 	for col, opVal := range filters {
 		q.Set(col, opVal)
 	}
+	return nil
 }
