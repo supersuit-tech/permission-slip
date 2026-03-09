@@ -23,7 +23,7 @@ type uploadFileParams struct {
 	Path       string `json:"path"`
 	Content    string `json:"content"`
 	Mode       string `json:"mode,omitempty"`
-	Autorename bool   `json:"autorename"`
+	Autorename *bool  `json:"autorename,omitempty"` // defaults to true when omitted
 }
 
 func (p *uploadFileParams) validate() error {
@@ -39,7 +39,7 @@ func (p *uploadFileParams) validate() error {
 	}
 	if len(decoded) > maxUploadBytes {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("file content exceeds maximum size of %d MB", maxUploadBytes>>20),
+			Message: fmt.Sprintf("file content is %d MB, which exceeds the maximum of %d MB", len(decoded)>>20, maxUploadBytes>>20),
 		}
 	}
 	if p.Mode != "" && p.Mode != "add" && p.Mode != "overwrite" {
@@ -55,10 +55,12 @@ type uploadAPIArg struct {
 }
 
 type uploadResponse struct {
-	Name        string `json:"name"`
-	PathDisplay string `json:"path_display"`
-	ID          string `json:"id"`
-	Size        int64  `json:"size"`
+	Name           string `json:"name"`
+	PathDisplay    string `json:"path_display"`
+	ID             string `json:"id"`
+	Size           int64  `json:"size"`
+	ContentHash    string `json:"content_hash"`
+	ServerModified string `json:"server_modified"`
 }
 
 func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -74,10 +76,16 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 		mode = "add"
 	}
 
+	// Default autorename to true when omitted (matches manifest schema default).
+	autorename := true
+	if params.Autorename != nil {
+		autorename = *params.Autorename
+	}
+
 	apiArg := uploadAPIArg{
 		Path:       params.Path,
 		Mode:       mode,
-		Autorename: params.Autorename,
+		Autorename: autorename,
 	}
 
 	var resp uploadResponse
@@ -86,9 +94,11 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"name":         resp.Name,
-		"path_display": resp.PathDisplay,
-		"id":           resp.ID,
-		"size":         resp.Size,
+		"name":            resp.Name,
+		"path_display":    resp.PathDisplay,
+		"id":              resp.ID,
+		"size":            resp.Size,
+		"content_hash":    resp.ContentHash,
+		"server_modified": resp.ServerModified,
 	})
 }

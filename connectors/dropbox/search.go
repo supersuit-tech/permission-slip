@@ -23,6 +23,16 @@ func (p *searchParams) validate() error {
 	if p.Query == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: query"}
 	}
+	if len(p.Query) < 3 {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("query must be at least 3 characters, got %d", len(p.Query)),
+		}
+	}
+	if p.Path != "" {
+		if err := validatePath(p.Path, "path"); err != nil {
+			return err
+		}
+	}
 	if p.MaxResults != 0 && (p.MaxResults < 1 || p.MaxResults > 1000) {
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("max_results must be between 1 and 1000, got %d", p.MaxResults),
@@ -56,19 +66,23 @@ type searchMatchMetadata struct {
 }
 
 type searchFileMetadata struct {
-	Tag         string `json:".tag"`
-	Name        string `json:"name"`
-	PathDisplay string `json:"path_display"`
-	ID          string `json:"id"`
-	Size        int64  `json:"size,omitempty"`
+	Tag            string `json:".tag"`
+	Name           string `json:"name"`
+	PathDisplay    string `json:"path_display"`
+	ID             string `json:"id"`
+	Size           int64  `json:"size,omitempty"`
+	ServerModified string `json:"server_modified,omitempty"`
+	ClientModified string `json:"client_modified,omitempty"`
 }
 
 type searchResultItem struct {
-	Type        string `json:"type"`
-	Name        string `json:"name"`
-	PathDisplay string `json:"path_display"`
-	ID          string `json:"id"`
-	Size        int64  `json:"size,omitempty"`
+	Type           string `json:"type"`
+	Name           string `json:"name"`
+	PathDisplay    string `json:"path_display"`
+	ID             string `json:"id"`
+	Size           int64  `json:"size,omitempty"`
+	ServerModified string `json:"server_modified,omitempty"`
+	ClientModified string `json:"client_modified,omitempty"`
 }
 
 func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -100,11 +114,13 @@ func (a *searchAction) Execute(ctx context.Context, req connectors.ActionRequest
 	items := make([]searchResultItem, len(resp.Matches))
 	for i, m := range resp.Matches {
 		items[i] = searchResultItem{
-			Type:        m.Metadata.Metadata.Tag,
-			Name:        m.Metadata.Metadata.Name,
-			PathDisplay: m.Metadata.Metadata.PathDisplay,
-			ID:          m.Metadata.Metadata.ID,
-			Size:        m.Metadata.Metadata.Size,
+			Type:           m.Metadata.Metadata.Tag,
+			Name:           m.Metadata.Metadata.Name,
+			PathDisplay:    m.Metadata.Metadata.PathDisplay,
+			ID:             m.Metadata.Metadata.ID,
+			Size:           m.Metadata.Metadata.Size,
+			ServerModified: m.Metadata.Metadata.ServerModified,
+			ClientModified: m.Metadata.Metadata.ClientModified,
 		}
 	}
 

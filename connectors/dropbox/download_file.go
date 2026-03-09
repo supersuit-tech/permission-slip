@@ -25,10 +25,13 @@ type downloadAPIArg struct {
 }
 
 type downloadResultHeader struct {
-	Name        string `json:"name"`
-	PathDisplay string `json:"path_display"`
-	ID          string `json:"id"`
-	Size        int64  `json:"size"`
+	Name           string `json:"name"`
+	PathDisplay    string `json:"path_display"`
+	ID             string `json:"id"`
+	Size           int64  `json:"size"`
+	ServerModified string `json:"server_modified"`
+	ClientModified string `json:"client_modified"`
+	ContentHash    string `json:"content_hash"`
 }
 
 func (a *downloadFileAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -45,10 +48,13 @@ func (a *downloadFileAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"name":         metadata.Name,
-		"path_display": metadata.PathDisplay,
-		"id":           metadata.ID,
-		"size":         metadata.Size,
-		"content":      base64.StdEncoding.EncodeToString(body),
+		"name":            metadata.Name,
+		"path_display":    metadata.PathDisplay,
+		"id":              metadata.ID,
+		"size":            metadata.Size,
+		"content":         base64.StdEncoding.EncodeToString(body),
+		"server_modified": metadata.ServerModified,
+		"client_modified": metadata.ClientModified,
+		"content_hash":    metadata.ContentHash,
 	})
 }

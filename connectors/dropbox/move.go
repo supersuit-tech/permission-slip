@@ -2,6 +2,7 @@ package dropbox
 
 import (
 	"context"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -22,7 +23,14 @@ func (p *moveParams) validate() error {
 	if err := validatePath(p.FromPath, "from_path"); err != nil {
 		return err
 	}
-	return validatePath(p.ToPath, "to_path")
+	if err := validatePath(p.ToPath, "to_path"); err != nil {
+		return err
+	}
+	// Dropbox paths are case-insensitive — catch no-op moves early.
+	if strings.EqualFold(p.FromPath, p.ToPath) {
+		return &connectors.ValidationError{Message: "from_path and to_path are the same (Dropbox paths are case-insensitive)"}
+	}
+	return nil
 }
 
 type moveRequest struct {

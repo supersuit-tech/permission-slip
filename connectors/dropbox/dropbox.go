@@ -108,7 +108,9 @@ type validatable interface {
 // runs its validation.
 func parseAndValidate(raw json.RawMessage, params validatable) error {
 	if err := json.Unmarshal(raw, params); err != nil {
-		return &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+		return &connectors.ValidationError{
+			Message: "invalid parameters: check that all parameter types are correct (e.g. strings are quoted, booleans are true/false, numbers are unquoted)",
+		}
 	}
 	return params.validate()
 }
@@ -343,7 +345,9 @@ func mapDropboxError(statusCode int, errorSummary string) error {
 	}
 }
 
-// validatePath checks that a Dropbox path starts with "/" and is non-empty.
+// validatePath checks that a Dropbox path starts with "/" and is well-formed.
+// Dropbox paths are case-insensitive and must not contain double slashes or
+// trailing slashes (except root "/").
 func validatePath(path, paramName string) error {
 	if path == "" {
 		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", paramName)}
@@ -351,6 +355,16 @@ func validatePath(path, paramName string) error {
 	if path[0] != '/' {
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("%s must start with / (e.g. /Documents/report.pdf), got %q", paramName, path),
+		}
+	}
+	if len(path) > 1 && path[len(path)-1] == '/' {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s must not end with a trailing slash, got %q", paramName, path),
+		}
+	}
+	if strings.Contains(path, "//") {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("%s contains double slashes — use single slashes (e.g. /Documents/report.pdf), got %q", paramName, path),
 		}
 	}
 	return nil

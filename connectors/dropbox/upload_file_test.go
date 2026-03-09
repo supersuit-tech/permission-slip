@@ -49,10 +49,11 @@ func TestUploadFile_Success(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL, srv.URL)
 	action := &uploadFileAction{conn: conn}
 
+	boolTrue := true
 	params, _ := json.Marshal(uploadFileParams{
 		Path:       "/Documents/report.pdf",
 		Content:    base64.StdEncoding.EncodeToString([]byte("file content")),
-		Autorename: true,
+		Autorename: &boolTrue,
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -71,6 +72,44 @@ func TestUploadFile_Success(t *testing.T) {
 	}
 	if data["id"] != "id:abc123" {
 		t.Errorf("expected id id:abc123, got %v", data["id"])
+	}
+}
+
+func TestUploadFile_DefaultAutorename(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var apiArg uploadAPIArg
+		json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &apiArg)
+		if !apiArg.Autorename {
+			t.Errorf("expected autorename to default to true, got false")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(uploadResponse{
+			Name:        "test.txt",
+			PathDisplay: "/test.txt",
+			ID:          "id:def456",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL, srv.URL)
+	action := &uploadFileAction{conn: conn}
+
+	// Omit autorename — should default to true
+	params, _ := json.Marshal(map[string]string{
+		"path":    "/test.txt",
+		"content": base64.StdEncoding.EncodeToString([]byte("data")),
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "dropbox.upload_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

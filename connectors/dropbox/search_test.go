@@ -129,6 +129,49 @@ func TestSearch_MissingQuery(t *testing.T) {
 	}
 }
 
+func TestSearch_QueryTooShort(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &searchAction{conn: conn}
+
+	params, _ := json.Marshal(searchParams{Query: "ab"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "dropbox.search",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for short query")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSearch_InvalidPath(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &searchAction{conn: conn}
+
+	params, _ := json.Marshal(searchParams{
+		Query: "test query",
+		Path:  "no-leading-slash",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "dropbox.search",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid path")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestSearch_InvalidMaxResults(t *testing.T) {
 	t.Parallel()
 	conn := New()

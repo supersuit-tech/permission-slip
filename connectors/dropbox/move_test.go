@@ -105,6 +105,29 @@ func TestMove_MissingToPath(t *testing.T) {
 	}
 }
 
+func TestMove_SamePath(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &moveAction{conn: conn}
+
+	params, _ := json.Marshal(moveParams{
+		FromPath: "/Documents/file.txt",
+		ToPath:   "/documents/file.txt", // case-insensitive match
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "dropbox.move",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for same path (case-insensitive)")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestMove_RelativePaths(t *testing.T) {
 	t.Parallel()
 	conn := New()

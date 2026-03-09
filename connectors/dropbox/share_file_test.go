@@ -136,6 +136,29 @@ func TestShareFile_InvalidVisibility(t *testing.T) {
 	}
 }
 
+func TestShareFile_InvalidExpires(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := &shareFileAction{conn: conn}
+
+	params, _ := json.Marshal(shareFileParams{
+		Path:    "/test.txt",
+		Expires: "not-a-date",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "dropbox.share_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid expires format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestShareFile_PasswordWithoutVisibility(t *testing.T) {
 	t.Parallel()
 	conn := New()

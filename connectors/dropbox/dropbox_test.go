@@ -172,6 +172,9 @@ func TestValidatePath(t *testing.T) {
 		{name: "valid root path", path: "/test", wantErr: false},
 		{name: "empty", path: "", wantErr: true},
 		{name: "relative path", path: "Documents/report.pdf", wantErr: true},
+		{name: "trailing slash", path: "/Documents/", wantErr: true},
+		{name: "double slashes", path: "/Documents//report.pdf", wantErr: true},
+		{name: "root slash only", path: "/", wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

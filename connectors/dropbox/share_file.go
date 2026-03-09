@@ -2,6 +2,7 @@ package dropbox
 
 import (
 	"context"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -28,6 +29,13 @@ func (p *shareFileParams) validate() error {
 	if p.RequestedVisibility == "password" && p.LinkPassword == "" {
 		return &connectors.ValidationError{Message: "link_password is required when requested_visibility is \"password\""}
 	}
+	if p.Expires != "" {
+		if _, err := time.Parse(time.RFC3339, p.Expires); err != nil {
+			return &connectors.ValidationError{
+				Message: "expires must be in ISO 8601 / RFC 3339 format (e.g. 2026-03-15T00:00:00Z)",
+			}
+		}
+	}
 	return nil
 }
 
@@ -43,9 +51,19 @@ type shareRequest struct {
 }
 
 type shareResponse struct {
-	URL       string `json:"url"`
-	PathLower string `json:"path_lower"`
-	Name      string `json:"name"`
+	URL              string                  `json:"url"`
+	PathLower        string                  `json:"path_lower"`
+	Name             string                  `json:"name"`
+	LinkPermissions  *shareLinkPermissions   `json:"link_permissions,omitempty"`
+	Expires          string                  `json:"expires,omitempty"`
+}
+
+type shareLinkPermissions struct {
+	ResolvedVisibility *shareVisibility `json:"resolved_visibility,omitempty"`
+}
+
+type shareVisibility struct {
+	Tag string `json:".tag"`
 }
 
 func (a *shareFileAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -68,9 +86,17 @@ func (a *shareFileAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
+	result := map[string]any{
 		"url":        resp.URL,
 		"path_lower": resp.PathLower,
 		"name":       resp.Name,
-	})
+	}
+	if resp.LinkPermissions != nil && resp.LinkPermissions.ResolvedVisibility != nil {
+		result["effective_visibility"] = resp.LinkPermissions.ResolvedVisibility.Tag
+	}
+	if resp.Expires != "" {
+		result["expires"] = resp.Expires
+	}
+
+	return connectors.JSONResult(result)
 }
