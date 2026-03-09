@@ -18,7 +18,11 @@ export default function LoginPage() {
         onBack={() => setStep("email")}
         onResend={async () => {
           const result = await sendOtp(email);
-          if (!result.error) cooldown.start();
+          // Start cooldown on success or rate-limit error so the button
+          // stays disabled even when the server rejects the request.
+          if (!result.error || result.error.code === "over_email_send_rate_limit") {
+            cooldown.start();
+          }
           return result;
         }}
         resendCooldownSeconds={cooldown.secondsLeft}
