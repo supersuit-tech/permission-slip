@@ -120,7 +120,7 @@ Permission Slip uses a single Supabase project for:
 
 RLS is enabled on all application tables via a database migration that runs automatically on startup. This locks down the Supabase PostgREST data API — with RLS enabled and no permissive policies, the `anon` and `authenticated` roles cannot read or write any table through PostgREST, even with a valid JWT.
 
-The Go backend connects as the `postgres` superuser, which bypasses RLS entirely. No application code changes are needed.
+The Go backend connects as the `app_backend` role (a least-privilege role with only `SELECT`, `INSERT`, `UPDATE`, `DELETE` on application tables). RLS is bypassed because the `app_backend` role is not subject to RLS policies (only `anon` and `authenticated` roles used by PostgREST are). Authorization is enforced in Go application code. The `postgres` superuser is reserved for running migrations.
 
 To verify RLS is enabled after deployment:
 
@@ -136,11 +136,18 @@ All rows should show `rowsecurity = true`. A database test (`TestRLSEnabledOnAll
 **Fly.io setup:**
 
 ```bash
-# Runtime secrets
+# Runtime secrets (superuser — for migrations only)
 fly secrets set \
   DATABASE_URL="postgres://postgres.[project-ref]:[password]@[host]:6543/postgres?sslmode=require" \
   SUPABASE_URL="https://[project-ref].supabase.co" \
   SUPABASE_SERVICE_ROLE_KEY="<service_role key from Supabase dashboard>"
+
+# App backend role (least-privilege — used at runtime)
+# After the migration runs, set the production password in Supabase SQL Editor:
+#   ALTER ROLE app_backend PASSWORD '<strong-password>';
+# Then add the secret:
+fly secrets set \
+  DATABASE_URL_APP="postgresql://app_backend:<password>@[pooler-host]:6543/postgres?sslmode=require"
 
 # Build-time args (inlined into frontend JS bundle)
 fly deploy \
@@ -366,6 +373,7 @@ Set via `fly secrets set`. These are encrypted at rest by Fly and injected as en
 
 fly secrets set \
   DATABASE_URL="postgres://postgres.[ref]:[pass]@[host]:6543/postgres?sslmode=require" \
+  DATABASE_URL_APP="postgresql://app_backend:[password]@[pooler-host]:6543/postgres?sslmode=require" \
   SUPABASE_URL="https://[project-ref].supabase.co" \
   BASE_URL="https://app.permissionslip.dev" \
   ALLOWED_ORIGINS="https://app.permissionslip.dev" \
@@ -462,7 +470,8 @@ Or hardcode in `fly.toml` for simpler deploys:
 
 | Variable | Type | Status | Description |
 |---|---|---|---|
-| `DATABASE_URL` | Runtime secret | **Required** | Supabase Postgres pooler connection string |
+| `DATABASE_URL` | Runtime secret | **Required** | Supabase Postgres pooler connection string (superuser — used for migrations) |
+| `DATABASE_URL_APP` | Runtime secret | **Required** | Least-privilege `app_backend` role connection string (used at runtime) |
 | `SUPABASE_URL` | Runtime secret | **Required** | Supabase project URL (JWT verification) |
 | `BASE_URL` | Runtime secret | **Required** | `https://app.permissionslip.dev` |
 | `ALLOWED_ORIGINS` | Runtime secret | **Required** | `https://app.permissionslip.dev` |
@@ -688,6 +697,7 @@ Setting any secret via `fly secrets set` triggers an automatic redeploy.
 | Secret | Cadence | Impact of Rotation |
 |---|---|---|
 | `DATABASE_URL` (password) | Every 90 days | None — new connections use the new password immediately |
+| `DATABASE_URL_APP` (password) | Every 90 days | None — rotate via Supabase SQL Editor (`ALTER ROLE app_backend PASSWORD '...'`), then update Fly secret |
 | `INVITE_HMAC_KEY` | Every 90 days | **Invalidates pending (unused) invite links.** Accepted invites are unaffected |
 | `SENDGRID_API_KEY` | Every 90 days | None — revoke the old key in SendGrid after deploying the new one |
 | `TWILIO_AUTH_TOKEN` | Every 90 days | None — regenerate in Twilio console, then update Fly |
@@ -706,6 +716,23 @@ Setting any secret via `fly secrets set` triggers an automatic redeploy.
 2. Update the connection string:
    ```bash
    fly secrets set DATABASE_URL="postgres://postgres.[ref]:[new-pass]@[host]:6543/postgres?sslmode=require"
+   ```
+
+**App backend database password (`DATABASE_URL_APP`):**
+
+The `app_backend` role is created by a migration with a dev password. In production, set a strong password via the Supabase SQL Editor:
+
+1. Generate a new password:
+   ```bash
+   openssl rand -hex 32
+   ```
+2. In **Supabase dashboard > SQL Editor**, run:
+   ```sql
+   ALTER ROLE app_backend PASSWORD 'paste-new-password-here';
+   ```
+3. Update the Fly secret (same pooler host as `DATABASE_URL`, just swap username and password):
+   ```bash
+   fly secrets set DATABASE_URL_APP="postgresql://app_backend:new-password@[pooler-host]:6543/postgres?sslmode=require"
    ```
 
 **HMAC key:**
