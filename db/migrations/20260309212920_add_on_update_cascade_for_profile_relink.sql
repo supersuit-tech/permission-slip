@@ -101,14 +101,19 @@ DO $$ BEGIN
 END $$;
 -- +goose StatementEnd
 
--- Grant the app_backend role access to auth.users so that
--- FindProfileByAuthEmail (SELECT) and RelinkProfile (INSERT) work in production.
-GRANT SELECT, INSERT ON auth.users TO app_backend;
+-- Grant the app_backend role SELECT on auth.users so that
+-- FindProfileByAuthEmail can JOIN on auth.users.email.
+-- INSERT is intentionally omitted: in production, Supabase creates the
+-- auth.users row during OTP login before the backend sees the JWT, so
+-- RelinkProfile's INSERT INTO auth.users ... ON CONFLICT DO NOTHING is
+-- always a no-op. In local dev, the test helper creates auth.users rows
+-- directly (running as superuser, not app_backend).
+GRANT SELECT ON auth.users TO app_backend;
 
 -- +goose Down
 
 -- Revoke auth.users grants added in UP.
-REVOKE SELECT, INSERT ON auth.users FROM app_backend;
+REVOKE SELECT ON auth.users FROM app_backend;
 
 -- Revert all constraints back to ON UPDATE NO ACTION (the default).
 

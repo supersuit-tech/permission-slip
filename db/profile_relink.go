@@ -51,6 +51,11 @@ func FindProfileByAuthEmail(ctx context.Context, db DBTX, email string) (*Profil
 //
 // In local dev, auth.users may not have the new ID yet, so we insert it
 // first (id only, no email — avoids unique constraint conflicts on email).
+// This bare (id) INSERT works because the local-dev auth.users stub
+// (created by testhelper/migrations) has only nullable columns besides id.
+// In production, auth.users has NOT NULL columns (aud, role, etc.), but
+// the INSERT is always a no-op there because Supabase already created the
+// row during OTP login.
 // If step 1 succeeds but step 2 fails, the orphaned auth.users row is
 // harmless and the next request will retry the full operation.
 func RelinkProfile(ctx context.Context, db DBTX, oldID, newID string) error {

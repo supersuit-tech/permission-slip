@@ -100,6 +100,8 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 										log.Printf("[%s] Onboarding: profile already re-linked (concurrent), using existing", TraceID(r.Context()))
 										RespondJSON(w, http.StatusOK, toOnboardingResponse(p))
 										return
+									} else if fetchErr != nil {
+										log.Printf("[%s] Onboarding: re-fetch after concurrent re-link failed: %v", TraceID(r.Context()), fetchErr)
 									}
 								} else {
 									log.Printf("[%s] Onboarding: re-linked profile %s→%s via username conflict", TraceID(r.Context()), owner.ID, userID)
