@@ -51,7 +51,7 @@ describe("EmailStep", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Too many requests. Please wait a moment and try again.",
+          "Too many login emails sent.",
           { exact: false }
         )
       ).toBeInTheDocument();

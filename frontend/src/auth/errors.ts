@@ -10,7 +10,7 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
   over_request_rate_limit:
     "Too many attempts. Please wait a moment and try again.",
   over_email_send_rate_limit:
-    "Too many requests. Please wait a moment and try again.",
+    "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again.",
   mfa_factor_not_found: "No authenticator found. Please re-enroll.",
   mfa_verification_failed:
     "Invalid code. Please check your authenticator app and try again.",

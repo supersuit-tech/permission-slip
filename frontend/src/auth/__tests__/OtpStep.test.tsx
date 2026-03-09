@@ -14,6 +14,8 @@ const defaultProps = {
   email: "test@example.com",
   onVerify: vi.fn().mockResolvedValue({ error: null }),
   onBack: vi.fn(),
+  onResend: vi.fn().mockResolvedValue({ error: null }),
+  resendCooldownSeconds: 0,
 };
 
 function renderOtpStep(props = defaultProps) {

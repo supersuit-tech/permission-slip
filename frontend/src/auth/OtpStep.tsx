@@ -11,11 +11,32 @@ interface OtpStepProps {
   email: string;
   onVerify: (code: string) => Promise<{ error: AuthError | null }>;
   onBack: () => void;
+  onResend: () => Promise<{ error: AuthError | null }>;
+  resendCooldownSeconds: number;
 }
 
-export default function OtpStep({ email, onVerify, onBack }: OtpStepProps) {
+export default function OtpStep({
+  email,
+  onVerify,
+  onBack,
+  onResend,
+  resendCooldownSeconds,
+}: OtpStepProps) {
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  const handleResend = async () => {
+    setResendError(null);
+    setResendSuccess(false);
+    const { error } = await onResend();
+    if (error) {
+      setResendError("Could not resend — please wait a moment and try again.");
+    } else {
+      setResendSuccess(true);
+    }
+  };
 
   const handleAutoFill = async () => {
     // Dynamic import keeps dev-only Mailpit code out of the production bundle
@@ -57,13 +78,33 @@ export default function OtpStep({ email, onVerify, onBack }: OtpStepProps) {
           </Button>
         </div>
       </form>
+      <div className="mt-3 flex flex-col items-start gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleResend}
+          disabled={resendCooldownSeconds > 0}
+          className="opacity-70"
+        >
+          {resendCooldownSeconds > 0
+            ? `Resend in ${resendCooldownSeconds}s`
+            : "Resend code"}
+        </Button>
+        {resendError && (
+          <p className="text-xs text-destructive">{resendError}</p>
+        )}
+        {resendSuccess && (
+          <p className="text-xs text-muted-foreground">Code resent.</p>
+        )}
+      </div>
       <DevOnly>
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={handleAutoFill}
-          className="mt-3 opacity-70"
+          className="mt-1 opacity-70"
         >
           Dev: Auto-fill code from Mailpit
         </Button>
