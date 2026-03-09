@@ -123,10 +123,10 @@ export default function OtpStep({
           )}
         </Button>
         {resendError && (
-          <p className="text-xs text-destructive">{resendError}</p>
+          <p role="alert" className="text-xs text-destructive">{resendError}</p>
         )}
         {resendSuccess && (
-          <p className="text-xs text-muted-foreground">Code resent.</p>
+          <p role="status" className="text-xs text-muted-foreground">Code resent.</p>
         )}
       </div>
       <DevOnly>
