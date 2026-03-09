@@ -380,6 +380,56 @@ func TestRead_CountTotal(t *testing.T) {
 	}
 }
 
+func TestRead_FilterColumnNameInjection(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readAction{conn: conn}
+
+	// A filter key of "select" would overwrite the select query param,
+	// potentially allowing data exfiltration. Must be rejected.
+	params, _ := json.Marshal(readParams{
+		Table:   "users",
+		Filters: map[string]string{"select": "eq.secret_column"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for reserved query param as filter key")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestRead_FilterColumnNameSpecialChars(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readAction{conn: conn}
+
+	params, _ := json.Marshal(readParams{
+		Table:   "users",
+		Filters: map[string]string{"col;DROP TABLE": "eq.1"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "supabase.read",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for unsafe column name")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestRead_NotFilterOperator(t *testing.T) {
 	t.Parallel()
 

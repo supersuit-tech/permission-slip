@@ -538,10 +538,54 @@ var validFilterOperators = map[string]bool{
 	"not.fts": true, "not.plfts": true, "not.phfts": true, "not.wfts": true,
 }
 
-// validateFilters checks that all filter values use valid PostgREST operator
-// prefixes. Returns a helpful error if an invalid operator is found.
+// reservedQueryParams lists PostgREST query parameter names that must not
+// be used as filter column names. If a filter key matches one of these, it
+// would overwrite an explicitly set parameter — potentially bypassing
+// pagination limits, changing selected columns, or altering query semantics.
+var reservedQueryParams = map[string]bool{
+	"select": true, "order": true, "limit": true, "offset": true,
+	"on_conflict": true, "columns": true, "or": true, "and": true,
+	"not": true,
+}
+
+// isColumnNameSafe checks that a column name contains only characters that
+// are valid in PostgreSQL column identifiers: ASCII letters, digits,
+// underscores. This prevents injection of PostgREST special syntax.
+func isColumnNameSafe(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// validateFilters checks that all filter column names are safe and values
+// use valid PostgREST operator prefixes. Returns a helpful error if an
+// invalid operator or unsafe column name is found.
 func validateFilters(filters map[string]string) error {
 	for col, opVal := range filters {
+		// Reject column names that collide with PostgREST reserved params.
+		if reservedQueryParams[col] {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf(
+					"filter column name %q is a reserved PostgREST parameter and cannot be used as a filter key",
+					col,
+				),
+			}
+		}
+		// Validate column name characters.
+		if !isColumnNameSafe(col) {
+			return &connectors.ValidationError{
+				Message: fmt.Sprintf(
+					"invalid filter column name %q: must contain only letters, digits, and underscores",
+					col,
+				),
+			}
+		}
 		dotIdx := strings.IndexByte(opVal, '.')
 		if dotIdx < 0 {
 			return &connectors.ValidationError{
