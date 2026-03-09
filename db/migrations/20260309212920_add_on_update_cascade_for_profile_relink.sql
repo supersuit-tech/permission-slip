@@ -101,7 +101,14 @@ DO $$ BEGIN
 END $$;
 -- +goose StatementEnd
 
+-- Grant the app_backend role access to auth.users so that
+-- FindProfileByAuthEmail (SELECT) and RelinkProfile (INSERT) work in production.
+GRANT SELECT, INSERT ON auth.users TO app_backend;
+
 -- +goose Down
+
+-- Revoke auth.users grants added in UP.
+REVOKE SELECT, INSERT ON auth.users FROM app_backend;
 
 -- Revert all constraints back to ON UPDATE NO ACTION (the default).
 

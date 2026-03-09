@@ -95,6 +95,12 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 							if emailErr == nil && oldOwner != nil && oldOwner.ID == owner.ID {
 								if rlErr := db.RelinkProfile(r.Context(), deps.DB, owner.ID, userID); rlErr != nil {
 									log.Printf("[%s] Onboarding: re-link on username conflict: %v", TraceID(r.Context()), rlErr)
+									// A concurrent request may have already completed the re-link.
+									if p, fetchErr := db.GetProfileByUserID(r.Context(), deps.DB, userID); fetchErr == nil && p != nil {
+										log.Printf("[%s] Onboarding: profile already re-linked (concurrent), using existing", TraceID(r.Context()))
+										RespondJSON(w, http.StatusOK, toOnboardingResponse(p))
+										return
+									}
 								} else {
 									log.Printf("[%s] Onboarding: re-linked profile %s→%s via username conflict", TraceID(r.Context()), owner.ID, userID)
 									owner.ID = userID
