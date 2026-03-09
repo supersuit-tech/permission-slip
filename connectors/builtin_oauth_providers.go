@@ -20,7 +20,7 @@ var (
 func init() {
 	for _, id := range []string{
 		"airtable", "atlassian", "calendly", "datadog", "discord",
-		"docusign", "figma", "github", "google", "hubspot", "kroger",
+		"docusign", "dropbox", "figma", "github", "google", "hubspot", "kroger",
 		"linear", "linkedin", "meta", "microsoft", "netlify", "notion",
 		"pagerduty", "salesforce", "sendgrid", "shopify", "slack",
 		"square", "stripe", "vercel", "zendesk", "zoom",

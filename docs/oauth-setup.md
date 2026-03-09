@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -101,6 +101,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `DOCUSIGN_CLIENT_ID` | Integration key from [DocuSign Apps & Keys](https://admindemo.docusign.com/apps-and-keys) |
 | `DOCUSIGN_CLIENT_SECRET` | Secret key from DocuSign Apps & Keys |
+
+### Dropbox OAuth
+
+| Variable | Description |
+|---|---|
+| `DROPBOX_CLIENT_ID` | App key from the [Dropbox App Console](https://www.dropbox.com/developers/apps) |
+| `DROPBOX_CLIENT_SECRET` | App secret from the Dropbox App Console |
 
 ### OAuth Infrastructure
 
@@ -618,6 +625,48 @@ This happens transparently during the OAuth callback. If the userinfo fetch fail
 ### 5. Production vs. Sandbox
 
 DocuSign's demo environment (used by default) and production environment use the same OAuth endpoints (`account.docusign.com`). When users connect in production, their `base_url` is automatically set to the correct production API URL based on their account region. No additional configuration is needed.
+
+## Dropbox OAuth Setup
+
+Dropbox uses OAuth 2.0 with offline access (refresh tokens) so credentials stay valid long-term without re-authentication.
+
+### 1. Create a Dropbox App
+
+1. Go to the [Dropbox App Console](https://www.dropbox.com/developers/apps)
+2. Click **Create app**
+3. Choose **Scoped access** (not "App folder")
+4. Choose **Full Dropbox** access type
+5. Give it a name (e.g., "Permission Slip")
+6. Under **Settings**, add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/dropbox/callback
+   ```
+7. Copy the **App key** (Client ID) and **App secret** (Client Secret)
+
+### 2. Configure Permissions
+
+In the **Permissions** tab of your Dropbox app, enable these scopes:
+
+- `files.content.write` — upload files, create folders, move/rename
+- `files.content.read` — download files, search
+- `sharing.write` — create shared links
+- `file_requests.read` — read file request metadata
+
+Click **Submit** after enabling scopes. Scope changes only take effect for new OAuth connections.
+
+### 3. Configure Environment
+
+```bash
+DROPBOX_CLIENT_ID=your-app-key
+DROPBOX_CLIENT_SECRET=your-app-secret
+```
+
+### 4. API Architecture
+
+Dropbox uses two API hosts. The connector handles this automatically:
+
+- **api.dropboxapi.com** — RPC/metadata endpoints (create folder, search, share, move)
+- **content.dropboxapi.com** — content endpoints (upload, download) where file bytes are sent/received as raw `application/octet-stream` with metadata in the `Dropbox-API-Arg` header
 
 ## X (Twitter) OAuth Setup
 
