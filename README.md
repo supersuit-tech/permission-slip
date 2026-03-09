@@ -5,7 +5,7 @@
 
 **The authorization layer between your AI and everything it touches.**
 
-Open-source API key vault where agents execute scoped, time-limited actions on behalf of their humans — every call approved, logged, and revocable.
+Give your agents the power to act — without giving them the keys to the kingdom. Permission Slip is an open-source secure proxy that sits between your AI agents and the outside world, routing every action through human-in-the-loop approval.
 
 ```
 ┌─────────┐         ┌─────────────────┐         ┌──────────────┐
@@ -23,45 +23,45 @@ Open-source API key vault where agents execute scoped, time-limited actions on b
                      └───────────┘
 ```
 
-## Get Started
+## 🚀 Try it now
 
-**[Get started for free on permissionslip.dev](https://www.permissionslip.dev)** — no setup required.
+**[permissionslip.dev](https://www.permissionslip.dev)** — hosted, no setup required.
 
-Or **[self-host](docs/deployment-self-hosted.md)** on your own infrastructure for full control (Docker, Fly.io, or bare metal).
+Or **[self-host it](docs/deployment-self-hosted.md)** on Docker, Fly.io, or bare metal. Even runs on a [Raspberry Pi 5](docs/raspberry-pi-quickstart.md) in under 30 minutes.
 
-**Want to run it on a Raspberry Pi?** Follow the **[Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md)** — a step-by-step guide to get Permission Slip running on a [Pi 5](https://a.co/d/0cQXzRi1) in under 30 minutes.
+---
 
-## Why Permission Slip?
+## ✨ Why Permission Slip?
 
-You want your AI agent to book flights, send emails, order food — but you can't trust it with full access to your accounts.
+You want your agent to book flights, send emails, and order food. But you can't trust it with full access to your accounts. Your options today:
 
-Your options today:
-- **Give the agent your passwords/API keys** — it can do anything, anytime, with no oversight
-- **Do everything manually** — defeats the purpose of having an agent
-- **Hope the agent asks permission** — it could lie, hallucinate, or get compromised
+- 😬 **Give the agent your passwords** — it can do anything, anytime, with no oversight
+- 😩 **Do everything manually** — defeats the purpose of having an agent
+- 🤞 **Hope the agent asks nicely** — it could lie, hallucinate, or get compromised
 
-Permission Slip solves this by acting as a secure proxy with human-in-the-loop approval, where **actions** are the core primitive. Agents can only submit pre-defined action types with schema-validated parameters — never arbitrary API calls. You always see exactly what the agent wants to do, and nothing executes without your consent.
+Permission Slip solves this with a **secure proxy + human-in-the-loop approval** model. Agents submit structured, schema-validated actions — never arbitrary API calls. Nothing executes without your explicit sign-off.
 
-For the full protocol design, architecture, and security model, see [SPEC.md](SPEC.md).
+---
 
-## Key Features
+## 🔑 Key Features
 
-- **Action-based security model** — agents submit structured actions, never arbitrary API calls
-- **Per-request approval** — push notifications with human-readable action summaries
-- **Standing approvals** — pre-authorize trusted, repetitive actions with constraints
-- **Cryptographic agent identity** — Ed25519 key pairs for request signing
-- **Zero credential exposure** — agents never see your API keys or passwords
-- **Self-hostable** — run your own instance for full control
-- **Single binary deployment** — Go server with embedded React frontend
-- **Audit trail** — every request, approval, and execution is logged
-- **OAuth 2.0 connections** — connect Google, Microsoft, or custom OAuth providers; tokens encrypted in vault with automatic background refresh before expiry
-- **User preferences** — per-channel notification settings, contact info, and credential vault management
+- 🛡️ **Action-based security** — agents submit structured actions, not raw API calls
+- 🔔 **Per-request approval** — push notifications with human-readable summaries
+- ✅ **Standing approvals** — pre-authorize trusted, repetitive actions with constraints
+- 🔐 **Cryptographic agent identity** — Ed25519 key pairs for tamper-proof request signing
+- 🙈 **Zero credential exposure** — agents never see your API keys or passwords
+- 📋 **Full audit trail** — every request, approval, and execution logged
+- 🔌 **OAuth 2.0 connections** — Google, Microsoft, and custom providers; tokens encrypted at rest with automatic refresh
+- 🏠 **Self-hostable** — your data, your infrastructure
+- 📦 **Single binary deployment** — Go server with embedded React frontend
 
-## Agent Compatibility
+---
 
-Permission Slip requires agents that can **(1) make HTTP requests to arbitrary URLs** (no sandboxed/restricted network) and **(2) generate Ed25519 key pairs** (shell access to crypto tooling). Here's what works and what doesn't:
+## 🤖 Agent Compatibility
 
-### Supported
+Permission Slip needs agents that can **(1) make HTTP requests to arbitrary URLs** and **(2) generate Ed25519 key pairs**. If it runs locally with a real shell, it will work. Cloud-hosted agents need case-by-case verification.
+
+### ✅ Supported
 
 | Agent | Notes |
 |---|---|
@@ -75,10 +75,10 @@ Permission Slip requires agents that can **(1) make HTTP requests to arbitrary U
 | [Aider](https://aider.chat) | Local CLI with full shell access |
 | [Continue](https://continue.dev) | Local IDE extension with terminal access |
 | [Codex CLI](https://github.com/openai/codex) (OpenAI) | Local CLI with full shell access |
-| [Devin](https://devin.ai) | Cloud-based but runs in a full VM with unrestricted network |
-| [GitHub Copilot Coding Agent](https://github.com/features/copilot) | Runs in GitHub Actions VMs with network access |
+| [Devin](https://devin.ai) | Cloud VM with unrestricted network |
+| [GitHub Copilot Coding Agent](https://github.com/features/copilot) | GitHub Actions VMs with network access |
 
-### Not Supported
+### ❌ Not Supported
 
 | Agent | Reason |
 |---|---|
@@ -90,7 +90,7 @@ Permission Slip requires agents that can **(1) make HTTP requests to arbitrary U
 | [v0](https://v0.dev) (Vercel) | Sandboxed, focused on UI generation |
 | [Bolt](https://bolt.new) | Sandboxed WebContainer with limited network |
 
-### Uncertain (needs testing)
+### ❓ Uncertain (needs testing)
 
 | Agent | Concern |
 |---|---|
@@ -98,276 +98,155 @@ Permission Slip requires agents that can **(1) make HTTP requests to arbitrary U
 | [Google Jules](https://jules.google) | Cloud dev agent — network policy unclear |
 | [Amazon Q Developer](https://aws.amazon.com/q/developer/) | Terminal access varies by context |
 
-> **General rule:** if the agent runs locally on your machine with a real shell, it will work. Cloud-hosted agents need case-by-case verification for unrestricted outbound HTTP.
+---
 
-## Documentation
+## 🛠️ Getting Started (local dev)
 
-- **[Docs Site](docs-site/)** — Mintlify-powered user-facing documentation (run `npx mintlify dev` from `docs-site/` to preview)
-- **[SPEC.md](SPEC.md)** — protocol overview, architecture, and security model
-- **[Terminology](docs/spec/terminology.md)** — core concepts and definitions
-- **[Authentication](docs/spec/authentication.md)** — agent identity, request signing, and security
-- **[API Reference](docs/spec/api.md)** — complete endpoint documentation
-- **[Notifications](docs/spec/notifications.md)** — push notification and webhook delivery
-- **[OpenAPI Spec](spec/openapi/)** — machine-readable API definition
-- **[Architecture](docs/architecture.md)** — system diagrams and component overview
-- **[Agent Integration Guide](docs/agents.md)** — how to integrate an autonomous agent with Permission Slip
-- **[Creating Connectors](docs/creating-connectors.md)** — guide to building new built-in connectors (GitHub, Slack, Zapier, Make, and more as references)
-- **[Custom Connectors](docs/custom-connectors.md)** — add connectors from external Git repos (subprocess-based plugin system)
-- **[Community Connectors](docs/community-connectors.md)** — directory of third-party connectors built by the community
-- **[Consent Banner](docs/consent-banner.md)** — cross-subdomain cookie consent banner (shared between www and app)
-- **[Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md)** — step-by-step guide to test the invite/registration flow
-- **[Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md)** — get Permission Slip running on a Raspberry Pi 5 in under 30 minutes
-- **[Self-Hosted Deployment](docs/deployment-self-hosted.md)** — complete guide for deploying on your own infrastructure (Docker, Fly.io, bare metal)
-- **[Production Deployment (internal)](docs/deployment-production.md)** — infrastructure, secrets, and operations for app.permissionslip.dev
-- **[Fly.io Deployment](docs/deployment.md)** — Dockerfile, fly.toml, secrets, and DNS setup
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 |
-| Mobile | React Native (Expo 55), TypeScript |
-| UI Components | shadcn/ui (Radix UI + Tailwind + Lucide icons) |
-| API Client | openapi-fetch with generated TypeScript types |
-| Auth | Supabase Auth (JWT-based, MFA support) |
-| Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
-| State | React Query (TanStack Query) |
-| Testing | Go test + real Postgres, Vitest + React Testing Library, Jest (mobile) |
-
-## Getting Started
-
-### Prerequisites
-
-- **Go 1.24+** — [Install Go](https://go.dev/doc/install)
-- **Node.js 20+** and **npm** — [Install Node.js](https://nodejs.org/)
-- **Supabase CLI** and **Docker** — [Install Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)
-- **PostgreSQL 16** (for running tests only) — [Install Postgres](https://www.postgresql.org/download/)
-
-### 1. Clone and install dependencies
+**Prerequisites:** Go 1.24+, Node.js 20+, Supabase CLI, Docker
 
 ```bash
+# 1. Clone and install
 git clone https://github.com/supersuit-tech/permission-slip-web.git
 cd permission-slip-web
 make install
-```
 
-### 2. Set up environment variables
-
-```bash
+# 2. Configure environment
 cp .env.example .env
-```
+# Edit .env — see .env.example for all options
 
-Edit `.env` as needed. See [.env.example](.env.example) for all available variables and their descriptions.
+# 3. Start Supabase (auth + local Postgres)
+supabase start
+# Copy the publishable key from `supabase status` into VITE_SUPABASE_PUBLISHABLE_KEY
 
-### 3. Start Supabase locally
-
-Supabase provides both authentication and the development database (PostgreSQL).
-
-```bash
-supabase start                        # start local Supabase stack (requires Docker)
-supabase status                       # get local URLs and keys for .env
-```
-
-Copy the `publishable key` from `supabase status` into your `.env` as `VITE_SUPABASE_PUBLISHABLE_KEY`. The default `DATABASE_URL` in `.env.example` already points to Supabase's local Postgres (`127.0.0.1:54322`).
-
-See the [Supabase docs](https://supabase.com/docs/guides/local-development) for more details.
-
-### 4. Run migrations
-
-```bash
+# 4. Run migrations and generate types
 make migrate-up
-```
-
-The app starts without a database if `DATABASE_URL` is not set, so you can work on frontend-only features without Supabase running.
-
-### 5. Generate the typed API client
-
-TypeScript types are generated from the OpenAPI spec for both `frontend/` and `mobile/`. This happens automatically after `npm install` via a postinstall hook, but you can also run it manually:
-
-```bash
 make generate
+
+# 5. Start the dev servers
+make dev-backend   # Go API server → http://localhost:8080
+make dev-frontend  # Vite + HMR   → http://localhost:5173
 ```
 
-### 6. Run in development
+For the full walkthrough including PostgreSQL setup and test database configuration, see the [self-hosted deployment guide](docs/deployment-self-hosted.md).
+
+---
+
+## 📱 Mobile App
+
+The approval app lives in `mobile/` (React Native / Expo). Approve or deny requests from your phone with push notifications, biometric lock, and deep linking.
 
 ```bash
-# Terminal 1 — Go API server (port 8080)
-make dev-backend
-
-# Terminal 2 — Vite dev server with HMR (port 5173)
-make dev-frontend
+make mobile-install  # install dependencies
+make mobile-start    # start Expo dev server (scan QR with Expo Go)
+make mobile-test     # run mobile tests
 ```
 
-Open **http://localhost:5173**. API requests to `/api/*` are automatically proxied to the Go server.
+For builds, code signing, OTA updates, and App Store submission, see [docs/mobile-builds.md](docs/mobile-builds.md).
 
-### Mobile App (Expo)
+---
 
-The mobile app lives in `mobile/` and shares the same OpenAPI spec for typed API access.
-
-```bash
-cd mobile
-npm install                # also runs `generate:api` via postinstall
-npm start                  # launches Expo dev server
-```
-
-Set `EXPO_PUBLIC_API_BASE_URL` in your `.env` (or Expo config) to point at your local backend (e.g. `http://<your-ip>:8080/api`). Without it, the app falls back to production and logs a warning in dev mode.
-
-> **Accessing via ngrok or an external URL?** Set `ALLOWED_ORIGINS` to your public URL (e.g. `ALLOWED_ORIGINS=https://your-subdomain.ngrok-free.app make dev-backend`) so the Go backend allows cross-origin requests. Without it, API calls from a non-localhost origin will be blocked with 403.
-
-### 7. Mobile app (optional)
-
-The mobile app lives in `mobile/` and uses React Native (Expo). It shares the same Supabase project and OpenAPI spec as the web frontend.
+## 🏗️ Production Build
 
 ```bash
-cd mobile
-npm install
-cp .env.example .env   # set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-npm start              # Expo dev server — scan QR with Expo Go app
-```
-
-**Auth tokens** are stored in the device's secure keychain (iOS Keychain / Android EncryptedSharedPreferences) via `expo-secure-store`, not in plain-text storage.
-
-See [`mobile/`](mobile/) for the full directory structure. Run `npm test` from the `mobile/` directory to run mobile unit tests.
-
-## Production Build
-
-Build a single Go binary with the React frontend embedded:
-
-```bash
-make build
+make build   # single Go binary with embedded React frontend
 ./bin/server
 ```
 
-The server serves both the API and the React app on a single port (default 8080). For containerized deployment, see **[Deploying to Fly.io](docs/deployment.md)** (includes Dockerfile, fly.toml, and step-by-step guide).
-
-### Production Environment Variables
-
-Beyond the variables in `.env.example`, these require attention for production:
+The server serves both the API and frontend on a single port (default 8080). The most critical environment variables:
 
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SUPABASE_URL` | Yes | Your Supabase project URL (for JWT verification) |
-| `BASE_URL` | Yes | Public URL of your deployment (e.g. `https://app.permissionslip.dev`) |
-| `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — generate with `openssl rand -hex 32` |
-| `SENTRY_DSN` | Optional | Sentry DSN for backend error tracking — panics and 5xx errors are captured automatically |
-| `VITE_SENTRY_DSN` | Optional | Sentry DSN for frontend error tracking (build-time) — React errors, failed API calls, and performance data |
-| `SENTRY_CSP_ENDPOINT` | Optional | Sentry CSP report-uri endpoint — captures Content-Security-Policy violations as Sentry events |
-| `BILLING_ENABLED` | Optional | Set to `true` to enable billing (Stripe, metering, plan limits). Default: `false` (all users get unlimited access) |
-| `VITE_POSTHOG_KEY` | Optional | PostHog project API key for product analytics (build-time) — consent-gated, no data sent until user accepts cookies |
-| `VITE_POSTHOG_HOST` | Optional | PostHog API host (build-time, default: `https://us.i.posthog.com`) — use a custom host if self-hosting PostHog |
-| `POSTHOG_HOST` | Optional | PostHog API host added to CSP `connect-src` — must match `VITE_POSTHOG_HOST` (runtime) |
-| `SHUTDOWN_TIMEOUT` | Optional | Graceful shutdown timeout for draining in-flight requests (default: `30s`) |
-| `AUDIT_PURGE_INTERVAL` | Optional | How often expired audit events are purged — Go duration format, minimum `1m` (default: `1h`) |
-| `OAUTH_REFRESH_INTERVAL` | Optional | How often the background job checks for expiring OAuth tokens — Go duration format, minimum `1m` (default: `10m`). Tokens within 15 minutes of expiry are proactively refreshed. |
-| `CARD_EXPIRY_CHECK_INTERVAL` | Optional | How often the background job checks for expiring payment methods — Go duration format, minimum `1h` (default: `24h`). Sends one-time email/SMS/push alerts for cards expiring within 30 days. |
-| `VAPID_PUBLIC_KEY` | For Web Push | VAPID public key for Web Push notifications |
-| `VAPID_PRIVATE_KEY` | For Web Push | VAPID private key — keep secret, never commit to git |
-| `VAPID_SUBJECT` | For Web Push | `mailto:` URL identifying the operator (e.g. `mailto:admin@mycompany.com`) |
-| `EXPO_ACCESS_TOKEN` | Optional | Expo Push Service access token for higher rate limits — generate at [expo.dev](https://expo.dev/accounts/[account]/settings/access-tokens) |
+| `SUPABASE_URL` | Yes | Supabase project URL for JWT verification |
+| `BASE_URL` | Yes | Public URL (e.g. `https://app.permissionslip.dev`) |
+| `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | For Web Push | Generate with `make generate-vapid-keys` |
 
-**Billing (`BILLING_ENABLED`):** Controls whether billing features are active. When unset or `false` (the default), all users are automatically assigned the unlimited `pay_as_you_go` plan — no Stripe keys, metering, or plan restrictions needed. Set to `true` for managed deployments that require plan-based limits and Stripe integration. The server logs the billing mode at startup. The frontend can query `GET /v1/config` to adapt its UI based on whether billing is enabled.
+For the full environment variable reference, Dockerfile, Fly.io setup, and hardening checklist, see [docs/deployment-self-hosted.md](docs/deployment-self-hosted.md).
 
-**VAPID keys (Web Push):** Set all three to enable Web Push notifications. If none are set, Web Push is disabled. If partially configured, the server will refuse to start. In development mode (`MODE=development`), keys are auto-generated and stored in the database for convenience.
+---
 
-Generate keys and set them as env vars for your platform:
+## 🔭 Observability
+
+Set `SENTRY_DSN` (backend) and `VITE_SENTRY_DSN` (frontend) to enable Sentry error tracking. Set `VITE_POSTHOG_KEY` to enable PostHog analytics — fully consent-gated, no data collected until the user accepts cookies.
+
+---
+
+## 🧪 Testing
 
 ```bash
-# Generate a VAPID key pair (.env format)
-make generate-vapid-keys
-
-# Fly.io — outputs a ready-to-run `fly secrets set` command
-go run ./cmd/generate-vapid-keys --format=fly
-
-# Heroku — outputs a ready-to-run `heroku config:set` command
-go run ./cmd/generate-vapid-keys --format=heroku
+make test            # all tests (backend + frontend + mobile)
+make test-backend    # Go tests (requires Postgres)
+make test-frontend   # frontend tests (no database needed)
+make mobile-test     # mobile tests (no database needed)
 ```
 
-> **Warning:** Changing VAPID keys invalidates all existing Web Push subscriptions. Users will need to re-subscribe to push notifications.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and development workflow.
 
-**Mobile Push (Expo):** Mobile push notifications are always enabled when a database is configured — no additional keys required. The sender uses the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/) to deliver notifications to registered devices. Set `EXPO_ACCESS_TOKEN` for authenticated mode (higher rate limits); without it, unauthenticated mode is used.
+---
 
-**Adding a notification channel:** Channels self-register via Go's `init()` mechanism. To add a new channel:
-1. Implement `notify.Sender` in a new package (e.g. `notify/mynewchannel/`).
-2. Add any required env-var fields to `notify.Config` in `notify/config.go`.
-3. Create `notify/mynewchannel/register.go` with an `init()` that calls `notify.RegisterSenderFactory("my-channel", fn)`.
-4. Add a blank import to `notify/all/all.go`.
+## ⚙️ Tech Stack
 
-No changes to `main.go` or the approval handler are needed. See the `notify` package doc comment for details.
+| Layer | Technology |
+|---|---|
+| Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui |
+| Mobile | React Native (Expo 55), TypeScript |
+| API Client | openapi-fetch with generated TypeScript types |
+| Auth | Supabase Auth (JWT-based, MFA support) |
+| Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
+| State | React Query (TanStack Query) |
+| Testing | Go test + real Postgres, Vitest + RTL, Jest (mobile) |
 
-## Mobile App
+---
 
-The mobile approval app lives in `mobile/` (React Native / Expo). It's a thin client for approving and viewing requests from your phone — similar to the Microsoft Authenticator approval flow.
+## 📚 Documentation
 
-**Current capabilities:** login, browse pending/approved/denied requests, view full request details (action parameters, risk level, agent info, expiry countdown), approve with confirmation code display (copyable `XXX-XXX` format), deny with confirmation, push notifications for new approval requests, notification tap → deep link to approval detail, URL-based deep linking, optional biometric lock, haptic feedback, and a Settings screen for managing mobile push notification preferences and signing out.
+### 📖 Getting Started
+- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Docker, Fly.io, bare metal
+- [Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md) — up and running in 30 minutes
+- [Architecture](docs/architecture.md) — system diagrams and component overview
+- [SPEC.md](SPEC.md) — protocol design, security model, and full spec
 
-**Deep linking:** The app registers the `permissionslip://` custom URL scheme and universal links for `app.permissionslip.dev`. Opening `permissionslip://permission-slip/approve/{approval_id}` or `https://app.permissionslip.dev/permission-slip/approve/{approval_id}` navigates to the approval detail screen. Deep link approval IDs are validated against the expected format (`appr_[a-zA-Z0-9]{6,64}`) before making API calls. On iOS, associated domains are configured via `applinks:app.permissionslip.dev`; on Android, intent filters with `autoVerify: true` handle App Links. The linking configuration lives in `src/navigation/linking.ts`.
+### 🔌 Integrations & Connectors
+- [Agent Integration Guide](docs/agents.md) — how to wire up an autonomous agent
+- [Creating Connectors](docs/creating-connectors.md) — build new built-in connectors
+- [Custom Connectors](docs/custom-connectors.md) — add connectors from external Git repos
+- [Community Connectors](docs/community-connectors.md) — third-party connector directory
 
-**Biometric auth:** Optional FaceID/TouchID/fingerprint lock via `expo-local-authentication`. When enabled, the app prompts for biometric authentication on resume from background. The preference is stored per user in `expo-secure-store` (keyed by user ID to prevent cross-account leakage on shared devices). The biometric prompt fires automatically when the lock screen appears — the manual "Unlock" button serves as a fallback. Biometric settings live in `src/hooks/useBiometricAuth.ts`.
+### 🔒 Protocol Reference
+- [Terminology](docs/spec/terminology.md) — core concepts and definitions
+- [Authentication](docs/spec/authentication.md) — agent identity and request signing
+- [API Reference](docs/spec/api.md) — complete endpoint documentation
+- [Notifications](docs/spec/notifications.md) — push notification and webhook delivery
+- [OpenAPI Spec](spec/openapi/) — machine-readable API definition
 
-**Haptic feedback:** Approve and deny actions provide haptic feedback at two stages: (1) on button tap (heavy impact for approve, warning for deny), and (2) after the API call completes (success or error notification). Uses `expo-haptics`.
+### 🚀 Deployment
+- [Fly.io Deployment](docs/deployment.md) — Dockerfile, fly.toml, DNS setup
+- [Production Deployment (internal)](docs/deployment-production.md) — infrastructure for app.permissionslip.dev
+- [Mobile Builds](docs/mobile-builds.md) — EAS builds, OTA updates, App Store submission
 
-**Push notifications:** The app uses `expo-notifications` to request push permissions, retrieve the Expo push token, and register it with the backend on login. Token registration retries automatically with exponential backoff (up to 3 retries) on transient failures. On logout, the token is unregistered from the backend for clean session separation. Notifications are delivered via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/). Push notifications require a physical device (not simulators). On Android, a dedicated "Approval Requests" notification channel is created for user-configurable notification preferences. Enable `__DEV__` logging (automatic in development builds) to trace the full push token lifecycle in the console.
+### 🧪 Contributing & Testing
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development workflow and code standards
+- [Integration Testing](docs/integration-testing.md) — end-to-end test strategy
+- [Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md) — invite/registration flow walkthrough
 
-**Notification deep linking:** Tapping a push notification navigates directly to the relevant approval detail screen. This works in three scenarios: app in foreground, app in background, and cold start (app was killed). On cold start, the notification is queued until auth completes, then processed automatically. The approval ID is validated against the expected format (`appr_*`) before making any API calls. The approvals list cache is also refreshed on notification tap so the list is up to date when navigating back.
+---
 
-```bash
-make mobile-install    # install mobile dependencies
-make mobile-start      # start Expo development server
-make mobile-test       # run mobile tests
-```
+## 🤝 Contributing
 
-**Build & distribution:** The app uses EAS (Expo Application Services) for building, code signing, OTA updates, and app store submission. Build profiles: `development` (simulator), `preview` (internal testers), `production` (app stores). OTA updates via `expo-updates` push JS bundle changes without app store review. See [docs/mobile-builds.md](docs/mobile-builds.md) for setup instructions, available commands, and code signing configuration.
+Contributions are welcome! Check [CONTRIBUTING.md](CONTRIBUTING.md) to get started, or browse [open issues](https://github.com/supersuit-tech/permission-slip-web/issues).
 
-```bash
-make mobile-build-dev  # build for development (simulator)
-make mobile-build-prod # build for production (app stores)
-make mobile-update     # push OTA update to production
-make mobile-submit     # submit to App Store / Google Play
-```
+---
 
-See [issue #9](https://github.com/supersuit-tech/permission-slip/issues/9) for the full mobile roadmap.
-
-## Testing
-
-```bash
-make test              # all tests (backend + frontend + mobile)
-make test-backend      # Go tests (requires Postgres)
-make test-frontend     # frontend tests (no database needed)
-make mobile-test       # mobile tests (no database needed)
-```
-
-Backend tests run against a real Postgres database. Frontend and mobile tests use mocked clients. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy.
-
-## Observability
-
-### Error Tracking (Sentry)
-
-Sentry captures backend panics/5xx errors and frontend React errors. Set `SENTRY_DSN` (backend) and `VITE_SENTRY_DSN` (frontend) to enable.
-
-### Product Analytics (PostHog)
-
-PostHog provides privacy-focused product analytics. It is **fully consent-gated** — no data is collected until the user explicitly accepts cookies via the consent banner.
-
-- Set `VITE_POSTHOG_KEY` and optionally `VITE_POSTHOG_HOST` to enable (build-time).
-- Set `POSTHOG_HOST` to add the PostHog API host to the CSP `connect-src` directive (runtime).
-- If `VITE_POSTHOG_KEY` is not set, PostHog is completely disabled — no SDK code executes.
-- Events are defined in `frontend/src/lib/posthog-events.ts`. To add a new event, add a constant there and use `trackEvent()` from `@/lib/posthog`.
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get started, our development workflow, and code standards.
-
-## License
+## 📜 License
 
 Permission Slip is licensed under the [Apache License 2.0](LICENSE).
+Built by [SuperSuit](https://supersuit.tech) — questions or feedback welcome at [supersuit.tech](https://supersuit.tech).
 
-## Contact
+---
 
-Permission Slip is developed by [SuperSuit](https://supersuit.tech). For questions or feedback, [open an issue](https://github.com/supersuit-tech/permission-slip-web/issues) or reach out at [supersuit.tech](https://supersuit.tech).
-
-## Contributors
+## 👥 Contributors
 
 <a href="https://github.com/chiedo"><img src="https://github.com/chiedo.png" width="50" height="50" alt="chiedo" style="border-radius:50%"></a>
 <a href="https://github.com/chiedobot"><img src="https://github.com/chiedobot.png" width="50" height="50" alt="chiedobot" style="border-radius:50%"></a>
