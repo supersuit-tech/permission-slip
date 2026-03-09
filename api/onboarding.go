@@ -84,8 +84,14 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 					// same email). If so, re-link the existing profile.
 					if email := UserEmail(r.Context()); email != "" {
 						owner, lookupErr := db.FindProfileByUsername(r.Context(), deps.DB, username)
+						if lookupErr != nil {
+							log.Printf("[%s] Onboarding: username owner lookup: %v", TraceID(r.Context()), lookupErr)
+						}
 						if lookupErr == nil && owner != nil {
 							oldOwner, emailErr := db.FindProfileByAuthEmail(r.Context(), deps.DB, email)
+							if emailErr != nil {
+								log.Printf("[%s] Onboarding: email owner lookup: %v", TraceID(r.Context()), emailErr)
+							}
 							if emailErr == nil && oldOwner != nil && oldOwner.ID == owner.ID {
 								if rlErr := db.RelinkProfile(r.Context(), deps.DB, owner.ID, userID); rlErr != nil {
 									log.Printf("[%s] Onboarding: re-link on username conflict: %v", TraceID(r.Context()), rlErr)
