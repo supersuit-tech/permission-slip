@@ -185,12 +185,9 @@ ALTER TABLE usage_periods
     ADD CONSTRAINT usage_periods_user_id_fkey
         FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE;
 
--- Drop the email column from auth.users stub (if we added it).
--- +goose StatementBegin
-DO $$ BEGIN
-    DROP INDEX IF EXISTS auth.users_email_key;
-    ALTER TABLE auth.users DROP COLUMN IF EXISTS email;
-EXCEPTION WHEN OTHERS THEN
-    NULL;
-END $$;
--- +goose StatementEnd
+-- NOTE: We intentionally do NOT drop auth.users.email here.
+-- In production Supabase, auth.users.email pre-exists (the UP block's
+-- IF NOT EXISTS guard was false and we never touched it). Dropping it
+-- would destroy Supabase authentication. In local dev, the column is
+-- harmless to leave in place. A no-op is safer than an irreversible
+-- production column drop.
