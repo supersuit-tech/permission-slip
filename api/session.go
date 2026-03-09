@@ -324,6 +324,11 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 							old.ID = userID
 							profile = old
 						}
+					} else if old != nil {
+						// old.ID == userID: a concurrent request already completed the
+						// re-link. The profile is correctly linked; use it directly.
+						log.Printf("[%s] RequireProfile: profile already re-linked to %s (concurrent)", TraceID(r.Context()), userID)
+						profile = old
 					}
 				}
 			}
