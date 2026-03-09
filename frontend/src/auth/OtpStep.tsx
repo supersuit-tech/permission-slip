@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
 import { safeErrorMessage } from "./errors";
@@ -28,6 +28,12 @@ export default function OtpStep({
   const [resendError, setResendError] = useState<string | null>(null);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [isResending, setIsResending] = useState(false);
+
+  // Clear the success banner when the cooldown expires so it doesn't
+  // linger indefinitely alongside an active "Resend code" button.
+  useEffect(() => {
+    if (resendCooldownSeconds === 0) setResendSuccess(false);
+  }, [resendCooldownSeconds]);
 
   const handleResend = async () => {
     setResendError(null);

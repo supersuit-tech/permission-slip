@@ -20,19 +20,21 @@ export function useCooldown(): UseCooldownResult {
     };
   }, []);
 
+  // Clear the interval once the counter reaches zero, keeping the
+  // state updater above pure (no side effects inside the updater).
+  useEffect(() => {
+    if (secondsLeft === 0 && intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, [secondsLeft]);
+
   const start = useCallback((seconds = DEFAULT_SECONDS) => {
     if (seconds <= 0) return;
     if (intervalRef.current !== null) clearInterval(intervalRef.current);
     setSecondsLeft(seconds);
     intervalRef.current = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          if (intervalRef.current !== null) clearInterval(intervalRef.current);
-          intervalRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
+      setSecondsLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
   }, []);
 
