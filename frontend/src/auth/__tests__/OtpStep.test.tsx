@@ -84,7 +84,7 @@ describe("OtpStep", () => {
 
   it("disables resend button and shows countdown during cooldown", () => {
     renderOtpStep({ ...defaultProps, resendCooldownSeconds: 42 });
-    const btn = screen.getByRole("button", { name: "Resend code (on cooldown)" });
+    const btn = screen.getByRole("button", { name: "Resend code in 42s (on cooldown)" });
     expect(btn).toBeInTheDocument();
     expect(btn).toBeDisabled();
     expect(screen.getByText("42s")).toBeInTheDocument();

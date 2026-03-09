@@ -110,7 +110,7 @@ export default function OtpStep({
           disabled={resendCooldownSeconds > 0 || isResending}
           aria-label={
             resendCooldownSeconds > 0
-              ? "Resend code (on cooldown)"
+              ? `Resend code in ${resendCooldownSeconds}s (on cooldown)`
               : isResending
                 ? "Resending…"
                 : "Resend code"
