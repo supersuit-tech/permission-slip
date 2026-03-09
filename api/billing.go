@@ -78,6 +78,7 @@ type smsUsage struct {
 
 type invoiceListResponse struct {
 	Invoices []apiInvoice `json:"invoices"`
+	HasMore  bool         `json:"has_more"`
 }
 
 // apiInvoice is the API representation of an invoice, matching the OpenAPI Invoice schema.
@@ -89,6 +90,29 @@ type apiInvoice struct {
 	PeriodStart      *string `json:"period_start,omitempty"`
 	PeriodEnd        *string `json:"period_end,omitempty"`
 	StripeInvoiceURL *string `json:"stripe_invoice_url,omitempty"`
+}
+
+// toAPIInvoice converts a Stripe InvoiceSummary to the API Invoice schema.
+func toAPIInvoice(s pstripe.InvoiceSummary) apiInvoice {
+	inv := apiInvoice{
+		ID:          s.ID,
+		Date:        time.Unix(s.Created, 0).UTC().Format(time.RFC3339),
+		AmountCents: s.AmountPaid,
+		Status:      s.Status,
+	}
+	if s.PeriodStart > 0 {
+		ps := time.Unix(s.PeriodStart, 0).UTC().Format(time.RFC3339)
+		inv.PeriodStart = &ps
+	}
+	if s.PeriodEnd > 0 {
+		pe := time.Unix(s.PeriodEnd, 0).UTC().Format(time.RFC3339)
+		inv.PeriodEnd = &pe
+	}
+	if s.HostedURL != "" {
+		hu := s.HostedURL
+		inv.StripeInvoiceURL = &hu
+	}
+	return inv
 }
 
 type billingPlanResponse struct {
@@ -621,7 +645,7 @@ func handleListInvoices(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		summaries, err := deps.Stripe.ListInvoices(r.Context(), *sub.StripeCustomerID, maxInvoiceResults)
+		summaries, hasMore, err := deps.Stripe.ListInvoices(r.Context(), *sub.StripeCustomerID, maxInvoiceResults)
 		if err != nil {
 			log.Printf("[%s] ListInvoices: Stripe list: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -631,27 +655,10 @@ func handleListInvoices(deps *Deps) http.HandlerFunc {
 
 		invoices := make([]apiInvoice, 0, len(summaries))
 		for _, s := range summaries {
-			inv := apiInvoice{
-				ID:          s.ID,
-				Date:        time.Unix(s.Created, 0).UTC().Format(time.RFC3339),
-				AmountCents: s.AmountPaid,
-				Status:      s.Status,
-			}
-			if s.PeriodStart > 0 {
-				ps := time.Unix(s.PeriodStart, 0).UTC().Format(time.RFC3339)
-				inv.PeriodStart = &ps
-			}
-			if s.PeriodEnd > 0 {
-				pe := time.Unix(s.PeriodEnd, 0).UTC().Format(time.RFC3339)
-				inv.PeriodEnd = &pe
-			}
-			if s.HostedURL != "" {
-				inv.StripeInvoiceURL = &s.HostedURL
-			}
-			invoices = append(invoices, inv)
+			invoices = append(invoices, toAPIInvoice(s))
 		}
 
-		RespondJSON(w, http.StatusOK, invoiceListResponse{Invoices: invoices})
+		RespondJSON(w, http.StatusOK, invoiceListResponse{Invoices: invoices, HasMore: hasMore})
 	}
 }
 

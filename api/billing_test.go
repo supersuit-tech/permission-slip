@@ -879,6 +879,85 @@ func TestListInvoices_NoStripeCustomer(t *testing.T) {
 	}
 }
 
+// ── toAPIInvoice mapping ────────────────────────────────────────────────────
+
+func TestToAPIInvoice_FullFields(t *testing.T) {
+	t.Parallel()
+	hostedURL := "https://invoice.stripe.com/i/acct_123/inv_456"
+	s := pstripe.InvoiceSummary{
+		ID:          "inv_456",
+		Status:      "paid",
+		AmountPaid:  1099,
+		Created:     1740787200, // 2025-03-01T00:00:00Z
+		PeriodStart: 1738368000, // 2025-02-01T00:00:00Z
+		PeriodEnd:   1740787200, // 2025-03-01T00:00:00Z
+		HostedURL:   hostedURL,
+	}
+
+	inv := toAPIInvoice(s)
+
+	if inv.ID != "inv_456" {
+		t.Errorf("ID: got %q, want %q", inv.ID, "inv_456")
+	}
+	if inv.AmountCents != 1099 {
+		t.Errorf("AmountCents: got %d, want 1099", inv.AmountCents)
+	}
+	if inv.Status != "paid" {
+		t.Errorf("Status: got %q, want %q", inv.Status, "paid")
+	}
+	wantDate := time.Unix(1740787200, 0).UTC().Format(time.RFC3339)
+	if inv.Date != wantDate {
+		t.Errorf("Date: got %q, want %q", inv.Date, wantDate)
+	}
+	if inv.PeriodStart == nil {
+		t.Fatal("PeriodStart: expected non-nil")
+	}
+	wantPS := time.Unix(1738368000, 0).UTC().Format(time.RFC3339)
+	if *inv.PeriodStart != wantPS {
+		t.Errorf("PeriodStart: got %q, want %q", *inv.PeriodStart, wantPS)
+	}
+	if inv.PeriodEnd == nil {
+		t.Fatal("PeriodEnd: expected non-nil")
+	}
+	wantPE := time.Unix(1740787200, 0).UTC().Format(time.RFC3339)
+	if *inv.PeriodEnd != wantPE {
+		t.Errorf("PeriodEnd: got %q, want %q", *inv.PeriodEnd, wantPE)
+	}
+	if inv.StripeInvoiceURL == nil {
+		t.Fatal("StripeInvoiceURL: expected non-nil")
+	}
+	if *inv.StripeInvoiceURL != hostedURL {
+		t.Errorf("StripeInvoiceURL: got %q, want %q", *inv.StripeInvoiceURL, hostedURL)
+	}
+	// Ensure pointer independence — mutating the original doesn't affect the copy.
+	s.HostedURL = "https://other.example.com"
+	if *inv.StripeInvoiceURL != hostedURL {
+		t.Error("StripeInvoiceURL pointer aliases original struct field")
+	}
+}
+
+func TestToAPIInvoice_OptionalFieldsAbsent(t *testing.T) {
+	t.Parallel()
+	s := pstripe.InvoiceSummary{
+		ID:      "inv_789",
+		Status:  "paid",
+		Created: 1740787200,
+		// PeriodStart, PeriodEnd, and HostedURL intentionally zero/empty
+	}
+
+	inv := toAPIInvoice(s)
+
+	if inv.PeriodStart != nil {
+		t.Errorf("PeriodStart: expected nil when zero, got %q", *inv.PeriodStart)
+	}
+	if inv.PeriodEnd != nil {
+		t.Errorf("PeriodEnd: expected nil when zero, got %q", *inv.PeriodEnd)
+	}
+	if inv.StripeInvoiceURL != nil {
+		t.Errorf("StripeInvoiceURL: expected nil when empty, got %q", *inv.StripeInvoiceURL)
+	}
+}
+
 func TestListInvoices_NoSubscription(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
@@ -906,3 +985,4 @@ func TestListInvoices_NoSubscription(t *testing.T) {
 		t.Errorf("expected empty invoices list, got %d", len(resp.Invoices))
 	}
 }
+
