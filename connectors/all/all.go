@@ -51,6 +51,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/square"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/stripe"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/supabase"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/trello"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/twilio"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/vercel"

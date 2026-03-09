@@ -27,9 +27,9 @@ func TestBuiltInProvidersAreRegistered(t *testing.T) {
 // is missing, the count will drop and this test will fail.
 func TestBuiltInConnectorsAreRegistered(t *testing.T) {
 	got := connectors.BuiltInConnectors()
-	// There are 48 built-in connector packages. Update this number when
+	// There are 50 built-in connector packages. Update this number when
 	// adding or removing connectors.
-	const expected = 48
+	const expected = 50
 	if len(got) != expected {
 		t.Fatalf("expected %d built-in connectors, got %d — did you forget to add register.go or a blank import in connectors/all?", expected, len(got))
 	}
