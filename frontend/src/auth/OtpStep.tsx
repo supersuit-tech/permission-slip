@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
+import { safeErrorMessage } from "./errors";
 import AuthLayout from "./AuthLayout";
 import DevOnly from "../components/DevOnly";
 import { Button } from "@/components/ui/button";
@@ -26,15 +27,23 @@ export default function OtpStep({
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
   const [resendError, setResendError] = useState<string | null>(null);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const handleResend = async () => {
     setResendError(null);
     setResendSuccess(false);
-    const { error } = await onResend();
-    if (error) {
-      setResendError("Could not resend — please wait a moment and try again.");
-    } else {
-      setResendSuccess(true);
+    setIsResending(true);
+    try {
+      const { error } = await onResend();
+      if (error) {
+        setResendError(safeErrorMessage(error));
+      } else {
+        setResendSuccess(true);
+      }
+    } catch {
+      setResendError("Something went wrong. Please try again.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -84,12 +93,14 @@ export default function OtpStep({
           variant="ghost"
           size="sm"
           onClick={handleResend}
-          disabled={resendCooldownSeconds > 0}
+          disabled={resendCooldownSeconds > 0 || isResending}
           className="opacity-70"
         >
           {resendCooldownSeconds > 0
             ? `Resend in ${resendCooldownSeconds}s`
-            : "Resend code"}
+            : isResending
+              ? "Resending…"
+              : "Resend code"}
         </Button>
         {resendError && (
           <p className="text-xs text-destructive">{resendError}</p>

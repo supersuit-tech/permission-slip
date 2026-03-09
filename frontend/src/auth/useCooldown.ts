@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface UseCooldownResult {
   secondsLeft: number;
@@ -20,7 +20,8 @@ export function useCooldown(): UseCooldownResult {
     };
   }, []);
 
-  const start = (seconds = DEFAULT_SECONDS) => {
+  const start = useCallback((seconds = DEFAULT_SECONDS) => {
+    if (seconds <= 0) return;
     if (intervalRef.current !== null) clearInterval(intervalRef.current);
     setSecondsLeft(seconds);
     intervalRef.current = setInterval(() => {
@@ -33,7 +34,7 @@ export function useCooldown(): UseCooldownResult {
         return prev - 1;
       });
     }, 1000);
-  };
+  }, []);
 
   return { secondsLeft, isActive: secondsLeft > 0, start };
 }

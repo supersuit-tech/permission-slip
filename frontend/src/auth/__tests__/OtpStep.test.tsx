@@ -74,4 +74,52 @@ describe("OtpStep", () => {
 
     expect(onBack).toHaveBeenCalled();
   });
+
+  it("shows resend button when cooldown is 0", () => {
+    renderOtpStep({ ...defaultProps, resendCooldownSeconds: 0 });
+    expect(screen.getByText("Resend code")).toBeInTheDocument();
+    expect(screen.getByText("Resend code")).not.toBeDisabled();
+  });
+
+  it("disables resend button and shows countdown during cooldown", () => {
+    renderOtpStep({ ...defaultProps, resendCooldownSeconds: 42 });
+    const btn = screen.getByText("Resend in 42s");
+    expect(btn).toBeInTheDocument();
+    expect(btn).toBeDisabled();
+  });
+
+  it("calls onResend when resend button is clicked", async () => {
+    const onResend = vi.fn().mockResolvedValue({ error: null });
+    renderOtpStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByText("Resend code"));
+
+    expect(onResend).toHaveBeenCalled();
+  });
+
+  it("shows success message after resend", async () => {
+    const onResend = vi.fn().mockResolvedValue({ error: null });
+    renderOtpStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByText("Resend code"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Code resent.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows safe error message when resend fails", async () => {
+    const onResend = vi.fn().mockResolvedValue({
+      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+    });
+    renderOtpStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByText("Resend code"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Too many login emails sent.", { exact: false })
+      ).toBeInTheDocument();
+    });
+  });
 });
