@@ -22,6 +22,7 @@ import (
 const SupabaseAudAuthenticated = "authenticated"
 
 type userIDKey struct{}
+type emailKey struct{}
 type profileKey struct{}
 
 // JWKSCache fetches and caches EC public keys from a JWKS endpoint.
@@ -247,6 +248,12 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 			}
 
 			ctx := context.WithValue(r.Context(), userIDKey{}, sub)
+			// Extract email from JWT for profile recovery (re-linking).
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				if email, ok := claims["email"].(string); ok && email != "" {
+					ctx = context.WithValue(ctx, emailKey{}, email)
+				}
+			}
 			// Tag Sentry events with the authenticated user so error reports
 			// show which user was affected.
 			SetSentryUser(ctx, sub)
@@ -259,6 +266,13 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 func UserID(ctx context.Context) string {
 	id, _ := ctx.Value(userIDKey{}).(string)
 	return id
+}
+
+// UserEmail returns the authenticated user's email from the JWT claims,
+// or "" if not available.
+func UserEmail(ctx context.Context) string {
+	e, _ := ctx.Value(emailKey{}).(string)
+	return e
 }
 
 // RequireProfile chains RequireSession → profile lookup.
@@ -283,6 +297,40 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify profile"))
 				return
+			}
+			if profile == nil {
+				// Profile not found by user ID. This can happen when Supabase
+				// creates a new auth identity (new UUID) for an existing email
+				// — the user's old profile is orphaned under the old UUID.
+				// Attempt to recover by looking up the profile via email and
+				// re-linking it to the current user ID.
+				if email := UserEmail(r.Context()); email != "" {
+					old, findErr := db.FindProfileByAuthEmail(r.Context(), deps.DB, email)
+					if findErr != nil {
+						log.Printf("[%s] RequireProfile: email fallback lookup: %v", TraceID(r.Context()), findErr)
+					}
+					if old != nil && old.ID != userID {
+						if rlErr := db.RelinkProfile(r.Context(), deps.DB, old.ID, userID); rlErr != nil {
+							log.Printf("[%s] RequireProfile: re-link profile %s→%s: %v", TraceID(r.Context()), old.ID, userID, rlErr)
+							// A concurrent request may have already completed the re-link.
+							// Re-fetch by the new user ID before falling through to 404.
+							if p, fetchErr := db.GetProfileByUserID(r.Context(), deps.DB, userID); fetchErr != nil {
+								log.Printf("[%s] RequireProfile: re-fetch after concurrent re-link: %v", TraceID(r.Context()), fetchErr)
+							} else {
+								profile = p
+							}
+						} else {
+							log.Printf("[%s] RequireProfile: re-linked profile %s→%s", TraceID(r.Context()), old.ID, userID)
+							old.ID = userID
+							profile = old
+						}
+					} else if old != nil {
+						// old.ID == userID: a concurrent request already completed the
+						// re-link. The profile is correctly linked; use it directly.
+						log.Printf("[%s] RequireProfile: profile already re-linked to %s (concurrent)", TraceID(r.Context()), userID)
+						profile = old
+					}
+				}
 			}
 			if profile == nil {
 				RespondError(w, r, http.StatusNotFound, NotFound(ErrProfileNotFound, "Profile not found"))

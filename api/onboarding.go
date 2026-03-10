@@ -79,6 +79,39 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 			if errors.As(err, &onboardErr) {
 				switch onboardErr.Code {
 				case db.OnboardingErrUsernameTaken:
+					// Before rejecting, check if the taken username belongs to
+					// the same user under a different Supabase identity (new UUID,
+					// same email). If so, re-link the existing profile.
+					if email := UserEmail(r.Context()); email != "" {
+						owner, lookupErr := db.FindProfileByUsername(r.Context(), deps.DB, username)
+						if lookupErr != nil {
+							log.Printf("[%s] Onboarding: username owner lookup: %v", TraceID(r.Context()), lookupErr)
+						}
+						if lookupErr == nil && owner != nil {
+							oldOwner, emailErr := db.FindProfileByAuthEmail(r.Context(), deps.DB, email)
+							if emailErr != nil {
+								log.Printf("[%s] Onboarding: email owner lookup: %v", TraceID(r.Context()), emailErr)
+							}
+							if emailErr == nil && oldOwner != nil && oldOwner.ID == owner.ID {
+								if rlErr := db.RelinkProfile(r.Context(), deps.DB, owner.ID, userID); rlErr != nil {
+									log.Printf("[%s] Onboarding: re-link on username conflict: %v", TraceID(r.Context()), rlErr)
+									// A concurrent request may have already completed the re-link.
+									if p, fetchErr := db.GetProfileByUserID(r.Context(), deps.DB, userID); fetchErr == nil && p != nil {
+										log.Printf("[%s] Onboarding: profile already re-linked (concurrent), using existing", TraceID(r.Context()))
+										RespondJSON(w, http.StatusOK, toOnboardingResponse(p))
+										return
+									} else if fetchErr != nil {
+										log.Printf("[%s] Onboarding: re-fetch after concurrent re-link failed: %v", TraceID(r.Context()), fetchErr)
+									}
+								} else {
+									log.Printf("[%s] Onboarding: re-linked profile %s→%s via username conflict", TraceID(r.Context()), owner.ID, userID)
+									owner.ID = userID
+									RespondJSON(w, http.StatusOK, toOnboardingResponse(owner))
+									return
+								}
+							}
+						}
+					}
 					RespondError(w, r, http.StatusConflict, Conflict(ErrConstraintViolation, "Username is already taken"))
 					return
 				case db.OnboardingErrProfileExists:
