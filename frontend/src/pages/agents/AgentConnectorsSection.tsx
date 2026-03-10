@@ -50,11 +50,12 @@ export function AgentConnectorsSection({
 
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
 
-  const filtered = search.trim()
+  const query = search.trim().toLowerCase();
+  const filtered = query
     ? allConnectors.filter(
         (c) =>
-          c.name.toLowerCase().includes(search.toLowerCase()) ||
-          c.description?.toLowerCase().includes(search.toLowerCase()),
+          c.name.toLowerCase().includes(query) ||
+          c.description?.toLowerCase().includes(query),
       )
     : allConnectors;
 
