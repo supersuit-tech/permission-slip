@@ -3,6 +3,7 @@ import { useAuth } from "./AuthContext";
 import { useCooldown } from "./useCooldown";
 import EmailStep from "./EmailStep";
 import CheckEmailStep from "./CheckEmailStep";
+import AuthLayout from "./AuthLayout";
 
 // Lazy-load OtpStep so it (and its dev-only dependencies like OtpCodeInput,
 // DevOnly, Mailpit auto-fill) are tree-shaken from the production bundle.
@@ -33,7 +34,7 @@ export default function LoginPage() {
 
   if (step === "otp") {
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<AuthLayout />}>
         <OtpStep
           email={email}
           onVerify={(code) => verifyOtp(email, code)}

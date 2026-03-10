@@ -98,6 +98,23 @@ describe("LoginPage", () => {
         type: "email",
       });
     });
+
+    it("stays on email step when send fails", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+      });
+
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
+    });
   });
 
   describe("production mode", () => {
@@ -161,22 +178,5 @@ describe("LoginPage", () => {
       });
       expect(screen.queryByText("Check your email")).not.toBeInTheDocument();
     });
-  });
-
-  it("stays on email step when send fails", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
-    });
-
-    renderWithProviders(<LoginPage />);
-
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    });
-    expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
   });
 });
