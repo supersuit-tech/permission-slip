@@ -50,6 +50,24 @@ type denyResponse struct {
 	DeniedAt   time.Time `json:"denied_at"`
 }
 
+// approvalDetailResponse includes execution details for the activity feed
+// detail panel. Extends the base approvalResponse with execution fields.
+type approvalDetailResponse struct {
+	ApprovalID      string     `json:"approval_id"`
+	AgentID         int64      `json:"agent_id"`
+	Action          any        `json:"action"`
+	Context         any        `json:"context"`
+	Status          string     `json:"status"`
+	ExecutionStatus *string    `json:"execution_status,omitempty"`
+	ExecutionResult any        `json:"execution_result,omitempty"`
+	ExecutedAt      *time.Time `json:"executed_at,omitempty"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
+	DeniedAt        *time.Time `json:"denied_at,omitempty"`
+	CancelledAt     *time.Time `json:"cancelled_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
 func init() {
 	RegisterRouteGroup(RegisterApprovalRoutes)
 }
@@ -58,6 +76,7 @@ func init() {
 func RegisterApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /approvals", requireProfile(handleListApprovals(deps)))
+	mux.Handle("GET /approvals/{approval_id}", requireProfile(handleGetApproval(deps)))
 	mux.Handle("POST /approvals/{approval_id}/approve", requireProfile(handleApproveApproval(deps)))
 	mux.Handle("POST /approvals/{approval_id}/deny", requireProfile(handleDenyApproval(deps)))
 }
@@ -120,6 +139,35 @@ func handleListApprovals(deps *Deps) http.HandlerFunc {
 			resp.NextCursor = &c
 		}
 
+		RespondJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleGetApproval returns a single approval by ID for the authenticated user.
+// Used by the activity feed detail panel to show full action parameters,
+// context, and execution results for historical approvals.
+func handleGetApproval(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+		approvalID := r.PathValue("approval_id")
+
+		if strings.TrimSpace(approvalID) == "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "approval_id is required"))
+			return
+		}
+
+		appr, err := db.GetApprovalByIDAndApprover(r.Context(), deps.DB, approvalID, profile.ID)
+		if err != nil {
+			log.Printf("[%s] GetApprovalByIDAndApprover: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get approval"))
+			return
+		}
+		if appr == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
+			return
+		}
+
+		resp := toApprovalDetailResponse(*appr)
 		RespondJSON(w, http.StatusOK, resp)
 	}
 }
@@ -331,6 +379,44 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Context = ctx
 		} else {
 			log.Printf("WARNING: corrupt context JSONB for approval %s: %v", a.ApprovalID, err)
+		}
+	}
+
+	return resp
+}
+
+// toApprovalDetailResponse converts a db.Approval to the detail response
+// that includes execution fields for the activity feed detail panel.
+func toApprovalDetailResponse(a db.Approval) approvalDetailResponse {
+	resp := approvalDetailResponse{
+		ApprovalID:      a.ApprovalID,
+		AgentID:         a.AgentID,
+		Status:          a.Status,
+		ExecutionStatus: a.ExecutionStatus,
+		ExecutedAt:      a.ExecutedAt,
+		ExpiresAt:       a.ExpiresAt,
+		ApprovedAt:      a.ApprovedAt,
+		DeniedAt:        a.DeniedAt,
+		CancelledAt:     a.CancelledAt,
+		CreatedAt:       a.CreatedAt,
+	}
+
+	if len(a.Action) > 0 {
+		var action any
+		if err := json.Unmarshal(a.Action, &action); err == nil {
+			resp.Action = action
+		}
+	}
+	if len(a.Context) > 0 {
+		var ctx any
+		if err := json.Unmarshal(a.Context, &ctx); err == nil {
+			resp.Context = ctx
+		}
+	}
+	if len(a.ExecutionResult) > 0 {
+		var result any
+		if err := json.Unmarshal(a.ExecutionResult, &result); err == nil {
+			resp.ExecutionResult = result
 		}
 	}
 

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Activity, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/table";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/utils";
 import {
+  type AuditEvent,
   type OutcomeFilter,
   ALL_OUTCOME_FILTERS,
+  ACTION_EVENT_TYPES,
   AuditEventRow,
 } from "@/lib/auditEvents";
 import { useInfiniteAuditEvents } from "@/hooks/useInfiniteAuditEvents";
@@ -20,6 +22,7 @@ import type { AuditEventFilters } from "@/hooks/useAuditEvents";
 import { useAgents } from "@/hooks/useAgents";
 import { ActivityFilters } from "./ActivityFilters";
 import { RetentionBanner } from "./RetentionBanner";
+import { ActivityDetailSheet } from "./ActivityDetailSheet";
 
 /** Set of valid outcome values for URL param validation. */
 const VALID_OUTCOMES = new Set(
@@ -35,8 +38,7 @@ function EmptyState() {
       </p>
       <p className="text-muted-foreground max-w-xs text-xs">
         Try adjusting your filters or check back later. Approval decisions,
-        standing approval executions, agent events, and payment charges will
-        appear here.
+        standing approval executions, and payment charges will appear here.
       </p>
     </div>
   );
@@ -44,6 +46,7 @@ function EmptyState() {
 
 export function ActivityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
 
   const rawOutcome = searchParams.get("outcome") ?? "all";
   const outcomeFilter: OutcomeFilter = VALID_OUTCOMES.has(rawOutcome as OutcomeFilter)
@@ -69,9 +72,10 @@ export function ActivityPage() {
     [setSearchParams],
   );
 
+  // Default to action event types when no explicit event_type filter is set
   const filters: AuditEventFilters = {
     ...(outcomeFilter !== "all" && { outcome: outcomeFilter }),
-    ...(eventTypeFilter && { event_type: eventTypeFilter }),
+    event_type: eventTypeFilter || ACTION_EVENT_TYPES,
     ...(agentFilter != null && { agent_id: agentFilter }),
   };
 
@@ -87,6 +91,10 @@ export function ActivityPage() {
   } = useInfiniteAuditEvents(filters);
 
   const { agents } = useAgents();
+
+  const handleRowClick = useCallback((event: AuditEvent) => {
+    setSelectedEvent(event);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -167,6 +175,7 @@ export function ActivityPage() {
                     formatTimestamp={formatAbsoluteTime}
                     timestampTitle={formatRelativeTime(event.timestamp)}
                     actionMaxWidth="max-w-[300px]"
+                    onClick={handleRowClick}
                   />
                 ))}
               </TableBody>
@@ -195,6 +204,12 @@ export function ActivityPage() {
           )}
         </>
       )}
+
+      <ActivityDetailSheet
+        event={selectedEvent}
+        open={selectedEvent !== null}
+        onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}
+      />
     </div>
   );
 }

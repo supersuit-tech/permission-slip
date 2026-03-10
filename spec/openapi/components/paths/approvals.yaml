@@ -679,6 +679,57 @@ listApprovals:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
+getApproval:
+  get:
+    operationId: getApproval
+    summary: Get Approval Details
+    description: |
+      Returns the full details of a single approval by ID. Includes action
+      parameters, context, execution status, and execution result. Used by the
+      activity feed detail panel to show what an agent tried to do and what
+      happened.
+
+      Only returns approvals owned by the authenticated user (as approver).
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/ApprovalId'
+
+    responses:
+      '200':
+        description: Approval details retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/ApprovalSummary'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Approval not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_not_found"
+                message: "Approval not found"
+                retryable: false
+                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
 approveApproval:
   post:
     operationId: approveApproval

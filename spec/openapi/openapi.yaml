@@ -173,6 +173,9 @@ paths:
   /v1/approvals/events:
     $ref: './components/paths/approvals.yaml#/approvalEvents'
 
+  /v1/approvals/{approval_id}:
+    $ref: './components/paths/approvals.yaml#/getApproval'
+
   /v1/approvals/{approval_id}/approve:
     $ref: './components/paths/approvals.yaml#/approveApproval'
 

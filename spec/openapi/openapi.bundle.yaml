@@ -2532,6 +2532,48 @@ paths:
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/approvals/{approval_id}:
+    get:
+      operationId: getApproval
+      summary: Get Approval Details
+      description: |
+        Returns the full details of a single approval by ID. Includes action
+        parameters, context, execution status, and execution result. Used by the
+        activity feed detail panel to show what an agent tried to do and what
+        happened.
+
+        Only returns approvals owned by the authenticated user (as approver).
+      tags:
+        - Approvals
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200':
+          description: Approval details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Approval not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: approval_not_found
+                  message: Approval not found
+                  retryable: false
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/approvals/{approval_id}/approve:
     post:
       operationId: approveApproval
@@ -8107,6 +8149,19 @@ components:
             - charged
           description: The outcome of the event.
           example: approved
+        source_id:
+          type: string
+          description: |
+            Identifier linking this event to its source record (e.g. approval_id,
+            standing approval execution id, agent id). Used by the frontend to
+            fetch full details for click-through views.
+          example: appr_abc123
+        source_type:
+          type: string
+          description: |
+            The type of source record this event originated from. Possible values:
+            "approval", "standing_approval", "agent", "payment_method_transaction".
+          example: approval
         connector_id:
           type: string
           nullable: true
