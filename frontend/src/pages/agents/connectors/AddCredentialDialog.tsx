@@ -28,6 +28,8 @@ interface AddCredentialDialogProps {
   fieldPlaceholder?: string;
   /** Override the dialog title (default: "Add Credential"). */
   title?: string;
+  /** Called after credentials are successfully stored. */
+  onSuccess?: () => void;
 }
 
 export function AddCredentialDialog({
@@ -38,6 +40,7 @@ export function AddCredentialDialog({
   fieldLabel,
   fieldPlaceholder,
   title,
+  onSuccess,
 }: AddCredentialDialogProps) {
   const { storeCredential, isLoading } = useStoreCredential();
   const [label, setLabel] = useState("");
@@ -72,6 +75,7 @@ export function AddCredentialDialog({
       toast.success(`Credentials stored for ${credential.service}`);
       resetForm();
       onOpenChange(false);
+      onSuccess?.();
     } catch (err) {
       toast.error(
         err instanceof Error
