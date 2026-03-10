@@ -163,6 +163,10 @@ const modeConfig: Record<
 
 const allModes: ParamMode[] = ["fixed", "pattern", "wildcard"];
 
+function isParamMode(value: string): value is ParamMode {
+  return allModes.includes(value as ParamMode);
+}
+
 function ConstraintModeDropdown({
   mode,
   disabled,
@@ -194,7 +198,7 @@ function ConstraintModeDropdown({
         <DropdownMenuRadioGroup
           value={mode}
           onValueChange={(v) => {
-            if (v !== mode) onChange(v as ParamMode);
+            if (v !== mode && isParamMode(v)) onChange(v);
           }}
         >
           {allModes.map((m) => {

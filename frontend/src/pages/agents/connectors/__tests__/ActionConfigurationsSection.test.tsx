@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
@@ -203,10 +203,10 @@ describe("ActionConfigurationsSection", () => {
     );
 
     // Set title to wildcard via dropdown.
-    // All params start in Fixed mode. Each has a dropdown trigger button.
-    const fixedButtons = screen.getAllByRole("button", { name: /Fixed/ });
-    // title is the second param field (repo=0, title=1, body=2).
-    await user.click(fixedButtons[1]!);
+    // Target the dropdown trigger within the "title" parameter group.
+    const titleInput = screen.getByLabelText("title");
+    const titleGroup = titleInput.closest(".space-y-1\\.5")!;
+    await user.click(within(titleGroup as HTMLElement).getByRole("button", { name: /Fixed/ }));
     // Select "Wildcard" from the dropdown menu.
     await user.click(screen.getByRole("menuitemradio", { name: /Wildcard/ }));
 
