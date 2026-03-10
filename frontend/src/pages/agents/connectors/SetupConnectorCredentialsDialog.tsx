@@ -89,7 +89,7 @@ export function SetupConnectorCredentialsDialog({
 
   const hasOAuth = !!effectiveOAuthProvider;
   const hasNoCredentials =
-    requiredCredentials.length === 0 && !matchingProvider;
+    !isLoading && requiredCredentials.length === 0 && !matchingProvider;
   const needsShopDomain =
     effectiveOAuthProvider != null &&
     SHOP_REQUIRED_PROVIDERS.has(effectiveOAuthProvider);
@@ -228,7 +228,6 @@ export function SetupConnectorCredentialsDialog({
             setAddCredentialOpen(nextOpen);
             if (!nextOpen) {
               setAddCredentialTarget(null);
-              onOpenChange(false);
             }
           }}
           credential={addCredentialTarget}
