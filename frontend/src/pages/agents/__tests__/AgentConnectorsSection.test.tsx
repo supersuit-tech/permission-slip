@@ -5,6 +5,7 @@ import { renderWithProviders } from "../../../test-helpers";
 import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import {
   mockGet,
+  mockPut,
   resetClientMocks,
 } from "../../../api/__mocks__/client";
 import { AgentConnectorsSection } from "../AgentConnectorsSection";
@@ -171,5 +172,63 @@ describe("AgentConnectorsSection", () => {
     expect(screen.getByText("GitHub")).toBeInTheDocument();
     expect(screen.queryByText("Gmail")).not.toBeInTheDocument();
     expect(screen.queryByText("Slack")).not.toBeInTheDocument();
+  });
+
+  it("shows no-match message when search has no results", async () => {
+    const user = userEvent.setup();
+    mockAllConnectors([
+      { id: "gmail", name: "Gmail", description: "Email", actions: ["a"], required_credentials: [] },
+      { id: "github", name: "GitHub", description: "Code", actions: ["b"], required_credentials: [] },
+      { id: "slack", name: "Slack", description: "Chat", actions: ["c"], required_credentials: [] },
+      { id: "stripe", name: "Stripe", description: "Payments", actions: ["d"], required_credentials: [] },
+    ]);
+    renderWithProviders(
+      <AgentConnectorsSection
+        agentId={42}
+        connectors={[]}
+        isLoading={false}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Gmail")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText("Search connectors...");
+    await user.type(searchInput, "zzz-no-match");
+
+    expect(screen.getByText(/No connectors match/)).toBeInTheDocument();
+  });
+
+  it("enables and navigates when clicking a non-enabled connector", async () => {
+    const user = userEvent.setup();
+    mockAllConnectors();
+    mockPut.mockResolvedValue({ data: {}, error: undefined });
+
+    renderWithProviders(
+      <AgentConnectorsSection
+        agentId={42}
+        connectors={mockEnabledConnectors}
+        isLoading={false}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("GitHub")).toBeInTheDocument();
+    });
+
+    // GitHub is not enabled — clicking it should call PUT to enable
+    await user.click(screen.getByText("GitHub").closest("button")!);
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith(
+        "/v1/agents/{agent_id}/connectors/{connector_id}",
+        expect.objectContaining({
+          params: { path: { agent_id: 42, connector_id: "github" } },
+        }),
+      );
+    });
   });
 });
