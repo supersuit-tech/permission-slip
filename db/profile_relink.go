@@ -62,12 +62,27 @@ func RelinkProfile(ctx context.Context, db DBTX, oldID, newID string) error {
 	// Ensure the new auth.users entry exists (Supabase manages this in prod;
 	// in local dev we create a minimal row ourselves). We omit the email
 	// to avoid colliding with the old user's unique email constraint.
+	//
+	// In production the app_backend role only has SELECT on auth.users
+	// (INSERT is intentionally omitted because Supabase creates the row
+	// during OTP login). The INSERT is therefore always a no-op in prod,
+	// but PostgreSQL still checks INSERT privilege before evaluating
+	// ON CONFLICT DO NOTHING — resulting in a 42501 (insufficient_privilege)
+	// error. We treat this specific error as success: if we lack INSERT
+	// permission, the row must already exist (managed by Supabase).
 	_, err := db.Exec(ctx,
 		`INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING`,
 		newID,
 	)
 	if err != nil {
-		return err
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42501" {
+			// insufficient_privilege — expected in production where
+			// app_backend lacks INSERT on auth.users. Safe to ignore
+			// because Supabase already created the row during login.
+		} else {
+			return err
+		}
 	}
 
 	// Update the profile PK — ON UPDATE CASCADE propagates to all child tables.
