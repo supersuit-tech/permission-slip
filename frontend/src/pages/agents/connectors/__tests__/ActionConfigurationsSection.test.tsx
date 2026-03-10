@@ -202,15 +202,13 @@ describe("ActionConfigurationsSection", () => {
       "my-repo",
     );
 
-    // Set title to wildcard: Fixed → Pattern → Wildcard (two clicks).
-    // All params start in Fixed mode, so buttons say "Pattern".
-    // Use role-based selectors to avoid matching <strong> tags in help text.
-    const patternButtons = screen.getAllByRole("button", { name: /Pattern/ });
+    // Set title to wildcard via dropdown.
+    // All params start in Fixed mode. Each has a dropdown trigger button.
+    const fixedButtons = screen.getAllByRole("button", { name: /Fixed/ });
     // title is the second param field (repo=0, title=1, body=2).
-    await user.click(patternButtons[1]!);
-    // Now the title button says "Wildcard" — click it.
-    const wildcardButtons = screen.getAllByRole("button", { name: /Wildcard/ });
-    await user.click(wildcardButtons[0]!);
+    await user.click(fixedButtons[1]!);
+    // Select "Wildcard" from the dropdown menu.
+    await user.click(screen.getByRole("menuitem", { name: /Wildcard/ }));
 
     await user.click(screen.getByText("Create Configuration"));
 

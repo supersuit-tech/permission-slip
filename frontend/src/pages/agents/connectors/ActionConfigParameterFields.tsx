@@ -1,8 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Asterisk, Lock, Regex } from "lucide-react";
+import { Asterisk, ChevronDown, Lock, Regex } from "lucide-react";
 import type { ParamMode } from "./ActionConfigFormFields";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 
@@ -93,7 +99,7 @@ export function ActionConfigParameterFields({
                 disabled={disabled || mode === "wildcard"}
                 className={mode === "wildcard" ? "bg-muted" : ""}
               />
-              <ConstraintModeButton
+              <ConstraintModeDropdown
                 mode={mode}
                 disabled={disabled}
                 onChange={(nextMode) => {
@@ -131,8 +137,30 @@ function inferModeFromValue(value: string): ParamMode {
   return "fixed";
 }
 
-/** Cycles through Fixed → Pattern → Wildcard. */
-function ConstraintModeButton({
+const modeConfig: Record<
+  ParamMode,
+  { icon: React.ReactNode; label: string; description: string }
+> = {
+  fixed: {
+    icon: <Lock className="size-3" />,
+    label: "Fixed",
+    description: "Exact value",
+  },
+  pattern: {
+    icon: <Regex className="size-3" />,
+    label: "Pattern",
+    description: "Glob matching with *",
+  },
+  wildcard: {
+    icon: <Asterisk className="size-3" />,
+    label: "Wildcard",
+    description: "Agent chooses freely",
+  },
+};
+
+const allModes: ParamMode[] = ["fixed", "pattern", "wildcard"];
+
+function ConstraintModeDropdown({
   mode,
   disabled,
   onChange,
@@ -141,51 +169,46 @@ function ConstraintModeButton({
   disabled?: boolean;
   onChange: (next: ParamMode) => void;
 }) {
-  function handleClick() {
-    if (mode === "fixed") onChange("pattern");
-    else if (mode === "pattern") onChange("wildcard");
-    else onChange("fixed");
-  }
-
-  const config: Record<
-    ParamMode,
-    { icon: React.ReactNode; label: string; title: string; variant: "default" | "outline" | "secondary" }
-  > = {
-    fixed: {
-      icon: <Regex className="size-3" />,
-      label: "Pattern",
-      title: "Switch to pattern mode (glob matching with *)",
-      variant: "outline",
-    },
-    pattern: {
-      icon: <Asterisk className="size-3" />,
-      label: "Wildcard",
-      title: "Switch to wildcard mode (agent chooses any value)",
-      variant: "secondary",
-    },
-    wildcard: {
-      icon: <Lock className="size-3" />,
-      label: "Fixed",
-      title: "Switch to fixed mode (exact value)",
-      variant: "default",
-    },
-  };
-
-  const { icon, label, title, variant } = config[mode];
+  const current = modeConfig[mode];
 
   return (
-    <Button
-      type="button"
-      variant={variant}
-      size="sm"
-      onClick={handleClick}
-      disabled={disabled}
-      title={title}
-      className="shrink-0"
-    >
-      {icon}
-      {label}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          className="shrink-0 gap-1.5"
+        >
+          {current.icon}
+          {current.label}
+          <ChevronDown className="size-3 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {allModes.map((m) => {
+          const cfg = modeConfig[m];
+          return (
+            <DropdownMenuItem
+              key={m}
+              onClick={() => onChange(m)}
+              className={m === mode ? "bg-accent" : ""}
+            >
+              <span className="flex items-center gap-2">
+                {cfg.icon}
+                <span>
+                  <span className="font-medium">{cfg.label}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    {cfg.description}
+                  </span>
+                </span>
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
