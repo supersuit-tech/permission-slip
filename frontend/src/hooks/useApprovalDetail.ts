@@ -36,7 +36,7 @@ export function useApprovalDetail(approvalId: string | null) {
       return data;
     },
     enabled: !!accessToken && !!approvalId,
-    staleTime: 60_000,
+    staleTime: Infinity,
   });
 
   return {

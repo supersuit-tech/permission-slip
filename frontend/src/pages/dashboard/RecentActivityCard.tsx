@@ -76,6 +76,7 @@ function EmptyState() {
 export function RecentActivityCard() {
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const filters: AuditEventFilters = {
     event_type: ACTION_EVENT_TYPES,
@@ -86,6 +87,7 @@ export function RecentActivityCard() {
 
   const handleRowClick = useCallback((event: AuditEvent) => {
     setSelectedEvent(event);
+    setIsSheetOpen(true);
   }, []);
 
   return (
@@ -165,8 +167,11 @@ export function RecentActivityCard() {
 
       <ActivityDetailSheet
         event={selectedEvent}
-        open={selectedEvent !== null}
-        onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}
+        open={isSheetOpen}
+        onOpenChange={(open) => {
+          setIsSheetOpen(open);
+          if (!open) setTimeout(() => setSelectedEvent(null), 300);
+        }}
       />
     </>
   );

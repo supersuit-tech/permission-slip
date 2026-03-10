@@ -47,6 +47,7 @@ function EmptyState() {
 export function ActivityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const rawOutcome = searchParams.get("outcome") ?? "all";
   const outcomeFilter: OutcomeFilter = VALID_OUTCOMES.has(rawOutcome as OutcomeFilter)
@@ -94,6 +95,7 @@ export function ActivityPage() {
 
   const handleRowClick = useCallback((event: AuditEvent) => {
     setSelectedEvent(event);
+    setIsSheetOpen(true);
   }, []);
 
   return (
@@ -207,8 +209,11 @@ export function ActivityPage() {
 
       <ActivityDetailSheet
         event={selectedEvent}
-        open={selectedEvent !== null}
-        onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}
+        open={isSheetOpen}
+        onOpenChange={(open) => {
+          setIsSheetOpen(open);
+          if (!open) setTimeout(() => setSelectedEvent(null), 300);
+        }}
       />
     </div>
   );

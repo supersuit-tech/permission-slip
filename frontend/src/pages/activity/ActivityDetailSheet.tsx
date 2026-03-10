@@ -120,6 +120,7 @@ function ApprovalDetails({ approvalId }: { approvalId: string }) {
   const riskLevel = context?.risk_level as "low" | "medium" | "high" | undefined;
   const description = typeof context?.description === "string" ? context.description : null;
   const executionResult = approval.execution_result as Record<string, unknown> | undefined;
+  const executionError = typeof executionResult?.error === "string" ? executionResult.error : undefined;
 
   return (
     <ApprovalContent
@@ -128,6 +129,7 @@ function ApprovalDetails({ approvalId }: { approvalId: string }) {
       riskLevel={riskLevel}
       description={description}
       executionStatus={approval.execution_status ?? undefined}
+      executionError={executionError}
       executionResult={executionResult}
     />
   );
@@ -139,6 +141,7 @@ function ApprovalContent({
   riskLevel,
   description,
   executionStatus,
+  executionError,
   executionResult,
 }: {
   actionType: string;
@@ -146,6 +149,7 @@ function ApprovalContent({
   riskLevel?: "low" | "medium" | "high" | null;
   description?: string | null;
   executionStatus?: string;
+  executionError?: string;
   executionResult?: Record<string, unknown>;
 }) {
   const { schema, actionName } = useActionSchema(actionType);
@@ -204,7 +208,7 @@ function ApprovalContent({
 
       {/* Execution Result */}
       {executionStatus && (
-        <ExecutionStatusSection status={executionStatus} />
+        <ExecutionStatusSection status={executionStatus} error={executionError} />
       )}
       {executionResult && Object.keys(executionResult).length > 0 && (
         <div className="space-y-2">
@@ -225,10 +229,8 @@ export function ActivityDetailSheet({
   open,
   onOpenChange,
 }: ActivityDetailSheetProps) {
-  if (!event) return null;
-
-  const actionType = getActionType(event);
-  const shouldFetchApproval = isApprovalEvent(event);
+  const actionType = event ? getActionType(event) : "";
+  const shouldFetchApproval = event ? isApprovalEvent(event) : false;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -240,7 +242,7 @@ export function ActivityDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-5 px-4 pb-6">
+        {event && <div className="space-y-5 px-4 pb-6">
           {/* Event header */}
           <div className="flex items-center justify-between gap-3">
             <OutcomeBadge outcome={event.outcome} />
@@ -303,7 +305,7 @@ export function ActivityDetailSheet({
               <p className="text-sm">{getActionSummary(event)}</p>
             </div>
           )}
-        </div>
+        </div>}
       </SheetContent>
     </Sheet>
   );
