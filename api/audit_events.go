@@ -14,8 +14,8 @@ import (
 )
 
 // auditEventResponse is the JSON representation of a single audit event
-// for the activity feed (GET /audit-events). Does NOT include id or source_id
-// since the activity feed is for display purposes only.
+// for the activity feed (GET /audit-events). Includes source_id and source_type
+// so the frontend can link events back to their source approval for detail views.
 type auditEventResponse struct {
 	EventType       string    `json:"event_type"`
 	Timestamp       time.Time `json:"timestamp"`
@@ -23,6 +23,8 @@ type auditEventResponse struct {
 	AgentMeta       any       `json:"agent_metadata,omitempty"`
 	Action          any       `json:"action,omitempty"`
 	Outcome         string    `json:"outcome"`
+	SourceID        string    `json:"source_id,omitempty"`
+	SourceType      string    `json:"source_type,omitempty"`
 	ConnectorID     *string   `json:"connector_id,omitempty"`
 	ExecutionStatus *string   `json:"execution_status,omitempty"`
 	ExecutionError  *string   `json:"execution_error,omitempty"`
@@ -400,6 +402,8 @@ func toAuditEventResponse(e db.AuditEvent) auditEventResponse {
 		AgentMeta:       unmarshalJSONB(e.AgentMeta),
 		Action:          unmarshalJSONB(e.Action),
 		Outcome:         e.Outcome,
+		SourceID:        e.SourceID,
+		SourceType:      e.SourceType,
 		ConnectorID:     e.ConnectorID,
 		ExecutionStatus: e.ExecutionStatus,
 		ExecutionError:  e.ExecutionError,

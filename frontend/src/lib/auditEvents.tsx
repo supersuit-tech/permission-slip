@@ -27,8 +27,17 @@ export const OUTCOME_FILTERS: { label: string; value: OutcomeFilter }[] = [
   { label: "All", value: "all" },
   { label: "Approved", value: "approved" },
   { label: "Denied", value: "denied" },
+  { label: "Pending", value: "pending" },
   { label: "Auto-executed", value: "auto_executed" },
 ];
+
+/**
+ * Default event_type filter that excludes lifecycle noise (agent.registered,
+ * agent.deactivated). Used by both the dashboard card and the activity page
+ * when no explicit event_type filter is set.
+ */
+export const ACTION_EVENT_TYPES =
+  "approval.requested,approval.approved,approval.denied,approval.cancelled,action.executed,standing_approval.executed,payment_method.charged";
 
 interface OutcomeStyle {
   label: string;
@@ -150,20 +159,26 @@ export function OutcomeBadge({ outcome }: { outcome: string }) {
 /**
  * Shared table row for rendering a single audit event.
  * Accepts a `formatTimestamp` prop so callers can choose relative vs absolute display.
+ * When `onClick` is provided, the row becomes clickable with a hover highlight.
  */
 export function AuditEventRow({
   event,
   formatTimestamp,
   timestampTitle,
   actionMaxWidth = "max-w-[200px]",
+  onClick,
 }: {
   event: AuditEvent;
   formatTimestamp: (ts: string) => string;
   timestampTitle?: string;
   actionMaxWidth?: string;
+  onClick?: (event: AuditEvent) => void;
 }) {
   return (
-    <TableRow>
+    <TableRow
+      className={onClick ? "cursor-pointer transition-colors hover:bg-accent" : undefined}
+      onClick={onClick ? () => onClick(event) : undefined}
+    >
       <TableCell className="whitespace-nowrap text-xs">
         {timestampTitle ? (
           <span title={timestampTitle}>
