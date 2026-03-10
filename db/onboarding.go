@@ -34,12 +34,26 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username string, market
 	// In production (Supabase), auth.users is managed by Supabase and this
 	// row already exists by the time the user reaches onboarding.
 	// In local dev (standalone Postgres), we insert it ourselves.
+	//
+	// In production the app_backend role only has SELECT on auth.users
+	// (INSERT is intentionally omitted because Supabase creates the row
+	// during OTP login). PostgreSQL checks INSERT privilege before evaluating
+	// ON CONFLICT DO NOTHING, so the no-op INSERT raises 42501
+	// (insufficient_privilege). We treat this as success: if we lack INSERT
+	// permission, the row must already exist (managed by Supabase).
 	_, err := db.Exec(ctx,
 		`INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
 		userID,
 	)
 	if err != nil {
-		return nil, err
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42501" {
+			// insufficient_privilege — expected in production where
+			// app_backend lacks INSERT on auth.users. Safe to ignore
+			// because Supabase already created the row during login.
+		} else {
+			return nil, err
+		}
 	}
 
 	var p Profile
