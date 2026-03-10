@@ -10,7 +10,7 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
   over_request_rate_limit:
     "Too many attempts. Please wait a moment and try again.",
   over_email_send_rate_limit:
-    "Too many requests. Please wait a moment and try again.",
+    "Too many login emails sent. Please wait a few minutes and try again.",
   mfa_factor_not_found: "No authenticator found. Please re-enroll.",
   mfa_verification_failed:
     "Invalid code. Please check your authenticator app and try again.",
@@ -20,9 +20,17 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
 };
 
 /** Returns a user-safe message for a Supabase AuthError by matching its code
- *  against a known allowlist. Unknown codes get a generic fallback. */
-export function safeErrorMessage(error: AuthError): string {
+ *  against a known allowlist. Unknown codes get a generic fallback.
+ *
+ *  Pass `overrides` to substitute a context-specific message for a given code
+ *  while still falling back to the allowlist for everything else. */
+export function safeErrorMessage(
+  error: AuthError,
+  overrides?: Partial<Record<string, string>>
+): string {
   if (error.code) {
+    const override = overrides?.[error.code];
+    if (override !== undefined) return override;
     const message = SAFE_ERROR_MESSAGES[error.code];
     if (message) return message;
   }
