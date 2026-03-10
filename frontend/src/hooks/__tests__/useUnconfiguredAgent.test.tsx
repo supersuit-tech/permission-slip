@@ -62,6 +62,7 @@ describe("useUnconfiguredAgent", () => {
       expect(result.current.isUnconfigured).toBe(true);
     });
     expect(result.current.agentId).toBe(1);
+    expect(result.current.agentName).toBe("Test Agent");
   });
 
   it("returns isUnconfigured false for single registered agent with connectors", async () => {

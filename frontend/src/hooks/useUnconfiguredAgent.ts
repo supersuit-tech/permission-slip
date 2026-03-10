@@ -1,5 +1,6 @@
 import type { Agent } from "./useAgents";
 import { useAgentConnectors } from "./useAgentConnectors";
+import { getAgentDisplayName } from "@/lib/agents";
 
 /**
  * Detects the "unconfigured agent" state: exactly one registered agent
@@ -31,5 +32,8 @@ export function useUnconfiguredAgent(agents: Agent[], agentsLoading: boolean) {
     isUnconfigured,
     isLoading,
     agentId,
+    agentName: singleRegistered
+      ? getAgentDisplayName(singleRegistered)
+      : undefined,
   };
 }

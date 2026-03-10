@@ -130,10 +130,12 @@ describe("Dashboard", () => {
 
     render(<Dashboard />, { wrapper });
 
+    // Wait for both agent and connector fetches to complete so unconfiguredLoading
+    // is false and all dashboard cards are rendered.
     await waitFor(() => {
       expect(screen.getByText("Registered Agents")).toBeInTheDocument();
+      expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
     });
-    expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
     expect(screen.getByText("Recent Activity")).toBeInTheDocument();
     expect(screen.getByText("Standing Approvals")).toBeInTheDocument();
 
@@ -173,14 +175,14 @@ describe("Dashboard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Your agent is ready.*now give it superpowers/),
+        screen.getByText(/My Agent is ready.*now give it superpowers/),
       ).toBeInTheDocument();
     });
 
     // Should show the agent card but not the other dashboard cards
     expect(screen.getByText("Registered Agents")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Configure Your Agent" }),
+      screen.getByRole("link", { name: "Configure My Agent" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Pending Approvals")).not.toBeInTheDocument();
     expect(screen.queryByText("Recent Activity")).not.toBeInTheDocument();

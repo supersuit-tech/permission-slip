@@ -22,8 +22,12 @@ export function Dashboard() {
     useStandingApprovals();
   const { events, isLoading: eventsLoading } = useAuditEvents();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const { isUnconfigured, agentId: unconfiguredAgentId } =
-    useUnconfiguredAgent(agents, isLoading);
+  const {
+    isUnconfigured,
+    isLoading: unconfiguredLoading,
+    agentId: unconfiguredAgentId,
+    agentName: unconfiguredAgentName,
+  } = useUnconfiguredAgent(agents, isLoading);
 
   const showOnboarding = !isLoading && !error && agents.length === 0;
   const hasActiveAgents = agents.some((a) => a.status === "registered");
@@ -33,11 +37,15 @@ export function Dashboard() {
   // Progressive disclosure: show cards only when relevant to the user's journey.
   // While a hook is still fetching we don't yet know whether data exists,
   // so default to showing the card to avoid jarring pop-in for returning users.
+  // Suppress other cards while we're checking whether the agent is unconfigured,
+  // to avoid flashing the full dashboard before switching to the hero.
   const showPendingApprovals =
-    approvalsLoading || hasActiveAgents || hasPendingApprovals;
-  const showActivity = eventsLoading || hasActivity;
+    !unconfiguredLoading &&
+    (approvalsLoading || hasActiveAgents || hasPendingApprovals);
+  const showActivity = !unconfiguredLoading && (eventsLoading || hasActivity);
   const showStandingApprovals =
-    standingLoading || standingApprovals.length > 0 || hasActivity;
+    !unconfiguredLoading &&
+    (standingLoading || standingApprovals.length > 0 || hasActivity);
 
   // Only prompt for notifications after the user has an active, configured agent
   const showNotificationBanner = hasActiveAgents && !isUnconfigured;
@@ -57,7 +65,10 @@ export function Dashboard() {
         </>
       ) : isUnconfigured ? (
         <>
-          <AgentConfigHero agentId={unconfiguredAgentId} />
+          <AgentConfigHero
+            agentId={unconfiguredAgentId}
+            agentName={unconfiguredAgentName}
+          />
           <RegisteredAgentsCard />
         </>
       ) : (
