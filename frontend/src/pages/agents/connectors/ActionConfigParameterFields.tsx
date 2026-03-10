@@ -22,6 +22,11 @@ interface ActionConfigParameterFieldsProps {
   disabled?: boolean;
 }
 
+/**
+ * Renders parameter fields for action configuration, with a constraint mode
+ * dropdown (Fixed/Pattern/Wildcard) per parameter. Used in both the Add and
+ * Edit action configuration dialogs.
+ */
 export function ActionConfigParameterFields({
   parametersSchema,
   values,
@@ -167,6 +172,7 @@ function isParamMode(value: string): value is ParamMode {
   return allModes.includes(value as ParamMode);
 }
 
+/** Dropdown selector for constraint mode (Fixed/Pattern/Wildcard) with radio semantics. */
 function ConstraintModeDropdown({
   mode,
   disabled,
