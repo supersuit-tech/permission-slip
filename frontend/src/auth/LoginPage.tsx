@@ -1,30 +1,57 @@
-import { useState } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
 import { useAuth } from "./AuthContext";
 import { useCooldown } from "./useCooldown";
 import EmailStep from "./EmailStep";
-import OtpStep from "./OtpStep";
+import CheckEmailStep from "./CheckEmailStep";
+import AuthLayout from "./AuthLayout";
+
+// Lazy-load OtpStep so it (and its dev-only dependencies like OtpCodeInput,
+// DevOnly, Mailpit auto-fill) are tree-shaken from the production bundle.
+// In production, the "otp" step is never reached.
+const OtpStep = lazy(() => import("./OtpStep"));
+
+type Step = "email" | "otp" | "check-email";
 
 export default function LoginPage() {
   const { sendOtp, verifyOtp } = useAuth();
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const cooldown = useCooldown();
 
+  const handleSendSuccess = (inputEmail: string) => {
+    setEmail(inputEmail);
+    setStep(import.meta.env.DEV ? "otp" : "check-email");
+    cooldown.start();
+  };
+
+  const handleResend = useCallback(async () => {
+    const result = await sendOtp(email);
+    if (!result.error || result.error.code === "over_email_send_rate_limit") {
+      cooldown.start();
+    }
+    return result;
+  }, [sendOtp, email, cooldown.start]);
+
   if (step === "otp") {
     return (
-      <OtpStep
+      <Suspense fallback={<AuthLayout>{null}</AuthLayout>}>
+        <OtpStep
+          email={email}
+          onVerify={(code) => verifyOtp(email, code)}
+          onBack={() => setStep("email")}
+          onResend={handleResend}
+          resendCooldownSeconds={cooldown.secondsLeft}
+        />
+      </Suspense>
+    );
+  }
+
+  if (step === "check-email") {
+    return (
+      <CheckEmailStep
         email={email}
-        onVerify={(code) => verifyOtp(email, code)}
         onBack={() => setStep("email")}
-        onResend={async () => {
-          const result = await sendOtp(email);
-          // Start cooldown on success or rate-limit error so the button
-          // stays disabled even when the server rejects the request.
-          if (!result.error || result.error.code === "over_email_send_rate_limit") {
-            cooldown.start();
-          }
-          return result;
-        }}
+        onResend={handleResend}
         resendCooldownSeconds={cooldown.secondsLeft}
       />
     );
@@ -35,9 +62,7 @@ export default function LoginPage() {
       onSubmit={async (inputEmail) => {
         const result = await sendOtp(inputEmail);
         if (!result.error) {
-          setEmail(inputEmail);
-          setStep("otp");
-          cooldown.start();
+          handleSendSuccess(inputEmail);
         }
         return result;
       }}

@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { AuthError } from "@supabase/supabase-js";
 import { renderWithProviders } from "../../test-helpers";
 import { mockAuth, mockUser, mockSession, setupAuthMocks } from "./fixtures";
@@ -16,6 +16,10 @@ describe("LoginPage", () => {
     setupAuthMocks();
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("shows email step initially", async () => {
     renderWithProviders(<LoginPage />);
     await waitFor(() => {
@@ -24,88 +28,155 @@ describe("LoginPage", () => {
     expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
   });
 
-  it("transitions to OTP step after successful code send", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: null,
+  describe("development mode", () => {
+    // import.meta.env.DEV is true by default in vitest
+
+    it("transitions to OTP step after successful code send", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: null,
+      });
+
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      });
+      expect(screen.getByText("test@example.com")).toBeInTheDocument();
     });
 
-    renderWithProviders(<LoginPage />);
+    it("returns to email step when back is clicked", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: null,
+      });
 
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
+      renderWithProviders(<LoginPage />);
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByText("Back"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
     });
-    expect(screen.getByText("test@example.com")).toBeInTheDocument();
+
+    it("calls verifyOtp with correct email and code", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: null,
+      });
+      mockAuth.verifyOtp.mockResolvedValue({
+        data: { session: mockSession, user: mockUser },
+        error: null,
+      });
+
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      });
+      await userEvent.type(screen.getByLabelText("Code"), "123456");
+      await userEvent.click(screen.getByText("Verify"));
+
+      expect(mockAuth.verifyOtp).toHaveBeenCalledWith({
+        email: "test@example.com",
+        token: "123456",
+        type: "email",
+      });
+    });
+
+    it("stays on email step when send fails", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+      });
+
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
+    });
   });
 
-  it("stays on email step when send fails", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+  describe("production mode", () => {
+    beforeEach(() => {
+      vi.stubEnv("DEV", false);
     });
 
-    renderWithProviders(<LoginPage />);
+    it("shows check-email step instead of OTP after successful send", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: null,
+      });
 
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
+      renderWithProviders(<LoginPage />);
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    });
-    expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
-  });
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
 
-  it("returns to email step when back is clicked", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: null,
-    });
-
-    renderWithProviders(<LoginPage />);
-
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText("Check your email")).toBeInTheDocument();
+      });
+      expect(screen.getByText("test@example.com")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByText("Back"));
+    it("returns to email step when back is clicked from check-email", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: null,
+      });
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Check your email")).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByText("Back"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      });
     });
-    expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
-  });
 
-  it("calls verifyOtp with correct email and code", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: null,
-    });
-    mockAuth.verifyOtp.mockResolvedValue({
-      data: { session: mockSession, user: mockUser },
-      error: null,
-    });
+    it("stays on email step when send fails", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+      });
 
-    renderWithProviders(<LoginPage />);
+      renderWithProviders(<LoginPage />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
-    });
-    await userEvent.type(screen.getByLabelText("Code"), "123456");
-    await userEvent.click(screen.getByText("Verify"));
-
-    expect(mockAuth.verifyOtp).toHaveBeenCalledWith({
-      email: "test@example.com",
-      token: "123456",
-      type: "email",
+      await waitFor(() => {
+        expect(screen.getByLabelText("Email")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Check your email")).not.toBeInTheDocument();
     });
   });
 });

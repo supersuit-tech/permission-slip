@@ -1,21 +1,28 @@
 # Frontend Authentication
 
-The frontend uses [Supabase Auth](https://supabase.com/docs/guides/auth) with a **passwordless OTP (email code)** flow. No passwords are stored or managed by this application.
+The frontend uses [Supabase Auth](https://supabase.com/docs/guides/auth) with a **passwordless email** flow. No passwords are stored or managed by this application.
+
+The authentication method differs by environment:
+- **Development**: Supabase sends a **6-digit OTP code** (via local Mailpit). The user enters the code in the UI.
+- **Production**: Supabase sends a **magic link**. The user clicks the link in their email to authenticate — no code entry required.
 
 ## How it works
 
 1. User enters their email on the login page.
-2. Supabase sends a 6-digit one-time code to that email.
-3. User enters the code. Supabase verifies it and returns a session.
+2. Supabase sends either a 6-digit code (dev) or a magic link (production) to that email.
+3. **Development**: User enters the code → Supabase verifies it and returns a session.
+   **Production**: User clicks the magic link → Supabase authenticates via URL callback and returns a session.
 4. The session (JWT) is stored in the browser by the Supabase client library and refreshed automatically.
 
 ```
-EmailStep  ──sendOtp(email)──→  Supabase Auth
+                           Development                              Production
+                           ───────────                              ──────────
+EmailStep  ──sendOtp(email)──→  Supabase Auth  ←──sendOtp(email)──  EmailStep
                                      │
-                                sends email
+                      sends email (code or link)
                                      │
-OtpStep   ──verifyOtp(email, code)─→ Supabase Auth
-                                     │
+OtpStep   ──verifyOtp(email, code)─→ │ ←── user clicks link ──  CheckEmailStep
+                                     │         (no code input)
                               returns session
                                      │
 AuthContext  ←──onAuthStateChange────┘
@@ -31,9 +38,12 @@ All auth code lives in `frontend/src/auth/`:
 | `types.ts` | `AuthStatus` and `AuthState` type definitions |
 | `AuthContext.tsx` | React context provider + `useAuth` hook. Wraps the Supabase auth listener and exposes `sendOtp`, `verifyOtp`, `signOut`, and MFA functions (`verifyMfa`, `enrollMfa`, `confirmMfaEnrollment`, `unenrollMfa`, `listMfaFactors`). |
 | `MfaChallengePage.tsx` | Shown at login when the user has MFA enrolled but hasn't completed the second factor. Prompts for a TOTP code. |
-| `LoginPage.tsx` | Step router — switches between `EmailStep` and `OtpStep` based on local state |
-| `EmailStep.tsx` | Email input form. Calls `sendOtp` and advances to OTP step on success. |
-| `OtpStep.tsx` | 6-digit code input form. Calls `verifyOtp`. Shows a dev-only auto-fill button (see below). |
+| `LoginPage.tsx` | Step router — switches between `EmailStep`, `OtpStep` (dev), or `CheckEmailStep` (production) based on local state and `import.meta.env.DEV`. |
+| `EmailStep.tsx` | Email input form. Calls `sendOtp` and advances to the next step on success. |
+| `OtpStep.tsx` | 6-digit code input form (dev only). Calls `verifyOtp`. Shows a dev-only auto-fill button (see below). |
+| `CheckEmailStep.tsx` | "Check your email" screen (production only). Tells the user to click their magic link. No code input. |
+| `useResend.ts` | Shared hook for resend state machine — loading flag, success/error banners, cooldown-expiry cleanup. Used by both `OtpStep` and `CheckEmailStep`. |
+| `ResendButton.tsx` | Shared presentational component for the resend button with cooldown countdown, loading state, and error/success banners. |
 | `useFormSubmit.ts` | Shared hook for form submission — manages error state, loading state, and safe error message conversion. Used by both `EmailStep` and `OtpStep`. |
 | `AuthLayout.tsx` | Shared layout wrapper for auth pages (container + heading). |
 | `errors.ts` | Maps Supabase `AuthError` codes to safe, user-facing messages. Avoids leaking internal error details. |
