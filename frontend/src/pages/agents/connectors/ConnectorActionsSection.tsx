@@ -62,7 +62,7 @@ export function ConnectorActionsSection({
   );
 }
 
-function ActionRow({ action }: { action: ConnectorAction }) {
+export function ActionRow({ action }: { action: ConnectorAction }) {
   const params = action.parameters_schema;
   const requiredFields =
     params && "required" in params && Array.isArray(params.required)
@@ -109,7 +109,7 @@ function ActionRow({ action }: { action: ConnectorAction }) {
   );
 }
 
-function RiskBadge({ level }: { level?: "low" | "medium" | "high" }) {
+export function RiskBadge({ level }: { level?: "low" | "medium" | "high" }) {
   switch (level) {
     case "low":
       return (

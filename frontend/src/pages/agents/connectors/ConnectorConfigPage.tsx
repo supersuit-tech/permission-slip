@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
 import { useCredentials } from "@/hooks/useCredentials";
 import { ConnectorOverviewSection } from "./ConnectorOverviewSection";
-import { ConnectorActionsSection } from "./ConnectorActionsSection";
+import { ConnectorActionsDialog } from "./ConnectorActionsDialog";
 import { ActionConfigurationsSection } from "./ActionConfigurationsSection";
 import { ConnectorCredentialsSection } from "./ConnectorCredentialsSection";
 import { DisableConnectorSection } from "./DisableConnectorSection";
@@ -46,6 +47,8 @@ export function ConnectorConfigPage() {
   const hasConfigCredentials = connectorConfigs.some((c) => !!c.credential_id);
   const shouldFetchCredentials = hasRequiredCredentials || hasConfigCredentials;
   const { credentials } = useCredentials({ enabled: shouldFetchCredentials });
+
+  const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
 
   const backTo = `/agents/${rawAgentId}`;
 
@@ -103,7 +106,19 @@ export function ConnectorConfigPage() {
         connector={connector}
         enabledAt={agentConnector?.enabled_at}
       />
-      <ConnectorActionsSection actions={connector.actions} />
+      <button
+        type="button"
+        onClick={() => setActionsDialogOpen(true)}
+        className="text-muted-foreground hover:text-foreground -mt-4 inline-flex items-center gap-1 text-sm transition-colors"
+      >
+        <ExternalLink className="size-3.5" />
+        View all {connector.actions.length} available actions
+      </button>
+      <ConnectorActionsDialog
+        open={actionsDialogOpen}
+        onOpenChange={setActionsDialogOpen}
+        actions={connector.actions}
+      />
       <ActionConfigurationsSection
         agentId={agentId}
         connectorId={connectorId}
