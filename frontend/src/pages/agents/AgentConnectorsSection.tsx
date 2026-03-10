@@ -41,7 +41,7 @@ export function AgentConnectorsSection({
   const [enablingId, setEnablingId] = useState<string | null>(null);
 
   const isLoading = enabledLoading || allLoading;
-  const error = enabledError ?? allError;
+  const error = allError ?? enabledError;
 
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
 
@@ -160,7 +160,7 @@ function ConnectorCard({
       type="button"
       className="border-border bg-card hover:bg-accent flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors disabled:opacity-50"
       onClick={() => onClick(connector)}
-      disabled={disabled && !isEnabling}
+      disabled={disabled}
     >
       {isEnabling ? (
         <Loader2 className="text-muted-foreground size-10 animate-spin" />
@@ -183,6 +183,11 @@ function ConnectorCard({
             </Badge>
           )}
         </div>
+        {connector.description && (
+          <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-tight">
+            {connector.description}
+          </p>
+        )}
         <p className="text-muted-foreground mt-0.5 text-xs leading-tight">
           {actionCount} action{actionCount !== 1 ? "s" : ""}
         </p>

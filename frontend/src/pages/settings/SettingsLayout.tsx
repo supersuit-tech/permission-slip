@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { providerLabel } from "@/lib/oauth";
@@ -16,8 +16,12 @@ import { AccountPage } from "./AccountPage";
 function SettingsIndex() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const firedRef = useRef(false);
 
   useEffect(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+
     const oauthStatus = searchParams.get("oauth_status");
     const oauthProvider = searchParams.get("oauth_provider");
     if (oauthStatus) {
@@ -35,8 +39,6 @@ function SettingsIndex() {
           : `Failed to connect ${label}. Please try again.`;
         toast.error(detail);
       }
-      navigate("/settings/profile", { replace: true });
-      return;
     }
     navigate("/settings/profile", { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
