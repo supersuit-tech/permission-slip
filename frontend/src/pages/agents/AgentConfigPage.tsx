@@ -5,7 +5,7 @@ import { useAgent } from "@/hooks/useAgent";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
 import { AgentInfoSection } from "./AgentInfoSection";
 import { AgentConnectorsSection } from "./AgentConnectorsSection";
-import { AgentCredentialsSection } from "./AgentCredentialsSection";
+
 import { DeactivateSection } from "./DeactivateSection";
 
 export function AgentConfigPage() {
@@ -60,12 +60,6 @@ export function AgentConfigPage() {
       <BackLink />
       <AgentInfoSection agent={agent} />
       <AgentConnectorsSection
-        agentId={agentId}
-        connectors={connectors}
-        isLoading={connectorsLoading}
-        error={connectorsError}
-      />
-      <AgentCredentialsSection
         agentId={agentId}
         connectors={connectors}
         isLoading={connectorsLoading}
