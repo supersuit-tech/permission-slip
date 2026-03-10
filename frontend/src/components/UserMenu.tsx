@@ -2,7 +2,9 @@ import { useNavigate } from "react-router-dom";
 import {
   LogOut,
   User,
-  KeyRound,
+  Shield,
+  Plug,
+  CreditCard,
   Moon,
   LifeBuoy,
 } from "lucide-react";
@@ -56,13 +58,21 @@ export function UserMenu() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem onSelect={() => navigate("/settings")}>
+            <DropdownMenuItem onSelect={() => navigate("/settings/profile")}>
               <User />
-              <span>Profile & Account</span>
+              <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/settings")}>
-              <KeyRound />
-              <span>Credential Vault</span>
+            <DropdownMenuItem onSelect={() => navigate("/settings/security")}>
+              <Shield />
+              <span>Security</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/settings/integrations")}>
+              <Plug />
+              <span>Integrations</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/settings/billing")}>
+              <CreditCard />
+              <span>Billing</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
