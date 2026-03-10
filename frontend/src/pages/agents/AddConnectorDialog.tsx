@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Plus, Plug, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { useConnectors } from "@/hooks/useConnectors";
 import { useEnableAgentConnector } from "@/hooks/useEnableAgentConnector";
 import type { AgentConnector } from "@/hooks/useAgentConnectors";
 import type { ConnectorSummary } from "@/hooks/useConnectors";
+import { SetupConnectorCredentialsDialog } from "./connectors/SetupConnectorCredentialsDialog";
 
 interface AddConnectorDialogProps {
   open: boolean;
@@ -37,6 +38,17 @@ export function AddConnectorDialog({
   const { enableConnector } = useEnableAgentConnector();
   const [enablingId, setEnablingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [setupConnector, setSetupConnector] = useState<ConnectorSummary | null>(null);
+
+  // Reset setup state when the parent closes the dialog externally (e.g. by
+  // navigating away). Without this, reopening the add-connector dialog would
+  // skip straight to the stale setup modal for the previously-enabled connector.
+  useEffect(() => {
+    if (!open) {
+      setSetupConnector(null);
+      setSearch("");
+    }
+  }, [open]);
 
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
   const available = allConnectors.filter((c) => !enabledIds.has(c.id));
@@ -54,7 +66,7 @@ export function AddConnectorDialog({
     try {
       await enableConnector({ agentId, connectorId: connector.id });
       toast.success(`${connector.name} enabled`);
-      onOpenChange(false);
+      setSetupConnector(connector);
     } catch {
       toast.error(`Failed to enable ${connector.name}`);
     } finally {
@@ -63,7 +75,8 @@ export function AddConnectorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open && !setupConnector} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add Connector</DialogTitle>
@@ -124,6 +137,22 @@ export function AddConnectorDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    {setupConnector && (
+      <SetupConnectorCredentialsDialog
+        open
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setSetupConnector(null);
+            onOpenChange(false);
+          }
+        }}
+        connectorId={setupConnector.id}
+        connectorName={setupConnector.name}
+        connectorLogoSvg={setupConnector.logo_svg}
+      />
+    )}
+    </>
   );
 }
 
