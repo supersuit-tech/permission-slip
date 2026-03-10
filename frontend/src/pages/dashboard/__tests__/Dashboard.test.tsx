@@ -14,7 +14,7 @@ function mockEmptyResponses() {
   mockGet.mockResolvedValue({ data: { data: [], has_more: false } });
 }
 
-/** Mock GET so /v1/agents returns agents and /v1/audit-events returns events. */
+/** Mock GET so /v1/agents returns a configured agent (with connectors) and activity. */
 function mockWithAgents() {
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/agents") {
@@ -30,6 +30,21 @@ function mockWithAgents() {
             },
           ],
           has_more: false,
+        },
+      });
+    }
+    if (url === "/v1/agents/{agent_id}/connectors") {
+      return Promise.resolve({
+        data: {
+          data: [
+            {
+              id: "github",
+              name: "GitHub",
+              actions: ["github.create_issue"],
+              required_credentials: [],
+              enabled_at: "2026-01-01T00:00:00Z",
+            },
+          ],
         },
       });
     }
@@ -49,6 +64,32 @@ function mockWithAgents() {
           has_more: false,
         },
       });
+    }
+    return Promise.resolve({ data: { data: [], has_more: false } });
+  });
+}
+
+/** Mock GET so /v1/agents returns a single registered agent with no connectors. */
+function mockUnconfiguredAgent() {
+  mockGet.mockImplementation((url: string) => {
+    if (url === "/v1/agents") {
+      return Promise.resolve({
+        data: {
+          data: [
+            {
+              agent_id: 1,
+              status: "registered",
+              last_active_at: null,
+              request_count_30d: 0,
+              metadata: { name: "My Agent" },
+            },
+          ],
+          has_more: false,
+        },
+      });
+    }
+    if (url === "/v1/agents/{agent_id}/connectors") {
+      return Promise.resolve({ data: { data: [] } });
     }
     return Promise.resolve({ data: { data: [], has_more: false } });
   });
@@ -122,5 +163,27 @@ describe("Dashboard", () => {
     await waitFor(() => {
       expect(screen.getByText("Add an Agent")).toBeInTheDocument();
     });
+  });
+
+  it("renders config hero when single agent has no connectors", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockUnconfiguredAgent();
+
+    render(<Dashboard />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Your agent is ready.*now give it superpowers/),
+      ).toBeInTheDocument();
+    });
+
+    // Should show the agent card but not the other dashboard cards
+    expect(screen.getByText("Registered Agents")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Configure Your Agent" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Pending Approvals")).not.toBeInTheDocument();
+    expect(screen.queryByText("Recent Activity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Standing Approvals")).not.toBeInTheDocument();
   });
 });

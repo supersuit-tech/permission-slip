@@ -10,7 +10,9 @@ import { RecentActivityCard } from "./RecentActivityCard";
 import { RegisteredAgentsCard } from "./RegisteredAgentsCard";
 import { StandingApprovalsCard } from "./StandingApprovalsCard";
 import { AgentOnboardingHero } from "./AgentOnboardingHero";
+import { AgentConfigHero } from "./AgentConfigHero";
 import { InviteCodeDialog } from "./InviteCodeDialog";
+import { useUnconfiguredAgent } from "@/hooks/useUnconfiguredAgent";
 
 export function Dashboard() {
   useApprovalEvents();
@@ -20,6 +22,8 @@ export function Dashboard() {
     useStandingApprovals();
   const { events, isLoading: eventsLoading } = useAuditEvents();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const { isUnconfigured, agentId: unconfiguredAgentId } =
+    useUnconfiguredAgent(agents, isLoading);
 
   const showOnboarding = !isLoading && !error && agents.length === 0;
   const hasActiveAgents = agents.some((a) => a.status === "registered");
@@ -35,8 +39,8 @@ export function Dashboard() {
   const showStandingApprovals =
     standingLoading || standingApprovals.length > 0 || hasActivity;
 
-  // Only prompt for notifications after the user has an active agent
-  const showNotificationBanner = hasActiveAgents;
+  // Only prompt for notifications after the user has an active, configured agent
+  const showNotificationBanner = hasActiveAgents && !isUnconfigured;
 
   return (
     <div className="space-y-6">
@@ -50,6 +54,11 @@ export function Dashboard() {
             open={inviteDialogOpen}
             onOpenChange={setInviteDialogOpen}
           />
+        </>
+      ) : isUnconfigured ? (
+        <>
+          <AgentConfigHero agentId={unconfiguredAgentId} />
+          <RegisteredAgentsCard />
         </>
       ) : (
         <>
