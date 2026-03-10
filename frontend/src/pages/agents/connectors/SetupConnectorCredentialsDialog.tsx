@@ -232,6 +232,7 @@ export function SetupConnectorCredentialsDialog({
             }
           }}
           credential={addCredentialTarget}
+          onSuccess={() => onOpenChange(false)}
         />
       )}
     </>

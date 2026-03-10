@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Plus, Plug, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,13 @@ export function AddConnectorDialog({
   const [enablingId, setEnablingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [setupConnector, setSetupConnector] = useState<ConnectorSummary | null>(null);
+
+  // Reset setup state when parent closes the dialog externally
+  useEffect(() => {
+    if (!open) {
+      setSetupConnector(null);
+    }
+  }, [open]);
 
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
   const available = allConnectors.filter((c) => !enabledIds.has(c.id));
