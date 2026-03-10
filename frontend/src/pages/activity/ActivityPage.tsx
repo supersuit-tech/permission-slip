@@ -22,7 +22,7 @@ import type { AuditEventFilters } from "@/hooks/useAuditEvents";
 import { useAgents } from "@/hooks/useAgents";
 import { ActivityFilters } from "./ActivityFilters";
 import { RetentionBanner } from "./RetentionBanner";
-import { ActivityDetailSheet } from "./ActivityDetailSheet";
+import { ActivityDetailSheet, SHEET_CLOSE_DELAY_MS } from "./ActivityDetailSheet";
 
 /** Set of valid outcome values for URL param validation. */
 const VALID_OUTCOMES = new Set(
@@ -212,7 +212,7 @@ export function ActivityPage() {
         open={isSheetOpen}
         onOpenChange={(open) => {
           setIsSheetOpen(open);
-          if (!open) setTimeout(() => setSelectedEvent(null), 300);
+          if (!open) setTimeout(() => setSelectedEvent(null), SHEET_CLOSE_DELAY_MS);
         }}
       />
     </div>

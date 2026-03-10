@@ -27,7 +27,7 @@ import {
   useAuditEvents,
   type AuditEventFilters,
 } from "@/hooks/useAuditEvents";
-import { ActivityDetailSheet } from "@/pages/activity/ActivityDetailSheet";
+import { ActivityDetailSheet, SHEET_CLOSE_DELAY_MS } from "@/pages/activity/ActivityDetailSheet";
 
 function OutcomeFilterTabs({
   value,
@@ -170,7 +170,7 @@ export function RecentActivityCard() {
         open={isSheetOpen}
         onOpenChange={(open) => {
           setIsSheetOpen(open);
-          if (!open) setTimeout(() => setSelectedEvent(null), 300);
+          if (!open) setTimeout(() => setSelectedEvent(null), SHEET_CLOSE_DELAY_MS);
         }}
       />
     </>

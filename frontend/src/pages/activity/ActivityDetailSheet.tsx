@@ -27,6 +27,9 @@ import { ActionPreviewSummary } from "@/components/ActionPreviewSummary";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { RiskBadge } from "@/pages/dashboard/approval-components";
 
+/** Matches Radix Sheet exit animation duration so content stays rendered during close. */
+export const SHEET_CLOSE_DELAY_MS = 300;
+
 interface ActivityDetailSheetProps {
   event: AuditEvent | null;
   open: boolean;
@@ -242,7 +245,8 @@ export function ActivityDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        {event && <div className="space-y-5 px-4 pb-6">
+        {event && (
+          <div className="space-y-5 px-4 pb-6">
           {/* Event header */}
           <div className="flex items-center justify-between gap-3">
             <OutcomeBadge outcome={event.outcome} />
@@ -305,7 +309,8 @@ export function ActivityDetailSheet({
               <p className="text-sm">{getActionSummary(event)}</p>
             </div>
           )}
-        </div>}
+        </div>
+        )}
       </SheetContent>
     </Sheet>
   );
