@@ -16,7 +16,6 @@ CREATE POLICY app_backend_all ON registration_invites FOR ALL TO app_backend USI
 CREATE POLICY app_backend_all ON agents FOR ALL TO app_backend USING (true) WITH CHECK (true);
 CREATE POLICY app_backend_all ON approvals FOR ALL TO app_backend USING (true) WITH CHECK (true);
 CREATE POLICY app_backend_all ON request_ids FOR ALL TO app_backend USING (true) WITH CHECK (true);
-CREATE POLICY app_backend_all ON consumed_tokens FOR ALL TO app_backend USING (true) WITH CHECK (true);
 CREATE POLICY app_backend_all ON credentials FOR ALL TO app_backend USING (true) WITH CHECK (true);
 CREATE POLICY app_backend_all ON agent_connectors FOR ALL TO app_backend USING (true) WITH CHECK (true);
 CREATE POLICY app_backend_all ON action_configurations FOR ALL TO app_backend USING (true) WITH CHECK (true);
@@ -52,7 +51,6 @@ DROP POLICY IF EXISTS app_backend_all ON registration_invites;
 DROP POLICY IF EXISTS app_backend_all ON agents;
 DROP POLICY IF EXISTS app_backend_all ON approvals;
 DROP POLICY IF EXISTS app_backend_all ON request_ids;
-DROP POLICY IF EXISTS app_backend_all ON consumed_tokens;
 DROP POLICY IF EXISTS app_backend_all ON credentials;
 DROP POLICY IF EXISTS app_backend_all ON agent_connectors;
 DROP POLICY IF EXISTS app_backend_all ON action_configurations;
