@@ -70,7 +70,8 @@ export function AgentConnectorsSection({
       await enableConnector({ agentId, connectorId: connector.id });
       toast.success(`${connector.name} enabled`);
       navigate(`/agents/${agentId}/connectors/${connector.id}`);
-    } catch {
+    } catch (err) {
+      console.error(`Failed to enable connector ${connector.id}:`, err);
       toast.error(`Failed to enable ${connector.name}`);
     } finally {
       setEnablingId(null);
