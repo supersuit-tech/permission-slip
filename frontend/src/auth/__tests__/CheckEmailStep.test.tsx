@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AuthError } from "@supabase/supabase-js";
 import { MemoryRouter } from "react-router-dom";
 import { CookieConsentProvider } from "@/components/CookieConsentContext";
@@ -24,6 +24,11 @@ function renderCheckEmailStep(props = defaultProps) {
 }
 
 describe("CheckEmailStep", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    defaultProps.onResend.mockResolvedValue({ error: null });
+  });
+
   it("shows email, sign-in link message, and spam hint", () => {
     renderCheckEmailStep();
     expect(screen.getByText("Check your email")).toBeInTheDocument();
@@ -97,6 +102,37 @@ describe("CheckEmailStep", () => {
       expect(
         screen.getByText("already received a link", { exact: false })
       ).toBeInTheDocument();
+    });
+  });
+
+  it("clears error banner when cooldown expires", async () => {
+    const onResend = vi.fn().mockResolvedValue({
+      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+    });
+    const { rerender } = renderCheckEmailStep({ ...defaultProps, onResend, resendCooldownSeconds: 0 });
+
+    await userEvent.click(screen.getByRole("button", { name: "Resend email" }));
+    await waitFor(() => {
+      expect(screen.getByText("Too many sign-in emails sent.", { exact: false })).toBeInTheDocument();
+    });
+
+    rerender(
+      <MemoryRouter>
+        <CookieConsentProvider>
+          <CheckEmailStep {...defaultProps} onResend={onResend} resendCooldownSeconds={5} />
+        </CookieConsentProvider>
+      </MemoryRouter>
+    );
+    rerender(
+      <MemoryRouter>
+        <CookieConsentProvider>
+          <CheckEmailStep {...defaultProps} onResend={onResend} resendCooldownSeconds={0} />
+        </CookieConsentProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
   });
 

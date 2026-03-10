@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
 import type { AuthError } from "@supabase/supabase-js";
-import { safeErrorMessage } from "./errors";
+import { useResend } from "./useResend";
 import AuthLayout from "./AuthLayout";
+import { ResendButton } from "./ResendButton";
 import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -18,39 +18,12 @@ export default function CheckEmailStep({
   onResend,
   resendCooldownSeconds,
 }: CheckEmailStepProps) {
-  const [resendError, setResendError] = useState<string | null>(null);
-  const [resendSuccess, setResendSuccess] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-
-  useEffect(() => {
-    if (resendCooldownSeconds === 0) {
-      setResendSuccess(false);
-      setResendError(null);
-    }
-  }, [resendCooldownSeconds]);
-
-  const handleResend = async () => {
-    setResendError(null);
-    setResendSuccess(false);
-    setIsResending(true);
-    try {
-      const { error } = await onResend();
-      if (error) {
-        setResendError(
-          safeErrorMessage(error, {
-            over_email_send_rate_limit:
-              "Too many sign-in emails sent. If you already received a link, you can still use it — otherwise wait a few minutes and try again.",
-          })
-        );
-      } else {
-        setResendSuccess(true);
-      }
-    } catch {
-      setResendError("Something went wrong. Please try again.");
-    } finally {
-      setIsResending(false);
-    }
-  };
+  const resend = useResend({
+    onResend,
+    cooldownSeconds: resendCooldownSeconds,
+    rateLimitMessage:
+      "Too many sign-in emails sent. If you already received a link, you can still use it — otherwise wait a few minutes and try again.",
+  });
 
   return (
     <AuthLayout>
@@ -74,39 +47,15 @@ export default function CheckEmailStep({
           Back
         </Button>
       </div>
-      <div className="mt-3 flex flex-col items-start gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleResend}
-          disabled={resendCooldownSeconds > 0 || isResending}
-          aria-label={
-            resendCooldownSeconds > 0
-              ? `Resend email in ${resendCooldownSeconds}s (on cooldown)`
-              : isResending
-                ? "Resending…"
-                : "Resend email"
-          }
-          className="opacity-70"
-        >
-          {resendCooldownSeconds > 0 ? (
-            <>
-              Resend in <span aria-hidden="true">{resendCooldownSeconds}s</span>
-            </>
-          ) : isResending ? (
-            "Resending…"
-          ) : (
-            "Resend email"
-          )}
-        </Button>
-        {resendError && (
-          <p role="alert" className="text-xs text-destructive">{resendError}</p>
-        )}
-        {resendSuccess && (
-          <p role="status" className="text-xs text-muted-foreground">Email resent.</p>
-        )}
-      </div>
+      <ResendButton
+        cooldownSeconds={resendCooldownSeconds}
+        isResending={resend.isResending}
+        error={resend.error}
+        success={resend.success}
+        onResend={resend.handleResend}
+        label="Resend email"
+        successMessage="Email resent."
+      />
     </AuthLayout>
   );
 }

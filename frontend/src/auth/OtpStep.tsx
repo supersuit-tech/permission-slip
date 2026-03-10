@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
-import { safeErrorMessage } from "./errors";
+import { useResend } from "./useResend";
 import AuthLayout from "./AuthLayout";
+import { ResendButton } from "./ResendButton";
 import DevOnly from "../components/DevOnly";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
@@ -25,41 +26,12 @@ export default function OtpStep({
 }: OtpStepProps) {
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
-  const [resendError, setResendError] = useState<string | null>(null);
-  const [resendSuccess, setResendSuccess] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-
-  // Clear the success banner when the cooldown expires so it doesn't
-  // linger indefinitely alongside an active "Resend code" button.
-  useEffect(() => {
-    if (resendCooldownSeconds === 0) {
-      setResendSuccess(false);
-      setResendError(null);
-    }
-  }, [resendCooldownSeconds]);
-
-  const handleResend = async () => {
-    setResendError(null);
-    setResendSuccess(false);
-    setIsResending(true);
-    try {
-      const { error: resendResultError } = await onResend();
-      if (resendResultError) {
-        setResendError(
-          safeErrorMessage(resendResultError, {
-            over_email_send_rate_limit:
-              "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again.",
-          })
-        );
-      } else {
-        setResendSuccess(true);
-      }
-    } catch {
-      setResendError("Something went wrong. Please try again.");
-    } finally {
-      setIsResending(false);
-    }
-  };
+  const resend = useResend({
+    onResend,
+    cooldownSeconds: resendCooldownSeconds,
+    rateLimitMessage:
+      "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again.",
+  });
 
   const handleAutoFill = async () => {
     // Dynamic import keeps dev-only Mailpit code out of the production bundle
@@ -101,39 +73,15 @@ export default function OtpStep({
           </Button>
         </div>
       </form>
-      <div className="mt-3 flex flex-col items-start gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleResend}
-          disabled={resendCooldownSeconds > 0 || isResending}
-          aria-label={
-            resendCooldownSeconds > 0
-              ? `Resend code in ${resendCooldownSeconds}s (on cooldown)`
-              : isResending
-                ? "Resending…"
-                : "Resend code"
-          }
-          className="opacity-70"
-        >
-          {resendCooldownSeconds > 0 ? (
-            <>
-              Resend in <span aria-hidden="true">{resendCooldownSeconds}s</span>
-            </>
-          ) : isResending ? (
-            "Resending…"
-          ) : (
-            "Resend code"
-          )}
-        </Button>
-        {resendError && (
-          <p role="alert" className="text-xs text-destructive">{resendError}</p>
-        )}
-        {resendSuccess && (
-          <p role="status" className="text-xs text-muted-foreground">Code resent.</p>
-        )}
-      </div>
+      <ResendButton
+        cooldownSeconds={resendCooldownSeconds}
+        isResending={resend.isResending}
+        error={resend.error}
+        success={resend.success}
+        onResend={resend.handleResend}
+        label="Resend code"
+        successMessage="Code resent."
+      />
       <DevOnly>
         <Button
           type="button"
