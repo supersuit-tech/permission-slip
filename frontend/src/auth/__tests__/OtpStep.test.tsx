@@ -14,6 +14,8 @@ const defaultProps = {
   email: "test@example.com",
   onVerify: vi.fn().mockResolvedValue({ error: null }),
   onBack: vi.fn(),
+  onResend: vi.fn().mockResolvedValue({ error: null }),
+  resendCooldownSeconds: 0,
 };
 
 function renderOtpStep(props = defaultProps) {
@@ -71,5 +73,86 @@ describe("OtpStep", () => {
     await userEvent.click(screen.getByText("Back"));
 
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("shows resend button when cooldown is 0", () => {
+    renderOtpStep({ ...defaultProps, resendCooldownSeconds: 0 });
+    const btn = screen.getByRole("button", { name: "Resend code" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).not.toBeDisabled();
+  });
+
+  it("disables resend button and shows countdown during cooldown", () => {
+    renderOtpStep({ ...defaultProps, resendCooldownSeconds: 42 });
+    const btn = screen.getByRole("button", { name: "Resend code in 42s (on cooldown)" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveTextContent("42s");
+  });
+
+  it("calls onResend when resend button is clicked", async () => {
+    const onResend = vi.fn().mockResolvedValue({ error: null });
+    renderOtpStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByRole("button", { name: "Resend code" }));
+
+    expect(onResend).toHaveBeenCalled();
+  });
+
+  it("shows success message after resend", async () => {
+    const onResend = vi.fn().mockResolvedValue({ error: null });
+    renderOtpStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByRole("button", { name: "Resend code" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Code resent.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows safe error message when resend fails", async () => {
+    const onResend = vi.fn().mockResolvedValue({
+      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+    });
+    renderOtpStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByRole("button", { name: "Resend code" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Too many login emails sent.", { exact: false })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("clears success banner when cooldown expires", async () => {
+    const onResend = vi.fn().mockResolvedValue({ error: null });
+    const { rerender } = renderOtpStep({ ...defaultProps, onResend, resendCooldownSeconds: 0 });
+
+    // Click resend — success message appears
+    await userEvent.click(screen.getByRole("button", { name: "Resend code" }));
+    await waitFor(() => {
+      expect(screen.getByText("Code resent.")).toBeInTheDocument();
+    });
+
+    // Simulate cooldown starting then expiring back to 0
+    rerender(
+      <MemoryRouter>
+        <CookieConsentProvider>
+          <OtpStep {...defaultProps} onResend={onResend} resendCooldownSeconds={5} />
+        </CookieConsentProvider>
+      </MemoryRouter>
+    );
+    rerender(
+      <MemoryRouter>
+        <CookieConsentProvider>
+          <OtpStep {...defaultProps} onResend={onResend} resendCooldownSeconds={0} />
+        </CookieConsentProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Code resent.")).not.toBeInTheDocument();
+    });
   });
 });
