@@ -349,9 +349,11 @@ function OAuthSetupContent({
       {needsShopDomain && (
         <div className="flex w-full max-w-xs items-center gap-2">
           <Input
+            id="shop-subdomain"
             placeholder="mystore"
             value={shopSubdomain}
             onChange={(e) => onShopSubdomainChange(e.target.value)}
+            aria-label="Shopify store subdomain"
           />
           <span className="text-muted-foreground whitespace-nowrap text-sm">
             .myshopify.com
