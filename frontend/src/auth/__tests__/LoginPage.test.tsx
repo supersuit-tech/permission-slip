@@ -117,7 +117,7 @@ describe("LoginPage", () => {
       await userEvent.click(screen.getByText("Continue"));
 
       await waitFor(() => {
-        expect(screen.getByText(/sign-in link/)).toBeInTheDocument();
+        expect(screen.getByText("Check your email")).toBeInTheDocument();
       });
       expect(screen.getByText("test@example.com")).toBeInTheDocument();
       expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
@@ -135,7 +135,7 @@ describe("LoginPage", () => {
       await userEvent.click(screen.getByText("Continue"));
 
       await waitFor(() => {
-        expect(screen.getByText(/sign-in link/)).toBeInTheDocument();
+        expect(screen.getByText("Check your email")).toBeInTheDocument();
       });
 
       await userEvent.click(screen.getByText("Back"));

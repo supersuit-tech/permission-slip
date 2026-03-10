@@ -24,10 +24,12 @@ function renderCheckEmailStep(props = defaultProps) {
 }
 
 describe("CheckEmailStep", () => {
-  it("shows email and sign-in link message", () => {
+  it("shows email, sign-in link message, and spam hint", () => {
     renderCheckEmailStep();
+    expect(screen.getByText("Check your email")).toBeInTheDocument();
     expect(screen.getByText("test@example.com")).toBeInTheDocument();
     expect(screen.getByText(/sign-in link/)).toBeInTheDocument();
+    expect(screen.getByText(/spam folder/)).toBeInTheDocument();
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
 
@@ -80,7 +82,7 @@ describe("CheckEmailStep", () => {
     });
   });
 
-  it("shows error message when resend fails", async () => {
+  it("shows context-specific error when rate-limited", async () => {
     const onResend = vi.fn().mockResolvedValue({
       error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
     });
@@ -90,7 +92,10 @@ describe("CheckEmailStep", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Too many login emails sent.", { exact: false })
+        screen.getByText("Too many sign-in emails sent.", { exact: false })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("already received a link", { exact: false })
       ).toBeInTheDocument();
     });
   });
