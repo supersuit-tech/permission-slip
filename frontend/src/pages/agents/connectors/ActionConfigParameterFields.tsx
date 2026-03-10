@@ -1,8 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Asterisk, Lock, Regex } from "lucide-react";
+import { Asterisk, ChevronDown, Lock, Regex } from "lucide-react";
 import type { ParamMode } from "./ActionConfigFormFields";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 
@@ -15,6 +22,11 @@ interface ActionConfigParameterFieldsProps {
   disabled?: boolean;
 }
 
+/**
+ * Renders parameter fields for action configuration, with a constraint mode
+ * dropdown (Fixed/Pattern/Wildcard) per parameter. Used in both the Add and
+ * Edit action configuration dialogs.
+ */
 export function ActionConfigParameterFields({
   parametersSchema,
   values,
@@ -93,17 +105,19 @@ export function ActionConfigParameterFields({
                 disabled={disabled || mode === "wildcard"}
                 className={mode === "wildcard" ? "bg-muted" : ""}
               />
-              <ConstraintModeButton
+              <ConstraintModeDropdown
                 mode={mode}
                 disabled={disabled}
                 onChange={(nextMode) => {
+                  const prevMode = mode;
                   onModeChange(key, nextMode);
                   if (nextMode === "wildcard") {
                     onValueChange(key, "*");
-                  } else {
-                    // Fixed or Pattern — clear the value so the user can type
+                  } else if (prevMode === "wildcard") {
+                    // Coming from wildcard — clear the "*" sentinel
                     onValueChange(key, "");
                   }
+                  // Switching between fixed ↔ pattern preserves the typed value
                 }}
               />
             </div>
@@ -131,8 +145,35 @@ function inferModeFromValue(value: string): ParamMode {
   return "fixed";
 }
 
-/** Cycles through Fixed → Pattern → Wildcard. */
-function ConstraintModeButton({
+const modeConfig: Record<
+  ParamMode,
+  { icon: React.ReactNode; label: string; description: string }
+> = {
+  fixed: {
+    icon: <Lock className="size-3" />,
+    label: "Fixed",
+    description: "Exact value",
+  },
+  pattern: {
+    icon: <Regex className="size-3" />,
+    label: "Pattern",
+    description: "Glob matching with *",
+  },
+  wildcard: {
+    icon: <Asterisk className="size-3" />,
+    label: "Wildcard",
+    description: "Agent chooses freely",
+  },
+};
+
+const allModes: ParamMode[] = ["fixed", "pattern", "wildcard"];
+
+function isParamMode(value: string): value is ParamMode {
+  return allModes.includes(value as ParamMode);
+}
+
+/** Dropdown selector for constraint mode (Fixed/Pattern/Wildcard) with radio semantics. */
+function ConstraintModeDropdown({
   mode,
   disabled,
   onChange,
@@ -141,51 +182,46 @@ function ConstraintModeButton({
   disabled?: boolean;
   onChange: (next: ParamMode) => void;
 }) {
-  function handleClick() {
-    if (mode === "fixed") onChange("pattern");
-    else if (mode === "pattern") onChange("wildcard");
-    else onChange("fixed");
-  }
-
-  const config: Record<
-    ParamMode,
-    { icon: React.ReactNode; label: string; title: string; variant: "default" | "outline" | "secondary" }
-  > = {
-    fixed: {
-      icon: <Regex className="size-3" />,
-      label: "Pattern",
-      title: "Switch to pattern mode (glob matching with *)",
-      variant: "outline",
-    },
-    pattern: {
-      icon: <Asterisk className="size-3" />,
-      label: "Wildcard",
-      title: "Switch to wildcard mode (agent chooses any value)",
-      variant: "secondary",
-    },
-    wildcard: {
-      icon: <Lock className="size-3" />,
-      label: "Fixed",
-      title: "Switch to fixed mode (exact value)",
-      variant: "default",
-    },
-  };
-
-  const { icon, label, title, variant } = config[mode];
+  const current = modeConfig[mode];
 
   return (
-    <Button
-      type="button"
-      variant={variant}
-      size="sm"
-      onClick={handleClick}
-      disabled={disabled}
-      title={title}
-      className="shrink-0"
-    >
-      {icon}
-      {label}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          title={current.description}
+          className="shrink-0 gap-1.5"
+        >
+          {current.icon}
+          {current.label}
+          <ChevronDown className="size-3 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuRadioGroup
+          value={mode}
+          onValueChange={(v) => {
+            if (v !== mode && isParamMode(v)) onChange(v);
+          }}
+        >
+          {allModes.map((m) => {
+            const cfg = modeConfig[m];
+            return (
+              <DropdownMenuRadioItem key={m} value={m}>
+                {cfg.icon}
+                <span className="font-medium">{cfg.label}</span>
+                <span className="text-muted-foreground text-xs">
+                  {cfg.description}
+                </span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
