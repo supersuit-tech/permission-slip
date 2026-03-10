@@ -1,11 +1,13 @@
 import { useState } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   KeyRound,
   Loader2,
   LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +47,7 @@ export function SetupConnectorCredentialsDialog({
   const { connector, isLoading: detailLoading } =
     useConnectorDetail(connectorId);
   const { providers, isLoading: providersLoading } = useOAuthProviders();
-  const { connections } = useOAuthConnections();
+  const { connections, isLoading: connectionsLoading } = useOAuthConnections();
 
   const [shopSubdomain, setShopSubdomain] = useState("");
   const [addCredentialOpen, setAddCredentialOpen] =
@@ -53,7 +55,7 @@ export function SetupConnectorCredentialsDialog({
   const [addCredentialTarget, setAddCredentialTarget] =
     useState<RequiredCredential | null>(null);
 
-  const isLoading = detailLoading || providersLoading;
+  const isLoading = detailLoading || providersLoading || connectionsLoading;
   const requiredCredentials = connector?.required_credentials ?? [];
 
   // Find OAuth credential requirement
@@ -78,6 +80,7 @@ export function SetupConnectorCredentialsDialog({
     ? connections.find((c) => c.provider === effectiveOAuthProvider)
     : null;
   const isAlreadyConnected = existingConnection?.status === "active";
+  const needsReauth = existingConnection?.status === "needs_reauth";
 
   // Find static (API key / basic) credential requirements
   const staticCredentials = requiredCredentials.filter(
@@ -153,6 +156,11 @@ export function SetupConnectorCredentialsDialog({
               providerName={providerLabel(effectiveOAuthProvider ?? connectorId)}
               onClose={() => onOpenChange(false)}
             />
+          ) : needsReauth && hasOAuth ? (
+            <NeedsReauthContent
+              providerName={providerLabel(effectiveOAuthProvider ?? connectorId)}
+              onReauthorize={handleOAuthConnect}
+            />
           ) : hasOAuth && hasOAuthCredentials ? (
             <OAuthSetupContent
               providerName={providerLabel(
@@ -177,7 +185,7 @@ export function SetupConnectorCredentialsDialog({
             !hasNoCredentials &&
             !isAlreadyConnected &&
             staticCredentials.length > 0 &&
-            !hasOAuth && (
+            (!hasOAuth || !hasOAuthCredentials) && (
               <StaticOnlyContent
                 credentials={staticCredentials}
                 onConnect={handleUseApiKey}
@@ -188,6 +196,7 @@ export function SetupConnectorCredentialsDialog({
             <div>
               {!isLoading &&
                 hasOAuth &&
+                hasOAuthCredentials &&
                 !isAlreadyConnected &&
                 staticCredentials.length > 0 && (
                   <Button
@@ -204,7 +213,9 @@ export function SetupConnectorCredentialsDialog({
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               {hasNoCredentials || isAlreadyConnected
                 ? "Done"
-                : "Set up later"}
+                : needsReauth
+                  ? "Skip for now"
+                  : "Set up later"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -268,6 +279,31 @@ function AlreadyConnectedContent({
   );
 }
 
+function NeedsReauthContent({
+  providerName,
+  onReauthorize,
+}: {
+  providerName: string;
+  onReauthorize: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-8 text-center">
+      <AlertTriangle className="size-10 text-amber-500" />
+      <p className="text-sm font-medium">
+        {providerName} connection expired
+      </p>
+      <p className="text-muted-foreground max-w-xs text-sm">
+        Your {providerName} connection has expired or was revoked.
+        Re-authorize to restore access.
+      </p>
+      <Button className="mt-2" onClick={onReauthorize}>
+        <LogIn className="size-4" />
+        Re-authorize {providerName}
+      </Button>
+    </div>
+  );
+}
+
 function OAuthSetupContent({
   providerName,
   scopes,
@@ -292,8 +328,7 @@ function OAuthSetupContent({
 
       {needsShopDomain && (
         <div className="flex w-full max-w-xs items-center gap-2">
-          <input
-            className="border-input bg-background placeholder:text-muted-foreground flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm"
+          <Input
             placeholder="mystore"
             value={shopSubdomain}
             onChange={(e) => onShopSubdomainChange(e.target.value)}

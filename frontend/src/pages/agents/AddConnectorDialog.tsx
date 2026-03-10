@@ -130,7 +130,7 @@ export function AddConnectorDialog({
 
     {setupConnector && (
       <SetupConnectorCredentialsDialog
-        open={!!setupConnector}
+        open
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             setSetupConnector(null);
