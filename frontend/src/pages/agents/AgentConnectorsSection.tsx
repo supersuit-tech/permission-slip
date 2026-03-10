@@ -24,6 +24,11 @@ interface AgentConnectorsSectionProps {
   error: string | null;
 }
 
+/**
+ * Searchable grid of all available connectors for an agent.
+ * Enabled connectors show an "Enabled" badge and navigate directly to config.
+ * Non-enabled connectors are auto-enabled on click before navigating.
+ */
 export function AgentConnectorsSection({
   agentId,
   connectors: enabledConnectors,
