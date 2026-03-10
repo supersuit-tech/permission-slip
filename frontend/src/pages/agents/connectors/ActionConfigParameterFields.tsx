@@ -104,13 +104,15 @@ export function ActionConfigParameterFields({
                 mode={mode}
                 disabled={disabled}
                 onChange={(nextMode) => {
+                  const prevMode = mode;
                   onModeChange(key, nextMode);
                   if (nextMode === "wildcard") {
                     onValueChange(key, "*");
-                  } else {
-                    // Fixed or Pattern — clear the value so the user can type
+                  } else if (prevMode === "wildcard") {
+                    // Coming from wildcard — clear the "*" sentinel
                     onValueChange(key, "");
                   }
+                  // Switching between fixed ↔ pattern preserves the typed value
                 }}
               />
             </div>
@@ -180,6 +182,7 @@ function ConstraintModeDropdown({
           variant="outline"
           size="sm"
           disabled={disabled}
+          title={current.description}
           className="shrink-0 gap-1.5"
         >
           {current.icon}
