@@ -208,7 +208,7 @@ describe("ActionConfigurationsSection", () => {
     // title is the second param field (repo=0, title=1, body=2).
     await user.click(fixedButtons[1]!);
     // Select "Wildcard" from the dropdown menu.
-    await user.click(screen.getByRole("menuitem", { name: /Wildcard/ }));
+    await user.click(screen.getByRole("menuitemradio", { name: /Wildcard/ }));
 
     await user.click(screen.getByText("Create Configuration"));
 

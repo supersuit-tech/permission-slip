@@ -4,7 +4,8 @@ import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -187,26 +188,25 @@ function ConstraintModeDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {allModes.map((m) => {
-          const cfg = modeConfig[m];
-          return (
-            <DropdownMenuItem
-              key={m}
-              onClick={() => onChange(m)}
-              className={m === mode ? "bg-accent" : ""}
-            >
-              <span className="flex items-center gap-2">
+        <DropdownMenuRadioGroup
+          value={mode}
+          onValueChange={(v) => {
+            if (v !== mode) onChange(v as ParamMode);
+          }}
+        >
+          {allModes.map((m) => {
+            const cfg = modeConfig[m];
+            return (
+              <DropdownMenuRadioItem key={m} value={m}>
                 {cfg.icon}
-                <span>
-                  <span className="font-medium">{cfg.label}</span>
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    {cfg.description}
-                  </span>
+                <span className="font-medium">{cfg.label}</span>
+                <span className="text-muted-foreground text-xs">
+                  {cfg.description}
                 </span>
-              </span>
-            </DropdownMenuItem>
-          );
-        })}
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
