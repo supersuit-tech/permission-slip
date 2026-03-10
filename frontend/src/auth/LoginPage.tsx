@@ -34,7 +34,7 @@ export default function LoginPage() {
 
   if (step === "otp") {
     return (
-      <Suspense fallback={<AuthLayout />}>
+      <Suspense fallback={<AuthLayout>{null}</AuthLayout>}>
         <OtpStep
           email={email}
           onVerify={(code) => verifyOtp(email, code)}
