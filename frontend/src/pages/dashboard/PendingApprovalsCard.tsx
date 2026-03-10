@@ -84,8 +84,8 @@ function EmptyState() {
         No pending requests
       </p>
       <p className="text-muted-foreground max-w-xs text-xs">
-        Your agents are quiet. New approval requests will appear here
-        automatically.
+        When an agent needs permission to perform an action, it will appear here
+        for your review. Requests expire if not reviewed in time.
       </p>
     </div>
   );

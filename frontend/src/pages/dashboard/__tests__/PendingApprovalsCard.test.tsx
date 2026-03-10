@@ -319,7 +319,7 @@ describe("PendingApprovalsCard", () => {
       expect(screen.getByText("No pending requests")).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/Your agents are quiet/),
+      screen.getByText(/When an agent needs permission/),
     ).toBeInTheDocument();
   });
 

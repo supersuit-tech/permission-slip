@@ -110,8 +110,8 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
         No standing approvals yet
       </p>
       <p className="text-muted-foreground mb-4 max-w-xs text-xs">
-        Create a standing approval to pre-authorize an agent for repeated
-        actions without per-request approval.
+        Tired of approving the same action? Create a standing approval to
+        let an agent repeat it automatically — with limits you control.
       </p>
       <Button size="sm" onClick={onCreate}>
         Create Standing Approval
