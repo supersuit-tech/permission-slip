@@ -5,6 +5,9 @@
 
 export { providerLabel } from "@/lib/labels";
 
+/** Providers that require a shop subdomain for per-shop OAuth URLs. */
+export const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
+
 /**
  * Builds the URL to initiate an OAuth authorization flow for a provider.
  * The backend redirects from this URL to the provider's consent screen.

@@ -21,12 +21,13 @@ import { useAuth } from "@/auth/AuthContext";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
-import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
+import {
+  providerLabel,
+  getOAuthAuthorizeUrl,
+  SHOP_REQUIRED_PROVIDERS,
+} from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { AddCredentialDialog } from "./AddCredentialDialog";
-
-/** Providers that require a shop subdomain for per-shop OAuth URLs. */
-const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
 
 interface SetupConnectorCredentialsDialogProps {
   open: boolean;
