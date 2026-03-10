@@ -75,7 +75,6 @@ describe("UserMenu", () => {
     await userEvent.click(screen.getByLabelText("User menu"));
     expect(screen.getByText("Profile")).toBeInTheDocument();
     expect(screen.getByText("Security")).toBeInTheDocument();
-    expect(screen.getByText("Integrations")).toBeInTheDocument();
     expect(screen.getByText("Billing")).toBeInTheDocument();
     expect(screen.getByText("Dark Mode")).toBeInTheDocument();
     expect(screen.getByText("Sign Out")).toBeInTheDocument();

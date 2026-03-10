@@ -1,22 +1,49 @@
-import { Routes, Route, Navigate, useSearchParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useSearchParams, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { providerLabel } from "@/lib/oauth";
 import { SettingsNav } from "./SettingsNav";
 import { ProfilePage } from "./ProfilePage";
 import { SecurityPage } from "./SecurityPage";
-import { IntegrationsPage } from "./IntegrationsPage";
 import { BillingSettingsPage } from "./BillingSettingsPage";
 import { AccountPage } from "./AccountPage";
 
 /**
- * If the user lands on /settings with an oauth_status query param (from an
- * OAuth callback), redirect them to the integrations sub-page so the
- * ConnectedAccountsSection can pick it up.
+ * Handles the OAuth callback redirect from the backend. The backend sends
+ * users to /settings?oauth_status=success&oauth_provider=github after OAuth
+ * completes. This component shows a toast and redirects to /settings/profile.
  */
 function SettingsIndex() {
   const [searchParams] = useSearchParams();
-  if (searchParams.get("oauth_status")) {
-    return <Navigate to={`/settings/integrations?${searchParams.toString()}`} replace />;
-  }
-  return <Navigate to="/settings/profile" replace />;
+  const navigate = useNavigate();
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+
+    const oauthStatus = searchParams.get("oauth_status");
+    const oauthProvider = searchParams.get("oauth_provider");
+    if (oauthStatus) {
+      if (oauthStatus === "success") {
+        toast.success(
+          `Successfully connected ${oauthProvider ? providerLabel(oauthProvider) : "account"}.`,
+        );
+      } else {
+        const oauthError = searchParams.get("oauth_error");
+        const label = oauthProvider
+          ? providerLabel(oauthProvider)
+          : "account";
+        const detail = oauthError
+          ? `Failed to connect ${label}: ${oauthError}`
+          : `Failed to connect ${label}. Please try again.`;
+        toast.error(detail);
+      }
+    }
+    navigate("/settings/profile", { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
+
+  return null;
 }
 
 export function SettingsLayout() {
@@ -31,7 +58,6 @@ export function SettingsLayout() {
             <Route index element={<SettingsIndex />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="security" element={<SecurityPage />} />
-            <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="billing" element={<BillingSettingsPage />} />
             <Route path="account" element={<AccountPage />} />
             <Route path="*" element={<Navigate to="/settings/profile" replace />} />

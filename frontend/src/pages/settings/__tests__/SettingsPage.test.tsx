@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { Route, Routes, MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks, mockMfa } from "../../../auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
@@ -10,6 +11,7 @@ import { SettingsLayout } from "../SettingsLayout";
 
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
+vi.mock("sonner");
 
 const mockProfile = {
   id: "user-123",
@@ -102,7 +104,6 @@ describe("SettingsLayout", () => {
     // Each nav item renders twice (desktop sidebar + mobile tabs)
     expect(screen.getAllByRole("link", { name: /Profile/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Security/ }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByRole("link", { name: /Integrations/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Billing/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Account/ }).length).toBeGreaterThanOrEqual(1);
   });
@@ -129,14 +130,38 @@ describe("SettingsLayout", () => {
     });
   });
 
-  it("renders integrations sections on /settings/integrations", async () => {
+  it("redirects /settings/integrations to /settings/profile", async () => {
     mockApiFetch();
     renderSettingsAt("/settings/integrations");
 
     await waitFor(() => {
-      expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
+      // Should redirect to profile page since integrations was removed
+      expect(screen.getAllByText("Account").length).toBeGreaterThanOrEqual(2);
     });
-    expect(screen.getByText("Credential Vault")).toBeInTheDocument();
+  });
+
+  it("shows success toast on OAuth callback redirect", async () => {
+    mockApiFetch();
+    renderSettingsAt("/settings?oauth_status=success&oauth_provider=github");
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        "Successfully connected GitHub.",
+      );
+    });
+  });
+
+  it("shows error toast on failed OAuth callback", async () => {
+    mockApiFetch();
+    renderSettingsAt(
+      "/settings?oauth_status=error&oauth_provider=google&oauth_error=access_denied",
+    );
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "Failed to connect Google: access_denied",
+      );
+    });
   });
 
   it("renders danger zone on /settings/account", async () => {

@@ -695,21 +695,19 @@ The X connector requires these scopes:
 
 ### 3. Configure in Permission Slip
 
-1. In Permission Slip, go to **Settings > OAuth App Credentials**
-2. Click **Configure** next to the X provider
-3. Enter your **Client ID** and **Client Secret** from the X Developer Portal
-4. Connect your X account via **Settings > Connected Accounts**
+1. In Permission Slip, go to an agent's configuration page and click the X connector card
+2. On the connector's configuration page, enter your **Client ID** and **Client Secret** from the X Developer Portal
+3. Connect your X account via the credential configuration section
 
 ## Self-Hosted BYOA Setup
 
-For self-hosted deployments without platform-level OAuth credentials, users configure their own OAuth apps through the Settings UI:
+For self-hosted deployments without platform-level OAuth credentials, users configure their own OAuth apps through the connector configuration UI:
 
 1. Follow the Google or Microsoft setup steps above to create an OAuth app
-2. In Permission Slip, go to **Settings > OAuth App Credentials**
-3. Click **Configure** next to the provider
-4. Enter your Client ID and Client Secret
-5. The credentials are encrypted and stored in the vault
-6. You can now connect your account via **Settings > Connected Accounts**
+2. In Permission Slip, navigate to an agent's configuration page and click the relevant connector card
+3. On the connector's configuration page, enter your Client ID and Client Secret
+4. The credentials are encrypted and stored in the vault
+5. You can now connect your account via the credential configuration section
 
 ## External Connector OAuth
 
@@ -747,11 +745,11 @@ For more details on creating external connectors, see [Creating Connectors](crea
 
 The OAuth provider doesn't have client credentials. Either:
 - Set the platform-level environment variables (`GOOGLE_CLIENT_ID`, etc.)
-- Configure BYOA credentials in Settings > OAuth App Credentials
+- Configure BYOA credentials via the connector configuration page on an agent
 
 ### "Needs Re-auth" status
 
-The refresh token has expired or been revoked. Click **Re-authorize** in Settings > Connected Accounts to re-establish the connection.
+The refresh token has expired or been revoked. Click **Re-authorize** on the connector's credential configuration page to re-establish the connection.
 
 ### Redirect URI mismatch
 
