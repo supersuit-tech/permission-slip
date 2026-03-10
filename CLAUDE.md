@@ -12,7 +12,17 @@
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
-- **Train the reviewer:** When you address a PR review comment, react to it (👍 if you agree and fixed it, 👎 if you disagree and explain why) and leave a threaded reply explaining what you changed and why. This builds context over time and helps the reviewer calibrate their feedback.
+- **Train the reviewer:** When you address a PR review comment, you MUST react to it AND leave a threaded reply. Do both of these for EVERY review comment you respond to:
+  1. **React** with 👍 (agree/fixed) or 👎 (disagree/won't fix) using the GitHub API:
+     ```bash
+     # Get the comment ID from the review comment URL or API response
+     # React with thumbs up (agreed and fixed):
+     GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api repos/supersuit-tech/permission-slip/pulls/comments/{comment_id}/reactions -f content="+1"
+     # React with thumbs down (disagree, explain why):
+     GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api repos/supersuit-tech/permission-slip/pulls/comments/{comment_id}/reactions -f content="-1"
+     ```
+  2. **Reply** in the thread explaining what you changed and why (or why you disagree).
+  This builds context over time and helps the reviewer calibrate their feedback.
 - If a file is getting large enough that splitting it would improve maintainability, just go ahead and split it — don't ask first.
 - When you need to ask questions, just ask them in regular chat text. Do NOT use the AskUserQuestion tool — it doesn't work reliably.
 

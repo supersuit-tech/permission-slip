@@ -17,7 +17,7 @@ describe("safeErrorMessage", () => {
       "over_email_send_rate_limit"
     );
     expect(safeErrorMessage(error)).toBe(
-      "Too many requests. Please wait a moment and try again."
+      "Too many login emails sent. Please wait a few minutes and try again."
     );
   });
 

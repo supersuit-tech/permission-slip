@@ -3,8 +3,8 @@ import { Dashboard } from "./pages/dashboard/Dashboard";
 import { AgentConfigPage } from "./pages/agents/AgentConfigPage";
 import { ConnectorConfigPage } from "./pages/agents/connectors/ConnectorConfigPage";
 import { ActivityPage } from "./pages/activity/ActivityPage";
-import { SettingsPage } from "./pages/settings/SettingsPage";
-import { BillingPage } from "./pages/billing/BillingPage";
+import { SettingsLayout } from "./pages/settings/SettingsLayout";
+import { BillingRedirect } from "./pages/billing/BillingRedirect";
 
 export interface RouteConfig {
   path: string;
@@ -23,6 +23,6 @@ export const appRoutes: RouteConfig[] = [
   { path: "/agents/:agentId", Component: AgentConfigPage },
   { path: "/agents/:agentId/connectors/:connectorId", Component: ConnectorConfigPage },
   { path: "/activity", Component: ActivityPage },
-  { path: "/settings", Component: SettingsPage },
-  { path: "/billing", Component: BillingPage },
+  { path: "/settings/*", Component: SettingsLayout },
+  { path: "/billing", Component: BillingRedirect },
 ];

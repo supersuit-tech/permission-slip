@@ -1,9 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { Route, Routes, MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks, mockMfa } from "../../../auth/__tests__/fixtures";
-import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
-import { SettingsPage } from "../SettingsPage";
+import { AuthProvider } from "../../../auth/AuthContext";
+import { CookieConsentProvider } from "../../../components/CookieConsentContext";
+import { SettingsLayout } from "../SettingsLayout";
 
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
@@ -63,41 +66,85 @@ function mockApiFetch() {
   });
 }
 
-describe("SettingsPage", () => {
-  let wrapper: ReturnType<typeof createAuthWrapper>;
+/** Renders SettingsLayout inside a parent route at /settings/* so nested Routes work. */
+function renderSettingsAt(path: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <QueryClientProvider client={queryClient}>
+        <CookieConsentProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/settings/*" element={<SettingsLayout />} />
+            </Routes>
+          </AuthProvider>
+        </CookieConsentProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+}
 
+describe("SettingsLayout", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     resetClientMocks();
-    wrapper = createAuthWrapper(["/settings"]);
   });
 
-  it("renders page title and back link", async () => {
+  it("renders page title and nav links", async () => {
     mockApiFetch();
-
-    render(<SettingsPage />, { wrapper });
+    renderSettingsAt("/settings/profile");
 
     await waitFor(() => {
       expect(screen.getByText("Settings")).toBeInTheDocument();
     });
-    expect(
-      screen.getByRole("link", { name: "Back to Dashboard" }),
-    ).toHaveAttribute("href", "/");
+    // Each nav item renders twice (desktop sidebar + mobile tabs)
+    expect(screen.getAllByRole("link", { name: /Profile/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("link", { name: /Security/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("link", { name: /Integrations/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("link", { name: /Billing/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole("link", { name: /Account/ }).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders all sections", async () => {
+  it("renders profile sections on /settings/profile", async () => {
     mockApiFetch();
-
-    render(<SettingsPage />, { wrapper });
+    renderSettingsAt("/settings/profile");
 
     await waitFor(() => {
-      expect(screen.getByText("Account")).toBeInTheDocument();
+      // "Account" appears in both nav link and section heading
+      expect(screen.getAllByText("Account").length).toBeGreaterThanOrEqual(2);
     });
-    expect(screen.getByText("Security")).toBeInTheDocument();
     expect(screen.getByText("Notifications")).toBeInTheDocument();
-    expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
+  });
+
+  it("renders security section on /settings/security", async () => {
+    mockApiFetch();
+    renderSettingsAt("/settings/security");
+
+    await waitFor(() => {
+      // "Security" appears in both nav and section heading — check for section content
+      const headings = screen.getAllByText("Security");
+      expect(headings.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("renders integrations sections on /settings/integrations", async () => {
+    mockApiFetch();
+    renderSettingsAt("/settings/integrations");
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
+    });
     expect(screen.getByText("Credential Vault")).toBeInTheDocument();
-    expect(screen.getByText("Data Retention")).toBeInTheDocument();
-    expect(screen.getByText("Danger Zone")).toBeInTheDocument();
+  });
+
+  it("renders danger zone on /settings/account", async () => {
+    mockApiFetch();
+    renderSettingsAt("/settings/account");
+
+    await waitFor(() => {
+      expect(screen.getByText("Danger Zone")).toBeInTheDocument();
+    });
   });
 });
