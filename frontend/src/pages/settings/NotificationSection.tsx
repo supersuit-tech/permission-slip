@@ -8,7 +8,7 @@ import { trackEvent, PostHogEvents } from "@/lib/posthog";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
 import type { components } from "@/api/schema";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -139,14 +139,11 @@ export function NotificationSection() {
                         <ArrowUpRight className="size-3" />
                       </Link>
                     ) : (
-                      <Button
-                        variant={pref.enabled ? "default" : "outline"}
-                        size="sm"
+                      <Switch
+                        checked={pref.enabled}
                         disabled={isUpdating}
-                        onClick={() => handleToggle(pref.channel, pref.enabled)}
-                      >
-                        {pref.enabled ? "Enabled" : "Disabled"}
-                      </Button>
+                        onCheckedChange={() => handleToggle(pref.channel, pref.enabled)}
+                      />
                     )}
                   </div>
                   {!planGated && warning && pref.enabled && (
@@ -170,14 +167,11 @@ export function NotificationSection() {
                     and tips.
                   </p>
                 </div>
-                <Button
-                  variant={profile?.marketing_opt_in ? "default" : "outline"}
-                  size="sm"
+                <Switch
+                  checked={profile?.marketing_opt_in ?? false}
                   disabled={isUpdatingProfile || !profile}
-                  onClick={handleToggleProductUpdates}
-                >
-                  {profile?.marketing_opt_in ? "Enabled" : "Disabled"}
-                </Button>
+                  onCheckedChange={handleToggleProductUpdates}
+                />
               </div>
               {!profile?.email && profile?.marketing_opt_in && (
                 <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">

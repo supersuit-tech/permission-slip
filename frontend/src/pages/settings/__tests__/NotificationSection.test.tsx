@@ -126,16 +126,16 @@ describe("NotificationSection", () => {
     render(<NotificationSection />, { wrapper });
 
     await waitFor(() => {
-      const buttons = screen.getAllByRole("button");
-      const enabledButtons = buttons.filter(
-        (b) => b.textContent === "Enabled",
+      const switches = screen.getAllByRole("switch");
+      const checked = switches.filter(
+        (s) => s.getAttribute("data-state") === "checked",
       );
-      const disabledButtons = buttons.filter(
-        (b) => b.textContent === "Disabled",
+      const unchecked = switches.filter(
+        (s) => s.getAttribute("data-state") === "unchecked",
       );
-      // 3 channels enabled (email, sms, mobile-push) + 2 disabled (web-push, product updates)
-      expect(enabledButtons).toHaveLength(3);
-      expect(disabledButtons).toHaveLength(2);
+      // 3 channels enabled (email, sms, mobile-push) + 2 unchecked (web-push, product updates)
+      expect(checked).toHaveLength(3);
+      expect(unchecked).toHaveLength(2);
     });
   });
 
@@ -225,11 +225,9 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Email")).toBeInTheDocument();
     });
 
-    // Click the first "Enabled" button (email)
-    const enabledButtons = screen.getAllByRole("button").filter(
-      (b) => b.textContent === "Enabled",
-    );
-    await user.click(enabledButtons[0]!);
+    // Click the first switch (email)
+    const switches = screen.getAllByRole("switch");
+    await user.click(switches[0]!);
 
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalledWith(
@@ -260,13 +258,9 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Mobile Push")).toBeInTheDocument();
     });
 
-    // Find the Mobile Push row's Enabled button and click it
-    const enabledButtons = screen.getAllByRole("button").filter(
-      (b) => b.textContent === "Enabled",
-    );
-    // Mobile Push is the last enabled channel button (after email, web-push, sms)
-    const mobilePushBtn = enabledButtons[enabledButtons.length - 1]!;
-    await user.click(mobilePushBtn);
+    // Find the Mobile Push switch (last channel switch, index 3) and click it
+    const switches = screen.getAllByRole("switch");
+    await user.click(switches[3]!);
 
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalledWith(
@@ -306,12 +300,10 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Product updates")).toBeInTheDocument();
     });
 
-    // The product updates button is the last "Disabled" button
-    const disabledButtons = screen.getAllByRole("button").filter(
-      (b) => b.textContent === "Disabled",
-    );
-    const productUpdatesBtn = disabledButtons[disabledButtons.length - 1]!;
-    await user.click(productUpdatesBtn);
+    // The product updates switch is the last one (after all channel switches)
+    const switches = screen.getAllByRole("switch");
+    const productUpdatesSwitch = switches[switches.length - 1]!;
+    await user.click(productUpdatesSwitch);
 
     await waitFor(() => {
       expect(mockPatch).toHaveBeenCalledWith(
@@ -363,12 +355,10 @@ describe("NotificationSection", () => {
       expect(screen.getByText("SMS")).toBeInTheDocument();
     });
 
-    // Should have 3 enabled buttons (email, web-push, mobile-push)
-    // SMS should not have a toggle button
-    const enabledButtons = screen.getAllByRole("button").filter(
-      (b) => b.textContent === "Enabled",
-    );
-    expect(enabledButtons).toHaveLength(3);
+    // Should have 3 channel switches (email, web-push, mobile-push) + 1 product updates = 4
+    // SMS should not have a switch (plan-gated)
+    const switches = screen.getAllByRole("switch");
+    expect(switches).toHaveLength(4);
   });
 
   it("does not show missing phone warning for plan-gated SMS", async () => {
