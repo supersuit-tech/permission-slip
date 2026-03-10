@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { useCooldown } from "./useCooldown";
 import EmailStep from "./EmailStep";
@@ -19,13 +19,13 @@ export default function LoginPage() {
     cooldown.start();
   };
 
-  const handleResend = async () => {
+  const handleResend = useCallback(async () => {
     const result = await sendOtp(email);
     if (!result.error || result.error.code === "over_email_send_rate_limit") {
       cooldown.start();
     }
     return result;
-  };
+  }, [sendOtp, email, cooldown.start]);
 
   if (step === "otp") {
     return (
