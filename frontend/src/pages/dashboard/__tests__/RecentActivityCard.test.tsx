@@ -118,7 +118,7 @@ describe("RecentActivityCard", () => {
     });
     expect(
       screen.getByText(
-        /Approval decisions, standing approval executions, and agent events/,
+        /Every approval, denial, and agent action is logged here/,
       ),
     ).toBeInTheDocument();
   });

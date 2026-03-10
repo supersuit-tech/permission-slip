@@ -79,7 +79,8 @@ function EmptyState({ onAddAgent }: { onAddAgent: () => void }) {
         No registered agents yet
       </p>
       <p className="text-muted-foreground mb-4 max-w-xs text-xs">
-        Add an agent and share the registration instructions to get started.
+        Register an agent to start controlling what it can do. You&apos;ll get
+        an invite code to share with the agent.
       </p>
       <Button size="sm" onClick={onAddAgent}>
         Add an Agent

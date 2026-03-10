@@ -55,7 +55,8 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Permission Slip")).toBeInTheDocument();
     });
-    expect(screen.getByText("Recent Activity")).toBeInTheDocument();
+    // Without API mocks, agent queries fail so Dashboard shows the agents card
+    expect(screen.getByText("Registered Agents")).toBeInTheDocument();
   });
 
   it("shows user menu avatar when authenticated", async () => {

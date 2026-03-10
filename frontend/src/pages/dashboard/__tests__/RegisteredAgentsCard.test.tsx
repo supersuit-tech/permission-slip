@@ -149,7 +149,7 @@ describe("RegisteredAgentsCard", () => {
       expect(screen.getByText("No registered agents yet")).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/Add an agent and share the registration instructions/)
+      screen.getByText(/Register an agent to start controlling what it can do/)
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Add an Agent" })

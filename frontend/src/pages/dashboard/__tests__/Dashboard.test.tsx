@@ -14,7 +14,7 @@ function mockEmptyResponses() {
   mockGet.mockResolvedValue({ data: { data: [], has_more: false } });
 }
 
-/** Mock GET so /v1/agents returns agents while other endpoints return empty. */
+/** Mock GET so /v1/agents returns agents and /v1/audit-events returns events. */
 function mockWithAgents() {
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/agents") {
@@ -27,6 +27,23 @@ function mockWithAgents() {
               last_active_at: "2025-01-01T00:00:00Z",
               request_count_30d: 5,
               metadata: { name: "Test Agent" },
+            },
+          ],
+          has_more: false,
+        },
+      });
+    }
+    if (url === "/v1/audit-events") {
+      return Promise.resolve({
+        data: {
+          data: [
+            {
+              event_type: "approval.approved",
+              timestamp: "2025-01-01T00:00:00Z",
+              agent_id: 1,
+              agent_metadata: { name: "Test Agent" },
+              action: { type: "test.action", version: "1", parameters: {} },
+              outcome: "approved",
             },
           ],
           has_more: false,

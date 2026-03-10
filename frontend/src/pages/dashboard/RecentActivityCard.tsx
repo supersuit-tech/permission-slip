@@ -63,8 +63,8 @@ function EmptyState() {
         No activity yet
       </p>
       <p className="text-muted-foreground max-w-xs text-xs">
-        Approval decisions, standing approval executions, and agent events will
-        appear here.
+        Every approval, denial, and agent action is logged here so you always
+        have a complete audit trail.
       </p>
     </div>
   );
