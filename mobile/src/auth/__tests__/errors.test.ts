@@ -13,7 +13,7 @@ function mockAuthError(code: string): AuthError {
 describe("safeErrorMessage", () => {
   it("returns a safe message for known error codes", () => {
     expect(safeErrorMessage(mockAuthError("otp_expired"))).toBe(
-      "Your code has expired. Please request a new one."
+      "Your sign-in link has expired. Please request a new one."
     );
     expect(safeErrorMessage(mockAuthError("over_request_rate_limit"))).toBe(
       "Too many attempts. Please wait a moment and try again."

@@ -18,7 +18,7 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
   return (
     <AuthLayout>
       <p className="text-sm text-muted-foreground">
-        Enter your email to sign in or create an account.
+        Enter your email and we'll send you a sign-in link.
       </p>
       <form
         onSubmit={(e) => handleSubmit(e, () => onSubmit(email.trim()))}

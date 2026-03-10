@@ -44,7 +44,7 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
       <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
         <Text style={authStyles.title}>Permission Slip</Text>
         <Text style={authStyles.subtitle}>
-          Enter your email to sign in or create an account.
+          Enter your email and we'll send you a sign-in link.
         </Text>
 
         <View style={authStyles.field}>
@@ -76,7 +76,7 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
 
         <TouchableOpacity
           testID="email-submit"
-          accessibilityLabel={isSubmitting ? "Sending code" : "Continue"}
+          accessibilityLabel={isSubmitting ? "Sending link" : "Continue"}
           accessibilityRole="button"
           style={[
             authStyles.button,

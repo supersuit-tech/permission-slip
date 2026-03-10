@@ -5,7 +5,7 @@ import type { AuthError } from "@supabase/supabase-js";
 // we only surface messages from this allowlist and fall back to a generic
 // message for anything unexpected.
 const SAFE_ERROR_MESSAGES: Record<string, string> = {
-  otp_expired: "Your code has expired. Please request a new one.",
+  otp_expired: "Your sign-in link has expired. Please request a new one.",
   otp_disabled: "Something went wrong. Please try again.",
   over_request_rate_limit:
     "Too many attempts. Please wait a moment and try again.",

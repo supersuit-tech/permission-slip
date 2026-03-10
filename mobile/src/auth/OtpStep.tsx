@@ -99,8 +99,9 @@ export default function OtpStep({
       <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
         <Text style={authStyles.title}>Check your email</Text>
         <Text style={authStyles.subtitle}>
-          Enter the code sent to{" "}
-          <Text style={localStyles.bold}>{email}</Text>
+          We sent a sign-in link to{" "}
+          <Text style={localStyles.bold}>{email}</Text>. Tap the link in the
+          email, or enter the code below.
         </Text>
 
         <View style={authStyles.field}>
@@ -164,7 +165,7 @@ export default function OtpStep({
         <View style={localStyles.resendRow}>
           <TouchableOpacity
             testID="otp-resend"
-            accessibilityLabel="Resend verification code"
+            accessibilityLabel="Resend sign-in email"
             accessibilityRole="button"
             onPress={handleResend}
             disabled={resendCooldown > 0 || isSubmitting}
@@ -177,8 +178,8 @@ export default function OtpStep({
               ]}
             >
               {resendCooldown > 0
-                ? `Resend code (${resendCooldown}s)`
-                : "Resend code"}
+                ? `Resend email (${resendCooldown}s)`
+                : "Resend email"}
             </Text>
           </TouchableOpacity>
           {resendStatus !== "idle" ? (
@@ -190,7 +191,7 @@ export default function OtpStep({
               ]}
             >
               {resendStatus === "sent"
-                ? "Code sent!"
+                ? "Email sent!"
                 : "Failed to resend. Please try again."}
             </Text>
           ) : null}

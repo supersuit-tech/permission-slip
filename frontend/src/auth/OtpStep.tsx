@@ -48,7 +48,7 @@ export default function OtpStep({
         setResendError(
           safeErrorMessage(resendResultError, {
             over_email_send_rate_limit:
-              "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again.",
+              "Too many login emails sent. Check your inbox for an existing link, or wait a few minutes and try again.",
           })
         );
       } else {
@@ -73,7 +73,8 @@ export default function OtpStep({
   return (
     <AuthLayout>
       <p className="text-sm text-muted-foreground">
-        Enter the code sent to <strong>{email}</strong>
+        We sent a sign-in link to <strong>{email}</strong>.
+        Click the link in your email, or enter the code below.
       </p>
       <form
         onSubmit={(e) => handleSubmit(e, () => onVerify(otpCode))}
@@ -110,10 +111,10 @@ export default function OtpStep({
           disabled={resendCooldownSeconds > 0 || isResending}
           aria-label={
             resendCooldownSeconds > 0
-              ? `Resend code in ${resendCooldownSeconds}s (on cooldown)`
+              ? `Resend email in ${resendCooldownSeconds}s (on cooldown)`
               : isResending
                 ? "Resending…"
-                : "Resend code"
+                : "Resend email"
           }
           className="opacity-70"
         >
@@ -124,14 +125,14 @@ export default function OtpStep({
           ) : isResending ? (
             "Resending…"
           ) : (
-            "Resend code"
+            "Resend email"
           )}
         </Button>
         {resendError && (
           <p role="alert" className="text-xs text-destructive">{resendError}</p>
         )}
         {resendSuccess && (
-          <p role="status" className="text-xs text-muted-foreground">Code resent.</p>
+          <p role="status" className="text-xs text-muted-foreground">Email resent.</p>
         )}
       </div>
       <DevOnly>
