@@ -695,21 +695,19 @@ The X connector requires these scopes:
 
 ### 3. Configure in Permission Slip
 
-1. In Permission Slip, go to an agent's configuration page and click the relevant connector
-2. Click **Configure** next to the X provider
-3. Enter your **Client ID** and **Client Secret** from the X Developer Portal
-4. Connect your X account via the connector's credential configuration page
+1. In Permission Slip, go to an agent's configuration page and click the X connector card
+2. On the connector's configuration page, enter your **Client ID** and **Client Secret** from the X Developer Portal
+3. Connect your X account via the credential configuration section
 
 ## Self-Hosted BYOA Setup
 
 For self-hosted deployments without platform-level OAuth credentials, users configure their own OAuth apps through the connector configuration UI:
 
 1. Follow the Google or Microsoft setup steps above to create an OAuth app
-2. In Permission Slip, navigate to an agent's configuration page and click the relevant connector
-3. Click **Configure** next to the provider
-4. Enter your Client ID and Client Secret
-5. The credentials are encrypted and stored in the vault
-6. You can now connect your account via the connector's credential configuration page
+2. In Permission Slip, navigate to an agent's configuration page and click the relevant connector card
+3. On the connector's configuration page, enter your Client ID and Client Secret
+4. The credentials are encrypted and stored in the vault
+5. You can now connect your account via the credential configuration section
 
 ## External Connector OAuth
 

@@ -124,7 +124,7 @@ export function AgentConnectorsSection({
 
             {filtered.length === 0 ? (
               <p className="text-muted-foreground py-6 text-center text-sm">
-                No connectors match &ldquo;{search}&rdquo;
+                No connectors match &ldquo;{search.trim()}&rdquo;
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
