@@ -52,6 +52,7 @@ type AuditEvent struct {
 	Action          []byte  // raw JSONB (approval action details, nullable)
 	Outcome         string  // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
 	SourceID        string  // unique ID per event source (e.g. approval_id)
+	SourceType      string  // "approval", "standing_approval", "agent", "payment_method_transaction"
 	ConnectorID     *string // which connector handled the action (nullable for lifecycle events)
 	ExecutionStatus *string // "success", "failure", "timeout", "skipped" (nullable)
 	ExecutionError  *string // failure details (nullable)
@@ -197,7 +198,7 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 
 	query := fmt.Sprintf(
 		`SELECT ae.id, ae.event_type, ae.created_at, ae.agent_id, ae.agent_meta, ae.action,
-		        %s AS outcome, ae.source_id, ae.connector_id, ae.execution_status, ae.execution_error
+		        %s AS outcome, ae.source_id, ae.source_type, ae.connector_id, ae.execution_status, ae.execution_error
 		 FROM audit_events ae
 		 LEFT JOIN agents a ON ae.agent_id = a.agent_id
 		 WHERE %s
@@ -318,7 +319,7 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 
 	query := fmt.Sprintf(
 		`SELECT ae.id, ae.event_type, ae.created_at, ae.agent_id, ae.agent_meta, ae.action,
-		        %s AS outcome, ae.source_id, ae.connector_id, ae.execution_status, ae.execution_error
+		        %s AS outcome, ae.source_id, ae.source_type, ae.connector_id, ae.execution_status, ae.execution_error
 		 FROM audit_events ae
 		 LEFT JOIN agents a ON ae.agent_id = a.agent_id
 		 WHERE %s
@@ -354,7 +355,7 @@ func scanAuditEvents(rows pgx.Rows) ([]AuditEvent, error) {
 		var eventType string
 		if err := rows.Scan(
 			&e.ID, &eventType, &e.Timestamp, &e.AgentID, &e.AgentMeta, &e.Action,
-			&e.Outcome, &e.SourceID, &e.ConnectorID, &e.ExecutionStatus, &e.ExecutionError,
+			&e.Outcome, &e.SourceID, &e.SourceType, &e.ConnectorID, &e.ExecutionStatus, &e.ExecutionError,
 		); err != nil {
 			return nil, fmt.Errorf("scan audit event: %w", err)
 		}

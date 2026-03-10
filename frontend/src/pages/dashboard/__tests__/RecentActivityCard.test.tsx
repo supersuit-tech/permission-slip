@@ -188,7 +188,28 @@ describe("RecentActivityCard", () => {
     });
   });
 
-  // TODO: Restore "View All Activity" link tests once /activity route exists (issue #203)
+  it("shows View All Activity link when has_more is true", async () => {
+    mockAuditFetch();
+
+    render(<RecentActivityCard />, { wrapper });
+
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: "View All Activity" });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/activity");
+    });
+  });
+
+  it("hides View All Activity link when has_more is false", async () => {
+    mockAuditFetch({ ...mockAuditEventsResponse, has_more: false });
+
+    render(<RecentActivityCard />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("My Bot")).toHaveLength(2);
+    });
+    expect(screen.queryByRole("link", { name: "View All Activity" })).not.toBeInTheDocument();
+  });
 
   it("falls back to Agent <id> when metadata has no name", async () => {
     mockAuditFetch({

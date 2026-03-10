@@ -64,6 +64,19 @@ AuditEvent:
         - charged
       description: The outcome of the event.
       example: "approved"
+    source_id:
+      type: string
+      description: |
+        Identifier linking this event to its source record (e.g. approval_id,
+        standing approval execution id, agent id). Used by the frontend to
+        fetch full details for click-through views.
+      example: "appr_abc123"
+    source_type:
+      type: string
+      description: |
+        The type of source record this event originated from. Possible values:
+        "approval", "standing_approval", "agent", "payment_method_transaction".
+      example: "approval"
     connector_id:
       type: string
       nullable: true

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,14 +17,17 @@ import {
 } from "@/components/ui/table";
 import { formatRelativeTime } from "@/lib/utils";
 import {
+  type AuditEvent,
   type OutcomeFilter,
   OUTCOME_FILTERS,
+  ACTION_EVENT_TYPES,
   AuditEventRow,
 } from "@/lib/auditEvents";
 import {
   useAuditEvents,
   type AuditEventFilters,
 } from "@/hooks/useAuditEvents";
+import { ActivityDetailSheet, SHEET_CLOSE_DELAY_MS } from "@/pages/activity/ActivityDetailSheet";
 
 function OutcomeFilterTabs({
   value,
@@ -72,83 +75,104 @@ function EmptyState() {
 
 export function RecentActivityCard() {
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
+  const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  const filters: AuditEventFilters =
-    outcomeFilter !== "all" ? { outcome: outcomeFilter } : {};
+  const filters: AuditEventFilters = {
+    event_type: ACTION_EVENT_TYPES,
+    ...(outcomeFilter !== "all" && { outcome: outcomeFilter }),
+  };
 
   const { events, hasMore, isLoading, error, refetch } = useAuditEvents(filters);
 
+  const handleRowClick = useCallback((event: AuditEvent) => {
+    setSelectedEvent(event);
+    setIsSheetOpen(true);
+  }, []);
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>Recent Activity</CardTitle>
-          <OutcomeFilterTabs
-            value={outcomeFilter}
-            onChange={setOutcomeFilter}
-          />
-        </div>
-      </CardHeader>
-      <CardContent className="px-3 md:px-6">
-        {isLoading ? (
-          <div
-            className="flex items-center justify-center py-8"
-            role="status"
-            aria-label="Loading activity"
-          >
-            <Loader2 className="text-muted-foreground size-6 animate-spin" />
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Recent Activity</CardTitle>
+            <OutcomeFilterTabs
+              value={outcomeFilter}
+              onChange={setOutcomeFilter}
+            />
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-destructive mb-2 text-sm">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </div>
-        ) : events.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="overflow-hidden rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-none bg-primary hover:bg-primary">
-                  <TableHead className="font-semibold text-primary-foreground">
-                    When
-                  </TableHead>
-                  <TableHead className="font-semibold text-primary-foreground">
-                    Agent
-                  </TableHead>
-                  <TableHead className="font-semibold text-primary-foreground">
-                    Action
-                  </TableHead>
-                  <TableHead className="font-semibold text-primary-foreground">
-                    Outcome
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="[&>tr:nth-child(even)]:bg-muted">
-                {events.map((event) => (
-                  <AuditEventRow
-                    key={`${event.timestamp}-${event.agent_id}-${event.event_type}`}
-                    event={event}
-                    formatTimestamp={formatRelativeTime}
-                  />
-                ))}
-              </TableBody>
-            </Table>
+        </CardHeader>
+        <CardContent className="px-3 md:px-6">
+          {isLoading ? (
+            <div
+              className="flex items-center justify-center py-8"
+              role="status"
+              aria-label="Loading activity"
+            >
+              <Loader2 className="text-muted-foreground size-6 animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-destructive mb-2 text-sm">{error}</p>
+              <Button variant="ghost" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : events.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="overflow-hidden rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-none bg-primary hover:bg-primary">
+                    <TableHead className="font-semibold text-primary-foreground">
+                      When
+                    </TableHead>
+                    <TableHead className="font-semibold text-primary-foreground">
+                      Agent
+                    </TableHead>
+                    <TableHead className="font-semibold text-primary-foreground">
+                      Action
+                    </TableHead>
+                    <TableHead className="font-semibold text-primary-foreground">
+                      Outcome
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="[&>tr:nth-child(even)]:bg-muted">
+                  {events.map((event) => (
+                    <AuditEventRow
+                      key={`${event.timestamp}-${event.agent_id}-${event.event_type}`}
+                      event={event}
+                      formatTimestamp={formatRelativeTime}
+                      onClick={handleRowClick}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+        {hasMore && (
+          <div className="px-6 pb-4 text-center">
+            <Link
+              to="/activity"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              View All Activity
+            </Link>
           </div>
         )}
-      </CardContent>
-      {hasMore && (
-        <div className="px-6 pb-4 text-center">
-          <Link
-            to="/activity"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            View All Activity
-          </Link>
-        </div>
-      )}
-    </Card>
+      </Card>
+
+      <ActivityDetailSheet
+        event={selectedEvent}
+        open={isSheetOpen}
+        onOpenChange={(open) => {
+          setIsSheetOpen(open);
+          if (!open) setTimeout(() => setSelectedEvent(null), SHEET_CLOSE_DELAY_MS);
+        }}
+      />
+    </>
   );
 }

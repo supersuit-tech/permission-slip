@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
@@ -202,15 +202,13 @@ describe("ActionConfigurationsSection", () => {
       "my-repo",
     );
 
-    // Set title to wildcard: Fixed → Pattern → Wildcard (two clicks).
-    // All params start in Fixed mode, so buttons say "Pattern".
-    // Use role-based selectors to avoid matching <strong> tags in help text.
-    const patternButtons = screen.getAllByRole("button", { name: /Pattern/ });
-    // title is the second param field (repo=0, title=1, body=2).
-    await user.click(patternButtons[1]!);
-    // Now the title button says "Wildcard" — click it.
-    const wildcardButtons = screen.getAllByRole("button", { name: /Wildcard/ });
-    await user.click(wildcardButtons[0]!);
+    // Set title to wildcard via dropdown.
+    // Target the dropdown trigger within the "title" parameter group.
+    const titleInput = screen.getByLabelText("title");
+    const titleGroup = titleInput.closest(".space-y-1\\.5")!;
+    await user.click(within(titleGroup as HTMLElement).getByRole("button", { name: /Fixed/ }));
+    // Select "Wildcard" from the dropdown menu.
+    await user.click(screen.getByRole("menuitemradio", { name: /Wildcard/ }));
 
     await user.click(screen.getByText("Create Configuration"));
 
