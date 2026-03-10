@@ -22,12 +22,8 @@ export function Dashboard() {
     useStandingApprovals();
   const { events, isLoading: eventsLoading } = useAuditEvents();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const {
-    isUnconfigured,
-    isLoading: unconfiguredLoading,
-    agentId: unconfiguredAgentId,
-    agentName: unconfiguredAgentName,
-  } = useUnconfiguredAgent(agents, isLoading);
+  const { isUnconfigured, agentId: unconfiguredAgentId, agentName: unconfiguredAgentName } =
+    useUnconfiguredAgent(agents, isLoading);
 
   const showOnboarding = !isLoading && !error && agents.length === 0;
   const hasActiveAgents = agents.some((a) => a.status === "registered");
@@ -37,19 +33,19 @@ export function Dashboard() {
   // Progressive disclosure: show cards only when relevant to the user's journey.
   // While a hook is still fetching we don't yet know whether data exists,
   // so default to showing the card to avoid jarring pop-in for returning users.
-  // Suppress other cards while we're checking whether the agent is unconfigured,
-  // to avoid flashing the full dashboard before switching to the hero.
   const showPendingApprovals =
-    !unconfiguredLoading &&
-    (approvalsLoading || hasActiveAgents || hasPendingApprovals);
-  const showActivity = !unconfiguredLoading && (eventsLoading || hasActivity);
+    approvalsLoading || hasActiveAgents || hasPendingApprovals;
+  const showActivity = eventsLoading || hasActivity;
   const showStandingApprovals =
-    !unconfiguredLoading &&
-    (standingLoading || standingApprovals.length > 0 || hasActivity);
+    standingLoading || standingApprovals.length > 0 || hasActivity;
 
   // Only prompt for notifications after the user has an active, configured agent
   const showNotificationBanner = hasActiveAgents && !isUnconfigured;
 
+  // Dashboard has three states based on the user's onboarding progress:
+  // 1. No agents registered → AgentOnboardingHero (register first agent)
+  // 2. Single registered agent, no connectors → AgentConfigHero (configure agent)
+  // 3. Configured agent(s) → Full dashboard (cards for agents, approvals, activity)
   return (
     <div className="space-y-6">
       {showNotificationBanner && <NotificationBanner />}
