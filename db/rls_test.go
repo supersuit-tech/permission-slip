@@ -55,6 +55,8 @@ func TestAppBackendHasPoliciesOnAllRLSTables(t *testing.T) {
 	pool := testhelper.SetupTestDB(t)
 
 	// Find all RLS-enabled tables that lack an app_backend policy.
+	// A TO PUBLIC policy (stored as '{=}' in pg_policies.roles) also covers
+	// app_backend, so we accept that as well.
 	rows, err := pool.Query(context.Background(), `
 		SELECT t.tablename
 		FROM pg_tables t
@@ -65,7 +67,7 @@ func TestAppBackendHasPoliciesOnAllRLSTables(t *testing.T) {
 		    SELECT 1 FROM pg_policies p
 		    WHERE p.schemaname = 'public'
 		      AND p.tablename = t.tablename
-		      AND 'app_backend' = ANY(p.roles)
+		      AND ('app_backend' = ANY(p.roles) OR p.roles = '{=}')
 		  )
 		ORDER BY t.tablename
 	`)
@@ -74,14 +76,35 @@ func TestAppBackendHasPoliciesOnAllRLSTables(t *testing.T) {
 	}
 	defer rows.Close()
 
+	var checked int
 	for rows.Next() {
 		var tablename string
 		if err := rows.Scan(&tablename); err != nil {
 			t.Fatalf("failed to scan row: %v", err)
 		}
+		checked++
 		t.Errorf("table %q has RLS enabled but no policy for app_backend — the Go backend will get zero rows", tablename)
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatalf("row iteration error: %v", err)
+	}
+
+	// Guard against vacuous pass when migrations didn't run.
+	if checked == 0 {
+		// Verify there actually are RLS-enabled tables — if there aren't,
+		// something is wrong with the test setup.
+		var rlsCount int
+		err := pool.QueryRow(context.Background(), `
+			SELECT count(*) FROM pg_tables
+			WHERE schemaname = 'public'
+			  AND tablename != 'goose_db_version'
+			  AND rowsecurity = true
+		`).Scan(&rlsCount)
+		if err != nil {
+			t.Fatalf("failed to count RLS tables: %v", err)
+		}
+		if rlsCount == 0 {
+			t.Fatal("no RLS-enabled tables found — migrations may not have run")
+		}
 	}
 }
