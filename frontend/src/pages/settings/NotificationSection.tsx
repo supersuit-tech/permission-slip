@@ -142,6 +142,7 @@ export function NotificationSection() {
                       <Switch
                         checked={pref.enabled}
                         disabled={isUpdating}
+                        aria-label={`${label?.name ?? pref.channel} notifications`}
                         onCheckedChange={() => handleToggle(pref.channel, pref.enabled)}
                       />
                     )}
@@ -170,6 +171,7 @@ export function NotificationSection() {
                 <Switch
                   checked={profile?.marketing_opt_in ?? false}
                   disabled={isUpdatingProfile || !profile}
+                  aria-label="Product updates notifications"
                   onCheckedChange={handleToggleProductUpdates}
                 />
               </div>

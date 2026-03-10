@@ -225,9 +225,8 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Email")).toBeInTheDocument();
     });
 
-    // Click the first switch (email)
-    const switches = screen.getAllByRole("switch");
-    await user.click(switches[0]!);
+    // Click the Email switch by accessible name
+    await user.click(screen.getByRole("switch", { name: /email notifications/i }));
 
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalledWith(
@@ -258,9 +257,8 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Mobile Push")).toBeInTheDocument();
     });
 
-    // Find the Mobile Push switch (last channel switch, index 3) and click it
-    const switches = screen.getAllByRole("switch");
-    await user.click(switches[3]!);
+    // Find the Mobile Push switch by accessible name
+    await user.click(screen.getByRole("switch", { name: /mobile push notifications/i }));
 
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalledWith(
@@ -300,10 +298,8 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Product updates")).toBeInTheDocument();
     });
 
-    // The product updates switch is the last one (after all channel switches)
-    const switches = screen.getAllByRole("switch");
-    const productUpdatesSwitch = switches[switches.length - 1]!;
-    await user.click(productUpdatesSwitch);
+    // Find the Product updates switch by accessible name
+    await user.click(screen.getByRole("switch", { name: /product updates notifications/i }));
 
     await waitFor(() => {
       expect(mockPatch).toHaveBeenCalledWith(
