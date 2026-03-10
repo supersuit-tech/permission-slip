@@ -37,14 +37,15 @@ import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
 import { InlineConfirmButton } from "@/components/InlineConfirmButton";
-import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
+import {
+  providerLabel,
+  getOAuthAuthorizeUrl,
+  SHOP_REQUIRED_PROVIDERS,
+} from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
-
-/** Providers that require a shop subdomain for per-shop OAuth URLs. */
-const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
 
 export interface ConnectorCredentialsSectionProps {
   connectorId: string;
