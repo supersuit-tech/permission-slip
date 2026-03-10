@@ -159,7 +159,11 @@ export function SetupConnectorCredentialsDialog({
           </DialogHeader>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
+            <div
+              className="flex items-center justify-center py-12"
+              role="status"
+              aria-label="Loading connector details"
+            >
               <Loader2
                 className="text-muted-foreground size-6 animate-spin"
                 aria-hidden="true"

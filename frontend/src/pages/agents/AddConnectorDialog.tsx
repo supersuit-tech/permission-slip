@@ -46,6 +46,7 @@ export function AddConnectorDialog({
   useEffect(() => {
     if (!open) {
       setSetupConnector(null);
+      setSearch("");
     }
   }, [open]);
 
