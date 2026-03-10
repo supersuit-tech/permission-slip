@@ -143,7 +143,7 @@ export function NotificationSection() {
                         checked={pref.enabled}
                         disabled={isUpdating}
                         aria-label={`${label?.name ?? pref.channel} notifications`}
-                        onCheckedChange={() => handleToggle(pref.channel, pref.enabled)}
+                        onCheckedChange={(checked) => handleToggle(pref.channel, !checked)}
                       />
                     )}
                   </div>
