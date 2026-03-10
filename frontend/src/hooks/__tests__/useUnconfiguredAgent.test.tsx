@@ -36,7 +36,9 @@ describe("useUnconfiguredAgent", () => {
     );
 
     expect(result.current.isUnconfigured).toBe(false);
-    expect(result.current.isLoading).toBe(true);
+    // isLoading is false because the hook only tracks connector loading,
+    // not the agents loading state (Dashboard handles that separately).
+    expect(result.current.isLoading).toBe(false);
   });
 
   it("returns isUnconfigured false when no agents exist", () => {

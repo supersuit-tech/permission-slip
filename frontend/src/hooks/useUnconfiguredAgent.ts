@@ -24,7 +24,11 @@ export function useUnconfiguredAgent(agents: Agent[], agentsLoading: boolean) {
     error: connectorsError,
   } = useAgentConnectors(agentId);
 
-  const isLoading = agentsLoading || (agentId > 0 && connectorsLoading);
+  // Only report loading during the connector fetch phase (not during agents
+  // loading). The Dashboard already handles the agents loading state via its
+  // own isLoading. Including agentsLoading here would suppress dashboard cards
+  // for ALL users during the initial load, not just the single-agent case.
+  const isLoading = agentId > 0 && connectorsLoading;
   const isUnconfigured =
     !isLoading && agentId > 0 && connectors.length === 0 && !connectorsError;
 

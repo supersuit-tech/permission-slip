@@ -130,14 +130,14 @@ describe("Dashboard", () => {
 
     render(<Dashboard />, { wrapper });
 
-    // Wait for both agent and connector fetches to complete so unconfiguredLoading
-    // is false and all dashboard cards are rendered.
+    // Wait for agent, connector, and event fetches to complete so all
+    // dashboard cards are rendered (unconfiguredLoading must also resolve).
     await waitFor(() => {
       expect(screen.getByText("Registered Agents")).toBeInTheDocument();
       expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
+      expect(screen.getByText("Recent Activity")).toBeInTheDocument();
+      expect(screen.getByText("Standing Approvals")).toBeInTheDocument();
     });
-    expect(screen.getByText("Recent Activity")).toBeInTheDocument();
-    expect(screen.getByText("Standing Approvals")).toBeInTheDocument();
 
     // Onboarding hero should NOT appear
     expect(
