@@ -29,7 +29,7 @@ export function SettingsNav() {
   return (
     <>
       {/* Desktop sidebar */}
-      <nav className="hidden w-[200px] shrink-0 md:block" aria-label="Settings">
+      <nav className="hidden w-[200px] shrink-0 md:block" aria-label="Settings navigation">
         <ul className="space-y-1">
           {settingsNavItems.map((item) => {
             const isActive = pathname.startsWith(item.path);
@@ -58,7 +58,7 @@ export function SettingsNav() {
       {/* Mobile horizontal tabs */}
       <nav
         className="flex gap-1 overflow-x-auto md:hidden"
-        aria-label="Settings"
+        aria-label="Settings tabs"
       >
         {settingsNavItems.map((item) => {
           const isActive = pathname.startsWith(item.path);

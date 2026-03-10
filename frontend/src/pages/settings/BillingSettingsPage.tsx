@@ -115,6 +115,7 @@ export function BillingSettingsPage() {
         </>
       ) : null}
 
+      {/* These sections manage their own loading/error states independently of the billing plan. */}
       <PaymentMethodSection />
       <DataRetentionSection />
     </>
