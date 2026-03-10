@@ -141,11 +141,10 @@ describe("ConnectorConfigPage", () => {
       screen.getByText("GitHub integration for repository management"),
     ).toBeInTheDocument();
 
-    // Actions section
-    expect(screen.getByText("Create Issue")).toBeInTheDocument();
-    expect(screen.getByText("Merge Pull Request")).toBeInTheDocument();
-    expect(screen.getByText("Low")).toBeInTheDocument();
-    expect(screen.getByText("High")).toBeInTheDocument();
+    // Actions are behind a dialog — verify the trigger link is visible
+    expect(
+      screen.getByText("View all 2 available actions"),
+    ).toBeInTheDocument();
 
     // Credentials section (loads asynchronously via useCredentials)
     await waitFor(() => {
