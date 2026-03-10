@@ -87,7 +87,7 @@ describe("OtpStep", () => {
     const btn = screen.getByRole("button", { name: "Resend code in 42s (on cooldown)" });
     expect(btn).toBeInTheDocument();
     expect(btn).toBeDisabled();
-    expect(screen.getByText("42s")).toBeInTheDocument();
+    expect(btn).toHaveTextContent("42s");
   });
 
   it("calls onResend when resend button is clicked", async () => {

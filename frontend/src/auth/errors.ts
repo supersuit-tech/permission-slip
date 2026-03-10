@@ -30,7 +30,7 @@ export function safeErrorMessage(
 ): string {
   if (error.code) {
     const override = overrides?.[error.code];
-    if (override) return override;
+    if (override !== undefined) return override;
     const message = SAFE_ERROR_MESSAGES[error.code];
     if (message) return message;
   }
