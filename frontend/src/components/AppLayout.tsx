@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Activity, CreditCard } from "lucide-react";
+import { LayoutDashboard, Activity, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
@@ -20,10 +20,7 @@ function buildNavItems(pendingCount: number): NavItem[] {
   return [
     { label: "Dashboard", path: "/", icon: LayoutDashboard, badge: pendingCount },
     { label: "Activity", path: "/activity", icon: Activity },
-    { label: "Users", path: "/users", disabled: true },
-    { label: "Roles", path: "/roles", disabled: true },
-    { label: "Billing", path: "/billing", icon: CreditCard },
-    { label: "Settings", path: "/settings" },
+    { label: "Settings", path: "/settings", icon: Settings },
   ];
 }
 
@@ -56,7 +53,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </li>
               );
             }
-            const isActive = pathname === item.path;
+            const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
             return (
               <li
                 key={item.path}
@@ -97,7 +94,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {navItems
             .filter((item) => item.icon && !item.disabled)
             .map((item) => {
-              const isActive = pathname === item.path;
+              const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
               const Icon = item.icon!;
               return (
                 <Link

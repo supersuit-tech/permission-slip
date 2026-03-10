@@ -379,8 +379,8 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 		// Build success/cancel URLs. Include {CHECKOUT_SESSION_ID} so the
 		// frontend can call POST /billing/activate to confirm the upgrade
 		// without relying solely on the webhook.
-		successURL := deps.BaseURL + "/billing?upgraded=true&session_id={CHECKOUT_SESSION_ID}"
-		cancelURL := deps.BaseURL + "/billing"
+		successURL := deps.BaseURL + "/settings/billing?upgraded=true&session_id={CHECKOUT_SESSION_ID}"
+		cancelURL := deps.BaseURL + "/settings/billing"
 
 		sess, err := deps.Stripe.CreateCheckoutSession(r.Context(), stripeCustomerID, successURL, cancelURL)
 		if err != nil {
