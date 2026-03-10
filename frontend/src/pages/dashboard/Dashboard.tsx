@@ -15,9 +15,10 @@ import { InviteCodeDialog } from "./InviteCodeDialog";
 export function Dashboard() {
   useApprovalEvents();
   const { agents, isLoading, error } = useAgents();
-  const { approvals } = useApprovals();
-  const { standingApprovals } = useStandingApprovals();
-  const { events } = useAuditEvents();
+  const { approvals, isLoading: approvalsLoading } = useApprovals();
+  const { standingApprovals, isLoading: standingLoading } =
+    useStandingApprovals();
+  const { events, isLoading: eventsLoading } = useAuditEvents();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   const showOnboarding = !isLoading && !error && agents.length === 0;
@@ -26,12 +27,13 @@ export function Dashboard() {
   const hasPendingApprovals = approvals.length > 0;
 
   // Progressive disclosure: show cards only when relevant to the user's journey.
-  // Standing Approvals is a power-user feature — only show it once the user
-  // has activity or has already created one.
-  const showPendingApprovals = hasActiveAgents || hasPendingApprovals;
-  const showActivity = hasActivity;
+  // While a hook is still fetching we don't yet know whether data exists,
+  // so default to showing the card to avoid jarring pop-in for returning users.
+  const showPendingApprovals =
+    approvalsLoading || hasActiveAgents || hasPendingApprovals;
+  const showActivity = eventsLoading || hasActivity;
   const showStandingApprovals =
-    standingApprovals.length > 0 || hasActivity;
+    standingLoading || standingApprovals.length > 0 || hasActivity;
 
   // Only prompt for notifications after the user has an active agent
   const showNotificationBanner = hasActiveAgents;
