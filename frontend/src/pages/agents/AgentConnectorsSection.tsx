@@ -1,34 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus, Plug } from "lucide-react";
+import { Loader2, Plug, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
-import { useDisableAgentConnector } from "@/hooks/useDisableAgentConnector";
-import type { AgentConnector } from "@/hooks/useAgentConnectors";
-import { AddConnectorDialog } from "./AddConnectorDialog";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
+import { useConnectors } from "@/hooks/useConnectors";
+import type { ConnectorSummary } from "@/hooks/useConnectors";
+import { useEnableAgentConnector } from "@/hooks/useEnableAgentConnector";
+import type { AgentConnector } from "@/hooks/useAgentConnectors";
 
 interface AgentConnectorsSectionProps {
   agentId: number;
@@ -39,228 +26,167 @@ interface AgentConnectorsSectionProps {
 
 export function AgentConnectorsSection({
   agentId,
-  connectors,
-  isLoading,
-  error,
+  connectors: enabledConnectors,
+  isLoading: enabledLoading,
+  error: enabledError,
 }: AgentConnectorsSectionProps) {
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-
-  return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Enabled Connectors</CardTitle>
-          <Button
-            size="sm"
-            onClick={() => setAddDialogOpen(true)}
-            disabled={isLoading || !!error}
-          >
-            <Plus className="size-4" />
-            Add Connector
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div
-              className="flex items-center justify-center py-8"
-              role="status"
-              aria-label="Loading connectors"
-            >
-              <Loader2
-                className="text-muted-foreground size-6 animate-spin"
-                aria-hidden="true"
-              />
-            </div>
-          ) : error ? (
-            <p className="text-destructive text-sm">{error}</p>
-          ) : connectors.length === 0 ? (
-            <EmptyConnectors onAdd={() => setAddDialogOpen(true)} />
-          ) : (
-            <ConnectorsTable connectors={connectors} agentId={agentId} />
-          )}
-        </CardContent>
-      </Card>
-
-      <AddConnectorDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        agentId={agentId}
-        enabledConnectors={connectors}
-      />
-    </>
-  );
-}
-
-function EmptyConnectors({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-8 text-center">
-      <Plug className="text-muted-foreground mb-3 size-10" />
-      <p className="text-muted-foreground mb-1 text-sm font-medium">
-        No connectors enabled
-      </p>
-      <p className="text-muted-foreground mb-4 max-w-xs text-xs">
-        Enable connectors for this agent to allow it to submit actions from
-        external services.
-      </p>
-      <Button variant="outline" size="sm" onClick={onAdd}>
-        <Plus className="size-4" />
-        Add Connector
-      </Button>
-    </div>
-  );
-}
-
-function ConnectorsTable({
-  connectors,
-  agentId,
-}: {
-  connectors: AgentConnector[];
-  agentId: number;
-}) {
-  return (
-    <div className="overflow-hidden rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-none bg-primary hover:bg-primary">
-            <TableHead className="font-semibold text-primary-foreground">
-              Connector
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
-              Actions
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
-              Enabled
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="[&>tr:nth-child(even)]:bg-muted">
-          {connectors.map((connector) => (
-            <ConnectorRow
-              key={connector.id}
-              connector={connector}
-              agentId={agentId}
-            />
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function ConnectorRow({
-  connector,
-  agentId,
-}: {
-  connector: AgentConnector;
-  agentId: number;
-}) {
+  const {
+    connectors: allConnectors,
+    isLoading: allLoading,
+    error: allError,
+  } = useConnectors();
+  const { enableConnector } = useEnableAgentConnector();
   const navigate = useNavigate();
-  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const { disableConnector, isLoading: disabling } = useDisableAgentConnector();
+  const [search, setSearch] = useState("");
+  const [enablingId, setEnablingId] = useState<string | null>(null);
 
-  async function handleRemove() {
+  const isLoading = enabledLoading || allLoading;
+  const error = enabledError ?? allError;
+
+  const enabledIds = new Set(enabledConnectors.map((c) => c.id));
+
+  const filtered = search.trim()
+    ? allConnectors.filter(
+        (c) =>
+          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          c.description?.toLowerCase().includes(search.toLowerCase()),
+      )
+    : allConnectors;
+
+  async function handleClick(connector: ConnectorSummary) {
+    if (enabledIds.has(connector.id)) {
+      navigate(`/agents/${agentId}/connectors/${connector.id}`);
+      return;
+    }
+
+    setEnablingId(connector.id);
     try {
-      const result = await disableConnector({
-        agentId,
-        connectorId: connector.id,
-      });
-      const revoked = result.revoked_standing_approvals;
-      if (revoked > 0) {
-        toast.success(
-          `${connector.name} disabled. ${revoked} standing approval${revoked === 1 ? "" : "s"} revoked.`,
-        );
-      } else {
-        toast.success(`${connector.name} disabled`);
-      }
-      setRemoveDialogOpen(false);
+      await enableConnector({ agentId, connectorId: connector.id });
+      toast.success(`${connector.name} enabled`);
+      navigate(`/agents/${agentId}/connectors/${connector.id}`);
     } catch {
-      toast.error(`Failed to disable ${connector.name}`);
+      toast.error(`Failed to enable ${connector.name}`);
+    } finally {
+      setEnablingId(null);
     }
   }
 
   return (
-    <>
-      <TableRow>
-        <TableCell>
-          <div className="flex items-center gap-2.5">
-            <ConnectorLogo
-              name={connector.name}
-              logoSvg={connector.logo_svg}
-              size="sm"
+    <Card>
+      <CardHeader>
+        <CardTitle>Connectors</CardTitle>
+        <CardDescription>
+          Services this agent can interact with. Click a connector to configure
+          credentials and actions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div
+            className="flex items-center justify-center py-8"
+            role="status"
+            aria-label="Loading connectors"
+          >
+            <Loader2
+              className="text-muted-foreground size-6 animate-spin"
+              aria-hidden="true"
             />
-            <div>
-              <p className="font-medium">{connector.name}</p>
-              {connector.description && (
-                <p className="text-muted-foreground text-xs">
-                  {connector.description}
-                </p>
-              )}
-            </div>
           </div>
-        </TableCell>
-        <TableCell className="text-muted-foreground text-sm">
-          {connector.actions.join(", ")}
-        </TableCell>
-        <TableCell className="text-muted-foreground text-sm">
-          {connector.enabled_at
-            ? new Date(connector.enabled_at).toLocaleDateString()
-            : "—"}
-        </TableCell>
-        <TableCell className="text-right">
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                navigate(`/agents/${agentId}/connectors/${connector.id}`)
-              }
-            >
-              Configure
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={() => setRemoveDialogOpen(true)}
-            >
-              Remove
-            </Button>
+        ) : error ? (
+          <p className="text-destructive text-sm">{error}</p>
+        ) : allConnectors.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Plug className="text-muted-foreground mb-3 size-10" />
+            <p className="text-muted-foreground text-sm">
+              No connectors are available yet.
+            </p>
           </div>
-        </TableCell>
-      </TableRow>
+        ) : (
+          <div className="space-y-3">
+            {allConnectors.length >= 4 && (
+              <div className="relative">
+                <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+                <Input
+                  placeholder="Search connectors..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            )}
 
-      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove {connector.name}</DialogTitle>
-            <DialogDescription>
-              This will disable the <strong>{connector.name}</strong> connector
-              for this agent. Any active standing approvals for actions from
-              this connector will be automatically revoked.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
+            {filtered.length === 0 ? (
+              <p className="text-muted-foreground py-6 text-center text-sm">
+                No connectors match &ldquo;{search}&rdquo;
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {filtered.map((connector) => (
+                  <ConnectorCard
+                    key={connector.id}
+                    connector={connector}
+                    isEnabled={enabledIds.has(connector.id)}
+                    isEnabling={enablingId === connector.id}
+                    disabled={enablingId !== null}
+                    onClick={handleClick}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConnectorCard({
+  connector,
+  isEnabled,
+  isEnabling,
+  disabled,
+  onClick,
+}: {
+  connector: ConnectorSummary;
+  isEnabled: boolean;
+  isEnabling: boolean;
+  disabled: boolean;
+  onClick: (connector: ConnectorSummary) => void;
+}) {
+  const actionCount = connector.actions.length;
+
+  return (
+    <button
+      type="button"
+      className="border-border bg-card hover:bg-accent flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors disabled:opacity-50"
+      onClick={() => onClick(connector)}
+      disabled={disabled && !isEnabling}
+    >
+      {isEnabling ? (
+        <Loader2 className="text-muted-foreground size-10 animate-spin" />
+      ) : (
+        <ConnectorLogo
+          name={connector.name}
+          logoSvg={connector.logo_svg}
+          size="lg"
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-center gap-1.5">
+          <p className="text-sm font-medium leading-tight">{connector.name}</p>
+          {isEnabled && (
+            <Badge
               variant="secondary"
-              onClick={() => setRemoveDialogOpen(false)}
-              disabled={disabling}
+              className="px-1.5 py-0 text-[10px] leading-4"
             >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRemove}
-              disabled={disabling}
-            >
-              {disabling && <Loader2 className="animate-spin" />}
-              Remove
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+              Enabled
+            </Badge>
+          )}
+        </div>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-tight">
+          {actionCount} action{actionCount !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </button>
   );
 }

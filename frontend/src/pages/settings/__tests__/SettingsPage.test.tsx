@@ -102,7 +102,6 @@ describe("SettingsLayout", () => {
     // Each nav item renders twice (desktop sidebar + mobile tabs)
     expect(screen.getAllByRole("link", { name: /Profile/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Security/ }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByRole("link", { name: /Integrations/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Billing/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Account/ }).length).toBeGreaterThanOrEqual(1);
   });
@@ -129,14 +128,14 @@ describe("SettingsLayout", () => {
     });
   });
 
-  it("renders integrations sections on /settings/integrations", async () => {
+  it("redirects /settings/integrations to /settings/profile", async () => {
     mockApiFetch();
     renderSettingsAt("/settings/integrations");
 
     await waitFor(() => {
-      expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
+      // Should redirect to profile page since integrations was removed
+      expect(screen.getAllByText("Account").length).toBeGreaterThanOrEqual(2);
     });
-    expect(screen.getByText("Credential Vault")).toBeInTheDocument();
   });
 
   it("renders danger zone on /settings/account", async () => {

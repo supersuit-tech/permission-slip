@@ -3,7 +3,6 @@ import {
   LogOut,
   User,
   Shield,
-  Plug,
   CreditCard,
   Moon,
   LifeBuoy,
@@ -65,10 +64,6 @@ export function UserMenu() {
             <DropdownMenuItem onSelect={() => navigate("/settings/security")}>
               <Shield />
               <span>Security</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/settings/integrations")}>
-              <Plug />
-              <span>Integrations</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => navigate("/settings/billing")}>
               <CreditCard />

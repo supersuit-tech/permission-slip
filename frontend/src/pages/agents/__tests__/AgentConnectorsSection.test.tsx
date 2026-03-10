@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../../../test-helpers";
@@ -12,7 +12,7 @@ import { AgentConnectorsSection } from "../AgentConnectorsSection";
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
-const mockConnectors = [
+const mockEnabledConnectors = [
   {
     id: "gmail",
     name: "Gmail",
@@ -21,15 +21,38 @@ const mockConnectors = [
     required_credentials: ["gmail"],
     enabled_at: "2026-02-18T10:00:00Z",
   },
+];
+
+function mockAllConnectors(connectors = [
+  {
+    id: "gmail",
+    name: "Gmail",
+    description: "Send and manage emails via Gmail API",
+    actions: ["email.send", "email.read"],
+    required_credentials: ["gmail"],
+  },
   {
     id: "github",
     name: "GitHub",
     description: "GitHub integration",
     actions: ["github.create_issue"],
     required_credentials: ["github"],
-    enabled_at: "2026-02-19T10:00:00Z",
   },
-];
+  {
+    id: "slack",
+    name: "Slack",
+    description: "Slack messaging",
+    actions: ["slack.send_message"],
+    required_credentials: ["slack"],
+  },
+]) {
+  mockGet.mockImplementation((url: string) => {
+    if (url === "/v1/connectors") {
+      return Promise.resolve({ data: { data: connectors } });
+    }
+    return Promise.resolve({ data: null });
+  });
+}
 
 describe("AgentConnectorsSection", () => {
   beforeEach(() => {
@@ -39,6 +62,7 @@ describe("AgentConnectorsSection", () => {
   });
 
   it("shows loading state", () => {
+    mockAllConnectors();
     renderWithProviders(
       <AgentConnectorsSection
         agentId={42}
@@ -50,7 +74,8 @@ describe("AgentConnectorsSection", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it("shows error state", () => {
+  it("shows error state", async () => {
+    mockAllConnectors();
     renderWithProviders(
       <AgentConnectorsSection
         agentId={42}
@@ -59,10 +84,49 @@ describe("AgentConnectorsSection", () => {
         error="Something went wrong"
       />,
     );
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    });
   });
 
-  it("shows empty state with Add Connector CTA", () => {
+  it("shows all available connectors as cards", async () => {
+    mockAllConnectors();
+    renderWithProviders(
+      <AgentConnectorsSection
+        agentId={42}
+        connectors={mockEnabledConnectors}
+        isLoading={false}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Gmail")).toBeInTheDocument();
+    });
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.getByText("Slack")).toBeInTheDocument();
+  });
+
+  it("shows Enabled badge on enabled connectors", async () => {
+    mockAllConnectors();
+    renderWithProviders(
+      <AgentConnectorsSection
+        agentId={42}
+        connectors={mockEnabledConnectors}
+        isLoading={false}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Gmail")).toBeInTheDocument();
+    });
+    // Only Gmail is enabled
+    expect(screen.getAllByText("Enabled")).toHaveLength(1);
+  });
+
+  it("shows empty state when no connectors available", async () => {
+    mockAllConnectors([]);
     renderWithProviders(
       <AgentConnectorsSection
         agentId={42}
@@ -71,79 +135,41 @@ describe("AgentConnectorsSection", () => {
         error={null}
       />,
     );
-    expect(screen.getByText("No connectors enabled")).toBeInTheDocument();
-    // One in the header, one in the empty state
-    const addButtons = screen.getAllByText("Add Connector");
-    expect(addButtons.length).toBeGreaterThanOrEqual(2);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No connectors are available yet."),
+      ).toBeInTheDocument();
+    });
   });
 
-  it("renders connector rows with Configure and Remove buttons", () => {
+  it("filters connectors by search", async () => {
+    const user = userEvent.setup();
+    // Need 4+ connectors to show search
+    mockAllConnectors([
+      { id: "gmail", name: "Gmail", description: "Email", actions: ["a"], required_credentials: [] },
+      { id: "github", name: "GitHub", description: "Code", actions: ["b"], required_credentials: [] },
+      { id: "slack", name: "Slack", description: "Chat", actions: ["c"], required_credentials: [] },
+      { id: "stripe", name: "Stripe", description: "Payments", actions: ["d"], required_credentials: [] },
+    ]);
     renderWithProviders(
       <AgentConnectorsSection
         agentId={42}
-        connectors={mockConnectors}
+        connectors={[]}
         isLoading={false}
         error={null}
       />,
     );
-    expect(screen.getByText("Gmail")).toBeInTheDocument();
-    expect(screen.getByText("GitHub")).toBeInTheDocument();
-    expect(screen.getAllByText("Configure")).toHaveLength(2);
-    expect(screen.getAllByText("Remove")).toHaveLength(2);
-  });
 
-  it("opens Add Connector dialog", async () => {
-    const user = userEvent.setup();
-    mockGet.mockResolvedValue({
-      data: {
-        data: [
-          {
-            id: "slack",
-            name: "Slack",
-            description: "Slack messaging",
-            actions: ["slack.send_message"],
-            required_credentials: ["slack"],
-          },
-        ],
-      },
+    await waitFor(() => {
+      expect(screen.getByText("Gmail")).toBeInTheDocument();
     });
 
-    renderWithProviders(
-      <AgentConnectorsSection
-        agentId={42}
-        connectors={mockConnectors}
-        isLoading={false}
-        error={null}
-      />,
-    );
+    const searchInput = screen.getByPlaceholderText("Search connectors...");
+    await user.type(searchInput, "git");
 
-    const addButton = screen.getAllByText("Add Connector")[0];
-    if (addButton) {
-      await user.click(addButton);
-    }
-    expect(
-      screen.getByText(
-        "Enable a connector for this agent to allow it to submit actions from external services.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("opens Remove confirmation dialog", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <AgentConnectorsSection
-        agentId={42}
-        connectors={mockConnectors}
-        isLoading={false}
-        error={null}
-      />,
-    );
-
-    const removeButtons = screen.getAllByText("Remove");
-    const firstRemove = removeButtons[0];
-    if (firstRemove) {
-      await user.click(firstRemove);
-    }
-    expect(screen.getByText("Remove Gmail")).toBeInTheDocument();
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.queryByText("Gmail")).not.toBeInTheDocument();
+    expect(screen.queryByText("Slack")).not.toBeInTheDocument();
   });
 });
