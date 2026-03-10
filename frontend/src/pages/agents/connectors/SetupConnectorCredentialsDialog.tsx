@@ -37,6 +37,21 @@ interface SetupConnectorCredentialsDialogProps {
   connectorLogoSvg?: string;
 }
 
+/**
+ * Modal shown immediately after enabling a connector, guiding the user through
+ * credential setup (OAuth or API key) in a single flow.
+ *
+ * Handles six states:
+ * - Loading: fetching connector detail, OAuth providers, and connections
+ * - No credentials required: connector is ready to use
+ * - Already connected: OAuth connection is active
+ * - Needs reauth: OAuth connection expired or revoked
+ * - OAuth available: prominent "Connect with {Provider}" button
+ * - OAuth unavailable / static only: API key or basic auth input
+ *
+ * For connectors that support both OAuth and static credentials, OAuth is
+ * shown prominently with a "Use API key instead" link in the footer.
+ */
 export function SetupConnectorCredentialsDialog({
   open,
   onOpenChange,

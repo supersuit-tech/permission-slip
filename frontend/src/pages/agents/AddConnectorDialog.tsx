@@ -40,7 +40,9 @@ export function AddConnectorDialog({
   const [search, setSearch] = useState("");
   const [setupConnector, setSetupConnector] = useState<ConnectorSummary | null>(null);
 
-  // Reset setup state when parent closes the dialog externally
+  // Reset setup state when the parent closes the dialog externally (e.g. by
+  // navigating away). Without this, reopening the add-connector dialog would
+  // skip straight to the stale setup modal for the previously-enabled connector.
   useEffect(() => {
     if (!open) {
       setSetupConnector(null);
