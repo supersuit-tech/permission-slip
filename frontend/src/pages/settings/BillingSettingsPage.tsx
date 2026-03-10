@@ -16,15 +16,22 @@ import { PaymentMethodSection } from "./PaymentMethodSection";
 import { DataRetentionSection } from "./DataRetentionSection";
 
 const RETRY_DELAYS = [1000, 2000, 3000];
+const ACTIVATION_KEY = "ps-billing-activation-done";
 
 export function BillingSettingsPage() {
   const { billingPlan, isLoading, error, refetch } = useBillingPlan();
   const { session } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const sessionId = searchParams.get("session_id");
+  const alreadyActivated = sessionId
+    ? sessionStorage.getItem(ACTIVATION_KEY) === sessionId
+    : false;
+
   const [showSuccess, setShowSuccess] = useState(
     searchParams.get("upgraded") === "true",
   );
-  const activateRef = useRef(false);
+  const activateRef = useRef(alreadyActivated);
 
   const isPaidPlan = billingPlan != null && billingPlan.plan.id !== "free";
 
@@ -44,12 +51,18 @@ export function BillingSettingsPage() {
       return;
     }
     activateRef.current = true;
+    if (sessionId) sessionStorage.setItem(ACTIVATION_KEY, sessionId);
     void activateUpgrade(sessionId, session.access_token)
       .then(() => refetch())
       .then((result) => {
         if (result?.data?.plan.id === "free") {
           void retryUntilUpgraded();
         }
+      })
+      .catch(() => {
+        // Activation call failed — fall back to polling so the webhook
+        // can still promote the plan.
+        void retryUntilUpgraded();
       });
   }, [showSuccess, searchParams, session?.access_token, refetch, retryUntilUpgraded]);
 
