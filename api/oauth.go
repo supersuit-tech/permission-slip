@@ -1019,12 +1019,16 @@ func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, prov
 	if returnTo != "" && isRelativePath(returnTo) {
 		path = returnTo
 	}
-	u := oauthBaseURL(deps) + path
-	params := url.Values{}
-	params.Set("oauth_provider", provider)
-	params.Set("oauth_status", status)
-	if errMsg != "" {
-		params.Set("oauth_error", errMsg)
+	parsedURL, err := url.Parse(oauthBaseURL(deps) + path)
+	if err != nil {
+		parsedURL, _ = url.Parse(oauthBaseURL(deps) + "/")
 	}
-	http.Redirect(w, r, u+"?"+params.Encode(), http.StatusTemporaryRedirect)
+	q := parsedURL.Query()
+	q.Set("oauth_provider", provider)
+	q.Set("oauth_status", status)
+	if errMsg != "" {
+		q.Set("oauth_error", errMsg)
+	}
+	parsedURL.RawQuery = q.Encode()
+	http.Redirect(w, r, parsedURL.String(), http.StatusTemporaryRedirect)
 }

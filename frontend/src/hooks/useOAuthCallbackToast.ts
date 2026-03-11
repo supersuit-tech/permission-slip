@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { providerLabel } from "@/lib/labels";
 
@@ -15,6 +16,7 @@ import { providerLabel } from "@/lib/labels";
  */
 export function useOAuthCallbackToast() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const firedRef = useRef(false);
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export function useOAuthCallbackToast() {
       toast.success(
         `Successfully connected ${oauthProvider ? providerLabel(oauthProvider) : "account"}.`,
       );
+      queryClient.invalidateQueries({ queryKey: ["oauth-connections"] });
     } else {
       const oauthError = searchParams.get("oauth_error");
       const label = oauthProvider ? providerLabel(oauthProvider) : "account";
