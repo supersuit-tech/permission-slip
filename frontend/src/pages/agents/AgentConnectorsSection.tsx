@@ -53,13 +53,21 @@ export function AgentConnectorsSection({
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
 
   const query = search.trim().toLowerCase();
-  const filtered = query
-    ? allConnectors.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query) ||
-          c.description?.toLowerCase().includes(query),
-      )
-    : allConnectors;
+  const filtered = (
+    query
+      ? allConnectors.filter(
+          (c) =>
+            c.name.toLowerCase().includes(query) ||
+            c.description?.toLowerCase().includes(query),
+        )
+      : allConnectors
+  )
+    .slice()
+    .sort((a, b) => {
+      const aEnabled = enabledIds.has(a.id) ? 0 : 1;
+      const bEnabled = enabledIds.has(b.id) ? 0 : 1;
+      return aEnabled - bEnabled;
+    });
 
   async function handleClick(connector: ConnectorSummary) {
     if (enabledIds.has(connector.id)) {
