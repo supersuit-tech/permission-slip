@@ -1,5 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { AuthError } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockAuth, setupAuthMocks } from "../../auth/__tests__/fixtures";
@@ -76,5 +77,25 @@ describe("useSignOut", () => {
     });
 
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("clears React Query cache on sign-out", async () => {
+    mockAuth.signOut.mockResolvedValue({ error: null });
+
+    const { result } = renderHook(
+      () => ({ signOut: useSignOut(), queryClient: useQueryClient() }),
+      { wrapper },
+    );
+
+    // Seed the cache with data from the current user.
+    result.current.queryClient.setQueryData(["agent", 42], { agent_id: 42 });
+    expect(result.current.queryClient.getQueryData(["agent", 42])).toBeDefined();
+
+    await act(async () => {
+      await result.current.signOut();
+    });
+
+    // Cache should be empty after sign-out.
+    expect(result.current.queryClient.getQueryData(["agent", 42])).toBeUndefined();
   });
 });

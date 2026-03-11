@@ -73,6 +73,13 @@ const mockCredentialsResponse = {
   ],
 };
 
+const mockAgentResponse = {
+  agent_id: 42,
+  status: "registered",
+  metadata: { name: "Test Agent" },
+  created_at: "2026-02-10T10:00:00Z",
+};
+
 const mockActionConfigsResponse = {
   data: [],
 };
@@ -115,6 +122,9 @@ describe("ConnectorConfigPage", () => {
 
   it("renders connector details after loading", async () => {
     mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/agents/{agent_id}") {
+        return Promise.resolve({ data: mockAgentResponse });
+      }
       if (path === "/v1/connectors/{connector_id}") {
         return Promise.resolve({ data: mockDetailResponse });
       }
@@ -156,8 +166,37 @@ describe("ConnectorConfigPage", () => {
     expect(screen.getByText("Disable")).toBeInTheDocument();
   });
 
+  it("shows 'Agent not found' when user does not own the agent", async () => {
+    mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/agents/{agent_id}") {
+        return Promise.resolve({ error: { message: "Not found" } });
+      }
+      // Connector detail is a public endpoint and still resolves,
+      // but the ownership gate should prevent rendering it.
+      if (path === "/v1/connectors/{connector_id}") {
+        return Promise.resolve({ data: mockDetailResponse });
+      }
+      if (path === "/v1/agents/{agent_id}/connectors") {
+        return Promise.resolve({ error: { message: "Not found" } });
+      }
+      if (path === "/v1/action-configurations") {
+        return Promise.resolve({ data: mockActionConfigsResponse });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Agent not found.")).toBeInTheDocument();
+    });
+  });
+
   it("shows error when connector not found", async () => {
     mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/agents/{agent_id}") {
+        return Promise.resolve({ data: mockAgentResponse });
+      }
       if (path === "/v1/connectors/{connector_id}") {
         return Promise.reject(new Error("Not found"));
       }
@@ -182,6 +221,9 @@ describe("ConnectorConfigPage", () => {
 
   it("shows credentials as not configured when none stored", async () => {
     mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/agents/{agent_id}") {
+        return Promise.resolve({ data: mockAgentResponse });
+      }
       if (path === "/v1/connectors/{connector_id}") {
         return Promise.resolve({ data: mockDetailResponse });
       }

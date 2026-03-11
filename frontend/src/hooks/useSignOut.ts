@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { MFA_PENDING_ENROLLMENT_KEY } from "@/auth/mfaPendingEnrollment";
@@ -11,6 +12,7 @@ import { MFA_PENDING_ENROLLMENT_KEY } from "@/auth/mfaPendingEnrollment";
  */
 export function useSignOut() {
   const { signOut } = useAuth();
+  const queryClient = useQueryClient();
 
   const handleSignOut = useCallback(async () => {
     // Clear MFA enrollment state before sign-out so it doesn't leak
@@ -21,12 +23,16 @@ export function useSignOut() {
       // sessionStorage unavailable
     }
 
+    // Clear all cached query data so the next user doesn't see
+    // the previous user's agents, connectors, approvals, etc.
+    queryClient.clear();
+
     const { error } = await signOut();
     if (error) {
       console.error("Sign out failed:", error);
       toast.error("Sign out failed. Please try again.");
     }
-  }, [signOut]);
+  }, [signOut, queryClient]);
 
   return handleSignOut;
 }
