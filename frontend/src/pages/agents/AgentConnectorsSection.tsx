@@ -16,6 +16,7 @@ import { useConnectors } from "@/hooks/useConnectors";
 import type { ConnectorSummary } from "@/hooks/useConnectors";
 import { useEnableAgentConnector } from "@/hooks/useEnableAgentConnector";
 import type { AgentConnector } from "@/hooks/useAgentConnectors";
+import { SetupConnectorCredentialsDialog } from "./connectors/SetupConnectorCredentialsDialog";
 
 interface AgentConnectorsSectionProps {
   agentId: number;
@@ -44,6 +45,7 @@ export function AgentConnectorsSection({
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [enablingId, setEnablingId] = useState<string | null>(null);
+  const [setupConnector, setSetupConnector] = useState<ConnectorSummary | null>(null);
 
   const isLoading = enabledLoading || allLoading;
   const error = allError ?? enabledError;
@@ -69,7 +71,7 @@ export function AgentConnectorsSection({
     try {
       await enableConnector({ agentId, connectorId: connector.id });
       toast.success(`${connector.name} enabled`);
-      navigate(`/agents/${agentId}/connectors/${connector.id}`);
+      setSetupConnector(connector);
     } catch (err) {
       console.error(`Failed to enable connector ${connector.id}:`, err);
       toast.error(`Failed to enable ${connector.name}`);
@@ -79,6 +81,7 @@ export function AgentConnectorsSection({
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Connectors</CardTitle>
@@ -144,6 +147,23 @@ export function AgentConnectorsSection({
         )}
       </CardContent>
     </Card>
+
+    {setupConnector && (
+      <SetupConnectorCredentialsDialog
+        open
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            const connectorId = setupConnector.id;
+            setSetupConnector(null);
+            navigate(`/agents/${agentId}/connectors/${connectorId}`);
+          }
+        }}
+        connectorId={setupConnector.id}
+        connectorName={setupConnector.name}
+        connectorLogoSvg={setupConnector.logo_svg}
+      />
+    )}
+    </>
   );
 }
 
