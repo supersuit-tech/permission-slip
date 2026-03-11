@@ -206,11 +206,16 @@ func TestAllowQueryParamToken_StripsTokenFromURL(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
 
-	// Use a custom handler that inspects the downstream request URL.
+	// Use a custom handler that inspects the downstream request URL and RequestURI.
 	inspectHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("access_token") != "" {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("access_token should have been stripped from URL"))
+			w.Write([]byte("access_token should have been stripped from r.URL"))
+			return
+		}
+		if strings.Contains(r.RequestURI, "access_token") {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("access_token should have been stripped from r.RequestURI"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)

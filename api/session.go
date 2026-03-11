@@ -368,6 +368,10 @@ func AllowQueryParamToken(next http.Handler) http.Handler {
 				q := r.URL.Query()
 				q.Del("access_token")
 				r.URL.RawQuery = q.Encode()
+				// r.RequestURI is the raw request-target copied verbatim by Clone;
+				// clear it so downstream handlers cannot observe the token via
+				// r.RequestURI even if r.URL.RawQuery is already clean.
+				r.RequestURI = r.URL.RequestURI()
 			}
 		}
 		next.ServeHTTP(w, r)
