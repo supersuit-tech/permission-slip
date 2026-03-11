@@ -18,7 +18,7 @@ func init() {
 // RegisterConfigRoutes adds server configuration endpoints to the mux.
 func RegisterConfigRoutes(mux *http.ServeMux, deps *Deps) {
 	requireSession := RequireSession(deps)
-	mux.Handle("GET /v1/config", requireSession(handleGetConfig(deps)))
+	mux.Handle("GET /config", requireSession(handleGetConfig(deps)))
 }
 
 // handleGetConfig returns server-level feature flags that the frontend needs

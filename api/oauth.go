@@ -106,11 +106,11 @@ func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	requireSession := RequireSession(deps)
 
-	mux.Handle("GET /v1/oauth/providers", requireProfile(handleListOAuthProviders(deps)))
-	mux.Handle("GET /v1/oauth/{provider}/authorize", requireProfile(handleOAuthAuthorize(deps)))
-	mux.Handle("GET /v1/oauth/{provider}/callback", requireSession(handleOAuthCallback(deps)))
-	mux.Handle("GET /v1/oauth/connections", requireProfile(handleListOAuthConnections(deps)))
-	mux.Handle("DELETE /v1/oauth/connections/{provider}", requireProfile(handleDeleteOAuthConnection(deps)))
+	mux.Handle("GET /oauth/providers", requireProfile(handleListOAuthProviders(deps)))
+	mux.Handle("GET /oauth/{provider}/authorize", requireProfile(handleOAuthAuthorize(deps)))
+	mux.Handle("GET /oauth/{provider}/callback", requireSession(handleOAuthCallback(deps)))
+	mux.Handle("GET /oauth/connections", requireProfile(handleListOAuthConnections(deps)))
+	mux.Handle("DELETE /oauth/connections/{provider}", requireProfile(handleDeleteOAuthConnection(deps)))
 }
 
 // --- CSRF state helpers ---

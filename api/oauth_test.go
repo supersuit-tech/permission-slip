@@ -103,7 +103,7 @@ func TestListOAuthProviders_ReturnsRegistered(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/providers", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/providers", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -152,7 +152,7 @@ func TestListOAuthProviders_EmptyWhenNilRegistry(t *testing.T) {
 	deps.OAuthProviders = nil
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/providers", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/providers", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -310,7 +310,7 @@ func TestOAuthAuthorize_Redirect(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -349,7 +349,7 @@ func TestOAuthAuthorize_ProviderNotFound(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/nonexistent/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/nonexistent/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -367,7 +367,7 @@ func TestOAuthAuthorize_ProviderUnconfigured(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/unconfigured/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/unconfigured/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -391,7 +391,7 @@ func TestOAuthAuthorize_InvalidProviderID(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Provider ID with uppercase and special chars should be rejected
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/INVALID%21/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/INVALID%21/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -406,7 +406,7 @@ func TestOAuthAuthorize_Unauthenticated(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := httptest.NewRequest(http.MethodGet, "/v1/oauth/google/authorize", nil)
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -426,7 +426,7 @@ func TestListOAuthConnections_Empty(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/connections", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/connections", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -455,7 +455,7 @@ func TestListOAuthConnections_ReturnsUserConnections(t *testing.T) {
 	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/connections", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/connections", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -497,7 +497,7 @@ func TestListOAuthConnections_IsolatedByUser(t *testing.T) {
 	router := NewRouter(deps)
 
 	// User 2 should see no connections
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/connections", uid2)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/connections", uid2)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -528,7 +528,7 @@ func TestDeleteOAuthConnection_Success(t *testing.T) {
 	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/connections/google", uid)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/google", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -563,7 +563,7 @@ func TestDeleteOAuthConnection_NotFound(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/connections/google", uid)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/google", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -592,7 +592,7 @@ func TestDeleteOAuthConnection_OtherUserCannot(t *testing.T) {
 	router := NewRouter(deps)
 
 	// User 2 tries to delete user 1's connection
-	r := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/connections/google", uid2)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/google", uid2)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -621,7 +621,7 @@ func TestOAuthCallback_MissingState(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/callback?code=test-code", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -644,7 +644,7 @@ func TestOAuthCallback_InvalidState(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/callback?code=test-code&state=invalid-jwt", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code&state=invalid-jwt", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -672,7 +672,7 @@ func TestOAuthCallback_ProviderMismatch(t *testing.T) {
 		t.Fatalf("create state: %v", err)
 	}
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -702,7 +702,7 @@ func TestOAuthCallback_UserMismatch(t *testing.T) {
 		t.Fatalf("create state: %v", err)
 	}
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), uid2)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), uid2)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -724,7 +724,7 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/callback?error=access_denied&error_description=User+denied+consent", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=User+denied+consent", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -754,7 +754,7 @@ func TestOAuthCallback_MissingCode(t *testing.T) {
 		t.Fatalf("create state: %v", err)
 	}
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/callback?state="+url.QueryEscape(state), uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?state="+url.QueryEscape(state), uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1034,7 +1034,7 @@ func TestOAuthAuthorize_Shopify_RequiresShopParam(t *testing.T) {
 	router := NewRouter(deps)
 
 	// No shop param → 400
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/shopify/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1052,7 +1052,7 @@ func TestOAuthAuthorize_Shopify_InvalidShop(t *testing.T) {
 	deps := oauthDepsWithShopify(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize?shop=-invalid", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/shopify/authorize?shop=-invalid", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1070,7 +1070,7 @@ func TestOAuthAuthorize_Shopify_ValidShop(t *testing.T) {
 	deps := oauthDepsWithShopify(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize?shop=mystore", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/shopify/authorize?shop=mystore", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1108,7 +1108,7 @@ func TestOAuthAuthorize_Shopify_FullDomainShop(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Full domain form should also work
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/shopify/authorize?shop=mystore.myshopify.com", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/shopify/authorize?shop=mystore.myshopify.com", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1136,7 +1136,7 @@ func TestOAuthAuthorize_NonShopProvider_IgnoresShopParam(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Google provider should work without shop param and ignore it
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/google/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1556,7 +1556,7 @@ func TestOAuthAuthorize_Zendesk_RequiresSubdomainParam(t *testing.T) {
 	router := NewRouter(deps)
 
 	// No subdomain param → 400
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/zendesk/authorize", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1574,7 +1574,7 @@ func TestOAuthAuthorize_Zendesk_InvalidSubdomain(t *testing.T) {
 	deps := oauthDepsWithZendesk(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize?subdomain=-invalid", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/zendesk/authorize?subdomain=-invalid", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1592,7 +1592,7 @@ func TestOAuthAuthorize_Zendesk_ValidSubdomain(t *testing.T) {
 	deps := oauthDepsWithZendesk(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize?subdomain=mycompany", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/zendesk/authorize?subdomain=mycompany", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -1640,7 +1640,7 @@ func TestOAuthAuthorize_Zendesk_FullDomainSubdomain(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Full domain form should also work
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/zendesk/authorize?subdomain=mycompany.zendesk.com", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/zendesk/authorize?subdomain=mycompany.zendesk.com", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
