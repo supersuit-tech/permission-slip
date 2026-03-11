@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import {
   AlertTriangle,
   Link2,
@@ -92,39 +91,9 @@ function statusBadge(status: string) {
 
 export function ConnectedAccountsSection() {
   const { session } = useAuth();
-  const { connections, isLoading, error, refetch } = useOAuthConnections();
+  const { connections, isLoading, error } = useOAuthConnections();
   const { providers } = useOAuthProviders();
   const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Handle OAuth callback status from redirect
-  useEffect(() => {
-    const oauthStatus = searchParams.get("oauth_status");
-    const oauthProvider = searchParams.get("oauth_provider");
-    if (oauthStatus) {
-      if (oauthStatus === "success") {
-        toast.success(
-          `Successfully connected ${oauthProvider ? providerLabel(oauthProvider) : "account"}.`,
-        );
-        refetch();
-      } else {
-        const oauthError = searchParams.get("oauth_error");
-        const label = oauthProvider
-          ? providerLabel(oauthProvider)
-          : "account";
-        const detail = oauthError
-          ? `Failed to connect ${label}: ${oauthError}`
-          : `Failed to connect ${label}. Please try again.`;
-        toast.error(detail);
-      }
-      // Remove query params without a full navigation
-      searchParams.delete("oauth_status");
-      searchParams.delete("oauth_provider");
-      searchParams.delete("oauth_error");
-      searchParams.delete("oauth_tab");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
 
   async function handleDisconnect(provider: string) {
     try {

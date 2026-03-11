@@ -205,7 +205,7 @@ func TestCreateAndVerifyOAuthState(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestVerifyOAuthState_InvalidSignature(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestVerifyOAuthState_MissingClaims(t *testing.T) {
 func TestVerifyOAuthState_NoSecret(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{}
-	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
+	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
 	if err == nil {
 		t.Fatal("expected error when no secret configured")
 	}
@@ -667,7 +667,7 @@ func TestOAuthCallback_ProviderMismatch(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Create state for "microsoft" but hit google callback
-	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "")
+	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "", "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -696,7 +696,7 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 
 	// State validation now runs before the provider error check, so we need a
 	// valid state token to reach the error-handling branch.
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "")
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -751,7 +751,7 @@ func TestOAuthCallback_MissingCode(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "")
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -953,7 +953,7 @@ func TestCreateAndVerifyOAuthState_WithShop(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore")
+	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -980,7 +980,7 @@ func TestCreateAndVerifyOAuthState_EmptyShop(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
