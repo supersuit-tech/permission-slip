@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -43,7 +44,7 @@ func RequestLoggerMiddleware(logger *slog.Logger, trustedProxyHeader string) fun
 
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
-				slog.String("path", r.RequestURI),
+				slog.String("path", redactAccessToken(r.RequestURI)),
 				slog.Int("status", rec.status),
 				slog.Duration("duration", duration),
 				slog.String("client_ip", clientIP(r, trustedProxyHeader)),
@@ -64,4 +65,42 @@ func RequestLoggerMiddleware(logger *slog.Logger, trustedProxyHeader string) fun
 			logger.LogAttrs(r.Context(), level, "http request", attrs...)
 		})
 	}
+}
+
+// redactAccessToken strips the access_token query parameter value from a
+// request URI to prevent session tokens from appearing in logs.
+// Per RFC 6750 §5.3, logged URIs must not contain bearer tokens.
+func redactAccessToken(uri string) string {
+	// Fast path: no query string or no access_token param.
+	qIdx := strings.IndexByte(uri, '?')
+	if qIdx < 0 {
+		return uri
+	}
+	query := uri[qIdx+1:]
+	if !strings.Contains(query, "access_token=") {
+		return uri
+	}
+
+	// Rebuild query, redacting the access_token value.
+	var b strings.Builder
+	b.WriteString(uri[:qIdx+1]) // path + '?'
+	first := true
+	for query != "" {
+		var param string
+		if i := strings.IndexByte(query, '&'); i >= 0 {
+			param, query = query[:i], query[i+1:]
+		} else {
+			param, query = query, ""
+		}
+		if !first {
+			b.WriteByte('&')
+		}
+		first = false
+		if strings.HasPrefix(param, "access_token=") {
+			b.WriteString("access_token=[REDACTED]")
+		} else {
+			b.WriteString(param)
+		}
+	}
+	return b.String()
 }

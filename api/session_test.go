@@ -83,10 +83,10 @@ func TestRequireSession_ValidToken(t *testing.T) {
 	}
 }
 
-func TestRequireSession_QueryParamToken(t *testing.T) {
+func TestAllowQueryParamToken_ValidToken(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
-	handler := RequireSession(deps)(sessionTestHandler())
+	handler := AllowQueryParamToken(RequireSession(deps)(sessionTestHandler()))
 
 	token := makeToken(t, testJWTSecret, jwt.MapClaims{
 		"sub": "00000000-0000-0000-0000-000000000001",
@@ -111,10 +111,10 @@ func TestRequireSession_QueryParamToken(t *testing.T) {
 	}
 }
 
-func TestRequireSession_HeaderTakesPrecedenceOverQueryParam(t *testing.T) {
+func TestAllowQueryParamToken_HeaderTakesPrecedence(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
-	handler := RequireSession(deps)(sessionTestHandler())
+	handler := AllowQueryParamToken(RequireSession(deps)(sessionTestHandler()))
 
 	// Header token for user 001, query param token for user 002.
 	headerToken := makeToken(t, testJWTSecret, jwt.MapClaims{
@@ -144,6 +144,82 @@ func TestRequireSession_HeaderTakesPrecedenceOverQueryParam(t *testing.T) {
 	// Header should win.
 	if body["user_id"] != "00000000-0000-0000-0000-000000000001" {
 		t.Errorf("expected user_id '00000000-0000-0000-0000-000000000001', got %q", body["user_id"])
+	}
+}
+
+func TestAllowQueryParamToken_ExpiredToken(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	handler := AllowQueryParamToken(RequireSession(deps)(sessionTestHandler()))
+
+	token := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000001",
+		"aud": SupabaseAudAuthenticated,
+		"exp": time.Now().Add(-time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize?access_token="+token, nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAllowQueryParamToken_MalformedToken(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	handler := AllowQueryParamToken(RequireSession(deps)(sessionTestHandler()))
+
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize?access_token=not-a-jwt", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAllowQueryParamToken_WrongAudience(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	handler := AllowQueryParamToken(RequireSession(deps)(sessionTestHandler()))
+
+	token := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000001",
+		"aud": "wrong-audience",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize?access_token="+token, nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestRequireSession_NoQueryParamFallback(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	// RequireSession alone (without AllowQueryParamToken) should NOT accept query params.
+	handler := RequireSession(deps)(sessionTestHandler())
+
+	token := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000001",
+		"aud": SupabaseAudAuthenticated,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(http.MethodGet, "/profile?access_token="+token, nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 (RequireSession should not accept query param), got %d", w.Code)
 	}
 }
 
