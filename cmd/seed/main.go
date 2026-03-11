@@ -132,13 +132,14 @@ func (s *supabaseClient) createUser(id, email, password string) {
 			}
 			log.Fatalf("createUser %s: HTTP request failed after %d attempts: %v", email, maxAttempts, err)
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+			resp.Body.Close()
 			return
 		}
 		var errBody map[string]any
 		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		resp.Body.Close()
 		if resp.StatusCode >= 500 && attempt < maxAttempts {
 			log.Printf("createUser %s: attempt %d got status %d, retrying...", email, attempt, resp.StatusCode)
 			time.Sleep(2 * time.Second)
@@ -150,32 +151,42 @@ func (s *supabaseClient) createUser(id, email, password string) {
 
 // listAllUsers returns the IDs of every user in Supabase Auth.
 // Used during cleanup to wipe all auth users for a clean seed.
+// Paginates through all pages to handle environments with >1000 users.
 func (s *supabaseClient) listAllUsers() []string {
-	apiURL := s.baseURL + "/auth/v1/admin/users?per_page=1000"
-	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		log.Fatalf("listAllUsers: new request failed: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+s.serviceRoleKey)
-	req.Header.Set("apikey", s.serviceRoleKey)
+	var ids []string
+	page := 1
+	for {
+		apiURL := fmt.Sprintf("%s/auth/v1/admin/users?per_page=1000&page=%d", s.baseURL, page)
+		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			log.Fatalf("listAllUsers: new request failed: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+s.serviceRoleKey)
+		req.Header.Set("apikey", s.serviceRoleKey)
 
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		log.Fatalf("listAllUsers: HTTP request failed: %v", err)
-	}
-	defer resp.Body.Close()
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			log.Fatalf("listAllUsers: HTTP request failed: %v", err)
+		}
 
-	var result struct {
-		Users []struct {
-			ID string `json:"id"`
-		} `json:"users"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatalf("listAllUsers: decode failed: %v", err)
-	}
-	ids := make([]string, len(result.Users))
-	for i, u := range result.Users {
-		ids[i] = u.ID
+		var result struct {
+			Users []struct {
+				ID string `json:"id"`
+			} `json:"users"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
+			log.Fatalf("listAllUsers: decode failed: %v", err)
+		}
+		resp.Body.Close()
+
+		for _, u := range result.Users {
+			ids = append(ids, u.ID)
+		}
+		if len(result.Users) == 0 {
+			break
+		}
+		page++
 	}
 	return ids
 }
@@ -203,13 +214,14 @@ func (s *supabaseClient) deleteUser(id string) {
 			}
 			log.Fatalf("deleteUser %s: HTTP request failed after %d attempts: %v", id, maxAttempts, err)
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
+			resp.Body.Close()
 			return
 		}
 		var errBody map[string]any
 		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		resp.Body.Close()
 		if resp.StatusCode >= 500 && attempt < maxAttempts {
 			log.Printf("deleteUser %s: attempt %d got status %d, retrying...", id, attempt, resp.StatusCode)
 			time.Sleep(2 * time.Second)
@@ -301,9 +313,8 @@ func main() {
 		fmt.Println("  - Or use email/password sign-in at http://localhost:5173")
 		fmt.Println("")
 		fmt.Println("Agent API Authentication:")
-		fmt.Println("  Sign requests using the private key at:")
-		fmt.Println("  ~/.ssh/permission_slip_agent")
-		fmt.Println("  (This is the corresponding private key for TEST_AGENT_PUB_KEY)")
+		fmt.Println("  Sign requests using the private key corresponding to TEST_AGENT_PUB_KEY.")
+		fmt.Println("  (Use whichever key you set — no specific path is assumed)")
 		fmt.Println("")
 		fmt.Println("⚠️  DEV MODE ONLY — do not use real credentials.")
 		fmt.Println("================================================================")
@@ -700,7 +711,11 @@ func seedUserHasAgents(ctx context.Context, tx db.DBTX, supa *supabaseClient) {
 		seedOpenclawAgent(ctx, tx, userHasAgents, testAgentPubKey)
 	}
 
-	fmt.Println("  ✓ has-registered-agents@test.local (3 registered, 1 pending, 1 deactivated, 3 agent-connectors)")
+	if os.Getenv("TEST_AGENT_PUB_KEY") != "" {
+		fmt.Println("  ✓ has-registered-agents@test.local (4 registered (incl. Openclaw), 1 pending, 1 deactivated, 3 agent-connectors)")
+	} else {
+		fmt.Println("  ✓ has-registered-agents@test.local (3 registered, 1 pending, 1 deactivated, 3 agent-connectors)")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -859,7 +874,11 @@ func seedUserHasActivity(ctx context.Context, tx db.DBTX, supa *supabaseClient) 
 		seedOpenclawAgent(ctx, tx, userHasActivity, testAgentPubKey)
 	}
 
-	fmt.Println("  ✓ has-recent-activity@test.local (2 active agents, 11 recent approvals, 1 standing approval)")
+	if os.Getenv("TEST_AGENT_PUB_KEY") != "" {
+		fmt.Println("  ✓ has-recent-activity@test.local (3 active agents (incl. Openclaw), 11 recent approvals, 1 standing approval)")
+	} else {
+		fmt.Println("  ✓ has-recent-activity@test.local (2 active agents, 11 recent approvals, 1 standing approval)")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1229,7 +1248,11 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		seedOpenclawAgent(ctx, tx, userHasEverything, testAgentPubKey)
 	}
 
-	fmt.Println("  ✓ has-everything@test.local (10 agents, 6 agent-connectors, 29 approvals, 2 credentials, 3 standing approvals, 4 action configs, 1 invite)")
+	if os.Getenv("TEST_AGENT_PUB_KEY") != "" {
+		fmt.Println("  ✓ has-everything@test.local (11 agents (incl. Openclaw), 6 agent-connectors, 29 approvals, 2 credentials, 3 standing approvals, 4 action configs, 1 invite)")
+	} else {
+		fmt.Println("  ✓ has-everything@test.local (10 agents, 6 agent-connectors, 29 approvals, 2 credentials, 3 standing approvals, 4 action configs, 1 invite)")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1302,5 +1325,9 @@ func seedUserHasPendingApprovals(ctx context.Context, tx db.DBTX, supa *supabase
 		seedOpenclawAgent(ctx, tx, userHasPendingApproval, testAgentPubKey)
 	}
 
-	fmt.Println("  ✓ has-pending-approvals@test.local (2 agents, 4 pending approvals)")
+	if os.Getenv("TEST_AGENT_PUB_KEY") != "" {
+		fmt.Println("  ✓ has-pending-approvals@test.local (3 agents (incl. Openclaw), 4 pending approvals)")
+	} else {
+		fmt.Println("  ✓ has-pending-approvals@test.local (2 agents, 4 pending approvals)")
+	}
 }
