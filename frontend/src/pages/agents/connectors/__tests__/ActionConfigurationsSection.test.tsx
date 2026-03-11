@@ -80,11 +80,13 @@ function renderSection({
   configs = [] as ActionConfiguration[],
   isLoading = false,
   error = null as string | null,
+  connectorName = "GitHub",
 } = {}) {
   return renderWithProviders(
     <ActionConfigurationsSection
       agentId={42}
       connectorId="github"
+      connectorName={connectorName}
       actions={mockActions}
       credentials={mockCredentials}
       configs={configs}
@@ -101,12 +103,17 @@ describe("ActionConfigurationsSection", () => {
     setupAuthMocks({ authenticated: true });
   });
 
-  it("shows empty state when no configurations exist", () => {
+  it("shows empty state with Enable All Actions button", () => {
     renderSection();
     expect(
-      screen.getByText("No action configurations yet."),
+      screen.getByText("Enable All Actions"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your agent can use any action from this connector/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Advanced: configure individual actions"),
+    ).toBeInTheDocument();
   });
 
   it("shows loading state", () => {
@@ -312,5 +319,76 @@ describe("ActionConfigurationsSection", () => {
     ];
     renderSection({ configs: disabledConfig });
     expect(screen.getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("calls create with wildcard action_type when clicking Enable All Actions", async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      data: {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    });
+
+    renderSection();
+    await user.click(screen.getByText("Enable All Actions"));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith("/v1/action-configurations", {
+        headers: { Authorization: "Bearer token" },
+        body: {
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "*",
+          name: "All GitHub Actions",
+          parameters: {},
+        },
+      });
+    });
+  });
+
+  it("renders wildcard config with All Actions badge", () => {
+    const wildcardConfig: ActionConfiguration[] = [
+      {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        credential_id: null,
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        description: null,
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    ];
+    renderSection({ configs: wildcardConfig });
+
+    expect(screen.getByText("All GitHub Actions")).toBeInTheDocument();
+    expect(screen.getByText("All Actions")).toBeInTheDocument();
+    expect(
+      screen.getByText(/All parameters — agent chooses freely/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows advanced option to add custom config in empty state", async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    // Click the advanced toggle
+    await user.click(
+      screen.getByText("Advanced: configure individual actions"),
+    );
+    expect(
+      screen.getByText("Add Custom Configuration"),
+    ).toBeInTheDocument();
   });
 });

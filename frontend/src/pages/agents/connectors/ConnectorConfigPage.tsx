@@ -156,6 +156,7 @@ export function ConnectorConfigPage() {
       <ActionConfigurationsSection
         agentId={agentId}
         connectorId={connectorId}
+        connectorName={connector.name}
         actions={connector.actions}
         credentials={credentials}
         configs={connectorConfigs}

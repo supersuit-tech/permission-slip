@@ -243,3 +243,22 @@ func DeleteActionConfig(ctx context.Context, db DBTX, configID, userID string) (
 	}
 	return ac, nil
 }
+
+// WildcardActionType is the reserved action_type value that means
+// "all actions on this connector".
+const WildcardActionType = "*"
+
+// ConnectorActionExists checks whether a (connector_id, action_type) pair
+// exists in the connector_actions table. Used to validate non-wildcard
+// action types now that the composite FK has been dropped.
+func ConnectorActionExists(ctx context.Context, db DBTX, connectorID, actionType string) (bool, error) {
+	var exists bool
+	err := db.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM connector_actions
+			WHERE connector_id = $1 AND action_type = $2
+		)`,
+		connectorID, actionType,
+	).Scan(&exists)
+	return exists, err
+}

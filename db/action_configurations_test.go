@@ -883,3 +883,157 @@ func TestDeleteActionConfig_WrongUser(t *testing.T) {
 		t.Error("config should still exist after failed delete by wrong user")
 	}
 }
+
+// ── Wildcard Action Type ────────────────────────────────────────────────────
+
+func TestWildcardActionType_InsertSuccess(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+
+	// Wildcard config — no matching connector_action row needed
+	configID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, "*", testhelper.ActionConfigOpts{
+		Name: "All Actions",
+	})
+
+	ac, err := db.GetActionConfigByID(t.Context(), tx, configID, uid)
+	if err != nil {
+		t.Fatalf("GetActionConfigByID: %v", err)
+	}
+	if ac == nil {
+		t.Fatal("expected non-nil result for wildcard config")
+	}
+	if ac.ActionType != "*" {
+		t.Errorf("expected action_type '*', got %q", ac.ActionType)
+	}
+}
+
+func TestWildcardActionType_UniquenessConstraint(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+
+	// First wildcard config succeeds
+	testhelper.InsertActionConfigFull(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, connID, "*", testhelper.ActionConfigOpts{
+		Name: "All Actions 1",
+	})
+
+	// Second wildcard config for same agent+connector should fail
+	err := testhelper.WithSavepoint(t, tx, func() error {
+		_, err := tx.Exec(context.Background(),
+			`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, name)
+			 VALUES ($1, $2, $3, $4, '*', '{}', 'All Actions 2')`,
+			testhelper.GenerateID(t, "ac_"), agentID, uid, connID)
+		return err
+	})
+	if err == nil {
+		t.Error("expected unique constraint violation for duplicate wildcard config, but insert succeeded")
+	}
+}
+
+func TestWildcardActionType_AllowedAlongsideSpecific(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, "test.action", "Test Action")
+
+	// Wildcard config
+	testhelper.InsertActionConfigFull(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, connID, "*", testhelper.ActionConfigOpts{
+		Name: "All Actions",
+	})
+
+	// Specific config for the same agent+connector should also work
+	testhelper.InsertActionConfig(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, connID, "test.action")
+
+	configs, err := db.ListActionConfigsByAgent(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("ListActionConfigsByAgent: %v", err)
+	}
+	if len(configs) != 2 {
+		t.Errorf("expected 2 configs (wildcard + specific), got %d", len(configs))
+	}
+}
+
+func TestWildcardActionType_UniquePerConnector(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	conn1 := testhelper.GenerateID(t, "conn_")
+	conn2 := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, conn1)
+	testhelper.InsertConnector(t, tx, conn2)
+
+	// Wildcard config for connector 1
+	testhelper.InsertActionConfigFull(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, conn1, "*", testhelper.ActionConfigOpts{
+		Name: "All Conn1 Actions",
+	})
+
+	// Wildcard config for connector 2 — should succeed (different connector)
+	testhelper.InsertActionConfigFull(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, conn2, "*", testhelper.ActionConfigOpts{
+		Name: "All Conn2 Actions",
+	})
+
+	configs, err := db.ListActionConfigsByAgent(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("ListActionConfigsByAgent: %v", err)
+	}
+	if len(configs) != 2 {
+		t.Errorf("expected 2 wildcard configs (one per connector), got %d", len(configs))
+	}
+}
+
+// ── ConnectorActionExists ────────────────────────────────────────────────────
+
+func TestConnectorActionExists_Found(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, "test.action", "Test Action")
+
+	exists, err := db.ConnectorActionExists(t.Context(), tx, connID, "test.action")
+	if err != nil {
+		t.Fatalf("ConnectorActionExists: %v", err)
+	}
+	if !exists {
+		t.Error("expected connector action to exist")
+	}
+}
+
+func TestConnectorActionExists_NotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+
+	exists, err := db.ConnectorActionExists(t.Context(), tx, connID, "nonexistent")
+	if err != nil {
+		t.Fatalf("ConnectorActionExists: %v", err)
+	}
+	if exists {
+		t.Error("expected connector action to not exist")
+	}
+}
+
+func TestWildcardActionType_IndexExists(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.RequireIndex(t, tx, "action_configurations", "idx_action_config_wildcard_unique")
+}
