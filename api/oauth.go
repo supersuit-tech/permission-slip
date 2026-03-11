@@ -104,11 +104,10 @@ func init() {
 // RegisterOAuthRoutes adds OAuth-related endpoints to the mux.
 func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
-	requireSession := RequireSession(deps)
 
 	mux.Handle("GET /oauth/providers", requireProfile(handleListOAuthProviders(deps)))
 	mux.Handle("GET /oauth/{provider}/authorize", requireProfile(handleOAuthAuthorize(deps)))
-	mux.Handle("GET /oauth/{provider}/callback", requireSession(handleOAuthCallback(deps)))
+	mux.Handle("GET /oauth/{provider}/callback", handleOAuthCallback(deps))
 	mux.Handle("GET /oauth/connections", requireProfile(handleListOAuthConnections(deps)))
 	mux.Handle("DELETE /oauth/connections/{provider}", requireProfile(handleDeleteOAuthConnection(deps)))
 }
@@ -495,16 +494,14 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Verify the session user matches the state user
-		sessionUserID := UserID(r.Context())
-		if sessionUserID != state.UserID {
-			log.Printf("[%s] OAuthCallback: user mismatch: state=%s session=%s", TraceID(r.Context()), state.UserID, sessionUserID)
-			redirectToFrontend(w, r, deps, providerID, "error", "Session mismatch")
-			return
-		}
+		// The callback is a browser redirect from the OAuth provider, so there
+		// is no Authorization header (no session middleware). The user identity
+		// comes from the signed state token which was created during the
+		// authorize step while the user was authenticated.
+		userID := state.UserID
 
 		// Look up profile for the user
-		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, sessionUserID)
+		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 		if err != nil || profile == nil {
 			log.Printf("[%s] OAuthCallback: profile lookup failed: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found")
