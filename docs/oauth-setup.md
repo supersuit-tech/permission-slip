@@ -782,7 +782,9 @@ The server has no secret to sign OAuth CSRF state tokens. This happens when:
 OAUTH_STATE_SECRET=$(openssl rand -hex 32)
 ```
 
-The server logs a `⚠️ OAUTH_STATE_SECRET` warning at startup when this is missing. Look for lines starting with `⚠️` in your startup logs.
+The server validates this at startup:
+- **Production** (non-dev): a `🚨`/`🛑` fatal-error line aborts startup — look for `config error` in your JSON logs with `"env_var":"OAUTH_STATE_SECRET"`.
+- **Development** (`MODE=development`): a `⚠️` warning is logged but startup continues.
 
 ### Token refresh failures
 

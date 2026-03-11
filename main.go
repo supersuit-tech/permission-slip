@@ -91,19 +91,18 @@ func main() {
 			logger.Warn("config warning", "env_var", w.envVar, "detail", w.message)
 		}
 		if len(warnings) > 0 {
-			log.Printf("⚠️  %d configuration warning(s) — see structured logs above for details", len(warnings))
+			logger.Warn("⚠️ configuration warnings", "count", len(warnings))
 		}
 		if len(errs) > 0 {
 			for _, e := range errs {
 				logger.Error("config error", "env_var", e.envVar, "detail", e.message)
 			}
-			log.Printf("🚨 %d required configuration value(s) missing — see structured logs above", len(errs))
 			log.Fatalf("🛑 Startup aborted: %d required configuration value(s) missing", len(errs))
 		} else {
-			log.Println("✅ Configuration valid — no fatal errors (warnings above are non-blocking)")
+			logger.Info("✅ configuration valid — no fatal errors (warnings above are non-blocking)")
 		}
 	} else {
-		log.Println("✅ All configuration checks passed")
+		logger.Info("✅ all configuration checks passed")
 	}
 
 	port := os.Getenv("PORT")
