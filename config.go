@@ -159,5 +159,75 @@ func validateConfig() (errs []configError, warnings []configError) {
 		})
 	}
 
+	// OAuth state secret — required when SUPABASE_JWT_SECRET is not set
+	// (e.g. JWKS-based auth with Supabase CLI v2+). Without either secret,
+	// OAuth CSRF state tokens cannot be signed and all OAuth flows will fail.
+	if os.Getenv("OAUTH_STATE_SECRET") == "" && !hasJWTSecret {
+		warnings = append(warnings, configError{
+			envVar:  "OAUTH_STATE_SECRET",
+			message: "not set and SUPABASE_JWT_SECRET is empty — OAuth flows will fail (generate with: openssl rand -hex 32)",
+		})
+	}
+
+	// OAuth redirect base URL — needed for constructing callback URLs.
+	if os.Getenv("OAUTH_REDIRECT_BASE_URL") == "" && os.Getenv("BASE_URL") == "" {
+		warnings = append(warnings, configError{
+			envVar:  "OAUTH_REDIRECT_BASE_URL",
+			message: "not set and BASE_URL is empty — OAuth callback URLs cannot be constructed",
+		})
+	}
+
+	// Notification email — warn if provider is set but required companion vars are missing.
+	emailProvider := os.Getenv("NOTIFICATION_EMAIL_PROVIDER")
+	if emailProvider == "twilio-sendgrid" {
+		if os.Getenv("SENDGRID_API_KEY") == "" {
+			warnings = append(warnings, configError{
+				envVar:  "SENDGRID_API_KEY",
+				message: "not set; NOTIFICATION_EMAIL_PROVIDER=twilio-sendgrid but API key is missing — email will be disabled",
+			})
+		}
+		if os.Getenv("NOTIFICATION_EMAIL_FROM") == "" {
+			warnings = append(warnings, configError{
+				envVar:  "NOTIFICATION_EMAIL_FROM",
+				message: "not set; required for sending email notifications",
+			})
+		}
+	} else if emailProvider == "smtp" {
+		if os.Getenv("SMTP_HOST") == "" {
+			warnings = append(warnings, configError{
+				envVar:  "SMTP_HOST",
+				message: "not set; NOTIFICATION_EMAIL_PROVIDER=smtp but SMTP host is missing — email will be disabled",
+			})
+		}
+		if os.Getenv("NOTIFICATION_EMAIL_FROM") == "" {
+			warnings = append(warnings, configError{
+				envVar:  "NOTIFICATION_EMAIL_FROM",
+				message: "not set; required for sending email notifications",
+			})
+		}
+	}
+
+	// Twilio SMS — if any Twilio var is set, all three are required.
+	hasTwilioSID := os.Getenv("TWILIO_ACCOUNT_SID") != ""
+	hasTwilioToken := os.Getenv("TWILIO_AUTH_TOKEN") != ""
+	hasTwilioFrom := os.Getenv("TWILIO_FROM_NUMBER") != ""
+	anyTwilio := hasTwilioSID || hasTwilioToken || hasTwilioFrom
+	if anyTwilio && (!hasTwilioSID || !hasTwilioToken || !hasTwilioFrom) {
+		missing := []string{}
+		if !hasTwilioSID {
+			missing = append(missing, "TWILIO_ACCOUNT_SID")
+		}
+		if !hasTwilioToken {
+			missing = append(missing, "TWILIO_AUTH_TOKEN")
+		}
+		if !hasTwilioFrom {
+			missing = append(missing, "TWILIO_FROM_NUMBER")
+		}
+		warnings = append(warnings, configError{
+			envVar:  strings.Join(missing, " / "),
+			message: "not set; SMS notifications partially configured — all three Twilio vars are required",
+		})
+	}
+
 	return errs, warnings
 }
