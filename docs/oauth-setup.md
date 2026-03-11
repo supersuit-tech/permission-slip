@@ -114,7 +114,7 @@ Permission Slip supports two modes for OAuth provider credentials:
 | Variable | Description | Default |
 |---|---|---|
 | `OAUTH_REDIRECT_BASE_URL` | Base URL for OAuth callbacks (e.g., `https://app.example.com/api`) | Falls back to `BASE_URL` |
-| `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens | Falls back to `SUPABASE_JWT_SECRET` |
+| `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens (generate with `openssl rand -hex 32`) | **Required** when using JWKS auth (no `SUPABASE_JWT_SECRET`). Falls back to `SUPABASE_JWT_SECRET` if unset. |
 | `OAUTH_REFRESH_INTERVAL` | Interval for background token refresh job | `10m` |
 
 ## Atlassian (Jira) OAuth Setup
@@ -770,6 +770,19 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
+
+### "Failed to initiate OAuth flow" error
+
+The server has no secret to sign OAuth CSRF state tokens. This happens when:
+- Using JWKS-based auth (Supabase CLI v2+) where `SUPABASE_JWT_SECRET` is not set
+- `OAUTH_STATE_SECRET` was not explicitly configured
+
+**Fix:** Set the `OAUTH_STATE_SECRET` environment variable:
+```bash
+OAUTH_STATE_SECRET=$(openssl rand -hex 32)
+```
+
+The server logs a `⚠️ OAUTH_STATE_SECRET` warning at startup when this is missing. Look for lines starting with `⚠️` in your startup logs.
 
 ### Token refresh failures
 

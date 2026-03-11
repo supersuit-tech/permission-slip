@@ -345,6 +345,29 @@ func main() {
 		validateConnectorRegistry(registry, deps.DB)
 	}
 
+	// ── Startup env-var health check ──────────────────────────────────────
+	// Warn loudly about missing configuration that will cause runtime errors.
+	// These are non-fatal so the server still starts, but operators can see
+	// at a glance what needs attention.
+	if oauthRegistry.Len() > 0 {
+		if deps.OAuthStateSecret == "" && deps.SupabaseJWTSecret == "" {
+			log.Println("⚠️  OAUTH_STATE_SECRET is not set and SUPABASE_JWT_SECRET is empty — OAuth flows will fail with \"Failed to initiate OAuth flow\". Set OAUTH_STATE_SECRET (openssl rand -hex 32).")
+		}
+		if deps.OAuthRedirectBaseURL == "" && deps.BaseURL == "" {
+			log.Println("⚠️  OAUTH_REDIRECT_BASE_URL and BASE_URL are both empty — OAuth callback URLs cannot be constructed.")
+		}
+		hasConfiguredProvider := false
+		for _, p := range oauthRegistry.List() {
+			if p.HasClientCredentials() {
+				hasConfiguredProvider = true
+				break
+			}
+		}
+		if !hasConfiguredProvider {
+			log.Println("⚠️  No OAuth providers have client credentials configured — users will need to use BYOA (Bring Your Own App) or set provider env vars (e.g. GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).")
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	// API routes
