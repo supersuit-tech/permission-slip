@@ -5,7 +5,7 @@
 
 # Go
 bin/
-seed
+/seed
 
 # Node (matches all directories: frontend/, mobile/, etc.)
 node_modules/
