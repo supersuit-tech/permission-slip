@@ -12,7 +12,7 @@
 // Security:
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
 //   - State encodes user ID + provider to prevent session fixation
-//   - Callback verifies session user matches the state token's user
+//   - Callback derives user identity from the signed state token (no session required)
 //   - Tokens stored server-side in Supabase Vault (AES-256-GCM)
 //   - Provider path params validated against ProviderIDPattern
 //   - No tokens or secrets are ever returned in API responses
@@ -466,17 +466,11 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Check for error from provider (e.g. user denied consent)
-		if errCode := r.URL.Query().Get("error"); errCode != "" {
-			errDesc := r.URL.Query().Get("error_description")
-			if errDesc == "" {
-				errDesc = errCode
-			}
-			redirectToFrontend(w, r, deps, providerID, "error", errDesc)
-			return
-		}
-
-		// Validate CSRF state
+		// Validate CSRF state first — even for error responses from the provider.
+		// Since this endpoint has no session middleware, the signed state token is
+		// the sole proof that the request originated from our authorize flow.
+		// Validating it before anything else prevents unauthenticated callers from
+		// triggering frontend redirects with arbitrary error text.
 		stateStr := r.URL.Query().Get("state")
 		if stateStr == "" {
 			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter")
@@ -491,6 +485,18 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		if state.Provider != providerID {
 			log.Printf("[%s] OAuthCallback: provider mismatch: state=%s path=%s", TraceID(r.Context()), state.Provider, providerID)
 			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch")
+			return
+		}
+
+		// Check for error from provider (e.g. user denied consent).
+		// This runs after state validation so only legitimate OAuth flows can
+		// surface error messages to the frontend.
+		if errCode := r.URL.Query().Get("error"); errCode != "" {
+			errDesc := r.URL.Query().Get("error_description")
+			if errDesc == "" {
+				errDesc = errCode
+			}
+			redirectToFrontend(w, r, deps, providerID, "error", errDesc)
 			return
 		}
 

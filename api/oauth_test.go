@@ -694,7 +694,14 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=User+denied+consent", nil)
+	// State validation now runs before the provider error check, so we need a
+	// valid state token to reach the error-handling branch.
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "")
+	if err != nil {
+		t.Fatalf("createOAuthState: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=User+denied+consent&state="+url.QueryEscape(state), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -707,6 +714,31 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 	}
 	if !strings.Contains(location, "User+denied+consent") && !strings.Contains(location, "User%20denied%20consent") {
 		t.Errorf("expected error description in redirect, got: %s", location)
+	}
+}
+
+func TestOAuthCallback_ProviderErrorWithoutState(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	deps := oauthDeps(tx)
+	router := NewRouter(deps)
+
+	// Without a valid state token, the provider error should NOT be reflected
+	// to the frontend — the request is rejected at state validation instead.
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=Injected+text", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+	location := w.Header().Get("Location")
+	if strings.Contains(location, "Injected") {
+		t.Errorf("unauthenticated error_description should not be reflected, got: %s", location)
+	}
+	if !strings.Contains(location, "Missing+state+parameter") && !strings.Contains(location, "Missing%20state%20parameter") {
+		t.Errorf("expected missing state error, got: %s", location)
 	}
 }
 
