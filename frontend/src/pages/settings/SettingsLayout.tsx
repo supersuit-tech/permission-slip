@@ -4,7 +4,6 @@ import { ProfilePage } from "./ProfilePage";
 import { SecurityPage } from "./SecurityPage";
 import { BillingSettingsPage } from "./BillingSettingsPage";
 import { AccountPage } from "./AccountPage";
-import { IntegrationsPage } from "./IntegrationsPage";
 
 export function SettingsLayout() {
   return (
@@ -20,7 +19,6 @@ export function SettingsLayout() {
             <Route path="security" element={<SecurityPage />} />
             <Route path="billing" element={<BillingSettingsPage />} />
             <Route path="account" element={<AccountPage />} />
-            <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="*" element={<Navigate to="/settings/profile" replace />} />
           </Routes>
         </div>

@@ -128,12 +128,13 @@ describe("SettingsLayout", () => {
     });
   });
 
-  it("renders integrations page at /settings/integrations", async () => {
+  it("redirects unknown sub-routes to /settings/profile", async () => {
     mockApiFetch();
     renderSettingsAt("/settings/integrations");
 
     await waitFor(() => {
-      expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
+      // Should fall through to profile page via catch-all route
+      expect(screen.getAllByText("Account").length).toBeGreaterThanOrEqual(2);
     });
   });
 
