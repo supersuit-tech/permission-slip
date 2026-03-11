@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAgent } from "@/hooks/useAgent";
 import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
@@ -24,6 +25,11 @@ export function ConnectorConfigPage() {
   // prevents the fetch without creating a query keyed on NaN.
   const agentId = paramsValid ? parsedAgentId : 0;
 
+  // Verify the current user owns this agent. The backend scopes by user,
+  // so a non-owned agent returns 404. Without this check the page would
+  // still render public connector catalog data for arbitrary agent IDs.
+  const { agent, isLoading: agentLoading, error: agentError } = useAgent(agentId);
+
   const {
     connector,
     isLoading: connectorLoading,
@@ -43,7 +49,7 @@ export function ConnectorConfigPage() {
   const connectorConfigs = configs.filter((c) => c.connector_id === connectorId);
 
   const hasRequiredCredentials =
-    !connectorLoading && !!connector && connector.required_credentials.length > 0;
+    !connectorLoading && !!connector && (connector.required_credentials?.length ?? 0) > 0;
   const hasConfigCredentials = connectorConfigs.some((c) => !!c.credential_id);
   const shouldFetchCredentials = hasRequiredCredentials || hasConfigCredentials;
   const { credentials } = useCredentials({ enabled: shouldFetchCredentials });
@@ -59,6 +65,34 @@ export function ConnectorConfigPage() {
         <p className="text-destructive text-sm">
           Invalid agent ID or connector ID.
         </p>
+      </div>
+    );
+  }
+
+  // Block access until we confirm the current user owns this agent.
+  if (agentLoading) {
+    return (
+      <div className="space-y-4">
+        <BackLink to={backTo} />
+        <div
+          className="flex items-center justify-center py-12"
+          role="status"
+          aria-label="Loading agent"
+        >
+          <Loader2
+            className="text-muted-foreground size-6 animate-spin"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (agentError || !agent) {
+    return (
+      <div className="space-y-4">
+        <BackLink to={backTo} />
+        <p className="text-destructive text-sm">Agent not found.</p>
       </div>
     );
   }
