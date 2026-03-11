@@ -33,7 +33,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <BetaBanner />
-      <div className="p-3 pb-20 md:p-5 md:pb-5">
+      <div className="p-3 md:p-5 md:pb-5">
       <nav className="mx-auto mb-6 flex max-w-[1200px] items-center rounded-xl border-b-2 bg-card px-4 py-3 shadow-sm md:mb-8 md:px-10 md:py-4">
         <Link to="/" className="flex items-center gap-2 text-base font-bold md:mr-10 md:gap-2.5 md:text-lg">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground md:h-8 md:w-8 md:text-sm">
@@ -88,36 +88,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <Footer className="mx-auto mt-12 max-w-[1200px] border-t pt-4" />
 
       </div>
-      {/* Mobile bottom navigation */}
-      <nav className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-sm md:hidden">
-        <div className="mx-auto flex max-w-md items-center justify-around px-4 py-2">
-          {navItems
-            .filter((item) => item.icon && !item.disabled)
-            .map((item) => {
-              const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
-              const Icon = item.icon!;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )}
-                >
-                  <Icon className="size-5" aria-hidden="true" />
-                  {item.label}
-                  {item.badge != null && item.badge > 0 && (
-                    <span className="absolute -top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-                      {item.badge > 9 ? "9+" : item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-        </div>
-      </nav>
     </div>
   );
 }
