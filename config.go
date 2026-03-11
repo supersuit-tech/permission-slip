@@ -153,28 +153,29 @@ func validateConfig() (errs []configError, warnings []configError) {
 		})
 	}
 	if os.Getenv("BASE_URL") == "" {
+		msg := "not set; invite URLs will not be generated"
+		if os.Getenv("OAUTH_REDIRECT_BASE_URL") == "" {
+			msg += " and OAuth callback URLs cannot be constructed (set BASE_URL or OAUTH_REDIRECT_BASE_URL)"
+		}
 		warnings = append(warnings, configError{
 			envVar:  "BASE_URL",
-			message: "not set; invite URLs will not be generated",
+			message: msg,
 		})
 	}
 
-	// OAuth state secret — required when SUPABASE_JWT_SECRET is not set
-	// (e.g. JWKS-based auth with Supabase CLI v2+). Without either secret,
-	// OAuth CSRF state tokens cannot be signed and all OAuth flows will fail.
+	// OAuth state secret — required in production when SUPABASE_JWT_SECRET is
+	// not set (e.g. JWKS-based auth with Supabase CLI v2+). Without either
+	// secret, OAuth CSRF state tokens cannot be signed and all flows will fail.
 	if os.Getenv("OAUTH_STATE_SECRET") == "" && !hasJWTSecret {
-		warnings = append(warnings, configError{
+		ce := configError{
 			envVar:  "OAUTH_STATE_SECRET",
 			message: "not set and SUPABASE_JWT_SECRET is empty — OAuth flows will fail (generate with: openssl rand -hex 32)",
-		})
-	}
-
-	// OAuth redirect base URL — needed for constructing callback URLs.
-	if os.Getenv("OAUTH_REDIRECT_BASE_URL") == "" && os.Getenv("BASE_URL") == "" {
-		warnings = append(warnings, configError{
-			envVar:  "OAUTH_REDIRECT_BASE_URL",
-			message: "not set and BASE_URL is empty — OAuth callback URLs cannot be constructed",
-		})
+		}
+		if devMode {
+			warnings = append(warnings, ce)
+		} else {
+			errs = append(errs, ce)
+		}
 	}
 
 	// Notification email — warn if provider is set but required companion vars are missing.

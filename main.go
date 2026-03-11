@@ -84,19 +84,23 @@ func main() {
 	}
 
 	// Validate required configuration before proceeding.
+	// Emit structured logs for aggregation pipelines AND plain-text emoji
+	// summaries so operators can spot issues at a glance in terminal output.
 	if errs, warnings := validateConfig(); len(errs) > 0 || len(warnings) > 0 {
+		for _, w := range warnings {
+			logger.Warn("config warning", "env_var", w.envVar, "detail", w.message)
+		}
 		if len(warnings) > 0 {
-			log.Println("⚠️  Missing recommended environment variables:")
-			for _, w := range warnings {
-				log.Printf("  ⚠️  %s — %s", w.envVar, w.message)
-			}
+			log.Printf("⚠️  %d configuration warning(s) — see structured logs above for details", len(warnings))
 		}
 		if len(errs) > 0 {
-			log.Println("🚨 Missing required environment variables:")
 			for _, e := range errs {
-				log.Printf("  🚨 %s — %s", e.envVar, e.message)
+				logger.Error("config error", "env_var", e.envVar, "detail", e.message)
 			}
+			log.Printf("🚨 %d required configuration value(s) missing — see structured logs above", len(errs))
 			log.Fatalf("🛑 Startup aborted: %d required configuration value(s) missing", len(errs))
+		} else {
+			log.Println("✅ Configuration valid — no fatal errors (warnings above are non-blocking)")
 		}
 	} else {
 		log.Println("✅ All configuration checks passed")

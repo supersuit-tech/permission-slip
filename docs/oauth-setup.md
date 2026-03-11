@@ -111,10 +111,10 @@ Permission Slip supports two modes for OAuth provider credentials:
 
 ### OAuth Infrastructure
 
-| Variable | Description | Default |
+| Variable | Description | Default / Notes |
 |---|---|---|
 | `OAUTH_REDIRECT_BASE_URL` | Base URL for OAuth callbacks (e.g., `https://app.example.com/api`) | Falls back to `BASE_URL` |
-| `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens (generate with `openssl rand -hex 32`) | **Required** when using JWKS auth (no `SUPABASE_JWT_SECRET`). Falls back to `SUPABASE_JWT_SECRET` if unset. |
+| `OAUTH_STATE_SECRET` | HMAC secret for signing OAuth CSRF state tokens (generate with `openssl rand -hex 32`). **Required** when using JWKS auth (no `SUPABASE_JWT_SECRET`). | Falls back to `SUPABASE_JWT_SECRET` if unset; no default for JWKS deployments. |
 | `OAUTH_REFRESH_INTERVAL` | Interval for background token refresh job | `10m` |
 
 ## Atlassian (Jira) OAuth Setup
