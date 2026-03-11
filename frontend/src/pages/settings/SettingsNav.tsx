@@ -4,6 +4,7 @@ import {
   Shield,
   CreditCard,
   Settings,
+  Link2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ interface SettingsNavItem {
 const settingsNavItems: SettingsNavItem[] = [
   { label: "Profile", path: "/settings/profile", icon: User },
   { label: "Security", path: "/settings/security", icon: Shield },
+  { label: "Integrations", path: "/settings/integrations", icon: Link2 },
   { label: "Billing", path: "/settings/billing", icon: CreditCard },
   { label: "Account", path: "/settings/account", icon: Settings },
 ];

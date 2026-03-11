@@ -7,11 +7,13 @@ import { ProfilePage } from "./ProfilePage";
 import { SecurityPage } from "./SecurityPage";
 import { BillingSettingsPage } from "./BillingSettingsPage";
 import { AccountPage } from "./AccountPage";
+import { IntegrationsPage } from "./IntegrationsPage";
 
 /**
  * Handles the OAuth callback redirect from the backend. The backend sends
  * users to /settings?oauth_status=success&oauth_provider=github after OAuth
- * completes. This component shows a toast and redirects to /settings/profile.
+ * completes. This component shows a toast and redirects to the appropriate
+ * settings sub-page (integrations for OAuth callbacks, profile otherwise).
  */
 function SettingsIndex() {
   const [searchParams] = useSearchParams();
@@ -40,7 +42,9 @@ function SettingsIndex() {
         toast.error(detail);
       }
     }
-    navigate("/settings/profile", { replace: true });
+    const oauthTab = searchParams.get("oauth_tab");
+    const dest = oauthTab === "connections" ? "/settings/integrations" : "/settings/profile";
+    navigate(dest, { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
 
   return null;
@@ -60,6 +64,7 @@ export function SettingsLayout() {
             <Route path="security" element={<SecurityPage />} />
             <Route path="billing" element={<BillingSettingsPage />} />
             <Route path="account" element={<AccountPage />} />
+            <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="*" element={<Navigate to="/settings/profile" replace />} />
           </Routes>
         </div>
