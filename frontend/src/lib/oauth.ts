@@ -25,6 +25,10 @@ export function getOAuthAuthorizeUrl(
 ): string {
   const baseUrl =
     import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
-  const returnTo = window.location.pathname + window.location.search + window.location.hash;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("oauth_status");
+  url.searchParams.delete("oauth_provider");
+  url.searchParams.delete("oauth_error");
+  const returnTo = url.pathname + (url.search || "") + url.hash;
   return `${baseUrl}/v1/oauth/${providerId}/authorize?access_token=${encodeURIComponent(accessToken)}&return_to=${encodeURIComponent(returnTo)}`;
 }

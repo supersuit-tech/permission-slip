@@ -446,6 +446,10 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// Create the CSRF state token after computing the final scope list so
 		// the callback can store exactly which scopes were requested.
 		returnTo := r.URL.Query().Get("return_to")
+		if returnTo != "" && !isRelativePath(returnTo) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid return_to parameter"))
+			return
+		}
 		profile := Profile(r.Context())
 		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID, returnTo)
 		if err != nil {
