@@ -134,6 +134,56 @@ func TestRequestLoggerMiddleware_IncludesClientIP(t *testing.T) {
 	}
 }
 
+func TestRedactAccessToken(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		uri  string
+		want string
+	}{
+		{"no query", "/api/v1/agents", "/api/v1/agents"},
+		{"no access_token", "/oauth/google/authorize?shop=mystore", "/oauth/google/authorize?shop=mystore"},
+		{"access_token only", "/oauth/google/authorize?access_token=eyJhbGci.xyz.sig", "/oauth/google/authorize?access_token=[REDACTED]"},
+		{"access_token with other params", "/oauth/google/authorize?shop=mystore&access_token=secret123&state=abc", "/oauth/google/authorize?shop=mystore&access_token=[REDACTED]&state=abc"},
+		{"access_token first", "/path?access_token=tok&foo=bar", "/path?access_token=[REDACTED]&foo=bar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := redactAccessToken(tt.uri)
+			if got != tt.want {
+				t.Errorf("redactAccessToken(%q) = %q, want %q", tt.uri, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRequestLoggerMiddleware_RedactsAccessToken(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RequestLoggerMiddleware(logger, "")(inner)
+	req := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize?access_token=secret-jwt-token", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse log entry: %v", err)
+	}
+
+	path, _ := entry["path"].(string)
+	if path != "/oauth/google/authorize?access_token=[REDACTED]" {
+		t.Errorf("expected redacted path, got %q", path)
+	}
+}
+
 func TestStatusRecorder_DefaultsTo200(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()

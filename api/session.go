@@ -176,6 +176,7 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 				RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Missing Authorization header"))
 				return
 			}
+
 			tokenString, ok := strings.CutPrefix(authHeader, "Bearer ")
 			if !ok || tokenString == "" {
 				RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Authorization header must use Bearer scheme"))
@@ -346,4 +347,33 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 func Profile(ctx context.Context) *db.Profile {
 	p, _ := ctx.Value(profileKey{}).(*db.Profile)
 	return p
+}
+
+// AllowQueryParamToken is a middleware that promotes an access_token query
+// parameter into the Authorization header. This implements RFC 6750 §2.3
+// for specific routes reached via browser redirect (e.g. OAuth authorize)
+// where the caller cannot set headers.
+//
+// Apply this only to routes that genuinely need it — query-param tokens
+// are more easily leaked via logs, Referer headers, and browser history
+// than header-based tokens.
+func AllowQueryParamToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" {
+			if qt := r.URL.Query().Get("access_token"); qt != "" {
+				r = r.Clone(r.Context())
+				r.Header.Set("Authorization", "Bearer "+qt)
+				// Strip the token from the URL to prevent leaking via Referer
+				// headers on subsequent redirects (RFC 6750 §5.3).
+				q := r.URL.Query()
+				q.Del("access_token")
+				r.URL.RawQuery = q.Encode()
+				// r.RequestURI is the raw request-target copied verbatim by Clone;
+				// clear it so downstream handlers cannot observe the token via
+				// r.RequestURI even if r.URL.RawQuery is already clean.
+				r.RequestURI = r.URL.RequestURI()
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }

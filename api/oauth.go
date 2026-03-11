@@ -106,7 +106,7 @@ func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 
 	mux.Handle("GET /oauth/providers", requireProfile(handleListOAuthProviders(deps)))
-	mux.Handle("GET /oauth/{provider}/authorize", requireProfile(handleOAuthAuthorize(deps)))
+	mux.Handle("GET /oauth/{provider}/authorize", AllowQueryParamToken(requireProfile(handleOAuthAuthorize(deps))))
 	mux.Handle("GET /oauth/{provider}/callback", handleOAuthCallback(deps))
 	mux.Handle("GET /oauth/connections", requireProfile(handleListOAuthConnections(deps)))
 	mux.Handle("DELETE /oauth/connections/{provider}", requireProfile(handleDeleteOAuthConnection(deps)))
