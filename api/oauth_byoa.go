@@ -74,10 +74,10 @@ func init() {
 func RegisterOAuthBYOARoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 
-	mux.Handle("POST /v1/oauth/provider-configs", requireProfile(handleCreateOAuthProviderConfig(deps)))
-	mux.Handle("GET /v1/oauth/provider-configs", requireProfile(handleListOAuthProviderConfigs(deps)))
-	mux.Handle("PUT /v1/oauth/provider-configs/{provider}", requireProfile(handleUpdateOAuthProviderConfig(deps)))
-	mux.Handle("DELETE /v1/oauth/provider-configs/{provider}", requireProfile(handleDeleteOAuthProviderConfig(deps)))
+	mux.Handle("POST /oauth/provider-configs", requireProfile(handleCreateOAuthProviderConfig(deps)))
+	mux.Handle("GET /oauth/provider-configs", requireProfile(handleListOAuthProviderConfigs(deps)))
+	mux.Handle("PUT /oauth/provider-configs/{provider}", requireProfile(handleUpdateOAuthProviderConfig(deps)))
+	mux.Handle("DELETE /oauth/provider-configs/{provider}", requireProfile(handleDeleteOAuthProviderConfig(deps)))
 }
 
 // --- Helpers ---

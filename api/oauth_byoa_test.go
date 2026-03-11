@@ -58,7 +58,7 @@ func TestCreateOAuthProviderConfig_Success(t *testing.T) {
 	router := NewRouter(deps)
 
 	body := `{"provider":"salesforce","client_id":"my-id","client_secret":"my-secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -119,7 +119,7 @@ func TestCreateOAuthProviderConfig_DuplicateReturnsConflict(t *testing.T) {
 	body := `{"provider":"salesforce","client_id":"id1","client_secret":"secret1"}`
 
 	// First create should succeed.
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -128,7 +128,7 @@ func TestCreateOAuthProviderConfig_DuplicateReturnsConflict(t *testing.T) {
 
 	// Second create should return 409.
 	body2 := `{"provider":"salesforce","client_id":"id2","client_secret":"secret2"}`
-	r2 := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body2)
+	r2 := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body2)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusConflict {
@@ -146,7 +146,7 @@ func TestCreateOAuthProviderConfig_UnknownProviderReturns404(t *testing.T) {
 	router := NewRouter(deps)
 
 	body := `{"provider":"unknown-provider","client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -165,7 +165,7 @@ func TestCreateOAuthProviderConfig_InvalidProviderIDReturns400(t *testing.T) {
 	router := NewRouter(deps)
 
 	body := `{"provider":"INVALID ID!","client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -193,7 +193,7 @@ func TestCreateOAuthProviderConfig_MissingFieldsReturns400(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, tc.body)
+			r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, tc.body)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, r)
 			if w.Code != http.StatusBadRequest {
@@ -223,7 +223,7 @@ func TestCreateOAuthProviderConfig_CredentialTooLongReturns400(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, tc.body)
+			r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, tc.body)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, r)
 			if w.Code != http.StatusBadRequest {
@@ -244,7 +244,7 @@ func TestUpdateOAuthProviderConfig_CredentialTooLongReturns400(t *testing.T) {
 
 	// Create a config first so the PUT has something to update.
 	createBody := `{"provider":"salesforce","client_id":"cid","client_secret":"csecret"}`
-	cr := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, createBody)
+	cr := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, createBody)
 	cw := httptest.NewRecorder()
 	router.ServeHTTP(cw, cr)
 	if cw.Code != http.StatusCreated {
@@ -262,7 +262,7 @@ func TestUpdateOAuthProviderConfig_CredentialTooLongReturns400(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/salesforce", uid, tc.body)
+			r := authenticatedJSONRequest(t, http.MethodPut, "/oauth/provider-configs/salesforce", uid, tc.body)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, r)
 			if w.Code != http.StatusBadRequest {
@@ -283,7 +283,7 @@ func TestListOAuthProviderConfigs_Empty(t *testing.T) {
 	deps, _ := byoaDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/oauth/provider-configs", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/provider-configs", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -311,7 +311,7 @@ func TestListOAuthProviderConfigs_ReturnsCreated(t *testing.T) {
 
 	// Create a config first.
 	body := `{"provider":"salesforce","client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -319,7 +319,7 @@ func TestListOAuthProviderConfigs_ReturnsCreated(t *testing.T) {
 	}
 
 	// List should return the created config.
-	r2 := authenticatedRequest(t, http.MethodGet, "/v1/oauth/provider-configs", uid)
+	r2 := authenticatedRequest(t, http.MethodGet, "/oauth/provider-configs", uid)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
@@ -351,7 +351,7 @@ func TestListOAuthProviderConfigs_IsolatedByUser(t *testing.T) {
 
 	// User 1 creates a config.
 	body := `{"provider":"salesforce","client_id":"id1","client_secret":"secret1"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid1, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid1, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -359,7 +359,7 @@ func TestListOAuthProviderConfigs_IsolatedByUser(t *testing.T) {
 	}
 
 	// User 2 should see an empty list.
-	r2 := authenticatedRequest(t, http.MethodGet, "/v1/oauth/provider-configs", uid2)
+	r2 := authenticatedRequest(t, http.MethodGet, "/oauth/provider-configs", uid2)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
@@ -388,7 +388,7 @@ func TestDeleteOAuthProviderConfig_Success(t *testing.T) {
 
 	// Create a config.
 	body := `{"provider":"salesforce","client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -401,7 +401,7 @@ func TestDeleteOAuthProviderConfig_Success(t *testing.T) {
 	}
 
 	// Delete the config.
-	r2 := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/provider-configs/salesforce", uid)
+	r2 := authenticatedRequest(t, http.MethodDelete, "/oauth/provider-configs/salesforce", uid)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
@@ -455,7 +455,7 @@ func TestDeleteOAuthProviderConfig_NotFoundReturns404(t *testing.T) {
 	deps, _ := byoaDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/provider-configs/salesforce", uid)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/provider-configs/salesforce", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -473,7 +473,7 @@ func TestDeleteOAuthProviderConfig_InvalidIDReturns400(t *testing.T) {
 	deps, _ := byoaDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/provider-configs/INVALID!", uid)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/provider-configs/INVALID!", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -495,7 +495,7 @@ func TestUpdateOAuthProviderConfig_Success(t *testing.T) {
 
 	// Create a config first.
 	createBody := `{"provider":"salesforce","client_id":"old-id","client_secret":"old-secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, createBody)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, createBody)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -509,7 +509,7 @@ func TestUpdateOAuthProviderConfig_Success(t *testing.T) {
 
 	// Update the config with new credentials.
 	updateBody := `{"client_id":"new-id","client_secret":"new-secret"}`
-	r2 := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/salesforce", uid, updateBody)
+	r2 := authenticatedJSONRequest(t, http.MethodPut, "/oauth/provider-configs/salesforce", uid, updateBody)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
@@ -558,7 +558,7 @@ func TestUpdateOAuthProviderConfig_NotFoundReturns404(t *testing.T) {
 	router := NewRouter(deps)
 
 	body := `{"client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/salesforce", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPut, "/oauth/provider-configs/salesforce", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -577,7 +577,7 @@ func TestUpdateOAuthProviderConfig_InvalidIDReturns400(t *testing.T) {
 	router := NewRouter(deps)
 
 	body := `{"client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPut, "/v1/oauth/provider-configs/INVALID!", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPut, "/oauth/provider-configs/INVALID!", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -599,7 +599,7 @@ func TestListOAuthProviderConfigs_IncludesUpdatedAt(t *testing.T) {
 
 	// Create a config.
 	body := `{"provider":"salesforce","client_id":"id","client_secret":"secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -607,7 +607,7 @@ func TestListOAuthProviderConfigs_IncludesUpdatedAt(t *testing.T) {
 	}
 
 	// List should include updated_at.
-	r2 := authenticatedRequest(t, http.MethodGet, "/v1/oauth/provider-configs", uid)
+	r2 := authenticatedRequest(t, http.MethodGet, "/oauth/provider-configs", uid)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
@@ -647,7 +647,7 @@ func TestBYOA_OverridesBuiltInForAuthorize(t *testing.T) {
 
 	// Register BYOA credentials for google.
 	body := `{"provider":"google","client_id":"byoa-client-id","client_secret":"byoa-client-secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -682,7 +682,7 @@ func TestBYOA_DeleteRevertsToBuiltIn(t *testing.T) {
 
 	// Register BYOA for google.
 	body := `{"provider":"google","client_id":"byoa-id","client_secret":"byoa-secret"}`
-	r := authenticatedJSONRequest(t, http.MethodPost, "/v1/oauth/provider-configs", uid, body)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/oauth/provider-configs", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
@@ -690,7 +690,7 @@ func TestBYOA_DeleteRevertsToBuiltIn(t *testing.T) {
 	}
 
 	// Delete BYOA config.
-	r2 := authenticatedRequest(t, http.MethodDelete, "/v1/oauth/provider-configs/google", uid)
+	r2 := authenticatedRequest(t, http.MethodDelete, "/oauth/provider-configs/google", uid)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {

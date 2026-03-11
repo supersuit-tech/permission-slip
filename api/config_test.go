@@ -18,7 +18,7 @@ func TestGetConfig_BillingDisabled(t *testing.T) {
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: false}
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/config", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/config", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -44,7 +44,7 @@ func TestGetConfig_BillingEnabled(t *testing.T) {
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/v1/config", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/config", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -67,7 +67,7 @@ func TestGetConfig_Unauthenticated(t *testing.T) {
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r := httptest.NewRequest(http.MethodGet, "/v1/config", nil)
+	r := httptest.NewRequest(http.MethodGet, "/config", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
