@@ -794,7 +794,7 @@ func TestExportAuditLogs_InvalidEventType(t *testing.T) {
 	}
 }
 
-func TestExportAuditLogs_ActivityFeedOmitsIDAndSourceID(t *testing.T) {
+func TestExportAuditLogs_ActivityFeedOmitsID(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -805,7 +805,8 @@ func TestExportAuditLogs_ActivityFeedOmitsIDAndSourceID(t *testing.T) {
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	// The activity feed (GET /audit-events) should NOT include id or source_id
+	// The activity feed (GET /audit-events) should NOT include id but SHOULD
+	// include source_id (added for click-through detail views).
 	r := authenticatedRequest(t, http.MethodGet, "/audit-events", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -826,8 +827,8 @@ func TestExportAuditLogs_ActivityFeedOmitsIDAndSourceID(t *testing.T) {
 	if _, ok := raw.Data[0]["id"]; ok {
 		t.Error("activity feed response should NOT include 'id' field")
 	}
-	if _, ok := raw.Data[0]["source_id"]; ok {
-		t.Error("activity feed response should NOT include 'source_id' field")
+	if _, ok := raw.Data[0]["source_id"]; !ok {
+		t.Error("activity feed response should include 'source_id' field")
 	}
 }
 
