@@ -77,7 +77,11 @@ func redactAccessToken(uri string) string {
 		return uri
 	}
 	query := uri[qIdx+1:]
-	if !strings.Contains(query, "access_token=") {
+	// Check that "access_token=" appears as a full parameter key — either at
+	// the start of the query string or immediately after a '&' separator.
+	// A plain Contains could false-positive on e.g. "my_access_token=..." or
+	// a value like "foo=access_token=bar".
+	if !strings.HasPrefix(query, "access_token=") && !strings.Contains(query, "&access_token=") {
 		return uri
 	}
 

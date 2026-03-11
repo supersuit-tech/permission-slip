@@ -202,6 +202,36 @@ func TestAllowQueryParamToken_WrongAudience(t *testing.T) {
 	}
 }
 
+func TestAllowQueryParamToken_StripsTokenFromURL(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+
+	// Use a custom handler that inspects the downstream request URL.
+	inspectHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("access_token") != "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("access_token should have been stripped from URL"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := AllowQueryParamToken(RequireSession(deps)(inspectHandler))
+
+	token := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000001",
+		"aud": SupabaseAudAuthenticated,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize?access_token="+token+"&state=abc", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestRequireSession_NoQueryParamFallback(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}

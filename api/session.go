@@ -363,6 +363,11 @@ func AllowQueryParamToken(next http.Handler) http.Handler {
 			if qt := r.URL.Query().Get("access_token"); qt != "" {
 				r = r.Clone(r.Context())
 				r.Header.Set("Authorization", "Bearer "+qt)
+				// Strip the token from the URL to prevent leaking via Referer
+				// headers on subsequent redirects (RFC 6750 §5.3).
+				q := r.URL.Query()
+				q.Del("access_token")
+				r.URL.RawQuery = q.Encode()
 			}
 		}
 		next.ServeHTTP(w, r)
