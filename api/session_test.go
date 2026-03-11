@@ -83,6 +83,70 @@ func TestRequireSession_ValidToken(t *testing.T) {
 	}
 }
 
+func TestRequireSession_QueryParamToken(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	handler := RequireSession(deps)(sessionTestHandler())
+
+	token := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000001",
+		"aud": SupabaseAudAuthenticated,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/authorize?access_token="+token, nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if body["user_id"] != "00000000-0000-0000-0000-000000000001" {
+		t.Errorf("expected user_id '00000000-0000-0000-0000-000000000001', got %q", body["user_id"])
+	}
+}
+
+func TestRequireSession_HeaderTakesPrecedenceOverQueryParam(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	handler := RequireSession(deps)(sessionTestHandler())
+
+	// Header token for user 001, query param token for user 002.
+	headerToken := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000001",
+		"aud": SupabaseAudAuthenticated,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	queryToken := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub": "00000000-0000-0000-0000-000000000002",
+		"aud": SupabaseAudAuthenticated,
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(http.MethodGet, "/profile?access_token="+queryToken, nil)
+	r.Header.Set("Authorization", "Bearer "+headerToken)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	// Header should win.
+	if body["user_id"] != "00000000-0000-0000-0000-000000000001" {
+		t.Errorf("expected user_id '00000000-0000-0000-0000-000000000001', got %q", body["user_id"])
+	}
+}
+
 func TestRequireSession_MissingAuthHeader(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}

@@ -163,8 +163,22 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 	var jwksMisconfigOnce sync.Once
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var tokenString string
+
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
+			if authHeader != "" {
+				var ok bool
+				tokenString, ok = strings.CutPrefix(authHeader, "Bearer ")
+				if !ok || tokenString == "" {
+					RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Authorization header must use Bearer scheme"))
+					return
+				}
+			} else if qt := r.URL.Query().Get("access_token"); qt != "" {
+				// RFC 6750 §2.3: accept Bearer token in the URI query parameter.
+				// This is required for endpoints reached via browser redirect
+				// (e.g. OAuth authorize) where the caller cannot set headers.
+				tokenString = qt
+			} else {
 				// If the request has an agent signature header, the caller is
 				// likely an agent hitting a dashboard endpoint by mistake.
 				// Give a more helpful error message.
@@ -174,11 +188,6 @@ func RequireSession(deps *Deps) func(http.Handler) http.Handler {
 					return
 				}
 				RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Missing Authorization header"))
-				return
-			}
-			tokenString, ok := strings.CutPrefix(authHeader, "Bearer ")
-			if !ok || tokenString == "" {
-				RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidToken, "Authorization header must use Bearer scheme"))
 				return
 			}
 
