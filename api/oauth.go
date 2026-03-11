@@ -133,7 +133,10 @@ func oauthStateSecret(deps *Deps) string {
 // dynamic OAuth URLs — the Shopify store subdomain (e.g. "mystore") or the
 // Zendesk subdomain (e.g. "mycompany"). Pass "" for providers with static
 // OAuth endpoints (e.g. Google, Slack).
-func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop string) (string, error) {
+//
+// The returnTo parameter is the frontend path the user should be sent back
+// to after the callback (e.g. "/agents/1"). Pass "" to redirect to "/".
+func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop, returnTo string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
 		return "", fmt.Errorf("no OAuth state secret configured")
@@ -148,6 +151,9 @@ func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop
 	}
 	if shop != "" {
 		claims["shop"] = shop
+	}
+	if returnTo != "" {
+		claims["return_to"] = returnTo
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
@@ -164,6 +170,10 @@ type oauthState struct {
 	// static OAuth endpoints (e.g. Google, Slack). The JWT claim key is
 	// "shop" for backward compatibility with in-flight tokens.
 	Shop string
+	// ReturnTo is the frontend path the user should be redirected to after
+	// the OAuth callback completes (e.g. "/agents/1"). Empty falls back
+	// to the root path "/".
+	ReturnTo string
 }
 
 // verifyOAuthState validates the signed state JWT and returns the encoded
@@ -203,7 +213,8 @@ func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 		}
 	}
 	shop, _ := claims["shop"].(string)
-	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop}, nil
+	returnTo, _ := claims["return_to"].(string)
+	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo}, nil
 }
 
 // --- Helpers ---
@@ -235,6 +246,13 @@ func newOAuth2Config(deps *Deps, provider oauth.Provider) *oauth2.Config {
 // from appearing in redirect URLs or log messages without validation.
 func validProviderID(id string) bool {
 	return id != "" && oauth.ProviderIDPattern.MatchString(id)
+}
+
+// isRelativePath returns true if s is a relative path that is safe to
+// use as a redirect target (prevents open-redirect via protocol-relative
+// URLs like "//evil.com" or absolute URLs like "https://evil.com").
+func isRelativePath(s string) bool {
+	return strings.HasPrefix(s, "/") && !strings.HasPrefix(s, "//")
 }
 
 // deduplicateScopes returns a new slice with duplicate scope strings removed,
@@ -427,8 +445,9 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 
 		// Create the CSRF state token after computing the final scope list so
 		// the callback can store exactly which scopes were requested.
+		returnTo := r.URL.Query().Get("return_to")
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID)
+		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID, returnTo)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
@@ -473,18 +492,18 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		// triggering frontend redirects with arbitrary error text.
 		stateStr := r.URL.Query().Get("state")
 		if stateStr == "" {
-			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter")
+			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter", "")
 			return
 		}
 		state, err := verifyOAuthState(deps, stateStr)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: invalid state: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Invalid or expired state token")
+			redirectToFrontend(w, r, deps, providerID, "error", "Invalid or expired state token", "")
 			return
 		}
 		if state.Provider != providerID {
 			log.Printf("[%s] OAuthCallback: provider mismatch: state=%s path=%s", TraceID(r.Context()), state.Provider, providerID)
-			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch")
+			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch", state.ReturnTo)
 			return
 		}
 
@@ -496,7 +515,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			if errDesc == "" {
 				errDesc = errCode
 			}
-			redirectToFrontend(w, r, deps, providerID, "error", errDesc)
+			redirectToFrontend(w, r, deps, providerID, "error", errDesc, state.ReturnTo)
 			return
 		}
 
@@ -510,19 +529,19 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 		if err != nil || profile == nil {
 			log.Printf("[%s] OAuthCallback: profile lookup failed: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found")
+			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found", state.ReturnTo)
 			return
 		}
 
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			redirectToFrontend(w, r, deps, providerID, "error", "Missing authorization code")
+			redirectToFrontend(w, r, deps, providerID, "error", "Missing authorization code", state.ReturnTo)
 			return
 		}
 
 		provider, ok := deps.OAuthProviders.Get(providerID)
 		if !ok {
-			redirectToFrontend(w, r, deps, providerID, "error", "Provider not found")
+			redirectToFrontend(w, r, deps, providerID, "error", "Provider not found", state.ReturnTo)
 			return
 		}
 
@@ -548,7 +567,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		token, err := cfg.Exchange(ctx, code)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: token exchange failed: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Token exchange failed")
+			redirectToFrontend(w, r, deps, providerID, "error", "Token exchange failed", state.ReturnTo)
 			return
 		}
 
@@ -587,7 +606,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			extra, err := enricher(ctx, token.AccessToken)
 			if err != nil {
 				log.Printf("[%s] OAuthCallback: post-OAuth enrichment for %q failed: %v", TraceID(r.Context()), providerID, err)
-				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again")
+				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again", state.ReturnTo)
 				return
 			}
 			if stateExtraData == nil {
@@ -600,11 +619,11 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 
 		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection")
+			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection", state.ReturnTo)
 			return
 		}
 
-		redirectToFrontend(w, r, deps, providerID, "success", "")
+		redirectToFrontend(w, r, deps, providerID, "success", "", state.ReturnTo)
 	}
 }
 
@@ -987,15 +1006,19 @@ func oauthCallbackURL(deps *Deps, providerID string) string {
 	return oauthBaseURL(deps) + "/api/v1/oauth/" + url.PathEscape(providerID) + "/callback"
 }
 
-// redirectToFrontend redirects the user's browser to the frontend settings
-// page with a status and optional error message as query parameters. The
-// oauth_tab param lets the frontend auto-navigate to the connections section.
-func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, provider, status, errMsg string) {
-	u := oauthBaseURL(deps) + "/settings"
+// redirectToFrontend redirects the user's browser back to the page they
+// started the OAuth flow from (returnTo), or to "/" if no return path was
+// provided. Status and error info are passed as query parameters so the
+// frontend can display an appropriate toast.
+func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, provider, status, errMsg, returnTo string) {
+	path := "/"
+	if returnTo != "" && isRelativePath(returnTo) {
+		path = returnTo
+	}
+	u := oauthBaseURL(deps) + path
 	params := url.Values{}
 	params.Set("oauth_provider", provider)
 	params.Set("oauth_status", status)
-	params.Set("oauth_tab", "connections")
 	if errMsg != "" {
 		params.Set("oauth_error", errMsg)
 	}

@@ -3,6 +3,7 @@ import { LayoutDashboard, Activity, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApprovals } from "@/hooks/useApprovals";
+import { useOAuthCallbackToast } from "@/hooks/useOAuthCallbackToast";
 import { Footer } from "./Footer";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
@@ -27,6 +28,7 @@ function buildNavItems(pendingCount: number): NavItem[] {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { approvals } = useApprovals();
+  useOAuthCallbackToast();
   const pendingCount = approvals.length;
   const navItems = buildNavItems(pendingCount);
 
