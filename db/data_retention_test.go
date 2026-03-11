@@ -12,9 +12,19 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
+	// cleanStaleAuditEvents removes any pre-existing audit_events rows within
+	// the test transaction so that PurgeExpiredAuditEvents counts only what the
+	// subtest explicitly inserts.  The DELETE is scoped to the transaction and
+	// rolled back at cleanup, so it never affects the real database.
+	cleanStaleAuditEvents := func(t *testing.T, tx db.DBTX) {
+		t.Helper()
+		testhelper.MustExec(t, tx, `DELETE FROM audit_events`)
+	}
+
 	t.Run("PurgesOldEventsForFreePlan", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
+		cleanStaleAuditEvents(t, tx)
 
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -50,6 +60,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 	t.Run("PreservesPaidPlanEvents", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
+		cleanStaleAuditEvents(t, tx)
 
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -73,6 +84,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 	t.Run("PurgesOldEventsForUserWithoutSubscription", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
+		cleanStaleAuditEvents(t, tx)
 
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -108,6 +120,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 	t.Run("PurgesOldPaidPlanEvents", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
+		cleanStaleAuditEvents(t, tx)
 
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -131,6 +144,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 	t.Run("GracePeriodPreservesEventsAfterDowngrade", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
+		cleanStaleAuditEvents(t, tx)
 
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -160,6 +174,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 	t.Run("ExpiredGracePeriodUsesCurrentPlanRetention", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
+		cleanStaleAuditEvents(t, tx)
 
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
