@@ -17,31 +17,34 @@ function SettingsIndex() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const firedRef = useRef(false);
+  const oauthStatus = searchParams.get("oauth_status");
 
   useEffect(() => {
-    if (firedRef.current) return;
+    if (!oauthStatus || firedRef.current) return;
     firedRef.current = true;
 
-    const oauthStatus = searchParams.get("oauth_status");
     const oauthProvider = searchParams.get("oauth_provider");
-    if (oauthStatus) {
-      if (oauthStatus === "success") {
-        toast.success(
-          `Successfully connected ${oauthProvider ? providerLabel(oauthProvider) : "account"}.`,
-        );
-      } else {
-        const oauthError = searchParams.get("oauth_error");
-        const label = oauthProvider
-          ? providerLabel(oauthProvider)
-          : "account";
-        const detail = oauthError
-          ? `Failed to connect ${label}: ${oauthError}`
-          : `Failed to connect ${label}. Please try again.`;
-        toast.error(detail);
-      }
+    if (oauthStatus === "success") {
+      toast.success(
+        `Successfully connected ${oauthProvider ? providerLabel(oauthProvider) : "account"}.`,
+      );
+    } else {
+      const oauthError = searchParams.get("oauth_error");
+      const label = oauthProvider
+        ? providerLabel(oauthProvider)
+        : "account";
+      const detail = oauthError
+        ? `Failed to connect ${label}: ${oauthError}`
+        : `Failed to connect ${label}. Please try again.`;
+      toast.error(detail);
     }
     navigate("/settings/profile", { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount
+
+  // Immediate redirect when there is no OAuth callback — avoids blank flash
+  if (!oauthStatus) {
+    return <Navigate to="/settings/profile" replace />;
+  }
 
   return null;
 }

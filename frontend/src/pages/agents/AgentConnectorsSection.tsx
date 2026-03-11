@@ -33,7 +33,6 @@ export function AgentConnectorsSection({
   agentId,
   connectors: enabledConnectors,
   isLoading: enabledLoading,
-  error: enabledError,
 }: AgentConnectorsSectionProps) {
   const {
     connectors: allConnectors,
@@ -46,7 +45,7 @@ export function AgentConnectorsSection({
   const [enablingId, setEnablingId] = useState<string | null>(null);
 
   const isLoading = enabledLoading || allLoading;
-  const error = allError ?? enabledError;
+  const error = allError; // only block the grid when the full connector list fails
 
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
 
@@ -114,6 +113,7 @@ export function AgentConnectorsSection({
               <div className="relative">
                 <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
                 <Input
+                  aria-label="Search connectors"
                   placeholder="Search connectors..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

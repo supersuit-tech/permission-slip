@@ -75,18 +75,42 @@ describe("AgentConnectorsSection", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
-  it("shows error state", async () => {
+  it("shows error state when all-connectors fetch fails", async () => {
+    // Simulate allConnectors fetch failure
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/connectors") {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve({ data: null });
+    });
+    renderWithProviders(
+      <AgentConnectorsSection
+        agentId={42}
+        connectors={[]}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByText("Unable to load connectors. Please try again later."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("still shows grid when only enabled-connectors fetch fails", async () => {
     mockAllConnectors();
     renderWithProviders(
       <AgentConnectorsSection
         agentId={42}
         connectors={[]}
         isLoading={false}
-        error="Something went wrong"
+        error="Failed to load enabled connectors"
       />,
     );
     await waitFor(() => {
-      expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+      // Grid should still render despite enabledError
+      expect(screen.getByText("Gmail")).toBeInTheDocument();
     });
   });
 
@@ -199,6 +223,29 @@ describe("AgentConnectorsSection", () => {
     await user.type(searchInput, "zzz-no-match");
 
     expect(screen.getByText(/No connectors match/)).toBeInTheDocument();
+  });
+
+  it("navigates directly when clicking an enabled connector without calling PUT", async () => {
+    const user = userEvent.setup();
+    mockAllConnectors();
+
+    renderWithProviders(
+      <AgentConnectorsSection
+        agentId={42}
+        connectors={mockEnabledConnectors}
+        isLoading={false}
+        error={null}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Gmail")).toBeInTheDocument();
+    });
+
+    // Gmail is enabled — clicking should navigate without calling PUT
+    await user.click(screen.getByText("Gmail").closest("button")!);
+
+    expect(mockPut).not.toHaveBeenCalled();
   });
 
   it("enables and navigates when clicking a non-enabled connector", async () => {
