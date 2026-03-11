@@ -58,7 +58,7 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 		"MODE":                       "development",
 		"DATABASE_URL":               "",
 		"SUPABASE_URL":               "",
-		"SUPABASE_JWT_SECRET":        "",
+		"SUPABASE_JWT_SECRET":        "test-secret",
 		"SUPABASE_JWKS_URL":          "",
 		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
 		"INVITE_HMAC_KEY":            "test-key",
@@ -138,6 +138,7 @@ func TestValidateConfig_SupabaseURLSuffices(t *testing.T) {
 		"SUPABASE_URL":        "http://localhost:54321",
 		"SUPABASE_JWT_SECRET": "",
 		"SUPABASE_JWKS_URL":   "",
+		"OAUTH_STATE_SECRET":  "test-oauth-state-secret",
 		"INVITE_HMAC_KEY":     "test-key",
 		"BASE_URL":            "https://example.com",
 		"VAPID_PUBLIC_KEY":    "BExamplePublicKey",
@@ -207,6 +208,7 @@ func TestValidateConfig_AllValid(t *testing.T) {
 		"DATABASE_URL":               "postgres://localhost/test",
 		"SUPABASE_URL":               "http://localhost:54321",
 		"SUPABASE_SERVICE_ROLE_KEY":  "test-service-role-key",
+		"OAUTH_STATE_SECRET":         "test-oauth-state-secret",
 		"INVITE_HMAC_KEY":            "test-key",
 		"BASE_URL":                   "https://example.com",
 		"VAPID_PUBLIC_KEY":           "BExamplePublicKey",
@@ -414,6 +416,7 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 		"DATABASE_URL":               "postgres://localhost/test",
 		"SUPABASE_URL":               "http://localhost:54321",
 		"SUPABASE_SERVICE_ROLE_KEY":  "test-key",
+		"OAUTH_STATE_SECRET":         "test-oauth-state-secret",
 		"BILLING_ENABLED":            "true",
 		"STRIPE_SECRET_KEY":          "sk_test_xxx",
 		"STRIPE_WEBHOOK_SECRET":      "whsec_xxx",
@@ -437,6 +440,77 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("expected no warnings, got %d: %v", len(warnings), warnings)
+	}
+}
+
+func TestValidateConfig_OAuthStateSecret_ErrorInProd(t *testing.T) {
+	// When neither OAUTH_STATE_SECRET nor SUPABASE_JWT_SECRET is set in
+	// production, validateConfig should return a fatal error.
+	setEnvForTest(t, map[string]string{
+		"MODE":                "",
+		"DATABASE_URL":        "postgres://localhost/test",
+		"SUPABASE_URL":        "http://localhost:54321",
+		"SUPABASE_JWT_SECRET": "",
+		"OAUTH_STATE_SECRET":  "",
+	})
+
+	errs, _ := validateConfig()
+	found := false
+	for _, e := range errs {
+		if e.envVar == "OAUTH_STATE_SECRET" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected error for missing OAUTH_STATE_SECRET when SUPABASE_JWT_SECRET is also empty")
+	}
+}
+
+func TestValidateConfig_OAuthStateSecret_WarningInDev(t *testing.T) {
+	// In development mode, missing OAUTH_STATE_SECRET should be a warning, not an error.
+	setEnvForTest(t, map[string]string{
+		"MODE":                "development",
+		"SUPABASE_URL":        "http://localhost:54321",
+		"SUPABASE_JWT_SECRET": "",
+		"OAUTH_STATE_SECRET":  "",
+	})
+
+	errs, warnings := validateConfig()
+	for _, e := range errs {
+		if e.envVar == "OAUTH_STATE_SECRET" {
+			t.Error("OAUTH_STATE_SECRET should be a warning in dev mode, not an error")
+		}
+	}
+	found := false
+	for _, w := range warnings {
+		if w.envVar == "OAUTH_STATE_SECRET" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected warning for missing OAUTH_STATE_SECRET in dev mode")
+	}
+}
+
+func TestValidateConfig_OAuthStateSecret_NoErrorWhenJWTSecretSet(t *testing.T) {
+	// When SUPABASE_JWT_SECRET is set, OAUTH_STATE_SECRET is not required.
+	setEnvForTest(t, map[string]string{
+		"MODE":                "",
+		"DATABASE_URL":        "postgres://localhost/test",
+		"SUPABASE_JWT_SECRET": "my-secret",
+		"OAUTH_STATE_SECRET":  "",
+	})
+
+	errs, warnings := validateConfig()
+	for _, e := range errs {
+		if e.envVar == "OAUTH_STATE_SECRET" {
+			t.Error("should not error for OAUTH_STATE_SECRET when SUPABASE_JWT_SECRET is set")
+		}
+	}
+	for _, w := range warnings {
+		if w.envVar == "OAUTH_STATE_SECRET" {
+			t.Error("should not warn for OAUTH_STATE_SECRET when SUPABASE_JWT_SECRET is set")
+		}
 	}
 }
 
