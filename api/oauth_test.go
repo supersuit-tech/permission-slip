@@ -621,7 +621,7 @@ func TestOAuthCallback_MissingState(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code", uid)
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?code=test-code", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -644,7 +644,7 @@ func TestOAuthCallback_InvalidState(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code&state=invalid-jwt", uid)
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?code=test-code&state=invalid-jwt", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -672,37 +672,7 @@ func TestOAuthCallback_ProviderMismatch(t *testing.T) {
 		t.Fatalf("create state: %v", err)
 	}
 
-	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), uid)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	if w.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
-	}
-	location := w.Header().Get("Location")
-	if !strings.Contains(location, "oauth_status=error") {
-		t.Errorf("expected error status in redirect, got: %s", location)
-	}
-}
-
-func TestOAuthCallback_UserMismatch(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid1 := testhelper.GenerateUID(t)
-	uid2 := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid1, "u1_"+uid1[:8])
-	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
-
-	deps := oauthDeps(tx)
-	router := NewRouter(deps)
-
-	// State is for user1 but session is user2
-	state, err := createOAuthState(deps, uid1, "google", []string{"openid"}, "")
-	if err != nil {
-		t.Fatalf("create state: %v", err)
-	}
-
-	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), uid2)
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?code=test-code&state="+url.QueryEscape(state), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -724,7 +694,14 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=User+denied+consent", uid)
+	// State validation now runs before the provider error check, so we need a
+	// valid state token to reach the error-handling branch.
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "")
+	if err != nil {
+		t.Fatalf("createOAuthState: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=User+denied+consent&state="+url.QueryEscape(state), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -737,6 +714,31 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 	}
 	if !strings.Contains(location, "User+denied+consent") && !strings.Contains(location, "User%20denied%20consent") {
 		t.Errorf("expected error description in redirect, got: %s", location)
+	}
+}
+
+func TestOAuthCallback_ProviderErrorWithoutState(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	deps := oauthDeps(tx)
+	router := NewRouter(deps)
+
+	// Without a valid state token, the provider error should NOT be reflected
+	// to the frontend — the request is rejected at state validation instead.
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?error=access_denied&error_description=Injected+text", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+	location := w.Header().Get("Location")
+	if strings.Contains(location, "Injected") {
+		t.Errorf("unauthenticated error_description should not be reflected, got: %s", location)
+	}
+	if !strings.Contains(location, "Missing+state+parameter") && !strings.Contains(location, "Missing%20state%20parameter") {
+		t.Errorf("expected missing state error, got: %s", location)
 	}
 }
 
@@ -754,7 +756,7 @@ func TestOAuthCallback_MissingCode(t *testing.T) {
 		t.Fatalf("create state: %v", err)
 	}
 
-	r := authenticatedRequest(t, http.MethodGet, "/oauth/google/callback?state="+url.QueryEscape(state), uid)
+	r := httptest.NewRequest(http.MethodGet, "/oauth/google/callback?state="+url.QueryEscape(state), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 

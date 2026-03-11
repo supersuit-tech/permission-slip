@@ -12,7 +12,7 @@
 // Security:
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
 //   - State encodes user ID + provider to prevent session fixation
-//   - Callback verifies session user matches the state token's user
+//   - Callback derives user identity from the signed state token (no session required)
 //   - Tokens stored server-side in Supabase Vault (AES-256-GCM)
 //   - Provider path params validated against ProviderIDPattern
 //   - No tokens or secrets are ever returned in API responses
@@ -104,11 +104,10 @@ func init() {
 // RegisterOAuthRoutes adds OAuth-related endpoints to the mux.
 func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
-	requireSession := RequireSession(deps)
 
 	mux.Handle("GET /oauth/providers", requireProfile(handleListOAuthProviders(deps)))
 	mux.Handle("GET /oauth/{provider}/authorize", requireProfile(handleOAuthAuthorize(deps)))
-	mux.Handle("GET /oauth/{provider}/callback", requireSession(handleOAuthCallback(deps)))
+	mux.Handle("GET /oauth/{provider}/callback", handleOAuthCallback(deps))
 	mux.Handle("GET /oauth/connections", requireProfile(handleListOAuthConnections(deps)))
 	mux.Handle("DELETE /oauth/connections/{provider}", requireProfile(handleDeleteOAuthConnection(deps)))
 }
@@ -467,17 +466,11 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Check for error from provider (e.g. user denied consent)
-		if errCode := r.URL.Query().Get("error"); errCode != "" {
-			errDesc := r.URL.Query().Get("error_description")
-			if errDesc == "" {
-				errDesc = errCode
-			}
-			redirectToFrontend(w, r, deps, providerID, "error", errDesc)
-			return
-		}
-
-		// Validate CSRF state
+		// Validate CSRF state first — even for error responses from the provider.
+		// Since this endpoint has no session middleware, the signed state token is
+		// the sole proof that the request originated from our authorize flow.
+		// Validating it before anything else prevents unauthenticated callers from
+		// triggering frontend redirects with arbitrary error text.
 		stateStr := r.URL.Query().Get("state")
 		if stateStr == "" {
 			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter")
@@ -495,16 +488,26 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Verify the session user matches the state user
-		sessionUserID := UserID(r.Context())
-		if sessionUserID != state.UserID {
-			log.Printf("[%s] OAuthCallback: user mismatch: state=%s session=%s", TraceID(r.Context()), state.UserID, sessionUserID)
-			redirectToFrontend(w, r, deps, providerID, "error", "Session mismatch")
+		// Check for error from provider (e.g. user denied consent).
+		// This runs after state validation so only legitimate OAuth flows can
+		// surface error messages to the frontend.
+		if errCode := r.URL.Query().Get("error"); errCode != "" {
+			errDesc := r.URL.Query().Get("error_description")
+			if errDesc == "" {
+				errDesc = errCode
+			}
+			redirectToFrontend(w, r, deps, providerID, "error", errDesc)
 			return
 		}
 
+		// The callback is a browser redirect from the OAuth provider, so there
+		// is no Authorization header (no session middleware). The user identity
+		// comes from the signed state token which was created during the
+		// authorize step while the user was authenticated.
+		userID := state.UserID
+
 		// Look up profile for the user
-		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, sessionUserID)
+		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 		if err != nil || profile == nil {
 			log.Printf("[%s] OAuthCallback: profile lookup failed: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found")
