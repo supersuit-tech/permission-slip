@@ -7,6 +7,7 @@
 --
 -- Wrapped in a DO block so the migration is safe on plain Postgres (CI)
 -- where the supabase_vault extension is not installed.
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'vault') THEN
@@ -22,9 +23,11 @@ BEGIN
     END IF;
 END
 $$;
+-- +goose StatementEnd
 
 -- +goose Down
 
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'vault') THEN
@@ -38,3 +41,4 @@ BEGIN
     END IF;
 END
 $$;
+-- +goose StatementEnd
