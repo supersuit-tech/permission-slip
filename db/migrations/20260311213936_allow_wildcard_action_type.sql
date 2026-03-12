@@ -15,6 +15,9 @@ CREATE UNIQUE INDEX idx_action_config_wildcard_unique
 
 DROP INDEX IF EXISTS idx_action_config_wildcard_unique;
 
+-- Remove wildcard configs that would violate the FK being restored.
+DELETE FROM action_configurations WHERE action_type = '*';
+
 ALTER TABLE action_configurations
   ADD CONSTRAINT action_configurations_connector_id_action_type_fkey
   FOREIGN KEY (connector_id, action_type)

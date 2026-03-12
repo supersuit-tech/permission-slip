@@ -245,7 +245,14 @@ func DeleteActionConfig(ctx context.Context, db DBTX, configID, userID string) (
 }
 
 // WildcardActionType is the reserved action_type value that means
-// "all actions on this connector".
+// "all actions on this connector". A wildcard config covers every current
+// and future action — the agent can choose any action and any parameter
+// values at execution time. Only one wildcard config is allowed per
+// agent + connector pair (enforced by idx_action_config_wildcard_unique).
+//
+// SECURITY: Wildcard configs skip action-type and parameter validation at
+// execution time, but standing approvals still gate actual execution
+// per-action-type.
 const WildcardActionType = "*"
 
 // ConnectorActionExists checks whether a (connector_id, action_type) pair
