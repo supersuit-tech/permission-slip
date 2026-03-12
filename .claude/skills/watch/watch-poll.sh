@@ -3,7 +3,12 @@
 # Handles all mechanical bookkeeping (fetching, deduplication, idle timeout)
 # and only invokes the Claude agent when there's actionable work.
 #
-# Usage: bash watch-poll.sh <PR_URL> [--automerge]
+# Usage: bash watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>]
+#
+# Options:
+#   --automerge       Enable auto-merge after checks pass
+#   --work-dir <path> Reuse an existing work directory (preserves state
+#                     across invocations: last-seen IDs, action log, cache)
 #
 # Environment:
 #   GH_HOST, GH_REPO — set by caller (defaults provided below)
@@ -18,11 +23,18 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Arguments
 # ---------------------------------------------------------------------------
-PR_URL="${1:?Usage: watch-poll.sh <PR_URL> [--automerge]}"
+PR_URL="${1:?Usage: watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>]}"
 AUTO_MERGE=false
-if [[ "${2:-}" == "--automerge" ]]; then
-  AUTO_MERGE=true
-fi
+EXISTING_WORK_DIR=""
+
+shift
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --automerge) AUTO_MERGE=true; shift ;;
+    --work-dir) EXISTING_WORK_DIR="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
 
 PR_NUMBER=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+')
 if [[ -z "$PR_NUMBER" ]]; then
@@ -39,7 +51,11 @@ BRANCH=$(git branch --show-current)
 # ---------------------------------------------------------------------------
 # Working directory for session state
 # ---------------------------------------------------------------------------
-WORK_DIR=$(mktemp -d "/tmp/watch-session-XXXXXX")
+if [[ -n "$EXISTING_WORK_DIR" && -d "$EXISTING_WORK_DIR" ]]; then
+  WORK_DIR="$EXISTING_WORK_DIR"
+else
+  WORK_DIR=$(mktemp -d "/tmp/watch-session-XXXXXX")
+fi
 # No EXIT trap — the caller (SKILL.md) is responsible for cleanup
 # since work-items.json and action-log.json must survive across script exits.
 
@@ -51,10 +67,11 @@ WORK_ITEMS_FILE="$WORK_DIR/work-items.json"
 ACTION_LOG_FILE="$WORK_DIR/action-log.json"
 CHECKLIST_CACHE_FILE="$WORK_DIR/checklist-cache.txt"
 
-echo "0" > "$LAST_REVIEW_ID_FILE"
-echo "0" > "$LAST_REVIEW_COMMENT_ID_FILE"
-echo "0" > "$LAST_ISSUE_COMMENT_ID_FILE"
-echo "[]" > "$ACTION_LOG_FILE"
+# Only initialize state files if they don't already exist (fresh session)
+[[ -f "$LAST_REVIEW_ID_FILE" ]] || echo "0" > "$LAST_REVIEW_ID_FILE"
+[[ -f "$LAST_REVIEW_COMMENT_ID_FILE" ]] || echo "0" > "$LAST_REVIEW_COMMENT_ID_FILE"
+[[ -f "$LAST_ISSUE_COMMENT_ID_FILE" ]] || echo "0" > "$LAST_ISSUE_COMMENT_ID_FILE"
+[[ -f "$ACTION_LOG_FILE" ]] || echo "[]" > "$ACTION_LOG_FILE"
 
 # Bot username(s) to filter out
 BOT_USERS=("claude-code[bot]" "github-actions[bot]" "claude[bot]")
@@ -259,15 +276,15 @@ fetch_checklist_items() {
     cached=$(cat "$CHECKLIST_CACHE_FILE")
   fi
 
-  local new_items="[]"
-  while IFS= read -r item_text; do
-    [[ -z "$item_text" ]] && continue
-    if [[ -z "$cached" ]] || ! echo "$cached" | grep -qF "$item_text"; then
-      new_items=$(echo "$new_items" | jq --arg text "$item_text" '. + [{type: "checklist", text: $text}]')
-    fi
-  done < <(echo "$items" | jq -r '.[].text')
-
-  echo "$new_items"
+  # Filter out already-processed items using jq (avoids pipe subshell issues)
+  if [[ -z "$cached" ]]; then
+    echo "$items"
+  else
+    # Build a jq filter that excludes exact matches against cached lines
+    echo "$items" | jq --arg cache "$cached" '
+      ($cache | split("\n") | map(select(length > 0))) as $done |
+      [.[] | select(.text as $t | $done | index($t) | not)]'
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -278,12 +295,15 @@ check_off_item() {
   local current_body
   current_body=$(gh_api "/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}" --jq '.body' 2>/dev/null || echo "")
 
-  # Escape special characters for sed
-  local escaped_text
-  escaped_text=$(printf '%s' "$item_text" | sed 's/[&/\]/\\&/g')
-
+  # Use python3 for literal string replacement (avoids sed regex escaping issues)
   local updated_body
-  updated_body=$(echo "$current_body" | sed "s/- \[ \] ${escaped_text}/- [x] ${escaped_text}/")
+  updated_body=$(python3 -c "
+import sys
+body = sys.stdin.read()
+old = '- [ ] ' + sys.argv[1]
+new = '- [x] ' + sys.argv[1]
+print(body.replace(old, new, 1), end='')
+" "$item_text" <<< "$current_body")
 
   gh_api "/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}" -X PATCH -f body="$updated_body" > /dev/null 2>&1
 
@@ -441,7 +461,7 @@ ${open_questions}
 
   wrapup="${wrapup}
 ---
-*Watch session ended after ${MAX_IDLE_CYCLES} minutes of inactivity. Processed ${comment_count} comments across ${total_cycles} poll cycles.*"
+*Watch session ended after $((MAX_IDLE_CYCLES * POLL_INTERVAL / 60)) minutes of inactivity. Processed ${comment_count} comments across ${total_cycles} poll cycles.*"
 
   echo "$wrapup" > "$WORK_DIR/wrap-up.md"
   echo "$wrapup"

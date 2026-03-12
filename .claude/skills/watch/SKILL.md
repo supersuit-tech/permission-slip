@@ -58,7 +58,12 @@ The agent orchestrates the session by running the shell scripts and only doing A
 ### Step 1: Run the polling script
 
 ```bash
-bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" ${AUTO_MERGE:+--automerge} 2>&1
+# First run (no --work-dir):
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") 2>&1
+# Capture WORK_DIR from the session context JSON in the output.
+
+# Subsequent runs (reuse WORK_DIR to preserve state):
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") --work-dir "$WORK_DIR" 2>&1
 ```
 
 The script handles:
@@ -284,7 +289,7 @@ After the agent finishes processing work items, go back to **Step 1** and run th
 When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has already been posted by the script. Run the post-session script:
 
 ```bash
-bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" ${AUTO_MERGE:+--automerge} 2>&1
+bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") 2>&1
 ```
 
 This handles:

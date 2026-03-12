@@ -39,6 +39,18 @@ gh_cmd() {
 }
 
 # ---------------------------------------------------------------------------
+# Snapshot latest run IDs before triggering (to detect new runs)
+# ---------------------------------------------------------------------------
+get_latest_run_id() {
+  local workflow="$1"
+  gh_cmd run list --workflow="$workflow" --branch "$BRANCH" --limit 1 --json databaseId 2>/dev/null \
+    | jq -r '.[0].databaseId // "0"'
+}
+
+ci_prev_run_id=$(get_latest_run_id "ci.yml")
+audit_prev_run_id=$(get_latest_run_id "audit.yml")
+
+# ---------------------------------------------------------------------------
 # Trigger CI and audit workflows
 # ---------------------------------------------------------------------------
 echo "[post] Triggering CI workflow on ${BRANCH}..."
@@ -52,6 +64,7 @@ gh_cmd workflow run audit.yml --ref "$BRANCH" 2>/dev/null || echo "[post] WARNIN
 # ---------------------------------------------------------------------------
 wait_for_workflow() {
   local workflow="$1"
+  local prev_run_id="$2"
   local max_wait=600  # 10 minutes
   local elapsed=0
 
@@ -66,7 +79,8 @@ wait_for_workflow() {
     conclusion=$(echo "$result" | jq -r '.[0].conclusion // "unknown"')
     run_id=$(echo "$result" | jq -r '.[0].databaseId // "unknown"')
 
-    if [[ "$status" == "completed" ]]; then
+    # Skip stale runs from before we triggered
+    if [[ "$run_id" != "unknown" && "$run_id" != "$prev_run_id" && "$status" == "completed" ]]; then
       echo "${conclusion}:${run_id}"
       return
     fi
@@ -79,13 +93,13 @@ wait_for_workflow() {
 }
 
 echo "[post] Waiting for CI workflow..."
-ci_result=$(wait_for_workflow "ci.yml")
+ci_result=$(wait_for_workflow "ci.yml" "$ci_prev_run_id")
 ci_conclusion="${ci_result%%:*}"
 ci_run_id="${ci_result##*:}"
 echo "[post] CI result: ${ci_conclusion} (run ${ci_run_id})"
 
 echo "[post] Waiting for audit workflow..."
-audit_result=$(wait_for_workflow "audit.yml")
+audit_result=$(wait_for_workflow "audit.yml" "$audit_prev_run_id")
 audit_conclusion="${audit_result%%:*}"
 audit_run_id="${audit_result##*:}"
 echo "[post] Audit result: ${audit_conclusion} (run ${audit_run_id})"
