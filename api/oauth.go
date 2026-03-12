@@ -968,13 +968,19 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Delete vault secrets (best-effort — idempotent).
+		// Delete vault secrets within the transaction. A failure here aborts
+		// the PostgreSQL transaction, so we must return immediately on error
+		// (matching the pattern in handleDeleteCredential).
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.AccessTokenVaultID); err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: vault delete access: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+			return
 		}
 		if result.RefreshTokenVaultID != nil {
 			if err := deps.Vault.DeleteSecret(r.Context(), tx, *result.RefreshTokenVaultID); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: vault delete refresh: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+				return
 			}
 		}
 

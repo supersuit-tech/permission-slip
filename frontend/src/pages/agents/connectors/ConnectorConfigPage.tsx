@@ -171,6 +171,11 @@ export function ConnectorConfigPage() {
         agentId={agentId}
         connectorId={connectorId}
         connectorName={connector.name}
+        oauthProvider={
+          connector.required_credentials?.find(
+            (c) => c.auth_type === "oauth2" && c.oauth_provider,
+          )?.oauth_provider ?? undefined
+        }
       />
     </div>
   );
