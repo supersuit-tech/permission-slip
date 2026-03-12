@@ -19,7 +19,31 @@ Agent ──→ Permission Slip ──→ External Service
           User (approve/deny)
 ```
 
-## Quick Start
+## Quick Start (CLI — recommended)
+
+The `@permission-slip/cli` npm package handles key generation, signing, config
+storage, and API calls automatically. Requires Node.js 18+.
+
+```bash
+# Step 1: Register (user shares an invite code with you)
+npx @permission-slip/cli register --invite-code <code>
+
+# Step 2: Verify (user shares the confirmation code from their dashboard)
+npx @permission-slip/cli verify --code <confirmation_code>
+
+# Step 3: Discover what you can do
+npx @permission-slip/cli capabilities
+
+# Step 4: Request approval and execute
+npx @permission-slip/cli request --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
+npx @permission-slip/cli execute --token <token> --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
+```
+
+Run `npx @permission-slip/cli --help` for all available commands.
+
+## Manual Quick Start (raw HTTP)
+
+If you can't use Node.js, you can interact with the API directly:
 
 1. [Generate an Ed25519 key pair](#1-generate-your-key-pair)
 2. [Register with an invite URL](#2-register-with-permission-slip)

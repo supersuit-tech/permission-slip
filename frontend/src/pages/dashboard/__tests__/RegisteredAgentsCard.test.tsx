@@ -271,7 +271,7 @@ describe("RegisteredAgentsCard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Generate registration instructions/)
+        screen.getByText(/Generate a one-time invite command/)
       ).toBeInTheDocument();
     });
   });
@@ -371,7 +371,7 @@ describe("RegisteredAgentsCard", () => {
       expect(screen.getByText("Complete Agent Registration")).toBeInTheDocument();
     });
     expect(
-      screen.getByText("Share this code with the agent to complete registration"),
+      screen.getByText("Confirmation code (included in the command below)"),
     ).toBeInTheDocument();
   });
 

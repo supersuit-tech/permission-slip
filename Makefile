@@ -9,12 +9,14 @@
        migrate-up migrate-down migrate-create db-setup seed \
        bundle generate generate-vapid-keys install-connectors \
        audit audit-backend audit-frontend audit-mobile \
-       docker-build deploy
+       docker-build deploy \
+       cli cli-install cli-build cli-test
 
-# Install all dependencies (frontend + backend + mobile)
+# Install all dependencies (frontend + backend + mobile + cli)
 install:
 	cd frontend && npm install
 	cd mobile && npm install
+	cd cli && npm install
 	go mod download
 
 # Full setup: install deps + generate API client
@@ -87,7 +89,7 @@ deploy:
 
 # ---------- Testing ----------
 
-test: test-backend test-frontend mobile-test
+test: test-backend test-frontend mobile-test cli-test
 
 test-backend:
 	go test ./...
@@ -204,6 +206,23 @@ install-connectors:
 # Generate a VAPID key pair for Web Push (required to enable Web Push in production)
 generate-vapid-keys:
 	go run ./cmd/generate-vapid-keys
+
+# ---------- CLI ----------
+
+# Install CLI dependencies
+cli-install:
+	cd cli && npm install
+
+# Build the CLI (TypeScript → dist/)
+cli-build: cli-install
+	cd cli && npm run build
+
+# Run CLI tests
+cli-test: cli-install
+	cd cli && npm test
+
+# Shorthand: install + build + test
+cli: cli-build cli-test
 
 # Create a new migration file: make migrate-create NAME=add_users_table
 migrate-create:

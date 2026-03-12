@@ -44,12 +44,11 @@ export function ReviewPendingAgentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Complete Agent Registration</DialogTitle>
           <DialogDescription>
-            This agent is waiting to complete registration. Copy the
-            instructions below and send them to the agent.
+            Tell your agent to run this command to finish registration.
           </DialogDescription>
         </DialogHeader>
 
@@ -74,7 +73,7 @@ export function ReviewPendingAgentDialog({
             <ConfirmationCodeBanner
               code={agent.confirmation_code}
               copyable
-              description="Share this code with the agent to complete registration"
+              description="Confirmation code (included in the command below)"
             />
           )}
 
@@ -83,15 +82,12 @@ export function ReviewPendingAgentDialog({
             <ExpiryInfo expiresAt={agent.expires_at} />
           )}
 
-          {/* Verification instructions for the agent */}
+          {/* One-line verify command */}
           {verificationInstructions && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Instructions for your agent</p>
-              <InstructionsBlock
-                instructions={verificationInstructions}
-                buttonLabel="Copy Verification Instructions"
-              />
-            </div>
+            <InstructionsBlock
+              instructions={verificationInstructions}
+              buttonLabel="Copy Verification Command"
+            />
           )}
         </div>
 
