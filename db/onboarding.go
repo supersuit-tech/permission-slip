@@ -58,10 +58,11 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username string, market
 
 	var p Profile
 	err = db.QueryRow(ctx,
-		`INSERT INTO profiles (id, username, marketing_opt_in) VALUES ($1, $2, $3)
-		 RETURNING id, username, marketing_opt_in, created_at`,
+		`INSERT INTO profiles (id, username, email, marketing_opt_in)
+		 VALUES ($1, $2, (SELECT email FROM auth.users WHERE id = $1), $3)
+		 RETURNING id, username, email, phone, marketing_opt_in, created_at`,
 		userID, username, marketingOptIn,
-	).Scan(&p.ID, &p.Username, &p.MarketingOptIn, &p.CreatedAt)
+	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
