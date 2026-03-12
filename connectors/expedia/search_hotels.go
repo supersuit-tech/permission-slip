@@ -18,6 +18,15 @@ type searchHotelsAction struct {
 	conn *ExpediaConnector
 }
 
+// ParameterAliases maps common agent shorthand to the canonical parameter names.
+// Agents sometimes send "check_in"/"check_out" instead of "checkin"/"checkout".
+func (a *searchHotelsAction) ParameterAliases() map[string]string {
+	return map[string]string{
+		"check_in":  "checkin",
+		"check_out": "checkout",
+	}
+}
+
 // searchHotelsParams are the parameters parsed from ActionRequest.Parameters.
 type searchHotelsParams struct {
 	Checkin    string    `json:"checkin"`

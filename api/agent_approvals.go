@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/shared"
 )
@@ -136,6 +137,25 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			result := ValidateConfigurationReference(w, r, deps, req.Configuration.ConfigurationID, agent.AgentID, actionType, actionParams)
 			if result == nil {
 				return // error already written
+			}
+		}
+
+		// Normalize parameter aliases before storage so canonical keys are stored.
+		// Actions declare their own aliases via ParameterAliaser; the API layer
+		// rewrites them here so the stored action JSON is always canonical.
+		if deps.Connectors != nil {
+			if action, ok := deps.Connectors.GetAction(actionType); ok {
+				if aliaser, ok := action.(connectors.ParameterAliaser); ok {
+					if aliases := aliaser.ParameterAliases(); len(aliases) > 0 {
+						if rawParams, hasParams := actionObj["parameters"]; hasParams {
+							normalized := connectors.NormalizeParameters(aliases, rawParams)
+							actionObj["parameters"] = normalized
+							if updated, err := json.Marshal(actionObj); err == nil {
+								req.Action = updated
+							}
+						}
+					}
+				}
 			}
 		}
 

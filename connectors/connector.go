@@ -16,6 +16,18 @@ type Action interface {
 	Execute(ctx context.Context, req ActionRequest) (*ActionResult, error)
 }
 
+// ParameterAliaser is an optional interface implemented by actions that
+// accept common aliases for their parameter names. The API layer checks for
+// this interface at approval ingestion time and rewrites aliases to canonical
+// keys before storing, so stored parameters are always canonical.
+//
+// Example: an action that expects "start_time" may return
+// map[string]string{"start": "start_time"} so that agents sending "start"
+// have their parameter automatically rewritten before storage and execution.
+type ParameterAliaser interface {
+	ParameterAliases() map[string]string // alias key → canonical key
+}
+
 // Connector represents an integration with an external service.
 // It owns shared configuration (HTTP clients, base URLs, auth helpers)
 // and registers the actions it supports.

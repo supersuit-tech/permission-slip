@@ -16,6 +16,15 @@ type updateCalendarEventAction struct {
 	conn *GoogleConnector
 }
 
+// ParameterAliases maps common agent shorthand to the canonical parameter names.
+// Agents sometimes send "start"/"end" instead of "start_time"/"end_time".
+func (a *updateCalendarEventAction) ParameterAliases() map[string]string {
+	return map[string]string{
+		"start": "start_time",
+		"end":   "end_time",
+	}
+}
+
 // updateCalendarEventParams is the user-facing parameter schema.
 type updateCalendarEventParams struct {
 	EventID        string   `json:"event_id"`
