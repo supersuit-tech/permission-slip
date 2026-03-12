@@ -407,6 +407,35 @@ func TestValidateConfigurationReference_WildcardMatchesAnyActionType(t *testing.
 	}
 }
 
+func TestValidateConfigurationReference_WildcardDisabledConfig(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".some_action", "Some Action")
+
+	configID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, "*", testhelper.ActionConfigOpts{
+		Name:   "All Actions",
+		Status: "disabled",
+	})
+
+	// A disabled wildcard config should be rejected. The query filters by
+	// status='active', so it returns not-found (400) rather than found-but-disabled (403).
+	deps, w, r := newTestRequest(tx)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, connID+".some_action", json.RawMessage(`{}`))
+	if result != nil {
+		t.Fatal("expected nil result for disabled wildcard config")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for disabled config (filtered by query), got %d", w.Code)
+	}
+	assertErrorCode(t, w.Body.Bytes(), string(ErrInvalidConfiguration))
+}
+
 func TestValidateConfigurationReference_WildcardAcceptsAnyParameters(t *testing.T) {
 	t.Parallel()
 	tx, _, agentID, connID, configID := setupWildcardConfigTest(t)
