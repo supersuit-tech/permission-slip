@@ -5,9 +5,8 @@ export function CookiePolicyPage() {
   return (
     <PolicyLayout title="Cookie Policy" lastUpdated="February 28, 2026">
       <p>
-        This Cookie Policy explains how Rocktown Capital LLC, doing business as
-        Supersuit Technologies (&quot;we,&quot; &quot;us,&quot; or
-        &quot;our&quot;), uses cookies and similar local storage technologies
+        This Cookie Policy explains how Supersuit Technologies LLC
+        (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) uses cookies and similar local storage technologies
         when you use Permission Slip at{" "}
         <a
           href="https://app.permissionslip.dev"
