@@ -144,6 +144,7 @@ export function DisableConnectorSection({
                 <Button
                   variant="destructive"
                   size="sm"
+                  disabled={isRemoving}
                   onClick={() => setRemoveConfirmOpen(true)}
                 >
                   Remove
@@ -187,7 +188,7 @@ export function DisableConnectorSection({
       </Dialog>
 
       {/* Remove confirmation */}
-      <Dialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+      <Dialog open={removeConfirmOpen} onOpenChange={(open) => !isRemoving && setRemoveConfirmOpen(open)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Remove {connectorName}</DialogTitle>
