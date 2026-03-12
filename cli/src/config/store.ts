@@ -58,15 +58,18 @@ export function loadRegistrations(): Registration[] {
 
 export function saveRegistration(reg: Registration): void {
   ensureConfigDir();
+  // Normalize: strip trailing slashes so lookups are consistent regardless of
+  // whether the caller passed "https://host" or "https://host/".
+  const normalized: Registration = { ...reg, server: reg.server.replace(/\/+$/, "") };
   const existing = loadRegistrations();
   // Upsert: replace existing entry for same server+agent_id if present
   const idx = existing.findIndex(
-    (r) => r.server === reg.server && r.agent_id === reg.agent_id,
+    (r) => r.server === normalized.server && r.agent_id === normalized.agent_id,
   );
   if (idx >= 0) {
-    existing[idx] = reg;
+    existing[idx] = normalized;
   } else {
-    existing.push(reg);
+    existing.push(normalized);
   }
   const data: RegistrationsFile = { registrations: existing };
   fs.writeFileSync(REGISTRATIONS_FILE, JSON.stringify(data, null, 2) + "\n", {
@@ -80,8 +83,9 @@ export function saveRegistration(reg: Registration): void {
  * registered one.
  */
 export function findRegistration(server: string): Registration | undefined {
+  const normalizedServer = server.replace(/\/+$/, "");
   const regs = loadRegistrations();
-  const matching = regs.filter((r) => r.server === server);
+  const matching = regs.filter((r) => r.server === normalizedServer);
   if (matching.length === 0) return undefined;
   return matching.sort(
     (a, b) =>

@@ -9,11 +9,7 @@ import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
 import { output, type OutputOptions } from "../output.js";
-
-/** Wraps a string in single quotes, escaping any embedded single quotes. */
-function shellQuote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`;
-}
+import { shellQuote } from "../util/shell.js";
 
 export function requestCommand(program: Command): void {
   program

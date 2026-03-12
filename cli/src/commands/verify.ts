@@ -9,6 +9,7 @@ import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { findRegistration, saveRegistration } from "../config/store.js";
 import { output, type OutputOptions } from "../output.js";
+import { shellQuote } from "../util/shell.js";
 
 export function verifyCommand(program: Command): void {
   program
@@ -63,7 +64,9 @@ export function verifyCommand(program: Command): void {
             status: result.status,
             agent_id: agentId,
             registered_at: result.registered_at,
-            next_step: "Run: permission-slip capabilities",
+            next_step: opts.server === "https://app.permissionslip.dev"
+              ? "Run: permission-slip capabilities"
+              : `Run: permission-slip capabilities --server ${shellQuote(opts.server)}`,
           },
           outputOpts,
         );
