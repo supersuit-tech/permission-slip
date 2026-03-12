@@ -1,7 +1,7 @@
 ---
 name: version-tag
 description: Create and push a version tag for a package (mobile, cli, or web) from the latest main branch.
-argument-hint: <package> <version> (e.g., cli 0.1.0)
+argument-hint: <package> [version] (e.g., "cli 0.1.0" or just "cli")
 ---
 
 # Version Tag
@@ -10,19 +10,34 @@ Create and push a git tag for a specific package from the latest `main` branch.
 
 ## Arguments
 
-This skill takes two arguments:
-1. **package** — one of `mobile`, `cli`, or `web`
-2. **version** — a semver version string (e.g., `0.1.0`, `1.2.3`)
+This skill takes one required and one optional argument:
+1. **package** (required) — one of `mobile`, `cli`, or `web`
+2. **version** (optional) — a semver version string (e.g., `0.1.0`, `1.2.3`). If omitted, automatically increments the patch version of the latest existing tag for the package.
 
-Example usage: `/version-tag cli 0.1.0`
+Example usage:
+- `/version-tag cli 0.1.0` — tags `cli/v0.1.0`
+- `/version-tag cli` — if latest cli tag is `cli/v0.1.0`, tags `cli/v0.1.1`
 
 ## Steps
 
 ### 1. Parse and Validate Arguments
 
-Parse the two arguments from the input. Validate:
+Parse the arguments from the input. Validate:
 - **package** must be one of: `mobile`, `cli`, `web`. If not, print an error and stop.
-- **version** must match semver format (e.g., `0.1.0`, `1.2.3`, `0.0.1-beta.1`). If not, print an error and stop.
+- If **version** is provided, it must match semver format (e.g., `0.1.0`, `1.2.3`, `0.0.1-beta.1`). If not, print an error and stop.
+
+#### Auto-increment (when version is omitted)
+
+If no version argument is provided, look up the latest existing tag for the package and increment its patch version:
+
+```bash
+LATEST=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh api repos/supersuit-tech/permission-slip/git/matching-refs/tags/<package>/v \
+  --jq '[.[].ref | ltrimstr("refs/tags/<package>/v")] | map(select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))) | sort_by(split(".") | map(tonumber)) | last')
+```
+
+- If no existing tags are found (`LATEST` is empty), default to `0.0.1`.
+- Otherwise, split `LATEST` on `.`, increment the third (patch) component by 1, and reassemble. For example, `0.1.0` becomes `0.1.1`.
 
 Construct the tag name: `<package>/v<version>` (e.g., `cli/v0.1.0`).
 
