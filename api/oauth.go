@@ -699,10 +699,10 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		refreshVaultID = &id
 	} else if oldRefreshVaultID != nil {
 		// New token omitted the refresh token — reuse the old vault secret.
-		log.Printf("WARNING: OAuth token exchange for provider %q did not return a refresh token; preserving existing refresh token from previous authorization", providerID)
+		log.Printf("[%s] WARNING: OAuth token exchange for provider %q did not return a refresh token; preserving existing refresh token from previous authorization", TraceID(ctx), providerID)
 		refreshVaultID = oldRefreshVaultID
 	} else if existing != nil {
-		log.Printf("WARNING: OAuth token exchange for provider %q did not return a refresh token and no previous refresh token exists", providerID)
+		log.Printf("[%s] WARNING: OAuth token exchange for provider %q did not return a refresh token and no previous refresh token exists", TraceID(ctx), providerID)
 	}
 
 	var tokenExpiry *time.Time
