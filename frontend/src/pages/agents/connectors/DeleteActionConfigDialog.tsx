@@ -47,10 +47,21 @@ export function DeleteActionConfigDialog({
         <DialogHeader>
           <DialogTitle>Delete Action Configuration</DialogTitle>
           <DialogDescription>
-            This will permanently delete the configuration{" "}
-            <strong>{config.name}</strong> ({config.action_type}). The agent
-            will no longer be able to reference this configuration. This action
-            is irreversible.
+            {config.action_type === "*" ? (
+              <>
+                This will permanently delete the enable-all configuration{" "}
+                <strong>{config.name}</strong>. The agent will lose access to{" "}
+                <strong>all actions</strong> on this connector. This action is
+                irreversible.
+              </>
+            ) : (
+              <>
+                This will permanently delete the configuration{" "}
+                <strong>{config.name}</strong> ({config.action_type}). The agent
+                will no longer be able to reference this configuration. This
+                action is irreversible.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Loader2, Plus, Settings, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -57,13 +58,22 @@ export function ActionConfigurationsSection({
     useCreateActionConfig();
 
   const handleEnableAll = async () => {
-    await createActionConfig({
-      agent_id: agentId,
-      connector_id: connectorId,
-      action_type: "*",
-      name: `All ${connectorName} Actions`,
-      parameters: {},
-    });
+    try {
+      await createActionConfig({
+        agent_id: agentId,
+        connector_id: connectorId,
+        action_type: "*",
+        name: `All ${connectorName} Actions`,
+        parameters: {},
+      });
+      toast.success(`All ${connectorName} actions enabled`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to enable all actions",
+      );
+    }
   };
 
   return (
