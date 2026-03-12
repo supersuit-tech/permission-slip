@@ -10,6 +10,7 @@
  * (e.g. /agents/42/verify), not the full URL including the /api/v1 prefix.
  */
 
+import crypto from "node:crypto";
 import { buildSignatureHeader, REGISTRATION_AGENT_ID } from "../auth/signing.js";
 
 export interface ApiError {
@@ -68,6 +69,19 @@ export class ApiClient {
   private agentId: number | string;
 
   constructor(opts: ClientOptions) {
+    // Reject non-http(s) schemes before ever making a request.
+    let parsed: URL;
+    try {
+      parsed = new URL(opts.serverUrl);
+    } catch {
+      throw new Error(`Invalid server URL: ${opts.serverUrl}`);
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error(
+        `Server URL must use http or https (got ${parsed.protocol}). ` +
+        "Check the --server flag.",
+      );
+    }
     this.base = normalizeBase(opts.serverUrl);
     this.agentId = opts.agentId;
   }

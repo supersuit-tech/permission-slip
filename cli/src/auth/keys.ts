@@ -12,7 +12,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { PUBLIC_KEY_FILE, PRIVATE_KEY_FILE, SSH_DIR } from "../config/store.js";
 
 export interface KeyPair {
@@ -87,8 +87,10 @@ export function generateKeyPair(overwrite = false): KeyPair {
   }
 
   try {
-    execSync(
-      `ssh-keygen -t ed25519 -f ${JSON.stringify(PRIVATE_KEY_FILE)} -N "" -C "permission-slip"`,
+    // Use execFileSync (not execSync) to avoid shell interpolation of the key path.
+    execFileSync(
+      "ssh-keygen",
+      ["-t", "ed25519", "-f", PRIVATE_KEY_FILE, "-N", "", "-C", "permission-slip"],
       { stdio: "pipe" },
     );
   } catch (err) {
@@ -105,15 +107,21 @@ export function generateKeyPair(overwrite = false): KeyPair {
 }
 
 /**
- * Writes an Ed25519 private key in OpenSSH PEM format.
+ * Writes an Ed25519 private key in PKCS8 PEM format.
  * Used as a fallback when ssh-keygen is not available.
+ *
+ * NOTE: This produces PKCS8 PEM (`-----BEGIN PRIVATE KEY-----`), not the
+ * OpenSSH native format (`-----BEGIN OPENSSH PRIVATE KEY-----`). Node's
+ * `crypto.createPrivateKey` accepts both, so signing works correctly.
+ * However, standard SSH tooling (e.g. `ssh-add`, `ssh-keygen -y`) will
+ * not recognize PKCS8 PEM — if interoperability with SSH tools is required,
+ * use a platform that has `ssh-keygen` available.
  */
 function writeOpenSSHPrivateKey(
   key: crypto.KeyObject,
   filePath: string,
 ): void {
   const pem = key.export({ type: "pkcs8", format: "pem" }) as string;
-  // Wrap in OpenSSH-style PEM (Node generates PKCS8, which OpenSSH can load)
   fs.writeFileSync(filePath, pem, { mode: 0o600 });
 }
 
