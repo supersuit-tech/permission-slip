@@ -162,7 +162,7 @@ export function ActionConfigurationsSection({
               type="button"
               onClick={handleEnableAll}
               disabled={isEnablingAll || actions.length === 0}
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+              className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 text-xs transition-colors"
             >
               {isEnablingAll ? (
                 <Loader2 className="size-3 animate-spin" />
