@@ -68,6 +68,9 @@ const (
 	ErrPaymentMethodRequired    ErrorCode = "payment_method_required"
 	ErrPaymentLimitExceeded     ErrorCode = "payment_limit_exceeded"
 
+	// Parameter validation (request-time, distinct from execution-time invalid_parameters)
+	ErrMissingRequiredParameters ErrorCode = "missing_required_parameters"
+
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )
