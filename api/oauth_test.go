@@ -871,6 +871,142 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 	}
 }
 
+func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+
+	// First authorization — includes refresh token.
+	token1 := &oauth2.Token{
+		AccessToken:  "access-old",
+		RefreshToken: "refresh-old",
+		Expiry:       time.Now().Add(time.Hour),
+		TokenType:    "Bearer",
+	}
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil); err != nil {
+		t.Fatalf("first storeOAuthTokens: %v", err)
+	}
+
+	// Verify refresh token was stored.
+	conn1, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "google")
+	if err != nil {
+		t.Fatalf("get connection after first auth: %v", err)
+	}
+	if conn1.RefreshTokenVaultID == nil {
+		t.Fatal("expected refresh token vault ID after first auth")
+	}
+	oldRefreshVaultID := *conn1.RefreshTokenVaultID
+
+	// Re-authorization — provider omits the refresh token this time.
+	token2 := &oauth2.Token{
+		AccessToken:  "access-new",
+		RefreshToken: "",
+		Expiry:       time.Now().Add(2 * time.Hour),
+		TokenType:    "Bearer",
+	}
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil); err != nil {
+		t.Fatalf("second storeOAuthTokens: %v", err)
+	}
+
+	// Connection should still have a refresh token vault ID (preserved).
+	conn2, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "google")
+	if err != nil {
+		t.Fatalf("get connection after re-auth: %v", err)
+	}
+	if conn2.RefreshTokenVaultID == nil {
+		t.Fatal("expected refresh token vault ID to be preserved after re-auth without refresh token")
+	}
+	if *conn2.RefreshTokenVaultID != oldRefreshVaultID {
+		t.Errorf("expected reused vault ID %s, got %s", oldRefreshVaultID, *conn2.RefreshTokenVaultID)
+	}
+
+	// The old refresh token value should still be readable.
+	mockVault := deps.Vault.(*vault.MockVaultStore)
+	refreshBytes, err := mockVault.ReadSecret(t.Context(), tx, *conn2.RefreshTokenVaultID)
+	if err != nil {
+		t.Fatalf("read preserved refresh token: %v", err)
+	}
+	if string(refreshBytes) != "refresh-old" {
+		t.Errorf("expected preserved refresh token %q, got %q", "refresh-old", string(refreshBytes))
+	}
+
+	// Access token should be the new one.
+	accessBytes, err := mockVault.ReadSecret(t.Context(), tx, conn2.AccessTokenVaultID)
+	if err != nil {
+		t.Fatalf("read new access token: %v", err)
+	}
+	if string(accessBytes) != "access-new" {
+		t.Errorf("expected new access token %q, got %q", "access-new", string(accessBytes))
+	}
+}
+
+func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+
+	// First authorization.
+	token1 := &oauth2.Token{
+		AccessToken:  "access-old",
+		RefreshToken: "refresh-old",
+		Expiry:       time.Now().Add(time.Hour),
+		TokenType:    "Bearer",
+	}
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil); err != nil {
+		t.Fatalf("first storeOAuthTokens: %v", err)
+	}
+
+	conn1, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "google")
+	if err != nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	oldRefreshVaultID := *conn1.RefreshTokenVaultID
+
+	// Re-authorization WITH a new refresh token.
+	token2 := &oauth2.Token{
+		AccessToken:  "access-new",
+		RefreshToken: "refresh-new",
+		Expiry:       time.Now().Add(2 * time.Hour),
+		TokenType:    "Bearer",
+	}
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil); err != nil {
+		t.Fatalf("second storeOAuthTokens: %v", err)
+	}
+
+	conn2, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "google")
+	if err != nil {
+		t.Fatalf("get connection after re-auth: %v", err)
+	}
+	if conn2.RefreshTokenVaultID == nil {
+		t.Fatal("expected refresh token vault ID")
+	}
+	// Should be a DIFFERENT vault ID (new secret created).
+	if *conn2.RefreshTokenVaultID == oldRefreshVaultID {
+		t.Error("expected new vault ID, got the old one")
+	}
+
+	// Old vault secret should be deleted.
+	mockVault := deps.Vault.(*vault.MockVaultStore)
+	if mockVault.HasSecret(oldRefreshVaultID) {
+		t.Error("old refresh token vault secret should have been deleted")
+	}
+
+	// New refresh token should be readable.
+	refreshBytes, err := mockVault.ReadSecret(t.Context(), tx, *conn2.RefreshTokenVaultID)
+	if err != nil {
+		t.Fatalf("read new refresh token: %v", err)
+	}
+	if string(refreshBytes) != "refresh-new" {
+		t.Errorf("expected %q, got %q", "refresh-new", string(refreshBytes))
+	}
+}
+
 // ── Shopify per-shop URL helpers ──────────────────────────────────────────────
 
 func TestValidateShopSubdomain(t *testing.T) {
