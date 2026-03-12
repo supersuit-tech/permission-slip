@@ -2,13 +2,17 @@ package amadeus
 
 import "encoding/json"
 
-// snakeToCamelTravelerFields maps snake_case traveler field names that agents
-// might send (following the system's convention) to the camelCase names that
-// Amadeus and our schema expect.
+// snakeToCamelTravelerFields maps snake_case top-level traveler field names
+// to their camelCase equivalents expected by the Amadeus API.
 var snakeToCamelTravelerFields = map[string]string{
-	"first_name":    "firstName",
-	"last_name":     "lastName",
 	"date_of_birth": "dateOfBirth",
+}
+
+// snakeToCamelNameFields maps snake_case name sub-object field names
+// to their camelCase equivalents expected by the Amadeus API.
+var snakeToCamelNameFields = map[string]string{
+	"first_name": "firstName",
+	"last_name":  "lastName",
 }
 
 // Normalize rewrites snake_case traveler fields to camelCase inside the
@@ -73,29 +77,31 @@ func normalizeTraveler(raw json.RawMessage) (json.RawMessage, bool) {
 
 	changed := false
 
-	// Rewrite top-level snake_case fields.
-	for snake, camel := range snakeToCamelTravelerFields {
-		if _, hasCamel := t[camel]; hasCamel {
-			// Canonical key already present; remove the snake_case duplicate if any.
-			if _, hasSnake := t[snake]; hasSnake {
+	// Rewrite top-level snake_case fields (e.g., date_of_birth → dateOfBirth).
+	// Also normalize name fields at top level in case agents flatten the structure.
+	for _, aliases := range []map[string]string{snakeToCamelTravelerFields, snakeToCamelNameFields} {
+		for snake, camel := range aliases {
+			if _, hasCamel := t[camel]; hasCamel {
+				if _, hasSnake := t[snake]; hasSnake {
+					delete(t, snake)
+					changed = true
+				}
+				continue
+			}
+			if val, hasSnake := t[snake]; hasSnake {
+				t[camel] = val
 				delete(t, snake)
 				changed = true
 			}
-			continue
-		}
-		if val, hasSnake := t[snake]; hasSnake {
-			t[camel] = val
-			delete(t, snake)
-			changed = true
 		}
 	}
 
-	// Rewrite name sub-object fields.
+	// Rewrite name sub-object fields (first_name → firstName, last_name → lastName).
 	if nameRaw, ok := t["name"]; ok {
 		var name map[string]json.RawMessage
 		if err := json.Unmarshal(nameRaw, &name); err == nil {
 			nameChanged := false
-			for snake, camel := range snakeToCamelTravelerFields {
+			for snake, camel := range snakeToCamelNameFields {
 				if _, hasCamel := name[camel]; hasCamel {
 					if _, hasSnake := name[snake]; hasSnake {
 						delete(name, snake)
