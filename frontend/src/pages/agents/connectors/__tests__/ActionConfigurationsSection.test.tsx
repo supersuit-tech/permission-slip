@@ -413,10 +413,45 @@ describe("ActionConfigurationsSection", () => {
       },
     ];
     renderSection({ configs: wildcardConfig });
-    // The "Enable All Actions" text in the table row should exist but not a footer button
-    const allButtons = screen.getAllByText("All Actions");
-    // Only the badge in the table, not a footer link
-    expect(allButtons).toHaveLength(1);
+    // Footer button must not be rendered
+    expect(
+      screen.queryByRole("button", { name: /Enable All Actions/ }),
+    ).not.toBeInTheDocument();
+    // The "All Actions" badge in the table row should still be present
+    expect(screen.getByText("All Actions")).toBeInTheDocument();
+  });
+
+  it("calls create with wildcard action_type when clicking footer Enable All Actions", async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      data: {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    });
+
+    renderSection({ configs: mockConfigs });
+    await user.click(screen.getByRole("button", { name: /Enable All Actions/ }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith("/v1/action-configurations", {
+        headers: { Authorization: "Bearer token" },
+        body: {
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "*",
+          name: "All GitHub Actions",
+          parameters: {},
+        },
+      });
+    });
   });
 
   it("shows advanced option to add custom config in empty state", async () => {

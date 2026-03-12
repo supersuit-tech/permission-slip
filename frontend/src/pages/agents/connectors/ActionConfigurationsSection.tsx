@@ -161,7 +161,7 @@ export function ActionConfigurationsSection({
             <button
               type="button"
               onClick={handleEnableAll}
-              disabled={isEnablingAll}
+              disabled={isEnablingAll || actions.length === 0}
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
             >
               {isEnablingAll ? (
