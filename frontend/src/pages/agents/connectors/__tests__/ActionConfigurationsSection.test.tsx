@@ -164,9 +164,19 @@ describe("ActionConfigurationsSection", () => {
     expect(screen.getByText("Not assigned")).toBeInTheDocument();
   });
 
-  it("opens Add dialog when clicking Add Configuration", async () => {
-    const user = userEvent.setup();
+  it("hides Add Configuration button in empty state", () => {
     renderSection();
+    expect(screen.queryByText("Add Configuration")).not.toBeInTheDocument();
+  });
+
+  it("shows Add Configuration button when configs exist", () => {
+    renderSection({ configs: mockConfigs });
+    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
+  });
+
+  it("opens Add dialog when clicking Add Configuration with configs", async () => {
+    const user = userEvent.setup();
+    renderSection({ configs: mockConfigs });
 
     await user.click(screen.getByText("Add Configuration"));
     expect(
@@ -191,7 +201,7 @@ describe("ActionConfigurationsSection", () => {
       },
     });
 
-    renderSection();
+    renderSection({ configs: mockConfigs });
     await user.click(screen.getByText("Add Configuration"));
 
     // Select action
@@ -377,6 +387,36 @@ describe("ActionConfigurationsSection", () => {
     expect(
       screen.getByText(/All parameters — agent chooses freely/),
     ).toBeInTheDocument();
+  });
+
+  it("shows Enable All Actions footer link when configs exist and none are wildcard", () => {
+    renderSection({ configs: mockConfigs });
+    // The table has configs, so a footer link should appear
+    const footerLink = screen.getByRole("button", { name: /Enable All Actions/ });
+    expect(footerLink).toBeInTheDocument();
+  });
+
+  it("hides Enable All Actions footer link when a wildcard config exists", () => {
+    const wildcardConfig: ActionConfiguration[] = [
+      {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        credential_id: null,
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        description: null,
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    ];
+    renderSection({ configs: wildcardConfig });
+    // The "Enable All Actions" text in the table row should exist but not a footer button
+    const allButtons = screen.getAllByText("All Actions");
+    // Only the badge in the table, not a footer link
+    expect(allButtons).toHaveLength(1);
   });
 
   it("shows advanced option to add custom config in empty state", async () => {

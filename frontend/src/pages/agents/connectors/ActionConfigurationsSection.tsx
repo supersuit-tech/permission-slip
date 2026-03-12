@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -84,14 +85,16 @@ export function ActionConfigurationsSection({
           <Settings className="text-muted-foreground size-5" />
           <CardTitle>Action Configurations</CardTitle>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setAddDialogOpen(true)}
-          disabled={actions.length === 0}
-        >
-          <Plus className="size-4" />
-          Add Configuration
-        </Button>
+        {configs.length > 0 && (
+          <Button
+            size="sm"
+            onClick={() => setAddDialogOpen(true)}
+            disabled={actions.length === 0}
+          >
+            <Plus className="size-4" />
+            Add Configuration
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -151,6 +154,25 @@ export function ActionConfigurationsSection({
           </div>
         )}
       </CardContent>
+
+      {configs.length > 0 &&
+        !configs.some((c) => c.action_type === WILDCARD_ACTION_TYPE) && (
+          <CardFooter className="justify-center border-t pt-4">
+            <button
+              type="button"
+              onClick={handleEnableAll}
+              disabled={isEnablingAll}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+            >
+              {isEnablingAll ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Zap className="size-3" />
+              )}
+              Enable All Actions
+            </button>
+          </CardFooter>
+        )}
 
       <AddActionConfigDialog
         open={addDialogOpen}
