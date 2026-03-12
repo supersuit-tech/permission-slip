@@ -23,6 +23,9 @@ $$;
 
 -- +goose Down
 
+-- Only revoke the privileges this migration added. SELECT, INSERT, UPDATE
+-- may have been granted through other mechanisms (vault functions, prior
+-- migrations) and revoking them here would leave the app in a broken state.
 -- +goose StatementBegin
 DO $$
 BEGIN
@@ -30,7 +33,7 @@ BEGIN
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'vault' AND table_name = 'secrets'
     ) THEN
-        REVOKE SELECT, INSERT, UPDATE, DELETE ON vault.secrets FROM app_backend;
+        REVOKE DELETE ON vault.secrets FROM app_backend;
     END IF;
 END
 $$;

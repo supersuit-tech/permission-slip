@@ -122,6 +122,7 @@ export function DisableConnectorSection({
               variant="destructive"
               size="sm"
               onClick={() => setDisableConfirmOpen(true)}
+              disabled={isRemoving}
             >
               Disable
             </Button>
