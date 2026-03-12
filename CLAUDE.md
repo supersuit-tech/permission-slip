@@ -12,6 +12,7 @@
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
+- **Check all comment types:** When asked to address PR review comments, also check normal PR comments (issue comments) for feedback worth implementing. Reviewers sometimes leave actionable suggestions in the general conversation thread instead of inline review comments — treat them the same way.
 - **Train the reviewer:** When you address a PR review comment, you MUST react to it AND leave a threaded reply. Do both of these for EVERY review comment you respond to:
   1. **React** with 👍 (agree/fixed) or 👎 (disagree/won't fix) using the GitHub API:
      ```bash

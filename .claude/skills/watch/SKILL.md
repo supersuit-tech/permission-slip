@@ -117,10 +117,10 @@ For each item in `work-items.json`, apply the appropriate action:
 
 #### Comments and Reviews
 
-For each comment or review in the `comments` array:
+For each comment or review in the `comments` array (including `review`, `review_comment`, and `issue_comment` types — normal PR comments often contain actionable feedback just like inline review comments):
 
 1. **Read** the instruction in the comment body.
-2. **Identify** the file and line it's attached to (for inline review comments — use `path` and `line` fields). For PR reviews, the body applies to the PR as a whole — check `state` for context (`CHANGES_REQUESTED` signals required fixes).
+2. **Identify** the file and line it's attached to (for inline review comments — use `path` and `line` fields). For PR reviews, the body applies to the PR as a whole — check `state` for context (`CHANGES_REQUESTED` signals required fixes). For issue comments (normal PR conversation), treat them as general feedback that may reference specific files or areas of the code.
 3. **Decide** whether to act on it or disagree:
    - **If you agree**: Implement the change. Commit with a clear message referencing the comment.
    - **If you disagree**: Leave a reply on that comment thread explaining your reasoning.
