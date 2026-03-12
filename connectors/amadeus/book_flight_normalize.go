@@ -76,7 +76,12 @@ func normalizeTraveler(raw json.RawMessage) (json.RawMessage, bool) {
 	// Rewrite top-level snake_case fields.
 	for snake, camel := range snakeToCamelTravelerFields {
 		if _, hasCamel := t[camel]; hasCamel {
-			continue // canonical already present
+			// Canonical key already present; remove the snake_case duplicate if any.
+			if _, hasSnake := t[snake]; hasSnake {
+				delete(t, snake)
+				changed = true
+			}
+			continue
 		}
 		if val, hasSnake := t[snake]; hasSnake {
 			t[camel] = val
@@ -92,6 +97,10 @@ func normalizeTraveler(raw json.RawMessage) (json.RawMessage, bool) {
 			nameChanged := false
 			for snake, camel := range snakeToCamelTravelerFields {
 				if _, hasCamel := name[camel]; hasCamel {
+					if _, hasSnake := name[snake]; hasSnake {
+						delete(name, snake)
+						nameChanged = true
+					}
 					continue
 				}
 				if val, hasSnake := name[snake]; hasSnake {

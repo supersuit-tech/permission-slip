@@ -103,7 +103,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		return
 	}
 
-	// ── Normalize parameter aliases ──────────────────────────────
+	// ── Normalize parameters ─────────────────────────────────────
 
 	if deps.Connectors != nil {
 		if action, ok := deps.Connectors.GetAction(req.Action.Type); ok {
@@ -112,13 +112,6 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 					params = connectors.NormalizeParameters(aliases, params)
 				}
 			}
-		}
-	}
-
-	// ── Normalize nested parameter structures ────────────────────
-
-	if deps.Connectors != nil {
-		if action, ok := deps.Connectors.GetAction(req.Action.Type); ok {
 			if normalizer, ok := action.(connectors.Normalizer); ok {
 				params = normalizer.Normalize(params)
 			}

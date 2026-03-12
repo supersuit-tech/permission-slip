@@ -10,7 +10,7 @@ import (
 // Verify bookFlightAction implements Normalizer at compile time.
 var _ connectors.Normalizer = (*bookFlightAction)(nil)
 
-func TestBookFlightNormalize_SnakeCaseToCalmelCase(t *testing.T) {
+func TestBookFlightNormalize_SnakeCaseToCamelCase(t *testing.T) {
 	t.Parallel()
 
 	action := &bookFlightAction{}
@@ -178,6 +178,17 @@ func TestBookFlightNormalize_CamelCaseTakesPrecedence(t *testing.T) {
 	}
 	if firstName != "John" {
 		t.Errorf("firstName = %q, want John (camelCase should take precedence)", firstName)
+	}
+
+	// Assert the snake_case duplicates were removed.
+	if _, ok := traveler["date_of_birth"]; ok {
+		t.Error("date_of_birth should have been removed when dateOfBirth was present")
+	}
+	if _, ok := name["first_name"]; ok {
+		t.Error("first_name should have been removed when firstName was present")
+	}
+	if _, ok := name["last_name"]; ok {
+		t.Error("last_name should have been removed when lastName was present")
 	}
 }
 
