@@ -27,6 +27,10 @@ func normalizeCalendarTimeParams(raw json.RawMessage) json.RawMessage {
 	changed := false
 	for alias, canonical := range aliases {
 		if _, hasCanonical := m[canonical]; hasCanonical {
+			if _, hasAlias := m[alias]; hasAlias {
+				delete(m, alias)
+				changed = true
+			}
 			continue
 		}
 		if val, hasAlias := m[alias]; hasAlias {

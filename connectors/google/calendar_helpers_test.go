@@ -100,6 +100,24 @@ func TestNormalizeCalendarTimeParams_AliasRemoved(t *testing.T) {
 	}
 }
 
+func TestNormalizeCalendarTimeParams_AliasRemovedWhenCanonicalPresent(t *testing.T) {
+	t.Parallel()
+	input := `{"start_time":"canonical","start":"alias","end_time":"canonical2","end":"alias2"}`
+	result := normalizeCalendarTimeParams(json.RawMessage(input))
+
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(result, &m); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	if _, ok := m["start"]; ok {
+		t.Error("alias key 'start' should have been removed even when canonical is present")
+	}
+	if _, ok := m["end"]; ok {
+		t.Error("alias key 'end' should have been removed even when canonical is present")
+	}
+}
+
 func TestNormalizeCalendarTimeParams_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	input := json.RawMessage(`not valid json`)
