@@ -8,6 +8,10 @@ import "encoding/json"
 //
 // If both an alias key and the canonical key are present, the canonical value
 // is kept and the alias key is dropped.
+//
+// Alias chains are not supported: each alias must map directly to a final
+// canonical key. If "a"→"b" and "b"→"c" are both in the map, the result is
+// undefined — the iteration order of Go maps is non-deterministic.
 func NormalizeParameters(aliases map[string]string, params json.RawMessage) json.RawMessage {
 	if len(aliases) == 0 || len(params) == 0 {
 		return params
