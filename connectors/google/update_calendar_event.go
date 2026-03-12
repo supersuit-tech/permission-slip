@@ -61,7 +61,7 @@ func (p *updateCalendarEventParams) normalize() {
 // Execute patches an existing Google Calendar event and returns its updated metadata.
 func (a *updateCalendarEventAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params updateCalendarEventParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+	if err := json.Unmarshal(normalizeCalendarTimeParams(req.Parameters), &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 	if err := params.validate(); err != nil {

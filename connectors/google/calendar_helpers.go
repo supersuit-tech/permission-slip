@@ -1,11 +1,55 @@
 package google
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
+
+// normalizeCalendarTimeParams rewrites common time-parameter aliases in the raw
+// JSON so the typed unmarshal succeeds even when an LLM agent sends "start"/"end"
+// instead of the schema-defined "start_time"/"end_time". Only absent canonical
+// keys are backfilled — if the agent sends both "start" and "start_time", the
+// canonical key wins and the alias is ignored.
+func normalizeCalendarTimeParams(raw json.RawMessage) json.RawMessage {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return raw // let the caller's Unmarshal report the error
+	}
+
+	aliases := map[string]string{
+		"start": "start_time",
+		"end":   "end_time",
+	}
+
+	changed := false
+	for alias, canonical := range aliases {
+		if _, hasCanonical := m[canonical]; hasCanonical {
+			if _, hasAlias := m[alias]; hasAlias {
+				delete(m, alias)
+				changed = true
+			}
+			continue
+		}
+		if val, hasAlias := m[alias]; hasAlias {
+			m[canonical] = val
+			delete(m, alias)
+			changed = true
+		}
+	}
+
+	if !changed {
+		return raw
+	}
+
+	out, err := json.Marshal(m)
+	if err != nil {
+		return raw
+	}
+	return out
+}
 
 // validateTimeRange checks that start and end are valid RFC 3339 timestamps
 // and that end is strictly after start. Used by create_calendar_event and
