@@ -1,0 +1,39 @@
+import { describe, it, expect } from "vitest";
+import { getOAuthAuthorizeUrl } from "../oauth";
+
+describe("getOAuthAuthorizeUrl", () => {
+  it("builds authorize URL without scopes", () => {
+    const url = getOAuthAuthorizeUrl("google", "tok_123");
+    expect(url).toContain("/v1/oauth/google/authorize?");
+    expect(url).toContain("access_token=tok_123");
+    expect(url).not.toContain("scope=");
+  });
+
+  it("appends scopes as repeated query params", () => {
+    const url = getOAuthAuthorizeUrl("slack", "tok_abc", [
+      "chat:write",
+      "channels:read",
+    ]);
+    expect(url).toContain("scope=chat%3Awrite");
+    expect(url).toContain("scope=channels%3Aread");
+  });
+
+  it("URL-encodes scopes with special characters", () => {
+    const url = getOAuthAuthorizeUrl("google", "tok_x", [
+      "https://www.googleapis.com/auth/gmail.send",
+    ]);
+    expect(url).toContain(
+      "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send",
+    );
+  });
+
+  it("skips scopes when array is empty", () => {
+    const url = getOAuthAuthorizeUrl("google", "tok_y", []);
+    expect(url).not.toContain("scope=");
+  });
+
+  it("skips scopes when undefined", () => {
+    const url = getOAuthAuthorizeUrl("google", "tok_z", undefined);
+    expect(url).not.toContain("scope=");
+  });
+});

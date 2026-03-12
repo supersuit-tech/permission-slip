@@ -120,6 +120,7 @@ export function SetupConnectorCredentialsDialog({
       const url = getOAuthAuthorizeUrl(
         effectiveOAuthProvider,
         session.access_token,
+        oauthCredential?.oauth_scopes,
       );
       window.location.href = `${url}&shop=${encodeURIComponent(subdomain)}`;
       return;
@@ -128,6 +129,7 @@ export function SetupConnectorCredentialsDialog({
     window.location.href = getOAuthAuthorizeUrl(
       effectiveOAuthProvider,
       session.access_token,
+      oauthCredential?.oauth_scopes,
     );
   }
 
