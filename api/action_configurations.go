@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -94,19 +95,48 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Validate parameters is a JSON object (if provided).
-		params := req.Parameters
-		if len(params) == 0 {
-			params = []byte("{}")
-		} else if err := ValidateJSONObject(params); err != nil {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters must be a JSON object"))
+		// Normalize action type — trim whitespace so " read_file " matches "read_file" at execution time.
+		req.ActionType = strings.TrimSpace(req.ActionType)
+
+		// Reject action types that contain "*" but are not exactly "*".
+		if req.ActionType != db.WildcardActionType && strings.Contains(req.ActionType, "*") {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action_type must be '*' for wildcard or a specific action type without '*'"))
 			return
 		}
 
-		// Reject malformed $pattern wrappers (e.g. without any "*").
-		if err := db.ValidateConfigParameters(params); err != nil {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
-			return
+		// Wildcard configs cover all actions with all parameters agent-controlled.
+		// Force empty parameters and skip parameter validation.
+		var params json.RawMessage
+		if req.ActionType == db.WildcardActionType {
+			params = []byte("{}")
+		} else {
+			// Validate parameters is a JSON object (if provided).
+			params = req.Parameters
+			if len(params) == 0 {
+				params = []byte("{}")
+			} else if err := ValidateJSONObject(params); err != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters must be a JSON object"))
+				return
+			}
+
+			// Reject malformed $pattern wrappers (e.g. without any "*").
+			if err := db.ValidateConfigParameters(params); err != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
+				return
+			}
+
+			// Validate that the action type exists for this connector (replaces
+			// the dropped composite FK).
+			exists, err := db.ConnectorActionExists(r.Context(), deps.DB, req.ConnectorID, req.ActionType)
+			if err != nil {
+				log.Printf("[%s] CreateActionConfig: check connector action: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create action configuration"))
+				return
+			}
+			if !exists {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Invalid connector or action type reference"))
+				return
+			}
 		}
 
 		if !verifyCredentialOwnership(w, r, deps, req.CredentialID, profile.ID) {
@@ -245,9 +275,25 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Validate parameters is a JSON object (if provided).
+		// Wildcard configs (action_type = "*") do not allow parameter changes —
+		// their parameters must remain {}. Look up the existing config to check.
 		var params []byte
 		if req.Parameters != nil {
+			existing, err := db.GetActionConfigByID(r.Context(), deps.DB, configID, profile.ID)
+			if err != nil {
+				log.Printf("[%s] UpdateActionConfig: lookup for wildcard check: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+				return
+			}
+			if existing == nil {
+				RespondError(w, r, http.StatusNotFound, NotFound(ErrActionConfigNotFound, "Action configuration not found"))
+				return
+			}
+			if existing.ActionType == db.WildcardActionType {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "cannot modify parameters on a wildcard (enable-all) configuration"))
+				return
+			}
+
 			if err := ValidateJSONObject(req.Parameters); err != nil {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters must be a JSON object"))
 				return

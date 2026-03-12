@@ -361,3 +361,104 @@ func assertErrorCode(t *testing.T, body []byte, expectedCode string) {
 		t.Errorf("expected error code %q, got %q", expectedCode, resp.Error.Code)
 	}
 }
+
+// ── Wildcard Action Type Tests ──────────────────────────────────────────────
+
+// setupWildcardConfigTest creates a wildcard (action_type="*") config.
+// Returns (tx, userID, agentID, connectorID, configID).
+func setupWildcardConfigTest(t *testing.T) (db.DBTX, string, int64, string, string) {
+	t.Helper()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".some_action", "Some Action")
+
+	configID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, "*", testhelper.ActionConfigOpts{
+		Name: "All Actions",
+	})
+
+	return tx, uid, agentID, connID, configID
+}
+
+func TestValidateConfigurationReference_WildcardMatchesAnyActionType(t *testing.T) {
+	t.Parallel()
+	tx, _, agentID, connID, configID := setupWildcardConfigTest(t)
+
+	// Wildcard config should accept any action type.
+	actionTypes := []string{
+		connID + ".some_action",
+		connID + ".another_action",
+		"completely.different.action",
+	}
+
+	for _, at := range actionTypes {
+		t.Run(at, func(t *testing.T) {
+			deps, w, r := newTestRequest(tx)
+			execParams := json.RawMessage(`{"any_param":"any_value"}`)
+			result := ValidateConfigurationReference(w, r, deps, configID, agentID, at, execParams)
+			if result == nil {
+				t.Errorf("expected wildcard config to match action type %q, got error: %s", at, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestValidateConfigurationReference_WildcardDisabledConfig(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".some_action", "Some Action")
+
+	configID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, "*", testhelper.ActionConfigOpts{
+		Name:   "All Actions",
+		Status: "disabled",
+	})
+
+	// A disabled wildcard config should be rejected. The query filters by
+	// status='active', so it returns not-found (400) rather than found-but-disabled (403).
+	deps, w, r := newTestRequest(tx)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, connID+".some_action", json.RawMessage(`{}`))
+	if result != nil {
+		t.Fatal("expected nil result for disabled wildcard config")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for disabled config (filtered by query), got %d", w.Code)
+	}
+	assertErrorCode(t, w.Body.Bytes(), string(ErrInvalidConfiguration))
+}
+
+func TestValidateConfigurationReference_WildcardAcceptsAnyParameters(t *testing.T) {
+	t.Parallel()
+	tx, _, agentID, connID, configID := setupWildcardConfigTest(t)
+
+	// Wildcard config should accept any parameters (including extra ones).
+	tests := []struct {
+		name       string
+		execParams string
+	}{
+		{"empty params", `{}`},
+		{"single param", `{"key":"value"}`},
+		{"many params", `{"a":"1","b":"2","c":"3","d":"4"}`},
+		{"nested objects", `{"config":{"nested":{"deep":"value"}}}`},
+		{"arrays", `{"items":[1,2,3]}`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			deps, w, r := newTestRequest(tx)
+			result := ValidateConfigurationReference(w, r, deps, configID, agentID, connID+".some_action", json.RawMessage(tc.execParams))
+			if result == nil {
+				t.Errorf("expected wildcard config to accept %s, got error: %s", tc.name, w.Body.String())
+			}
+		})
+	}
+}

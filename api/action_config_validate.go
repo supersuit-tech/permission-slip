@@ -56,7 +56,11 @@ func ValidateConfigurationReference(
 	}
 
 	// 3. Validate action type matches.
-	if ac.ActionType != actionType {
+	// Wildcard configs (action_type = "*") match any action type.
+	// SECURITY: This is safe because execution still requires a standing approval
+	// (or interactive approval) that matches the specific action type being
+	// executed. The wildcard config alone does not grant execution rights.
+	if ac.ActionType != db.WildcardActionType && ac.ActionType != actionType {
 		resp := BadRequest(ErrConfigActionTypeMismatch, "Action type does not match configuration")
 		resp.Error.Details = map[string]any{
 			"configuration_action_type": ac.ActionType,
@@ -67,20 +71,24 @@ func ValidateConfigurationReference(
 	}
 
 	// 4. Validate parameters against configuration constraints.
-	if err := db.ValidateParametersAgainstConfig(ac.Parameters, parameters); err != nil {
-		var configErr *db.ConfigValidationError
-		if errors.As(err, &configErr) {
-			resp := BadRequest(ErrInvalidParameters, "Parameters do not comply with configuration constraints")
-			resp.Error.Details = map[string]any{
-				"parameter":        configErr.Parameter,
-				"constraint_error": configErr.Reason,
+	// Wildcard configs allow any parameters — skip validation entirely.
+	// SECURITY: Safe for the same reason as step 3 — standing approvals gate execution.
+	if ac.ActionType != db.WildcardActionType {
+		if err := db.ValidateParametersAgainstConfig(ac.Parameters, parameters); err != nil {
+			var configErr *db.ConfigValidationError
+			if errors.As(err, &configErr) {
+				resp := BadRequest(ErrInvalidParameters, "Parameters do not comply with configuration constraints")
+				resp.Error.Details = map[string]any{
+					"parameter":        configErr.Parameter,
+					"constraint_error": configErr.Reason,
+				}
+				RespondError(w, r, http.StatusBadRequest, resp)
+				return nil
 			}
-			RespondError(w, r, http.StatusBadRequest, resp)
+			log.Printf("[%s] ValidateConfigurationReference: param validation: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters"))
 			return nil
 		}
-		log.Printf("[%s] ValidateConfigurationReference: param validation: %v", TraceID(r.Context()), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters"))
-		return nil
 	}
 
 	return &ConfigValidationResult{Config: ac}

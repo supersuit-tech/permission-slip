@@ -6922,7 +6922,11 @@ components:
           type: string
           maxLength: 128
           description: |
-            Action type from the connector's action catalog.
+            Action type from the connector's action catalog, or `"*"` to enable
+            **all** actions on this connector. A wildcard configuration covers
+            every current and future action — the agent can choose any action and
+            any parameter values. Only one wildcard configuration is allowed per
+            agent + connector pair.
           example: github.create_issue
         credential_id:
           type: string
@@ -7030,7 +7034,11 @@ components:
         action_type:
           type: string
           maxLength: 128
-          description: Action type from the connector's action catalog.
+          description: |
+            Action type from the connector's action catalog, or `"*"` to enable
+            **all** actions on this connector. When `"*"` is used, parameters are
+            forced to `{}` (the agent can choose any parameter values at execution
+            time). Only one wildcard configuration is allowed per agent + connector.
           example: github.create_issue
         credential_id:
           type: string
@@ -7093,7 +7101,9 @@ components:
         parameters:
           type: object
           additionalProperties: true
-          description: Updated parameter values.
+          description: |
+            Updated parameter values. Cannot be modified on wildcard (`action_type = "*"`)
+            configurations — their parameters are always `{}`.
           example:
             repo: supersuit-tech/api
             title: '*'

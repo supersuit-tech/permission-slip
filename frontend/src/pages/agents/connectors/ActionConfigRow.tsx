@@ -5,7 +5,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import type { CredentialSummary } from "@/hooks/useCredentials";
-import { isPatternWrapper } from "./ActionConfigFormFields";
+import { isPatternWrapper, WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
 interface ActionConfigRowProps {
   config: ActionConfiguration;
@@ -22,7 +22,10 @@ export function ActionConfigRow({
   onEdit,
   onDelete,
 }: ActionConfigRowProps) {
-  const action = actions.find((a) => a.action_type === config.action_type);
+  const isWildcardConfig = config.action_type === WILDCARD_ACTION_TYPE;
+  const action = isWildcardConfig
+    ? null
+    : actions.find((a) => a.action_type === config.action_type);
   const credential = config.credential_id
     ? credentials.find((c) => c.id === config.credential_id)
     : null;
@@ -42,15 +45,28 @@ export function ActionConfigRow({
         </div>
       </TableCell>
       <TableCell>
-        <div>
-          <p className="text-sm">{action?.name ?? config.action_type}</p>
-          <p className="text-muted-foreground font-mono text-xs">
-            {config.action_type}
-          </p>
-        </div>
+        {isWildcardConfig ? (
+          <div>
+            <Badge className="bg-primary/10 text-primary border-primary/20 border">
+              All Actions
+            </Badge>
+            <p className="text-muted-foreground mt-0.5 font-mono text-xs">*</p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm">{action?.name ?? config.action_type}</p>
+            <p className="text-muted-foreground font-mono text-xs">
+              {config.action_type}
+            </p>
+          </div>
+        )}
       </TableCell>
       <TableCell>
-        {paramEntries.length > 0 ? (
+        {isWildcardConfig ? (
+          <span className="text-muted-foreground text-xs italic">
+            All parameters — agent chooses freely
+          </span>
+        ) : paramEntries.length > 0 ? (
           <div className="space-y-0.5">
             {paramEntries.map(([key, value]) => (
               <ParameterPill key={key} name={key} value={value} />
