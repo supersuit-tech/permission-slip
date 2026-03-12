@@ -30,8 +30,7 @@ describe("saveRegistration / loadRegistrations", () => {
   it("saves and loads a registration", () => {
     saveRegistration({
       server: "https://example.permissionslip.dev",
-      api_base: "https://example.permissionslip.dev/api/v1",
-      agent_id: 99,
+            agent_id: 99,
       registered_at: "2026-01-01T00:00:00Z",
     });
 
@@ -44,8 +43,7 @@ describe("saveRegistration / loadRegistrations", () => {
   it("upserts when same server+agent_id exists", () => {
     saveRegistration({
       server: "https://example.permissionslip.dev",
-      api_base: "https://example.permissionslip.dev/api/v1",
-      agent_id: 99,
+            agent_id: 99,
       registered_at: "2026-02-01T00:00:00Z",
     });
 
@@ -61,8 +59,7 @@ describe("saveRegistration / loadRegistrations", () => {
     const beforeCount = loadRegistrations().length;
     saveRegistration({
       server: "https://other.permissionslip.dev",
-      api_base: "https://other.permissionslip.dev/api/v1",
-      agent_id: 100,
+            agent_id: 100,
       registered_at: "2026-01-01T00:00:00Z",
     });
     const afterCount = loadRegistrations().length;

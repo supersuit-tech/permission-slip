@@ -63,20 +63,9 @@ export function executeCommand(program: Command): void {
         const agentId = resolveAgentId(opts.server, opts.agentId);
         const client = new ApiClient({ serverUrl: opts.server, agentId });
 
-        let result: unknown;
-        if (opts.token) {
-          result = await client.execute(
-            { token: opts.token },
-            opts.action,
-            params,
-          );
-        } else if (opts.configuration) {
-          result = await client.execute(
-            { configuration_id: opts.configuration },
-            undefined,
-            params,
-          );
-        }
+        const result: unknown = opts.token
+          ? await client.execute({ token: opts.token }, opts.action, params)
+          : await client.execute({ configuration_id: opts.configuration! }, undefined, params);
 
         output(result, outputOpts);
       } catch (err) {

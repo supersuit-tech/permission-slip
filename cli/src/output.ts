@@ -8,9 +8,12 @@ export interface OutputOptions {
 }
 
 export function output(data: unknown, opts: OutputOptions): void {
+  // JSON.stringify(undefined) returns undefined (not a string), which would
+  // print the literal text "undefined" — not valid JSON. Normalise to null.
+  const value = data !== undefined ? data : null;
   if (opts.pretty) {
-    console.log(JSON.stringify(data, null, 2));
+    console.log(JSON.stringify(value, null, 2));
   } else {
-    console.log(JSON.stringify(data));
+    console.log(JSON.stringify(value));
   }
 }

@@ -15,7 +15,6 @@ import path from "node:path";
 
 export interface Registration {
   server: string;
-  api_base: string;
   agent_id: number;
   registered_at: string;
 }

@@ -54,7 +54,6 @@ export function verifyCommand(program: Command): void {
         // Update the registration with the confirmed timestamp
         saveRegistration({
           server: opts.server,
-          api_base: `${opts.server}/api/v1`,
           agent_id: agentId,
           registered_at: result.registered_at,
         });

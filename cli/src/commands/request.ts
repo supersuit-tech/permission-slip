@@ -10,6 +10,11 @@ import { ApiClient } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
 import { output, type OutputOptions } from "../output.js";
 
+/** Wraps a string in single quotes, escaping any embedded single quotes. */
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
 export function requestCommand(program: Command): void {
   program
     .command("request")
@@ -61,7 +66,7 @@ export function requestCommand(program: Command): void {
             ...result,
             next_step:
               "Wait for the user to approve on the dashboard. Once they share the execution token with you, run: " +
-              `permission-slip execute --token <token> --action ${opts.action} --params '${opts.params}'`,
+              `permission-slip execute --token <token> --action ${shellQuote(opts.action)} --params ${shellQuote(opts.params)}`,
           },
           outputOpts,
         );

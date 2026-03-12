@@ -15,7 +15,7 @@ import { generateKeyPair, keyPairExists, displayPath } from "../auth/keys.js";
 import { ApiClient } from "../api/client.js";
 import { REGISTRATION_AGENT_ID } from "../auth/signing.js";
 import { saveRegistration } from "../config/store.js";
-import { output, OutputOptions } from "../output.js";
+import { output, type OutputOptions } from "../output.js";
 
 export function registerCommand(program: Command): void {
   program
@@ -69,7 +69,6 @@ export function registerCommand(program: Command): void {
         // Save a partial registration (will be completed after verify)
         saveRegistration({
           server: opts.server,
-          api_base: `${opts.server}/api/v1`,
           agent_id: result.agent_id,
           registered_at: new Date().toISOString(),
         });
@@ -85,16 +84,8 @@ export function registerCommand(program: Command): void {
           outputOpts,
         );
       } catch (err) {
-        handleError(err, outputOpts);
+        output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);
       }
     });
-}
-
-function handleError(err: unknown, opts: OutputOptions): void {
-  if (err instanceof Error) {
-    output({ error: err.message }, opts);
-  } else {
-    output({ error: String(err) }, opts);
-  }
 }
