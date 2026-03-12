@@ -156,6 +156,12 @@ docker run --rm -v ${PWD}:/local openapitools/openapi-generator-cli generate \
   -o /local/generated/go-client
 ```
 
+## Versioning
+
+The `info.version` in the OpenAPI spec tracks the **product/API version** using [semver](https://semver.org/). While pre-launch, the version is `0.x.y` to signal that breaking changes may occur without a major version bump.
+
+The `/v1/` prefix in URL paths (e.g., `/api/v1/approvals/request`) is a **routing convention**, not a semantic version. It simply means "first version of the API surface." There are no plans to introduce `/v2/` or change this prefix — if the API evolves in breaking ways, we'll use the spec version, feature flags, or request headers to manage compatibility rather than minting a new URL prefix.
+
 ## Key Features
 
 ### Strict Validation
