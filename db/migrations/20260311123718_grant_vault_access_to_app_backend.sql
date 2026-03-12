@@ -15,9 +15,8 @@ BEGIN
         GRANT SELECT ON vault.decrypted_secrets TO app_backend;
 
         -- Grant execute on public vault API functions by exact signature.
-        -- NOTE: pgsodium schema grants (needed for vault.decrypted_secrets to
-        -- call _crypto_aead_det_decrypt) are in a separate migration:
-        -- 20260312113621_grant_pgsodium_execute_to_app_backend.sql
+        -- The internal _crypto_aead_* functions are owned by a Supabase superuser
+        -- and cannot be granted by the postgres role.
         GRANT EXECUTE ON FUNCTION vault.create_secret(text, text, text, uuid) TO app_backend;
         GRANT EXECUTE ON FUNCTION vault.update_secret(uuid, text, text, text, uuid) TO app_backend;
 
