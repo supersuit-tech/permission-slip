@@ -20,6 +20,7 @@ import {
   parseParametersSchema,
 } from "./ActionConfigParameterFields";
 import {
+  WILDCARD_ACTION_TYPE,
   NameField,
   DescriptionField,
   CredentialSelect,
@@ -65,7 +66,7 @@ export function EditActionConfigDialog({
     inferModesFromConfig(config.parameters),
   );
 
-  const isWildcard = config.action_type === "*";
+  const isWildcard = config.action_type === WILDCARD_ACTION_TYPE;
   const action = useMemo(
     () =>
       isWildcard

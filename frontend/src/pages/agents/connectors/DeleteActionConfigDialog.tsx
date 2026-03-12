@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDeleteActionConfig } from "@/hooks/useDeleteActionConfig";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
 interface DeleteActionConfigDialogProps {
   open: boolean;
@@ -47,7 +48,7 @@ export function DeleteActionConfigDialog({
         <DialogHeader>
           <DialogTitle>Delete Action Configuration</DialogTitle>
           <DialogDescription>
-            {config.action_type === "*" ? (
+            {config.action_type === WILDCARD_ACTION_TYPE ? (
               <>
                 This will permanently delete the enable-all configuration{" "}
                 <strong>{config.name}</strong>. The agent will lose access to{" "}

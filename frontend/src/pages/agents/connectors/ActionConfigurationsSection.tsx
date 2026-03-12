@@ -19,6 +19,7 @@ import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import type { CredentialSummary } from "@/hooks/useCredentials";
+import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 import { ActionConfigRow } from "./ActionConfigRow";
 import { AddActionConfigDialog } from "./AddActionConfigDialog";
 import { EditActionConfigDialog } from "./EditActionConfigDialog";
@@ -62,7 +63,7 @@ export function ActionConfigurationsSection({
       await createActionConfig({
         agent_id: agentId,
         connector_id: connectorId,
-        action_type: "*",
+        action_type: WILDCARD_ACTION_TYPE,
         name: `All ${connectorName} Actions`,
         parameters: {},
       });

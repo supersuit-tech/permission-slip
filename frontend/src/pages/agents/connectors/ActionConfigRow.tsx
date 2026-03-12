@@ -5,7 +5,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import type { CredentialSummary } from "@/hooks/useCredentials";
-import { isPatternWrapper } from "./ActionConfigFormFields";
+import { isPatternWrapper, WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
 interface ActionConfigRowProps {
   config: ActionConfiguration;
@@ -22,7 +22,7 @@ export function ActionConfigRow({
   onEdit,
   onDelete,
 }: ActionConfigRowProps) {
-  const isWildcardConfig = config.action_type === "*";
+  const isWildcardConfig = config.action_type === WILDCARD_ACTION_TYPE;
   const action = isWildcardConfig
     ? null
     : actions.find((a) => a.action_type === config.action_type);
