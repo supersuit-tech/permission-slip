@@ -78,21 +78,20 @@ func normalizeTraveler(raw json.RawMessage) (json.RawMessage, bool) {
 	changed := false
 
 	// Rewrite top-level snake_case fields (e.g., date_of_birth → dateOfBirth).
-	// Also normalize name fields at top level in case agents flatten the structure.
-	for _, aliases := range []map[string]string{snakeToCamelTravelerFields, snakeToCamelNameFields} {
-		for snake, camel := range aliases {
-			if _, hasCamel := t[camel]; hasCamel {
-				if _, hasSnake := t[snake]; hasSnake {
-					delete(t, snake)
-					changed = true
-				}
-				continue
-			}
-			if val, hasSnake := t[snake]; hasSnake {
-				t[camel] = val
+	// Name fields (first_name, last_name) are NOT normalized at the top level —
+	// they belong inside the name sub-object per the Amadeus API schema.
+	for snake, camel := range snakeToCamelTravelerFields {
+		if _, hasCamel := t[camel]; hasCamel {
+			if _, hasSnake := t[snake]; hasSnake {
 				delete(t, snake)
 				changed = true
 			}
+			continue
+		}
+		if val, hasSnake := t[snake]; hasSnake {
+			t[camel] = val
+			delete(t, snake)
+			changed = true
 		}
 	}
 
