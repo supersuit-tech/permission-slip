@@ -153,7 +153,7 @@ Follow this checklist whenever a migration introduces a new table, uses a new ex
 
 7. **Extension upgrades?** Supabase extensions evolve across versions (e.g., vault v0.2.8 → v0.3.0 moved `_crypto_aead_det_decrypt` from pgsodium to vault schema). When granting on extension functions, consider version differences and use `IF EXISTS` guards on pg_proc to handle both old and new versions gracefully.
 
-8. **Wrap grants in IF EXISTS guards.** Extension schemas (vault, pgsodium) don't exist in plain Postgres (CI/test). Always wrap extension grants in `DO $$ IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = '...') THEN ... END IF; $$`.
+8. **Wrap grants in IF EXISTS guards.** Extension schemas (vault, pgsodium) don't exist in plain Postgres (CI/test). For schema-level or table-level grants, check schema existence: `DO $$ IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = '...') THEN ... END IF; $$`. For function-level grants, use a `BEGIN / EXCEPTION WHEN undefined_function THEN NULL; END;` block to silently skip when the function doesn't exist — this is tighter than a name-only pg_proc check and handles signature changes across extension versions.
 
 ## Database Seed Data
 

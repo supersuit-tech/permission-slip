@@ -10,21 +10,16 @@
 -- which only covers vault v0.2.x where the view calls pgsodium directly.
 -- This migration covers v0.3.0+ where the view calls a vault-schema wrapper.
 --
--- Wrapped in a DO block so the migration is safe when the function doesn't
--- exist (older vault version or plain Postgres without supabase_vault).
+-- Uses BEGIN/EXCEPTION to gracefully skip when the function doesn't exist
+-- (older vault version or plain Postgres without supabase_vault).
 
 -- +goose StatementBegin
 DO $$
 BEGIN
     -- Vault v0.3.0+ wrapper function used by vault.decrypted_secrets view.
-    IF EXISTS (
-        SELECT 1 FROM pg_proc p
-        JOIN pg_namespace n ON p.pronamespace = n.oid
-        WHERE n.nspname = 'vault'
-          AND p.proname = '_crypto_aead_det_decrypt'
-    ) THEN
-        GRANT EXECUTE ON FUNCTION vault._crypto_aead_det_decrypt(bytea, bytea, bigint, bytea, bytea) TO app_backend;
-    END IF;
+    GRANT EXECUTE ON FUNCTION vault._crypto_aead_det_decrypt(bytea, bytea, bigint, bytea, bytea) TO app_backend;
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
+    NULL; -- vault v0.3.0 not installed; skip
 END
 $$;
 -- +goose StatementEnd
@@ -34,14 +29,9 @@ $$;
 -- +goose StatementBegin
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_proc p
-        JOIN pg_namespace n ON p.pronamespace = n.oid
-        WHERE n.nspname = 'vault'
-          AND p.proname = '_crypto_aead_det_decrypt'
-    ) THEN
-        REVOKE EXECUTE ON FUNCTION vault._crypto_aead_det_decrypt(bytea, bytea, bigint, bytea, bytea) FROM app_backend;
-    END IF;
+    REVOKE EXECUTE ON FUNCTION vault._crypto_aead_det_decrypt(bytea, bytea, bigint, bytea, bytea) FROM app_backend;
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN
+    NULL; -- vault v0.3.0 not installed; skip
 END
 $$;
 -- +goose StatementEnd
