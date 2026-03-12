@@ -16,7 +16,7 @@
  *   config        Show saved configuration and registrations
  *   whoami        Show agent identity and registration info
  *
- * All commands output JSON by default. Pass --pretty for formatted output.
+ * All commands output compact JSON by default. Pass --pretty for pretty-printed JSON.
  */
 
 import { Command } from "commander";
@@ -36,7 +36,7 @@ program
   .name("permission-slip")
   .description(
     "Agent-facing CLI for Permission Slip — register, verify, and interact with Permission Slip servers.\n\n" +
-    "All commands output structured JSON by default. Pass --pretty for human-readable output.\n\n" +
+    "All commands output compact JSON by default. Pass --pretty for pretty-printed JSON.\n\n" +
     "Quick start:\n" +
     "  1. Register:  permission-slip register --invite-code <code>\n" +
     "  2. Verify:    permission-slip verify --code <confirmation_code>\n" +

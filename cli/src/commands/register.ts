@@ -29,7 +29,7 @@ export function registerCommand(program: Command): void {
     )
     .option("--name <name>", "Agent name shown in the dashboard", "Agent")
     .option("--version <version>", "Agent version metadata", "1.0.0")
-    .option("--pretty", "Human-readable output instead of JSON")
+    .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       inviteCode: string;
       server: string;

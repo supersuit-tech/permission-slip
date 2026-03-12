@@ -19,7 +19,7 @@ export function connectorsCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--id <connector_id>", "Get details for a specific connector")
-    .option("--pretty", "Human-readable output instead of JSON")
+    .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       server: string;
       id?: string;

@@ -21,7 +21,7 @@ export function configCommand(program: Command): void {
     .command("config")
     .description("Show saved configuration and registrations")
     .option("--server <url>", "Show registration for a specific server only")
-    .option("--pretty", "Human-readable output instead of JSON")
+    .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action((opts: { server?: string; pretty?: boolean }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {

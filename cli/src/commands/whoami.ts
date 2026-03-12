@@ -20,7 +20,7 @@ export function whoamiCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
-    .option("--pretty", "Human-readable output instead of JSON")
+    .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       server: string;
       agentId?: string;

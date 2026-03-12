@@ -32,7 +32,7 @@ export function executeCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
-    .option("--pretty", "Human-readable output instead of JSON")
+    .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       token?: string;
       configuration?: string;
@@ -48,6 +48,9 @@ export function executeCommand(program: Command): void {
           throw new Error(
             "Provide either --token <token> (one-off approval) or --configuration <id> (standing approval).",
           );
+        }
+        if (opts.token && !opts.action) {
+          throw new Error("--action <action_id> is required when using --token.");
         }
 
         let params: unknown;

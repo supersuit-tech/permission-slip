@@ -9,11 +9,15 @@
 // Step 1 — Invite instructions (sent with the invite code)
 // ---------------------------------------------------------------------------
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 export function generateInviteInstructions(
   inviteCode: string,
   origin: string,
 ): string {
-  return `npx @permission-slip/cli register --invite-code ${inviteCode} --server ${origin}
+  return `npx @permission-slip/cli register --invite-code ${shellQuote(inviteCode)} --server ${shellQuote(origin)}
 
 The CLI will generate your signing key (if you don't have one) and register automatically.
 Save the agent_id from the response — you'll need to share it with the user so they can send you the confirmation code.`;
@@ -28,7 +32,7 @@ export function generateVerificationInstructions(
   confirmationCode: string,
   origin: string,
 ): string {
-  return `npx @permission-slip/cli verify --code ${confirmationCode} --server ${origin}
+  return `npx @permission-slip/cli verify --code ${shellQuote(confirmationCode)} --server ${shellQuote(origin)}
 
 Your agent ID is: ${agentId}`;
 }
