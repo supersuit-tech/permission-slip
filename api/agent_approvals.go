@@ -129,11 +129,10 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Normalize parameter aliases before storage so canonical keys are stored.
-		// Actions declare their own aliases via ParameterAliaser; the API layer
-		// rewrites them here so the stored action JSON is always canonical.
-		// Must run before ValidateConfigurationReference so constraints are
-		// evaluated against canonical keys, not raw aliases.
+		// Normalize parameters before storage so canonical keys are stored.
+		// First rewrites flat aliases (ParameterAliaser), then applies nested
+		// normalization (Normalizer). Must run before ValidateConfigurationReference
+		// so constraints are evaluated against canonical keys.
 		if deps.Connectors != nil {
 			if action, ok := deps.Connectors.GetAction(actionType); ok {
 				if aliaser, ok := action.(connectors.ParameterAliaser); ok {
@@ -144,6 +143,14 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 							if updated, err := json.Marshal(actionObj); err == nil {
 								req.Action = updated
 							}
+						}
+					}
+				}
+				if normalizer, ok := action.(connectors.Normalizer); ok {
+					if rawParams, hasParams := actionObj["parameters"]; hasParams {
+						actionObj["parameters"] = normalizer.Normalize(rawParams)
+						if updated, err := json.Marshal(actionObj); err == nil {
+							req.Action = updated
 						}
 					}
 				}
