@@ -80,7 +80,7 @@ func validateActionParameters(
 		hint = fmt.Sprintf("see GET /connectors/%s for the full parameter schema", parts[0])
 	}
 
-	resp := BadRequest(ErrInvalidParameters, "action parameters are missing required fields")
+	resp := BadRequest(ErrMissingRequiredParameters, "action parameters are missing required fields")
 	resp.Error.Details = map[string]any{
 		"missing_fields": missing,
 		"hint":           hint,

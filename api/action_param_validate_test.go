@@ -52,8 +52,8 @@ func TestAgentRequestApproval_MissingRequiredParameter(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if errResp.Error.Code != ErrInvalidParameters {
-		t.Errorf("expected error code %q, got %q", ErrInvalidParameters, errResp.Error.Code)
+	if errResp.Error.Code != ErrMissingRequiredParameters {
+		t.Errorf("expected error code %q, got %q", ErrMissingRequiredParameters, errResp.Error.Code)
 	}
 
 	// Check that missing_fields contains "target".
@@ -195,8 +195,8 @@ func TestAgentRequestApproval_NoParametersWithRequiredFields(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if errResp.Error.Code != ErrInvalidParameters {
-		t.Errorf("expected error code %q, got %q", ErrInvalidParameters, errResp.Error.Code)
+	if errResp.Error.Code != ErrMissingRequiredParameters {
+		t.Errorf("expected error code %q, got %q", ErrMissingRequiredParameters, errResp.Error.Code)
 	}
 }
 

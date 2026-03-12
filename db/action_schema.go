@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -14,7 +15,7 @@ func GetActionParametersSchema(ctx context.Context, db DBTX, actionType string) 
 		`SELECT parameters_schema FROM connector_actions WHERE action_type = $1`,
 		actionType,
 	).Scan(&schema)
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
