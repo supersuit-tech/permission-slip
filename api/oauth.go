@@ -657,17 +657,26 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		}
 		// Not found is fine — first connection.
 	}
+
+	// Track the old refresh token vault ID so we can reuse it if the new
+	// token exchange doesn't include a refresh token (Google edge case where
+	// prompt=consent + access_type=offline still omits the refresh token).
+	var oldRefreshVaultID *string
 	if existing != nil {
-		// Clean up old vault secrets. A failure here aborts the PostgreSQL
-		// transaction, so we must return immediately (same pattern as
-		// handleDeleteOAuthConnection).
+		oldRefreshVaultID = existing.RefreshTokenVaultID
+
+		// Always clean up the old access token secret.
 		if err := deps.Vault.DeleteSecret(ctx, tx, existing.AccessTokenVaultID); err != nil {
 			return fmt.Errorf("delete orphaned access token secret: %w", err)
 		}
-		if existing.RefreshTokenVaultID != nil {
+
+		// Only delete the old refresh token secret if the new token includes
+		// a replacement. Otherwise we reuse the existing vault entry.
+		if existing.RefreshTokenVaultID != nil && token.RefreshToken != "" {
 			if err := deps.Vault.DeleteSecret(ctx, tx, *existing.RefreshTokenVaultID); err != nil {
 				return fmt.Errorf("delete orphaned refresh token secret: %w", err)
 			}
+			oldRefreshVaultID = nil // cleared — will create fresh below
 		}
 	}
 
@@ -688,6 +697,12 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 			return fmt.Errorf("vault create refresh token: %w", err)
 		}
 		refreshVaultID = &id
+	} else if oldRefreshVaultID != nil {
+		// New token omitted the refresh token — reuse the old vault secret.
+		log.Printf("WARNING: OAuth token exchange for provider %q did not return a refresh token; preserving existing refresh token from previous authorization", providerID)
+		refreshVaultID = oldRefreshVaultID
+	} else if existing != nil {
+		log.Printf("WARNING: OAuth token exchange for provider %q did not return a refresh token and no previous refresh token exists", providerID)
 	}
 
 	var tokenExpiry *time.Time
