@@ -97,7 +97,7 @@ type meetingEntryPoint struct {
 // Execute creates a Google Calendar event with an attached Google Meet link.
 func (a *createMeetingAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createMeetingParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+	if err := json.Unmarshal(normalizeCalendarTimeParams(req.Parameters), &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
 	if err := params.validate(); err != nil {
