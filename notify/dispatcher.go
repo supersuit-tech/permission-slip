@@ -74,6 +74,11 @@ func (d *Dispatcher) DispatchSync(ctx context.Context, approval Approval, recipi
 func (d *Dispatcher) enabledSenders(ctx context.Context, recipient Recipient) []Sender {
 	var toSend []Sender
 	for _, s := range d.senders {
+		// Skip channels where the recipient lacks the required contact info.
+		if !recipientHasContact(s.Name(), recipient) {
+			log.Printf("notify: channel %q skipped for user %s — missing contact info", s.Name(), recipient.UserID)
+			continue
+		}
 		if d.prefs != nil {
 			enabled, err := d.prefs.IsChannelEnabled(ctx, recipient.UserID, s.Name())
 			if err != nil {
@@ -87,6 +92,20 @@ func (d *Dispatcher) enabledSenders(ctx context.Context, recipient Recipient) []
 		toSend = append(toSend, s)
 	}
 	return toSend
+}
+
+// recipientHasContact returns true if the recipient has the contact info
+// required by the given channel. Channels not listed here are assumed to
+// not need any specific contact field (e.g. web-push uses the UserID).
+func recipientHasContact(channel string, r Recipient) bool {
+	switch channel {
+	case "email":
+		return r.Email != nil && *r.Email != ""
+	case "sms":
+		return r.Phone != nil && *r.Phone != ""
+	default:
+		return true
+	}
 }
 
 // sendAll delivers to every sender concurrently and waits for all to finish.
