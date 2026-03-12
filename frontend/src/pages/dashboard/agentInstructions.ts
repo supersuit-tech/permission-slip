@@ -43,9 +43,12 @@ Your agent ID is: ${agentId}`;
 
 export function generatePostRegistrationInstructions(
   _agentId: number,
-  _origin: string,
+  origin: string,
 ): string {
-  return `npx @permission-slip/cli capabilities
+  const serverFlag = origin !== "https://app.permissionslip.dev"
+    ? ` --server ${shellQuote(origin)}`
+    : "";
+  return `npx @permission-slip/cli capabilities${serverFlag}
 
 The CLI handles signing, config storage, and API calls automatically.
 Run \`npx @permission-slip/cli --help\` for all available commands.`;
