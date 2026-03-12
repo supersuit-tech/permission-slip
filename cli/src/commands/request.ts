@@ -2,7 +2,8 @@
  * permission-slip request --action <action_id> [--params '{}'] [--server <url>]
  *
  * Requests one-off approval for an action. Returns the approval ID and URL.
- * The user must approve on the dashboard and share a confirmation code.
+ * Once the approver approves on the dashboard, the action executes automatically
+ * — there is no separate execute step for one-off approvals.
  */
 
 import type { Command } from "commander";
@@ -61,8 +62,9 @@ export function requestCommand(program: Command): void {
           {
             ...result,
             next_step:
-              "Wait for the user to approve on the dashboard. Once they share the execution token with you, run: " +
-              `permission-slip execute --token <token> --action ${shellQuote(opts.action)} --params ${shellQuote(opts.params)}` +
+              "Your request is pending approval. Once approved, the action will execute automatically — no further action is needed from you. " +
+              "To check the outcome, run: " +
+              `permission-slip request-status --approval-id ${result.approval_id}` +
               (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
           },
           outputOpts,

@@ -244,6 +244,21 @@ export class ApiClient {
     });
   }
 
+  /** GET /approvals/{id}/status — check approval and execution status */
+  async approvalStatus(approvalId: string) {
+    return this.request<{
+      approval_id: string;
+      status: string;
+      expires_at: string;
+      created_at: string;
+      execution_status?: string;
+      execution_result?: unknown;
+    }>({
+      method: "GET",
+      routerPath: `/approvals/${approvalId}/status`,
+    });
+  }
+
   /** POST /actions/execute */
   async execute(
     tokenOrConfigId: { token: string } | { configuration_id: string; request_id?: string },
