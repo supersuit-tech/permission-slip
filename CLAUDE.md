@@ -106,6 +106,8 @@ This generates a real timestamp from `date +%Y%m%d%H%M%S` and creates the file w
 
 A test (`TestMigrationTimestampsUnique` in `db/migrations_integrity_test.go`) validates that all migration timestamps are unique and in sorted order. This runs as part of `make test-backend` and will catch duplicates before CI.
 
+**Extension-managed objects need explicit grants.** `ALTER DEFAULT PRIVILEGES` only applies to tables created *after* the grant runs — it never covers tables created by extensions (e.g., `vault.secrets`, pgcrypto functions). Whenever a migration grants access to an extension-managed schema, always add explicit `GRANT ... ON <table> TO app_backend` for every object the app touches, not just the functions and views.
+
 ## Database Seed Data
 
 Whenever you make changes to database schema, tables, or migrations, review the seed file and update it to reflect the new schema. Add seed data for any new tables or columns so the seed remains comprehensive and stable. The seed should always be runnable against the current schema without errors.
