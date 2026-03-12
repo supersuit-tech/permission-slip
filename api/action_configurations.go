@@ -282,7 +282,11 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
 				return
 			}
-			if existing != nil && existing.ActionType == db.WildcardActionType {
+			if existing == nil {
+				RespondError(w, r, http.StatusNotFound, NotFound(ErrActionConfigNotFound, "Action configuration not found"))
+				return
+			}
+			if existing.ActionType == db.WildcardActionType {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "cannot modify parameters on a wildcard (enable-all) configuration"))
 				return
 			}
