@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
@@ -27,13 +26,13 @@ func validateActionParameters(
 	parameters json.RawMessage,
 ) bool {
 	// Look up the schema from the database.
-	schema, err := db.GetActionParametersSchema(r.Context(), d, actionType)
+	actionSchema, err := db.GetActionParametersSchema(r.Context(), d, actionType)
 	if err != nil {
 		log.Printf("[%s] validateActionParameters: schema lookup: %v", TraceID(r.Context()), err)
 		// Fail-open on DB errors — don't block the request.
 		return true
 	}
-	if len(schema) == 0 {
+	if actionSchema == nil || len(actionSchema.Schema) == 0 {
 		// No schema defined for this action — fail-open.
 		return true
 	}
@@ -42,7 +41,7 @@ func validateActionParameters(
 	var schemaDef struct {
 		Required []string `json:"required"`
 	}
-	if err := json.Unmarshal(schema, &schemaDef); err != nil {
+	if err := json.Unmarshal(actionSchema.Schema, &schemaDef); err != nil {
 		log.Printf("[%s] validateActionParameters: parse schema: %v", TraceID(r.Context()), err)
 		// Malformed schema — fail-open.
 		return true
@@ -74,11 +73,8 @@ func validateActionParameters(
 		return true
 	}
 
-	// Build connector hint from the action type (e.g., "github.create_issue" → "github").
-	hint := "see GET /connectors for the full parameter schema"
-	if parts := strings.SplitN(actionType, ".", 2); len(parts) == 2 && parts[0] != "" {
-		hint = fmt.Sprintf("see GET /connectors/%s for the full parameter schema", parts[0])
-	}
+	// Use the connector ID from the DB row for the hint URL.
+	hint := fmt.Sprintf("see GET /connectors/%s for the full parameter schema", actionSchema.ConnectorID)
 
 	resp := BadRequest(ErrMissingRequiredParameters, "action parameters are missing required fields")
 	resp.Error.Details = map[string]any{
