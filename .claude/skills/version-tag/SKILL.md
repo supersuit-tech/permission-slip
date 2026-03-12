@@ -28,60 +28,43 @@ Construct the tag name: `<package>/v<version>` (e.g., `cli/v0.1.0`).
 
 ### 2. Check for Existing Tag
 
-```bash
-git tag -l "<package>/v<version>"
-```
-
-If the tag already exists locally or on the remote, print an error and stop. Do NOT overwrite existing tags.
-
-Also check the remote:
-```bash
-git ls-remote --tags origin "refs/tags/<package>/v<version>"
-```
-
-### 3. Stash or Guard Current Work
-
-Before switching branches, check if there are uncommitted changes:
-```bash
-git status --porcelain
-```
-
-If there are changes, stash them:
-```bash
-git stash push -m "version-tag: stash before tagging <package>/v<version>"
-```
-
-Remember to restore the stash and return to the original branch afterward.
-
-### 4. Checkout Main and Pull Latest
+Use the GitHub CLI to check whether the tag already exists on the remote:
 
 ```bash
-ORIGINAL_BRANCH=$(git branch --show-current)
-git checkout main
-git pull origin main
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh api repos/supersuit-tech/permission-slip/git/ref/tags/<package>/v<version> 2>/dev/null
 ```
 
-### 5. Create and Push the Tag
+If the command succeeds (exit code 0), the tag already exists — print an error and stop. Do NOT overwrite existing tags.
+
+### 3. Resolve Latest Main SHA
+
+Fetch the SHA of the tip of `main` from GitHub without checking out anything locally:
 
 ```bash
-git tag <package>/v<version>
-git push origin <package>/v<version>
+SHA=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh api repos/supersuit-tech/permission-slip/git/ref/heads/main \
+  --jq '.object.sha')
 ```
 
-### 6. Return to Original Branch
+If the command fails or `SHA` is empty, print an error and stop.
+
+### 4. Create and Push the Tag
+
+Create the tag reference on GitHub directly via the API — no local branch switching or `git push` needed:
 
 ```bash
-git checkout $ORIGINAL_BRANCH
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh api repos/supersuit-tech/permission-slip/git/refs \
+  -f ref="refs/tags/<package>/v<version>" \
+  -f sha="$SHA"
 ```
 
-If changes were stashed in step 3, restore them:
-```bash
-git stash pop
-```
+If the command fails, print the error output and stop.
 
-### 7. Confirm
+### 5. Confirm
 
 Print a summary:
 ```
-Tagged and pushed: <package>/v<version>
+Tagged and pushed: <package>/v<version> -> <SHA>
 ```
