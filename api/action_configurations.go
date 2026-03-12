@@ -95,6 +95,9 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Normalize action type — trim whitespace so " read_file " matches "read_file" at execution time.
+		req.ActionType = strings.TrimSpace(req.ActionType)
+
 		// Reject action types that contain "*" but are not exactly "*".
 		if req.ActionType != db.WildcardActionType && strings.Contains(req.ActionType, "*") {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action_type must be '*' for wildcard or a specific action type without '*'"))

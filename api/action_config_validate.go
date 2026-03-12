@@ -57,6 +57,9 @@ func ValidateConfigurationReference(
 
 	// 3. Validate action type matches.
 	// Wildcard configs (action_type = "*") match any action type.
+	// SECURITY: This is safe because execution still requires a standing approval
+	// (or interactive approval) that matches the specific action type being
+	// executed. The wildcard config alone does not grant execution rights.
 	if ac.ActionType != db.WildcardActionType && ac.ActionType != actionType {
 		resp := BadRequest(ErrConfigActionTypeMismatch, "Action type does not match configuration")
 		resp.Error.Details = map[string]any{
@@ -69,6 +72,7 @@ func ValidateConfigurationReference(
 
 	// 4. Validate parameters against configuration constraints.
 	// Wildcard configs allow any parameters — skip validation entirely.
+	// SECURITY: Safe for the same reason as step 3 — standing approvals gate execution.
 	if ac.ActionType != db.WildcardActionType {
 		if err := db.ValidateParametersAgainstConfig(ac.Parameters, parameters); err != nil {
 			var configErr *db.ConfigValidationError
