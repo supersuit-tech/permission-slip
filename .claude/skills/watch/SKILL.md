@@ -9,6 +9,33 @@ argument-hint: "<PR_URL> [--automerge]"
 
 Poll a GitHub Pull Request for all comments (general and inline review comments) and PR reviews (top-level review submissions) and autonomously act on each one.
 
+This skill uses shell scripts for all mechanical bookkeeping (polling, fetching, deduplication, idle tracking, checklist parsing, wrap-up generation) and only invokes the agent for tasks requiring AI reasoning (implementing changes, resolving conflicts, diagnosing CI failures).
+
+## Architecture
+
+```
+watch-poll.sh          — Deterministic polling loop (no AI needed)
+  ├── Fetches comments from 3 GitHub API endpoints
+  ├── Deduplicates by tracking last-seen IDs
+  ├── Filters out bot-authored comments
+  ├── Merges from main, detects conflicts
+  ├── Parses PR body for unchecked Claude Code checklist items
+  ├── Writes work-items.json when there's actionable work
+  └── Generates wrap-up comment from action-log.json on idle timeout
+
+watch-post.sh          — Post-session tasks (no AI needed)
+  ├── Triggers CI and audit workflows
+  ├── Waits for completion
+  ├── Auto-merges if enabled and checks pass
+  └── Triggers webhook notification
+
+Agent (this skill)     — Only invoked when reasoning is needed
+  ├── Implements review comment requests
+  ├── Resolves merge conflicts
+  ├── Diagnoses and fixes CI failures
+  └── Appends actions to action-log.json
+```
+
 ## Setup
 
 Parse the arguments from: `$ARGUMENTS`
@@ -22,105 +49,84 @@ Set these variables for the session:
 - `PR_NUMBER` — the extracted PR number
 - `AUTO_MERGE` — `true` if `--automerge` was passed, `false` otherwise
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
+- `SKILL_DIR` — the directory containing this skill file (`.claude/skills/watch`)
 
-## Pre-Poll: Merge from Main
+## Orchestration Loop
 
-Before entering the polling loop, merge the latest main into the branch. This ensures the branch starts from a clean, up-to-date state before processing review comments.
+The agent orchestrates the session by running the shell scripts and only doing AI work when the scripts signal that it's needed.
 
-```bash
-git fetch origin main
-git merge origin/main --no-edit
-```
-
-If the merge produces conflicts, follow the same conflict resolution procedure described in Polling Loop step 2. Run tests and build after resolving.
-
-CI is manual-only (`workflow_dispatch`), so there are no check runs to inspect at this point. CI will be triggered once at the end of the watch session (see Post-Poll step 11).
-
-## Polling Loop
-
-Poll every **60 seconds**. On each poll cycle:
-
-### 1. Fetch All Comments and Reviews
-
-Fetch **all** comments and reviews using all three endpoints (PR reviews, review comments, and issue-level comments are separate):
+### Step 1: Run the polling script
 
 ```bash
-# PR reviews (top-level review submissions — approve, request changes, comment)
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}/reviews?per_page=100"
+# First run (no --work-dir):
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") 2>&1
+# Capture WORK_DIR from the session context JSON in the output.
 
-# Review comments (inline on diffs)
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}/comments?per_page=100"
-
-# Issue-level comments (general PR conversation)
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments?per_page=100"
+# Subsequent runs (reuse WORK_DIR to preserve state):
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") --work-dir "$WORK_DIR" 2>&1
 ```
 
-Handle pagination if there are more than 100 results per endpoint.
+The script handles:
+- Fetching comments from all 3 GitHub API endpoints (reviews, review comments, issue comments)
+- Deduplication via last-seen ID tracking per endpoint
+- Filtering out bot-authored comments
+- Merging from main and detecting conflicts
+- Parsing the PR body for unchecked `### Claude Code` checklist items
+- Idle counter tracking (6 consecutive empty cycles = timeout)
+- Generating and posting the wrap-up comment on idle timeout
 
-**PR reviews note:** Each review object has a `body` (which may be empty) and a `state` (`APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED`, `PENDING`). Only process reviews that have a non-empty `body` — empty-body reviews (e.g., a bare approval with no text) have no actionable instructions. Ignore reviews with state `PENDING` (these are drafts not yet submitted).
+### Step 2: Check script output
 
-### 2. Merge from Main
+The script communicates via stdout signals and exit codes:
 
-Keep the branch up to date by merging from main on every poll cycle. This prevents the branch from drifting too far from the base branch and avoids large conflict resolutions later.
+**Exit code 0 + `AGENT_NEEDED`**: The script found actionable work. Read `WORK_ITEMS_FILE` for the structured work items:
 
-```bash
-# Fetch the latest base branch
-git fetch origin main
-
-# Merge main into the current branch
-git merge origin/main --no-edit
+```json
+{
+  "pr_number": "123",
+  "pr_url": "https://github.com/.../pull/123",
+  "branch": "feature-branch",
+  "cycle": 1,
+  "comments": [
+    {
+      "type": "review_comment",
+      "id": 456,
+      "author": "reviewer",
+      "body": "Please rename this variable",
+      "path": "src/main.go",
+      "line": 42,
+      "diff_hunk": "...",
+      "node_id": "..."
+    }
+  ],
+  "merge_status": "clean|updated|conflict",
+  "conflict_files": ["file1.go", "file2.ts"],
+  "checklist_items": [
+    {"type": "checklist", "text": "Add unit tests for the new handler"}
+  ]
+}
 ```
 
-**If the merge succeeds cleanly** (no conflicts and no new commits), continue to the next step — the branch is already up to date.
+**Exit code 0 + `IDLE_TIMEOUT`**: The session ended due to inactivity. The script already posted the wrap-up comment. Proceed to Step 4 (post-session).
 
-**If the merge succeeds with new commits**, the branch has been updated. Continue to the next step — tests will be run before pushing.
+**Exit code 100**: Pre-poll merge conflict. The script detected conflicts before the polling loop started. Read `WORK_ITEMS_FILE` for conflict details and resolve them (see Step 3), then re-run the polling script.
 
-**If the merge produces conflicts**, resolve them thoughtfully:
+### Step 3: Process work items (AI reasoning)
 
-1. **Run `git diff --name-only --diff-filter=U`** to list all conflicted files.
-2. **For each conflicted file:**
-   a. **Read the entire file** to understand the full context — not just the conflict markers.
-   b. **Read the PR diff** (`git diff origin/main..HEAD -- <file>`) to understand what this branch intended to change.
-   c. **Read the base branch version** (`git show origin/main:<file>`) to understand what changed upstream.
-   d. **Understand intent from both sides** — what was the PR trying to accomplish? What did the base branch change introduce? Check recent commit messages on both sides (`git log --oneline HEAD..origin/main -- <file>` and `git log --oneline origin/main..HEAD -- <file>`) for context.
-   e. **Resolve the conflict** by editing the file to preserve the intent of both sides. Do NOT blindly accept "ours" or "theirs" — merge the logic correctly so both changes coexist. If the changes are truly incompatible (e.g., both sides renamed the same function differently), prefer the PR branch's version but note this in the decision log.
-   f. **Stage the resolved file** with `git add <file>`.
-3. **After resolving all files**, complete the merge commit:
-   ```bash
-   git commit -m "Merge origin/main: resolve conflicts in <list of files>"
-   ```
-4. **Run tests** (`make test`) and **build** (`make build`) to verify the resolution didn't break anything. If tests fail, investigate and fix before proceeding.
-5. **Reset the idle counter to 0** — a merge conflict resolution counts as meaningful activity.
+For each item in `work-items.json`, apply the appropriate action:
 
-**If the conflict cannot be resolved confidently** (e.g., large-scale structural changes on both sides that require product decisions), do NOT force a resolution. Instead:
-- Abort the merge (`git merge --abort`)
-- Post a comment on the PR explaining which files conflict and why automatic resolution isn't safe
-- Log this in the decision log as an open question
+#### Comments and Reviews
 
-### 3. Track and Process New Comments
+For each comment or review in the `comments` array:
 
-- Track the **last-seen ID** for each endpoint separately (review IDs, review comment IDs, and issue comment IDs).
-- On the **first poll**, process ALL existing comments and reviews.
-- On subsequent polls, only process items with IDs greater than the last-seen ID for that endpoint.
-- Process new items in **chronological order** — never skip any, even if multiple arrive between polls.
-- Ignore comments and reviews authored by yourself (the bot).
-- For PR reviews, use the review `id` field for tracking. Only process reviews with a non-empty `body` and a non-`PENDING` state.
-
-### 4. Act on Each Comment or Review
-
-For each new comment or review:
-
-1. **Read** the instruction in the comment/review body.
-2. **Identify** the file and line it's attached to (for inline review comments). For PR reviews, the body applies to the PR as a whole — check the review's `state` for additional context (e.g., `CHANGES_REQUESTED` signals required fixes).
+1. **Read** the instruction in the comment body.
+2. **Identify** the file and line it's attached to (for inline review comments — use `path` and `line` fields). For PR reviews, the body applies to the PR as a whole — check `state` for context (`CHANGES_REQUESTED` signals required fixes).
 3. **Decide** whether to act on it or disagree:
    - **If you agree**: Implement the change. Commit with a clear message referencing the comment.
    - **If you disagree**: Leave a reply on that comment thread explaining your reasoning.
 4. **Do not ask questions** — make your best judgment and implement.
 5. **After implementing**: Run relevant tests (`make test-backend` for Go, `make test-frontend` for frontend, `make test` if unsure).
-
-### 5. Resolve Conversations
-
-After addressing a review comment, **resolve the conversation** using the GitHub GraphQL API:
+6. **Resolve the conversation** using the GitHub GraphQL API:
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api graphql -f query='
@@ -133,7 +139,7 @@ mutation {
 }'
 ```
 
-To get the thread node ID, use the `node_id` field from the review comment, or query for PR review threads:
+To get the thread node ID, query for PR review threads and match by `databaseId`:
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api graphql -f query='
@@ -157,9 +163,47 @@ query {
 }'
 ```
 
-Match threads by comment `databaseId` to find the correct `id` for resolving.
+7. **Log the action** by appending to the action log file (see Action Log Format below).
 
-### 6. Decision Log
+#### Merge Conflicts
+
+If `merge_status` is `"conflict"` and `conflict_files` is non-empty:
+
+1. **Run `git diff --name-only --diff-filter=U`** to list all conflicted files.
+2. **For each conflicted file:**
+   a. **Read the entire file** to understand the full context — not just the conflict markers.
+   b. **Read the PR diff** (`git diff origin/main..HEAD -- <file>`) to understand what this branch intended to change.
+   c. **Read the base branch version** (`git show origin/main:<file>`) to understand what changed upstream.
+   d. **Understand intent from both sides** — check recent commit messages on both sides for context.
+   e. **Resolve the conflict** by editing the file to preserve the intent of both sides. Do NOT blindly accept "ours" or "theirs". If changes are truly incompatible, prefer the PR branch's version but note this in the action log.
+   f. **Stage the resolved file** with `git add <file>`.
+3. **Complete the merge commit:**
+   ```bash
+   git commit -m "Merge origin/main: resolve conflicts in <list of files>"
+   ```
+4. **Run tests** (`make test`) and **build** (`make build`) to verify the resolution.
+5. **Log conflict resolutions** in the action log.
+
+**If the conflict cannot be resolved confidently**, abort the merge (`git merge --abort`), post a comment on the PR explaining why, and log it as an open question.
+
+#### Checklist Items
+
+For each item in the `checklist_items` array:
+
+1. **Read and understand** the checklist item text.
+2. **Implement** the requested change (adding tests, fixing lint, updating docs, etc.).
+3. **Run relevant tests** to verify.
+4. **Commit** with a clear message referencing the checklist item.
+5. **Check off the item** in the PR body:
+   ```bash
+   CURRENT_BODY=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body')
+   UPDATED_BODY=$(echo "$CURRENT_BODY" | sed 's/- \[ \] <exact item text>/- [x] <exact item text>/')
+   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" -X PATCH -f body="$UPDATED_BODY"
+   ```
+   Update the PR body after each item to avoid race conditions.
+6. **Log the action** in the action log.
+
+#### Decision Log
 
 For anything you **considered but chose not to do**, or **had questions about**, or **made a judgment call on**:
 
@@ -168,215 +212,105 @@ For anything you **considered but chose not to do**, or **had questions about**,
   - `- [ ] Considered X but chose Y because Z (commit abc123)`
   - `- [ ] Question: Should we also handle edge case X?`
 
-### 7. Process PR Body Checklist
+#### Push Changes
 
-On each poll cycle, fetch the PR body and check for unchecked checklist items that Claude Code can address.
-
-#### Fetch the PR body
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body'
-```
-
-#### Identify unchecked items
-
-Parse the PR body for unchecked checklist items (`- [ ]`). These may appear under any heading, but pay special attention to items under headings like `### Claude Code`, `### Automated`, or similar sections that indicate tasks meant for Claude Code.
-
-**Skip** items that are clearly meant for humans or for OpenClaw (e.g., items under `### OpenClaw`, `### Manual`, or items that require human judgment like "get stakeholder sign-off", "manually verify in production", "design review").
-
-#### Act on each item
-
-For each unchecked item that Claude Code can address:
-
-1. **Read and understand** the checklist item.
-2. **Implement** the requested change — this might be adding tests, fixing lint issues, updating documentation, running checks, adding error handling, etc.
-3. **Run relevant tests** to verify the change doesn't break anything.
-4. **Commit** with a clear message referencing the checklist item.
-5. **Check off the item** in the PR body by updating it via the API:
-
-```bash
-# Fetch current body, update the checkbox, and PATCH it back
-CURRENT_BODY=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" --jq '.body')
-# Replace the specific "- [ ] <item text>" with "- [x] <item text>"
-UPDATED_BODY=$(echo "$CURRENT_BODY" | sed 's/- \[ \] <exact item text>/- [x] <exact item text>/')
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}" -X PATCH -f body="$UPDATED_BODY"
-```
-
-**Important:** Update the PR body after each item (not in batch) to avoid race conditions if the PR body is edited concurrently.
-
-If new checklist items were processed, reset the idle counter to 0.
-
-### 8. Push Changes
-
-After processing all new comments and checklist items in a poll cycle, push your commits:
+After processing all work items, push your commits:
 
 ```bash
 git push -u origin <current-branch>
 ```
 
-### 9. Continue Polling
+### Step 3b: Update the action log
 
-After each cycle, wait 60 seconds and poll again.
+After processing all work items, append entries to the action log file (`ACTION_LOG_FILE` from the script output). The agent must read the current log, append new entries, and write it back.
 
-**Idle timeout:** Track the number of consecutive poll cycles with **no new comments, reviews, merge conflicts, or checklist items processed**. If **6 consecutive cycles** pass with no new activity (i.e., 6 minutes of inactivity), **stop polling** and post a wrap-up comment on the PR before exiting (see step 10).
+#### Action Log Format
 
-If any cycle finds new comments, reviews, merge conflicts that needed resolution, new commits merged in from main, or unchecked checklist items that were processed, reset the idle counter to 0.
+The action log is a JSON array. Each entry has a `type` field and type-specific fields:
 
-### 10. Post Wrap-Up Comment on Idle Exit
+```json
+[
+  {
+    "type": "change",
+    "description": "Rename variable for clarity",
+    "detail": "Renamed `usr` to `currentUser` per reviewer request",
+    "commit": "abc1234"
+  },
+  {
+    "type": "implemented",
+    "author": "reviewer-username",
+    "request": "rename the variable",
+    "commit": "abc1234"
+  },
+  {
+    "type": "declined",
+    "author": "reviewer-username",
+    "request": "add caching here",
+    "reason": "premature optimization, no performance issue observed"
+  },
+  {
+    "type": "conflict_resolution",
+    "file": "src/main.go",
+    "detail": "branch added handler, main renamed package — kept both changes",
+    "commit": "def5678"
+  },
+  {
+    "type": "checklist_done",
+    "text": "Add unit tests for the new handler",
+    "detail": "Added 3 test cases covering success, auth failure, and validation",
+    "commit": "ghi9012"
+  },
+  {
+    "type": "checklist_skipped",
+    "text": "Get stakeholder sign-off",
+    "reason": "requires human action / OpenClaw task"
+  },
+  {
+    "type": "judgment",
+    "description": "Whether to split the handler file",
+    "choice": "split into handler.go and handler_test.go",
+    "reason": "file was over 500 lines, splitting improves maintainability"
+  },
+  {
+    "type": "open_question",
+    "description": "Should we also add rate limiting to this endpoint?"
+  }
+]
+```
 
-When stopping due to the idle timeout, post a comment on the PR summarizing the entire watch session. Use the following command:
+### Step 4: Loop back to polling
+
+After the agent finishes processing work items, go back to **Step 1** and run the polling script again. The script maintains state across invocations via temp files in its work directory.
+
+**Important**: Pass the same work directory to the script on subsequent runs so it preserves last-seen IDs and the action log. The script's `WORK_DIR` is printed in its session context output — capture it on the first run and reuse it.
+
+### Step 5: Post-session tasks
+
+When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has already been posted by the script. Run the post-session script:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments" -f body="<comment body>"
+bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") 2>&1
 ```
 
-The comment must include these sections:
+This handles:
+- Triggering CI and audit workflows
+- Waiting for them to complete
+- Auto-merging if enabled and checks pass
+- Triggering the webhook notification
 
-**a) Summary of Changes** — A concise overview of all changes made during this watch session. List each commit with its message and what it addressed.
+**If the post-session script exits with code 101 (CI failure) or 102 (audit failure):**
 
-**b) Merge Conflict Resolutions** — If any merge conflicts were resolved during the session, list each one:
-- Which files had conflicts
-- What the competing changes were (branch vs. base)
-- How the conflict was resolved and why
+1. Read the failure logs from the file path in the script output.
+2. Reproduce locally by running the relevant commands.
+3. Fix the issue, commit, and push.
+4. Post an addendum comment:
+   ```markdown
+   ## 🔧 Post-Session Check Fixes
 
-**c) PR Checklist Items** — A summary of checklist items processed from the PR body:
-- Which items were completed (checked off) and what was done for each.
-- Which items were skipped because they require human action or are meant for OpenClaw.
-
-**d) Decision Log** — A record of key choices made during the session:
-- **Implemented:** What review comments were acted on and how.
-- **Declined / Disagreed:** Any review comments you chose not to implement, with reasoning.
-- **Judgment Calls:** Ambiguous requests where you picked an approach — explain what you chose and why.
-- **Open Questions:** Anything that may need human follow-up or further discussion.
-
-Format the comment in markdown. Example structure:
-
-```markdown
-## 🤖 Watch Session Summary
-
-### Changes Made
-- **`<short description>`** (`<commit hash>`) — <what was changed and why>
-- ...
-
-### Merge Conflict Resolutions
-- **`<file>`** — <branch changed X, main changed Y> → resolved by <approach> (`<commit hash>`)
-- ...
-
-*(Omit this section if no merge conflicts occurred.)*
-
-### PR Checklist Items
-- ✅ **`<item text>`** — <what was done> (`<commit hash>`)
-- ⏭️ **`<item text>`** — skipped (requires human action / OpenClaw task)
-- ...
-
-*(Omit this section if no checklist items were in the PR body.)*
-
-### Decision Log
-
-#### ✅ Implemented
-- <comment author> asked for X → implemented in `<commit hash>`
-- ...
-
-#### ❌ Declined
-- <comment author> suggested X → declined because Y
-- ...
-
-#### ⚖️ Judgment Calls
-- <description of ambiguous situation> → chose X because Y
-- ...
-
-#### ❓ Open Questions
-- <anything that needs human follow-up>
-- ...
-
----
-*Watch session ended after 6 minutes of inactivity. Processed N comments across M poll cycles.*
-```
-
-If no changes were made during the session (e.g., all comments were already addressed before watching started, or no comments existed), still post the comment noting that no action was needed.
-
-### 11. Post-Poll: Trigger CI and Fix Failing Checks
-
-CI is manual-only, so after posting the wrap-up comment, **trigger CI once** against the final state of the branch, wait for it to complete, and fix any failures.
-
-#### a) Trigger the CI and audit workflows
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run ci.yml --ref "$(git branch --show-current)"
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run audit.yml --ref "$(git branch --show-current)"
-```
-
-#### b) Wait for the run to appear and complete
-
-Poll until the run triggered above finishes. First, wait ~5 seconds for the run to register, then poll:
-
-```bash
-# Find the most recent run on this branch
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run list --workflow=ci.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
-```
-
-Poll every 30 seconds until `status` is `completed`. Do the same for the audit workflow:
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run list --workflow=audit.yml --branch "$(git branch --show-current)" --limit 1 --json databaseId,status,conclusion
-```
-
-Wait for both workflows to complete before proceeding.
-
-#### c) Check results
-
-If `conclusion` is `success`, no action needed — exit cleanly.
-
-If `conclusion` is `failure`:
-
-1. Fetch the failed run's logs:
-   ```bash
-   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh run view <run-id> --log-failed
+   Fixed failing checks after watch session ended:
+   - **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
    ```
-2. **Read the failure logs** to understand what went wrong.
-3. **Reproduce locally** by running the relevant commands (`make test-backend`, `make test-frontend`, `make build`).
-4. **Fix the issue** — read surrounding code context, understand the root cause, implement the fix.
-5. **Run tests and build locally** to verify the fix.
-6. **Commit** with a clear message (e.g., `fix: resolve failing CI — <brief description>`).
-7. **Push** to the branch.
-8. **Trigger CI again** (repeat from step a) to verify the fix. If it fails again, repeat the fix cycle up to 3 times before posting a comment that CI cannot be fixed automatically.
-
-If fixes were pushed, append an addendum to the wrap-up comment (post a new comment) noting the additional fixes made:
-
-```markdown
-## 🔧 Post-Session Check Fixes
-
-Fixed failing checks after watch session ended:
-- **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
-```
-
-### 12. Auto-Merge (if enabled)
-
-If `AUTO_MERGE` is `true` and **both** CI and audit workflows passed (`conclusion` is `success`), merge the PR:
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr merge ${PR_NUMBER} --squash --delete-branch
-```
-
-If the merge fails (e.g., branch protection rules, required reviews not met), post a comment on the PR explaining why auto-merge could not complete:
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments" -f body="⚠️ **Auto-merge failed.** The \`--automerge\` flag was set, but the merge could not be completed. Reason: <error details>. Please merge manually."
-```
-
-If `AUTO_MERGE` is `false`, or if CI/audit failed, skip this step.
-
-### 13. Trigger Webhook Notification
-
-After all polling, wrap-up, check fixes, and optional auto-merge are complete, trigger the webhook workflow to notify that the watch session has finished:
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml -f pr_url="${PR_URL}"
-```
-
-`PR_URL` is the PR URL extracted from the arguments during Setup. This fires the `trigger-webhook.yml` workflow in the `supersuit-tech/permission-slip` repo, which sends a webhook notification with the PR URL.
-
-This step runs unconditionally — whether or not changes were made during the session.
+5. Re-run the post-session script. Repeat up to 3 times before posting a comment that CI cannot be fixed automatically.
 
 ## Important Rules
 
@@ -386,3 +320,4 @@ This step runs unconditionally — whether or not changes were made during the s
 - **Run tests** before pushing to make sure nothing is broken.
 - **Run `make build`** before pushing to catch TypeScript compilation errors.
 - **Be thorough** — read surrounding code context before making changes.
+- **Always update the action log** after completing work — the wrap-up comment is generated from it.
