@@ -71,18 +71,19 @@ export function DisableConnectorSection({
       return;
     }
 
-    // Step 2: disconnect OAuth (best-effort — connector is already disabled)
-    if (oauthProvider) {
-      try {
-        await disconnect(oauthProvider);
-        toast.success("Connector removed and OAuth disconnected");
-      } catch {
-        toast.warning(
-          "Connector disabled, but OAuth disconnect failed. You can disconnect manually from Settings.",
-        );
-      }
-    } else {
-      toast.success("Connector removed");
+    // Step 2: disconnect OAuth (best-effort — connector is already disabled).
+    // The Remove button is only rendered when oauthProvider is set, so this
+    // branch is always taken. The assertion guards against future refactors.
+    if (!oauthProvider) {
+      throw new Error("handleRemove called without oauthProvider");
+    }
+    try {
+      await disconnect(oauthProvider);
+      toast.success("Connector removed and OAuth disconnected");
+    } catch {
+      toast.warning(
+        "Connector disabled, but OAuth disconnect failed. You can disconnect manually from Settings.",
+      );
     }
 
     setRemoveConfirmOpen(false);
@@ -149,8 +150,8 @@ export function DisableConnectorSection({
             <DialogDescription>
               This will disable the <strong>{connectorName}</strong> connector
               for this agent. Any active standing approvals for actions from
-              this connector will be automatically revoked. Your OAuth
-              connection is preserved.
+              this connector will be automatically revoked.
+              {oauthProvider && " Your OAuth connection is preserved."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

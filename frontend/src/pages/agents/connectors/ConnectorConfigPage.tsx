@@ -174,7 +174,7 @@ export function ConnectorConfigPage() {
         oauthProvider={
           connector.required_credentials?.find(
             (c) => c.auth_type === "oauth2" && c.oauth_provider,
-          )?.oauth_provider ?? undefined
+          )?.oauth_provider
         }
       />
     </div>
