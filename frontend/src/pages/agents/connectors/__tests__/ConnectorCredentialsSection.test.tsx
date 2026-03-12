@@ -370,6 +370,42 @@ describe("ConnectorCredentialsSection", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows re-authorization state for expired connection", async () => {
+    setupMockGet({
+      "/v1/oauth/connections": {
+        data: {
+          connections: [
+            {
+              provider: "slack",
+              status: "needs_reauth",
+              scopes: ["chat:write"],
+              connected_at: "2026-01-01T10:00:00Z",
+            },
+          ],
+        },
+      },
+      "/v1/oauth/providers": {
+        data: { providers: [{ id: "slack", has_credentials: true }] },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        connectorId="slack"
+        requiredCredentials={[{
+          service: "slack",
+          auth_type: "oauth2" as const,
+          oauth_provider: "slack",
+        }]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Re-authorization required")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /Re-authorize/ })).toBeInTheDocument();
+  });
+
   it("shows both OAuth and API key options for mixed credentials", async () => {
     setupMockGet();
 
