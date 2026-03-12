@@ -7,9 +7,9 @@ export function TermsOfServicePage() {
     <PolicyLayout title="Terms of Service" lastUpdated="February 28, 2026">
       <p>
         These Terms of Service (&quot;Terms&quot;) govern your access to and use
-        of Permission Slip (&quot;the Service&quot;), operated by Rocktown
-        Capital LLC, doing business as Supersuit Technologies (&quot;we,&quot;
-        &quot;us,&quot; or &quot;our&quot;), located in the Commonwealth of
+        of Permission Slip (&quot;the Service&quot;), operated by Supersuit
+        Technologies LLC (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;),
+        located in the Commonwealth of
         Virginia, USA.
       </p>
       <p>
@@ -304,8 +304,8 @@ export function TermsOfServicePage() {
       <p>
         The Permission Slip source code is licensed under the Apache 2.0
         license. The &quot;Permission Slip&quot; and &quot;Supersuit
-        Technologies&quot; names and logos are trademarks of Rocktown Capital
-        LLC. Your data remains yours &mdash; we claim no ownership of the
+        Technologies&quot; names and logos are trademarks of Supersuit
+        Technologies LLC. Your data remains yours &mdash; we claim no ownership of the
         content you process through the Service.
       </p>
 
@@ -379,8 +379,8 @@ export function TermsOfServicePage() {
       {/* ------------------------------------------------------------------ */}
       <h2>13. Indemnification</h2>
       <p>
-        You agree to indemnify and hold harmless Rocktown Capital LLC (d/b/a
-        Supersuit Technologies), its officers, directors, employees, and agents
+        You agree to indemnify and hold harmless Supersuit Technologies LLC,
+        its officers, directors, employees, and agents
         from any claims, damages, losses, or expenses (including reasonable
         attorney fees) arising from:
       </p>
@@ -518,7 +518,7 @@ export function TermsOfServicePage() {
         These Terms, together with our{" "}
         <Link to="/policy/privacy">Privacy Policy</Link> and{" "}
         <Link to="/policy/cookies">Cookie Policy</Link>, constitute the entire
-        agreement between you and Rocktown Capital LLC regarding your use of the
+        agreement between you and Supersuit Technologies LLC regarding your use of the
         Service.
       </p>
 
@@ -553,8 +553,7 @@ export function TermsOfServicePage() {
           <a href="mailto:support@supersuit.tech">support@supersuit.tech</a>
         </li>
         <li>
-          <strong>Entity:</strong> Rocktown Capital LLC (d/b/a Supersuit
-          Technologies)
+          <strong>Entity:</strong> Supersuit Technologies LLC
         </li>
         <li>
           <strong>Governing law:</strong> Commonwealth of Virginia, USA

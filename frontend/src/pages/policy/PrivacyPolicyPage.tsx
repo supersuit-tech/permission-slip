@@ -5,7 +5,7 @@ export function PrivacyPolicyPage() {
   return (
     <PolicyLayout title="Privacy Policy" lastUpdated="February 28, 2026">
       <p>
-        Rocktown Capital LLC, doing business as Supersuit Technologies
+        Supersuit Technologies LLC
         (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), operates Permission
         Slip (&quot;the Service&quot;) at{" "}
         <a
@@ -334,8 +334,7 @@ export function PrivacyPolicyPage() {
           <a href="mailto:support@supersuit.tech">support@supersuit.tech</a>
         </li>
         <li>
-          <strong>Entity:</strong> Rocktown Capital LLC (d/b/a Supersuit
-          Technologies)
+          <strong>Entity:</strong> Supersuit Technologies LLC
         </li>
         <li>
           <strong>Governing law:</strong> Commonwealth of Virginia, USA
