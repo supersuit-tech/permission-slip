@@ -150,6 +150,21 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Normalize nested parameter structures (e.g., snake_case → camelCase
+		// inside arrays). Runs after flat alias normalization above.
+		if deps.Connectors != nil {
+			if action, ok := deps.Connectors.GetAction(actionType); ok {
+				if normalizer, ok := action.(connectors.Normalizer); ok {
+					if rawParams, hasParams := actionObj["parameters"]; hasParams {
+						actionObj["parameters"] = normalizer.Normalize(rawParams)
+						if updated, err := json.Marshal(actionObj); err == nil {
+							req.Action = updated
+						}
+					}
+				}
+			}
+		}
+
 		// Optional: validate configuration reference — sees canonical keys after normalization.
 		if req.Configuration != nil {
 			// ValidateConfigurationReference expects action.parameters, not

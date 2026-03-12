@@ -115,6 +115,16 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		}
 	}
 
+	// ── Normalize nested parameter structures ────────────────────
+
+	if deps.Connectors != nil {
+		if action, ok := deps.Connectors.GetAction(req.Action.Type); ok {
+			if normalizer, ok := action.(connectors.Normalizer); ok {
+				params = normalizer.Normalize(params)
+			}
+		}
+	}
+
 	// ── Check monthly request quota ─────────────────────────────
 
 	var blocked bool
