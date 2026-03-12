@@ -241,12 +241,10 @@ function OAuthCredentialRow({
     }
   }
 
-  const scopes = requiredCredential.oauth_scopes ?? [];
-
   return (
     <>
       <div className="rounded-lg border p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
@@ -271,69 +269,46 @@ function OAuthCredentialRow({
                 {isConnected
                   ? `Connected ${new Date(connection.connected_at).toLocaleDateString()}`
                   : needsReauth
-                    ? "Connection expired or was revoked \u2014 re-authorize to restore access"
-                    : `Connect your ${providerLabel(providerId)} account via OAuth for automatic token management`}
+                    ? "Re-authorization required"
+                    : "Not connected"}
               </p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {isConnected ? (
-              <>
-                <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                  Connected
-                </span>
-                <InlineConfirmButton
-                  confirmLabel="Disconnect"
-                  isProcessing={isDisconnecting}
-                  onConfirm={handleDisconnect}
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Disconnect ${providerLabel(providerId)}`}
-                  >
-                    <Unplug className="text-muted-foreground size-4" />
-                  </Button>
-                </InlineConfirmButton>
-              </>
-            ) : needsReauth ? (
-              <>
-                <Badge variant="destructive" className="gap-1 text-xs">
-                  <AlertTriangle className="size-3" />
-                  Needs Re-auth
-                </Badge>
-                <Button variant="outline" size="sm" onClick={handleConnect}>
-                  <LogIn className="size-3" />
-                  Re-authorize
-                </Button>
-              </>
-            ) : (
-              <>
-                <span className="text-muted-foreground text-xs font-medium">
-                  Not connected
-                </span>
+              <InlineConfirmButton
+                confirmLabel="Disconnect"
+                isProcessing={isDisconnecting}
+                onConfirm={handleDisconnect}
+              >
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleConnect}
-                  disabled={!provider?.has_credentials}
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Disconnect ${providerLabel(providerId)}`}
                 >
-                  <LogIn className="size-3" />
-                  Connect {providerLabel(providerId)}
+                  <Unplug className="text-muted-foreground size-4" />
                 </Button>
-              </>
+              </InlineConfirmButton>
+            ) : needsReauth ? (
+              <Button variant="outline" size="sm" onClick={handleConnect}>
+                <LogIn className="size-3" />
+                Re-authorize
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleConnect}
+                disabled={!provider?.has_credentials}
+              >
+                <LogIn className="size-3" />
+                Connect {providerLabel(providerId)}
+              </Button>
             )}
           </div>
         </div>
-        {scopes.length > 0 && !isConnected && (
-          <div className="mt-2 pl-8">
-            <p className="text-muted-foreground text-[11px]">
-              Permissions requested: {scopes.join(", ")}
-            </p>
-          </div>
-        )}
         {!isConnected && !needsReauth && !provider?.has_credentials && (
-          <p className="text-muted-foreground mt-2 text-xs">
+          <p className="text-muted-foreground mt-2 pl-8 text-xs">
             OAuth is not available yet — ask your admin to configure{" "}
             {providerLabel(providerId)} OAuth credentials.
           </p>

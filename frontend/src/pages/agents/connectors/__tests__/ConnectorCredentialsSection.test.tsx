@@ -324,11 +324,7 @@ describe("ConnectorCredentialsSection", () => {
       expect(screen.getByText("OAuth")).toBeInTheDocument();
     });
     expect(screen.getByText("Recommended")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Connect your Slack account via OAuth for automatic token management",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Not connected")).toBeInTheDocument();
   });
 
   it("shows OAuth connected status when user has connection", async () => {
@@ -367,7 +363,7 @@ describe("ConnectorCredentialsSection", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Connected")).toBeInTheDocument();
+      expect(screen.getByText(/^Connected/)).toBeInTheDocument();
     });
     expect(
       screen.getByLabelText("Disconnect Slack"),
