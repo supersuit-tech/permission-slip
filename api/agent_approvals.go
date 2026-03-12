@@ -150,11 +150,16 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Validate action parameters against the connector's parameters_schema.
+		// Runs after alias normalization so canonical keys are checked.
+		// Fail-open: skipped if the action has no schema.
+		actionParams := json.RawMessage(actionObj["parameters"])
+		if !validateActionParameters(w, r, deps.DB, actionType, actionParams) {
+			return
+		}
+
 		// Optional: validate configuration reference — sees canonical keys after normalization.
 		if req.Configuration != nil {
-			// ValidateConfigurationReference expects action.parameters, not
-			// the full action object. Extract it from the already-parsed map.
-			actionParams := json.RawMessage(actionObj["parameters"])
 			result := ValidateConfigurationReference(w, r, deps, req.Configuration.ConfigurationID, agent.AgentID, actionType, actionParams)
 			if result == nil {
 				return // error already written
