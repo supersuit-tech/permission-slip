@@ -28,6 +28,18 @@ type ParameterAliaser interface {
 	ParameterAliases() map[string]string // alias key → canonical key
 }
 
+// Normalizer is an optional interface for actions that need arbitrary
+// parameter transformation beyond flat key aliasing. The API layer calls
+// Normalize() after ParameterAliaser (if both are implemented), before
+// storing the approval or executing the action.
+//
+// Use this for nested structures (e.g., rewriting snake_case field names
+// inside arrays of objects) where ParameterAliaser's flat key→key map
+// is insufficient.
+type Normalizer interface {
+	Normalize(params json.RawMessage) json.RawMessage
+}
+
 // Connector represents an integration with an external service.
 // It owns shared configuration (HTTP clients, base URLs, auth helpers)
 // and registers the actions it supports.

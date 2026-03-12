@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Permission Slip API
-  version: 1.0.0
+  version: 0.1.0
   description: |
     Permission Slip is a centralized middle-man service that sits between AI agents and external 
     APIs. Agents submit pre-defined **actions** for human approval, and Permission Slip executes 
