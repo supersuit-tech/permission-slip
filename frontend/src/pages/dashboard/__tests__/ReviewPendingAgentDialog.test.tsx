@@ -50,7 +50,7 @@ describe("ReviewPendingAgentDialog", () => {
 
     expect(screen.getByText("Complete Agent Registration")).toBeInTheDocument();
     expect(
-      screen.getByText("This agent is waiting to complete registration. Copy the instructions below and send them to the agent."),
+      screen.getByText("Tell your agent to run this command to finish registration."),
     ).toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("ReviewPendingAgentDialog", () => {
       screen.getByRole("button", { name: "Copy confirmation code" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Share this code with the agent to complete registration"),
+      screen.getByText("Confirmation code (included in the command below)"),
     ).toBeInTheDocument();
   });
 
@@ -109,7 +109,7 @@ describe("ReviewPendingAgentDialog", () => {
     );
 
     expect(
-      screen.queryByText("Share this code with the agent to complete registration"),
+      screen.queryByText("Confirmation code (included in the command below)"),
     ).not.toBeInTheDocument();
   });
 

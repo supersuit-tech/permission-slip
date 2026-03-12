@@ -156,7 +156,7 @@ describe("PendingAgentBanners", () => {
       expect(screen.getByText("Complete Agent Registration")).toBeInTheDocument();
     });
     expect(
-      screen.getByText("Share this code with the agent to complete registration"),
+      screen.getByText("Confirmation code (included in the command below)"),
     ).toBeInTheDocument();
   });
 

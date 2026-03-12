@@ -33,12 +33,11 @@ export function RegistrationSuccessDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Agent Registered Successfully</DialogTitle>
           <DialogDescription>
-            Copy these instructions and send them to your agent so it knows how
-            to use Permission Slip going forward.
+            Your agent is ready. Tell it to run this command to discover what it can do.
           </DialogDescription>
         </DialogHeader>
 
@@ -53,10 +52,9 @@ export function RegistrationSuccessDialog({
             </div>
           </div>
 
-          {/* Post-registration instructions */}
           <InstructionsBlock
             instructions={instructions}
-            buttonLabel="Copy Post-Registration Instructions"
+            buttonLabel="Copy Command"
           />
         </div>
 
