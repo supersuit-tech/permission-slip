@@ -1,7 +1,25 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { getOAuthAuthorizeUrl } from "../oauth";
 
 describe("getOAuthAuthorizeUrl", () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    // Pin window.location so tests don't depend on jsdom's default URL.
+    Object.defineProperty(window, "location", {
+      value: new URL("http://localhost/settings/connectors"),
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+  });
   it("builds authorize URL without scopes", () => {
     const url = getOAuthAuthorizeUrl("google", "tok_123");
     expect(url).toContain("/v1/oauth/google/authorize?");
