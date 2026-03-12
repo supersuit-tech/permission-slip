@@ -89,5 +89,11 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username string, market
 	}
 
 	p.CreatedAt = p.CreatedAt.UTC().Truncate(time.Millisecond)
+
+	// Disable SMS notifications by default — users must explicitly opt in.
+	if err := UpsertNotificationPreference(ctx, db, userID, "sms", false); err != nil {
+		return nil, err
+	}
+
 	return &p, nil
 }

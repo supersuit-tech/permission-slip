@@ -92,6 +92,25 @@ func TestCreateProfile_MarketingOptIn(t *testing.T) {
 	}
 }
 
+func TestCreateProfile_SMSDisabledByDefault(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	_, err := db.CreateProfile(context.Background(), tx, uid, "smsuser", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	enabled, err := db.IsNotificationChannelEnabled(context.Background(), tx, uid, "sms")
+	if err != nil {
+		t.Fatalf("IsNotificationChannelEnabled: %v", err)
+	}
+	if enabled {
+		t.Error("expected SMS notifications to be disabled for new users")
+	}
+}
+
 // isOnboardingErr is a helper to avoid importing errors in test file.
 func isOnboardingErr(err error, target **db.OnboardingError) bool {
 	if e, ok := err.(*db.OnboardingError); ok {
