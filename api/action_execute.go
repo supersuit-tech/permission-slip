@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/shared"
 )
@@ -100,6 +101,18 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 	if err := ValidateJSONObject(params); err != nil {
 		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters must be a JSON object"))
 		return
+	}
+
+	// ── Normalize parameter aliases ──────────────────────────────
+
+	if deps.Connectors != nil {
+		if action, ok := deps.Connectors.GetAction(req.Action.Type); ok {
+			if aliaser, ok := action.(connectors.ParameterAliaser); ok {
+				if aliases := aliaser.ParameterAliases(); len(aliases) > 0 {
+					params = connectors.NormalizeParameters(aliases, params)
+				}
+			}
+		}
 	}
 
 	// ── Check monthly request quota ─────────────────────────────

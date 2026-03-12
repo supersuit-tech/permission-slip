@@ -15,6 +15,16 @@ type createCalendarEventAction struct {
 	conn *MicrosoftConnector
 }
 
+// ParameterAliases maps common agent shorthand to the canonical parameter names.
+// Agents familiar with Google Calendar may send "start_time"/"end_time" instead
+// of the Microsoft convention "start"/"end".
+func (a *createCalendarEventAction) ParameterAliases() map[string]string {
+	return map[string]string{
+		"start_time": "start",
+		"end_time":   "end",
+	}
+}
+
 // createCalendarEventParams is the user-facing parameter schema.
 type createCalendarEventParams struct {
 	Subject   string   `json:"subject"`

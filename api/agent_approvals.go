@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/shared"
 )
@@ -128,7 +129,28 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Optional: validate configuration reference.
+		// Normalize parameter aliases before storage so canonical keys are stored.
+		// Actions declare their own aliases via ParameterAliaser; the API layer
+		// rewrites them here so the stored action JSON is always canonical.
+		// Must run before ValidateConfigurationReference so constraints are
+		// evaluated against canonical keys, not raw aliases.
+		if deps.Connectors != nil {
+			if action, ok := deps.Connectors.GetAction(actionType); ok {
+				if aliaser, ok := action.(connectors.ParameterAliaser); ok {
+					if aliases := aliaser.ParameterAliases(); len(aliases) > 0 {
+						if rawParams, hasParams := actionObj["parameters"]; hasParams {
+							normalized := connectors.NormalizeParameters(aliases, rawParams)
+							actionObj["parameters"] = normalized
+							if updated, err := json.Marshal(actionObj); err == nil {
+								req.Action = updated
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Optional: validate configuration reference — sees canonical keys after normalization.
 		if req.Configuration != nil {
 			// ValidateConfigurationReference expects action.parameters, not
 			// the full action object. Extract it from the already-parsed map.

@@ -16,6 +16,15 @@ type listAvailableTimesAction struct {
 	conn *CalendlyConnector
 }
 
+// ParameterAliases maps common agent shorthand to the canonical parameter names.
+// Agents sometimes send "start"/"end" instead of "start_time"/"end_time".
+func (a *listAvailableTimesAction) ParameterAliases() map[string]string {
+	return map[string]string{
+		"start": "start_time",
+		"end":   "end_time",
+	}
+}
+
 type listAvailableTimesParams struct {
 	EventTypeURI string `json:"event_type_uri"`
 	StartTime    string `json:"start_time"`
