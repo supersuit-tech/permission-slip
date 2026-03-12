@@ -658,15 +658,15 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		// Not found is fine — first connection.
 	}
 	if existing != nil {
-		// Clean up old vault secrets. Errors here are non-fatal — the old
-		// connection row is already deleted so orphaned secrets won't be
-		// referenced, but we log for observability.
+		// Clean up old vault secrets. A failure here aborts the PostgreSQL
+		// transaction, so we must return immediately (same pattern as
+		// handleDeleteOAuthConnection).
 		if err := deps.Vault.DeleteSecret(ctx, tx, existing.AccessTokenVaultID); err != nil {
-			log.Printf("[%s] storeOAuthTokens: orphaned access token secret %s: %v", TraceID(ctx), existing.AccessTokenVaultID, err)
+			return fmt.Errorf("delete orphaned access token secret: %w", err)
 		}
 		if existing.RefreshTokenVaultID != nil {
 			if err := deps.Vault.DeleteSecret(ctx, tx, *existing.RefreshTokenVaultID); err != nil {
-				log.Printf("[%s] storeOAuthTokens: orphaned refresh token secret %s: %v", TraceID(ctx), *existing.RefreshTokenVaultID, err)
+				return fmt.Errorf("delete orphaned refresh token secret: %w", err)
 			}
 		}
 	}
