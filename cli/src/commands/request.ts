@@ -60,8 +60,8 @@ export function requestCommand(program: Command): void {
           {
             ...result,
             next_step:
-              "Wait for the user to approve on the dashboard, then run: " +
-              `permission-slip execute --approval ${result.approval_id} --params '${opts.params}'`,
+              "Wait for the user to approve on the dashboard. Once they share the execution token with you, run: " +
+              `permission-slip execute --token <token> --action ${opts.action} --params '${opts.params}'`,
           },
           outputOpts,
         );

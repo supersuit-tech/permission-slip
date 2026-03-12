@@ -13,6 +13,7 @@
 import type { Command } from "commander";
 import { generateKeyPair, keyPairExists, displayPath } from "../auth/keys.js";
 import { ApiClient } from "../api/client.js";
+import { REGISTRATION_AGENT_ID } from "../auth/signing.js";
 import { saveRegistration } from "../config/store.js";
 import { output, OutputOptions } from "../output.js";
 
@@ -55,7 +56,7 @@ export function registerCommand(program: Command): void {
         // Register
         const client = new ApiClient({
           serverUrl: opts.server,
-          agentId: "9223372036854775807",
+          agentId: REGISTRATION_AGENT_ID,
         });
 
         const result = await client.register(
@@ -78,6 +79,7 @@ export function registerCommand(program: Command): void {
             agent_id: result.agent_id,
             expires_at: result.expires_at,
             verification_required: result.verification_required,
+            key_file: displayPath(kp.privateKeyFile),
             next_step: `Run: permission-slip verify --code <confirmation_code> --server ${opts.server}`,
           },
           outputOpts,

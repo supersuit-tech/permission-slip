@@ -1,11 +1,16 @@
 /**
- * permission-slip execute --approval <id> [--params '{}'] [--server <url>]
+ * permission-slip execute --token <token> [--action <id>] [--params '{}'] [--server <url>]
  *   or
  * permission-slip execute --configuration <id> [--params '{}'] [--server <url>]
  *
  * Executes an approved action using either:
- *  - A one-off approval token (requires --approval to get a token first)
+ *  - A one-off execution token (obtained after the user approves a request)
  *  - A standing approval configuration (--configuration)
+ *
+ * NOTE: The /approvals/{id}/verify endpoint (which trades an approval ID for
+ * a token) is currently "Planned" server-side. Until it is implemented, agents
+ * must obtain the token out-of-band (the user shares it after approving on the
+ * dashboard) and pass it directly with --token.
  */
 
 import type { Command } from "commander";
@@ -17,8 +22,7 @@ export function executeCommand(program: Command): void {
   program
     .command("execute")
     .description("Execute an approved action")
-    .option("--approval <id>", "Approval ID from a 'request' command")
-    .option("--token <token>", "Execution token (obtained via approval verification)")
+    .option("--token <token>", "Execution token (shared by the user after approving on the dashboard)")
     .option("--configuration <id>", "Standing approval configuration ID")
     .option("--action <action_id>", "Action type (required with --token)")
     .option("--params <json>", "Action parameters as JSON string", "{}")
@@ -30,7 +34,6 @@ export function executeCommand(program: Command): void {
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--pretty", "Human-readable output instead of JSON")
     .action(async (opts: {
-      approval?: string;
       token?: string;
       configuration?: string;
       action?: string;
