@@ -236,7 +236,11 @@ export class ApiClient {
     }>({
       method: "POST",
       routerPath: "/approvals/request",
-      body: { request_id: requestId, action_id: actionId, parameters: params, context },
+      body: {
+        request_id: requestId,
+        action: { type: actionId, parameters: params },
+        context: context ?? {},
+      },
     });
   }
 
