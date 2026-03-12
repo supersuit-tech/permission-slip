@@ -658,10 +658,16 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		// Not found is fine — first connection.
 	}
 	if existing != nil {
-		// Clean up old vault secrets.
-		_ = deps.Vault.DeleteSecret(ctx, tx, existing.AccessTokenVaultID)
+		// Clean up old vault secrets. A failure here aborts the PostgreSQL
+		// transaction, so we must return immediately (same pattern as
+		// handleDeleteOAuthConnection).
+		if err := deps.Vault.DeleteSecret(ctx, tx, existing.AccessTokenVaultID); err != nil {
+			return fmt.Errorf("delete orphaned access token secret: %w", err)
+		}
 		if existing.RefreshTokenVaultID != nil {
-			_ = deps.Vault.DeleteSecret(ctx, tx, *existing.RefreshTokenVaultID)
+			if err := deps.Vault.DeleteSecret(ctx, tx, *existing.RefreshTokenVaultID); err != nil {
+				return fmt.Errorf("delete orphaned refresh token secret: %w", err)
+			}
 		}
 	}
 
@@ -968,13 +974,19 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Delete vault secrets (best-effort — idempotent).
+		// Delete vault secrets within the transaction. A failure here aborts
+		// the PostgreSQL transaction, so we must return immediately on error
+		// (matching the pattern in handleDeleteCredential).
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.AccessTokenVaultID); err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: vault delete access: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+			return
 		}
 		if result.RefreshTokenVaultID != nil {
 			if err := deps.Vault.DeleteSecret(r.Context(), tx, *result.RefreshTokenVaultID); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: vault delete refresh: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+				return
 			}
 		}
 

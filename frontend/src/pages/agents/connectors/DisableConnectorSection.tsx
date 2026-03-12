@@ -18,20 +18,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDisableAgentConnector } from "@/hooks/useDisableAgentConnector";
+import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
+import { providerLabel } from "@/lib/labels";
 
 interface DisableConnectorSectionProps {
   agentId: number;
   connectorId: string;
   connectorName: string;
+  /** OAuth provider ID — when set, shows a "Remove" option that also disconnects OAuth. */
+  oauthProvider?: string;
 }
 
 export function DisableConnectorSection({
   agentId,
   connectorId,
   connectorName,
+  oauthProvider,
 }: DisableConnectorSectionProps) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const { disableConnector, isLoading } = useDisableAgentConnector();
+  const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const { disableConnector, isLoading: isDisabling } =
+    useDisableAgentConnector();
+  const { disconnect } = useDisconnectOAuth();
   const navigate = useNavigate();
 
   async function handleDisable() {
@@ -45,10 +54,51 @@ export function DisableConnectorSection({
       } else {
         toast.success("Connector disabled");
       }
-      setConfirmOpen(false);
+      setDisableConfirmOpen(false);
       navigate(`/agents/${agentId}`);
     } catch {
       toast.error("Failed to disable connector");
+    }
+  }
+
+  async function handleRemove() {
+    setIsRemoving(true);
+    try {
+      // Step 1: disable the connector
+      let disableResult: Awaited<ReturnType<typeof disableConnector>>;
+      try {
+        disableResult = await disableConnector({ agentId, connectorId });
+      } catch {
+        toast.error("Failed to disable connector");
+        return;
+      }
+
+      // Step 2: disconnect OAuth (best-effort — connector is already disabled).
+      // The Remove button is only rendered when oauthProvider is set, so this
+      // branch is always taken. The assertion guards against future refactors.
+      if (!oauthProvider) {
+        throw new Error("handleRemove called without oauthProvider");
+      }
+      const revoked = disableResult.revoked_standing_approvals;
+      const revokedSuffix =
+        revoked > 0
+          ? ` ${revoked} standing approval${revoked === 1 ? "" : "s"} revoked.`
+          : "";
+      try {
+        await disconnect(oauthProvider);
+        toast.success(
+          `Connector removed and OAuth disconnected.${revokedSuffix}`,
+        );
+      } catch {
+        toast.warning(
+          `Connector disabled, but OAuth disconnect failed.${revokedSuffix} You can disconnect manually from Settings.`,
+        );
+      }
+
+      setRemoveConfirmOpen(false);
+      navigate(`/agents/${agentId}`);
+    } finally {
+      setIsRemoving(false);
     }
   }
 
@@ -58,28 +108,56 @@ export function DisableConnectorSection({
         <CardHeader>
           <CardTitle className="text-destructive">Danger Zone</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Disable this connector</p>
               <p className="text-muted-foreground text-xs">
-                This will prevent the agent from submitting actions from{" "}
-                {connectorName}. Any active standing approvals for this
-                connector will be revoked.
+                Temporarily prevent the agent from using {connectorName}. Your
+                credentials{oauthProvider && " and OAuth connections"} are
+                preserved &mdash; you can re-enable later without reconnecting.
               </p>
             </div>
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => setConfirmOpen(true)}
+              onClick={() => setDisableConfirmOpen(true)}
+              disabled={isRemoving}
             >
               Disable
             </Button>
           </div>
+
+          {oauthProvider && (
+            <>
+              <div className="border-t" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    Remove this connector
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Disable the connector and disconnect the{" "}
+                    {providerLabel(oauthProvider)} OAuth connection. You will
+                    need to re-authorize when re-enabling.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={isRemoving}
+                  onClick={() => setRemoveConfirmOpen(true)}
+                >
+                  Remove
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      {/* Disable confirmation */}
+      <Dialog open={disableConfirmOpen} onOpenChange={setDisableConfirmOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Disable {connectorName}</DialogTitle>
@@ -87,23 +165,57 @@ export function DisableConnectorSection({
               This will disable the <strong>{connectorName}</strong> connector
               for this agent. Any active standing approvals for actions from
               this connector will be automatically revoked.
+              {oauthProvider && " Your OAuth connection is preserved."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="secondary"
-              onClick={() => setConfirmOpen(false)}
-              disabled={isLoading}
+              onClick={() => setDisableConfirmOpen(false)}
+              disabled={isDisabling}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDisable}
-              disabled={isLoading}
+              disabled={isDisabling}
             >
-              {isLoading && <Loader2 className="animate-spin" />}
+              {isDisabling && <Loader2 className="animate-spin" />}
               Disable
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove confirmation */}
+      <Dialog open={removeConfirmOpen} onOpenChange={(open) => !isRemoving && setRemoveConfirmOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove {connectorName}</DialogTitle>
+            <DialogDescription>
+              This will disable the <strong>{connectorName}</strong> connector
+              and disconnect the{" "}
+              <strong>{providerLabel(oauthProvider ?? "")}</strong> OAuth
+              connection. Standing approvals will be revoked and you will need
+              to re-authorize OAuth when re-enabling.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setRemoveConfirmOpen(false)}
+              disabled={isRemoving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemove}
+              disabled={isRemoving}
+            >
+              {isRemoving && <Loader2 className="animate-spin" />}
+              Remove
             </Button>
           </DialogFooter>
         </DialogContent>
