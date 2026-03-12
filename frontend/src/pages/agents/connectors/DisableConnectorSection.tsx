@@ -64,8 +64,9 @@ export function DisableConnectorSection({
 
   async function handleRemove() {
     // Step 1: disable the connector
+    let disableResult: Awaited<ReturnType<typeof disableConnector>>;
     try {
-      await disableConnector({ agentId, connectorId });
+      disableResult = await disableConnector({ agentId, connectorId });
     } catch {
       toast.error("Failed to disable connector");
       return;
@@ -77,12 +78,19 @@ export function DisableConnectorSection({
     if (!oauthProvider) {
       throw new Error("handleRemove called without oauthProvider");
     }
+    const revoked = disableResult.revoked_standing_approvals;
+    const revokedSuffix =
+      revoked > 0
+        ? ` ${revoked} standing approval${revoked === 1 ? "" : "s"} revoked.`
+        : "";
     try {
       await disconnect(oauthProvider);
-      toast.success("Connector removed and OAuth disconnected");
+      toast.success(
+        `Connector removed and OAuth disconnected.${revokedSuffix}`,
+      );
     } catch {
       toast.warning(
-        "Connector disabled, but OAuth disconnect failed. You can disconnect manually from Settings.",
+        `Connector disabled, but OAuth disconnect failed.${revokedSuffix} You can disconnect manually from Settings.`,
       );
     }
 
