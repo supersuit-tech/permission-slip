@@ -226,6 +226,7 @@ function OAuthCredentialRow({
     window.location.href = getOAuthAuthorizeUrl(
       providerId,
       session.access_token,
+      requiredCredential.oauth_scopes,
     );
   }
 
@@ -344,6 +345,7 @@ function OAuthCredentialRow({
           open={shopDialogOpen}
           onOpenChange={setShopDialogOpen}
           providerId={providerId}
+          oauthScopes={requiredCredential.oauth_scopes}
         />
       )}
     </>
@@ -354,10 +356,12 @@ function ShopDomainDialog({
   open,
   onOpenChange,
   providerId,
+  oauthScopes,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providerId: string;
+  oauthScopes?: string[];
 }) {
   const { session } = useAuth();
   const [shop, setShop] = useState("");
@@ -368,7 +372,7 @@ function ShopDomainDialog({
     const trimmed = shop.trim().toLowerCase();
     if (!trimmed) return;
     const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
-    const url = getOAuthAuthorizeUrl(providerId, session.access_token);
+    const url = getOAuthAuthorizeUrl(providerId, session.access_token, oauthScopes);
     window.location.href = `${url}&shop=${encodeURIComponent(subdomain)}`;
     onOpenChange(false);
   }

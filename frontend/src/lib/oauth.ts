@@ -22,6 +22,7 @@ export const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
 export function getOAuthAuthorizeUrl(
   providerId: string,
   accessToken: string,
+  scopes?: string[],
 ): string {
   const baseUrl =
     import.meta.env.VITE_API_BASE_URL?.replace(/\/v1\/?$/, "") ?? "/api";
@@ -30,5 +31,11 @@ export function getOAuthAuthorizeUrl(
   url.searchParams.delete("oauth_provider");
   url.searchParams.delete("oauth_error");
   const returnTo = url.pathname + (url.search || "") + url.hash;
-  return `${baseUrl}/v1/oauth/${providerId}/authorize?access_token=${encodeURIComponent(accessToken)}&return_to=${encodeURIComponent(returnTo)}`;
+  let result = `${baseUrl}/v1/oauth/${providerId}/authorize?access_token=${encodeURIComponent(accessToken)}&return_to=${encodeURIComponent(returnTo)}`;
+  if (scopes?.length) {
+    for (const s of scopes) {
+      result += `&scope=${encodeURIComponent(s)}`;
+    }
+  }
+  return result;
 }
