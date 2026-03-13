@@ -64,7 +64,48 @@ SHA=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
 
 If the command fails or `SHA` is empty, print an error and stop.
 
-### 4. Create and Push the Tag
+### 4. Sync package.json Version
+
+Check whether `<package>/package.json` exists in the repo and whether its `version` field matches the target version. If it doesn't match, bump it via the GitHub API (creating a commit directly on `main`) and update `SHA` to the new commit.
+
+```bash
+# Fetch the file metadata and content
+FILE_RESP=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh api repos/supersuit-tech/permission-slip/contents/<package>/package.json \
+  --jq '{sha: .sha, content: .content}')
+
+FILE_SHA=$(echo "$FILE_RESP" | jq -r '.sha')
+# Decode content (GitHub returns base64 with newlines)
+CURRENT_CONTENT=$(echo "$FILE_RESP" | jq -r '.content' | base64 -d)
+PKG_VERSION=$(echo "$CURRENT_CONTENT" | jq -r '.version')
+
+if [ "$PKG_VERSION" != "<version>" ]; then
+  echo "package.json version is $PKG_VERSION, bumping to <version>..."
+
+  # Produce updated JSON preserving formatting
+  UPDATED_CONTENT=$(echo "$CURRENT_CONTENT" | jq --arg v "<version>" '.version = $v')
+  ENCODED=$(echo "$UPDATED_CONTENT" | base64 -w 0)
+
+  COMMIT_RESP=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+    gh api repos/supersuit-tech/permission-slip/contents/<package>/package.json \
+    -X PUT \
+    -f message="chore: bump <package> version to <version>" \
+    -f content="$ENCODED" \
+    -f sha="$FILE_SHA")
+
+  # Update SHA to point to the new commit so the tag lands on it
+  SHA=$(echo "$COMMIT_RESP" | jq -r '.commit.sha')
+  if [ -z "$SHA" ] || [ "$SHA" = "null" ]; then
+    echo "::error::Failed to bump package.json — could not get new commit SHA"
+    exit 1
+  fi
+  echo "Committed package.json bump: $SHA"
+fi
+```
+
+If the file doesn't exist (404), skip this step silently and proceed with the original `SHA`.
+
+### 5. Create and Push the Tag
 
 Create the tag reference on GitHub directly via the API — no local branch switching or `git push` needed:
 
@@ -77,7 +118,7 @@ GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
 
 If the command fails, print the error output and stop.
 
-### 5. Confirm
+### 6. Confirm
 
 Print a summary:
 ```
