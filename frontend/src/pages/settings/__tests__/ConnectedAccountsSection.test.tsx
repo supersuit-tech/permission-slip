@@ -210,6 +210,7 @@ describe("ConnectedAccountsSection", () => {
     mockApiFetch(
       [
         {
+          id: "conn-123",
           provider: "google",
           scopes: ["openid"],
           status: "active",
@@ -240,9 +241,9 @@ describe("ConnectedAccountsSection", () => {
 
     await waitFor(() => {
       expect(mockDelete).toHaveBeenCalledWith(
-        "/v1/oauth/connections/{provider}",
+        "/v1/oauth/connections/{connection_id}",
         expect.objectContaining({
-          params: { path: { provider: "google" } },
+          params: { path: { connection_id: "conn-123" } },
         }),
       );
     });

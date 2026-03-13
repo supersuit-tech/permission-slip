@@ -8,21 +8,21 @@ export function useDisconnectOAuth() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (provider: string) => {
+    mutationFn: async (connectionId: string) => {
       if (!session?.access_token) {
         throw new Error("Not authenticated");
       }
 
       const { data, error } = await client.DELETE(
-        "/v1/oauth/connections/{provider}",
+        "/v1/oauth/connections/{connection_id}",
         {
           headers: { Authorization: `Bearer ${session.access_token}` },
-          params: { path: { provider } },
+          params: { path: { connection_id: connectionId } },
         },
       );
       if (error) {
         throw new Error(
-          getApiErrorMessage(error, "Failed to disconnect provider"),
+          getApiErrorMessage(error, "Failed to disconnect connection"),
         );
       }
       return data;
@@ -33,7 +33,7 @@ export function useDisconnectOAuth() {
   });
 
   return {
-    disconnect: (provider: string) => mutation.mutateAsync(provider),
+    disconnect: (connectionId: string) => mutation.mutateAsync(connectionId),
     isLoading: mutation.isPending,
   };
 }

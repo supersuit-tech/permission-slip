@@ -265,6 +265,13 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 						Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
 					}
 				}
+				// Verify the bound connection belongs to the executing user.
+				// Without this, a binding could reference another user's connection.
+				if conn.UserID != userID {
+					return connectors.Credentials{}, &connectors.ValidationError{
+						Message: "bound OAuth connection does not belong to this user",
+					}
+				}
 				// Use the bound connection directly (not a provider re-query)
 				// so the specific oauth_connection_id in the binding is honoured.
 				return resolveOAuthCredentialsFromConnection(ctx, deps, conn)
@@ -476,16 +483,34 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 		}
 	}
 
-	// Look up the user's OAuth connection for this provider.
-	conn, err := db.GetOAuthConnectionByProvider(ctx, deps.DB, userID, providerID)
+	// Look up the user's OAuth connections for this provider. Multiple
+	// connections may exist (e.g. two Google accounts). Use the most recently
+	// created active connection as the default when no agent binding is set.
+	conns, err := db.GetOAuthConnectionsByProvider(ctx, deps.DB, userID, providerID)
 	if err != nil {
-		return zero, fmt.Errorf("look up OAuth connection for provider %q: %w", providerID, err)
+		return zero, fmt.Errorf("look up OAuth connections for provider %q: %w", providerID, err)
 	}
-	if conn == nil {
+	if len(conns) == 0 {
 		return zero, &connectors.OAuthRefreshError{
 			Provider:     providerID,
 			Message:      fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
 			NotConnected: true,
+		}
+	}
+
+	// Pick the first active connection (ordered by created_at DESC).
+	var conn *db.OAuthConnection
+	for i := range conns {
+		if conns[i].Status == db.OAuthStatusActive {
+			conn = &conns[i]
+			break
+		}
+	}
+	if conn == nil {
+		// All connections exist but none are active.
+		return zero, &connectors.OAuthRefreshError{
+			Provider: providerID,
+			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", providerID, conns[0].Status),
 		}
 	}
 

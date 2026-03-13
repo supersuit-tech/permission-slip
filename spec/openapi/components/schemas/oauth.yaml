@@ -82,6 +82,13 @@ OAuthConnection:
         or shop domain for Shopify (e.g. "mystore.myshopify.com"). Omitted for
         providers with static OAuth endpoints (e.g. Google, Slack).
       example: "mycompany.zendesk.com"
+    display_name:
+      type: string
+      description: >
+        A human-readable identifier for this connection, typically the
+        authenticated user's email address. Omitted when no identifying
+        information is available.
+      example: "user@example.com"
 
 OAuthConnectionListResponse:
   type: object

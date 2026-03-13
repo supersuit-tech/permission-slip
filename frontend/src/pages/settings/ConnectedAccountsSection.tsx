@@ -4,14 +4,12 @@ import {
   Link2,
   Loader2,
   LogIn,
+  Plus,
   Unplug,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "@/auth/AuthContext";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
-import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
-import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import { providerLabel, getOAuthAuthorizeUrl } from "@/lib/oauth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DisconnectOAuthDialog } from "@/pages/agents/connectors/DisconnectOAuthDialog";
 
 /**
  * Config for providers that need a per-instance subdomain before the OAuth
@@ -93,41 +92,58 @@ export function ConnectedAccountsSection() {
   const { session } = useAuth();
   const { connections, isLoading, error } = useOAuthConnections();
   const { providers } = useOAuthProviders();
-  const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
 
-  async function handleDisconnect(provider: string) {
-    try {
-      await disconnect(provider);
-      toast.success(`${providerLabel(provider)} disconnected.`);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to disconnect.";
-      toast.error(message);
-    }
-  }
+  const [instanceDialogState, setInstanceDialogState] = useState<{
+    provider: string;
+    replaceId?: string;
+  } | null>(null);
 
-  const [instanceDialogProvider, setInstanceDialogProvider] = useState<
-    string | null
-  >(null);
+  const [disconnectTarget, setDisconnectTarget] = useState<{
+    id: string;
+    provider: string;
+    displayName?: string;
+  } | null>(null);
 
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
     if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
-      setInstanceDialogProvider(providerId);
+      setInstanceDialogState({ provider: providerId });
       return;
     }
-    // Open in same window — the callback redirects back to settings
     window.location.href = getOAuthAuthorizeUrl(
       providerId,
       session.access_token,
     );
   }
 
-  // Providers that are ready to connect but don't have an active connection
+  function handleReconnect(connectionId: string, providerId: string) {
+    if (!session?.access_token) return;
+    if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
+      setInstanceDialogState({ provider: providerId, replaceId: connectionId });
+      return;
+    }
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+      { replaceId: connectionId },
+    );
+  }
+
+  // Providers that are ready to connect (have credentials configured)
+  const configuredProviders = providers.filter((p) => p.has_credentials);
+
+  // Group connections by provider for display
   const connectedProviderIds = new Set(connections.map((c) => c.provider));
-  const availableProviders = providers.filter(
-    (p) => p.has_credentials && !connectedProviderIds.has(p.id),
+
+  // Providers with no connections yet — show as initial "Connect" buttons
+  const unconnectedProviders = configuredProviders.filter(
+    (p) => !connectedProviderIds.has(p.id),
   );
+
+  // Providers that already have connections — show "Add another account" buttons
+  const connectedProviderIdsWithCredentials = configuredProviders
+    .filter((p) => connectedProviderIds.has(p.id))
+    .map((p) => p.id);
 
   return (
     <Card>
@@ -161,13 +177,18 @@ export function ConnectedAccountsSection() {
           <div className="space-y-3">
             {connections.map((conn) => (
               <div
-                key={conn.provider}
+                key={conn.id}
                 className="flex items-center justify-between rounded-lg border p-4"
               >
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">
                     {providerLabel(conn.provider)}
-                    {conn.instance && (
+                    {conn.display_name && (
+                      <span className="text-muted-foreground ml-1.5 font-normal">
+                        ({conn.display_name})
+                      </span>
+                    )}
+                    {!conn.display_name && conn.instance && (
                       <span className="text-muted-foreground ml-1.5 font-normal">
                         ({conn.instance})
                       </span>
@@ -186,33 +207,64 @@ export function ConnectedAccountsSection() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleConnect(conn.provider)}
+                      onClick={() => handleReconnect(conn.id, conn.provider)}
                     >
                       <LogIn className="size-4" />
                       Re-authorize
                     </Button>
                   ) : (
-                    <InlineConfirmButton
-                      confirmLabel="Disconnect"
-                      isProcessing={isDisconnecting}
-                      onConfirm={() => handleDisconnect(conn.provider)}
-                    >
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleReconnect(conn.id, conn.provider)
+                        }
+                      >
+                        <LogIn className="size-4" />
+                        Reconnect
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         aria-label={`Disconnect ${providerLabel(conn.provider)}`}
+                        onClick={() =>
+                          setDisconnectTarget({
+                            id: conn.id,
+                            provider: conn.provider,
+                            displayName: conn.display_name,
+                          })
+                        }
                       >
                         <Unplug className="text-muted-foreground size-4" />
                       </Button>
-                    </InlineConfirmButton>
+                    </>
                   )}
                 </div>
               </div>
             ))}
 
-            {availableProviders.length > 0 && (
+            {/* "Add another account" for providers that already have connections */}
+            {connectedProviderIdsWithCredentials.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
-                {availableProviders.map((provider) => (
+                {connectedProviderIdsWithCredentials.map((providerId) => (
+                  <Button
+                    key={`add-${providerId}`}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleConnect(providerId)}
+                  >
+                    <Plus className="size-4" />
+                    Add another {providerLabel(providerId)} account
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {/* "Connect" for providers with no connections yet */}
+            {unconnectedProviders.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {unconnectedProviders.map((provider) => (
                   <Button
                     key={provider.id}
                     variant="outline"
@@ -226,7 +278,7 @@ export function ConnectedAccountsSection() {
               </div>
             )}
 
-            {connections.length === 0 && availableProviders.length === 0 && (
+            {connections.length === 0 && configuredProviders.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
                 No OAuth providers are configured yet. Set up client credentials
                 to enable OAuth connections.
@@ -236,28 +288,43 @@ export function ConnectedAccountsSection() {
         )}
       </CardContent>
 
-      {instanceDialogProvider &&
+      {instanceDialogState &&
         session?.access_token &&
-        instanceDialogProvider in INSTANCE_SUBDOMAIN_PROVIDERS && (
+        instanceDialogState.provider in INSTANCE_SUBDOMAIN_PROVIDERS && (
           <InstanceSubdomainDialog
             open
-            config={INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!}
+            config={INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogState.provider]!}
             onOpenChange={(open) => {
-              if (!open) setInstanceDialogProvider(null);
+              if (!open) setInstanceDialogState(null);
             }}
             onSubmit={(value) => {
-              if (!session?.access_token || !instanceDialogProvider) return;
+              if (!session?.access_token || !instanceDialogState) return;
               const cfg =
-                INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!;
+                INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogState.provider]!;
               const url = getOAuthAuthorizeUrl(
-                instanceDialogProvider,
+                instanceDialogState.provider,
                 session.access_token,
+                instanceDialogState.replaceId
+                  ? { replaceId: instanceDialogState.replaceId }
+                  : undefined,
               );
               window.location.href = `${url}&${cfg.queryParam}=${encodeURIComponent(value)}`;
-              setInstanceDialogProvider(null);
+              setInstanceDialogState(null);
             }}
           />
         )}
+
+      {disconnectTarget && (
+        <DisconnectOAuthDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDisconnectTarget(null);
+          }}
+          connectionId={disconnectTarget.id}
+          providerName={providerLabel(disconnectTarget.provider)}
+          displayName={disconnectTarget.displayName}
+        />
+      )}
     </Card>
   );
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // OAuth connection status values. Must match the CHECK constraint on
@@ -58,8 +57,7 @@ func (e *OAuthConnectionError) Error() string { return e.Message }
 type OAuthConnectionErrCode int
 
 const (
-	OAuthConnectionErrNotFound  OAuthConnectionErrCode = iota
-	OAuthConnectionErrDuplicate                        // unique (user_id, provider) violation
+	OAuthConnectionErrNotFound OAuthConnectionErrCode = iota
 )
 
 // oauthConnectionColumns is the shared SELECT column list for oauth_connections queries.
@@ -118,9 +116,34 @@ func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider
 	return &c, nil
 }
 
+// GetOAuthConnectionsByProvider returns all OAuth connections for a given user
+// and provider, ordered by created_at descending (newest first). Use this when
+// multiple connections per provider are allowed.
+func GetOAuthConnectionsByProvider(ctx context.Context, db DBTX, userID, provider string) ([]OAuthConnection, error) {
+	rows, err := db.Query(ctx, `
+		SELECT `+oauthConnectionColumns+`
+		FROM oauth_connections
+		WHERE user_id = $1 AND provider = $2
+		ORDER BY created_at DESC`,
+		userID, provider,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conns []OAuthConnection
+	for rows.Next() {
+		c, err := scanOAuthConnection(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		conns = append(conns, c)
+	}
+	return conns, rows.Err()
+}
+
 // CreateOAuthConnection inserts a new OAuth connection row.
-// Returns a *OAuthConnectionError with code OAuthConnectionErrDuplicate if
-// the (user_id, provider) unique constraint is violated.
 func CreateOAuthConnection(ctx context.Context, db DBTX, p CreateOAuthConnectionParams) (*OAuthConnection, error) {
 	row := db.QueryRow(ctx, `
 		INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, refresh_token_vault_id, scopes, token_expiry, extra_data)
@@ -130,10 +153,6 @@ func CreateOAuthConnection(ctx context.Context, db DBTX, p CreateOAuthConnection
 	)
 	c, err := scanOAuthConnection(row.Scan)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
-			return nil, &OAuthConnectionError{Code: OAuthConnectionErrDuplicate, Message: "OAuth connection already exists for this provider"}
-		}
 		return nil, err
 	}
 	return &c, nil
@@ -213,15 +232,16 @@ type DeleteOAuthConnectionResult struct {
 	RefreshTokenVaultID *string
 }
 
-// DeleteOAuthConnection deletes an OAuth connection by user and provider.
+// DeleteOAuthConnectionByID deletes a single OAuth connection by its ID.
+// The userID parameter ensures the caller owns the connection (defense-in-depth).
 // Returns the vault secret IDs so the caller can delete the vault secrets too.
-func DeleteOAuthConnection(ctx context.Context, db DBTX, userID, provider string) (*DeleteOAuthConnectionResult, error) {
+func DeleteOAuthConnectionByID(ctx context.Context, db DBTX, userID, connectionID string) (*DeleteOAuthConnectionResult, error) {
 	var result DeleteOAuthConnectionResult
 	err := db.QueryRow(ctx, `
 		DELETE FROM oauth_connections
-		WHERE user_id = $1 AND provider = $2
+		WHERE id = $1 AND user_id = $2
 		RETURNING access_token_vault_id, refresh_token_vault_id`,
-		userID, provider,
+		connectionID, userID,
 	).Scan(&result.AccessTokenVaultID, &result.RefreshTokenVaultID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, &OAuthConnectionError{Code: OAuthConnectionErrNotFound, Message: "OAuth connection not found"}

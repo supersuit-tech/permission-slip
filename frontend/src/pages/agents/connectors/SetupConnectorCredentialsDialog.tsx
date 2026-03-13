@@ -91,12 +91,16 @@ export function SetupConnectorCredentialsDialog({
     : null;
   const hasOAuthCredentials = !!provider?.has_credentials;
 
-  // Check if already connected
-  const existingConnection = effectiveOAuthProvider
-    ? connections.find((c) => c.provider === effectiveOAuthProvider)
-    : null;
-  const isAlreadyConnected = existingConnection?.status === "active";
-  const needsReauth = existingConnection?.status === "needs_reauth";
+  // Check if already connected (any active connection for this provider)
+  const providerConnections = effectiveOAuthProvider
+    ? connections.filter((c) => c.provider === effectiveOAuthProvider)
+    : [];
+  const isAlreadyConnected = providerConnections.some(
+    (c) => c.status === "active",
+  );
+  const needsReauth =
+    !isAlreadyConnected &&
+    providerConnections.some((c) => c.status === "needs_reauth");
 
   // Find static (API key / basic) credential requirements
   const staticCredentials = requiredCredentials.filter(
