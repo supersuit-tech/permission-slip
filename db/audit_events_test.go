@@ -392,6 +392,96 @@ func TestListAuditEvents(t *testing.T) {
 		}
 	})
 
+	t.Run("DeduplicatesResolvedApproval", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Same source_id for both events — simulates a requested→approved lifecycle.
+		sourceID := testhelper.GenerateID(t, "appr_")
+		base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.requested", "pending", sourceID, base)
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", sourceID, base.Add(time.Minute))
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event (deduped), got %d", len(page.Events))
+		}
+		if page.Events[0].EventType != db.AuditEventApprovalApproved {
+			t.Errorf("expected approval.approved, got %s", page.Events[0].EventType)
+		}
+	})
+
+	t.Run("ShowsUnresolvedPendingApproval", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Only a requested event, no resolution — should still appear.
+		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.requested", "pending", testhelper.GenerateID(t, "appr_"))
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 pending event, got %d", len(page.Events))
+		}
+		if page.Events[0].EventType != db.AuditEventApprovalRequested {
+			t.Errorf("expected approval.requested, got %s", page.Events[0].EventType)
+		}
+	})
+
+	t.Run("DeduplicatesAcrossResolutionTypes", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+
+		// Approval that was denied.
+		denied := testhelper.GenerateID(t, "appr_")
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.requested", "pending", denied, base)
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", denied, base.Add(time.Minute))
+
+		// Approval that was cancelled.
+		cancelled := testhelper.GenerateID(t, "appr_")
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.requested", "pending", cancelled, base.Add(2*time.Minute))
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.cancelled", "cancelled", cancelled, base.Add(3*time.Minute))
+
+		// Approval still pending (no resolution).
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.requested", "pending", testhelper.GenerateID(t, "appr_"), base.Add(4*time.Minute))
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Should see: pending request + cancelled + denied = 3 (not 5).
+		if len(page.Events) != 3 {
+			t.Fatalf("expected 3 events (2 resolved + 1 pending), got %d", len(page.Events))
+		}
+
+		types := map[db.AuditEventType]int{}
+		for _, e := range page.Events {
+			types[e.EventType]++
+		}
+		if types[db.AuditEventApprovalRequested] != 1 {
+			t.Errorf("expected 1 approval.requested (unresolved), got %d", types[db.AuditEventApprovalRequested])
+		}
+		if types[db.AuditEventApprovalDenied] != 1 {
+			t.Errorf("expected 1 approval.denied, got %d", types[db.AuditEventApprovalDenied])
+		}
+		if types[db.AuditEventApprovalCancelled] != 1 {
+			t.Errorf("expected 1 approval.cancelled, got %d", types[db.AuditEventApprovalCancelled])
+		}
+	})
+
 	t.Run("MixedEventTypes", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
