@@ -54,4 +54,20 @@ describe("getOAuthAuthorizeUrl", () => {
     const url = getOAuthAuthorizeUrl("google", "tok_z", undefined);
     expect(url).not.toContain("scope=");
   });
+
+  it("appends replace param when replaceId is provided", () => {
+    const url = getOAuthAuthorizeUrl("google", "tok_r", {
+      scopes: ["openid"],
+      replaceId: "oconn_abc123",
+    });
+    expect(url).toContain("scope=openid");
+    expect(url).toContain("replace=oconn_abc123");
+  });
+
+  it("omits replace param when replaceId is not set", () => {
+    const url = getOAuthAuthorizeUrl("google", "tok_n", {
+      scopes: ["openid"],
+    });
+    expect(url).not.toContain("replace=");
+  });
 });

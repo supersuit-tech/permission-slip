@@ -14,17 +14,7 @@ export { providerLabel } from "@/lib/labels";
 export const SHOP_REQUIRED_PROVIDERS = new Set(["shopify"]);
 
 /**
- * Builds the URL to initiate an OAuth authorization flow for a provider.
- * The backend redirects from this URL to the provider's consent screen.
- * After the OAuth flow completes, the user is redirected back to the
- * current page (window.location.pathname + search + hash).
- */
-/**
  * Options for building an OAuth authorize URL.
- *
- * @param replaceId - When set, the backend replaces the specified existing
- *   connection instead of creating a new one alongside it. Used for the
- *   "Reconnect" flow.
  */
 interface OAuthAuthorizeOptions {
   scopes?: string[];
