@@ -17,7 +17,7 @@ vi.mock("../../../api/client");
 const allEnabled = [
   { channel: "email", enabled: true, available: true },
   { channel: "web-push", enabled: true, available: true },
-  { channel: "sms", enabled: true, available: true },
+  { channel: "sms", enabled: false, available: false },
   { channel: "mobile-push", enabled: true, available: true },
 ];
 
@@ -118,7 +118,7 @@ describe("NotificationSection", () => {
     const prefs = [
       { channel: "email", enabled: true, available: true },
       { channel: "web-push", enabled: false, available: true },
-      { channel: "sms", enabled: true, available: true },
+      { channel: "sms", enabled: false, available: false },
       { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileWithContact, prefs);
@@ -133,8 +133,9 @@ describe("NotificationSection", () => {
       const unchecked = switches.filter(
         (s) => s.getAttribute("data-state") === "unchecked",
       );
-      // 3 channels enabled (email, sms, mobile-push) + 2 unchecked (web-push, product updates)
-      expect(checked).toHaveLength(3);
+      // 2 channels enabled (email, mobile-push) + 2 unchecked (web-push, product updates)
+      // SMS has no switch (beta-disabled)
+      expect(checked).toHaveLength(2);
       expect(unchecked).toHaveLength(2);
     });
   });
@@ -153,18 +154,18 @@ describe("NotificationSection", () => {
     });
   });
 
-  it("shows warning when phone is missing and SMS notifications enabled", async () => {
+  it("does not show phone warning when SMS is beta-disabled", async () => {
     mockApiFetch(profileNoContact, allEnabled);
 
     render(<NotificationSection />, { wrapper });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          "Add a phone number above to receive SMS notifications.",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText("SMS")).toBeInTheDocument();
     });
+    // SMS is gated during beta, so no phone warning should appear.
+    expect(
+      screen.queryByText(/Add a phone number/),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show warnings when contact info is present", async () => {
@@ -187,7 +188,7 @@ describe("NotificationSection", () => {
     const prefs = [
       { channel: "email", enabled: false, available: true },
       { channel: "web-push", enabled: true, available: true },
-      { channel: "sms", enabled: false, available: true },
+      { channel: "sms", enabled: false, available: false },
       { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileNoContact, prefs);
@@ -326,20 +327,16 @@ describe("NotificationSection", () => {
     });
   });
 
-  it("shows SMS as gated with upgrade link on free plan", async () => {
+  it("shows SMS as coming soon during beta", async () => {
     mockApiFetch(profileWithContact, smsGated);
 
     render(<NotificationSection />, { wrapper });
 
     await waitFor(() => {
       expect(
-        screen.getByText("Available on paid plan"),
+        screen.getByText("Coming soon"),
       ).toBeInTheDocument();
     });
-    const upgradeLink = screen.getByRole("link", {
-      name: /Available on paid plan/,
-    });
-    expect(upgradeLink).toHaveAttribute("href", "/billing");
   });
 
   it("does not show toggle button for plan-gated SMS", async () => {
@@ -352,7 +349,7 @@ describe("NotificationSection", () => {
     });
 
     // Should have 3 channel switches (email, web-push, mobile-push) + 1 product updates = 4
-    // SMS should not have a switch (plan-gated)
+    // SMS should not have a switch (beta-disabled)
     const switches = screen.getAllByRole("switch");
     expect(switches).toHaveLength(4);
   });
