@@ -93,9 +93,10 @@ export function ConnectedAccountsSection() {
   const { connections, isLoading, error } = useOAuthConnections();
   const { providers } = useOAuthProviders();
 
-  const [instanceDialogProvider, setInstanceDialogProvider] = useState<
-    string | null
-  >(null);
+  const [instanceDialogState, setInstanceDialogState] = useState<{
+    provider: string;
+    replaceId?: string;
+  } | null>(null);
 
   const [disconnectTarget, setDisconnectTarget] = useState<{
     id: string;
@@ -106,7 +107,7 @@ export function ConnectedAccountsSection() {
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
     if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
-      setInstanceDialogProvider(providerId);
+      setInstanceDialogState({ provider: providerId });
       return;
     }
     window.location.href = getOAuthAuthorizeUrl(
@@ -118,9 +119,7 @@ export function ConnectedAccountsSection() {
   function handleReconnect(connectionId: string, providerId: string) {
     if (!session?.access_token) return;
     if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
-      // For instance-based providers, re-open the subdomain dialog.
-      // The replace param will be added after the subdomain is entered.
-      setInstanceDialogProvider(providerId);
+      setInstanceDialogState({ provider: providerId, replaceId: connectionId });
       return;
     }
     window.location.href = getOAuthAuthorizeUrl(
@@ -289,25 +288,28 @@ export function ConnectedAccountsSection() {
         )}
       </CardContent>
 
-      {instanceDialogProvider &&
+      {instanceDialogState &&
         session?.access_token &&
-        instanceDialogProvider in INSTANCE_SUBDOMAIN_PROVIDERS && (
+        instanceDialogState.provider in INSTANCE_SUBDOMAIN_PROVIDERS && (
           <InstanceSubdomainDialog
             open
-            config={INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!}
+            config={INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogState.provider]!}
             onOpenChange={(open) => {
-              if (!open) setInstanceDialogProvider(null);
+              if (!open) setInstanceDialogState(null);
             }}
             onSubmit={(value) => {
-              if (!session?.access_token || !instanceDialogProvider) return;
+              if (!session?.access_token || !instanceDialogState) return;
               const cfg =
-                INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogProvider]!;
+                INSTANCE_SUBDOMAIN_PROVIDERS[instanceDialogState.provider]!;
               const url = getOAuthAuthorizeUrl(
-                instanceDialogProvider,
+                instanceDialogState.provider,
                 session.access_token,
+                instanceDialogState.replaceId
+                  ? { replaceId: instanceDialogState.replaceId }
+                  : undefined,
               );
               window.location.href = `${url}&${cfg.queryParam}=${encodeURIComponent(value)}`;
-              setInstanceDialogProvider(null);
+              setInstanceDialogState(null);
             }}
           />
         )}

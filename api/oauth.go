@@ -686,14 +686,27 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 	// When empty, create a new connection alongside any existing ones.
 	var existing *db.DeleteOAuthConnectionResult
 	if replaceID != "" {
-		existing, err = db.DeleteOAuthConnectionByID(ctx, tx, userID, replaceID)
-		if err != nil {
-			var connErr *db.OAuthConnectionError
-			if !errors.As(err, &connErr) || connErr.Code != db.OAuthConnectionErrNotFound {
-				return fmt.Errorf("delete existing connection: %w", err)
-			}
-			// Not found is fine — connection may have been deleted already.
+		// Validate that the connection being replaced belongs to the same
+		// provider. Without this check a crafted URL could delete a
+		// connection for a different provider (e.g. replace a Slack
+		// connection while authorizing Google).
+		oldConn, lookupErr := db.GetOAuthConnectionByID(ctx, tx, replaceID)
+		if lookupErr != nil {
+			return fmt.Errorf("lookup connection to replace: %w", lookupErr)
 		}
+		if oldConn != nil && oldConn.UserID == userID && oldConn.Provider == providerID {
+			existing, err = db.DeleteOAuthConnectionByID(ctx, tx, userID, replaceID)
+			if err != nil {
+				var connErr *db.OAuthConnectionError
+				if !errors.As(err, &connErr) || connErr.Code != db.OAuthConnectionErrNotFound {
+					return fmt.Errorf("delete existing connection: %w", err)
+				}
+			}
+		} else if oldConn != nil && oldConn.Provider != providerID {
+			log.Printf("[%s] storeOAuthTokens: replaceID %q belongs to provider %q, not %q — ignoring", TraceID(ctx), replaceID, oldConn.Provider, providerID)
+			// Ignore the replaceID — create a new connection instead.
+		}
+		// If oldConn is nil or belongs to another user, just ignore and create new.
 	}
 
 	// Track the old refresh token vault ID so we can reuse it if the new

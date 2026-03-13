@@ -218,7 +218,9 @@ function OAuthCredentialRow({
   providers: { id: string; has_credentials: boolean }[];
 }) {
   const { session } = useAuth();
-  const [shopDialogOpen, setShopDialogOpen] = useState(false);
+  const [shopDialogState, setShopDialogState] = useState<{
+    replaceId?: string;
+  } | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<{
     id: string;
     displayName?: string;
@@ -241,7 +243,7 @@ function OAuthCredentialRow({
   function handleConnect() {
     if (!session?.access_token || !providerId) return;
     if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
-      setShopDialogOpen(true);
+      setShopDialogState({});
       return;
     }
     window.location.href = getOAuthAuthorizeUrl(
@@ -254,7 +256,7 @@ function OAuthCredentialRow({
   function handleReconnect(connectionId: string) {
     if (!session?.access_token || !providerId) return;
     if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
-      setShopDialogOpen(true);
+      setShopDialogState({ replaceId: connectionId });
       return;
     }
     window.location.href = getOAuthAuthorizeUrl(
@@ -391,12 +393,15 @@ function OAuthCredentialRow({
         )}
       </div>
 
-      {SHOP_REQUIRED_PROVIDERS.has(providerId) && (
+      {SHOP_REQUIRED_PROVIDERS.has(providerId) && shopDialogState && (
         <ShopDomainDialog
-          open={shopDialogOpen}
-          onOpenChange={setShopDialogOpen}
+          open
+          onOpenChange={(open) => {
+            if (!open) setShopDialogState(null);
+          }}
           providerId={providerId}
           oauthScopes={requiredCredential.oauth_scopes}
+          replaceId={shopDialogState.replaceId}
         />
       )}
 
@@ -420,11 +425,13 @@ function ShopDomainDialog({
   onOpenChange,
   providerId,
   oauthScopes,
+  replaceId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providerId: string;
   oauthScopes?: string[];
+  replaceId?: string;
 }) {
   const { session } = useAuth();
   const [shop, setShop] = useState("");
@@ -435,7 +442,10 @@ function ShopDomainDialog({
     const trimmed = shop.trim().toLowerCase();
     if (!trimmed) return;
     const subdomain = trimmed.replace(/\.myshopify\.com$/, "");
-    const url = getOAuthAuthorizeUrl(providerId, session.access_token, oauthScopes);
+    const url = getOAuthAuthorizeUrl(providerId, session.access_token, {
+      scopes: oauthScopes,
+      replaceId,
+    });
     window.location.href = `${url}&shop=${encodeURIComponent(subdomain)}`;
     onOpenChange(false);
   }
