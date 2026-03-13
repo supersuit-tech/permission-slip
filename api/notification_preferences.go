@@ -65,7 +65,8 @@ var paidOnlyChannels = map[string]bool{
 // betaDisabledChannels lists channels that are disabled during the beta period.
 // These channels are always unavailable regardless of plan.
 var betaDisabledChannels = map[string]bool{
-	"sms": true,
+	"sms":      true,
+	"web-push": true,
 }
 
 func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
