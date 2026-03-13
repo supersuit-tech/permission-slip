@@ -212,3 +212,20 @@ func GetDecryptedCredentials(
 	}
 	return creds, nil
 }
+
+// GetCredentialByID returns the credential metadata for the given ID,
+// or nil if no credential exists with that ID.
+func GetCredentialByID(ctx context.Context, db DBTX, credID string) (*Credential, error) {
+	var c Credential
+	err := db.QueryRow(ctx, `
+		SELECT id, user_id, service, label, created_at
+		FROM credentials WHERE id = $1`, credID,
+	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}

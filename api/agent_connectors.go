@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -201,16 +202,21 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Validate ownership of the referenced credential/connection.
+		// Validate ownership and service match for static credentials.
 		if req.CredentialID != nil {
-			owns, err := db.CredentialBelongsToUser(r.Context(), deps.DB, *req.CredentialID, userID)
+			cred, err := db.GetCredentialByID(r.Context(), deps.DB, *req.CredentialID)
 			if err != nil {
 				log.Printf("[%s] AssignCredential: credential check: %v", TraceID(r.Context()), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify credential"))
 				return
 			}
-			if !owns {
+			if cred == nil || cred.UserID != userID {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Credential not found"))
+				return
+			}
+			if cred.Service != connectorID {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+					fmt.Sprintf("credential service %q does not match connector %q", cred.Service, connectorID)))
 				return
 			}
 		}

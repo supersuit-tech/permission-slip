@@ -65,7 +65,8 @@ func UpsertAgentConnectorCredential(ctx context.Context, db DBTX, p UpsertAgentC
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (agent_id, connector_id) DO UPDATE
 		    SET credential_id = EXCLUDED.credential_id,
-		        oauth_connection_id = EXCLUDED.oauth_connection_id
+		        oauth_connection_id = EXCLUDED.oauth_connection_id,
+		        approver_id = EXCLUDED.approver_id
 		RETURNING id, agent_id, connector_id, approver_id,
 		          credential_id, oauth_connection_id, created_at`,
 		p.ID, p.AgentID, p.ConnectorID, p.ApproverID,
