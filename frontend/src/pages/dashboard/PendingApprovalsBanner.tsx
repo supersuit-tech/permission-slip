@@ -34,13 +34,9 @@ function ApprovalBannerItem({
 
   return (
     <>
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         onClick={() => setDialogOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") setDialogOpen(true);
-        }}
         className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-left text-sm text-blue-900 shadow-sm transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-950/70"
         aria-label={`Pending approval: ${approval.action.type} from ${agentDisplayName}`}
       >
@@ -59,7 +55,7 @@ function ApprovalBannerItem({
         <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
           Review
         </span>
-      </div>
+      </button>
 
       <ReviewApprovalDialog
         approval={approval}
