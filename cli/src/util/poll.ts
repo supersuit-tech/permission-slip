@@ -25,9 +25,13 @@ const DEFAULT_TIMEOUT = 120;
 const MIN_TIMEOUT = 1;
 const MAX_TIMEOUT = 86400;
 
-/** Parses and clamps a timeout string to a valid range. */
-export function parseTimeout(value: string | undefined): number {
-  return Math.max(MIN_TIMEOUT, Math.min(Number(value) || DEFAULT_TIMEOUT, MAX_TIMEOUT));
+/** Parses and clamps a timeout string to a valid range. Warns on invalid input. */
+export function parseTimeout(value: string | undefined, warn: (msg: string) => void = (msg) => process.stderr.write(msg)): number {
+  const parsed = Number(value);
+  if (value !== undefined && (isNaN(parsed) || parsed === 0)) {
+    warn(`Warning: invalid --timeout value "${value}", using default ${DEFAULT_TIMEOUT}s\n`);
+  }
+  return Math.max(MIN_TIMEOUT, Math.min(parsed || DEFAULT_TIMEOUT, MAX_TIMEOUT));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -37,6 +41,11 @@ function sleep(ms: number): Promise<void> {
 function isTransientError(err: unknown): boolean {
   if (err instanceof PermissionSlipApiError) {
     return err.apiError.retryable || err.statusCode === 429 || err.statusCode >= 500;
+  }
+  // Native fetch throws TypeError for network-level failures
+  // (ECONNREFUSED, DNS errors, aborted connections) — treat as transient.
+  if (err instanceof TypeError) {
+    return true;
   }
   return false;
 }

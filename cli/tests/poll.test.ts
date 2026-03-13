@@ -203,6 +203,33 @@ describe("pollUntilResolved", () => {
     expect(mock.mock.calls.length).toBe(2);
   });
 
+  it("retries on native network errors (TypeError) and resolves", async () => {
+    let callCount = 0;
+    const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // First call: network-level failure (e.g., ECONNREFUSED)
+        throw new TypeError("fetch failed");
+      }
+      return makeResult({ status: "approved", execution_status: "success" });
+    });
+    const client = { approvalStatus: mock } as unknown as ApiClient;
+
+    const promise = pollUntilResolved({
+      approvalId: "appr_test123",
+      client,
+      timeoutSeconds: 10,
+    });
+
+    await jest.advanceTimersByTimeAsync(2000);
+
+    const result = await promise;
+
+    expect(result.status).toBe("approved");
+    expect(result.timed_out).toBeUndefined();
+    expect(mock.mock.calls.length).toBe(2);
+  });
+
   it("propagates non-transient errors immediately", async () => {
     const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
       throw new PermissionSlipApiError(401, {
@@ -248,5 +275,26 @@ describe("parseTimeout", () => {
 
   it("parses valid timeout", () => {
     expect(parseTimeout("30")).toBe(30);
+  });
+
+  it("warns on non-numeric value", () => {
+    const warnings: string[] = [];
+    parseTimeout("abc", (msg) => warnings.push(msg));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("invalid --timeout");
+    expect(warnings[0]).toContain("abc");
+  });
+
+  it("warns on zero value", () => {
+    const warnings: string[] = [];
+    parseTimeout("0", (msg) => warnings.push(msg));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("invalid --timeout");
+  });
+
+  it("does not warn on valid value", () => {
+    const warnings: string[] = [];
+    parseTimeout("30", (msg) => warnings.push(msg));
+    expect(warnings).toHaveLength(0);
   });
 });
