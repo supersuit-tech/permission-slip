@@ -53,8 +53,9 @@ function isTransientError(err: unknown): boolean {
 /**
  * Polls `GET /approvals/{id}/status` with gentle backoff until the approval
  * reaches a terminal state (approved/denied/cancelled/expired) or the timeout
- * elapses. Returns the last status result. Transient API errors (429, 5xx) are
- * silently retried on the next interval instead of aborting the wait.
+ * elapses. Returns the last status result. Transient errors — API errors
+ * (429, 5xx, retryable) and native network failures (TypeError from fetch) —
+ * are silently retried on the next interval instead of aborting the wait.
  */
 export async function pollUntilResolved(
   opts: PollOptions,

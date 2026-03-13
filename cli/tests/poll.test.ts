@@ -230,6 +230,56 @@ describe("pollUntilResolved", () => {
     expect(mock.mock.calls.length).toBe(2);
   });
 
+  it("returns timed_out with minimal info when final check fails transiently", async () => {
+    const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
+      // Always throw transient error — even on the final post-timeout check.
+      throw new TypeError("fetch failed");
+    });
+    const client = { approvalStatus: mock } as unknown as ApiClient;
+
+    const promise = pollUntilResolved({
+      approvalId: "appr_test123",
+      client,
+      timeoutSeconds: 1,
+    });
+
+    await jest.advanceTimersByTimeAsync(3000);
+
+    const result = await promise;
+
+    expect(result.status).toBe("pending");
+    expect(result.timed_out).toBe(true);
+    expect(result.approval_id).toBe("appr_test123");
+    // Should have minimal info (empty strings) since the API never responded.
+    expect(result.expires_at).toBe("");
+    expect(result.created_at).toBe("");
+  });
+
+  it("calls onPoll with correct arguments while pending", async () => {
+    const pending = makeResult({ status: "pending" });
+    const approved = makeResult({ status: "approved", execution_status: "success" });
+    const { client } = makeMockClient([pending, approved]);
+    const pollCalls: Array<{ status: string; elapsed: number; timeout: number }> = [];
+
+    const promise = pollUntilResolved({
+      approvalId: "appr_test123",
+      client,
+      timeoutSeconds: 30,
+      onPoll: (info) => pollCalls.push(info),
+    });
+
+    // Poll 1 → pending → onPoll called → sleep 2s
+    await jest.advanceTimersByTimeAsync(2000);
+    // Poll 2 → approved → returns
+
+    await promise;
+
+    expect(pollCalls).toHaveLength(1);
+    expect(pollCalls[0]!.status).toBe("pending");
+    expect(pollCalls[0]!.timeout).toBe(30);
+    expect(typeof pollCalls[0]!.elapsed).toBe("number");
+  });
+
   it("propagates non-transient errors immediately", async () => {
     const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
       throw new PermissionSlipApiError(401, {
@@ -253,28 +303,30 @@ describe("pollUntilResolved", () => {
 });
 
 describe("parseTimeout", () => {
+  const noop = () => {};
+
   it("returns default for undefined", () => {
-    expect(parseTimeout(undefined)).toBe(120);
+    expect(parseTimeout(undefined, noop)).toBe(120);
   });
 
   it("returns default for non-numeric", () => {
-    expect(parseTimeout("abc")).toBe(120);
+    expect(parseTimeout("abc", noop)).toBe(120);
   });
 
   it("clamps negative to minimum", () => {
-    expect(parseTimeout("-5")).toBe(1);
+    expect(parseTimeout("-5", noop)).toBe(1);
   });
 
   it("clamps zero to default (via || fallback)", () => {
-    expect(parseTimeout("0")).toBe(120);
+    expect(parseTimeout("0", noop)).toBe(120);
   });
 
   it("clamps large values to maximum", () => {
-    expect(parseTimeout("100000")).toBe(86400);
+    expect(parseTimeout("100000", noop)).toBe(86400);
   });
 
   it("parses valid timeout", () => {
-    expect(parseTimeout("30")).toBe(30);
+    expect(parseTimeout("30", noop)).toBe(30);
   });
 
   it("warns on non-numeric value", () => {
