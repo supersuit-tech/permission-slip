@@ -393,8 +393,8 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 				t.Error("expected email to be disabled")
 			}
 		case "web-push":
-			if !p.Enabled {
-				t.Errorf("expected %q to remain enabled", p.Channel)
+			if p.Enabled {
+				t.Errorf("expected %q to default to disabled during beta", p.Channel)
 			}
 		case "sms":
 			if p.Enabled {
