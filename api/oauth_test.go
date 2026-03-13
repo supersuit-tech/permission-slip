@@ -205,7 +205,7 @@ func TestCreateAndVerifyOAuthState(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestVerifyOAuthState_InvalidSignature(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestVerifyOAuthState_MissingClaims(t *testing.T) {
 func TestVerifyOAuthState_NoSecret(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{}
-	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
+	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
 	if err == nil {
 		t.Fatal("expected error when no secret configured")
 	}
@@ -514,7 +514,7 @@ func TestListOAuthConnections_IsolatedByUser(t *testing.T) {
 	}
 }
 
-// ── DELETE /v1/oauth/connections/{provider} ───────────────────────────────────
+// ── DELETE /v1/oauth/connections/{connection_id} ─────────────────────────────
 
 func TestDeleteOAuthConnection_Success(t *testing.T) {
 	t.Parallel()
@@ -523,12 +523,12 @@ func TestDeleteOAuthConnection_Success(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	v := vault.NewMockVaultStore()
-	insertTestOAuthConnection(t, tx, v, uid, "google", []string{"openid"}, true)
+	connID := insertTestOAuthConnection(t, tx, v, uid, "google", []string{"openid"}, true)
 
 	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/google", uid)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/"+connID, uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -540,8 +540,8 @@ func TestDeleteOAuthConnection_Success(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if resp.Provider != "google" {
-		t.Errorf("expected google, got %s", resp.Provider)
+	if resp.Provider != connID {
+		t.Errorf("expected %s, got %s", connID, resp.Provider)
 	}
 
 	// Verify the connection is actually gone
@@ -563,7 +563,7 @@ func TestDeleteOAuthConnection_NotFound(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/google", uid)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/nonexistent_conn_id", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -586,13 +586,13 @@ func TestDeleteOAuthConnection_OtherUserCannot(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:8])
 
 	v := vault.NewMockVaultStore()
-	insertTestOAuthConnection(t, tx, v, uid1, "google", []string{"openid"}, false)
+	connID := insertTestOAuthConnection(t, tx, v, uid1, "google", []string{"openid"}, false)
 
 	deps := oauthDepsWithVault(tx, v)
 	router := NewRouter(deps)
 
 	// User 2 tries to delete user 1's connection
-	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/google", uid2)
+	r := authenticatedRequest(t, http.MethodDelete, "/oauth/connections/"+connID, uid2)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -667,7 +667,7 @@ func TestOAuthCallback_ProviderMismatch(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Create state for "microsoft" but hit google callback
-	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "", "")
+	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "", "", "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -696,7 +696,7 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 
 	// State validation now runs before the provider error check, so we need a
 	// valid state token to reach the error-handling branch.
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "")
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -751,7 +751,7 @@ func TestOAuthCallback_MissingCode(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "")
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "", "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -804,7 +804,7 @@ func TestStoreOAuthTokens_CreateNew(t *testing.T) {
 		TokenType:    "Bearer",
 	}
 
-	err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil)
+	err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -843,18 +843,24 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
-	// Re-auth with new tokens
+	// Get the first connection's ID to use as replaceID
+	conn1, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "google")
+	if err != nil {
+		t.Fatalf("get first connection: %v", err)
+	}
+
+	// Re-auth with new tokens, replacing the first connection
 	token2 := &oauth2.Token{
 		AccessToken:  "access-new",
 		RefreshToken: "refresh-new",
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -886,7 +892,7 @@ func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -901,13 +907,14 @@ func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
 	oldRefreshVaultID := *conn1.RefreshTokenVaultID
 
 	// Re-authorization — provider omits the refresh token this time.
+	// Pass conn1.ID as replaceID to replace the existing connection.
 	token2 := &oauth2.Token{
 		AccessToken:  "access-new",
 		RefreshToken: "",
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -958,7 +965,7 @@ func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -968,14 +975,14 @@ func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
 	}
 	oldRefreshVaultID := *conn1.RefreshTokenVaultID
 
-	// Re-authorization WITH a new refresh token.
+	// Re-authorization WITH a new refresh token, replacing the first connection.
 	token2 := &oauth2.Token{
 		AccessToken:  "access-new",
 		RefreshToken: "refresh-new",
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil); err != nil {
+	if err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -1089,7 +1096,7 @@ func TestCreateAndVerifyOAuthState_WithShop(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore", "")
+	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -1116,7 +1123,7 @@ func TestCreateAndVerifyOAuthState_EmptyShop(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -1300,7 +1307,7 @@ func TestStoreOAuthTokens_WithStateExtra(t *testing.T) {
 	}
 
 	stateExtra := map[string]string{"shop_domain": "mystore.myshopify.com"}
-	err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra)
+	err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -1811,7 +1818,7 @@ func TestStoreOAuthTokens_WithZendeskSubdomain(t *testing.T) {
 	}
 
 	stateExtra := map[string]string{"subdomain": "mycompany"}
-	err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra)
+	err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}

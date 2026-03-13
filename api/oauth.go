@@ -85,6 +85,9 @@ type oauthConnectionResponse struct {
 	// OAuth URLs (e.g. "mycompany.zendesk.com" for Zendesk, "mystore.myshopify.com"
 	// for Shopify). Empty for providers with static OAuth endpoints.
 	Instance string `json:"instance,omitempty"`
+	// DisplayName is a human-readable identifier for this connection, typically
+	// the authenticated user's email address. Empty when email is not available.
+	DisplayName string `json:"display_name,omitempty"`
 }
 
 type oauthConnectionListResponse struct {
@@ -110,7 +113,7 @@ func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("GET /oauth/{provider}/authorize", AllowQueryParamToken(requireProfile(handleOAuthAuthorize(deps))))
 	mux.Handle("GET /oauth/{provider}/callback", handleOAuthCallback(deps))
 	mux.Handle("GET /oauth/connections", requireProfile(handleListOAuthConnections(deps)))
-	mux.Handle("DELETE /oauth/connections/{provider}", requireProfile(handleDeleteOAuthConnection(deps)))
+	mux.Handle("DELETE /oauth/connections/{connection_id}", requireProfile(handleDeleteOAuthConnection(deps)))
 }
 
 // --- CSRF state helpers ---
@@ -135,9 +138,14 @@ func oauthStateSecret(deps *Deps) string {
 // Zendesk subdomain (e.g. "mycompany"). Pass "" for providers with static
 // OAuth endpoints (e.g. Google, Slack).
 //
+// The replaceID parameter, if non-empty, is the ID of an existing OAuth
+// connection to replace. When set, storeOAuthTokens deletes only that
+// specific connection instead of all connections for the provider. When
+// empty, a new connection is created alongside any existing ones.
+//
 // The returnTo parameter is the frontend path the user should be sent back
 // to after the callback (e.g. "/agents/1"). Pass "" to redirect to "/".
-func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop, returnTo string) (string, error) {
+func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop, returnTo, replaceID string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
 		return "", fmt.Errorf("no OAuth state secret configured")
@@ -155,6 +163,9 @@ func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop
 	}
 	if returnTo != "" {
 		claims["return_to"] = returnTo
+	}
+	if replaceID != "" {
+		claims["replace_id"] = replaceID
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
@@ -175,6 +186,10 @@ type oauthState struct {
 	// the OAuth callback completes (e.g. "/agents/1"). Empty falls back
 	// to the root path "/".
 	ReturnTo string
+	// ReplaceID is the ID of an existing OAuth connection to replace. When
+	// set, storeOAuthTokens deletes only that specific connection. When empty,
+	// a new connection is created alongside any existing ones.
+	ReplaceID string
 }
 
 // verifyOAuthState validates the signed state JWT and returns the encoded
@@ -215,7 +230,8 @@ func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	}
 	shop, _ := claims["shop"].(string)
 	returnTo, _ := claims["return_to"].(string)
-	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo}, nil
+	replaceID, _ := claims["replace_id"].(string)
+	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo, ReplaceID: replaceID}, nil
 }
 
 // --- Helpers ---
@@ -451,8 +467,10 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid return_to parameter"))
 			return
 		}
+		// Optional: replace an existing connection instead of creating alongside.
+		replaceID := r.URL.Query().Get("replace")
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID, returnTo)
+		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID, returnTo, replaceID)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
@@ -622,7 +640,18 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData); err != nil {
+		// Run best-effort email enrichers (fetches user email from provider
+		// userinfo endpoints). Failures are logged but don't block the flow.
+		if softExtra := runSoftEnrichers(ctx, providerID, token.AccessToken); softExtra != nil {
+			if stateExtraData == nil {
+				stateExtraData = make(map[string]string)
+			}
+			for k, v := range softExtra {
+				stateExtraData[k] = v
+			}
+		}
+
+		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID); err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection", state.ReturnTo)
 			return
@@ -640,7 +669,11 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 // alongside any fields extracted from the token response. This is used for
 // data carried through the state token (e.g. shop_domain for Shopify).
 // It may be nil when no state-derived extra data is needed.
-func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string) error {
+//
+// replaceID, if non-empty, is the ID of an existing connection to replace.
+// When set, only that specific connection is deleted. When empty, a new
+// connection is created alongside any existing ones for the same provider.
+func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string) error {
 	tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -649,14 +682,18 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		defer db.RollbackTx(ctx, tx) //nolint:errcheck // best-effort cleanup
 	}
 
-	// Delete existing connection if present (re-auth flow).
-	existing, err := db.DeleteOAuthConnection(ctx, tx, userID, providerID)
-	if err != nil {
-		var connErr *db.OAuthConnectionError
-		if !errors.As(err, &connErr) || connErr.Code != db.OAuthConnectionErrNotFound {
-			return fmt.Errorf("delete existing connection: %w", err)
+	// When replaceID is set, delete that specific connection (reconnect flow).
+	// When empty, create a new connection alongside any existing ones.
+	var existing *db.DeleteOAuthConnectionResult
+	if replaceID != "" {
+		existing, err = db.DeleteOAuthConnectionByID(ctx, tx, userID, replaceID)
+		if err != nil {
+			var connErr *db.OAuthConnectionError
+			if !errors.As(err, &connErr) || connErr.Code != db.OAuthConnectionErrNotFound {
+				return fmt.Errorf("delete existing connection: %w", err)
+			}
+			// Not found is fine — connection may have been deleted already.
 		}
-		// Not found is fine — first connection.
 	}
 
 	// Track the old refresh token vault ID so we can reuse it if the new
@@ -922,6 +959,19 @@ func instanceFromExtraData(extraData json.RawMessage) string {
 	return ""
 }
 
+// emailFromExtraData extracts the email field from an OAuth connection's
+// extra_data JSON. Returns "" if no email is present.
+func emailFromExtraData(extraData json.RawMessage) string {
+	if len(extraData) == 0 {
+		return ""
+	}
+	var extra map[string]string
+	if err := json.Unmarshal(extraData, &extra); err != nil {
+		return ""
+	}
+	return extra["email"]
+}
+
 // handleListOAuthConnections returns all OAuth connections for the authenticated user.
 func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -947,6 +997,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 				Status:      c.Status,
 				ConnectedAt: c.CreatedAt,
 				Instance:    instanceFromExtraData(c.ExtraData),
+				DisplayName: emailFromExtraData(c.ExtraData),
 			}
 		}
 
@@ -954,7 +1005,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// handleDeleteOAuthConnection disconnects an OAuth provider for the authenticated user.
+// handleDeleteOAuthConnection disconnects a specific OAuth connection by its ID.
 func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.Vault == nil || deps.DB == nil {
@@ -963,23 +1014,23 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		}
 
 		profile := Profile(r.Context())
-		providerID := r.PathValue("provider")
-		if !validProviderID(providerID) {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid provider ID"))
+		connectionID := r.PathValue("connection_id")
+		if connectionID == "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "missing connection ID"))
 			return
 		}
 
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: begin tx: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
 		if owned {
 			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
 		}
 
-		result, err := db.DeleteOAuthConnection(r.Context(), tx, profile.ID, providerID)
+		result, err := db.DeleteOAuthConnectionByID(r.Context(), tx, profile.ID, connectionID)
 		if err != nil {
 			var connErr *db.OAuthConnectionError
 			if errors.As(err, &connErr) && connErr.Code == db.OAuthConnectionErrNotFound {
@@ -987,7 +1038,7 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] DeleteOAuthConnection: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
 
@@ -996,13 +1047,13 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		// (matching the pattern in handleDeleteCredential).
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.AccessTokenVaultID); err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: vault delete access: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
 		if result.RefreshTokenVaultID != nil {
 			if err := deps.Vault.DeleteSecret(r.Context(), tx, *result.RefreshTokenVaultID); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: vault delete refresh: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 				return
 			}
 		}
@@ -1010,13 +1061,13 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: commit: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth provider"))
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 				return
 			}
 		}
 
 		RespondJSON(w, http.StatusOK, oauthDisconnectResponse{
-			Provider:       providerID,
+			Provider:       connectionID,
 			DisconnectedAt: time.Now().UTC(),
 		})
 	}

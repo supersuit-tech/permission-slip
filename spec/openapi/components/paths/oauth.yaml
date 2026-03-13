@@ -470,13 +470,15 @@ oauthProviderConfigByProvider:
 oauthDisconnect:
   delete:
     operationId: deleteOAuthConnection
-    summary: Disconnect OAuth Provider
+    summary: Disconnect OAuth Connection
     description: |
-      Disconnects an OAuth provider for the authenticated user. Deletes the
-      OAuth connection row and removes the encrypted tokens from the vault.
+      Disconnects a specific OAuth connection by its ID. Deletes the
+      OAuth connection row, removes the encrypted tokens from the vault,
+      and cascades to remove any agent-connector credential bindings that
+      reference this connection.
 
       After disconnection, any connector actions that depend on this OAuth
-      provider will fail until the user re-authorizes.
+      connection will fail until the user connects a new account.
 
       ## Security
 
@@ -490,10 +492,10 @@ oauthDisconnect:
       - SupabaseSession: []
 
     parameters:
-      - name: provider
+      - name: connection_id
         in: path
         required: true
-        description: The OAuth provider ID to disconnect
+        description: The OAuth connection ID to disconnect (e.g. "oconn_abc123")
         schema:
           type: string
 

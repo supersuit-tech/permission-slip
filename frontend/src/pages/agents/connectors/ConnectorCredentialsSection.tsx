@@ -35,8 +35,6 @@ import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
-import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
-import { InlineConfirmButton } from "@/components/InlineConfirmButton";
 import {
   providerLabel,
   getOAuthAuthorizeUrl,
@@ -51,6 +49,8 @@ import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
+import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
+import type { OAuthConnection } from "@/hooks/useOAuthConnections";
 
 export interface ConnectorCredentialsSectionProps {
   agentId: number;
@@ -214,23 +214,29 @@ function OAuthCredentialRow({
   providers,
 }: {
   requiredCredential: RequiredCredential;
-  connections: {
-    provider: string;
-    status: string;
-    scopes: string[];
-    connected_at: string;
-  }[];
+  connections: OAuthConnection[];
   providers: { id: string; has_credentials: boolean }[];
 }) {
   const { session } = useAuth();
-  const { disconnect, isLoading: isDisconnecting } = useDisconnectOAuth();
   const [shopDialogOpen, setShopDialogOpen] = useState(false);
+  const [disconnectTarget, setDisconnectTarget] = useState<{
+    id: string;
+    displayName?: string;
+  } | null>(null);
 
   const providerId = requiredCredential.oauth_provider ?? "";
-  const connection = connections.find((c) => c.provider === providerId);
+  const providerConnections = connections.filter(
+    (c) => c.provider === providerId,
+  );
+  const activeConnections = providerConnections.filter(
+    (c) => c.status === "active",
+  );
+  const needsReauthConnection = providerConnections.find(
+    (c) => c.status === "needs_reauth",
+  );
   const provider = providers.find((p) => p.id === providerId);
-  const isConnected = connection?.status === "active";
-  const needsReauth = connection?.status === "needs_reauth";
+  const hasAnyConnection = providerConnections.length > 0;
+  const isConnected = activeConnections.length > 0;
 
   function handleConnect() {
     if (!session?.access_token || !providerId) return;
@@ -241,19 +247,21 @@ function OAuthCredentialRow({
     window.location.href = getOAuthAuthorizeUrl(
       providerId,
       session.access_token,
-      requiredCredential.oauth_scopes,
+      { scopes: requiredCredential.oauth_scopes },
     );
   }
 
-  async function handleDisconnect() {
-    try {
-      await disconnect(providerId);
-      toast.success(`${providerLabel(providerId)} disconnected.`);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to disconnect.";
-      toast.error(message);
+  function handleReconnect(connectionId: string) {
+    if (!session?.access_token || !providerId) return;
+    if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
+      setShopDialogOpen(true);
+      return;
     }
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+      { scopes: requiredCredential.oauth_scopes, replaceId: connectionId },
+    );
   }
 
   return (
@@ -263,7 +271,7 @@ function OAuthCredentialRow({
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
-            ) : needsReauth ? (
+            ) : needsReauthConnection ? (
               <AlertTriangle className="size-5 shrink-0 text-amber-500" />
             ) : (
               <Circle className="text-muted-foreground size-5 shrink-0" />
@@ -282,34 +290,15 @@ function OAuthCredentialRow({
               </div>
               <p className="text-muted-foreground text-xs">
                 {isConnected
-                  ? `Connected ${new Date(connection.connected_at).toLocaleDateString()}`
-                  : needsReauth
+                  ? `${activeConnections.length} account${activeConnections.length !== 1 ? "s" : ""} connected`
+                  : needsReauthConnection
                     ? "Re-authorization required"
                     : "Not connected"}
               </p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {isConnected ? (
-              <InlineConfirmButton
-                confirmLabel="Disconnect"
-                isProcessing={isDisconnecting}
-                onConfirm={handleDisconnect}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Disconnect ${providerLabel(providerId)}`}
-                >
-                  <Unplug className="text-muted-foreground size-4" />
-                </Button>
-              </InlineConfirmButton>
-            ) : needsReauth ? (
-              <Button variant="outline" size="sm" onClick={handleConnect}>
-                <LogIn className="size-3" />
-                Re-authorize
-              </Button>
-            ) : (
+            {!hasAnyConnection && (
               <Button
                 variant="outline"
                 size="sm"
@@ -320,9 +309,81 @@ function OAuthCredentialRow({
                 Connect {providerLabel(providerId)}
               </Button>
             )}
+            {hasAnyConnection && provider?.has_credentials && (
+              <Button variant="outline" size="sm" onClick={handleConnect}>
+                <Plus className="size-3" />
+                Add account
+              </Button>
+            )}
           </div>
         </div>
-        {!isConnected && !needsReauth && !provider?.has_credentials && (
+
+        {/* List each connection */}
+        {providerConnections.length > 0 && (
+          <div className="mt-3 space-y-2 border-t pt-3">
+            {providerConnections.map((conn) => (
+              <div
+                key={conn.id}
+                className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm">
+                    {conn.display_name || providerLabel(conn.provider)}
+                    {conn.instance && !conn.display_name && (
+                      <span className="text-muted-foreground ml-1">
+                        ({conn.instance})
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {conn.status === "active"
+                      ? `Connected ${new Date(conn.connected_at).toLocaleDateString()}`
+                      : conn.status === "needs_reauth"
+                        ? "Needs re-authorization"
+                        : conn.status}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  {conn.status === "needs_reauth" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReconnect(conn.id)}
+                    >
+                      <LogIn className="size-3" />
+                      Re-authorize
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleReconnect(conn.id)}
+                      aria-label="Reconnect"
+                    >
+                      <LogIn className="size-3" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() =>
+                      setDisconnectTarget({
+                        id: conn.id,
+                        displayName: conn.display_name,
+                      })
+                    }
+                    aria-label={`Disconnect ${conn.display_name ?? providerLabel(conn.provider)}`}
+                  >
+                    <Unplug className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!hasAnyConnection && !provider?.has_credentials && (
           <p className="text-muted-foreground mt-2 pl-8 text-xs">
             OAuth is not available yet — ask your admin to configure{" "}
             {providerLabel(providerId)} OAuth credentials.
@@ -336,6 +397,18 @@ function OAuthCredentialRow({
           onOpenChange={setShopDialogOpen}
           providerId={providerId}
           oauthScopes={requiredCredential.oauth_scopes}
+        />
+      )}
+
+      {disconnectTarget && (
+        <DisconnectOAuthDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDisconnectTarget(null);
+          }}
+          connectionId={disconnectTarget.id}
+          providerName={providerLabel(providerId)}
+          displayName={disconnectTarget.displayName}
         />
       )}
     </>
@@ -548,7 +621,7 @@ function AgentCredentialBinding({
   agentId: number;
   connectorId: string;
   credentials: CredentialSummary[];
-  connections: { id: string; provider: string; status: string; scopes: string[]; connected_at: string }[];
+  connections: OAuthConnection[];
   anyLoading: boolean;
 }) {
   const { binding, isLoading: bindingLoading } =
@@ -641,7 +714,8 @@ function AgentCredentialBinding({
           <option value="">Default (auto-resolve)</option>
           {activeConnections.map((conn) => (
             <option key={`oauth:${conn.id}`} value={`oauth:${conn.id}`}>
-              {providerLabel(conn.provider)} OAuth (connected{" "}
+              {providerLabel(conn.provider)} OAuth
+              {conn.display_name ? ` — ${conn.display_name}` : ""} (connected{" "}
               {new Date(conn.connected_at).toLocaleDateString()})
             </option>
           ))}

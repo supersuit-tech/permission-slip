@@ -54,9 +54,10 @@ export function RemoveCredentialDialog({
                 {" "}
                 (<strong>{credential.label}</strong>)
               </>
-            )}
-            . Actions requiring this credential will fail until new credentials
-            are stored. This action is irreversible.
+            )}{" "}
+            and remove it from <strong>all agents</strong> that use it. Actions
+            requiring this credential will fail until a new credential is
+            stored. This action is irreversible.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

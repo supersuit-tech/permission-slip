@@ -298,7 +298,7 @@ paths:
   /v1/oauth/connections:
     $ref: './components/paths/oauth.yaml#/oauthConnections'
 
-  /v1/oauth/connections/{provider}:
+  /v1/oauth/connections/{connection_id}:
     $ref: './components/paths/oauth.yaml#/oauthDisconnect'
 
   /v1/oauth/provider-configs:
