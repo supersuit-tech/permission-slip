@@ -1,16 +1,16 @@
 /**
- * permission-slip execute --token <token> [--action <id>] [--params '{}'] [--server <url>]
- *   or
  * permission-slip execute --configuration <id> [--params '{}'] [--server <url>]
  *
- * Executes an approved action using either:
- *  - A one-off execution token (obtained after the user approves a request)
- *  - A standing approval configuration (--configuration)
+ * Executes an action using a standing approval configuration.
  *
- * NOTE: The /approvals/{id}/verify endpoint (which trades an approval ID for
- * a token) is currently "Planned" server-side. Until it is implemented, agents
- * must obtain the token out-of-band (the user shares it after approving on the
- * dashboard) and pass it directly with --token.
+ * Standing approvals are pre-approved recurring action configurations. Use
+ * `permission-slip capabilities` to see available standing approvals and
+ * their configuration IDs.
+ *
+ * NOTE: For one-off approvals (created via `permission-slip request`), the
+ * server auto-executes the action when the approver approves it — you do NOT
+ * need to call `execute`. Use `permission-slip request-status` to check the
+ * outcome instead.
  */
 
 import type { Command } from "commander";
@@ -21,8 +21,8 @@ import { output, type OutputOptions } from "../output.js";
 export function executeCommand(program: Command): void {
   program
     .command("execute")
-    .description("Execute an approved action")
-    .option("--token <token>", "Execution token (shared by the user after approving on the dashboard)")
+    .description("Execute an action using a standing approval (one-off approvals auto-execute on approval)")
+    .option("--token <token>", "Execution token (advanced — most agents should use --configuration instead)")
     .option("--configuration <id>", "Standing approval configuration ID")
     .option("--action <action_id>", "Action type (required with --token)")
     .option("--params <json>", "Action parameters as JSON string", "{}")
