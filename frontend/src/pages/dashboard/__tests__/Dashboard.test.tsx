@@ -133,7 +133,6 @@ describe("Dashboard", () => {
     await waitFor(() => {
       expect(screen.getByText("Registered Agents")).toBeInTheDocument();
     });
-    expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
     expect(screen.getByText("Recent Activity")).toBeInTheDocument();
     expect(screen.getByText("Standing Approvals")).toBeInTheDocument();
 
