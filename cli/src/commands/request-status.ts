@@ -10,7 +10,7 @@ import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
 import { output, type OutputOptions } from "../output.js";
-import { pollUntilResolved } from "../util/poll.js";
+import { pollUntilResolved, parseTimeout } from "../util/poll.js";
 
 export function requestStatusCommand(program: Command): void {
   program
@@ -47,7 +47,7 @@ export function requestStatusCommand(program: Command): void {
         }
 
         // Wait for terminal state.
-        const timeoutSeconds = Math.max(1, Math.min(Number(opts.timeout) || 120, 86400));
+        const timeoutSeconds = parseTimeout(opts.timeout);
 
         process.stderr.write(`Waiting for approval ${opts.approvalId}...\n`);
 

@@ -21,6 +21,15 @@ export interface PollOptions {
 
 const TERMINAL_STATUSES = new Set(["approved", "denied", "cancelled", "expired"]);
 
+const DEFAULT_TIMEOUT = 120;
+const MIN_TIMEOUT = 1;
+const MAX_TIMEOUT = 86400;
+
+/** Parses and clamps a timeout string to a valid range. */
+export function parseTimeout(value: string | undefined): number {
+  return Math.max(MIN_TIMEOUT, Math.min(Number(value) || DEFAULT_TIMEOUT, MAX_TIMEOUT));
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

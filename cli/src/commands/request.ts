@@ -11,7 +11,7 @@ import { ApiClient } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
-import { pollUntilResolved } from "../util/poll.js";
+import { pollUntilResolved, parseTimeout } from "../util/poll.js";
 
 export function requestCommand(program: Command): void {
   program
@@ -81,7 +81,7 @@ export function requestCommand(program: Command): void {
         }
 
         // Wait for approval resolution.
-        const timeoutSeconds = Math.max(1, Math.min(Number(opts.timeout) || 120, 86400));
+        const timeoutSeconds = parseTimeout(opts.timeout);
 
         process.stderr.write(
           `Waiting for approval... (approve at ${result.approval_url})\n`,

@@ -3,7 +3,8 @@
  */
 
 import { jest } from "@jest/globals";
-import { pollUntilResolved, type ApprovalStatusResult } from "../src/util/poll.js";
+import { pollUntilResolved, parseTimeout, type ApprovalStatusResult } from "../src/util/poll.js";
+import { PermissionSlipApiError } from "../src/api/client.js";
 import type { ApiClient } from "../src/api/client.js";
 
 function makeResult(overrides: Partial<ApprovalStatusResult> = {}): ApprovalStatusResult {
@@ -167,5 +168,85 @@ describe("pollUntilResolved", () => {
     // The final check after timeout returns approved, so timed_out should not be set.
     expect(result.status).toBe("approved");
     expect(result.timed_out).toBeUndefined();
+  });
+
+  it("retries on transient errors and resolves", async () => {
+    let callCount = 0;
+    const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // First call: transient 503
+        throw new PermissionSlipApiError(503, {
+          code: "service_unavailable",
+          message: "Service Unavailable",
+          retryable: true,
+        });
+      }
+      // Second call: approved
+      return makeResult({ status: "approved", execution_status: "success" });
+    });
+    const client = { approvalStatus: mock } as unknown as ApiClient;
+
+    const promise = pollUntilResolved({
+      approvalId: "appr_test123",
+      client,
+      timeoutSeconds: 10,
+    });
+
+    // Advance past first sleep interval after transient error.
+    await jest.advanceTimersByTimeAsync(2000);
+
+    const result = await promise;
+
+    expect(result.status).toBe("approved");
+    expect(result.timed_out).toBeUndefined();
+    expect(mock.mock.calls.length).toBe(2);
+  });
+
+  it("propagates non-transient errors immediately", async () => {
+    const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
+      throw new PermissionSlipApiError(401, {
+        code: "unauthorized",
+        message: "Unauthorized",
+        retryable: false,
+      });
+    });
+    const client = { approvalStatus: mock } as unknown as ApiClient;
+
+    await expect(
+      pollUntilResolved({
+        approvalId: "appr_test123",
+        client,
+        timeoutSeconds: 10,
+      }),
+    ).rejects.toThrow("Unauthorized");
+
+    expect(mock.mock.calls.length).toBe(1);
+  });
+});
+
+describe("parseTimeout", () => {
+  it("returns default for undefined", () => {
+    expect(parseTimeout(undefined)).toBe(120);
+  });
+
+  it("returns default for non-numeric", () => {
+    expect(parseTimeout("abc")).toBe(120);
+  });
+
+  it("clamps negative to minimum", () => {
+    expect(parseTimeout("-5")).toBe(1);
+  });
+
+  it("clamps zero to default (via || fallback)", () => {
+    expect(parseTimeout("0")).toBe(120);
+  });
+
+  it("clamps large values to maximum", () => {
+    expect(parseTimeout("100000")).toBe(86400);
+  });
+
+  it("parses valid timeout", () => {
+    expect(parseTimeout("30")).toBe(30);
   });
 });
