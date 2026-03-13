@@ -15,7 +15,6 @@ import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import type { CredentialSummary } from "@/hooks/useCredentials";
 import {
   ActionConfigParameterFields,
   parseParametersSchema,
@@ -24,7 +23,6 @@ import {
   ActionSelect,
   NameField,
   DescriptionField,
-  CredentialSelect,
   buildParametersFromForm,
   getEmptyRequiredParams,
   isPatternWrapper,
@@ -38,7 +36,6 @@ interface AddActionConfigDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
-  credentials: CredentialSummary[];
 }
 
 export function AddActionConfigDialog({
@@ -47,7 +44,6 @@ export function AddActionConfigDialog({
   agentId,
   connectorId,
   actions,
-  credentials,
 }: AddActionConfigDialogProps) {
   const { createActionConfig, isPending } = useCreateActionConfig();
   const { templates, isLoading: templatesLoading } =
@@ -56,7 +52,6 @@ export function AddActionConfigDialog({
   const [selectedActionType, setSelectedActionType] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [credentialId, setCredentialId] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
@@ -82,7 +77,6 @@ export function AddActionConfigDialog({
     setSelectedActionType("");
     setName("");
     setDescription("");
-    setCredentialId("");
     setParamValues({});
     setParamModes({});
     setAppliedTemplateId(null);
@@ -159,7 +153,6 @@ export function AddActionConfigDialog({
         action_type: selectedActionType,
         name: name.trim(),
         description: description.trim() || undefined,
-        credential_id: credentialId || undefined,
         parameters: buildParametersFromForm(paramValues, schema?.properties, paramModes),
       });
       toast.success(`Configuration "${name.trim()}" created`);
@@ -218,15 +211,6 @@ export function AddActionConfigDialog({
               value={description}
               onChange={setDescription}
               disabled={isPending}
-            />
-
-            <CredentialSelect
-              id="config-credential"
-              value={credentialId}
-              onChange={setCredentialId}
-              credentials={credentials}
-              disabled={isPending}
-              helpText="A credential is required before the agent can execute actions through this configuration."
             />
 
             {selectedAction && (

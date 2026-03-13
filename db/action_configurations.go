@@ -11,24 +11,23 @@ import (
 
 // ActionConfiguration represents a row from the action_configurations table.
 type ActionConfiguration struct {
-	ID           string
-	AgentID      int64
-	UserID       string
-	ConnectorID  string
-	ActionType   string
-	CredentialID *string
-	Parameters   []byte // raw JSONB
-	Status       string
-	Name         string
-	Description  *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID          string
+	AgentID     int64
+	UserID      string
+	ConnectorID string
+	ActionType  string
+	Parameters  []byte // raw JSONB
+	Status      string
+	Name        string
+	Description *string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // actionConfigColumns is the canonical column list for SELECT on the action_configurations table.
 // Keep in sync with scanActionConfig.
 const actionConfigColumns = `id, agent_id, user_id, connector_id, action_type,
-	credential_id, parameters, status, name, description, created_at, updated_at`
+	parameters, status, name, description, created_at, updated_at`
 
 // scanActionConfig scans a single row into an ActionConfiguration.
 // The row must select actionConfigColumns.
@@ -36,7 +35,7 @@ func scanActionConfig(row pgx.Row) (*ActionConfiguration, error) {
 	var ac ActionConfiguration
 	err := row.Scan(
 		&ac.ID, &ac.AgentID, &ac.UserID, &ac.ConnectorID, &ac.ActionType,
-		&ac.CredentialID, &ac.Parameters, &ac.Status, &ac.Name, &ac.Description,
+		&ac.Parameters, &ac.Status, &ac.Name, &ac.Description,
 		&ac.CreatedAt, &ac.UpdatedAt,
 	)
 	if err != nil {
@@ -67,21 +66,20 @@ const MaxActionConfigListSize = 200
 
 // CreateActionConfigParams holds the parameters for inserting a new action configuration.
 type CreateActionConfigParams struct {
-	ID           string
-	AgentID      int64
-	UserID       string
-	ConnectorID  string
-	ActionType   string
-	CredentialID *string
-	Parameters   []byte // raw JSONB
-	Name         string
-	Description  *string
+	ID          string
+	AgentID     int64
+	UserID      string
+	ConnectorID string
+	ActionType  string
+	Parameters  []byte // raw JSONB
+	Name        string
+	Description *string
 }
 
 // CreateActionConfig inserts a new action configuration with status 'active'.
 // The INSERT is guarded by an agent ownership check: if the agent does not
 // belong to the user, no row is inserted and ActionConfigErrAgentNotFound
-// is returned. FK violations (connector, action_type, credential) are mapped
+// is returned. FK violations (connector, action_type) are mapped
 // to ActionConfigErrInvalidRef.
 func CreateActionConfig(ctx context.Context, db DBTX, p CreateActionConfigParams) (*ActionConfiguration, error) {
 	row := db.QueryRow(ctx,
@@ -89,12 +87,12 @@ func CreateActionConfig(ctx context.Context, db DBTX, p CreateActionConfigParams
 			SELECT 1 FROM agents WHERE agent_id = $2 AND approver_id = $3
 		)
 		INSERT INTO action_configurations
-		   (id, agent_id, user_id, connector_id, action_type, credential_id, parameters, name, description)
-		 SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9
+		   (id, agent_id, user_id, connector_id, action_type, parameters, name, description)
+		 SELECT $1, $2, $3, $4, $5, $6, $7, $8
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+actionConfigColumns,
 		p.ID, p.AgentID, p.UserID, p.ConnectorID, p.ActionType,
-		p.CredentialID, p.Parameters, p.Name, p.Description,
+		p.Parameters, p.Name, p.Description,
 	)
 	ac, err := scanActionConfig(row)
 	if err != nil {
@@ -159,13 +157,12 @@ func ListActionConfigsByAgent(ctx context.Context, db DBTX, agentID int64, userI
 
 // UpdateActionConfigParams holds the mutable fields for updating an action configuration.
 type UpdateActionConfigParams struct {
-	ID           string
-	UserID       string
-	CredentialID *string
-	Parameters   []byte // raw JSONB
-	Status       *string
-	Name         *string
-	Description  *string
+	ID          string
+	UserID      string
+	Parameters  []byte // raw JSONB
+	Status      *string
+	Name        *string
+	Description *string
 }
 
 // UpdateActionConfig updates the mutable fields of an action configuration.
@@ -174,15 +171,14 @@ type UpdateActionConfigParams struct {
 func UpdateActionConfig(ctx context.Context, db DBTX, p UpdateActionConfigParams) (*ActionConfiguration, error) {
 	row := db.QueryRow(ctx,
 		`UPDATE action_configurations
-		 SET credential_id = COALESCE($3, credential_id),
-		     parameters    = COALESCE($4, parameters),
-		     status        = COALESCE($5, status),
-		     name          = COALESCE($6, name),
-		     description   = COALESCE($7, description),
+		 SET parameters    = COALESCE($3, parameters),
+		     status        = COALESCE($4, status),
+		     name          = COALESCE($5, name),
+		     description   = COALESCE($6, description),
 		     updated_at    = now()
 		 WHERE id = $1 AND user_id = $2
 		 RETURNING `+actionConfigColumns,
-		p.ID, p.UserID, p.CredentialID, p.Parameters, p.Status, p.Name, p.Description,
+		p.ID, p.UserID, p.Parameters, p.Status, p.Name, p.Description,
 	)
 	ac, err := scanActionConfig(row)
 	if err != nil {
@@ -207,7 +203,7 @@ func UpdateActionConfig(ctx context.Context, db DBTX, p UpdateActionConfigParams
 func GetActiveActionConfigForAgent(ctx context.Context, db DBTX, configID string, agentID int64) (*ActionConfiguration, error) {
 	row := db.QueryRow(ctx,
 		`SELECT ac.id, ac.agent_id, ac.user_id, ac.connector_id, ac.action_type,
-		        ac.credential_id, ac.parameters, ac.status, ac.name, ac.description,
+		        ac.parameters, ac.status, ac.name, ac.description,
 		        ac.created_at, ac.updated_at
 		 FROM action_configurations ac
 		 JOIN agents a ON a.agent_id = ac.agent_id AND a.approver_id = ac.user_id

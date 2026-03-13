@@ -1,16 +1,14 @@
-import { CheckCircle2, Circle, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import type { CredentialSummary } from "@/hooks/useCredentials";
 import { isPatternWrapper, WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
 interface ActionConfigRowProps {
   config: ActionConfiguration;
   actions: ConnectorAction[];
-  credentials: CredentialSummary[];
   onEdit: (config: ActionConfiguration) => void;
   onDelete: (config: ActionConfiguration) => void;
 }
@@ -18,7 +16,6 @@ interface ActionConfigRowProps {
 export function ActionConfigRow({
   config,
   actions,
-  credentials,
   onEdit,
   onDelete,
 }: ActionConfigRowProps) {
@@ -26,9 +23,6 @@ export function ActionConfigRow({
   const action = isWildcardConfig
     ? null
     : actions.find((a) => a.action_type === config.action_type);
-  const credential = config.credential_id
-    ? credentials.find((c) => c.id === config.credential_id)
-    : null;
 
   const paramEntries = Object.entries(config.parameters);
 
@@ -74,26 +68,6 @@ export function ActionConfigRow({
           </div>
         ) : (
           <span className="text-muted-foreground text-xs">No parameters</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {credential ? (
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="size-3.5 text-green-600 dark:text-green-400" />
-            <span className="text-sm">
-              {credential.label ?? credential.service}
-            </span>
-          </div>
-        ) : config.credential_id ? (
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="text-muted-foreground size-3.5" />
-            <span className="text-muted-foreground text-sm">Assigned</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <Circle className="text-muted-foreground size-3.5" />
-            <span className="text-muted-foreground text-sm">Not assigned</span>
-          </div>
         )}
       </TableCell>
       <TableCell>

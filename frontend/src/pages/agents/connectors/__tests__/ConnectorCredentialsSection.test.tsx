@@ -64,7 +64,13 @@ function setupMockGet(overrides: Record<string, unknown> = {}) {
     "/v1/oauth/providers": { data: { providers: [] } },
     ...overrides,
   };
-  mockGet.mockImplementation((path: string) => {
+  mockGet.mockImplementation((path: string, ..._args: unknown[]) => {
+    // Match the agent connector credential path pattern
+    if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential") {
+      return Promise.resolve({
+        data: { agent_id: 42, connector_id: "github", credential_id: null, oauth_connection_id: null },
+      });
+    }
     const match = defaults[path];
     if (match) return Promise.resolve(match);
     return Promise.resolve({ data: {} });
@@ -81,6 +87,7 @@ describe("ConnectorCredentialsSection", () => {
   it("shows no credentials required message when empty", () => {
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={[]}
       />,
@@ -94,6 +101,7 @@ describe("ConnectorCredentialsSection", () => {
     mockGet.mockReturnValue(new Promise(() => {}));
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -108,6 +116,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -125,6 +134,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -142,6 +152,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -170,6 +181,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -202,6 +214,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -232,6 +245,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={apiKeyCredentials}
       />,
@@ -263,6 +277,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="jira"
         requiredCredentials={[
           { service: "jira", auth_type: "basic" as const },
@@ -285,6 +300,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={oauthCredentials}
       />,
@@ -308,6 +324,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="slack"
         requiredCredentials={[
           {
@@ -350,6 +367,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="slack"
         requiredCredentials={[
           {
@@ -391,6 +409,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="slack"
         requiredCredentials={[{
           service: "slack",
@@ -411,6 +430,7 @@ describe("ConnectorCredentialsSection", () => {
 
     renderWithProviders(
       <ConnectorCredentialsSection
+        agentId={42}
         connectorId="github"
         requiredCredentials={mixedCredentials}
       />,

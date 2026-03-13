@@ -16,7 +16,7 @@ func TestActionConfigurationsSchema(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "action_configurations", []string{
 		"id", "agent_id", "user_id", "connector_id", "action_type",
-		"credential_id", "parameters", "status", "name", "description",
+		"parameters", "status", "name", "description",
 		"created_at", "updated_at",
 	})
 }
@@ -113,54 +113,6 @@ func TestActionConfigurationsCascadeDeleteOnConnectorDelete(t *testing.T) {
 	)
 }
 
-func TestActionConfigurationsCredentialSetNullOnDelete(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-	connID := testhelper.GenerateID(t, "conn_")
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, "test.action", "Test Action")
-
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredential(t, tx, credID, uid, "test_svc")
-
-	configID := testhelper.GenerateID(t, "ac_")
-	cred := credID
-	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, "test.action", testhelper.ActionConfigOpts{
-		CredentialID: &cred,
-	})
-
-	// Verify credential_id is set
-	var credBefore *string
-	err := tx.QueryRow(context.Background(),
-		`SELECT credential_id FROM action_configurations WHERE id = $1`, configID).Scan(&credBefore)
-	if err != nil {
-		t.Fatalf("query before delete: %v", err)
-	}
-	if credBefore == nil || *credBefore != credID {
-		t.Fatalf("expected credential_id %q before delete, got %v", credID, credBefore)
-	}
-
-	// Delete the credential
-	_, err = tx.Exec(context.Background(),
-		`DELETE FROM credentials WHERE id = $1`, credID)
-	if err != nil {
-		t.Fatalf("delete credential: %v", err)
-	}
-
-	// Verify credential_id is now NULL (SET NULL behavior)
-	var credAfter *string
-	err = tx.QueryRow(context.Background(),
-		`SELECT credential_id FROM action_configurations WHERE id = $1`, configID).Scan(&credAfter)
-	if err != nil {
-		t.Fatalf("query after delete: %v", err)
-	}
-	if credAfter != nil {
-		t.Errorf("expected credential_id to be NULL after credential deletion, got %q", *credAfter)
-	}
-}
 
 // ── JSONB Size Constraint ────────────────────────────────────────────────────
 
@@ -244,46 +196,11 @@ func TestCreateActionConfig_Success(t *testing.T) {
 	if ac.Description == nil || *ac.Description != desc {
 		t.Errorf("expected description %q, got %v", desc, ac.Description)
 	}
-	if ac.CredentialID != nil {
-		t.Errorf("expected nil credential_id, got %v", ac.CredentialID)
-	}
 	if ac.CreatedAt.IsZero() {
 		t.Error("expected non-zero created_at")
 	}
 	if ac.UpdatedAt.IsZero() {
 		t.Error("expected non-zero updated_at")
-	}
-}
-
-func TestCreateActionConfig_WithCredential(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-	connID := testhelper.GenerateID(t, "conn_")
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, "test.action", "Test Action")
-
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredential(t, tx, credID, uid, "test_svc")
-
-	configID := testhelper.GenerateID(t, "ac_")
-	ac, err := db.CreateActionConfig(t.Context(), tx, db.CreateActionConfigParams{
-		ID:           configID,
-		AgentID:      agentID,
-		UserID:       uid,
-		ConnectorID:  connID,
-		ActionType:   "test.action",
-		CredentialID: &credID,
-		Parameters:   []byte(`{}`),
-		Name:         "With Credential",
-	})
-	if err != nil {
-		t.Fatalf("CreateActionConfig: %v", err)
-	}
-	if ac.CredentialID == nil || *ac.CredentialID != credID {
-		t.Errorf("expected credential_id %q, got %v", credID, ac.CredentialID)
 	}
 }
 

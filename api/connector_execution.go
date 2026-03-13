@@ -31,7 +31,7 @@ type paymentParams struct {
 // validates the payment method and enforces spending limits before execution,
 // then records the transaction only after the connector succeeds. This ensures
 // failed executions don't count against the user's spending limits.
-func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType string, parameters json.RawMessage, pp *paymentParams) (*connectors.ActionResult, error) {
+func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, userID, actionType string, parameters json.RawMessage, pp *paymentParams) (*connectors.ActionResult, error) {
 	if deps.Connectors == nil {
 		return nil, nil
 	}
@@ -52,7 +52,7 @@ func executeConnectorAction(ctx context.Context, deps *Deps, userID, actionType 
 	connectorID := strings.SplitN(actionType, ".", 2)[0]
 
 	var creds connectors.Credentials
-	creds, err = resolveCredentialsWithFallback(ctx, deps, userID, actionType, connectorID, reqCreds)
+	creds, err = resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, reqCreds)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 // For connectors supporting multiple auth methods (e.g. OAuth + API key), it
 // tries OAuth first, then falls back to static credentials if the user hasn't
 // connected their OAuth account.
-func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
 	// If there's a built-in OAuth provider for this connector but the manifest
 	// only declares static credentials (e.g. Shopify), synthesize an oauth2
 	// entry so OAuth is tried first with static as fallback.
@@ -245,6 +245,41 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, userID, act
 
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
+	}
+
+	// Check for an agent-specific credential binding. If one exists, use it
+	// directly instead of falling through to user-global resolution.
+	if agentID > 0 {
+		binding, err := db.GetAgentConnectorCredential(ctx, deps.DB, agentID, connectorID)
+		if err != nil {
+			log.Printf("resolve agent connector credential: %v", err)
+			// Fall through to global resolution on lookup error.
+		} else if binding != nil {
+			if binding.OAuthConnectionID != nil {
+				conn, oauthErr := db.GetOAuthConnectionByID(ctx, deps.DB, *binding.OAuthConnectionID)
+				if oauthErr != nil {
+					return connectors.Credentials{}, fmt.Errorf("look up bound OAuth connection: %w", oauthErr)
+				}
+				if conn == nil {
+					return connectors.Credentials{}, &connectors.ValidationError{
+						Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
+					}
+				}
+				// Reuse the standard OAuth credential resolution (handles refresh, etc.)
+				providerID := connectorID
+				return resolveOAuthCredentials(ctx, deps, userID, &db.RequiredCredential{
+					AuthType:      "oauth2",
+					OAuthProvider: &providerID,
+				})
+			}
+			if binding.CredentialID != nil {
+				creds, credErr := resolveStaticCredentialByID(ctx, deps, *binding.CredentialID)
+				if credErr != nil {
+					return connectors.Credentials{}, credErr
+				}
+				return creds, nil
+			}
+		}
 	}
 
 	// Single credential type: use the existing path directly.
@@ -373,6 +408,48 @@ func decryptServiceCredentials(ctx context.Context, deps *Deps, userID, service 
 			b, jsonErr := json.Marshal(v)
 			if jsonErr != nil {
 				return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, jsonErr)
+			}
+			credMap[k] = string(b)
+		}
+	}
+	return connectors.NewCredentials(credMap), nil
+}
+
+// resolveStaticCredentialByID fetches and decrypts a specific credential by its
+// ID (from the agent_connector_credentials binding). This bypasses the
+// service-based lookup and goes straight to the vault.
+func resolveStaticCredentialByID(ctx context.Context, deps *Deps, credentialID string) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+	if deps.Vault == nil {
+		return zero, fmt.Errorf("credential vault is not configured")
+	}
+	vaultSecretID, err := db.GetVaultSecretIDByCredentialID(ctx, deps.DB, credentialID)
+	if err != nil {
+		var credErr *db.CredentialError
+		if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
+			return zero, &connectors.ValidationError{
+				Message: "bound credential no longer exists — reassign credentials for this connector",
+			}
+		}
+		return zero, fmt.Errorf("look up bound credential: %w", err)
+	}
+	raw, err := deps.Vault.ReadSecret(ctx, deps.DB, vaultSecretID)
+	if err != nil {
+		return zero, fmt.Errorf("decrypt bound credential: %w", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return zero, fmt.Errorf("unmarshal bound credential: %w", err)
+	}
+	credMap := make(map[string]string, len(parsed))
+	for k, v := range parsed {
+		switch vv := v.(type) {
+		case string:
+			credMap[k] = vv
+		default:
+			b, jsonErr := json.Marshal(v)
+			if jsonErr != nil {
+				return zero, fmt.Errorf("marshal credential field %q: %w", k, jsonErr)
 			}
 			credMap[k] = string(b)
 		}

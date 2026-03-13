@@ -445,9 +445,8 @@ func TestGetCapabilities_WithActionConfigurations(t *testing.T) {
 	// Insert an action configuration with credential bound.
 	cfgID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfigFull(t, tx, cfgID, agentID, uid, conn, "github.create_issue", testhelper.ActionConfigOpts{
-		CredentialID: &credID,
-		Parameters:   []byte(`{"repo":"supersuit-tech/webapp","title":"*","body":"*"}`),
-		Name:         "Create issues in webapp",
+		Parameters: []byte(`{"repo":"supersuit-tech/webapp","title":"*","body":"*"}`),
+		Name:       "Create issues in webapp",
 	})
 
 	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
@@ -487,10 +486,6 @@ func TestGetCapabilities_WithActionConfigurations(t *testing.T) {
 	if ac.Name != "Create issues in webapp" {
 		t.Errorf("expected name 'Create issues in webapp', got %q", ac.Name)
 	}
-	if !ac.CredentialReady {
-		t.Error("expected credential_ready=true when credential is bound")
-	}
-
 	// Verify parameters are included.
 	var params map[string]interface{}
 	if err := json.Unmarshal(ac.Parameters, &params); err != nil {
@@ -541,9 +536,6 @@ func TestGetCapabilities_ActionConfigCredentialNotReady(t *testing.T) {
 	a := resp.Connectors[0].Actions[0]
 	if len(a.ActionConfigurations) != 1 {
 		t.Fatalf("expected 1 action config, got %d", len(a.ActionConfigurations))
-	}
-	if a.ActionConfigurations[0].CredentialReady {
-		t.Error("expected credential_ready=false when no credential is bound")
 	}
 }
 

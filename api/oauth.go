@@ -76,6 +76,7 @@ type oauthProviderListResponse struct {
 }
 
 type oauthConnectionResponse struct {
+	ID          string    `json:"id"`
 	Provider    string    `json:"provider"`
 	Scopes      []string  `json:"scopes"`
 	Status      string    `json:"status"`
@@ -940,6 +941,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 		data := make([]oauthConnectionResponse, len(conns))
 		for i, c := range conns {
 			data[i] = oauthConnectionResponse{
+				ID:          c.ID,
 				Provider:    c.Provider,
 				Scopes:      c.Scopes,
 				Status:      c.Status,

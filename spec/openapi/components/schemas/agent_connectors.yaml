@@ -123,3 +123,50 @@ DisableAgentConnectorResponse:
     connector_id: "gmail"
     disabled_at: "2026-02-18T12:00:00Z"
     revoked_standing_approvals: 2
+
+AssignCredentialRequest:
+  type: object
+  description: |
+    Assign a credential to an agent-connector pair. Exactly one of `credential_id`
+    or `oauth_connection_id` must be provided.
+  properties:
+    credential_id:
+      type: string
+      description: Static credential ID to assign.
+      example: "cred_abc123"
+    oauth_connection_id:
+      type: string
+      description: OAuth connection ID to assign.
+      example: "oc_def456"
+
+AgentConnectorCredentialResponse:
+  type: object
+  required:
+    - agent_id
+    - connector_id
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Agent identifier.
+      example: 42
+    connector_id:
+      type: string
+      maxLength: 128
+      description: Connector identifier.
+      example: "gmail"
+    credential_id:
+      type: string
+      nullable: true
+      description: Static credential ID if assigned.
+      example: "cred_abc123"
+    oauth_connection_id:
+      type: string
+      nullable: true
+      description: OAuth connection ID if assigned.
+      example: "oc_def456"
+
+  example:
+    agent_id: 42
+    connector_id: "gmail"
+    oauth_connection_id: "oc_def456"

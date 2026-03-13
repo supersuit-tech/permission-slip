@@ -201,7 +201,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 
 	// ── Execute the action via connector ─────────────────────────
 
-	result, execErr := executeConnectorAction(r.Context(), deps, exec.UserID, req.Action.Type, params, &paymentParams{
+	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, req.Action.Type, params, &paymentParams{
 		PaymentMethodID: req.PaymentMethodID,
 		AmountCents:     req.AmountCents,
 	})

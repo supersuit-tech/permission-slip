@@ -1,6 +1,5 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { CredentialSummary } from "@/hooks/useCredentials";
 import validation from "@/lib/validation";
 
 /** Reserved action_type value meaning "all actions on this connector". */
@@ -57,48 +56,6 @@ export function DescriptionField({
         maxLength={validation.actionConfigDescription.maxLength}
         disabled={disabled}
       />
-    </div>
-  );
-}
-
-interface CredentialSelectProps {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  credentials: CredentialSummary[];
-  disabled?: boolean;
-  helpText?: string;
-}
-
-export function CredentialSelect({
-  id,
-  value,
-  onChange,
-  credentials,
-  disabled,
-  helpText,
-}: CredentialSelectProps) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>Credential{helpText ? " (optional)" : ""}</Label>
-      <select
-        id={id}
-        className={selectClassName}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-      >
-        <option value="">{helpText ? "Assign later..." : "None (assign later)"}</option>
-        {credentials.map((cred) => (
-          <option key={cred.id} value={cred.id}>
-            {cred.label ?? cred.service} (added{" "}
-            {new Date(cred.created_at).toLocaleDateString()})
-          </option>
-        ))}
-      </select>
-      {helpText && (
-        <p className="text-muted-foreground text-xs">{helpText}</p>
-      )}
     </div>
   );
 }

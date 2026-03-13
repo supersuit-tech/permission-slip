@@ -40,11 +40,16 @@ OAuthProviderListResponse:
 OAuthConnection:
   type: object
   required:
+    - id
     - provider
     - scopes
     - status
     - connected_at
   properties:
+    id:
+      type: string
+      description: Unique identifier for this OAuth connection.
+      example: "oc_abc123"
     provider:
       type: string
       description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")

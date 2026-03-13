@@ -44,14 +44,6 @@ ActionConfiguration:
         agent + connector pair.
       example: "github.create_issue"
 
-    credential_id:
-      type: string
-      nullable: true
-      description: |
-        Credential bound to this configuration. Required before execution but
-        can be omitted during creation and assigned later.
-      example: "cred_abc123"
-
     parameters:
       type: object
       additionalProperties: true
@@ -124,7 +116,6 @@ ActionConfiguration:
     agent_id: 42
     connector_id: "github"
     action_type: "github.create_issue"
-    credential_id: "cred_abc123"
     parameters:
       repo:
         $pattern: "supersuit-tech/*"
@@ -167,14 +158,6 @@ CreateActionConfigRequest:
         time). Only one wildcard configuration is allowed per agent + connector.
       example: "github.create_issue"
 
-    credential_id:
-      type: string
-      nullable: true
-      description: |
-        Optional credential to bind to this configuration. Can be assigned later
-        via update. Required before the agent can execute actions through this config.
-      example: "cred_abc123"
-
     parameters:
       type: object
       additionalProperties: true
@@ -211,7 +194,6 @@ CreateActionConfigRequest:
     agent_id: 42
     connector_id: "github"
     action_type: "github.create_issue"
-    credential_id: "cred_abc123"
     parameters:
       repo: "supersuit-tech/webapp"
       title: "*"
@@ -225,12 +207,6 @@ UpdateActionConfigRequest:
   description: |
     Partial update — only provided fields are changed. At least one field must be provided.
   properties:
-    credential_id:
-      type: string
-      nullable: true
-      description: New credential to bind to this configuration.
-      example: "cred_def456"
-
     parameters:
       type: object
       additionalProperties: true
@@ -284,7 +260,6 @@ ActionConfigListResponse:
         agent_id: 42
         connector_id: "github"
         action_type: "github.create_issue"
-        credential_id: "cred_abc123"
         parameters:
           repo: "supersuit-tech/webapp"
           title: "*"

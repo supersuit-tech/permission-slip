@@ -245,7 +245,7 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 		_ = json.Unmarshal(appr.Action, &actionObj)
 	}
 
-	result, execErr := executeConnectorAction(ctx, deps, userID, actionType, actionObj.Parameters, nil)
+	result, execErr := executeConnectorAction(ctx, deps, appr.AgentID, userID, actionType, actionObj.Parameters, nil)
 
 	var execStatus string
 	var resultJSON json.RawMessage

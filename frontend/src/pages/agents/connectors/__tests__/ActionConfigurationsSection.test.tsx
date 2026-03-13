@@ -12,8 +12,6 @@ import {
 import { ActionConfigurationsSection } from "../ActionConfigurationsSection";
 import type { ActionConfiguration } from "../../../../hooks/useActionConfigs";
 import type { ConnectorAction } from "../../../../hooks/useConnectorDetail";
-import type { CredentialSummary } from "../../../../hooks/useCredentials";
-
 vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
@@ -51,22 +49,12 @@ const mockActions: ConnectorAction[] = [
   },
 ];
 
-const mockCredentials: CredentialSummary[] = [
-  {
-    id: "cred_123",
-    service: "github",
-    label: "Personal Access Token",
-    created_at: "2026-02-11T10:00:00Z",
-  },
-];
-
 const mockConfigs: ActionConfiguration[] = [
   {
     id: "ac_001",
     agent_id: 42,
     connector_id: "github",
     action_type: "github.create_issue",
-    credential_id: "cred_123",
     parameters: { repo: "supersuit-tech/webapp", title: "*", body: "*" },
     status: "active",
     name: "Create bug issues",
@@ -88,7 +76,6 @@ function renderSection({
       connectorId="github"
       connectorName={connectorName}
       actions={mockActions}
-      credentials={mockCredentials}
       configs={configs}
       isLoading={isLoading}
       error={error}
@@ -136,7 +123,6 @@ describe("ActionConfigurationsSection", () => {
     expect(screen.getByText("Create Issue")).toBeInTheDocument();
     expect(screen.getByText("github.create_issue")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
-    expect(screen.getByText("Personal Access Token")).toBeInTheDocument();
   });
 
   it("shows parameter pills with wildcard distinction", () => {
@@ -151,17 +137,6 @@ describe("ActionConfigurationsSection", () => {
     // Wildcard params show *
     const wildcardBadges = screen.getAllByText("*");
     expect(wildcardBadges.length).toBe(2); // title and body
-  });
-
-  it("shows 'Not assigned' when no credential bound", () => {
-    const configWithoutCred: ActionConfiguration[] = [
-      {
-        ...mockConfigs[0]!,
-        credential_id: null,
-      },
-    ];
-    renderSection({ configs: configWithoutCred });
-    expect(screen.getByText("Not assigned")).toBeInTheDocument();
   });
 
   it("hides Add Configuration button in empty state", () => {
@@ -371,7 +346,6 @@ describe("ActionConfigurationsSection", () => {
         agent_id: 42,
         connector_id: "github",
         action_type: "*",
-        credential_id: null,
         parameters: {},
         status: "active",
         name: "All GitHub Actions",
@@ -403,7 +377,6 @@ describe("ActionConfigurationsSection", () => {
         agent_id: 42,
         connector_id: "github",
         action_type: "*",
-        credential_id: null,
         parameters: {},
         status: "active",
         name: "All GitHub Actions",

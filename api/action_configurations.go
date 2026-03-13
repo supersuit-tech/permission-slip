@@ -16,35 +16,32 @@ import (
 // --- Request / response types ---
 
 type createActionConfigRequest struct {
-	AgentID      int64            `json:"agent_id" validate:"gt=0"`
-	ConnectorID  string           `json:"connector_id" validate:"required"`
-	ActionType   string           `json:"action_type" validate:"required"`
-	CredentialID *string          `json:"credential_id,omitempty"`
-	Parameters   json.RawMessage  `json:"parameters"`
-	Name         string           `json:"name" validate:"required"`
-	Description  *string          `json:"description,omitempty"`
+	AgentID     int64           `json:"agent_id" validate:"gt=0"`
+	ConnectorID string          `json:"connector_id" validate:"required"`
+	ActionType  string          `json:"action_type" validate:"required"`
+	Parameters  json.RawMessage `json:"parameters"`
+	Name        string          `json:"name" validate:"required"`
+	Description *string         `json:"description,omitempty"`
 }
 
 type updateActionConfigRequest struct {
-	CredentialID *string          `json:"credential_id,omitempty"`
-	Parameters   json.RawMessage  `json:"parameters,omitempty"`
-	Status       *string          `json:"status,omitempty" validate:"omitempty,oneof=active disabled"`
-	Name         *string          `json:"name,omitempty"`
-	Description  *string          `json:"description,omitempty"`
+	Parameters json.RawMessage `json:"parameters,omitempty"`
+	Status     *string         `json:"status,omitempty" validate:"omitempty,oneof=active disabled"`
+	Name       *string         `json:"name,omitempty"`
+	Description *string        `json:"description,omitempty"`
 }
 
 type actionConfigResponse struct {
-	ID           string    `json:"id"`
-	AgentID      int64     `json:"agent_id"`
-	ConnectorID  string    `json:"connector_id"`
-	ActionType   string    `json:"action_type"`
-	CredentialID *string   `json:"credential_id,omitempty"`
-	Parameters   any       `json:"parameters"`
-	Status       string    `json:"status"`
-	Name         string    `json:"name"`
-	Description  *string   `json:"description,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	AgentID     int64     `json:"agent_id"`
+	ConnectorID string    `json:"connector_id"`
+	ActionType  string    `json:"action_type"`
+	Parameters  any       `json:"parameters"`
+	Status      string    `json:"status"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type actionConfigListResponse struct {
@@ -139,10 +136,6 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		if !verifyCredentialOwnership(w, r, deps, req.CredentialID, profile.ID) {
-			return
-		}
-
 		configID, err := generatePrefixedID("ac_", 16)
 		if err != nil {
 			log.Printf("[%s] CreateActionConfig: generate ID: %v", TraceID(r.Context()), err)
@@ -151,15 +144,14 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 		}
 
 		ac, err := db.CreateActionConfig(r.Context(), deps.DB, db.CreateActionConfigParams{
-			ID:           configID,
-			AgentID:      req.AgentID,
-			UserID:       profile.ID,
-			ConnectorID:  req.ConnectorID,
-			ActionType:   req.ActionType,
-			CredentialID: req.CredentialID,
-			Parameters:   params,
-			Name:         req.Name,
-			Description:  req.Description,
+			ID:          configID,
+			AgentID:     req.AgentID,
+			UserID:      profile.ID,
+			ConnectorID: req.ConnectorID,
+			ActionType:  req.ActionType,
+			Parameters:  params,
+			Name:        req.Name,
+			Description: req.Description,
 		})
 		if err != nil {
 			var acErr *db.ActionConfigError
@@ -257,7 +249,7 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 		}
 
 		// Validate at least one field is provided.
-		if req.CredentialID == nil && req.Parameters == nil && req.Status == nil && req.Name == nil && req.Description == nil {
+		if req.Parameters == nil && req.Status == nil && req.Name == nil && req.Description == nil {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "at least one field must be provided for update"))
 			return
 		}
@@ -306,18 +298,13 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 			params = req.Parameters
 		}
 
-		if !verifyCredentialOwnership(w, r, deps, req.CredentialID, profile.ID) {
-			return
-		}
-
 		ac, err := db.UpdateActionConfig(r.Context(), deps.DB, db.UpdateActionConfigParams{
-			ID:           configID,
-			UserID:       profile.ID,
-			CredentialID: req.CredentialID,
-			Parameters:   params,
-			Status:       req.Status,
-			Name:         req.Name,
-			Description:  req.Description,
+			ID:          configID,
+			UserID:      profile.ID,
+			Parameters:  params,
+			Status:      req.Status,
+			Name:        req.Name,
+			Description: req.Description,
 		})
 		if err != nil {
 			var acErr *db.ActionConfigError
@@ -370,38 +357,17 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 
 // --- Helpers ---
 
-// verifyCredentialOwnership checks that the credential belongs to the user and
-// writes an error response if it doesn't. Returns true if the caller should
-// continue (credential is valid or nil), false if an error response was sent.
-func verifyCredentialOwnership(w http.ResponseWriter, r *http.Request, deps *Deps, credentialID *string, userID string) bool {
-	if credentialID == nil {
-		return true
-	}
-	owns, err := db.CredentialBelongsToUser(r.Context(), deps.DB, *credentialID, userID)
-	if err != nil {
-		log.Printf("[%s] credential ownership check: %v", TraceID(r.Context()), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify credential"))
-		return false
-	}
-	if !owns {
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Credential not found"))
-		return false
-	}
-	return true
-}
-
 func toActionConfigResponse(ac db.ActionConfiguration) actionConfigResponse {
 	resp := actionConfigResponse{
-		ID:           ac.ID,
-		AgentID:      ac.AgentID,
-		ConnectorID:  ac.ConnectorID,
-		ActionType:   ac.ActionType,
-		CredentialID: ac.CredentialID,
-		Status:       ac.Status,
-		Name:         ac.Name,
-		Description:  ac.Description,
-		CreatedAt:    ac.CreatedAt,
-		UpdatedAt:    ac.UpdatedAt,
+		ID:          ac.ID,
+		AgentID:     ac.AgentID,
+		ConnectorID: ac.ConnectorID,
+		ActionType:  ac.ActionType,
+		Status:      ac.Status,
+		Name:        ac.Name,
+		Description: ac.Description,
+		CreatedAt:   ac.CreatedAt,
+		UpdatedAt:   ac.UpdatedAt,
 	}
 	// Parse parameters into a generic map for clean JSON output.
 	if len(ac.Parameters) > 0 {
