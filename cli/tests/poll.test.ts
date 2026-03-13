@@ -317,7 +317,7 @@ describe("parseTimeout", () => {
     expect(parseTimeout("-5", noop)).toBe(120);
   });
 
-  it("clamps zero to default (via || fallback)", () => {
+  it("returns default for zero", () => {
     expect(parseTimeout("0", noop)).toBe(120);
   });
 
