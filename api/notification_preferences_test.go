@@ -33,8 +33,8 @@ func TestUpdateNotificationPreferences_EnableSMS_FreeTier_Rejected(t *testing.T)
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}
-	if resp.Error.Code != ErrSMSUnavailableBeta {
-		t.Errorf("expected error code %q, got %q", ErrSMSUnavailableBeta, resp.Error.Code)
+	if resp.Error.Code != ErrChannelUnavailableBeta {
+		t.Errorf("expected error code %q, got %q", ErrChannelUnavailableBeta, resp.Error.Code)
 	}
 }
 

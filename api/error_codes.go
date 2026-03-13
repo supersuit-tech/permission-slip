@@ -53,7 +53,7 @@ const (
 	ErrDowngradeLimitExceeded   ErrorCode = "downgrade_limit_exceeded"
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
 	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
-	ErrSMSUnavailableBeta       ErrorCode = "sms_unavailable_beta"
+	ErrChannelUnavailableBeta   ErrorCode = "channel_unavailable_beta"
 	// OAuth
 	ErrOAuthProviderNotFound     ErrorCode = "oauth_provider_not_found"
 	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"

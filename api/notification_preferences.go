@@ -2,9 +2,14 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
+	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
@@ -113,7 +118,9 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 		// Gate beta-disabled channels: reject enabling any channel disabled during beta.
 		for _, p := range req.Preferences {
 			if p.Enabled && betaDisabledChannels[p.Channel] {
-				RespondError(w, r, http.StatusForbidden, Forbidden(ErrSMSUnavailableBeta, "SMS notifications are not yet available. They will be enabled after the beta period."))
+				label := cases.Title(language.English).String(strings.NewReplacer("-", " ").Replace(p.Channel))
+				msg := fmt.Sprintf("%s notifications are not yet available. They will be enabled after the beta period.", label)
+				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelUnavailableBeta, msg))
 				return
 			}
 		}
