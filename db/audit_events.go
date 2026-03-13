@@ -197,16 +197,29 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 	// Suppress approval.requested events that have a corresponding resolution
 	// event (approved/denied/cancelled) for the same source_id. This keeps the
 	// activity feed clean by showing only the final state of each approval.
-	where = append(where, `NOT (
-		ae.event_type = 'approval.requested'
-		AND ae.source_id IS NOT NULL
-		AND EXISTS (
-			SELECT 1 FROM audit_events ae2
-			WHERE ae2.source_id = ae.source_id
-			  AND ae2.user_id = ae.user_id
-			  AND ae2.event_type IN ('approval.approved', 'approval.denied', 'approval.cancelled')
-		)
-	)`)
+	// Skip the dedup when the caller explicitly filters by approval.requested —
+	// an explicit filter signals intent to see all matching events (e.g. audits).
+	requestedTypeExplicit := false
+	if filter != nil {
+		for _, et := range filter.EventTypes {
+			if et == AuditEventApprovalRequested {
+				requestedTypeExplicit = true
+				break
+			}
+		}
+	}
+	if !requestedTypeExplicit {
+		where = append(where, `NOT (
+			ae.event_type = 'approval.requested'
+			AND ae.source_id IS NOT NULL
+			AND EXISTS (
+				SELECT 1 FROM audit_events ae2
+				WHERE ae2.source_id = ae.source_id
+				  AND ae2.user_id = ae.user_id
+				  AND ae2.event_type IN ('approval.approved', 'approval.denied', 'approval.cancelled')
+			)
+		)`)
+	}
 
 	limitPlaceholder := b.addArg(fetchLimit)
 

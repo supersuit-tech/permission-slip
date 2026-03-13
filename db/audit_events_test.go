@@ -437,6 +437,34 @@ func TestListAuditEvents(t *testing.T) {
 		}
 	})
 
+	t.Run("DeduplicationSkippedWhenFilteringByRequested", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+		// Same source_id: requested + approved.
+		sourceID := testhelper.GenerateID(t, "appr_")
+		base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.requested", "pending", sourceID, base)
+		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", sourceID, base.Add(time.Minute))
+
+		// Explicit filter for approval.requested should bypass dedup and return all.
+		filter := &db.AuditEventFilter{
+			EventTypes: []db.AuditEventType{db.AuditEventApprovalRequested},
+		}
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, filter, 0)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 approval.requested event (dedup bypassed), got %d", len(page.Events))
+		}
+		if page.Events[0].EventType != db.AuditEventApprovalRequested {
+			t.Errorf("expected approval.requested, got %s", page.Events[0].EventType)
+		}
+	})
+
 	t.Run("DeduplicatesAcrossResolutionTypes", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
