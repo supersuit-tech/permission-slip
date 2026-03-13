@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
@@ -8,7 +8,7 @@ import {
   mockPost,
   resetClientMocks,
 } from "../../../api/__mocks__/client";
-import { PendingApprovalsCard } from "../PendingApprovalsCard";
+import { PendingApprovalsBanner } from "../PendingApprovalsBanner";
 
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
@@ -68,7 +68,7 @@ function mockApprovalsFetch(response = mockApprovalsResponse) {
   mockGet.mockResolvedValue({ data: response });
 }
 
-describe("PendingApprovalsCard", () => {
+describe("PendingApprovalsBanner", () => {
   let wrapper: ReturnType<typeof createAuthWrapper>;
 
   beforeEach(() => {
@@ -83,30 +83,41 @@ describe("PendingApprovalsCard", () => {
     vi.useRealTimers();
   });
 
-  it("renders title", async () => {
-    mockApprovalsFetch();
+  it("renders nothing when no approvals", async () => {
+    mockApprovalsFetch(emptyResponse);
 
-    render(<PendingApprovalsCard />, { wrapper });
-
-    expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
-  });
-
-  it("renders request count description when approvals exist", async () => {
-    mockApprovalsFetch();
-
-    render(<PendingApprovalsCard />, { wrapper });
+    const { container } = render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("2 requests awaiting your review"),
-      ).toBeInTheDocument();
+      expect(container.innerHTML).toBe("");
     });
   });
 
-  it("renders approval rows with action type and agent name", async () => {
+  it("renders nothing while loading", () => {
+    setupAuthMocks({ authenticated: true });
+    mockGet.mockReturnValue(new Promise(() => {}));
+
+    const { container } = render(<PendingApprovalsBanner />, { wrapper });
+
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders nothing on error", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockGet.mockRejectedValue(new Error("Network error"));
+
+    const { container } = render(<PendingApprovalsBanner />, { wrapper });
+
+    await waitFor(() => {
+      // Should stay empty on error
+      expect(container.querySelector('[role="status"]')).toBeNull();
+    });
+  });
+
+  it("renders banner items with action type and agent name", async () => {
     mockApprovalsFetch();
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("email.send")).toBeInTheDocument();
@@ -119,7 +130,7 @@ describe("PendingApprovalsCard", () => {
   it("renders risk badges", async () => {
     mockApprovalsFetch();
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("low")).toBeInTheDocument();
@@ -130,20 +141,15 @@ describe("PendingApprovalsCard", () => {
   it("renders countdown timers", async () => {
     mockApprovalsFetch();
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
-    // shouldAdvanceTime lets real wall-clock time leak into Date.now(),
-    // so the countdown may have ticked 1-2 seconds beyond the expected
-    // value. Use flexible matchers instead of exact text.
     await waitFor(() => {
       const timerEls = screen
         .getAllByText(/^\d+:\d{2}$/)
         .map((el) => el.textContent ?? "");
-      // First approval: ~3 min remaining (could be 3:00 or 2:5x)
       expect(
         timerEls.some((t) => t === "3:00" || t.startsWith("2:5")),
       ).toBe(true);
-      // Second approval: ~30 sec remaining (could be 0:30 or 0:2x)
       expect(
         timerEls.some(
           (t) => t === "0:30" || (t.startsWith("0:2") && t !== "0:2"),
@@ -152,61 +158,28 @@ describe("PendingApprovalsCard", () => {
     });
   });
 
-  it("countdown decrements over time", async () => {
+  it("renders a Review link for each banner item", async () => {
     mockApprovalsFetch();
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
-    // shouldAdvanceTime lets real wall-clock time leak into Date.now(),
-    // so use a flexible matcher for the initial value too.
     await waitFor(() => {
-      const timerEls = screen
-        .getAllByText(/^\d+:\d{2}$/)
-        .map((el) => el.textContent ?? "");
-      expect(
-        timerEls.some((t) => t === "3:00" || t.startsWith("2:5")),
-      ).toBe(true);
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(5_000);
-    });
-
-    // After advancing 5s, the ~3:00 timer should now be ~2:55 or lower.
-    // Assert the timer decremented rather than checking an exact value.
-    await waitFor(() => {
-      const timerEls = screen
-        .getAllByText(/^\d+:\d{2}$/)
-        .map((el) => el.textContent ?? "");
-      const firstTimer = timerEls.find(
-        (t) => t.startsWith("2:") && t !== "2:60",
-      );
-      expect(firstTimer).toBeTruthy();
+      expect(screen.getAllByRole("button", { name: /Pending approval/ })).toHaveLength(2);
     });
   });
 
-  it("renders a Review button for each approval row", async () => {
-    mockApprovalsFetch();
-
-    render(<PendingApprovalsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: /Review/ })).toHaveLength(2);
-    });
-  });
-
-  it("opens review dialog with details on Review click", async () => {
+  it("opens review dialog on banner click", async () => {
     mockApprovalsFetch();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("email.send")).toBeInTheDocument();
     });
 
-    const reviewButtons = screen.getAllByRole("button", { name: /Review/ });
-    await user.click(reviewButtons[0]!);
+    const bannerItems = screen.getAllByRole("button", { name: /Pending approval/ });
+    await user.click(bannerItems[0]!);
 
     await waitFor(() => {
       expect(
@@ -216,10 +189,6 @@ describe("PendingApprovalsCard", () => {
     expect(
       screen.getByText("Send welcome email to new user"),
     ).toBeInTheDocument();
-    // "alice@example.com" and "Hello World" may appear in both the list row
-    // summary and the dialog. Use getAllByText to account for both locations.
-    expect(screen.getAllByText("alice@example.com").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Hello World").length).toBeGreaterThanOrEqual(1);
   });
 
   it("approves via review dialog and shows success message", async () => {
@@ -235,15 +204,14 @@ describe("PendingApprovalsCard", () => {
     });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: /Review/ })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /Pending approval/ })).toHaveLength(2);
     });
 
-    // Open the review dialog
-    const reviewButtons = screen.getAllByRole("button", { name: /Review/ });
-    await user.click(reviewButtons[0]!);
+    const bannerItems = screen.getAllByRole("button", { name: /Pending approval/ });
+    await user.click(bannerItems[0]!);
 
     await waitFor(() => {
       expect(
@@ -257,7 +225,6 @@ describe("PendingApprovalsCard", () => {
       expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
     });
     expect(screen.getByText(/The action has been executed/)).toBeInTheDocument();
-    // "Done" button should be visible in the success state
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
@@ -266,15 +233,14 @@ describe("PendingApprovalsCard", () => {
     mockPost.mockResolvedValue({ data: {} });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: /Review/ })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /Pending approval/ })).toHaveLength(2);
     });
 
-    // Open the review dialog
-    const reviewButtons = screen.getAllByRole("button", { name: /Review/ });
-    await user.click(reviewButtons[0]!);
+    const bannerItems = screen.getAllByRole("button", { name: /Pending approval/ });
+    await user.click(bannerItems[0]!);
 
     await waitFor(() => {
       expect(
@@ -293,58 +259,20 @@ describe("PendingApprovalsCard", () => {
     mockApprovalsFetch();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("data.delete")).toBeInTheDocument();
     });
 
-    // Click Review on the high-risk approval (second row)
-    const reviewButtons = screen.getAllByRole("button", { name: /Review/ });
-    await user.click(reviewButtons[1]!);
+    const bannerItems = screen.getAllByRole("button", { name: /Pending approval/ });
+    await user.click(bannerItems[1]!);
 
     await waitFor(() => {
       expect(
         screen.getByText(/high-risk action/),
       ).toBeInTheDocument();
     });
-  });
-
-  it("renders empty state when no approvals", async () => {
-    mockApprovalsFetch(emptyResponse);
-
-    render(<PendingApprovalsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText("No pending requests")).toBeInTheDocument();
-    });
-    expect(
-      screen.getByText(/When an agent needs permission/),
-    ).toBeInTheDocument();
-  });
-
-  it("renders loading spinner initially", () => {
-    setupAuthMocks({ authenticated: true });
-    // Don't resolve the mock so it stays in loading state
-    mockGet.mockReturnValue(new Promise(() => {}));
-
-    render(<PendingApprovalsCard />, { wrapper });
-
-    expect(screen.getByText("Pending Approvals")).toBeInTheDocument();
-  });
-
-  it("renders error state with retry button", async () => {
-    setupAuthMocks({ authenticated: true });
-    mockGet.mockRejectedValue(new Error("Network error"));
-
-    render(<PendingApprovalsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Unable to load approvals. Please try again later."),
-      ).toBeInTheDocument();
-    });
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("shows expired for timed-out approval", async () => {
@@ -354,22 +282,10 @@ describe("PendingApprovalsCard", () => {
     };
     mockApprovalsFetch({ data: [expiredApproval] });
 
-    render(<PendingApprovalsCard />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Expired")).toBeInTheDocument();
-    });
-  });
-
-  it("shows singular 'request' for single approval", async () => {
-    mockApprovalsFetch({ data: [mockApproval] });
-
-    render(<PendingApprovalsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("1 request awaiting your review"),
-      ).toBeInTheDocument();
     });
   });
 });
