@@ -335,7 +335,7 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	}
 
 	// All channels default to enabled when no preferences are set.
-	// SMS should not be available on the free plan.
+	// SMS and web-push are unavailable during beta regardless of plan.
 	requiredChannels := []string{"email", "web-push", "sms", "mobile-push"}
 	for _, ch := range requiredChannels {
 		p, ok := prefsByChannel[ch]
@@ -343,20 +343,17 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 			t.Errorf("expected preference for channel %q", ch)
 			continue
 		}
-		if ch == "sms" {
+		if ch == "sms" || ch == "web-push" {
 			if p.Enabled {
-				t.Error("expected SMS to default to disabled during beta")
+				t.Errorf("expected %q to default to disabled during beta", ch)
 			}
 			if p.Available {
-				t.Error("expected SMS to be unavailable during beta")
+				t.Errorf("expected %q to be unavailable during beta", ch)
 			}
 		} else if !p.Enabled {
 			t.Errorf("expected channel %q to default to enabled", ch)
-		}
-		if ch != "sms" {
-			if !p.Available {
-				t.Errorf("expected channel %q to be available", ch)
-			}
+		} else if !p.Available {
+			t.Errorf("expected channel %q to be available", ch)
 		}
 	}
 }
