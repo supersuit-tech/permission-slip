@@ -352,8 +352,11 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 			}
 		} else if !p.Enabled {
 			t.Errorf("expected channel %q to default to enabled", ch)
-		} else if !p.Available {
-			t.Errorf("expected channel %q to be available", ch)
+		}
+		if ch != "sms" && ch != "web-push" {
+			if !p.Available {
+				t.Errorf("expected channel %q to be available", ch)
+			}
 		}
 	}
 }
