@@ -5647,6 +5647,13 @@ paths:
             type: array
             items:
               type: string
+        - name: replace
+          in: query
+          required: false
+          description: |
+            ID of an existing OAuth connection to replace (reconnect flow). When set, the specified connection is deleted and replaced by the new one after successful authorization. When omitted, a new connection is created alongside any existing ones for the same provider. The connection must belong to the authenticated user and the same provider being authorized.
+          schema:
+            type: string
       responses:
         '307':
           description: Redirects to the OAuth provider's authorization endpoint
@@ -5745,13 +5752,24 @@ paths:
                 $ref: '#/components/schemas/OAuthConnectionListResponse'
               example:
                 connections:
-                  - provider: google
+                  - id: oconn_abc123
+                    provider: google
                     scopes:
                       - openid
                       - https://www.googleapis.com/auth/userinfo.email
                     status: active
                     connected_at: '2026-03-05T10:00:00Z'
-                  - provider: microsoft
+                    display_name: user@gmail.com
+                  - id: oconn_def456
+                    provider: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/gmail.send
+                    status: active
+                    connected_at: '2026-03-06T09:00:00Z'
+                    display_name: work@company.com
+                  - id: oconn_ghi789
+                    provider: microsoft
                     scopes:
                       - openid
                       - offline_access
