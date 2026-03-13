@@ -2,17 +2,13 @@
  * Polls an approval's status until it reaches a terminal state or timeout.
  */
 
-import type { ApiClient } from "../api/client.js";
+import {
+  type ApiClient,
+  type ApprovalStatusResult,
+  PermissionSlipApiError,
+} from "../api/client.js";
 
-/** The shape returned by ApiClient.approvalStatus(). */
-export interface ApprovalStatusResult {
-  approval_id: string;
-  status: string;
-  expires_at: string;
-  created_at: string;
-  execution_status?: string;
-  execution_result?: unknown;
-}
+export type { ApprovalStatusResult };
 
 export interface PollOptions {
   approvalId: string;
@@ -27,10 +23,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isTransientError(err: unknown): boolean {
+  if (err instanceof PermissionSlipApiError) {
+    return err.apiError.retryable || err.statusCode === 429 || err.statusCode >= 500;
+  }
+  return false;
+}
+
 /**
  * Polls `GET /approvals/{id}/status` with gentle backoff until the approval
  * reaches a terminal state (approved/denied/cancelled/expired) or the timeout
- * elapses. Returns the last status result.
+ * elapses. Returns the last status result. Transient API errors (429, 5xx) are
+ * silently retried on the next interval instead of aborting the wait.
  */
 export async function pollUntilResolved(
   opts: PollOptions,
@@ -40,12 +44,15 @@ export async function pollUntilResolved(
   const maxInterval = 5000; // cap at 5 seconds
 
   while (Date.now() < deadline) {
-    const result = (await opts.client.approvalStatus(
-      opts.approvalId,
-    )) as ApprovalStatusResult;
+    try {
+      const result = await opts.client.approvalStatus(opts.approvalId);
 
-    if (TERMINAL_STATUSES.has(result.status)) {
-      return result;
+      if (TERMINAL_STATUSES.has(result.status)) {
+        return result;
+      }
+    } catch (err) {
+      if (!isTransientError(err)) throw err;
+      // Transient error — continue to next poll interval.
     }
 
     const remaining = deadline - Date.now();
@@ -56,9 +63,7 @@ export async function pollUntilResolved(
   }
 
   // Final check after timeout.
-  const final = (await opts.client.approvalStatus(
-    opts.approvalId,
-  )) as ApprovalStatusResult;
+  const final = await opts.client.approvalStatus(opts.approvalId);
 
   if (TERMINAL_STATUSES.has(final.status)) {
     return final;

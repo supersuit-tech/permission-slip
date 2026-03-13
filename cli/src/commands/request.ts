@@ -70,9 +70,10 @@ export function requestCommand(program: Command): void {
               ...result,
               next_step:
                 "Your request is pending approval. Once approved, the action will execute automatically — no further action is needed from you. " +
-                "To check the outcome, run: " +
+                "To wait for the outcome, run: " +
                 `permission-slip request-status --approval-id ${shellQuote(result.approval_id)}` +
-                (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
+                (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : "") +
+                " (this blocks until resolved; add --no-wait for a single status check)",
             },
             outputOpts,
           );

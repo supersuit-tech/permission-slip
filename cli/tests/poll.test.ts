@@ -165,8 +165,7 @@ describe("pollUntilResolved", () => {
     const result = await promise;
 
     // The final check after timeout returns approved, so timed_out should not be set.
-    if (result.status === "approved") {
-      expect(result.timed_out).toBeUndefined();
-    }
+    expect(result.status).toBe("approved");
+    expect(result.timed_out).toBeUndefined();
   });
 });

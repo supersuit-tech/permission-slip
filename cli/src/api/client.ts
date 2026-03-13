@@ -21,6 +21,16 @@ export interface ApiError {
   trace_id?: string;
 }
 
+/** Shape returned by GET /approvals/{id}/status. */
+export interface ApprovalStatusResult {
+  approval_id: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  execution_status?: string;
+  execution_result?: unknown;
+}
+
 export class PermissionSlipApiError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -245,15 +255,8 @@ export class ApiClient {
   }
 
   /** GET /approvals/{id}/status — check approval and execution status */
-  async approvalStatus(approvalId: string) {
-    return this.request<{
-      approval_id: string;
-      status: string;
-      expires_at: string;
-      created_at: string;
-      execution_status?: string;
-      execution_result?: unknown;
-    }>({
+  async approvalStatus(approvalId: string): Promise<ApprovalStatusResult> {
+    return this.request<ApprovalStatusResult>({
       method: "GET",
       routerPath: `/approvals/${approvalId}/status`,
     });
