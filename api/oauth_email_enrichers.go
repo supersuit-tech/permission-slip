@@ -87,20 +87,41 @@ func fetchGitHubEmail(ctx context.Context, accessToken string) (map[string]strin
 }
 
 // fetchMicrosoftEmail fetches the user's email from Microsoft Graph.
+// Tries the "mail" field first, falling back to "userPrincipalName".
 func fetchMicrosoftEmail(ctx context.Context, accessToken string) (map[string]string, error) {
-	extra, err := fetchEmailFromJSON(ctx, accessToken, "https://graph.microsoft.com/v1.0/me", "mail")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://graph.microsoft.com/v1.0/me", nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create request: %w", err)
 	}
-	if extra["email"] != "" {
-		return extra, nil
-	}
-	// Fall back to userPrincipalName if mail is empty.
-	extra2, err := fetchEmailFromJSON(ctx, accessToken, "https://graph.microsoft.com/v1.0/me", "userPrincipalName")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := emailHTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	return extra2, nil
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("returned HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	if mail, _ := data["mail"].(string); mail != "" {
+		return map[string]string{"email": mail}, nil
+	}
+	if upn, _ := data["userPrincipalName"].(string); upn != "" {
+		return map[string]string{"email": upn}, nil
+	}
+	return nil, fmt.Errorf("no email found in Microsoft profile")
 }
 
 // fetchSlackEmail fetches the user's email from Slack's OIDC userinfo endpoint.

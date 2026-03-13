@@ -265,6 +265,13 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 						Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
 					}
 				}
+				// Verify the bound connection belongs to the executing user.
+				// Without this, a binding could reference another user's connection.
+				if conn.UserID != userID {
+					return connectors.Credentials{}, &connectors.ValidationError{
+						Message: "bound OAuth connection does not belong to this user",
+					}
+				}
 				// Use the bound connection directly (not a provider re-query)
 				// so the specific oauth_connection_id in the binding is honoured.
 				return resolveOAuthCredentialsFromConnection(ctx, deps, conn)

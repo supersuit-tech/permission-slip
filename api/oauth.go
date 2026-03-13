@@ -1033,6 +1033,18 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Look up the connection first so we can return the provider name.
+		conn, err := db.GetOAuthConnectionByID(r.Context(), deps.DB, connectionID)
+		if err != nil {
+			log.Printf("[%s] DeleteOAuthConnection: lookup: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
+			return
+		}
+		if conn == nil || conn.UserID != profile.ID {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrOAuthConnectionNotFound, "OAuth connection not found"))
+			return
+		}
+
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: begin tx: %v", TraceID(r.Context()), err)
@@ -1080,7 +1092,7 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, oauthDisconnectResponse{
-			Provider:       connectionID,
+			Provider:       conn.Provider,
 			DisconnectedAt: time.Now().UTC(),
 		})
 	}

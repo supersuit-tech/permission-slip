@@ -540,8 +540,8 @@ func TestDeleteOAuthConnection_Success(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if resp.Provider != connID {
-		t.Errorf("expected %s, got %s", connID, resp.Provider)
+	if resp.Provider != "google" {
+		t.Errorf("expected google, got %s", resp.Provider)
 	}
 
 	// Verify the connection is actually gone
