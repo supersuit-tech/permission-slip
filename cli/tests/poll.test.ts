@@ -313,8 +313,8 @@ describe("parseTimeout", () => {
     expect(parseTimeout("abc", noop)).toBe(120);
   });
 
-  it("clamps negative to minimum", () => {
-    expect(parseTimeout("-5", noop)).toBe(1);
+  it("returns default for negative value", () => {
+    expect(parseTimeout("-5", noop)).toBe(120);
   });
 
   it("clamps zero to default (via || fallback)", () => {
