@@ -243,7 +243,6 @@ User-created configurations that define exactly how an agent is allowed to use a
 | `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
 | `connector_id` | text | NOT NULL, FK → connectors(id) ON DELETE CASCADE, max 255 chars |
 | `action_type` | text | NOT NULL, max 255 chars, FK (composite with connector_id) → connector_actions ON DELETE CASCADE |
-| `credential_id` | text | FK → credentials(id) ON DELETE SET NULL, max 255 chars |
 | `parameters` | jsonb | NOT NULL, DEFAULT '{}', max 64 KB |
 | `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'disabled') |
 | `name` | text | NOT NULL, max 255 chars |
@@ -255,8 +254,6 @@ User-created configurations that define exactly how an agent is allowed to use a
 
 **Behavior:**
 - An agent can have multiple configurations for the same action type (e.g., `email.send` to alice vs `email.send` to bob)
-- Credential binding is optional — `credential_id` can be NULL (must be set before execution)
-- Deleting a credential sets `credential_id` to NULL (ON DELETE SET NULL) rather than cascading the delete
 - Parameters use `"*"` as a wildcard convention: fixed parameters must match exactly at execution time, wildcard parameters accept any value that passes the action's schema validation
 
 ### `standing_approvals`
@@ -432,7 +429,9 @@ connector_actions
   └── action_configurations ((connector_id, action_type) → connector_actions, CASCADE)
 
 credentials
-  └── action_configurations (credential_id → credentials, SET NULL)
+  └── agent_connector_credentials (credential_id → credentials, CASCADE)
+oauth_connections
+  └── agent_connector_credentials (oauth_connection_id → oauth_connections, CASCADE)
 ```
 
 ## Conventions

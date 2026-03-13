@@ -36,8 +36,8 @@ type CapabilityAction struct {
 }
 
 // CapabilityActionConfig represents an active action configuration for an agent.
-// Each configuration defines a pre-approved parameter set and credential binding
-// that the agent can reference when requesting approval or executing actions.
+// Each configuration defines a pre-approved parameter set that the agent can
+// reference when requesting approval or executing actions.
 type CapabilityActionConfig struct {
 	ConfigurationID string
 	ConnectorID     string
@@ -45,7 +45,6 @@ type CapabilityActionConfig struct {
 	Name            string
 	Description     *string
 	Parameters      json.RawMessage // includes wildcards ("*")
-	CredentialReady bool
 }
 
 // CapabilityStandingApproval represents an active, non-expired standing approval.
@@ -174,19 +173,11 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// 4. Active action configurations for this agent.
 	//
 	// Each configuration defines a pre-approved set of parameters (with
-	// optional wildcards) and a credential binding. The agent picks from
-	// these when requesting approval or executing actions.
-	//
-	// credential_ready indicates whether the configuration's credential_id
-	// is non-null AND the referenced credential exists for the same user.
+	// optional wildcards). The agent picks from these when requesting
+	// approval or executing actions.
 	acRows, err := db.Query(ctx, `
 		SELECT ac.id, ac.connector_id, ac.action_type, ac.name, ac.description,
-		       ac.parameters,
-		       (ac.credential_id IS NOT NULL AND EXISTS (
-		           SELECT 1 FROM credentials cr
-		           WHERE cr.id = ac.credential_id
-		             AND cr.user_id = ac.user_id
-		       )) AS credential_ready
+		       ac.parameters
 		FROM action_configurations ac
 		WHERE ac.agent_id = $1
 		  AND ac.user_id = $2
@@ -203,7 +194,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	for acRows.Next() {
 		var ac CapabilityActionConfig
 		if err := acRows.Scan(&ac.ConfigurationID, &ac.ConnectorID, &ac.ActionType,
-			&ac.Name, &ac.Description, &ac.Parameters, &ac.CredentialReady); err != nil {
+			&ac.Name, &ac.Description, &ac.Parameters); err != nil {
 			return nil, err
 		}
 		caps.ActionConfigs = append(caps.ActionConfigs, ac)

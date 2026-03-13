@@ -181,3 +181,149 @@ agentConnectorById:
 
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+agentConnectorCredential:
+  put:
+    operationId: assignAgentConnectorCredential
+    summary: Assign Credential to Agent Connector
+    description: |
+      Assign a credential or OAuth connection to an agent-connector pair. This determines
+      which credential the agent uses when executing actions through this connector.
+
+      Exactly one of `credential_id` or `oauth_connection_id` must be provided.
+      If a credential is already assigned, it is replaced (upsert behavior).
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/agent_connectors.yaml#/AssignCredentialRequest'
+          examples:
+            static_credential:
+              summary: Assign a static API key credential
+              value:
+                credential_id: "cred_abc123"
+            oauth_connection:
+              summary: Assign an OAuth connection
+              value:
+                oauth_connection_id: "oc_def456"
+
+    responses:
+      '200':
+        description: Credential assigned successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorCredentialResponse'
+
+      '400':
+        description: Invalid request (validation errors, invalid references)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent not found or not owned by user
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  delete:
+    operationId: removeAgentConnectorCredential
+    summary: Remove Credential from Agent Connector
+    description: |
+      Remove the credential binding for an agent-connector pair. After removal,
+      the agent falls back to user-global credential resolution for this connector.
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    responses:
+      '200':
+        description: Credential binding removed
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: "removed"
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: No credential binding found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  get:
+    operationId: getAgentConnectorCredential
+    summary: Get Agent Connector Credential
+    description: |
+      Get the current credential binding for an agent-connector pair.
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    responses:
+      '200':
+        description: Credential binding retrieved (fields are null if no binding exists)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorCredentialResponse'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'

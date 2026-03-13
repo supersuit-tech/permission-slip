@@ -35,13 +35,12 @@ actionConfigurations:
           schema:
             $ref: '../schemas/action_configurations.yaml#/CreateActionConfigRequest'
           examples:
-            with_credential:
-              summary: Configuration with locked parameters and credential
+            with_params:
+              summary: Configuration with locked parameters
               value:
                 agent_id: 42
                 connector_id: "github"
                 action_type: "github.create_issue"
-                credential_id: "cred_abc123"
                 parameters:
                   repo: "supersuit-tech/webapp"
                   title: "*"
@@ -49,8 +48,8 @@ actionConfigurations:
                   label: "bug"
                 name: "Create bug issues in webapp"
                 description: "Agent can create issues labeled 'bug'. Title and body are freeform."
-            without_credential:
-              summary: Configuration without credential (assign later)
+            minimal:
+              summary: Configuration with minimal fields
               value:
                 agent_id: 42
                 connector_id: "slack"

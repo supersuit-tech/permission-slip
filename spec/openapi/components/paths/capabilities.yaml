@@ -155,7 +155,6 @@ agentCapabilities:
                                 to: "team@mycompany.com"
                                 subject: "*"
                                 body: "*"
-                              credential_ready: true
                         - action_type: "email.read"
                           name: "Read Email"
                           description: "Read emails from Gmail inbox"

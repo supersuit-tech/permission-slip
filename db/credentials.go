@@ -166,6 +166,23 @@ func GetVaultSecretID(ctx context.Context, db DBTX, userID, service string, labe
 	return vaultSecretID, nil
 }
 
+// GetVaultSecretIDByCredentialID looks up the vault_secret_id for a credential
+// by its primary key. Used when resolving agent-specific credential bindings.
+func GetVaultSecretIDByCredentialID(ctx context.Context, db DBTX, credentialID string) (string, error) {
+	var vaultSecretID string
+	err := db.QueryRow(ctx, `
+		SELECT vault_secret_id FROM credentials WHERE id = $1`,
+		credentialID,
+	).Scan(&vaultSecretID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
+	}
+	if err != nil {
+		return "", err
+	}
+	return vaultSecretID, nil
+}
+
 // GetDecryptedCredentials retrieves and decrypts the credential secret for a
 // given user and service. This is designed to be called by the connector engine
 // at action execution time.
@@ -194,4 +211,21 @@ func GetDecryptedCredentials(
 		return nil, fmt.Errorf("unmarshal decrypted credentials: %w", err)
 	}
 	return creds, nil
+}
+
+// GetCredentialByID returns the credential metadata for the given ID,
+// or nil if no credential exists with that ID.
+func GetCredentialByID(ctx context.Context, db DBTX, credID string) (*Credential, error) {
+	var c Credential
+	err := db.QueryRow(ctx, `
+		SELECT id, user_id, service, label, created_at
+		FROM credentials WHERE id = $1`, credID,
+	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

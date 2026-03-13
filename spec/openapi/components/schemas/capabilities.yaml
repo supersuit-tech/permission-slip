@@ -76,7 +76,6 @@ AgentCapabilitiesResponse:
                   to: "team@mycompany.com"
                   subject: "*"
                   body: "*"
-                credential_ready: true
           - action_type: "email.read"
             name: "Read Email"
             description: "Read emails from Gmail inbox"
@@ -341,7 +340,6 @@ ActionCapability:
           to: "team@mycompany.com"
           subject: "*"
           body: "*"
-        credential_ready: true
 
 StandingApprovalCapability:
   type: object
@@ -421,7 +419,6 @@ ActionConfigCapability:
     - action_type
     - name
     - parameters
-    - credential_ready
   properties:
     configuration_id:
       type: string
@@ -473,18 +470,6 @@ ActionConfigCapability:
         subject: "*"
         body: "*"
 
-    credential_ready:
-      type: boolean
-      description: |
-        Whether the credential bound to this configuration is present and valid.
-
-        - `true`: A credential is assigned and exists — the action can be executed.
-        - `false`: Either no credential is assigned or the assigned credential
-          has been deleted. The user must assign a credential before execution.
-
-        **Security**: No credential values or identifiers are exposed to the agent.
-      example: true
-
   example:
     configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     action_type: "email.send"
@@ -494,4 +479,3 @@ ActionConfigCapability:
       to: "team@mycompany.com"
       subject: "*"
       body: "*"
-    credential_ready: true

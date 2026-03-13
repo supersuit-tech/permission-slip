@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { useUpdateActionConfig } from "@/hooks/useUpdateActionConfig";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import type { CredentialSummary } from "@/hooks/useCredentials";
 import {
   ActionConfigParameterFields,
   parseParametersSchema,
@@ -23,7 +22,6 @@ import {
   WILDCARD_ACTION_TYPE,
   NameField,
   DescriptionField,
-  CredentialSelect,
   StatusSelect,
   buildParametersFromForm,
   getEmptyRequiredParams,
@@ -37,7 +35,6 @@ interface EditActionConfigDialogProps {
   config: ActionConfiguration;
   agentId: number;
   actions: ConnectorAction[];
-  credentials: CredentialSummary[];
 }
 
 export function EditActionConfigDialog({
@@ -46,7 +43,6 @@ export function EditActionConfigDialog({
   config,
   agentId,
   actions,
-  credentials,
 }: EditActionConfigDialogProps) {
   const { updateActionConfig, isPending } = useUpdateActionConfig();
 
@@ -55,9 +51,6 @@ export function EditActionConfigDialog({
   // unmounts/remounts when switching configs. useState initializers suffice.
   const [name, setName] = useState(config.name);
   const [description, setDescription] = useState(config.description ?? "");
-  const [credentialId, setCredentialId] = useState(
-    config.credential_id ?? "",
-  );
   const [status, setStatus] = useState<"active" | "disabled">(config.status);
   const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
     toStringRecord(config.parameters),
@@ -110,7 +103,6 @@ export function EditActionConfigDialog({
         body: {
           name: name.trim(),
           description: description.trim() || null,
-          credential_id: credentialId || null,
           status,
           parameters: buildParametersFromForm(paramValues, schema?.properties, paramModes),
         },
@@ -134,7 +126,7 @@ export function EditActionConfigDialog({
             <DialogTitle>Edit Action Configuration</DialogTitle>
             <DialogDescription>
               {isWildcard
-                ? "Update the name, description, credential, or status for this enable-all configuration. Parameters cannot be changed on wildcard configurations."
+                ? "Update the name, description, or status for this enable-all configuration. Parameters cannot be changed on wildcard configurations."
                 : <>Update the configuration for{" "}
                   <strong>{action?.name ?? config.action_type}</strong>. The action
                   type and connector cannot be changed.</>}
@@ -175,14 +167,6 @@ export function EditActionConfigDialog({
               id="edit-config-status"
               value={status}
               onChange={setStatus}
-              disabled={isPending}
-            />
-
-            <CredentialSelect
-              id="edit-config-credential"
-              value={credentialId}
-              onChange={setCredentialId}
-              credentials={credentials}
               disabled={isPending}
             />
 

@@ -43,7 +43,6 @@ type actionConfigCapability struct {
 	Name            string          `json:"name"`
 	Description     *string         `json:"description,omitempty"`
 	Parameters      json.RawMessage `json:"parameters"`
-	CredentialReady bool            `json:"credential_ready"`
 }
 
 type standingApprovalCapability struct {
@@ -192,7 +191,6 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 					Name:            cfg.Name,
 					Description:     cfg.Description,
 					Parameters:      cfg.Parameters,
-					CredentialReady: cfg.CredentialReady,
 				})
 			}
 			acap.ActionConfigurations = acs

@@ -6,7 +6,6 @@ import { useAgent } from "@/hooks/useAgent";
 import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
-import { useCredentials } from "@/hooks/useCredentials";
 import { ConnectorOverviewSection } from "./ConnectorOverviewSection";
 import { ConnectorActionsDialog } from "./ConnectorActionsDialog";
 import { ActionConfigurationsSection } from "./ActionConfigurationsSection";
@@ -47,12 +46,6 @@ export function ConnectorConfigPage() {
   } = useActionConfigs(agentId);
 
   const connectorConfigs = configs.filter((c) => c.connector_id === connectorId);
-
-  const hasRequiredCredentials =
-    !connectorLoading && !!connector && (connector.required_credentials?.length ?? 0) > 0;
-  const hasConfigCredentials = connectorConfigs.some((c) => !!c.credential_id);
-  const shouldFetchCredentials = hasRequiredCredentials || hasConfigCredentials;
-  const { credentials } = useCredentials({ enabled: shouldFetchCredentials });
 
   const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
 
@@ -158,12 +151,12 @@ export function ConnectorConfigPage() {
         connectorId={connectorId}
         connectorName={connector.name}
         actions={connector.actions}
-        credentials={credentials}
         configs={connectorConfigs}
         isLoading={configsLoading}
         error={configsError}
       />
       <ConnectorCredentialsSection
+        agentId={agentId}
         connectorId={connectorId}
         requiredCredentials={connector.required_credentials}
       />

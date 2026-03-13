@@ -19,11 +19,10 @@ func InsertActionConfig(t *testing.T, d db.DBTX, configID string, agentID int64,
 
 // ActionConfigOpts holds optional fields for InsertActionConfigFull.
 type ActionConfigOpts struct {
-	CredentialID *string
-	Parameters   []byte // raw JSON, defaults to '{}'
-	Status       string // defaults to 'active'
-	Name         string // defaults to configID
-	Description  *string
+	Parameters  []byte // raw JSON, defaults to '{}'
+	Status      string // defaults to 'active'
+	Name        string // defaults to configID
+	Description *string
 }
 
 // InsertActionConfigFull creates an action configuration with full control over all fields.
@@ -43,9 +42,9 @@ func InsertActionConfigFull(t *testing.T, d db.DBTX, configID string, agentID in
 	}
 
 	_, err := d.Exec(context.Background(),
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, credential_id, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		configID, agentID, userID, connectorID, actionType, opts.CredentialID, params, status, name, opts.Description)
+		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		configID, agentID, userID, connectorID, actionType, params, status, name, opts.Description)
 	if err != nil {
 		t.Fatalf("InsertActionConfigFull: %v", err)
 	}

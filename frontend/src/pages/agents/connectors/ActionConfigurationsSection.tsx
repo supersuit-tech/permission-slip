@@ -19,7 +19,6 @@ import {
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import type { CredentialSummary } from "@/hooks/useCredentials";
 import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 import { ActionConfigRow } from "./ActionConfigRow";
 import { AddActionConfigDialog } from "./AddActionConfigDialog";
@@ -31,7 +30,6 @@ interface ActionConfigurationsSectionProps {
   connectorId: string;
   connectorName: string;
   actions: ConnectorAction[];
-  credentials: CredentialSummary[];
   configs: ActionConfiguration[];
   isLoading: boolean;
   error: string | null;
@@ -42,7 +40,6 @@ export function ActionConfigurationsSection({
   connectorId,
   connectorName,
   actions,
-  credentials,
   configs,
   isLoading,
   error,
@@ -130,9 +127,6 @@ export function ActionConfigurationsSection({
                     Parameters
                   </TableHead>
                   <TableHead className="font-semibold text-primary-foreground">
-                    Credential
-                  </TableHead>
-                  <TableHead className="font-semibold text-primary-foreground">
                     Status
                   </TableHead>
                   <TableHead className="w-[100px] font-semibold text-primary-foreground" />
@@ -144,7 +138,6 @@ export function ActionConfigurationsSection({
                     key={config.id}
                     config={config}
                     actions={actions}
-                    credentials={credentials}
                     onEdit={setEditTarget}
                     onDelete={setDeleteTarget}
                   />
@@ -180,7 +173,6 @@ export function ActionConfigurationsSection({
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
-        credentials={credentials}
       />
 
       {editTarget && (
@@ -192,7 +184,6 @@ export function ActionConfigurationsSection({
           config={editTarget}
           agentId={agentId}
           actions={actions}
-          credentials={credentials}
         />
       )}
 

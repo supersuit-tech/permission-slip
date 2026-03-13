@@ -42,17 +42,24 @@ import {
   getOAuthAuthorizeUrl,
   SHOP_REQUIRED_PROVIDERS,
 } from "@/lib/oauth";
+import {
+  useAgentConnectorCredential,
+  useAssignAgentConnectorCredential,
+  useRemoveAgentConnectorCredential,
+} from "@/hooks/useAgentConnectorCredential";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 
 export interface ConnectorCredentialsSectionProps {
+  agentId: number;
   connectorId: string;
   requiredCredentials: RequiredCredential[];
 }
 
 export function ConnectorCredentialsSection({
+  agentId,
   connectorId,
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
@@ -110,6 +117,14 @@ export function ConnectorCredentialsSection({
         )}
       </CardHeader>
       <CardContent>
+        <AgentCredentialBinding
+          agentId={agentId}
+          connectorId={connectorId}
+          credentials={credentials}
+          connections={connections}
+          anyLoading={anyLoading}
+        />
+
         {!hasRequiredCredentials && !matchingProvider ? (
           <p className="text-muted-foreground py-4 text-center text-sm">
             This connector does not require any credentials.
@@ -517,5 +532,127 @@ function StaticCredentialRow({
         />
       )}
     </>
+  );
+}
+
+const selectClassName =
+  "border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm";
+
+function AgentCredentialBinding({
+  agentId,
+  connectorId,
+  credentials,
+  connections,
+  anyLoading,
+}: {
+  agentId: number;
+  connectorId: string;
+  credentials: CredentialSummary[];
+  connections: { id: string; provider: string; status: string; scopes: string[]; connected_at: string }[];
+  anyLoading: boolean;
+}) {
+  const { binding, isLoading: bindingLoading } =
+    useAgentConnectorCredential(agentId, connectorId);
+  const { assign, isPending: assigning } =
+    useAssignAgentConnectorCredential();
+  const { remove, isPending: removing } =
+    useRemoveAgentConnectorCredential();
+
+  const isLoading = anyLoading || bindingLoading;
+  const isPending = assigning || removing;
+
+  // Build options for the dropdown
+  const activeConnections = connections.filter(
+    (c) => c.status === "active" && c.id,
+  );
+
+  const currentValue = binding?.credential_id
+    ? `cred:${binding.credential_id}`
+    : binding?.oauth_connection_id
+      ? `oauth:${binding.oauth_connection_id}`
+      : "";
+
+  async function handleChange(value: string) {
+    if (isPending) return;
+
+    try {
+      if (!value) {
+        await remove({ agentId, connectorId });
+        toast.success("Credential unassigned from this agent.");
+      } else if (value.startsWith("oauth:")) {
+        await assign({
+          agentId,
+          connectorId,
+          oauthConnectionId: value.slice("oauth:".length),
+        });
+        toast.success("OAuth connection assigned to this agent.");
+      } else if (value.startsWith("cred:")) {
+        await assign({
+          agentId,
+          connectorId,
+          credentialId: value.slice("cred:".length),
+        });
+        toast.success("Credential assigned to this agent.");
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update credential.",
+      );
+    }
+  }
+
+  if (isLoading) return null;
+
+  // Don't show if there are no credentials or connections to choose from
+  if (credentials.length === 0 && activeConnections.length === 0) return null;
+
+  return (
+    <div className="mb-4 rounded-lg border p-3">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="agent-credential-select" className="text-sm font-medium">
+            Agent Credential
+          </Label>
+          {currentValue ? (
+            <Badge
+              variant="secondary"
+              className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+            >
+              Assigned
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-muted-foreground">
+              Using default
+            </Badge>
+          )}
+        </div>
+        <p className="text-muted-foreground text-xs">
+          {currentValue
+            ? "This agent uses a specific credential for this connector."
+            : "This agent uses your default credential. Assign a specific one to override."}
+        </p>
+        <select
+          id="agent-credential-select"
+          className={selectClassName}
+          value={currentValue}
+          onChange={(e) => handleChange(e.target.value)}
+          disabled={isPending}
+        >
+          <option value="">Default (auto-resolve)</option>
+          {activeConnections.map((conn) => (
+            <option key={`oauth:${conn.id}`} value={`oauth:${conn.id}`}>
+              {providerLabel(conn.provider)} OAuth (connected{" "}
+              {new Date(conn.connected_at).toLocaleDateString()})
+            </option>
+          ))}
+          {credentials.map((cred) => (
+            <option key={`cred:${cred.id}`} value={`cred:${cred.id}`}>
+              {cred.label ?? cred.service} (added{" "}
+              {new Date(cred.created_at).toLocaleDateString()})
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }
