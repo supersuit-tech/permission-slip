@@ -20,6 +20,7 @@ jobs:
           PR_URL: ${{ inputs.pr_url }}
           PR_TITLE: ${{ inputs.pr_title }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           if [ -z "$WEBHOOK_URL" ]; then
             echo "::error::WEBHOOK_URL secret is not set"
@@ -34,9 +35,15 @@ jobs:
             MESSAGE="permission-slip: Claude Code needs your attention"
           fi
 
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
+          CURL_ARGS=(-s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"message\": \"${MESSAGE}\"}")
+
+          if [ -n "$WEBHOOK_SECRET" ]; then
+            CURL_ARGS+=(-H "Authorization: Bearer ${WEBHOOK_SECRET}")
+          fi
+
+          RESPONSE=$(curl "${CURL_ARGS[@]}")
 
           HTTP_STATUS=$(echo "$RESPONSE" | tail -1 | sed 's/HTTP_STATUS://')
           BODY=$(echo "$RESPONSE" | sed '$d')
