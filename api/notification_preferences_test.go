@@ -33,22 +33,12 @@ func TestUpdateNotificationPreferences_EnableSMS_FreeTier_Rejected(t *testing.T)
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}
-	if resp.Error.Code != ErrSMSRequiresPaidPlan {
-		t.Errorf("expected error code %q, got %q", ErrSMSRequiresPaidPlan, resp.Error.Code)
-	}
-	// Verify error includes plan details for the frontend.
-	if resp.Error.Details == nil {
-		t.Fatal("expected error details with plan info")
-	}
-	if resp.Error.Details["current_plan"] != db.PlanFree {
-		t.Errorf("expected current_plan=%q, got %v", db.PlanFree, resp.Error.Details["current_plan"])
-	}
-	if resp.Error.Details["required_plan"] != db.PlanPayAsYouGo {
-		t.Errorf("expected required_plan=%q, got %v", db.PlanPayAsYouGo, resp.Error.Details["required_plan"])
+	if resp.Error.Code != ErrChannelUnavailableBeta {
+		t.Errorf("expected error code %q, got %q", ErrChannelUnavailableBeta, resp.Error.Code)
 	}
 }
 
-func TestUpdateNotificationPreferences_EnableSMS_PaidTier_Allowed(t *testing.T) {
+func TestUpdateNotificationPreferences_EnableSMS_PaidTier_RejectedDuringBeta(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -63,8 +53,9 @@ func TestUpdateNotificationPreferences_EnableSMS_PaidTier_Allowed(t *testing.T) 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	// SMS is disabled during beta regardless of plan.
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -151,7 +142,7 @@ func TestUpdateNotificationPreferences_MixedChannels_FreeTier_SMSBlocked(t *test
 	}
 }
 
-func TestGetNotificationPreferences_SMSAvailable_PaidTier(t *testing.T) {
+func TestGetNotificationPreferences_SMSUnavailable_PaidTier_DuringBeta(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -174,9 +165,19 @@ func TestGetNotificationPreferences_SMSAvailable_PaidTier(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
+	// SMS should be unavailable during beta regardless of plan.
 	for _, p := range resp.Preferences {
-		if !p.Available {
-			t.Errorf("expected all channels available on paid plan, got %q unavailable", p.Channel)
+		if p.Channel == "sms" {
+			if p.Available {
+				t.Error("expected SMS unavailable during beta even on paid plan")
+			}
+			if p.Enabled {
+				t.Error("expected SMS to default to disabled during beta")
+			}
+		} else {
+			if !p.Available {
+				t.Errorf("expected %q available on paid plan", p.Channel)
+			}
 		}
 	}
 }

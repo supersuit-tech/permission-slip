@@ -2,9 +2,14 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
+	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
@@ -57,6 +62,12 @@ var paidOnlyChannels = map[string]bool{
 	"sms": true,
 }
 
+// betaDisabledChannels lists channels that are disabled during the beta period.
+// These channels are always unavailable regardless of plan.
+var betaDisabledChannels = map[string]bool{
+	"sms": true,
+}
+
 func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
@@ -104,25 +115,18 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			seen[p.Channel] = true
 		}
 
-		// Gate SMS behind paid tier: reject enabling SMS on the free plan.
-		// Look up the plan once — reused for both the gate check and the response.
-		planID := userPlanID(r.Context(), deps.DB, profile.ID)
-		if seen["sms"] {
-			for _, p := range req.Preferences {
-				if p.Channel == "sms" && p.Enabled {
-					if !isPaidPlan(planID) {
-						resp := Forbidden(ErrSMSRequiresPaidPlan, "SMS notifications require a paid plan. Upgrade to Pay As You Go to enable SMS.")
-						resp.Error.Details = map[string]any{
-							"current_plan":  planID,
-							"required_plan": db.PlanPayAsYouGo,
-						}
-						RespondError(w, r, http.StatusForbidden, resp)
-						return
-					}
-					break
-				}
+		// Gate beta-disabled channels: reject enabling any channel disabled during beta.
+		for _, p := range req.Preferences {
+			if p.Enabled && betaDisabledChannels[p.Channel] {
+				label := cases.Title(language.English).String(strings.NewReplacer("-", " ").Replace(p.Channel))
+				msg := fmt.Sprintf("%s notifications are not yet available. They will be enabled after the beta period.", label)
+				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelUnavailableBeta, msg))
+				return
 			}
 		}
+
+		// Look up plan for the response (SMS availability in response payload).
+		planID := userPlanID(r.Context(), deps.DB, profile.ID)
 
 		for _, p := range req.Preferences {
 			if err := db.UpsertNotificationPreference(r.Context(), deps.DB, profile.ID, p.Channel, p.Enabled); err != nil {
@@ -180,10 +184,16 @@ func buildPreferencesResponse(prefs []db.NotificationPreference, planID string) 
 	for _, ch := range allChannels {
 		enabled, exists := channelMap[ch]
 		if !exists {
-			enabled = true // missing rows default to enabled
+			if betaDisabledChannels[ch] {
+				enabled = false // beta-disabled channels default to off
+			} else {
+				enabled = true // missing rows default to enabled
+			}
 		}
 		available := true
-		if paidOnlyChannels[ch] {
+		if betaDisabledChannels[ch] {
+			available = false // always unavailable during beta
+		} else if paidOnlyChannels[ch] {
 			available = paid
 		}
 		result = append(result, notificationPreferenceResponse{

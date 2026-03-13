@@ -343,14 +343,17 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 			t.Errorf("expected preference for channel %q", ch)
 			continue
 		}
-		if !p.Enabled {
+		if ch == "sms" {
+			if p.Enabled {
+				t.Error("expected SMS to default to disabled during beta")
+			}
+			if p.Available {
+				t.Error("expected SMS to be unavailable during beta")
+			}
+		} else if !p.Enabled {
 			t.Errorf("expected channel %q to default to enabled", ch)
 		}
-		if ch == "sms" {
-			if p.Available {
-				t.Error("expected SMS to be unavailable on free plan")
-			}
-		} else {
+		if ch != "sms" {
 			if !p.Available {
 				t.Errorf("expected channel %q to be available", ch)
 			}
@@ -389,9 +392,13 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 			if p.Enabled {
 				t.Error("expected email to be disabled")
 			}
-		case "web-push", "sms":
+		case "web-push":
 			if !p.Enabled {
 				t.Errorf("expected %q to remain enabled", p.Channel)
+			}
+		case "sms":
+			if p.Enabled {
+				t.Error("expected SMS to default to disabled during beta")
 			}
 		}
 	}

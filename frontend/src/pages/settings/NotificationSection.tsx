@@ -1,5 +1,4 @@
-import { Link } from "react-router-dom";
-import { Bell, Loader2, AlertTriangle, ArrowUpRight, Lock } from "lucide-react";
+import { Bell, Loader2, AlertTriangle, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/useProfile";
@@ -29,7 +28,7 @@ const CHANNEL_LABELS: Record<string, { name: string; description: string }> = {
   },
   sms: {
     name: "SMS",
-    description: "Text message notifications for urgent approval requests.",
+    description: "Text message notifications for urgent approval requests. Available after the beta.",
   },
   "mobile-push": {
     name: "Mobile Push",
@@ -131,13 +130,9 @@ export function NotificationSection() {
                       </p>
                     </div>
                     {planGated ? (
-                      <Link
-                        to="/billing"
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 no-underline transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
-                      >
-                        Available on paid plan
-                        <ArrowUpRight className="size-3" />
-                      </Link>
+                      <span className="inline-flex items-center whitespace-nowrap rounded-md border border-muted bg-muted/50 px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                        Coming soon
+                      </span>
                     ) : (
                       <Switch
                         checked={pref.enabled}
