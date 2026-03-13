@@ -165,14 +165,14 @@ func TestGetNotificationPreferences_SMSUnavailable_PaidTier_DuringBeta(t *testin
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	// SMS should be unavailable during beta regardless of plan.
+	// SMS and web-push are unavailable during beta regardless of plan.
 	for _, p := range resp.Preferences {
-		if p.Channel == "sms" {
+		if p.Channel == "sms" || p.Channel == "web-push" {
 			if p.Available {
-				t.Error("expected SMS unavailable during beta even on paid plan")
+				t.Errorf("expected %q unavailable during beta even on paid plan", p.Channel)
 			}
 			if p.Enabled {
-				t.Error("expected SMS to default to disabled during beta")
+				t.Errorf("expected %q to default to disabled during beta", p.Channel)
 			}
 		} else {
 			if !p.Available {
@@ -206,9 +206,9 @@ func TestGetNotificationPreferences_SMSUnavailable_FreeTier(t *testing.T) {
 	}
 
 	for _, p := range resp.Preferences {
-		if p.Channel == "sms" {
+		if p.Channel == "sms" || p.Channel == "web-push" {
 			if p.Available {
-				t.Error("expected SMS unavailable on free tier")
+				t.Errorf("expected %q unavailable (beta-disabled or plan-gated)", p.Channel)
 			}
 		} else {
 			if !p.Available {
@@ -276,5 +276,34 @@ func TestGetNotificationPreferences_IncludesMobilePush(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected mobile-push channel in preferences response")
+	}
+}
+
+func TestUpdateNotificationPreferences_EnableWebPush_RejectedDuringBeta(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
+		`{"preferences":[{"channel":"web-push","enabled":true}]}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	// web-push is disabled during beta regardless of plan.
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if resp.Error.Code != ErrChannelUnavailableBeta {
+		t.Errorf("expected error code %q, got %q", ErrChannelUnavailableBeta, resp.Error.Code)
 	}
 }

@@ -366,9 +366,7 @@ If no configuration matches what you need to do, you **cannot proceed** — requ
 
 ---
 
-## 4. Request Approval and Execute — *Planned*
-
-> **Note**: The agent-facing approval and execution endpoints described in this section are not yet implemented. The current backend only exposes dashboard-facing approval routes (`GET /approvals`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/deny`). The following describes the planned agent protocol.
+## 4. Request Approval and Execute
 
 ### Option A: One-Off Approval (Default)
 
@@ -415,7 +413,20 @@ The user receives a notification and reviews the request on their dashboard.
 
 The user reviews and approves (or denies) the request. After approving, they see a confirmation code and share it with you.
 
-There is no webhook or polling endpoint — the confirmation code is communicated out-of-band (the user pastes it in chat, sets it in your config, etc.).
+You can poll `GET /approvals/{id}/status` to check for approval resolution. The Permission Slip CLI does this automatically — by default, `permission-slip request` blocks until the approval is resolved (approved, denied, cancelled, or expired) or the `--timeout` elapses. Pass `--no-wait` if you prefer fire-and-forget behavior.
+
+```bash
+# Default: blocks until resolved (up to 120s)
+permission-slip request --action email.send --params '{"to":["alice@example.com"]}'
+
+# Fire-and-forget:
+permission-slip request --action email.send --params '{}' --no-wait
+
+# Custom timeout:
+permission-slip request --action email.send --params '{}' --timeout 30
+```
+
+Alternatively, the user can share the approval confirmation code out-of-band (paste it in chat, set it in your config, etc.).
 
 #### 4a-3. Verify and Get Token
 
@@ -683,9 +694,10 @@ Steps 6-10 repeat for each action. With standing approvals, steps 7-9 are skippe
 | `POST /agents/{id}/verify` | Signature | Implemented | Verify registration with confirmation code |
 | `GET /agents/me` | Signature | Implemented | Get your own agent record (status, metadata, timestamps) |
 | `GET /agents/{id}/capabilities` | Signature | Implemented | Discover action configurations, connectors, actions, and standing approvals |
-| `POST /approvals/request` | Signature | Planned | Request one-off approval for an action |
+| `POST /approvals/request` | Signature | Implemented | Request one-off approval for an action |
+| `GET /approvals/{id}/status` | Signature | Implemented | Poll approval status (pending → approved/denied/cancelled/expired) |
+| `POST /approvals/{id}/cancel` | Signature | Implemented | Cancel a pending approval request |
 | `POST /approvals/{id}/verify` | Signature | Planned | Submit approval confirmation code, get execution token |
-| `POST /approvals/{id}/cancel` | Signature | Planned | Cancel a pending approval request |
 | `POST /actions/execute` | Signature | Planned | Execute an action (with token or standing approval) |
 
 Full machine-readable spec: [`spec/openapi/`](../spec/openapi/)
