@@ -1190,35 +1190,32 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	// Action configurations (4: mix of active/disabled, with/without credentials)
 	// ---------------------------------------------------------------
 
-	// Claude Code → github.create_issue (locked repo, wildcard title/body, with credential)
+	// Claude Code → github.create_issue (locked repo, wildcard title/body)
 	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, credential_id, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)`,
+		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
 		"ac-claude-create-issue", claude, userHasEverything,
 		connectorGitHub, "github.create_issue",
-		"cred-github-token",
 		`{"repo": "supersuit-tech/permission-slip-web", "title": "*", "body": "*", "label": "bug"}`,
 		"Create bug issues in permission-slip-web",
 		"Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.")
 
-	// Claude Code → github.merge_pr (locked repo, wildcard PR number, with credential)
+	// Claude Code → github.merge_pr (locked repo, wildcard PR number)
 	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, credential_id, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)`,
+		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
 		"ac-claude-merge-pr", claude, userHasEverything,
 		connectorGitHub, "github.merge_pr",
-		"cred-github-token",
 		`{"repo": "supersuit-tech/permission-slip-web", "pr": "*"}`,
 		"Merge PRs in permission-slip-web",
 		"Agent can merge any PR in the main repo.")
 
-	// Slack Notifier → slack.send_message (locked channel, wildcard message, with credential)
+	// Slack Notifier → slack.send_message (locked channel, wildcard message)
 	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, credential_id, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)`,
+		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
 		"ac-slack-send-releases", slack, userHasEverything,
 		connectorSlack, "slack.send_message",
-		"cred-slack-oauth",
 		`{"channel": "#releases", "message": "*"}`,
 		"Post to #releases",
 		"Agent can send any message to the #releases channel.")

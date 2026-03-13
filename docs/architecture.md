@@ -380,7 +380,6 @@ erDiagram
         string user_id FK
         string connector_id FK
         string action_type FK "composite with connector_id"
-        string credential_id FK "nullable, SET NULL"
         json parameters "fixed values or wildcard *"
         string status "active | disabled"
         string name
