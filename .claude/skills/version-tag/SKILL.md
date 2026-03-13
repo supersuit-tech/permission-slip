@@ -75,23 +75,25 @@ FILE_RESP=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
   --jq '{sha: .sha, content: .content}')
 
 FILE_SHA=$(echo "$FILE_RESP" | jq -r '.sha')
-# Decode content (GitHub returns base64 with newlines)
-CURRENT_CONTENT=$(echo "$FILE_RESP" | jq -r '.content' | base64 -d)
+# Decode content (GitHub returns base64 with newlines; use portable flags for Linux + macOS)
+CURRENT_CONTENT=$(echo "$FILE_RESP" | jq -r '.content' | base64 --decode 2>/dev/null || echo "$FILE_RESP" | jq -r '.content' | base64 -D 2>/dev/null)
 PKG_VERSION=$(echo "$CURRENT_CONTENT" | jq -r '.version')
 
 if [ "$PKG_VERSION" != "<version>" ]; then
   echo "package.json version is $PKG_VERSION, bumping to <version>..."
 
-  # Produce updated JSON preserving formatting
+  # NOTE: jq reformats the JSON to 2-space indentation. Intentional: keeps files canonical.
   UPDATED_CONTENT=$(echo "$CURRENT_CONTENT" | jq --arg v "<version>" '.version = $v')
-  ENCODED=$(echo "$UPDATED_CONTENT" | base64 -w 0)
+  # tr -d '\n' is portable across Linux and macOS (avoids GNU-only base64 -w 0)
+  ENCODED=$(echo "$UPDATED_CONTENT" | base64 | tr -d '\n')
 
   COMMIT_RESP=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
     gh api repos/supersuit-tech/permission-slip/contents/<package>/package.json \
     -X PUT \
     -f message="chore: bump <package> version to <version>" \
     -f content="$ENCODED" \
-    -f sha="$FILE_SHA")
+    -f sha="$FILE_SHA" \
+    -f branch="main")
 
   # Update SHA to point to the new commit so the tag lands on it
   SHA=$(echo "$COMMIT_RESP" | jq -r '.commit.sha')
