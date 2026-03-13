@@ -71,12 +71,24 @@ export async function pollUntilResolved(
     interval = Math.min(Math.ceil(interval * 1.5), maxInterval);
   }
 
-  // Final check after timeout.
-  const final = await opts.client.approvalStatus(opts.approvalId);
+  // Final check after timeout — also protected from transient errors.
+  try {
+    const final = await opts.client.approvalStatus(opts.approvalId);
 
-  if (TERMINAL_STATUSES.has(final.status)) {
-    return final;
+    if (TERMINAL_STATUSES.has(final.status)) {
+      return final;
+    }
+
+    return { ...final, timed_out: true };
+  } catch (err) {
+    if (!isTransientError(err)) throw err;
+    // Transient error on final check — report timeout with minimal info.
+    return {
+      approval_id: opts.approvalId,
+      status: "pending",
+      expires_at: "",
+      created_at: "",
+      timed_out: true,
+    };
   }
-
-  return { ...final, timed_out: true };
 }
