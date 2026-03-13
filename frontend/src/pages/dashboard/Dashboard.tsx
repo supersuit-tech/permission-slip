@@ -4,7 +4,6 @@ import { useAgents } from "@/hooks/useAgents";
 import { useApprovals } from "@/hooks/useApprovals";
 import { useStandingApprovals } from "@/hooks/useStandingApprovals";
 import { useAuditEvents } from "@/hooks/useAuditEvents";
-import { NotificationBanner } from "./NotificationBanner";
 import { PendingApprovalsCard } from "./PendingApprovalsCard";
 import { RecentActivityCard } from "./RecentActivityCard";
 import { RegisteredAgentsCard } from "./RegisteredAgentsCard";
@@ -39,16 +38,12 @@ export function Dashboard() {
   const showStandingApprovals =
     standingLoading || standingApprovals.length > 0 || hasActivity;
 
-  // Only prompt for notifications after the user has an active, configured agent
-  const showNotificationBanner = hasActiveAgents && !isUnconfigured;
-
   // Dashboard has three states based on the user's onboarding progress:
   // 1. No agents registered → AgentOnboardingHero (register first agent)
   // 2. Single registered agent, no connectors → AgentConfigHero (configure agent)
   // 3. Configured agent(s) → Full dashboard (cards for agents, approvals, activity)
   return (
     <div className="space-y-6">
-      {showNotificationBanner && <NotificationBanner />}
       {showOnboarding ? (
         <>
           <AgentOnboardingHero
