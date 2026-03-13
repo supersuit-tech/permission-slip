@@ -35,6 +35,9 @@ jobs:
             MESSAGE="permission-slip: Claude Code needs your attention"
           fi
 
+          PAYLOAD=$(jq -n --arg msg "$MESSAGE" --arg secret "$NOTIFY_WEBHOOK_SECRET" \
+            '{message: $msg, secret: $secret}')
+
           curl -s -X POST "$NOTIFY_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"message\": \"${MESSAGE}\", \"secret\": \"${NOTIFY_WEBHOOK_SECRET}\"}"
+            -d "$PAYLOAD"
