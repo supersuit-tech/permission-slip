@@ -15,6 +15,8 @@ export interface PollOptions {
   client: ApiClient;
   /** Maximum seconds to wait before returning. */
   timeoutSeconds: number;
+  /** Called after each poll while still pending. Use for progress messages. */
+  onPoll?: (info: { status: string; elapsed: number; timeout: number }) => void;
 }
 
 const TERMINAL_STATUSES = new Set(["approved", "denied", "cancelled", "expired"]);
@@ -39,7 +41,8 @@ function isTransientError(err: unknown): boolean {
 export async function pollUntilResolved(
   opts: PollOptions,
 ): Promise<ApprovalStatusResult & { timed_out?: boolean }> {
-  const deadline = Date.now() + opts.timeoutSeconds * 1000;
+  const start = Date.now();
+  const deadline = start + opts.timeoutSeconds * 1000;
   let interval = 2000; // start at 2 seconds
   const maxInterval = 5000; // cap at 5 seconds
 
@@ -50,6 +53,12 @@ export async function pollUntilResolved(
       if (TERMINAL_STATUSES.has(result.status)) {
         return result;
       }
+
+      opts.onPoll?.({
+        status: result.status,
+        elapsed: Math.round((Date.now() - start) / 1000),
+        timeout: opts.timeoutSeconds,
+      });
     } catch (err) {
       if (!isTransientError(err)) throw err;
       // Transient error — continue to next poll interval.

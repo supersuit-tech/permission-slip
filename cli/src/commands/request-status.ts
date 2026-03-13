@@ -48,13 +48,25 @@ export function requestStatusCommand(program: Command): void {
 
         // Wait for terminal state.
         const timeoutSeconds = Math.max(1, Math.min(Number(opts.timeout) || 120, 86400));
+
+        process.stderr.write(`Waiting for approval ${opts.approvalId}...\n`);
+
         const result = await pollUntilResolved({
           approvalId: opts.approvalId,
           client,
           timeoutSeconds,
+          onPoll: ({ elapsed, timeout }) => {
+            process.stderr.write(
+              `Still waiting... ${elapsed}s / ${timeout}s\n`,
+            );
+          },
         });
 
         output(result, outputOpts);
+
+        if (result.timed_out) {
+          process.exit(2);
+        }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);

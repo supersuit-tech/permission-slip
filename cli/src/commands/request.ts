@@ -82,10 +82,20 @@ export function requestCommand(program: Command): void {
 
         // Wait for approval resolution.
         const timeoutSeconds = Math.max(1, Math.min(Number(opts.timeout) || 120, 86400));
+
+        process.stderr.write(
+          `Waiting for approval... (approve at ${result.approval_url})\n`,
+        );
+
         const statusResult = await pollUntilResolved({
           approvalId: result.approval_id,
           client,
           timeoutSeconds,
+          onPoll: ({ elapsed, timeout }) => {
+            process.stderr.write(
+              `Still waiting... ${elapsed}s / ${timeout}s\n`,
+            );
+          },
         });
 
         output(
@@ -95,6 +105,10 @@ export function requestCommand(program: Command): void {
           },
           outputOpts,
         );
+
+        if (statusResult.timed_out) {
+          process.exit(2);
+        }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);
