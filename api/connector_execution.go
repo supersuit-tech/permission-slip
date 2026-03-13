@@ -489,19 +489,47 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 		}
 	}
 
-	// Check connection status (allowlist: only "active" connections may be used).
-	// Using != active instead of checking individual non-active statuses ensures
-	// that any new status added in the future is denied by default.
+	return credentialsFromOAuthConnection(ctx, deps, conn)
+}
+
+// resolveOAuthCredentialsFromConnection resolves credentials from a specific
+// OAuth connection (already fetched by ID). This is used by agent-specific
+// credential bindings to honour the exact bound connection rather than
+// re-querying by provider+user, which could return a different connection.
+func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn *db.OAuthConnection) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+	if deps.Vault == nil {
+		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
+	}
+	if deps.OAuthProviders == nil {
+		return zero, fmt.Errorf("OAuth provider registry is not configured")
+	}
+
+	return credentialsFromOAuthConnection(ctx, deps, conn)
+}
+
+// credentialsFromOAuthConnection is the shared implementation for building
+// credentials from an OAuthConnection. Both resolveOAuthCredentials (provider
+// lookup path) and resolveOAuthCredentialsFromConnection (agent binding path)
+// delegate here after their own connection lookup and dependency checks.
+//
+// It validates the connection status, refreshes the token if near-expiry,
+// reads the access token from the vault, and merges provider extra data.
+func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConnection) (connectors.Credentials, error) {
+	var zero connectors.Credentials
+
+	// Allowlist: only "active" connections may be used. Using != active ensures
+	// any new status added in the future is denied by default.
 	if conn.Status != db.OAuthStatusActive {
 		return zero, &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", providerID, conn.Status),
+			Provider: conn.Provider,
+			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", conn.Provider, conn.Status),
 		}
 	}
 
-	// Check if the token needs refreshing (expired or within pre-emptive buffer).
+	// Refresh the token if expired or within pre-emptive buffer.
 	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-oauth.TokenExpiryBuffer)) {
-		if err := refreshOAuthConnection(ctx, deps, conn, providerID); err != nil {
+		if err := refreshOAuthConnection(ctx, deps, conn, conn.Provider); err != nil {
 			return zero, err
 		}
 	}
@@ -527,53 +555,6 @@ func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, req
 
 	// Set access_token AFTER merging extra_data so that a tampered extra_data
 	// field cannot overwrite the vault-sourced access token.
-	creds["access_token"] = string(accessTokenBytes)
-
-	return connectors.NewCredentials(creds), nil
-}
-
-// resolveOAuthCredentialsFromConnection resolves credentials from a specific
-// OAuth connection (already fetched by ID). This is used by agent-specific
-// credential bindings to honour the exact bound connection rather than
-// re-querying by provider+user, which could return a different connection.
-func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn *db.OAuthConnection) (connectors.Credentials, error) {
-	var zero connectors.Credentials
-	if deps.Vault == nil {
-		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
-	}
-	if deps.OAuthProviders == nil {
-		return zero, fmt.Errorf("OAuth provider registry is not configured")
-	}
-
-	if conn.Status != db.OAuthStatusActive {
-		return zero, &connectors.OAuthRefreshError{
-			Provider: conn.Provider,
-			Message:  fmt.Sprintf("bound OAuth connection has status %q — user must re-authorize", conn.Status),
-		}
-	}
-
-	// Refresh the token if expired or near-expiry.
-	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-oauth.TokenExpiryBuffer)) {
-		if err := refreshOAuthConnection(ctx, deps, conn, conn.Provider); err != nil {
-			return zero, err
-		}
-	}
-
-	// Read the (possibly refreshed) access token from the vault.
-	accessTokenBytes, err := deps.Vault.ReadSecret(ctx, deps.DB, conn.AccessTokenVaultID)
-	if err != nil {
-		return zero, fmt.Errorf("read access token from vault: %w", err)
-	}
-
-	creds := map[string]string{}
-	if len(conn.ExtraData) > 0 {
-		var extra map[string]string
-		if err := json.Unmarshal(conn.ExtraData, &extra); err == nil {
-			for k, v := range extra {
-				creds[k] = v
-			}
-		}
-	}
 	creds["access_token"] = string(accessTokenBytes)
 
 	return connectors.NewCredentials(creds), nil
