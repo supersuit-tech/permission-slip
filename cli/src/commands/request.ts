@@ -64,7 +64,7 @@ export function requestCommand(program: Command): void {
             next_step:
               "Your request is pending approval. Once approved, the action will execute automatically — no further action is needed from you. " +
               "To check the outcome, run: " +
-              `permission-slip request-status --approval-id ${result.approval_id}` +
+              `permission-slip request-status --approval-id ${shellQuote(result.approval_id)}` +
               (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
           },
           outputOpts,
