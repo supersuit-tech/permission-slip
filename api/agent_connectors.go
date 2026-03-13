@@ -231,6 +231,11 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "OAuth connection not found"))
 				return
 			}
+			if conn.Provider != connectorID {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+					fmt.Sprintf("OAuth connection provider %q does not match connector %q", conn.Provider, connectorID)))
+				return
+			}
 		}
 
 		bindingID, err := generatePrefixedID("acc_", 16)

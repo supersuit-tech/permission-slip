@@ -541,6 +541,9 @@ func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn
 	if deps.Vault == nil {
 		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
 	}
+	if deps.OAuthProviders == nil {
+		return zero, fmt.Errorf("OAuth provider registry is not configured")
+	}
 
 	if conn.Status != db.OAuthStatusActive {
 		return zero, &connectors.OAuthRefreshError{

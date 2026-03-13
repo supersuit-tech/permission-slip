@@ -212,6 +212,34 @@ func TestAssignCredential_ServiceMismatch(t *testing.T) {
 	}
 }
 
+func TestAssignCredential_OAuthProviderMismatch(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	// OAuth connection for a different provider
+	oauthID := testhelper.GenerateID(t, "oac_")
+	testhelper.InsertOAuthConnection(t, tx, oauthID, uid, "other_provider")
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := fmt.Sprintf(`{"oauth_connection_id":"%s"}`, oauthID)
+	r := authenticatedJSONRequest(t, http.MethodPut,
+		fmt.Sprintf("/agents/%d/connectors/%s/credential", agentID, connID), uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for provider mismatch, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestAssignCredential_WrongOwner(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
