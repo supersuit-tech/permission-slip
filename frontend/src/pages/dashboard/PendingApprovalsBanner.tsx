@@ -68,7 +68,7 @@ function ApprovalBannerItem({
 }
 
 export function PendingApprovalsBanner() {
-  const { approvals, isLoading, error } = useApprovals();
+  const { approvals, isLoading, error, refetch } = useApprovals();
   const { agents } = useAgents();
 
   const agentMap = useMemo(() => {
@@ -79,19 +79,39 @@ export function PendingApprovalsBanner() {
     return map;
   }, [agents]);
 
-  if (isLoading || error || approvals.length === 0) {
-    return null;
+  if (isLoading) return null;
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+        Could not load pending approvals.{" "}
+        <button
+          type="button"
+          className="underline"
+          onClick={() => refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
+  if (approvals.length === 0) return null;
+
   return (
-    <div className="space-y-2" role="status" aria-label="Pending approvals">
-      {approvals.map((approval) => (
-        <ApprovalBannerItem
-          key={approval.approval_id}
-          approval={approval}
-          agentDisplayName={resolveAgentName(approval.agent_id, agentMap)}
-        />
-      ))}
-    </div>
+    <>
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {approvals.length} pending approval{approvals.length !== 1 ? "s" : ""}
+      </span>
+      <div className="space-y-2" aria-label="Pending approvals">
+        {approvals.map((approval) => (
+          <ApprovalBannerItem
+            key={approval.approval_id}
+            approval={approval}
+            agentDisplayName={resolveAgentName(approval.agent_id, agentMap)}
+          />
+        ))}
+      </div>
+    </>
   );
 }

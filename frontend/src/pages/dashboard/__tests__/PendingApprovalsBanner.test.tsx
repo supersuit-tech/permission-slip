@@ -102,16 +102,18 @@ describe("PendingApprovalsBanner", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("renders nothing on error", async () => {
+  it("renders error state with retry button", async () => {
     setupAuthMocks({ authenticated: true });
     mockGet.mockRejectedValue(new Error("Network error"));
 
-    const { container } = render(<PendingApprovalsBanner />, { wrapper });
+    render(<PendingApprovalsBanner />, { wrapper });
 
     await waitFor(() => {
-      // Should stay empty on error
-      expect(container.querySelector('[role="status"]')).toBeNull();
+      expect(
+        screen.getByText(/Could not load pending approvals/),
+      ).toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("renders banner items with action type and agent name", async () => {
