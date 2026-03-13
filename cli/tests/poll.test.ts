@@ -344,6 +344,13 @@ describe("parseTimeout", () => {
     expect(warnings[0]).toContain("invalid --timeout");
   });
 
+  it("warns on negative value", () => {
+    const warnings: string[] = [];
+    parseTimeout("-5", (msg) => warnings.push(msg));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("invalid --timeout");
+  });
+
   it("does not warn on valid value", () => {
     const warnings: string[] = [];
     parseTimeout("30", (msg) => warnings.push(msg));

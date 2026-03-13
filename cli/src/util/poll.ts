@@ -28,7 +28,7 @@ const MAX_TIMEOUT = 86400;
 /** Parses and clamps a timeout string to a valid range. Warns on invalid input. */
 export function parseTimeout(value: string | undefined, warn: (msg: string) => void = (msg) => process.stderr.write(msg)): number {
   const parsed = Number(value);
-  if (value !== undefined && (isNaN(parsed) || parsed === 0)) {
+  if (value !== undefined && (isNaN(parsed) || parsed <= 0)) {
     warn(`Warning: invalid --timeout value "${value}", using default ${DEFAULT_TIMEOUT}s\n`);
   }
   return Math.max(MIN_TIMEOUT, Math.min(parsed || DEFAULT_TIMEOUT, MAX_TIMEOUT));

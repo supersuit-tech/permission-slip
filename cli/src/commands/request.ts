@@ -107,7 +107,7 @@ export function requestCommand(program: Command): void {
         );
 
         if (statusResult.timed_out) {
-          process.exit(2);
+          process.exitCode = 2;
         }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);

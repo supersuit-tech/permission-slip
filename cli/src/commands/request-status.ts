@@ -65,7 +65,7 @@ export function requestStatusCommand(program: Command): void {
         output(result, outputOpts);
 
         if (result.timed_out) {
-          process.exit(2);
+          process.exitCode = 2;
         }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
