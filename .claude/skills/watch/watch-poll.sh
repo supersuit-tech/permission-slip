@@ -3,12 +3,15 @@
 # Handles all mechanical bookkeeping (fetching, deduplication, idle timeout)
 # and only invokes the Claude agent when there's actionable work.
 #
-# Usage: bash watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>]
+# Usage: bash watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>] [--max-turns <N>]
 #
 # Options:
 #   --automerge       Enable auto-merge after checks pass
 #   --work-dir <path> Reuse an existing work directory (preserves state
 #                     across invocations: last-seen IDs, action log, cache)
+#   --max-turns <N>   Maximum number of agent turns before ending the session.
+#                     Each turn = one AGENT_NEEDED signal (one round of AI work).
+#                     When reached, the session wraps up as if idle-timeout.
 #
 # Environment:
 #   GH_HOST, GH_REPO — set by caller (defaults provided below)
@@ -23,15 +26,17 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Arguments
 # ---------------------------------------------------------------------------
-PR_URL="${1:?Usage: watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>]}"
+PR_URL="${1:?Usage: watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>] [--max-turns <N>]}"
 AUTO_MERGE=false
 EXISTING_WORK_DIR=""
+MAX_TURNS=0  # 0 = unlimited
 
 shift
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --automerge) AUTO_MERGE=true; shift ;;
     --work-dir) EXISTING_WORK_DIR="$2"; shift 2 ;;
+    --max-turns) MAX_TURNS="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -66,12 +71,14 @@ LAST_ISSUE_COMMENT_ID_FILE="$WORK_DIR/last-issue-comment-id"
 WORK_ITEMS_FILE="$WORK_DIR/work-items.json"
 ACTION_LOG_FILE="$WORK_DIR/action-log.json"
 CHECKLIST_CACHE_FILE="$WORK_DIR/checklist-cache.txt"
+TURNS_FILE="$WORK_DIR/turns-count"
 
 # Only initialize state files if they don't already exist (fresh session)
 [[ -f "$LAST_REVIEW_ID_FILE" ]] || echo "0" > "$LAST_REVIEW_ID_FILE"
 [[ -f "$LAST_REVIEW_COMMENT_ID_FILE" ]] || echo "0" > "$LAST_REVIEW_COMMENT_ID_FILE"
 [[ -f "$LAST_ISSUE_COMMENT_ID_FILE" ]] || echo "0" > "$LAST_ISSUE_COMMENT_ID_FILE"
 [[ -f "$ACTION_LOG_FILE" ]] || echo "[]" > "$ACTION_LOG_FILE"
+[[ -f "$TURNS_FILE" ]] || echo "0" > "$TURNS_FILE"
 
 # Bot username(s) to filter out
 BOT_USERS=("claude-code[bot]" "github-actions[bot]" "claude[bot]")
@@ -495,12 +502,38 @@ EOF
 # ---------------------------------------------------------------------------
 # MAIN LOOP
 # ---------------------------------------------------------------------------
+CURRENT_TURNS=$(cat "$TURNS_FILE")
+
 echo "=== Watch session started ==="
 echo "PR: ${PR_URL} (#${PR_NUMBER})"
 echo "Branch: ${BRANCH}"
 echo "Auto-merge: ${AUTO_MERGE}"
+echo "Max turns: ${MAX_TURNS} (0=unlimited)"
+echo "Turns used: ${CURRENT_TURNS}"
 echo "Work dir: ${WORK_DIR}"
 echo ""
+
+# --- Check turn limit before doing anything ---
+if [[ "$MAX_TURNS" -gt 0 && "$CURRENT_TURNS" -ge "$MAX_TURNS" ]]; then
+  echo "=== Turn limit reached (${CURRENT_TURNS}/${MAX_TURNS}) ==="
+
+  # Print session context for the calling agent
+  print_session_context
+
+  # Generate and post wrap-up
+  echo "[wrap-up] Generating session summary..."
+  wrapup=$(generate_wrapup "$CURRENT_TURNS")
+  echo "[wrap-up] Posting to PR..."
+  post_wrapup_comment "$wrapup"
+
+  echo "IDLE_TIMEOUT"
+  echo "REASON=turn limit reached (${CURRENT_TURNS}/${MAX_TURNS})"
+  echo "WRAPUP_POSTED=true"
+  echo "AUTO_MERGE=${AUTO_MERGE}"
+  echo "TOTAL_CYCLES=${CURRENT_TURNS}"
+
+  exit 0
+fi
 
 # Print session context for the calling agent
 print_session_context
@@ -513,6 +546,8 @@ if [[ "$pre_merge" == "conflict" ]]; then
   echo "[pre-poll] CONFLICTS detected in: ${conflict_files}"
   # Build work items with just the conflict
   build_work_items "[]" "conflict" "$conflict_files" "[]"
+  # Increment turns counter
+  echo $((CURRENT_TURNS + 1)) > "$TURNS_FILE"
   echo "AGENT_NEEDED"
   echo "REASON=pre-poll merge conflict"
   echo "WORK_ITEMS_FILE=${WORK_ITEMS_FILE}"
@@ -571,6 +606,10 @@ while true; do
     IDLE_COUNTER=0
 
     build_work_items "$new_comments" "$merge_status" "$conflict_files" "$checklist_items"
+
+    # Increment turns counter
+    CURRENT_TURNS=$(cat "$TURNS_FILE")
+    echo $((CURRENT_TURNS + 1)) > "$TURNS_FILE"
 
     echo "AGENT_NEEDED"
     echo "REASON=cycle ${CYCLE}: ${comment_count} comments, merge=${merge_status}, ${checklist_count} checklist items"

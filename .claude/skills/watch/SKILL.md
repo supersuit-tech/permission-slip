@@ -2,7 +2,7 @@
 name: watch
 description: Poll a GitHub PR for new comments and PR reviews and act on them autonomously. Use when the user wants to monitor a PR for feedback and have Claude implement requested changes automatically.
 disable-model-invocation: true
-argument-hint: "<PR_URL> [--automerge]"
+argument-hint: "<PR_URL> [--automerge] [--max-turns <N>]"
 ---
 
 # Watch PR for Comments and Reviews
@@ -40,7 +40,7 @@ Agent (this skill)     — Only invoked when reasoning is needed
 
 Parse the arguments from: `$ARGUMENTS`
 
-Extract the PR URL and any flags. The format is: `<PR_URL> [--automerge]`
+Extract the PR URL and any flags. The format is: `<PR_URL> [--automerge] [--max-turns <N>]`
 
 Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permission-slip/pull/123` → `123`).
 
@@ -48,6 +48,7 @@ Set these variables for the session:
 - `PR_URL` — the PR URL extracted from the arguments
 - `PR_NUMBER` — the extracted PR number
 - `AUTO_MERGE` — `true` if `--automerge` was passed, `false` otherwise
+- `MAX_TURNS` — the value of `--max-turns` if passed, `0` otherwise (0 = unlimited)
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 - `SKILL_DIR` — the directory containing this skill file (`.claude/skills/watch`)
 
@@ -59,11 +60,11 @@ The agent orchestrates the session by running the shell scripts and only doing A
 
 ```bash
 # First run (no --work-dir):
-bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") 2>&1
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") $([[ "$MAX_TURNS" -gt 0 ]] && echo "--max-turns $MAX_TURNS") 2>&1
 # Capture WORK_DIR from the session context JSON in the output.
 
 # Subsequent runs (reuse WORK_DIR to preserve state):
-bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") --work-dir "$WORK_DIR" 2>&1
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") $([[ "$MAX_TURNS" -gt 0 ]] && echo "--max-turns $MAX_TURNS") --work-dir "$WORK_DIR" 2>&1
 ```
 
 The script handles:
@@ -73,6 +74,7 @@ The script handles:
 - Merging from main and detecting conflicts
 - Parsing the PR body for unchecked `### Claude Code` checklist items
 - Idle counter tracking (6 consecutive empty cycles = timeout)
+- Turn limit tracking (exits when `--max-turns` agent invocations reached)
 - Generating and posting the wrap-up comment on idle timeout
 
 ### Step 2: Check script output
@@ -107,7 +109,7 @@ The script communicates via stdout signals and exit codes:
 }
 ```
 
-**Exit code 0 + `IDLE_TIMEOUT`**: The session ended due to inactivity. The script already posted the wrap-up comment. Proceed to Step 4 (post-session).
+**Exit code 0 + `IDLE_TIMEOUT`**: The session ended due to inactivity or the `--max-turns` limit being reached. The script already posted the wrap-up comment. Proceed to Step 4 (post-session).
 
 **Exit code 100**: Pre-poll merge conflict. The script detected conflicts before the polling loop started. Read `WORK_ITEMS_FILE` for conflict details and resolve them (see Step 3), then re-run the polling script.
 
