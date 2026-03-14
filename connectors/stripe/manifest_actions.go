@@ -84,7 +84,7 @@ func stripeActions() []connectors.ManifestAction {
 					"due_date": {
 						"type": "integer",
 						"description": "Due date as Unix timestamp (seconds since epoch)",
-						"x-ui": { "label": "Due Date", "widget": "date", "group": "billing" }
+						"x-ui": { "label": "Due Date", "group": "billing" }
 					},
 					"auto_advance": {
 						"type": "boolean",
