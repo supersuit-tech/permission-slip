@@ -150,15 +150,16 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		}
 	}
 
-	// Extract body and attachments from the MIME tree (depth-limited).
-	// Only set content_type when a body is present to avoid misleading
-	// consumers for metadata/minimal formats that return no body data.
-	body, contentType := extractBody(&msg.Payload, 0)
-	if body != "" {
-		detail.Body = body
-		detail.ContentType = contentType
+	// Only extract body and attachments for format=full. The metadata and
+	// minimal formats return no body data or MIME parts from the Gmail API.
+	if params.Format == "full" {
+		body, contentType := extractBody(&msg.Payload, 0)
+		if body != "" {
+			detail.Body = body
+			detail.ContentType = contentType
+		}
+		detail.Attachments = extractAttachments(&msg.Payload)
 	}
-	detail.Attachments = extractAttachments(&msg.Payload)
 
 	return connectors.JSONResult(detail)
 }
