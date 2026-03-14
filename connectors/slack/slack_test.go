@@ -309,8 +309,11 @@ func TestCheckHTTPStatus(t *testing.T) {
 			}
 			switch tt.wantType {
 			case "auth":
-				if !connectors.IsAuthError(err) {
+				var ae *connectors.AuthError
+				if !errors.As(err, &ae) {
 					t.Errorf("expected AuthError, got %T: %v", err, err)
+				} else if ae.Message == "" {
+					t.Error("AuthError.Message is empty")
 				}
 			case "rate_limit":
 				var rle *connectors.RateLimitError
@@ -380,8 +383,11 @@ func TestDoPost_HTTPErrors(t *testing.T) {
 			}
 			switch tt.wantType {
 			case "auth":
-				if !connectors.IsAuthError(err) {
+				var ae *connectors.AuthError
+				if !errors.As(err, &ae) {
 					t.Errorf("expected AuthError, got %T: %v", err, err)
+				} else if ae.Message == "" {
+					t.Error("AuthError.Message is empty")
 				}
 			case "rate_limit":
 				var rle *connectors.RateLimitError

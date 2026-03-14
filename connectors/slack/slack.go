@@ -286,7 +286,7 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	// Handle HTTP-level errors before attempting JSON unmarshal.
 	// Slack normally returns 200 with {"ok": false} for app-level errors,
 	// but can return non-200 for rate limits, auth failures, and server errors.
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return checkHTTPStatus(resp.StatusCode, resp.Header, respBody)
 	}
 
