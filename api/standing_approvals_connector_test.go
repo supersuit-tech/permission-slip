@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
@@ -57,14 +58,26 @@ func TestExecuteStandingApproval_ConnectorExecution(t *testing.T) {
 	testhelper.InsertConnector(t, tx, "testconn")
 	testhelper.InsertConnectorAction(t, tx, "testconn", "testconn.do_thing", "Do Thing")
 	testhelper.InsertConnectorRequiredCredential(t, tx, "testconn", "testconn_service", "api_key")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, "testconn")
 
 	// Store a credential the mock vault can decrypt.
 	mockVault := vault.NewMockVaultStore()
+	credID := "cred_test1"
 	secretID, err := mockVault.CreateSecret(context.Background(), tx, "test-cred", []byte(`{"api_key":"secret_value_123"}`))
 	if err != nil {
 		t.Fatalf("failed to create mock vault secret: %v", err)
 	}
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, "cred_test1", uid, "testconn_service", secretID)
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "testconn_service", secretID)
+
+	// Create explicit credential binding.
+	bindingID := testhelper.GenerateID(t, "accr_")
+	_, bindErr := db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
+		ID: bindingID, AgentID: agentID, ConnectorID: "testconn",
+		ApproverID: uid, CredentialID: &credID,
+	})
+	if bindErr != nil {
+		t.Fatalf("upsert binding: %v", bindErr)
+	}
 
 	// Set up mock connector action.
 	resultData := json.RawMessage(`{"issue_id":42}`)

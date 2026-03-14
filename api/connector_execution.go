@@ -219,204 +219,58 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 	}, nil
 }
 
-// resolveCredentialsWithFallback tries to resolve credentials in priority order.
-// For connectors supporting multiple auth methods (e.g. OAuth + API key), it
-// tries OAuth first, then falls back to static credentials if the user hasn't
-// connected their OAuth account.
+// resolveCredentialsWithFallback resolves credentials for a connector action.
+// It requires an explicit credential binding on the agent — no auto-resolve.
+// If no binding exists, it returns a validation error prompting the user to
+// assign a credential in the agent's connector settings.
 func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
-	// If there's a built-in OAuth provider for this connector but the manifest
-	// only declares static credentials (e.g. Shopify), synthesize an oauth2
-	// entry so OAuth is tried first with static as fallback.
-	hasExplicitOAuth := false
-	for _, rc := range reqCreds {
-		if rc.AuthType == "oauth2" {
-			hasExplicitOAuth = true
-			break
-		}
-	}
-	if !hasExplicitOAuth && deps.OAuthProviders != nil {
-		if _, providerExists := deps.OAuthProviders.Get(connectorID); providerExists {
-			reqCreds = append([]db.RequiredCredential{{
-				AuthType:      "oauth2",
-				OAuthProvider: &connectorID,
-			}}, reqCreds...)
-		}
-	}
-
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
 	}
 
-	// Check for an agent-specific credential binding. If one exists, use it
-	// directly instead of falling through to user-global resolution.
-	if agentID > 0 {
-		binding, err := db.GetAgentConnectorCredential(ctx, deps.DB, agentID, connectorID)
-		if err != nil {
-			log.Printf("resolve agent connector credential: %v", err)
-			// Fall through to global resolution on lookup error.
-		} else if binding != nil {
-			if binding.OAuthConnectionID != nil {
-				conn, oauthErr := db.GetOAuthConnectionByID(ctx, deps.DB, *binding.OAuthConnectionID)
-				if oauthErr != nil {
-					return connectors.Credentials{}, fmt.Errorf("look up bound OAuth connection: %w", oauthErr)
-				}
-				if conn == nil {
-					return connectors.Credentials{}, &connectors.ValidationError{
-						Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
-					}
-				}
-				// Verify the bound connection belongs to the executing user.
-				// Without this, a binding could reference another user's connection.
-				if conn.UserID != userID {
-					return connectors.Credentials{}, &connectors.ValidationError{
-						Message: "bound OAuth connection does not belong to this user",
-					}
-				}
-				// Use the bound connection directly (not a provider re-query)
-				// so the specific oauth_connection_id in the binding is honoured.
-				return resolveOAuthCredentialsFromConnection(ctx, deps, conn)
-			}
-			if binding.CredentialID != nil {
-				creds, credErr := resolveStaticCredentialByID(ctx, deps, *binding.CredentialID)
-				if credErr != nil {
-					return connectors.Credentials{}, credErr
-				}
-				return creds, nil
-			}
+	// Require an explicit credential binding. No auto-resolve — the user must
+	// assign a credential to the agent+connector before it can execute.
+	if agentID == 0 {
+		return connectors.Credentials{}, &connectors.ValidationError{
+			Message: "no credential assigned — assign a credential to this connector before running actions",
 		}
 	}
 
-	// Single credential type: use the existing path directly.
-	if len(reqCreds) == 1 {
-		rc := reqCreds[0]
-		if rc.AuthType == "oauth2" {
-			return resolveOAuthCredentials(ctx, deps, userID, &rc)
-		}
-		return resolveStaticCredentials(ctx, deps, userID, actionType)
+	binding, err := db.GetAgentConnectorCredential(ctx, deps.DB, agentID, connectorID)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up agent connector credential: %w", err)
 	}
-
-	// Multiple credential types: try OAuth first, fall back to static.
-	for _, rc := range reqCreds {
-		if rc.AuthType == "oauth2" {
-			creds, err := resolveOAuthCredentials(ctx, deps, userID, &rc)
-			if err == nil {
-				return creds, nil
-			}
-			var oauthErr *connectors.OAuthRefreshError
-			if errors.As(err, &oauthErr) {
-				// For implicit OAuth (system-injected, not declared in the
-				// connector manifest), any OAuth failure should fall back to
-				// static credentials — the user's primary auth was always static.
-				if !hasExplicitOAuth {
-					continue
-				}
-				// For explicit OAuth, only fall back when the user has no
-				// connection at all. If the connection exists but needs
-				// re-auth or refresh failed, fail immediately so the user
-				// knows to reconnect.
-				if oauthErr.NotConnected {
-					continue
-				}
-			}
-			return connectors.Credentials{}, err
+	if binding == nil {
+		return connectors.Credentials{}, &connectors.ValidationError{
+			Message: "no credential assigned — go to the agent's connector settings and assign a credential",
 		}
 	}
 
-	// No OAuth connection available — fall back to static credentials.
-	for _, rc := range reqCreds {
-		if rc.AuthType != "oauth2" {
-			creds, err := resolveStaticCredentialsByService(ctx, deps, userID, rc.Service)
-			if err == nil {
-				return creds, nil
-			}
-			// If the specific static credential isn't found either, continue
-			// to try others or fall through to the final error.
-			var valErr *connectors.ValidationError
-			if errors.As(err, &valErr) {
-				continue
-			}
-			return connectors.Credentials{}, err
+	if binding.OAuthConnectionID != nil {
+		conn, oauthErr := db.GetOAuthConnectionByID(ctx, deps.DB, *binding.OAuthConnectionID)
+		if oauthErr != nil {
+			return connectors.Credentials{}, fmt.Errorf("look up bound OAuth connection: %w", oauthErr)
 		}
+		if conn == nil {
+			return connectors.Credentials{}, &connectors.ValidationError{
+				Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
+			}
+		}
+		// Verify the bound connection belongs to the executing user.
+		if conn.UserID != userID {
+			return connectors.Credentials{}, &connectors.ValidationError{
+				Message: "bound OAuth connection does not belong to this user",
+			}
+		}
+		return resolveOAuthCredentialsFromConnection(ctx, deps, conn)
+	}
+	if binding.CredentialID != nil {
+		return resolveStaticCredentialByID(ctx, deps, *binding.CredentialID)
 	}
 
-	// Build a helpful message listing which credential options are available.
-	var methods []string
-	for _, rc := range reqCreds {
-		if rc.AuthType == "oauth2" {
-			provider := "OAuth"
-			if rc.OAuthProvider != nil {
-				provider = *rc.OAuthProvider + " OAuth"
-			}
-			methods = append(methods, provider+" (Settings → Connected Accounts)")
-		} else {
-			methods = append(methods, rc.Service+" "+rc.AuthType)
-		}
-	}
 	return connectors.Credentials{}, &connectors.ValidationError{
-		Message: fmt.Sprintf("no credentials available — configure one of: %s", strings.Join(methods, ", ")),
+		Message: "credential binding is incomplete — reassign a credential for this connector",
 	}
-}
-
-// resolveStaticCredentialsByService fetches and decrypts static credentials for
-// a specific service. Used when falling back from OAuth to API key.
-func resolveStaticCredentialsByService(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
-	return decryptServiceCredentials(ctx, deps, userID, service)
-}
-
-// resolveStaticCredentials fetches and decrypts static credentials (api_key, basic, custom)
-// for the given action type.
-func resolveStaticCredentials(ctx context.Context, deps *Deps, userID, actionType string) (connectors.Credentials, error) {
-	var zero connectors.Credentials
-	services, err := db.GetRequiredServicesByActionType(ctx, deps.DB, actionType)
-	if err != nil {
-		return zero, fmt.Errorf("look up required services: %w", err)
-	}
-	credMap := make(map[string]string, len(services))
-	for _, service := range services {
-		creds, err := decryptServiceCredentials(ctx, deps, userID, service)
-		if err != nil {
-			return connectors.Credentials{}, err
-		}
-		// Merge into the combined map (multi-service connectors need all credentials).
-		for k, v := range creds.ToMap() {
-			credMap[k] = v
-		}
-	}
-	return connectors.NewCredentials(credMap), nil
-}
-
-// decryptServiceCredentials fetches and decrypts credentials for a single
-// service from the vault. Shared by resolveStaticCredentials (multi-service)
-// and resolveStaticCredentialsByService (single-service fallback).
-func decryptServiceCredentials(ctx context.Context, deps *Deps, userID, service string) (connectors.Credentials, error) {
-	var zero connectors.Credentials
-	if deps.Vault == nil {
-		return zero, fmt.Errorf("credential vault is not configured but connector requires service %q", service)
-	}
-	decrypted, err := db.GetDecryptedCredentials(ctx, deps.DB, deps.Vault.ReadSecret, userID, service, nil)
-	if err != nil {
-		var credErr *db.CredentialError
-		if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
-			return zero, &connectors.ValidationError{
-				Message: fmt.Sprintf("no credentials stored for service %q", service),
-			}
-		}
-		return zero, fmt.Errorf("decrypt credentials for service %q: %w", service, err)
-	}
-	credMap := make(map[string]string, len(decrypted))
-	for k, v := range decrypted {
-		switch vv := v.(type) {
-		case string:
-			credMap[k] = vv
-		default:
-			b, jsonErr := json.Marshal(v)
-			if jsonErr != nil {
-				return zero, fmt.Errorf("marshal credential %q for service %q: %w", k, service, jsonErr)
-			}
-			credMap[k] = string(b)
-		}
-	}
-	return connectors.NewCredentials(credMap), nil
 }
 
 // resolveStaticCredentialByID fetches and decrypts a specific credential by its
@@ -461,62 +315,6 @@ func resolveStaticCredentialByID(ctx context.Context, deps *Deps, credentialID s
 	return connectors.NewCredentials(credMap), nil
 }
 
-// resolveOAuthCredentials looks up the user's OAuth connection for the required
-// provider, refreshes the token if it's expired or near-expiry, and returns
-// credentials containing the valid access token.
-func resolveOAuthCredentials(ctx context.Context, deps *Deps, userID string, reqCred *db.RequiredCredential) (connectors.Credentials, error) {
-	var zero connectors.Credentials
-	if deps.Vault == nil {
-		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
-	}
-	if deps.OAuthProviders == nil {
-		return zero, fmt.Errorf("OAuth provider registry is not configured")
-	}
-
-	providerID := ""
-	if reqCred.OAuthProvider != nil {
-		providerID = *reqCred.OAuthProvider
-	}
-	if providerID == "" {
-		return zero, &connectors.ValidationError{
-			Message: "connector requires OAuth but no oauth_provider is configured",
-		}
-	}
-
-	// Look up the user's OAuth connections for this provider. Multiple
-	// connections may exist (e.g. two Google accounts). Use the most recently
-	// created active connection as the default when no agent binding is set.
-	conns, err := db.GetOAuthConnectionsByProvider(ctx, deps.DB, userID, providerID)
-	if err != nil {
-		return zero, fmt.Errorf("look up OAuth connections for provider %q: %w", providerID, err)
-	}
-	if len(conns) == 0 {
-		return zero, &connectors.OAuthRefreshError{
-			Provider:     providerID,
-			Message:      fmt.Sprintf("no OAuth connection for provider %q — user must connect via Settings", providerID),
-			NotConnected: true,
-		}
-	}
-
-	// Pick the first active connection (ordered by created_at DESC).
-	var conn *db.OAuthConnection
-	for i := range conns {
-		if conns[i].Status == db.OAuthStatusActive {
-			conn = &conns[i]
-			break
-		}
-	}
-	if conn == nil {
-		// All connections exist but none are active.
-		return zero, &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Message:  fmt.Sprintf("OAuth connection for %q has status %q — user must re-authorize", providerID, conns[0].Status),
-		}
-	}
-
-	return credentialsFromOAuthConnection(ctx, deps, conn)
-}
-
 // resolveOAuthCredentialsFromConnection resolves credentials from a specific
 // OAuth connection (already fetched by ID). This is used by agent-specific
 // credential bindings to honour the exact bound connection rather than
@@ -533,10 +331,8 @@ func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn
 	return credentialsFromOAuthConnection(ctx, deps, conn)
 }
 
-// credentialsFromOAuthConnection is the shared implementation for building
-// credentials from an OAuthConnection. Both resolveOAuthCredentials (provider
-// lookup path) and resolveOAuthCredentialsFromConnection (agent binding path)
-// delegate here after their own connection lookup and dependency checks.
+// credentialsFromOAuthConnection builds credentials from an OAuthConnection.
+// resolveOAuthCredentialsFromConnection delegates here after dependency checks.
 //
 // It validates the connection status, refreshes the token if near-expiry,
 // reads the access token from the vault, and merges provider extra data.

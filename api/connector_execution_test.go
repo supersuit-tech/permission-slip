@@ -23,6 +23,7 @@ type oauthExecFixture struct {
 	TX       db.DBTX
 	Deps     *Deps
 	UserID   string
+	AgentID  int64
 	Vault    *vault.MockVaultStore
 	ConnReg  *connectors.Registry
 	OAuthReg *oauth.Registry
@@ -75,10 +76,14 @@ func setupOAuthExecutionTest(t *testing.T, opts oauthExecOpts) oauthExecFixture 
 	testhelper.InsertConnectorAction(t, tx, connID, actionType, "Test Action")
 	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, provider, provider, nil)
 
+	// Agent + agent_connector (required for credential resolution).
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
 	// Vault.
 	v := vault.NewMockVaultStore()
 
-	// OAuth connection (optional).
+	// OAuth connection (optional) + credential binding.
 	if opts.Connection != nil {
 		connOAuthID := testhelper.GenerateID(t, "oconn_")
 		// Default scopes to empty array to satisfy NOT NULL constraint.
@@ -86,6 +91,20 @@ func setupOAuthExecutionTest(t *testing.T, opts oauthExecOpts) oauthExecFixture 
 			opts.Connection.Scopes = []string{}
 		}
 		testhelper.InsertOAuthConnectionFull(t, tx, connOAuthID, uid, provider, *opts.Connection)
+
+		// Create an explicit credential binding to this OAuth connection.
+		conn, connErr := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, provider)
+		if connErr != nil {
+			t.Fatalf("get oauth connection: %v", connErr)
+		}
+		bindingID := testhelper.GenerateID(t, "accr_")
+		_, bindErr := db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
+			ID: bindingID, AgentID: agentID, ConnectorID: connID,
+			ApproverID: uid, OAuthConnectionID: &conn.ID,
+		})
+		if bindErr != nil {
+			t.Fatalf("upsert binding: %v", bindErr)
+		}
 	}
 
 	// Connector registry.
@@ -128,6 +147,7 @@ func setupOAuthExecutionTest(t *testing.T, opts oauthExecOpts) oauthExecFixture 
 		TX:       tx,
 		Deps:     deps,
 		UserID:   uid,
+		AgentID:  agentID,
 		Vault:    v,
 		ConnReg:  reg,
 		OAuthReg: oauthReg,
@@ -225,7 +245,7 @@ func TestExecuteConnectorAction_OAuthPath_Success(t *testing.T) {
 		t.Fatalf("update tokens: %v", err)
 	}
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -242,41 +262,34 @@ func TestExecuteConnectorAction_OAuthPath_Success(t *testing.T) {
 	}
 }
 
-func TestExecuteConnectorAction_OAuthPath_NoConnection(t *testing.T) {
+func TestExecuteConnectorAction_OAuthPath_NoConnection_NoBinding(t *testing.T) {
 	t.Parallel()
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{
-		// No Connection — tests the "user hasn't connected" case.
+		// No Connection — no binding will be created either.
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
-		t.Fatal("expected error when no OAuth connection exists")
+		t.Fatal("expected error when no credential binding exists")
 	}
-	if !connectors.IsOAuthRefreshError(err) {
-		t.Errorf("expected OAuthRefreshError, got %T: %v", err, err)
-	}
-	// Verify the error message mentions the provider so agents can display helpful info.
-	if !strings.Contains(err.Error(), "google") {
-		t.Errorf("expected error to mention provider name, got: %s", err.Error())
+	// Without a binding, the error should tell the user to assign a credential.
+	if !strings.Contains(err.Error(), "no credential assigned") {
+		t.Errorf("expected 'no credential assigned' error, got: %v", err)
 	}
 }
 
-// TestExecuteConnectorAction_DualAuth_FallbackToAPIKey verifies that when a
-// connector supports both OAuth and API key, and the user has no OAuth connection
-// but has an API key credential, execution succeeds using the API key.
-func TestExecuteConnectorAction_DualAuth_FallbackToAPIKey(t *testing.T) {
+// TestExecuteConnectorAction_DualAuth_NoBinding_ReturnsError verifies that when a
+// connector supports both OAuth and API key, but no credential binding exists,
+// execution fails with a clear error instead of auto-resolving.
+func TestExecuteConnectorAction_DualAuth_NoBinding_ReturnsError(t *testing.T) {
 	t.Parallel()
 
-	var capturedCreds connectors.Credentials
 	f := setupOAuthExecutionTest(t, oauthExecOpts{
 		ConnectorID: "testnotion",
 		ActionType:  "testnotion.search",
 		Provider:    "notion",
-		// No OAuth connection — will trigger fallback.
-		OnExec: func(creds connectors.Credentials) {
-			capturedCreds = creds
-		},
+		// No OAuth connection — no binding will be created.
 	})
 
 	// Add a static api_key credential alongside the OAuth one.
@@ -288,13 +301,13 @@ func TestExecuteConnectorAction_DualAuth_FallbackToAPIKey(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, f.TX, credID, f.UserID, "testnotion", vaultID)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
-	if err != nil {
-		t.Fatalf("expected fallback to API key, got error: %v", err)
+	// Without a binding, execution should fail even though credentials exist.
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
+	if err == nil {
+		t.Fatal("expected error when no credential binding exists")
 	}
-
-	if token, ok := capturedCreds.Get("api_key"); !ok || token != "ntn_test_key_123" {
-		t.Errorf("expected api_key=ntn_test_key_123, got %q (ok=%v)", token, ok)
+	if !strings.Contains(err.Error(), "no credential assigned") {
+		t.Errorf("expected 'no credential assigned' error, got: %v", err)
 	}
 }
 
@@ -321,7 +334,7 @@ func TestExecuteConnectorAction_DualAuth_NeedsReauth_NoFallback(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, f.TX, credID, f.UserID, "testnotion", vaultID)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for needs_reauth — should NOT fall back to API key")
 	}
@@ -337,7 +350,7 @@ func TestExecuteConnectorAction_OAuthPath_NeedsReauth(t *testing.T) {
 		Connection: &testhelper.OAuthConnectionOpts{Status: "needs_reauth"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for needs_reauth connection")
 	}
@@ -354,7 +367,7 @@ func TestExecuteConnectorAction_OAuthPath_RevokedConnection(t *testing.T) {
 		Connection: &testhelper.OAuthConnectionOpts{Status: "revoked"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.list_emails", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.list_emails", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for revoked connection")
 	}
@@ -368,7 +381,7 @@ func TestExecuteConnectorAction_OAuthPath_NoVault(t *testing.T) {
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{NoVault: true})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when vault is nil")
 	}
@@ -379,7 +392,7 @@ func TestExecuteConnectorAction_OAuthPath_NoOAuthRegistry(t *testing.T) {
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{NoOAuthRegistry: true})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when OAuth registry is nil")
 	}
@@ -398,7 +411,7 @@ func TestExecuteConnectorAction_OAuthPath_ExpiredTokenNoRefreshToken(t *testing.
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, &pastExpiry)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error for expired token without refresh token")
 	}
@@ -431,7 +444,7 @@ func TestExecuteConnectorAction_OAuthPath_NonExpiredTokenSkipsRefresh(t *testing
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, &farFuture)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -462,7 +475,7 @@ func TestExecuteConnectorAction_OAuthPath_NilTokenExpirySkipsRefresh(t *testing.
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, nil)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -520,7 +533,7 @@ func TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken(t *testing.T) {
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -590,7 +603,7 @@ func TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked(t *testing.T)
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when refresh token is revoked")
 	}
@@ -605,22 +618,85 @@ func TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked(t *testing.T)
 	}
 }
 
-// ── resolveCredentialsWithFallback: multi-credential fallback ────────────────
+// ── resolveCredentialsWithFallback: no auto-resolve ─────────────────────────
 
-func TestResolveCredentialsWithFallback_OAuthFallsBackToAPIKey(t *testing.T) {
+func TestResolveCredentialsWithFallback_NoAgentID_ReturnsError(t *testing.T) {
 	t.Parallel()
 
-	// Set up a connector with BOTH OAuth and API key credentials, but
-	// no OAuth connection — should fall back to the API key.
+	// agentID=0 should always return an error — credentials require
+	// an explicit agent binding.
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	connID := "trkfb"
+	connID := "trkno"
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertConnectorAction(t, tx, connID, connID+".do_thing", "Do Thing")
-	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, connID+"_oauth", connID, nil)
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore()}
+
+	reqCreds, err := db.GetRequiredCredentialsByActionType(t.Context(), tx, connID+".do_thing")
+	if err != nil {
+		t.Fatalf("get creds: %v", err)
+	}
+
+	_, err = resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".do_thing", connID, reqCreds)
+	if err == nil {
+		t.Fatal("expected error when agentID is 0")
+	}
+	if !strings.Contains(err.Error(), "no credential assigned") {
+		t.Errorf("expected 'no credential assigned' error, got: %v", err)
+	}
+}
+
+func TestResolveCredentialsWithFallback_NoBinding_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	// Agent exists but has no credential binding — should return an error
+	// instead of auto-resolving.
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "trknb"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".do_thing", "Do Thing")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore()}
+
+	reqCreds, err := db.GetRequiredCredentialsByActionType(t.Context(), tx, connID+".do_thing")
+	if err != nil {
+		t.Fatalf("get creds: %v", err)
+	}
+
+	_, err = resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, reqCreds)
+	if err == nil {
+		t.Fatal("expected error when no credential binding exists")
+	}
+	if !strings.Contains(err.Error(), "no credential assigned") {
+		t.Errorf("expected 'no credential assigned' error, got: %v", err)
+	}
+}
+
+func TestResolveCredentialsWithFallback_WithStaticBinding_Works(t *testing.T) {
+	t.Parallel()
+
+	// Agent has an explicit static credential binding — should resolve.
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "trksb"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".do_thing", "Do Thing")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
 	v := vault.NewMockVaultStore()
 	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-api-key"})
@@ -628,20 +704,24 @@ func TestResolveCredentialsWithFallback_OAuthFallsBackToAPIKey(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
 
-	oauthReg := oauth.NewRegistry()
-	_ = oauthReg.Register(oauth.Provider{
-		ID: connID, AuthorizeURL: "https://example.com/auth", TokenURL: "https://example.com/token",
-		ClientID: "cid", ClientSecret: "cs", Source: oauth.SourceBuiltIn,
+	// Create an explicit binding.
+	bindingID := testhelper.GenerateID(t, "accr_")
+	_, err := db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
+		ID: bindingID, AgentID: agentID, ConnectorID: connID,
+		ApproverID: uid, CredentialID: &credID,
 	})
+	if err != nil {
+		t.Fatalf("upsert binding: %v", err)
+	}
 
-	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
+	deps := &Deps{DB: tx, Vault: v}
 
 	reqCreds, err := db.GetRequiredCredentialsByActionType(t.Context(), tx, connID+".do_thing")
 	if err != nil {
 		t.Fatalf("get creds: %v", err)
 	}
 
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".do_thing", connID, reqCreds)
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, reqCreds)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -651,21 +731,22 @@ func TestResolveCredentialsWithFallback_OAuthFallsBackToAPIKey(t *testing.T) {
 	}
 }
 
-func TestResolveCredentialsWithFallback_OAuthSucceedsWhenAvailable(t *testing.T) {
+func TestResolveCredentialsWithFallback_WithOAuthBinding_Works(t *testing.T) {
 	t.Parallel()
 
-	// Set up a connector with BOTH OAuth and API key, WITH an active
-	// OAuth connection — should use OAuth, not fall back.
+	// Agent has an explicit OAuth connection binding — should resolve.
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	connID := "trkoau"
+	connID := "trkob"
 	provider := connID
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertConnectorAction(t, tx, connID, connID+".do_thing", "Do Thing")
 	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, connID+"_oauth", provider, nil)
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
+
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
 	v := vault.NewMockVaultStore()
 	accessVaultID, _ := v.CreateSecret(t.Context(), tx, "access", []byte("oauth-access-token"))
@@ -674,8 +755,8 @@ func TestResolveCredentialsWithFallback_OAuthSucceedsWhenAvailable(t *testing.T)
 	futureExpiry := time.Now().Add(1 * time.Hour)
 	connOAuthID := testhelper.GenerateID(t, "oconn_")
 	testhelper.InsertOAuthConnectionFull(t, tx, connOAuthID, uid, provider, testhelper.OAuthConnectionOpts{
-		Status:  "active",
-		Scopes:  []string{},
+		Status: "active",
+		Scopes: []string{},
 	})
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, provider)
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), tx, conn.ID, uid, accessVaultID, nil, &futureExpiry)
@@ -686,6 +767,16 @@ func TestResolveCredentialsWithFallback_OAuthSucceedsWhenAvailable(t *testing.T)
 		ClientID: "cid", ClientSecret: "cs", Source: oauth.SourceBuiltIn,
 	})
 
+	// Create an explicit binding to the OAuth connection.
+	bindingID := testhelper.GenerateID(t, "accr_")
+	_, err := db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
+		ID: bindingID, AgentID: agentID, ConnectorID: connID,
+		ApproverID: uid, OAuthConnectionID: &conn.ID,
+	})
+	if err != nil {
+		t.Fatalf("upsert binding: %v", err)
+	}
+
 	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
 
 	reqCreds, err := db.GetRequiredCredentialsByActionType(t.Context(), tx, connID+".do_thing")
@@ -693,7 +784,7 @@ func TestResolveCredentialsWithFallback_OAuthSucceedsWhenAvailable(t *testing.T)
 		t.Fatalf("get creds: %v", err)
 	}
 
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".do_thing", connID, reqCreds)
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, reqCreds)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -703,43 +794,9 @@ func TestResolveCredentialsWithFallback_OAuthSucceedsWhenAvailable(t *testing.T)
 	}
 }
 
-func TestResolveCredentialsWithFallback_BothFail_ReturnsError(t *testing.T) {
-	t.Parallel()
+// ── executeConnectorAction: static credential path with binding ─────────────
 
-	// No OAuth connection AND no API key stored — both fail.
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "trkbf"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, connID+".do_thing", "Do Thing")
-	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, connID+"_oauth", connID, nil)
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
-
-	v := vault.NewMockVaultStore()
-	oauthReg := oauth.NewRegistry()
-	_ = oauthReg.Register(oauth.Provider{
-		ID: connID, AuthorizeURL: "https://example.com/auth", TokenURL: "https://example.com/token",
-		ClientID: "cid", ClientSecret: "cs", Source: oauth.SourceBuiltIn,
-	})
-
-	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
-
-	reqCreds, err := db.GetRequiredCredentialsByActionType(t.Context(), tx, connID+".do_thing")
-	if err != nil {
-		t.Fatalf("get creds: %v", err)
-	}
-
-	_, err = resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".do_thing", connID, reqCreds)
-	if err == nil {
-		t.Fatal("expected error when both auth methods fail")
-	}
-}
-
-// ── executeConnectorAction: static credential path ──────────────────────────
-
-func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
+func TestExecuteConnectorAction_StaticPath_WithBinding(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -750,6 +807,9 @@ func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
 	testhelper.InsertConnectorAction(t, tx, connID, "testslack.send_message", "Send Message")
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "slack", "api_key")
 
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
 	v := vault.NewMockVaultStore()
 	credJSON, _ := json.Marshal(map[string]string{"api_key": "xoxb-test-token"})
 	vaultID, err := v.CreateSecret(t.Context(), tx, "cred", credJSON)
@@ -758,6 +818,16 @@ func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
 	}
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "slack", vaultID)
+
+	// Create an explicit binding.
+	bindingID := testhelper.GenerateID(t, "accr_")
+	_, err = db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
+		ID: bindingID, AgentID: agentID, ConnectorID: connID,
+		ApproverID: uid, CredentialID: &credID,
+	})
+	if err != nil {
+		t.Fatalf("upsert binding: %v", err)
+	}
 
 	var capturedCreds connectors.Credentials
 	reg := connectors.NewRegistry()
@@ -769,7 +839,7 @@ func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
 
 	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
 
-	result, err := executeConnectorAction(t.Context(), deps, 0, uid, "testslack.send_message", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), deps, agentID, uid, "testslack.send_message", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -783,171 +853,6 @@ func TestExecuteConnectorAction_StaticPath_StillWorks(t *testing.T) {
 	}
 	if tok != "xoxb-test-token" {
 		t.Errorf("expected api_key %q, got %q", "xoxb-test-token", tok)
-	}
-}
-
-// ── Implicit OAuth provider fallback tests ──────────────────────────────────
-// These test the code path where a connector declares only static credentials
-// (api_key) but has a matching built-in OAuth provider in the registry.
-// resolveCredentialsWithFallback should synthesize an oauth2 entry and try
-// OAuth first, falling back to static credentials if OAuth isn't available.
-
-func TestResolveCredentialsWithFallback_ImplicitOAuth_UsesOAuthWhenConnected(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testshopify"
-	provider := "testshopify"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, connID+".list_products", "List Products")
-	// Only declare api_key — no explicit oauth2 credential.
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "shopify_api_key", "api_key")
-
-	v := vault.NewMockVaultStore()
-	accessToken, err := v.CreateSecret(t.Context(), tx, "access", []byte("shpat_oauth_token"))
-	if err != nil {
-		t.Fatalf("vault create: %v", err)
-	}
-
-	// Create an active OAuth connection for the provider.
-	connOAuthID := testhelper.GenerateID(t, "oconn_")
-	testhelper.InsertOAuthConnectionFull(t, tx, connOAuthID, uid, provider, testhelper.OAuthConnectionOpts{
-		Status:              "active",
-		Scopes:              []string{"write_products"},
-		AccessTokenVaultID:  accessToken,
-		TokenExpiry:         func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
-	})
-
-	// Register a matching OAuth provider.
-	oauthReg := oauth.NewRegistry()
-	_ = oauthReg.Register(oauth.Provider{
-		ID:           provider,
-		AuthorizeURL: "https://test.myshopify.com/admin/oauth/authorize",
-		TokenURL:     "https://test.myshopify.com/admin/oauth/access_token",
-		ClientID:     "test-id",
-		ClientSecret: "test-secret",
-		Source:       oauth.SourceBuiltIn,
-	})
-
-	reqCreds := []db.RequiredCredential{{Service: "shopify_api_key", AuthType: "api_key"}}
-	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
-
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".list_products", connID, reqCreds)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	tok, ok := creds.Get("access_token")
-	if !ok {
-		t.Fatal("expected access_token in credentials (from OAuth)")
-	}
-	if tok != "shpat_oauth_token" {
-		t.Errorf("expected OAuth token %q, got %q", "shpat_oauth_token", tok)
-	}
-}
-
-func TestResolveCredentialsWithFallback_ImplicitOAuth_FallsBackToStatic(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testshopify"
-	provider := "testshopify"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, connID+".list_products", "List Products")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "shopify_api_key", "api_key")
-
-	v := vault.NewMockVaultStore()
-	// Store a static API key credential (no OAuth connection).
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "shpat_static_key"})
-	vaultID, err := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	if err != nil {
-		t.Fatalf("vault create: %v", err)
-	}
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "shopify_api_key", vaultID)
-
-	oauthReg := oauth.NewRegistry()
-	_ = oauthReg.Register(oauth.Provider{
-		ID:           provider,
-		AuthorizeURL: "https://test.myshopify.com/admin/oauth/authorize",
-		TokenURL:     "https://test.myshopify.com/admin/oauth/access_token",
-		ClientID:     "test-id",
-		ClientSecret: "test-secret",
-		Source:       oauth.SourceBuiltIn,
-	})
-
-	reqCreds := []db.RequiredCredential{{Service: "shopify_api_key", AuthType: "api_key"}}
-	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
-
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".list_products", connID, reqCreds)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	tok, ok := creds.Get("api_key")
-	if !ok {
-		t.Fatal("expected api_key in credentials (static fallback)")
-	}
-	if tok != "shpat_static_key" {
-		t.Errorf("expected static key %q, got %q", "shpat_static_key", tok)
-	}
-}
-
-func TestResolveCredentialsWithFallback_ImplicitOAuth_NeedsReauthFallsBack(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	connID := "testshopify"
-	provider := "testshopify"
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, connID+".list_products", "List Products")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "shopify_api_key", "api_key")
-
-	v := vault.NewMockVaultStore()
-
-	// Create a needs_reauth OAuth connection.
-	connOAuthID := testhelper.GenerateID(t, "oconn_")
-	testhelper.InsertOAuthConnectionFull(t, tx, connOAuthID, uid, provider, testhelper.OAuthConnectionOpts{
-		Status: "needs_reauth",
-		Scopes: []string{"write_products"},
-	})
-
-	// Store a static API key credential as fallback.
-	credJSON, _ := json.Marshal(map[string]string{"api_key": "shpat_static_key"})
-	vaultID, err := v.CreateSecret(t.Context(), tx, "cred", credJSON)
-	if err != nil {
-		t.Fatalf("vault create: %v", err)
-	}
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "shopify_api_key", vaultID)
-
-	oauthReg := oauth.NewRegistry()
-	_ = oauthReg.Register(oauth.Provider{
-		ID:           provider,
-		AuthorizeURL: "https://test.myshopify.com/admin/oauth/authorize",
-		TokenURL:     "https://test.myshopify.com/admin/oauth/access_token",
-		ClientID:     "test-id",
-		ClientSecret: "test-secret",
-		Source:       oauth.SourceBuiltIn,
-	})
-
-	reqCreds := []db.RequiredCredential{{Service: "shopify_api_key", AuthType: "api_key"}}
-	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
-
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".list_products", connID, reqCreds)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	tok, ok := creds.Get("api_key")
-	if !ok {
-		t.Fatal("expected api_key in credentials (static fallback after needs_reauth)")
-	}
-	if tok != "shpat_static_key" {
-		t.Errorf("expected static key %q, got %q", "shpat_static_key", tok)
 	}
 }
 
@@ -1071,6 +976,7 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 type paymentExecFixture struct {
 	TX         db.DBTX
 	UserID     string
+	AgentID    int64
 	ConnID     string
 	ActionType string
 	Vault      *vault.MockVaultStore
@@ -1111,11 +1017,25 @@ func setupPaymentExecTest(t *testing.T, opts paymentExecOpts) *paymentExecFixtur
 	}
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
 
+	// Agent + agent_connector + credential binding.
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
 	v := vault.NewMockVaultStore()
 	credJSON, _ := json.Marshal(map[string]string{"api_key": "test-key"})
 	vaultID, _ := v.CreateSecret(t.Context(), tx, "cred", credJSON)
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultID)
+
+	// Create explicit credential binding.
+	bindingID := testhelper.GenerateID(t, "accr_")
+	_, bindErr := db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
+		ID: bindingID, AgentID: agentID, ConnectorID: connID,
+		ApproverID: uid, CredentialID: &credID,
+	})
+	if bindErr != nil {
+		t.Fatalf("upsert binding: %v", bindErr)
+	}
 
 	reg := connectors.NewRegistry()
 	if opts.Connector != nil {
@@ -1127,6 +1047,7 @@ func setupPaymentExecTest(t *testing.T, opts paymentExecOpts) *paymentExecFixtur
 	return &paymentExecFixture{
 		TX:         tx,
 		UserID:     uid,
+		AgentID:    agentID,
 		ConnID:     connID,
 		ActionType: actionType,
 		Vault:      v,
@@ -1162,7 +1083,7 @@ func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
 	})
 
 	amount := 5000
-	result, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
 	})
@@ -1203,7 +1124,7 @@ func TestExecuteConnectorAction_PaymentMethod_MissingRequired(t *testing.T) {
 	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	// No payment params provided.
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when payment_method_id is missing")
 	}
@@ -1226,7 +1147,7 @@ func TestExecuteConnectorAction_PaymentMethod_PerTxLimitExceeded(t *testing.T) {
 	})
 
 	amount := 5000 // Exceeds 1000 limit
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
 	})
@@ -1274,7 +1195,7 @@ func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T)
 	}
 
 	amount := 2000 // 9000 + 2000 = 11000 > 10000 monthly limit
-	_, err = executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
+	_, err = executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
 	})
@@ -1310,7 +1231,7 @@ func TestExecuteConnectorAction_PaymentMethod_NotFound(t *testing.T) {
 	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	amount := 100
-	_, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: "00000000-0000-0000-0000-000000000099",
 		AmountCents:     &amount,
 	})
@@ -1332,7 +1253,7 @@ func TestExecuteConnectorAction_NoPaymentMethod_WhenNotRequired(t *testing.T) {
 	f := setupPaymentExecTest(t, paymentExecOpts{RequiresPayment: &noPayment})
 
 	// No payment params — should succeed because action doesn't require payment.
-	result, err := executeConnectorAction(t.Context(), f.Deps, 0, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
