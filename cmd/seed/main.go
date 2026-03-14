@@ -14,6 +14,7 @@ import (
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
+	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
@@ -51,8 +52,9 @@ var userEmails = map[string]string{
 
 // Connector ID constants for use in scenario seed data below.
 const (
-	connectorGitHub = "github"
-	connectorSlack  = "slack"
+	connectorGitHub  = "github"
+	connectorSlack   = "slack"
+	connectorGoogle  = "google"
 )
 
 // supabaseClient holds config for Supabase Admin API calls.
@@ -356,6 +358,7 @@ func cleanDB(ctx context.Context, tx db.DBTX) {
 	exec(ctx, tx, `DELETE FROM profiles`)
 	exec(ctx, tx, `DELETE FROM auth.users`)
 	exec(ctx, tx, `DELETE FROM connectors WHERE id = $1`, connectorGitHub)
+	exec(ctx, tx, `DELETE FROM connectors WHERE id = $1`, connectorGoogle)
 	exec(ctx, tx, `DELETE FROM connectors WHERE id = $1`, connectorSlack)
 }
 
@@ -613,6 +616,7 @@ func seedConnectors(ctx context.Context, tx db.DBTX) {
 		manifest *connectors.ConnectorManifest
 	}{
 		{ghconnector.New().Manifest()},
+		{googleconnector.New().Manifest()},
 		{slackconnector.New().Manifest()},
 	}
 
@@ -625,7 +629,7 @@ func seedConnectors(ctx context.Context, tx db.DBTX) {
 		}
 	}
 
-	fmt.Println("  ✓ Connectors: github, slack (with templates)")
+	fmt.Println("  ✓ Connectors: github, google, slack (with templates)")
 }
 
 // ---------------------------------------------------------------------------
@@ -961,7 +965,7 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	pagerduty := agentIDs["PagerDuty Escalator"]
 
 	// ---------------------------------------------------------------
-	// Agent connectors — enable GitHub and/or Slack for key agents
+	// Agent connectors — enable GitHub, Slack, and/or Google for agents
 	// ---------------------------------------------------------------
 	agentConnectors := []struct {
 		agentID     int64
@@ -973,11 +977,66 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		{sentry, connectorGitHub},
 		{datadog, connectorSlack},
 		{pagerduty, connectorSlack},
+		// Google connector on all 7 pre-seeded registered agents (Openclaw excluded)
+		{claude, connectorGoogle},
+		{github, connectorGoogle},
+		{slack, connectorGoogle},
+		{jira, connectorGoogle},
+		{sentry, connectorGoogle},
+		{datadog, connectorGoogle},
+		{pagerduty, connectorGoogle},
 	}
 	for _, ac := range agentConnectors {
 		exec(ctx, tx,
 			`INSERT INTO agent_connectors (agent_id, approver_id, connector_id) VALUES ($1, $2, $3)`,
 			ac.agentID, userHasEverything, ac.connectorID)
+	}
+
+	// ---------------------------------------------------------------
+	// OAuth connections — two Google accounts for testing multi-account
+	//
+	// vault_secret_id values are placeholder UUIDs — they don't reference
+	// real vault secrets. Seed data is for UI development; actual vault
+	// integration is tested via MockVaultStore in Go tests.
+	// ---------------------------------------------------------------
+	exec(ctx, tx,
+		`INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, scopes, status, extra_data)
+		 VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
+		"oauth-google-work", userHasEverything, "google",
+		"00000000-0000-0000-0000-000000000080",
+		`{https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/drive}`,
+		`{"email": "alice@supersuit.com", "name": "Alice (Work)"}`)
+
+	exec(ctx, tx,
+		`INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, scopes, status, extra_data)
+		 VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
+		"oauth-google-personal", userHasEverything, "google",
+		"00000000-0000-0000-0000-000000000081",
+		`{https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/drive}`,
+		`{"email": "alice.personal@gmail.com", "name": "Alice (Personal)"}`)
+
+	// ---------------------------------------------------------------
+	// Agent-connector credentials — bind one Google OAuth per agent
+	// ---------------------------------------------------------------
+	// Alternate between the two Google accounts so both appear in use.
+	googleOAuthBindings := []struct {
+		id        string
+		agentID   int64
+		oauthConn string
+	}{
+		{"acc-claude-google", claude, "oauth-google-work"},
+		{"acc-github-google", github, "oauth-google-personal"},
+		{"acc-slack-google", slack, "oauth-google-work"},
+		{"acc-jira-google", jira, "oauth-google-personal"},
+		{"acc-sentry-google", sentry, "oauth-google-work"},
+		{"acc-datadog-google", datadog, "oauth-google-personal"},
+		{"acc-pagerduty-google", pagerduty, "oauth-google-work"},
+	}
+	for _, b := range googleOAuthBindings {
+		exec(ctx, tx,
+			`INSERT INTO agent_connector_credentials (id, agent_id, connector_id, approver_id, oauth_connection_id)
+			 VALUES ($1, $2, $3, $4, $5)`,
+			b.id, b.agentID, connectorGoogle, userHasEverything, b.oauthConn)
 	}
 
 	// ---------------------------------------------------------------
@@ -1246,9 +1305,9 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	}
 
 	if os.Getenv("TEST_AGENT_PUB_KEY") != "" {
-		fmt.Println("  ✓ has-everything@test.local (11 agents (incl. Openclaw), 6 agent-connectors, 29 approvals, 2 credentials, 3 standing approvals, 4 action configs, 1 invite)")
+		fmt.Println("  ✓ has-everything@test.local (11 agents (incl. Openclaw), 13 agent-connectors, 29 approvals, 2 credentials, 2 oauth connections, 7 agent-connector-credentials, 3 standing approvals, 4 action configs, 1 invite)")
 	} else {
-		fmt.Println("  ✓ has-everything@test.local (10 agents, 6 agent-connectors, 29 approvals, 2 credentials, 3 standing approvals, 4 action configs, 1 invite)")
+		fmt.Println("  ✓ has-everything@test.local (10 agents, 13 agent-connectors, 29 approvals, 2 credentials, 2 oauth connections, 7 agent-connector-credentials, 3 standing approvals, 4 action configs, 1 invite)")
 	}
 }
 

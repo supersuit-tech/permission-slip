@@ -69,7 +69,8 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// 1. Enabled connectors with credential readiness.
 	//
 	// For each enabled connector, check if ALL required credential services
-	// have a matching row in the credentials table for this user. If a
+	// have a matching row in the credentials table (for api_key/basic/custom)
+	// or the oauth_connections table (for oauth2) for this user. If a
 	// connector has no required credentials, it's considered ready.
 	connRows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description,
@@ -80,6 +81,13 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		               SELECT 1 FROM credentials cr
 		               WHERE cr.user_id = ac.approver_id
 		                 AND cr.service = crc.service
+		             )
+		             AND NOT EXISTS (
+		               SELECT 1 FROM oauth_connections oc
+		               WHERE oc.user_id = ac.approver_id
+		                 AND oc.provider = crc.oauth_provider
+		                 AND oc.status = 'active'
+		                 AND crc.oauth_scopes <@ oc.scopes
 		             )
 		       ) AS credentials_ready
 		FROM agent_connectors ac
