@@ -732,7 +732,8 @@ function AgentCredentialBinding({
           ))}
           {scopedCredentials.map((cred) => (
             <option key={`cred:${cred.id}`} value={`cred:${cred.id}`}>
-              {cred.label ?? cred.service} (added{" "}
+              {serviceLabel(cred.service)}
+              {cred.label ? ` — ${cred.label}` : ""} (added{" "}
               {new Date(cred.created_at).toLocaleDateString()})
             </option>
           ))}
