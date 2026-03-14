@@ -529,3 +529,167 @@ func TestManifestValidation_ReservedAuthorizeParams(t *testing.T) {
 		})
 	}
 }
+
+// ── x-ui Validation ─────────────────────────────────────────────────────
+
+func TestParseManifest_ValidXUI(t *testing.T) {
+	input := `{
+		"id": "x",
+		"name": "X",
+		"actions": [{
+			"action_type": "x.do",
+			"name": "Do",
+			"parameters_schema": {
+				"type": "object",
+				"x-ui": {
+					"groups": [
+						{"id": "main", "label": "Main Settings"},
+						{"id": "advanced", "label": "Advanced", "collapsed": true}
+					],
+					"order": ["name", "email", "notify"]
+				},
+				"properties": {
+					"name": {
+						"type": "string",
+						"x-ui": {"label": "Full Name", "placeholder": "John Doe", "group": "main", "widget": "text"}
+					},
+					"email": {
+						"type": "string",
+						"x-ui": {"label": "Email", "group": "main", "help_url": "https://example.com/help"}
+					},
+					"notify": {
+						"type": "boolean",
+						"x-ui": {"widget": "toggle", "group": "advanced", "visible_when": {"field": "email", "equals": "set"}}
+					}
+				}
+			}
+		}]
+	}`
+
+	_, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseManifest_XUIWithoutGroups(t *testing.T) {
+	// x-ui on properties without root groups or order should be fine
+	// as long as no group references are made.
+	input := `{
+		"id": "x",
+		"name": "X",
+		"actions": [{
+			"action_type": "x.do",
+			"name": "Do",
+			"parameters_schema": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"x-ui": {"label": "Name", "widget": "text", "placeholder": "Enter name"}
+					}
+				}
+			}
+		}]
+	}`
+
+	_, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseManifest_NoXUI(t *testing.T) {
+	// Schema without any x-ui should pass validation (backwards compatible).
+	input := `{
+		"id": "x",
+		"name": "X",
+		"actions": [{
+			"action_type": "x.do",
+			"name": "Do",
+			"parameters_schema": {
+				"type": "object",
+				"properties": {
+					"name": {"type": "string"}
+				}
+			}
+		}]
+	}`
+
+	_, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseManifest_XUIValidationErrors(t *testing.T) {
+	base := func(schema string) string {
+		return fmt.Sprintf(`{"id":"x","name":"X","actions":[{"action_type":"x.do","name":"Do","parameters_schema":%s}]}`, schema)
+	}
+
+	tests := []struct {
+		name   string
+		schema string
+	}{
+		{
+			"invalid widget type",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"widget":"slider"}}}}`,
+		},
+		{
+			"group references undefined group",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"group":"missing"}}}}`,
+		},
+		{
+			"group references undefined group with other groups defined",
+			`{"type":"object","x-ui":{"groups":[{"id":"billing","label":"Billing"}]},"properties":{"f":{"type":"string","x-ui":{"group":"shipping"}}}}`,
+		},
+		{
+			"order references unknown property",
+			`{"type":"object","x-ui":{"order":["name","nonexistent"]},"properties":{"name":{"type":"string"}}}`,
+		},
+		{
+			"visible_when references unknown property",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"visible_when":{"field":"ghost","equals":"val"}}}}}`,
+		},
+		{
+			"root x-ui groups with empty id",
+			`{"type":"object","x-ui":{"groups":[{"id":"","label":"Empty"}]},"properties":{"f":{"type":"string"}}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := base(tt.schema)
+			_, err := ParseManifest([]byte(input))
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
+	// All valid widget types should be accepted.
+	for _, widget := range []string{"text", "select", "textarea", "toggle", "number", "date"} {
+		t.Run(widget, func(t *testing.T) {
+			input := fmt.Sprintf(`{
+				"id": "x",
+				"name": "X",
+				"actions": [{
+					"action_type": "x.do",
+					"name": "Do",
+					"parameters_schema": {
+						"type": "object",
+						"properties": {
+							"f": {"type": "string", "x-ui": {"widget": %q}}
+						}
+					}
+				}]
+			}`, widget)
+			_, err := ParseManifest([]byte(input))
+			if err != nil {
+				t.Fatalf("widget %q should be valid, got: %v", widget, err)
+			}
+		})
+	}
+}

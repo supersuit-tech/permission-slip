@@ -81,6 +81,16 @@ var validRiskLevels = map[string]bool{
 	"high":   true,
 }
 
+// validWidgets are the allowed values for x-ui.widget on schema properties.
+var validWidgets = map[string]bool{
+	"text":     true,
+	"select":   true,
+	"textarea": true,
+	"toggle":   true,
+	"number":   true,
+	"date":     true,
+}
+
 // validAuthTypes are the allowed values for credential auth types.
 // Must match the CHECK constraint on connector_required_credentials.auth_type.
 var validAuthTypes = map[string]bool{
@@ -182,6 +192,15 @@ func (m *ConnectorManifest) Validate() error {
 		}
 		if a.RiskLevel != "" && !validRiskLevels[a.RiskLevel] {
 			return fmt.Errorf("manifest validation: actions[%d].risk_level %q must be low, medium, or high", i, a.RiskLevel)
+		}
+	}
+
+	// Validate x-ui hints in parameters_schema (optional).
+	for i, a := range m.Actions {
+		if len(a.ParametersSchema) > 0 {
+			if err := validateParametersSchemaUI(a.ParametersSchema, i); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -310,6 +329,86 @@ func (m *ConnectorManifest) Validate() error {
 	for i, c := range m.RequiredCredentials {
 		if c.AuthType == "oauth2" && !knownProviders[c.OAuthProvider] {
 			return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider %q is not a built-in provider and not declared in oauth_providers", i, c.OAuthProvider)
+		}
+	}
+
+	return nil
+}
+
+// validateParametersSchemaUI validates x-ui rendering hints embedded in a
+// parameters_schema. It checks that widget values, group references, field
+// ordering, and visible_when references are all consistent and valid.
+func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
+	// Parse the schema into a generic map.
+	var s map[string]json.RawMessage
+	if err := json.Unmarshal(schema, &s); err != nil {
+		// Not a JSON object — nothing to validate here (other validation handles this).
+		return nil
+	}
+
+	// Extract property keys.
+	var properties map[string]json.RawMessage
+	if raw, ok := s["properties"]; ok {
+		if err := json.Unmarshal(raw, &properties); err != nil {
+			return nil // malformed properties — not our concern here
+		}
+	}
+	propertyKeys := make(map[string]bool, len(properties))
+	for k := range properties {
+		propertyKeys[k] = true
+	}
+
+	// Parse root-level x-ui.
+	var rootUI struct {
+		Groups []struct {
+			ID string `json:"id"`
+		} `json:"groups"`
+		Order []string `json:"order"`
+	}
+	groupIDs := make(map[string]bool)
+	if raw, ok := s["x-ui"]; ok {
+		if err := json.Unmarshal(raw, &rootUI); err != nil {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui is not a valid object: %w", actionIdx, err)
+		}
+		for _, g := range rootUI.Groups {
+			if g.ID == "" {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.groups contains entry with empty id", actionIdx)
+			}
+			groupIDs[g.ID] = true
+		}
+		// Validate x-ui.order references existing property keys.
+		for _, field := range rootUI.Order {
+			if !propertyKeys[field] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.order references unknown property %q", actionIdx, field)
+			}
+		}
+	}
+
+	// Validate property-level x-ui.
+	for propName, propRaw := range properties {
+		var prop struct {
+			XUI *struct {
+				Widget      string `json:"widget"`
+				Group       string `json:"group"`
+				VisibleWhen *struct {
+					Field string `json:"field"`
+				} `json:"visible_when"`
+			} `json:"x-ui"`
+		}
+		if err := json.Unmarshal(propRaw, &prop); err != nil {
+			continue // not our concern
+		}
+		if prop.XUI == nil {
+			continue
+		}
+		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q is not a valid widget type", actionIdx, propName, prop.XUI.Widget)
+		}
+		if prop.XUI.Group != "" && !groupIDs[prop.XUI.Group] {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.group %q does not match any defined group in x-ui.groups", actionIdx, propName, prop.XUI.Group)
+		}
+		if prop.XUI.VisibleWhen != nil && prop.XUI.VisibleWhen.Field != "" && !propertyKeys[prop.XUI.VisibleWhen.Field] {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
 		}
 	}
 
