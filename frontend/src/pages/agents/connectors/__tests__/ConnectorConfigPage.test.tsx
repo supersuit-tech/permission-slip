@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -156,7 +157,10 @@ describe("ConnectorConfigPage", () => {
       screen.getByText("View all 2 available actions"),
     ).toBeInTheDocument();
 
-    // Credentials section (loads asynchronously via useCredentials)
+    // Credentials section — content is behind "Manage credentials" modal
+    const user = userEvent.setup();
+    const manageBtn = await screen.findByRole("button", { name: /Manage credentials/i });
+    await user.click(manageBtn);
     await waitFor(() => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
@@ -236,7 +240,11 @@ describe("ConnectorConfigPage", () => {
       return Promise.resolve({ data: {} });
     });
 
+    const user = userEvent.setup();
     renderPage();
+
+    const manageBtn = await screen.findByRole("button", { name: /Manage credentials/i });
+    await user.click(manageBtn);
 
     await waitFor(() => {
       expect(screen.getByText("Not configured")).toBeInTheDocument();
