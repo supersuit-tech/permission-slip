@@ -892,6 +892,63 @@ func TestCreateStandingApproval_WithSourceActionConfigurationID(t *testing.T) {
 	}
 }
 
+func TestCreateStandingApproval_SourceActionConfigIDEmpty(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "email.send",
+		"constraints": {"to": "user@example.com"},
+		"source_action_configuration_id": "",
+		"expires_at": "%s"
+	}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_SourceActionConfigIDTooLong(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	longID := strings.Repeat("a", 129)
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "email.send",
+		"constraints": {"to": "user@example.com"},
+		"source_action_configuration_id": "%s",
+		"expires_at": "%s"
+	}`, agentID, longID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestCreateStandingApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
