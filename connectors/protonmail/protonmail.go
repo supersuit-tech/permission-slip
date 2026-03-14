@@ -219,7 +219,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 							"items": {"type": "integer", "minimum": 1},
 							"minItems": 1,
 							"maxItems": 50,
-							"description": "Sequence numbers of emails to archive (batch)"
+							"description": "Sequence numbers of emails to archive (batch). Combined unique count of message_id + message_ids must not exceed 50."
 						},
 						"folder": {
 							"type": "string",
