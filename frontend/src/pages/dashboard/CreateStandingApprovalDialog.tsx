@@ -194,7 +194,10 @@ export function CreateStandingApprovalDialog({
       }
       setStep(3);
     } else if (step === 3) {
-      if (isCustomAction && !configSchema) {
+      // Use manual JSON path when no schema properties are available —
+      // matches the rendering condition in StepConstraints.
+      const useManualJson = !configSchema?.properties;
+      if (useManualJson) {
         try {
           const parsed = JSON.parse(manualConstraintsJson) as Record<
             string,
@@ -247,7 +250,10 @@ export function CreateStandingApprovalDialog({
 
     let constraints: Record<string, unknown>;
 
-    if (isCustomAction && !configSchema) {
+    // Use manual JSON path when no schema properties are available —
+    // matches the rendering condition in StepConstraints.
+    const useManualJson = !configSchema?.properties;
+    if (useManualJson) {
       try {
         constraints = JSON.parse(manualConstraintsJson) as Record<
           string,
@@ -357,7 +363,6 @@ export function CreateStandingApprovalDialog({
 
           {step === 3 && (
             <StepConstraints
-              isCustomAction={isCustomAction}
               configSchema={configSchema}
               schemaLoading={schemaLoading}
               paramValues={paramValues}

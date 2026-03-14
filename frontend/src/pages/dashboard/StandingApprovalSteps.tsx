@@ -121,7 +121,6 @@ export function StepPickAction({
 }
 
 export function StepConstraints({
-  isCustomAction,
   configSchema,
   schemaLoading,
   paramValues,
@@ -132,7 +131,6 @@ export function StepConstraints({
   onManualConstraintsJsonChange,
   isPending,
 }: {
-  isCustomAction: boolean;
   configSchema: ParametersSchema | null;
   schemaLoading: boolean;
   paramValues: Record<string, string>;
@@ -154,9 +152,6 @@ export function StepConstraints({
     );
   }
 
-  const showSchemaFields = configSchema?.properties && !isCustomAction;
-  const showManualJson = isCustomAction && !configSchema?.properties;
-
   return (
     <div className="space-y-3">
       <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3">
@@ -167,7 +162,7 @@ export function StepConstraints({
         </p>
       </div>
 
-      {showSchemaFields ? (
+      {configSchema?.properties ? (
         <div className="space-y-2">
           <Label>Constraints</Label>
           <ActionConfigParameterFields
@@ -179,9 +174,13 @@ export function StepConstraints({
             disabled={isPending}
           />
         </div>
-      ) : showManualJson ? (
+      ) : (
         <div className="space-y-2">
           <Label htmlFor="sa-manual-constraints">Constraints (JSON)</Label>
+          <p className="text-muted-foreground text-xs">
+            No parameter schema found for this action. Enter constraints
+            manually as a JSON object.
+          </p>
           <textarea
             id="sa-manual-constraints"
             className="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -191,39 +190,9 @@ export function StepConstraints({
             disabled={isPending}
           />
           <p className="text-muted-foreground text-xs">
-            Enter parameter constraints as a JSON object. Use{" "}
-            <code className="font-mono">&quot;*&quot;</code> for wildcard
+            Use <code className="font-mono">&quot;*&quot;</code> for wildcard
             parameters, but at least one must be non-wildcard.
           </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <Label>Constraints</Label>
-          {configSchema?.properties ? (
-            <ActionConfigParameterFields
-              parametersSchema={configSchema}
-              values={paramValues}
-              onValueChange={onParamValueChange}
-              modes={paramModes}
-              onModeChange={onParamModeChange}
-              disabled={isPending}
-            />
-          ) : (
-            <>
-              <p className="text-muted-foreground text-sm">
-                No parameter schema found for this action. Enter constraints
-                manually as JSON.
-              </p>
-              <textarea
-                id="sa-manual-constraints-fallback"
-                className="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder={'{\n  "param": "value"\n}'}
-                value={manualConstraintsJson}
-                onChange={(e) => onManualConstraintsJsonChange(e.target.value)}
-                disabled={isPending}
-              />
-            </>
-          )}
         </div>
       )}
     </div>
