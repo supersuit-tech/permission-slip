@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import { isPatternWrapper, WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
+import { isPatternWrapper } from "@/lib/constraints";
+import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
 interface ActionConfigRowProps {
   config: ActionConfiguration;
