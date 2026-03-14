@@ -137,6 +137,71 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		deleteCredentials := r.URL.Query().Get("delete_credentials") == "true"
+
+		if deleteCredentials {
+			// Wrap in a transaction so connector disable + credential delete are atomic.
+			tx, _, err := db.BeginOrContinue(r.Context(), deps.DB)
+			if err != nil {
+				log.Printf("[%s] DisableAgentConnector: begin tx: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+				return
+			}
+			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck
+
+			// Look up credential binding before disabling (cascade will delete the binding row).
+			credBinding, err := db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
+			if err != nil {
+				log.Printf("[%s] DisableAgentConnector: get credential: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+				return
+			}
+
+			result, err := db.DisableAgentConnector(r.Context(), tx, agentID, userID, connectorID)
+			if err != nil {
+				log.Printf("[%s] DisableAgentConnector: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+				return
+			}
+			if result == nil {
+				RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorNotFound, "Connector not enabled for this agent"))
+				return
+			}
+
+			// Delete the credential and its vault secret if one was assigned.
+			if credBinding != nil && credBinding.CredentialID != nil {
+				deleteResult, err := db.DeleteCredential(r.Context(), tx, *credBinding.CredentialID, userID)
+				if err != nil {
+					var credErr *db.CredentialError
+					if !errors.As(err, &credErr) || credErr.Code != db.CredentialErrNotFound {
+						log.Printf("[%s] DisableAgentConnector: delete credential: %v", TraceID(r.Context()), err)
+						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
+						return
+					}
+				} else if deps.Vault != nil {
+					if err := deps.Vault.DeleteSecret(r.Context(), tx, deleteResult.VaultSecretID); err != nil {
+						log.Printf("[%s] DisableAgentConnector: vault delete: %v", TraceID(r.Context()), err)
+						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
+						return
+					}
+				}
+			}
+
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] DisableAgentConnector: commit: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+				return
+			}
+
+			RespondJSON(w, http.StatusOK, disableAgentConnectorResponse{
+				AgentID:                  result.AgentID,
+				ConnectorID:              result.ConnectorID,
+				DisabledAt:               result.DisabledAt,
+				RevokedStandingApprovals: result.RevokedStandingApprovals,
+			})
+			return
+		}
+
 		// Delete is scoped by approver_id: returns nil for both "agent not found"
 		// and "connector not enabled" to avoid leaking agent existence.
 		result, err := db.DisableAgentConnector(r.Context(), deps.DB, agentID, userID, connectorID)

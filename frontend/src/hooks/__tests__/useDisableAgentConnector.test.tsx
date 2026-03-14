@@ -46,6 +46,7 @@ describe("useDisableAgentConnector", () => {
         headers: { Authorization: "Bearer token" },
         params: {
           path: { agent_id: 42, connector_id: "gmail" },
+          query: {},
         },
       },
     );

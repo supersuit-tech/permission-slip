@@ -1,13 +1,16 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
 // ── GET /agents/{agent_id}/connectors ───────────────────────────────────────
@@ -414,5 +417,60 @@ func TestDisableAgentConnector_RevokesStandingApprovals(t *testing.T) {
 	resp := decodeDisableAgentConnectorResponse(t, w.Body.Bytes())
 	if resp.RevokedStandingApprovals != 1 {
 		t.Errorf("expected 1 revoked standing approval, got %d", resp.RevokedStandingApprovals)
+	}
+}
+
+func TestDisableAgentConnector_DeleteCredentials(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	mockVault := vault.NewMockVaultStore()
+	vaultSecretID, err := mockVault.CreateSecret(context.Background(), tx, "cred_test", []byte("secret"))
+	if err != nil {
+		t.Fatalf("CreateSecret: %v", err)
+	}
+
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultSecretID)
+	if _, err = db.UpsertAgentConnectorCredential(context.Background(), tx, db.UpsertAgentConnectorCredentialParams{
+		ID:           testhelper.GenerateID(t, "acc_"),
+		AgentID:      agentID,
+		ConnectorID:  connID,
+		ApproverID:   uid,
+		CredentialID: &credID,
+	}); err != nil {
+		t.Fatalf("UpsertAgentConnectorCredential: %v", err)
+	}
+
+	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodDelete,
+		fmt.Sprintf("/agents/%d/connectors/%s?delete_credentials=true", agentID, connID), uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Credential row should be gone.
+	exists, err := db.CredentialBelongsToUser(context.Background(), tx, credID, uid)
+	if err != nil {
+		t.Fatalf("CredentialBelongsToUser: %v", err)
+	}
+	if exists {
+		t.Error("expected credential to be deleted, but it still exists")
+	}
+
+	// Vault secret should be gone.
+	if mockVault.SecretCount() != 0 {
+		t.Errorf("expected 0 vault secrets after remove, got %d", mockVault.SecretCount())
 	}
 }

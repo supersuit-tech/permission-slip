@@ -1454,6 +1454,15 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AgentId'
         - $ref: '#/components/parameters/ConnectorId'
+        - name: delete_credentials
+          in: query
+          required: false
+          description: |
+            When true, permanently delete any API key credentials associated with
+            this connector in addition to disabling it. OAuth connections are not
+            affected by this flag (they are managed separately).
+          schema:
+            type: boolean
       responses:
         '200':
           description: Connector disabled for agent
@@ -5647,6 +5656,13 @@ paths:
             type: array
             items:
               type: string
+        - name: replace
+          in: query
+          required: false
+          description: |
+            ID of an existing OAuth connection to replace (reconnect flow). When set, the specified connection is deleted and replaced by the new one after successful authorization. When omitted, a new connection is created alongside any existing ones for the same provider. The connection must belong to the authenticated user and the same provider being authorized.
+          schema:
+            type: string
       responses:
         '307':
           description: Redirects to the OAuth provider's authorization endpoint
@@ -5745,13 +5761,24 @@ paths:
                 $ref: '#/components/schemas/OAuthConnectionListResponse'
               example:
                 connections:
-                  - provider: google
+                  - id: oconn_abc123
+                    provider: google
                     scopes:
                       - openid
                       - https://www.googleapis.com/auth/userinfo.email
                     status: active
                     connected_at: '2026-03-05T10:00:00Z'
-                  - provider: microsoft
+                    display_name: user@gmail.com
+                  - id: oconn_def456
+                    provider: google
+                    scopes:
+                      - openid
+                      - https://www.googleapis.com/auth/gmail.send
+                    status: active
+                    connected_at: '2026-03-06T09:00:00Z'
+                    display_name: work@company.com
+                  - id: oconn_ghi789
+                    provider: microsoft
                     scopes:
                       - openid
                       - offline_access
@@ -5766,16 +5793,18 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/oauth/connections/{provider}:
+  /v1/oauth/connections/{connection_id}:
     delete:
       operationId: deleteOAuthConnection
-      summary: Disconnect OAuth Provider
+      summary: Disconnect OAuth Connection
       description: |
-        Disconnects an OAuth provider for the authenticated user. Deletes the
-        OAuth connection row and removes the encrypted tokens from the vault.
+        Disconnects a specific OAuth connection by its ID. Deletes the
+        OAuth connection row, removes the encrypted tokens from the vault,
+        and cascades to remove any agent-connector credential bindings that
+        reference this connection.
 
         After disconnection, any connector actions that depend on this OAuth
-        provider will fail until the user re-authorizes.
+        connection will fail until the user connects a new account.
 
         ## Security
 
@@ -5786,10 +5815,10 @@ paths:
       security:
         - SupabaseSession: []
       parameters:
-        - name: provider
+        - name: connection_id
           in: path
           required: true
-          description: The OAuth provider ID to disconnect
+          description: The OAuth connection ID to disconnect (e.g. "oconn_abc123")
           schema:
             type: string
       responses:
@@ -10512,6 +10541,11 @@ components:
           description: |
             For providers with per-instance OAuth URLs (e.g. Zendesk, Shopify), the instance identifier — subdomain for Zendesk (e.g. "mycompany.zendesk.com") or shop domain for Shopify (e.g. "mystore.myshopify.com"). Omitted for providers with static OAuth endpoints (e.g. Google, Slack).
           example: mycompany.zendesk.com
+        display_name:
+          type: string
+          description: |
+            A human-readable identifier for this connection, typically the authenticated user's email address. Omitted when no identifying information is available.
+          example: user@example.com
     OAuthConnectionListResponse:
       type: object
       required:

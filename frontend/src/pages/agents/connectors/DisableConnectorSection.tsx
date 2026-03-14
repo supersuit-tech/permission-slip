@@ -64,10 +64,10 @@ export function DisableConnectorSection({
   async function handleRemove() {
     setIsRemoving(true);
     try {
-      // Step 1: disable the connector
+      // Step 1: disable the connector and delete any API key credentials.
       let disableResult: Awaited<ReturnType<typeof disableConnector>>;
       try {
-        disableResult = await disableConnector({ agentId, connectorId });
+        disableResult = await disableConnector({ agentId, connectorId, deleteCredentials: true });
       } catch {
         toast.error("Failed to disable connector");
         return;
@@ -138,9 +138,10 @@ export function DisableConnectorSection({
                     Remove this connector
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    Disable the connector and disconnect the{" "}
-                    {providerLabel(oauthProvider)} OAuth connection. You will
-                    need to re-authorize when re-enabling.
+                    Disable the connector, disconnect the{" "}
+                    {providerLabel(oauthProvider)} OAuth connection, and
+                    permanently delete any saved API keys. You will need to
+                    re-authorize and re-add credentials when re-enabling.
                   </p>
                 </div>
                 <Button
@@ -196,11 +197,12 @@ export function DisableConnectorSection({
           <DialogHeader>
             <DialogTitle>Remove {connectorName}</DialogTitle>
             <DialogDescription>
-              This will disable the <strong>{connectorName}</strong> connector
-              and disconnect the{" "}
+              This will disable the <strong>{connectorName}</strong> connector,
+              disconnect the{" "}
               <strong>{providerLabel(oauthProvider ?? "")}</strong> OAuth
-              connection. Standing approvals will be revoked and you will need
-              to re-authorize OAuth when re-enabling.
+              connection, and permanently delete any saved API keys. Standing
+              approvals will be revoked. You will need to re-authorize and
+              re-add credentials when re-enabling.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

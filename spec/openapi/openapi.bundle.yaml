@@ -1454,6 +1454,15 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AgentId'
         - $ref: '#/components/parameters/ConnectorId'
+        - name: delete_credentials
+          in: query
+          required: false
+          description: |
+            When true, permanently delete any API key credentials associated with
+            this connector in addition to disabling it. OAuth connections are not
+            affected by this flag (they are managed separately).
+          schema:
+            type: boolean
       responses:
         '200':
           description: Connector disabled for agent
