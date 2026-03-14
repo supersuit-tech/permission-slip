@@ -338,7 +338,7 @@ function OAuthCredentialRow({
                     )}
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    {conn.display_name && `${providerLabel(conn.provider)} · `}
+                    {conn.display_name && `${providerLabel(conn.provider)}${conn.instance ? ` (${conn.instance})` : ""} · `}
                     {conn.status === "active"
                       ? `Connected ${new Date(conn.connected_at).toLocaleDateString()}`
                       : conn.status === "needs_reauth"
@@ -734,7 +734,7 @@ function AgentCredentialBinding({
           {activeConnections.map((conn) => (
             <option key={`oauth:${conn.id}`} value={`oauth:${conn.id}`}>
               {conn.display_name
-                ? `${conn.display_name} — ${providerLabel(conn.provider)} OAuth`
+                ? `${conn.display_name} — ${providerLabel(conn.provider)} OAuth${conn.instance ? ` (${conn.instance})` : ""}`
                 : `${providerLabel(conn.provider)} OAuth`}{" "}
               (connected{" "}
               {new Date(conn.connected_at).toLocaleDateString()})

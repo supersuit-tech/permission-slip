@@ -190,7 +190,7 @@ export function ConnectedAccountsSection() {
                     )}
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    {conn.display_name && `${providerLabel(conn.provider)} · `}
+                    {conn.display_name && `${providerLabel(conn.provider)}${conn.instance ? ` (${conn.instance})` : ""} · `}
                     {conn.scopes.length} scope
                     {conn.scopes.length !== 1 ? "s" : ""} granted &middot;
                     Connected{" "}
