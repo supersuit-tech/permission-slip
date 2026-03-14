@@ -398,8 +398,9 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			XUI *struct {
 				Widget      string `json:"widget"`
 				Group       string `json:"group"`
+				HelpURL     string `json:"help_url"`
 				VisibleWhen *struct {
-					Field  string `json:"field"`
+					Field  string           `json:"field"`
 					Equals *json.RawMessage `json:"equals"`
 				} `json:"visible_when"`
 			} `json:"x-ui"`
@@ -412,6 +413,12 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		}
 		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
 			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, textarea, toggle, number, date", actionIdx, propName, prop.XUI.Widget)
+		}
+		if prop.XUI.HelpURL != "" {
+			field := fmt.Sprintf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.help_url", actionIdx, propName)
+			if err := validateURL(prop.XUI.HelpURL, field, "http", "https"); err != nil {
+				return err
+			}
 		}
 		if prop.XUI.Group != "" && !groupIDs[prop.XUI.Group] {
 			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.group %q does not match any defined group in x-ui.groups", actionIdx, propName, prop.XUI.Group)

@@ -671,6 +671,14 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 			"visible_when missing equals key",
 			`{"type":"object","properties":{"a":{"type":"string"},"f":{"type":"string","x-ui":{"visible_when":{"field":"a"}}}}}`,
 		},
+		{
+			"help_url with javascript scheme",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"help_url":"javascript:alert(1)"}}}}`,
+		},
+		{
+			"help_url with no host",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"help_url":"https://"}}}}`,
+		},
 	}
 
 	for _, tt := range tests {
