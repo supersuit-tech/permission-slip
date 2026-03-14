@@ -72,6 +72,29 @@ const FALLBACK_OUTCOME: OutcomeStyle = {
   Icon: HelpCircle,
 };
 
+/**
+ * Deduplicate events that share a source_id: if a resolved (non-pending) event
+ * exists for a given source_id, drop any pending events with the same source_id.
+ * Events without a source_id are always kept.
+ *
+ * This prevents "double entries" in the UI where an approval shows up once as
+ * Pending (approval.requested) and again as Approved/Denied.
+ */
+export function deduplicateEvents(events: AuditEvent[]): AuditEvent[] {
+  const resolvedSourceIds = new Set<string>();
+  for (const event of events) {
+    if (event.source_id && event.outcome !== "pending") {
+      resolvedSourceIds.add(event.source_id);
+    }
+  }
+  return events.filter(
+    (event) =>
+      !event.source_id ||
+      event.outcome !== "pending" ||
+      !resolvedSourceIds.has(event.source_id),
+  );
+}
+
 export function getAuditAgentName(event: AuditEvent): string {
   return getAgentDisplayName({
     agent_id: event.agent_id,
