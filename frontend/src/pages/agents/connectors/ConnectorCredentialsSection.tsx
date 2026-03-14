@@ -115,6 +115,7 @@ export function ConnectorCredentialsSection({
         open={manageDialogOpen}
         onOpenChange={setManageDialogOpen}
         connectorId={connectorId}
+        connectorLabel={serviceLabel(connectorId)}
         hasRequiredCredentials={hasRequiredCredentials}
         hasImplicitOAuth={hasImplicitOAuth}
         hasOAuth={hasOAuth}

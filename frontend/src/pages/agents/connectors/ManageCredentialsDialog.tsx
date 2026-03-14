@@ -40,6 +40,7 @@ export interface ManageCredentialsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   connectorId: string;
+  connectorLabel?: string;
   hasRequiredCredentials: boolean;
   hasImplicitOAuth: boolean;
   hasOAuth: boolean;
@@ -57,6 +58,7 @@ export function ManageCredentialsDialog({
   open,
   onOpenChange,
   connectorId,
+  connectorLabel,
   hasRequiredCredentials,
   hasImplicitOAuth,
   hasOAuth,
@@ -73,9 +75,12 @@ export function ManageCredentialsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Manage Credentials</DialogTitle>
+          <DialogTitle>
+            Manage {connectorLabel ?? "Credentials"}
+          </DialogTitle>
           <DialogDescription>
-            Connect accounts and manage credentials for this connector.
+            Connect accounts and manage credentials
+            {connectorLabel ? ` for ${connectorLabel}` : ""}.
           </DialogDescription>
         </DialogHeader>
 
