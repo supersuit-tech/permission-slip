@@ -77,7 +77,7 @@ export function ActionConfigurationsSection({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Settings className="text-muted-foreground size-5" />
           <CardTitle>Action Configurations</CardTitle>
@@ -85,6 +85,7 @@ export function ActionConfigurationsSection({
         {configs.length > 0 && (
           <Button
             size="sm"
+            className="shrink-0 self-start sm:self-center"
             onClick={() => setAddDialogOpen(true)}
             disabled={actions.length === 0}
           >

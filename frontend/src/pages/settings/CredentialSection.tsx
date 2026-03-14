@@ -44,7 +44,7 @@ export function CredentialSection() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <KeyRound className="text-muted-foreground size-5" />
               <CardTitle>Credential Vault</CardTitle>
@@ -64,6 +64,7 @@ export function CredentialSection() {
               <Button
                 variant="outline"
                 size="sm"
+                className="shrink-0 self-start sm:self-center"
                 onClick={() => setAddDialogOpen(true)}
               >
                 <Plus className="size-4" />
@@ -97,16 +98,16 @@ export function CredentialSection() {
               {credentials.map((cred) => (
                 <div
                   key={cred.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
+                  className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-0.5">
+                  <div className="min-w-0 space-y-0.5">
                     <p className="text-sm font-medium">{cred.service}</p>
                     <p className="text-xs text-muted-foreground">
                       {cred.label ?? "Credential"} &middot; Added{" "}
                       {new Date(cred.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Badge variant="secondary">Active</Badge>
                     <InlineConfirmButton
                       confirmLabel="Delete"

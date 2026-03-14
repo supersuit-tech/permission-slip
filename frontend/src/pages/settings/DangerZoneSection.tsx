@@ -38,8 +38,8 @@ export function DangerZoneSection() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between rounded-lg border border-destructive/30 p-4">
-            <div className="space-y-0.5">
+          <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 space-y-0.5">
               <p className="text-sm font-medium">Delete Account</p>
               <p className="text-xs text-muted-foreground">
                 Permanently delete your account and all associated data.
@@ -48,6 +48,7 @@ export function DangerZoneSection() {
             <Button
               variant="destructive"
               size="sm"
+              className="shrink-0 self-start sm:self-center"
               onClick={() => setDialogOpen(true)}
             >
               Delete Account

@@ -109,8 +109,8 @@ export function DisableConnectorSection({
           <CardTitle className="text-destructive">Danger Zone</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-sm font-medium">Disable this connector</p>
               <p className="text-muted-foreground text-xs">
                 Temporarily prevent the agent from using {connectorName}. Your
@@ -121,6 +121,7 @@ export function DisableConnectorSection({
             <Button
               variant="destructive"
               size="sm"
+              className="shrink-0 self-start sm:self-center"
               onClick={() => setDisableConfirmOpen(true)}
               disabled={isRemoving}
             >
@@ -131,8 +132,8 @@ export function DisableConnectorSection({
           {oauthProvider && (
             <>
               <div className="border-t" />
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-medium">
                     Remove this connector
                   </p>
@@ -145,6 +146,7 @@ export function DisableConnectorSection({
                 <Button
                   variant="destructive"
                   size="sm"
+                  className="shrink-0 self-start sm:self-center"
                   disabled={isRemoving}
                   onClick={() => setRemoveConfirmOpen(true)}
                 >

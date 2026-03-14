@@ -268,7 +268,7 @@ function OAuthCredentialRow({
   return (
     <>
       <div className="rounded-lg border p-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
@@ -298,7 +298,7 @@ function OAuthCredentialRow({
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 pl-8 sm:pl-0">
             {!hasAnyConnection && (
               <Button
                 variant="outline"
@@ -515,7 +515,7 @@ function StaticCredentialRow({
   return (
     <>
       <div className="rounded-lg border p-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
@@ -549,7 +549,7 @@ function StaticCredentialRow({
               )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 pl-8 sm:pl-0">
             <span
               className={`text-xs font-medium ${
                 isConnected

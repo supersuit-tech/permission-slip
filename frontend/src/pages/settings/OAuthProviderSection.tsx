@@ -83,9 +83,9 @@ export function OAuthProviderSection() {
               {configuredByoaProviders.map((config) => (
                 <div
                   key={config.provider}
-                  className="flex items-center justify-between rounded-lg border p-4"
+                  className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-0.5">
+                  <div className="min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2">
                       <KeyRound className="text-muted-foreground size-4" />
                       <p className="text-sm font-medium">
@@ -97,7 +97,7 @@ export function OAuthProviderSection() {
                       {new Date(config.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Badge variant="secondary">BYOA</Badge>
                     <InlineConfirmButton
                       confirmLabel="Remove"
@@ -119,9 +119,9 @@ export function OAuthProviderSection() {
               {unconfiguredProviders.map((provider) => (
                 <div
                   key={provider.id}
-                  className="flex items-center justify-between rounded-lg border border-dashed p-4"
+                  className="flex flex-col gap-3 rounded-lg border border-dashed p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-0.5">
+                  <div className="min-w-0 space-y-0.5">
                     <p className="text-sm font-medium">
                       {providerLabel(provider.id)}
                     </p>
@@ -132,6 +132,7 @@ export function OAuthProviderSection() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="shrink-0 self-start sm:self-center"
                     onClick={() =>
                       setBYOADialog({
                         provider: provider.id,

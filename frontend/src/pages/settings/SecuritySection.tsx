@@ -122,9 +122,9 @@ export function SecuritySection() {
               {factors.map((factor) => (
                 <div
                   key={factor.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
+                  className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="space-y-0.5">
+                  <div className="min-w-0 space-y-0.5">
                     <p className="text-sm font-medium">
                       {factor.friendly_name ?? "Authenticator App"}
                     </p>

@@ -42,8 +42,8 @@ export function DeactivateSection({ agentId }: { agentId: number }) {
           <CardTitle className="text-destructive">Danger Zone</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-sm font-medium">Deactivate this agent</p>
               <p className="text-muted-foreground text-xs">
                 This will revoke all standing approvals and prevent the agent
@@ -53,6 +53,7 @@ export function DeactivateSection({ agentId }: { agentId: number }) {
             <Button
               variant="destructive"
               size="sm"
+              className="shrink-0 self-start sm:self-center"
               onClick={() => setConfirmOpen(true)}
             >
               Deactivate
