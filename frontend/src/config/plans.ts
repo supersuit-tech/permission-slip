@@ -22,8 +22,13 @@ const plans: PlansMap = plansJson;
 
 export type { PlanConfig };
 
-export const freePlan = plans["free"]!;
-export const paidPlan = plans["pay_as_you_go"]!;
+const freePlanRaw = plans["free"];
+const paidPlanRaw = plans["pay_as_you_go"];
+if (!freePlanRaw || !paidPlanRaw) {
+  throw new Error("plans.json is missing required plan definitions (free, pay_as_you_go)");
+}
+export const freePlan: PlanConfig = freePlanRaw;
+export const paidPlan: PlanConfig = paidPlanRaw;
 
 /** Format a number with locale-aware separators (e.g. 1,000). */
 export function formatLimit(n: number): string {

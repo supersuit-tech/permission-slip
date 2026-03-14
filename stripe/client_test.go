@@ -5,8 +5,8 @@ import (
 )
 
 func TestFreeRequestAllowance(t *testing.T) {
-	if FreeRequestAllowance != 250 {
-		t.Errorf("expected FreeRequestAllowance=250 (from config/plans.json free plan), got %d", FreeRequestAllowance)
+	if FreeRequestAllowance() != 250 {
+		t.Errorf("expected FreeRequestAllowance()=250 (from config/plans.json free plan), got %d", FreeRequestAllowance())
 	}
 }
 

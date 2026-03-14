@@ -56,7 +56,7 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 		                AND s.downgraded_at > now() - interval '%d days'
 		           THEN %d
 		           ELSE %s
-		      END)`, gracePeriodDays, PaidPlanRetentionDays, caseExpr))
+		      END)`, gracePeriodDays, PaidPlanRetentionDays(), caseExpr))
 	if err != nil {
 		return 0, fmt.Errorf("purge expired audit events (subscribed users): %w", err)
 	}

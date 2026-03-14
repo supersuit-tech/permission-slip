@@ -50,6 +50,12 @@ func TestGetPlan_PayAsYouGo(t *testing.T) {
 	if plan.MaxAgents != nil {
 		t.Errorf("expected max_agents=nil (unlimited), got %v", *plan.MaxAgents)
 	}
+	if plan.MaxStandingApprovals != nil {
+		t.Errorf("expected max_standing_approvals=nil (unlimited), got %v", *plan.MaxStandingApprovals)
+	}
+	if plan.MaxCredentials != nil {
+		t.Errorf("expected max_credentials=nil (unlimited), got %v", *plan.MaxCredentials)
+	}
 	if plan.AuditRetentionDays != 90 {
 		t.Errorf("expected audit_retention_days=90, got %d", plan.AuditRetentionDays)
 	}

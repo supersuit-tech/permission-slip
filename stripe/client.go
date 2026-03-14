@@ -91,15 +91,18 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, stripeCustomerID, su
 	return sess, nil
 }
 
-// FreeRequestAllowance is the number of requests included for free each
+// freeRequestAllowance is the number of requests included for free each
 // billing period before per-request charges apply. Derived from config/plans.json.
-var FreeRequestAllowance = func() int64 {
+var freeRequestAllowance = func() int64 {
 	p := config.GetPlan(config.PlanFree)
 	if p != nil && p.MaxRequestsPerMonth != nil {
 		return int64(*p.MaxRequestsPerMonth)
 	}
 	return 250 // fallback
 }()
+
+// FreeRequestAllowance returns the number of free requests per billing period.
+func FreeRequestAllowance() int64 { return freeRequestAllowance }
 
 // OverageCostCents calculates the cost in cents for overage requests at
 // $0.005/request (0.5 cents). Uses ceiling division to avoid under-billing
@@ -116,7 +119,8 @@ func OverageCostCents(overage int) int {
 // usage. It calculates the overage beyond the free allowance and charges
 // $0.005 per request. Returns nil (no error) if usage is within the free tier.
 func (c *Client) CreateUsageInvoiceItem(ctx context.Context, stripeCustomerID string, requestCount int64) (*gostripe.InvoiceItem, error) {
-	billable := requestCount - FreeRequestAllowance
+	allowance := FreeRequestAllowance()
+	billable := requestCount - allowance
 	if billable <= 0 {
 		return nil, nil // within free tier
 	}
@@ -127,7 +131,7 @@ func (c *Client) CreateUsageInvoiceItem(ctx context.Context, stripeCustomerID st
 		Customer:    gostripe.String(stripeCustomerID),
 		Amount:      gostripe.Int64(amountCents),
 		Currency:    gostripe.String(string(gostripe.CurrencyUSD)),
-		Description: gostripe.String(fmt.Sprintf("API requests: %d billable (after %d free)", billable, FreeRequestAllowance)),
+		Description: gostripe.String(fmt.Sprintf("API requests: %d billable (after %d free)", billable, allowance)),
 	}
 	params.Context = ctx
 
