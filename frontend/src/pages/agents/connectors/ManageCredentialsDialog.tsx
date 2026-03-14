@@ -125,7 +125,7 @@ export function ManageCredentialsDialog({
                 cred.auth_type !== "oauth2";
 
               return (
-                <div key={cred.service}>
+                <div key={`${cred.service}:${cred.auth_type}`}>
                   {showOrSeparator && (
                     <div className="flex items-center gap-3 py-1">
                       <div className="bg-border h-px flex-1" />
@@ -561,7 +561,9 @@ function StaticCredentialRow({
       {removeTarget && (
         <RemoveCredentialDialog
           open
-          onOpenChange={() => setRemoveTarget(null)}
+          onOpenChange={(open) => {
+            if (!open) setRemoveTarget(null);
+          }}
           credential={removeTarget}
         />
       )}

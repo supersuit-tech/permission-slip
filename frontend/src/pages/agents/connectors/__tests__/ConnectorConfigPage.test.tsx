@@ -138,6 +138,17 @@ describe("ConnectorConfigPage", () => {
       if (path === "/v1/action-configurations") {
         return Promise.resolve({ data: mockActionConfigsResponse });
       }
+      if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential") {
+        return Promise.resolve({
+          data: { agent_id: 42, connector_id: "github", credential_id: "cred_123", oauth_connection_id: null },
+        });
+      }
+      if (path === "/v1/oauth/connections") {
+        return Promise.resolve({ data: { connections: [] } });
+      }
+      if (path === "/v1/oauth/providers") {
+        return Promise.resolve({ data: { providers: [] } });
+      }
       return Promise.resolve({ data: {} });
     });
 
@@ -236,6 +247,17 @@ describe("ConnectorConfigPage", () => {
       }
       if (path === "/v1/credentials") {
         return Promise.resolve({ data: { credentials: [] } });
+      }
+      if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential") {
+        return Promise.resolve({
+          data: { agent_id: 42, connector_id: "github", credential_id: null, oauth_connection_id: null },
+        });
+      }
+      if (path === "/v1/oauth/connections") {
+        return Promise.resolve({ data: { connections: [] } });
+      }
+      if (path === "/v1/oauth/providers") {
+        return Promise.resolve({ data: { providers: [] } });
       }
       return Promise.resolve({ data: {} });
     });

@@ -16,6 +16,7 @@ import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { providerLabel } from "@/lib/oauth";
+import { serviceLabel } from "@/lib/labels";
 import {
   useAgentConnectorCredential,
   useAssignAgentConnectorCredential,
