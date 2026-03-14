@@ -168,7 +168,10 @@ export function StandingApprovalsCard() {
     useStandingApprovals();
   const { agents } = useAgents();
   const agentIds = useMemo(
-    () => standingApprovals.map((sa) => sa.agent_id),
+    () =>
+      standingApprovals
+        .filter((sa) => !!sa.source_action_configuration_id)
+        .map((sa) => sa.agent_id),
     [standingApprovals],
   );
   const configMap = useActionConfigMap(agentIds);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Asterisk, Lock, Regex } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { isPatternWrapper } from "@/pages/agents/connectors/ActionConfigFormFields";
+import { isPatternWrapper } from "@/lib/constraints";
 
 /** Maximum number of constraints shown before collapsing with "+N more". */
 const VISIBLE_LIMIT = 2;

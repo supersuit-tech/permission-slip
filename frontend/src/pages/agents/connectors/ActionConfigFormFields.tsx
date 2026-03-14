@@ -186,12 +186,5 @@ export function buildParametersFromForm(
   return parameters;
 }
 
-/** Check if a stored parameter value is a $pattern wrapper object. */
-export function isPatternWrapper(value: unknown): value is { $pattern: string } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "$pattern" in value &&
-    typeof (value as Record<string, unknown>).$pattern === "string"
-  );
-}
+// Re-exported from shared lib for backward compatibility.
+export { isPatternWrapper } from "@/lib/constraints";

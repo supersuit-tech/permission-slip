@@ -1,7 +1,7 @@
 import { Check, FileText, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
-import { isPatternWrapper } from "./ActionConfigFormFields";
+import { isPatternWrapper } from "@/lib/constraints";
 
 interface TemplatePickerProps {
   templates: ActionConfigTemplate[];

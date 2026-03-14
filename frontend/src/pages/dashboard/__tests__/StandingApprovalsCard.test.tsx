@@ -185,4 +185,15 @@ describe("StandingApprovalsCard", () => {
       expect(screen.getByText("Agent 1")).toBeInTheDocument();
     });
   });
+
+  it("shows no config subtitle when source config is not found", async () => {
+    mockApiFetch(mockStandingApprovals, freePlanResponse, mockAgents, []);
+
+    render(<StandingApprovalsCard />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Send company emails")).not.toBeInTheDocument();
+      expect(screen.getByText("email.send")).toBeInTheDocument();
+    });
+  });
 });
