@@ -410,7 +410,7 @@ RequiredCredentials: []connectors.ManifestCredential{
 },
 ```
 
-At execution time, `resolveCredentialsWithFallback` tries OAuth first. If the user has no OAuth connection, it falls back to static credentials (API key). The `ValidateCredentials` method must accept either credential type:
+At execution time, `resolveCredentialsWithFallback` uses the credential explicitly assigned to the agent+connector pair. There is no auto-resolve — the user must assign a credential in the agent's connector settings before actions can execute. The `ValidateCredentials` method must accept either credential type since the binding could be either OAuth or static:
 
 ```go
 func (c *MyConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {

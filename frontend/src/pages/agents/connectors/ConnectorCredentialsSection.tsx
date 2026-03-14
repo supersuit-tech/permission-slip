@@ -43,7 +43,6 @@ import {
 import {
   useAgentConnectorCredential,
   useAssignAgentConnectorCredential,
-  useRemoveAgentConnectorCredential,
 } from "@/hooks/useAgentConnectorCredential";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
@@ -639,11 +638,9 @@ function AgentCredentialBinding({
     useAgentConnectorCredential(agentId, connectorId);
   const { assign, isPending: assigning } =
     useAssignAgentConnectorCredential();
-  const { remove, isPending: removing } =
-    useRemoveAgentConnectorCredential();
 
   const isLoading = anyLoading || bindingLoading;
-  const isPending = assigning || removing;
+  const isPending = assigning;
 
   // Build options scoped to this connector — only show credentials whose
   // service matches the connector ID and OAuth connections whose provider
@@ -662,13 +659,10 @@ function AgentCredentialBinding({
       : "";
 
   async function handleChange(value: string) {
-    if (isPending) return;
+    if (isPending || !value) return;
 
     try {
-      if (!value) {
-        await remove({ agentId, connectorId });
-        toast.success("Credential unassigned from this agent.");
-      } else if (value.startsWith("oauth:")) {
+      if (value.startsWith("oauth:")) {
         await assign({
           agentId,
           connectorId,
@@ -692,8 +686,10 @@ function AgentCredentialBinding({
 
   if (isLoading) return null;
 
-  // Don't show if there are no credentials or connections to choose from
-  if (scopedCredentials.length === 0 && activeConnections.length === 0) return null;
+  // Don't show if there are no scoped credentials, connections, or existing binding.
+  // A stale binding (pointing to a deleted credential) must still be visible
+  // so the user can reassign it.
+  if (scopedCredentials.length === 0 && activeConnections.length === 0 && !binding) return null;
 
   return (
     <div className="mb-4 rounded-lg border p-3">
@@ -710,18 +706,15 @@ function AgentCredentialBinding({
               Assigned
             </Badge>
           ) : (
-            <Badge
-              variant="secondary"
-              className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-            >
-              Using default
+            <Badge variant="destructive">
+              Not set
             </Badge>
           )}
         </div>
         <p className="text-muted-foreground text-xs">
           {currentValue
             ? "This agent uses a specific credential for this connector."
-            : "This agent uses your default credential. Assign a specific one to override."}
+            : "Select a credential for this agent. The connector won\u2019t work until one is assigned."}
         </p>
         <select
           id="agent-credential-select"
@@ -730,7 +723,7 @@ function AgentCredentialBinding({
           onChange={(e) => handleChange(e.target.value)}
           disabled={isPending}
         >
-          <option value="">Default (auto-resolve)</option>
+          {!currentValue && <option value="">Select a credential…</option>}
           {activeConnections.map((conn) => (
             <option key={`oauth:${conn.id}`} value={`oauth:${conn.id}`}>
               {conn.display_name
