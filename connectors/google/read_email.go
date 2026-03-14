@@ -33,13 +33,30 @@ type readEmailAction struct {
 // readEmailParams is the user-facing parameter schema.
 type readEmailParams struct {
 	MessageID string `json:"message_id"`
+	Format    string `json:"format,omitempty"`
+}
+
+// validFormats are the allowed values for the format parameter.
+var validFormats = map[string]bool{
+	"full":     true,
+	"metadata": true,
+	"minimal":  true,
 }
 
 func (p *readEmailParams) validate() error {
 	if p.MessageID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message_id"}
 	}
+	if p.Format != "" && !validFormats[p.Format] {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid format: %q (must be full, metadata, or minimal)", p.Format)}
+	}
 	return nil
+}
+
+func (p *readEmailParams) normalize() {
+	if p.Format == "" {
+		p.Format = "full"
+	}
 }
 
 // gmailFullMessage is the Gmail API response from messages.get with format=full.
@@ -79,8 +96,8 @@ type emailFullDetail struct {
 	Date        string               `json:"date,omitempty"`
 	Snippet     string               `json:"snippet,omitempty"`
 	Labels      []string             `json:"labels,omitempty"`
-	ContentType string               `json:"content_type"`
-	Body        string               `json:"body"`
+	ContentType string               `json:"content_type,omitempty"`
+	Body        string               `json:"body,omitempty"`
 	Attachments []gmailAttachmentInfo `json:"attachments,omitempty"`
 }
 
@@ -102,9 +119,10 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	if err := params.validate(); err != nil {
 		return nil, err
 	}
+	params.normalize()
 
 	var msg gmailFullMessage
-	msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(params.MessageID) + "?format=full"
+	msgURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(params.MessageID) + "?format=" + params.Format
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, msgURL, nil, &msg); err != nil {
 		return nil, err
 	}
@@ -132,11 +150,16 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		}
 	}
 
-	// Extract body and attachments from the MIME tree (depth-limited).
-	body, contentType := extractBody(&msg.Payload, 0)
-	detail.Body = body
-	detail.ContentType = contentType
-	detail.Attachments = extractAttachments(&msg.Payload)
+	// Only extract body and attachments for format=full. The metadata and
+	// minimal formats return no body data or MIME parts from the Gmail API.
+	if params.Format == "full" {
+		body, contentType := extractBody(&msg.Payload, 0)
+		if body != "" {
+			detail.Body = body
+			detail.ContentType = contentType
+		}
+		detail.Attachments = extractAttachments(&msg.Payload)
+	}
 
 	return connectors.JSONResult(detail)
 }

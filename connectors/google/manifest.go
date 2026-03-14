@@ -683,6 +683,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"message_id": {
 							"type": "string",
 							"description": "The Gmail message ID to read (from list_emails results)"
+						},
+						"format": {
+							"type": "string",
+							"enum": ["full", "metadata", "minimal"],
+							"default": "full",
+							"description": "Controls how much of the message is returned. 'full' (default) returns headers, body, and attachment metadata. 'metadata' returns headers only (no body). 'minimal' returns only ID, labels, and snippet."
 						}
 					}
 				}`)),
