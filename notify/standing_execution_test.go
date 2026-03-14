@@ -7,16 +7,11 @@ import (
 	"time"
 )
 
-// standingExecutionApproval delegates to the shared fixture in testdata_test.go
-func standingExecutionApproval() Approval {
-	return testStandingExecutionApproval()
-}
-
 // ── extractStandingExecutionInfo tests ──────────────────────────────────────
 
 func TestExtractStandingExecutionInfo_Full(t *testing.T) {
 	t.Parallel()
-	a := standingExecutionApproval()
+	a := testStandingExecutionApproval()
 	info := extractStandingExecutionInfo(a)
 
 	if info.AgentName != "Deploy Bot" {
@@ -85,7 +80,7 @@ func TestExecutionCountLabel_NoCount(t *testing.T) {
 
 func TestBuildEmailSubject_StandingExecution(t *testing.T) {
 	t.Parallel()
-	a := standingExecutionApproval()
+	a := testStandingExecutionApproval()
 	subject := buildEmailSubject(a)
 	expected := "Deploy Bot executed github.issues.create via standing approval"
 	if subject != expected {
@@ -110,7 +105,7 @@ func TestBuildEmailSubject_StandingExecution_NoActionType(t *testing.T) {
 
 func TestBuildEmailPlainBody_StandingExecution(t *testing.T) {
 	t.Parallel()
-	a := standingExecutionApproval()
+	a := testStandingExecutionApproval()
 	body := buildEmailPlainBody(a)
 
 	checks := []string{
@@ -147,7 +142,7 @@ func TestBuildEmailPlainBody_StandingExecution_NoSensitiveData(t *testing.T) {
 
 func TestBuildEmailHTMLBody_StandingExecution(t *testing.T) {
 	t.Parallel()
-	a := standingExecutionApproval()
+	a := testStandingExecutionApproval()
 	h := buildEmailHTMLBody(a)
 
 	checks := []string{
@@ -205,7 +200,7 @@ func TestBuildEmailHTMLBody_StandingExecution_NoURL(t *testing.T) {
 
 func TestFormatSMSBody_StandingExecution(t *testing.T) {
 	t.Parallel()
-	a := standingExecutionApproval()
+	a := testStandingExecutionApproval()
 	body := formatSMSBody(a)
 
 	checks := []string{
@@ -258,7 +253,7 @@ func TestFormatSMSBody_StandingExecution_Unlimited(t *testing.T) {
 
 func TestBuildPushContent_StandingExecution(t *testing.T) {
 	t.Parallel()
-	a := standingExecutionApproval()
+	a := testStandingExecutionApproval()
 	c := BuildPushContent(a)
 
 	if c.Title != "Deploy Bot auto-executed" {
