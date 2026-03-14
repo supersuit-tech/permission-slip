@@ -86,10 +86,11 @@ type emailFullDetail struct {
 
 // gmailAttachmentInfo describes an attachment without including its content.
 type gmailAttachmentInfo struct {
-	Filename    string `json:"filename"`
-	MimeType    string `json:"mime_type"`
-	Size        int    `json:"size"`
-	PartID      string `json:"part_id,omitempty"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mime_type"`
+	Size         int    `json:"size"`
+	PartID       string `json:"part_id,omitempty"`
+	AttachmentID string `json:"attachment_id,omitempty"`
 }
 
 // Execute fetches a single email by message ID and returns its full content.
@@ -201,9 +202,10 @@ func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo, dept
 	}
 	if part.Body.AttachmentID != "" {
 		info := gmailAttachmentInfo{
-			MimeType: part.MimeType,
-			Size:     part.Body.Size,
-			PartID:   part.PartID,
+			MimeType:     part.MimeType,
+			Size:         part.Body.Size,
+			PartID:       part.PartID,
+			AttachmentID: part.Body.AttachmentID,
 		}
 		// Extract filename from Content-Disposition, falling back to
 		// Content-Type name= (used by some older mailers).
@@ -258,11 +260,15 @@ func parseFilename(headerValue string) string {
 }
 
 // decodeRFC5987 decodes a RFC 5987 encoded value like "UTF-8''caf%C3%A9.pdf".
-// Returns empty string if the format is unrecognized.
+// Only UTF-8 charset is supported; other charsets (e.g. ISO-8859-1) return ""
+// to avoid producing invalid UTF-8 strings.
 func decodeRFC5987(value string) string {
 	// Format: charset'language'encoded_value
 	parts := strings.SplitN(value, "'", 3)
 	if len(parts) != 3 {
+		return ""
+	}
+	if !strings.EqualFold(parts[0], "UTF-8") {
 		return ""
 	}
 	decoded, err := url.PathUnescape(parts[2])

@@ -239,6 +239,9 @@ func TestReadEmail_WithAttachments(t *testing.T) {
 	if att.PartID != "1" {
 		t.Errorf("expected part_id '1', got %q", att.PartID)
 	}
+	if att.AttachmentID != "att-001" {
+		t.Errorf("expected attachment_id 'att-001', got %q", att.AttachmentID)
+	}
 }
 
 func TestReadEmail_AttachmentFilenameFromContentType(t *testing.T) {
@@ -504,6 +507,7 @@ func TestDecodeRFC5987_EdgeCases(t *testing.T) {
 		{"invalid percent encoding", "UTF-8''bad%ZZvalue", ""},
 		{"empty value after quotes", "UTF-8''", ""},
 		{"empty input", "", ""},
+		{"non-UTF-8 charset rejected", "ISO-8859-1''caf%E9.pdf", ""},
 	}
 
 	for _, tt := range tests {
