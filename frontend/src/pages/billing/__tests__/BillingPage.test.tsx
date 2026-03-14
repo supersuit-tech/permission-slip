@@ -10,6 +10,7 @@ import {
   paidPlanResponse,
   usageDetailResponse,
   freeUsageDetailResponse,
+  paidUnderAllowanceUsageResponse,
   invoicesResponse,
   agentsResponse,
   overLimitPaidPlanResponse,
@@ -21,7 +22,7 @@ vi.mock("../../../api/client");
 
 function mockBillingApi(
   planResponse: typeof freePlanResponse | typeof paidPlanResponse,
-  usageResponse: typeof usageDetailResponse | typeof freeUsageDetailResponse = usageDetailResponse,
+  usageResponse: typeof usageDetailResponse | typeof freeUsageDetailResponse | typeof paidUnderAllowanceUsageResponse = usageDetailResponse,
 ) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
@@ -270,7 +271,7 @@ describe("BillingPage", () => {
       expect(screen.getByText("Pay-as-you-go")).toBeInTheDocument();
     });
 
-    it("shows unlimited usage for paid plan", async () => {
+    it("shows unlimited usage for paid plan resources", async () => {
       mockBillingApi(paidPlanResponse);
 
       render(<BillingPage />, { wrapper });
@@ -278,8 +279,22 @@ describe("BillingPage", () => {
       await waitFor(() => {
         expect(screen.getByText("Usage")).toBeInTheDocument();
       });
+      // Agents, Standing Approvals, Credentials show "Unlimited"
       const unlimitedTexts = screen.getAllByText(/Unlimited/);
       expect(unlimitedTexts.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("shows free request allowance for paid plan", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Usage")).toBeInTheDocument();
+      });
+      // Paid plan shows requests against the 250 free allowance with billed count
+      expect(screen.getByText(/billed/)).toBeInTheDocument();
+      expect(screen.getByText(/\$0.005\/request/)).toBeInTheDocument();
     });
 
     it("does not show upgrade CTA for paid plan", async () => {
@@ -513,8 +528,31 @@ describe("BillingPage", () => {
       await waitFor(() => {
         expect(screen.getByText("Estimated cost")).toBeInTheDocument();
       });
-      // $2.71 requests + $0.05 SMS = $2.76 (shown in both UsageDashboard and PlanDetailsCard)
-      expect(screen.getAllByText("$2.76").length).toBeGreaterThanOrEqual(1);
+      // $6.46 requests + $0.05 SMS = $6.51 (shown in both UsageDashboard and PlanDetailsCard)
+      expect(screen.getAllByText("$6.51").length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("shows free requests remaining when under allowance", async () => {
+      mockBillingApi(paidPlanResponse, paidUnderAllowanceUsageResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Estimated cost")).toBeInTheDocument();
+      });
+      expect(screen.getAllByText("$0.00").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/free requests remaining/)).toBeInTheDocument();
+    });
+
+    it("shows billed requests count when over allowance", async () => {
+      mockBillingApi(paidPlanResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Estimated cost")).toBeInTheDocument();
+      });
+      expect(screen.getByText(/requests billed/)).toBeInTheDocument();
     });
 
     it("shows days remaining in billing period", async () => {
