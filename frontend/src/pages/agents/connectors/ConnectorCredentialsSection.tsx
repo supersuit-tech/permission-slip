@@ -329,15 +329,16 @@ function OAuthCredentialRow({
                 className="bg-muted/50 flex items-center justify-between rounded-md px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm">
+                  <p className="truncate text-sm font-medium">
                     {conn.display_name || providerLabel(conn.provider)}
                     {conn.instance && !conn.display_name && (
-                      <span className="text-muted-foreground ml-1">
+                      <span className="text-muted-foreground ml-1 font-normal">
                         ({conn.instance})
                       </span>
                     )}
                   </p>
                   <p className="text-muted-foreground text-xs">
+                    {conn.display_name && `${providerLabel(conn.provider)} · `}
                     {conn.status === "active"
                       ? `Connected ${new Date(conn.connected_at).toLocaleDateString()}`
                       : conn.status === "needs_reauth"
@@ -704,7 +705,10 @@ function AgentCredentialBinding({
               Assigned
             </Badge>
           ) : (
-            <Badge variant="secondary" className="text-muted-foreground">
+            <Badge
+              variant="secondary"
+              className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+            >
               Using default
             </Badge>
           )}
@@ -724,8 +728,10 @@ function AgentCredentialBinding({
           <option value="">Default (auto-resolve)</option>
           {activeConnections.map((conn) => (
             <option key={`oauth:${conn.id}`} value={`oauth:${conn.id}`}>
-              {providerLabel(conn.provider)} OAuth
-              {conn.display_name ? ` — ${conn.display_name}` : ""} (connected{" "}
+              {conn.display_name
+                ? `${conn.display_name} — ${providerLabel(conn.provider)} OAuth`
+                : `${providerLabel(conn.provider)} OAuth`}{" "}
+              (connected{" "}
               {new Date(conn.connected_at).toLocaleDateString()})
             </option>
           ))}

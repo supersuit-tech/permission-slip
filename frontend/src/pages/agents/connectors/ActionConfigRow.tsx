@@ -128,7 +128,10 @@ function StatusBadge({ status }: { status: "active" | "disabled" }) {
     );
   }
   return (
-    <Badge variant="secondary" className="text-muted-foreground">
+    <Badge
+      variant="secondary"
+      className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+    >
       Disabled
     </Badge>
   );

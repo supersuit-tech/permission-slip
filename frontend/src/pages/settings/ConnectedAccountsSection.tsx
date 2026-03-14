@@ -182,12 +182,7 @@ export function ConnectedAccountsSection() {
               >
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">
-                    {providerLabel(conn.provider)}
-                    {conn.display_name && (
-                      <span className="text-muted-foreground ml-1.5 font-normal">
-                        ({conn.display_name})
-                      </span>
-                    )}
+                    {conn.display_name || providerLabel(conn.provider)}
                     {!conn.display_name && conn.instance && (
                       <span className="text-muted-foreground ml-1.5 font-normal">
                         ({conn.instance})
@@ -195,6 +190,7 @@ export function ConnectedAccountsSection() {
                     )}
                   </p>
                   <p className="text-muted-foreground text-xs">
+                    {conn.display_name && `${providerLabel(conn.provider)} · `}
                     {conn.scopes.length} scope
                     {conn.scopes.length !== 1 ? "s" : ""} granted &middot;
                     Connected{" "}
