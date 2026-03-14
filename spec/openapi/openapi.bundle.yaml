@@ -7964,7 +7964,7 @@ components:
         source_action_configuration_id:
           type: string
           pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
+          maxLength: 35
           nullable: true
           description: |
             The action configuration this standing approval was derived from, if any.
@@ -8220,7 +8220,7 @@ components:
         action_configuration_id:
           type: string
           pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
+          maxLength: 35
           description: |
             Optional reference to the action configuration this standing approval
             was derived from. When provided, the backend records it for traceability.
