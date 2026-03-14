@@ -300,6 +300,15 @@ This handles:
 - Auto-merging if enabled and checks pass
 - Triggering the webhook notification
 
+**After the script completes successfully (exit code 0) with `AUTO_MERGE=true`:**
+
+Check the script output for the merge result. The script prints clear signals:
+- `"[post] PR merged successfully."` → The merge completed. Report it as **merged**, not "attempted". Do NOT say "may need human approval" — if the script printed this, the PR is merged.
+- `"[post] Auto-merge failed."` → The merge failed. The script already posted a comment on the PR. Report the failure and suggest the user merge manually.
+- `"[post] Auto-merge enabled but checks did not pass."` → CI or audit failed, merge was skipped. Report which checks failed.
+
+**Do NOT hedge or use vague language like "attempted" or "may need human approval" when the script output clearly indicates success or failure.** Read the output and report what actually happened.
+
 **If the post-session script exits with code 101 (CI failure) or 102 (audit failure):**
 
 1. Read the failure logs from the file path in the script output.
