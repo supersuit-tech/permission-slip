@@ -79,7 +79,7 @@ func (p *archiveEmailParams) validate() error {
 	if p.Folder == "" {
 		p.Folder = "INBOX"
 	}
-	if p.Folder == archiveMailbox {
+	if strings.EqualFold(p.Folder, archiveMailbox) {
 		return &connectors.ValidationError{Message: "cannot archive emails that are already in the Archive folder"}
 	}
 	return nil

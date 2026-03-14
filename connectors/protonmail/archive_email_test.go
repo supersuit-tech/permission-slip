@@ -126,21 +126,24 @@ func TestArchiveEmail_ArchiveFolderRejected(t *testing.T) {
 	conn := New()
 	action := &archiveEmailAction{conn: conn}
 
-	params, _ := json.Marshal(map[string]any{
-		"message_ids": []int{1},
-		"folder":      "Archive",
-	})
+	// Test case-insensitive rejection per RFC 3501.
+	for _, folder := range []string{"Archive", "archive", "ARCHIVE"} {
+		params, _ := json.Marshal(map[string]any{
+			"message_ids": []int{1},
+			"folder":      folder,
+		})
 
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "protonmail.archive_email",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error when source folder is Archive")
-	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+		_, err := action.Execute(t.Context(), connectors.ActionRequest{
+			ActionType:  "protonmail.archive_email",
+			Parameters:  params,
+			Credentials: validCreds(),
+		})
+		if err == nil {
+			t.Fatalf("expected error when source folder is %q", folder)
+		}
+		if !connectors.IsValidationError(err) {
+			t.Errorf("folder %q: expected ValidationError, got: %T", folder, err)
+		}
 	}
 }
 
