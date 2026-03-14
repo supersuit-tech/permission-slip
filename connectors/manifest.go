@@ -427,6 +427,9 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			if prop.XUI.VisibleWhen.Field == "" {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires a \"field\" key", actionIdx, propName)
 			}
+			if prop.XUI.VisibleWhen.Field == propName {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field must not reference the property itself", actionIdx, propName)
+			}
 			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
 			}
