@@ -161,13 +161,22 @@ describe("ParameterFieldWidget", () => {
       expect(screen.getByText("Enabled")).toBeInTheDocument();
     });
 
-    it("fires onChange with 'true'/'false' strings", async () => {
+    it("fires onChange with 'true' when toggled on", async () => {
       const user = userEvent.setup();
       const { onChange } = renderWidget(toggleProp, "false");
 
       await user.click(screen.getByRole("switch"));
 
       expect(onChange).toHaveBeenCalledWith("true");
+    });
+
+    it("fires onChange with 'false' when toggled off", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(toggleProp, "true");
+
+      await user.click(screen.getByRole("switch"));
+
+      expect(onChange).toHaveBeenCalledWith("false");
     });
   });
 

@@ -105,7 +105,7 @@ function SelectWidget({ inputId, value, onChange, disabled, placeholder, enumVal
       data-testid={`select-${inputId}`}
     >
       <option value="">{placeholder ?? "Select…"}</option>
-      {(enumValues ?? []).map((opt) => (
+      {(enumValues ?? []).filter((opt) => opt !== "").map((opt) => (
         <option key={opt} value={opt}>
           {opt}
         </option>
