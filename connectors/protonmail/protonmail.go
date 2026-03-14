@@ -204,6 +204,10 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
+					"oneOf": [
+						{"required": ["message_id"]},
+						{"required": ["message_ids"]}
+					],
 					"properties": {
 						"message_id": {
 							"type": "integer",
