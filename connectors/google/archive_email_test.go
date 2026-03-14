@@ -138,3 +138,30 @@ func TestArchiveEmail_AuthFailure(t *testing.T) {
 		t.Errorf("expected AuthError, got: %T (%v)", err, err)
 	}
 }
+
+func TestArchiveEmail_RateLimit(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "60")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &archiveEmailAction{conn: conn}
+
+	params, _ := json.Marshal(archiveEmailParams{MessageID: "msg-123"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.archive_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for rate limit")
+	}
+	if !connectors.IsRateLimitError(err) {
+		t.Errorf("expected RateLimitError, got: %T", err)
+	}
+}
