@@ -71,6 +71,12 @@ export function ManageCredentialsDialog({
   error,
   oauthError,
 }: ManageCredentialsDialogProps) {
+  // True when connectorId is already a static required credential service —
+  // skip orphan merging to avoid showing the same credentials in two rows.
+  const connectorIdIsExplicitService = sorted.some(
+    (c) => c.auth_type !== "oauth2" && c.service === connectorId,
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
@@ -141,9 +147,6 @@ export function ManageCredentialsDialog({
                 !sorted
                   .slice(0, idx)
                   .some((c) => c.auth_type !== "oauth2");
-              const connectorIdIsExplicitService = sorted.some(
-                (c) => c.auth_type !== "oauth2" && c.service === connectorId,
-              );
               let storedCredentials =
                 storedByService.get(cred.service) ?? [];
               if (
