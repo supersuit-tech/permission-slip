@@ -3997,6 +3997,7 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
+                    source_action_configuration_id: null
                   - standing_approval_id: sa_def456
                     agent_id: 42
                     user_id: alice
@@ -4012,6 +4013,7 @@ paths:
                     expires_at: '2026-05-15T00:00:00Z'
                     created_at: '2026-02-14T10:35:00Z'
                     revoked_at: null
+                    source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
                 has_more: true
                 next_cursor: 2026-02-14T10:30:00.000000000Z,sa_abc123
         '400':
@@ -4125,6 +4127,7 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
+                    source_action_configuration_id: null
                 has_more: false
         '400':
           description: Invalid query parameters
@@ -4182,6 +4185,7 @@ paths:
               action_version: '1'
               constraints:
                 recipient_pattern: '*@mycompany.com'
+              action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
               max_executions: 100
               expires_at: '2026-03-14T00:00:00Z'
       responses:
@@ -7839,11 +7843,13 @@ components:
         - agent_id
         - user_id
         - action_type
+        - constraints
         - status
         - execution_count
         - starts_at
         - expires_at
         - created_at
+        - source_action_configuration_id
       properties:
         standing_approval_id:
           type: string
@@ -7955,6 +7961,17 @@ components:
             ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval was revoked.
             `null` if not revoked.
           example: null
+        source_action_configuration_id:
+          type: string
+          pattern: ^ac_[a-f0-9]{32}$
+          maxLength: 35
+          nullable: true
+          description: |
+            The action configuration this standing approval was derived from, if any.
+            Nullable — `null` when the standing approval was created with a custom
+            action type rather than from an existing configuration. The referenced
+            configuration may have been deleted since creation.
+          example: null
       example:
         standing_approval_id: sa_abc123
         agent_id: 42
@@ -7971,6 +7988,7 @@ components:
         expires_at: '2026-02-21T00:00:00Z'
         created_at: '2026-02-14T10:30:00Z'
         revoked_at: null
+        source_action_configuration_id: null
     StandingApprovalExecuteRequest:
       type: object
       required:
@@ -8118,6 +8136,7 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
+            source_action_configuration_id: null
         has_more: false
     UserStandingApprovalListResponse:
       type: object
@@ -8159,12 +8178,14 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
+            source_action_configuration_id: null
         has_more: false
     CreateStandingApprovalRequest:
       type: object
       required:
         - agent_id
         - action_type
+        - constraints
         - expires_at
       properties:
         agent_id:
@@ -8187,10 +8208,24 @@ components:
         constraints:
           type: object
           additionalProperties: true
-          description: Constraint boundaries for this standing approval.
+          description: |
+            Constraint boundaries for this standing approval. Required and must
+            contain at least one non-wildcard parameter constraint. A standing
+            approval without parameter constraints is a blank check — the backend
+            rejects empty constraints or constraints where every value is a
+            wildcard (`"*"`).
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
+        action_configuration_id:
+          type: string
+          pattern: ^ac_[a-f0-9]{32}$
+          maxLength: 35
+          description: |
+            Optional reference to the action configuration this standing approval
+            was derived from. When provided, the backend records it for traceability.
+            No foreign-key enforcement — the configuration may be deleted later.
+          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         max_executions:
           type: integer
           minimum: 1
@@ -8213,6 +8248,7 @@ components:
         action_version: '1'
         constraints:
           recipient_pattern: '*@mycompany.com'
+        action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         max_executions: 100
         expires_at: '2026-03-14T00:00:00Z'
     RevokeStandingApprovalResponse:
