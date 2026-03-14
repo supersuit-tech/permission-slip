@@ -419,10 +419,15 @@ The Permission Slip CLI returns immediately by default with an `approval_id` and
 # Default: returns immediately with approval_id
 permission-slip request --action email.send --params '{"to":["alice@example.com"]}'
 
-# Check result later:
+# Check result (single snapshot):
 permission-slip status <approval_id>
 
-# Block until resolved (up to 120s):
+# Fire-and-forget, then block later when ready:
+APPROVAL_ID=$(permission-slip request --action email.send --params '{}' | jq -r '.approval_id')
+# ... do other work ...
+permission-slip status --wait "$APPROVAL_ID"
+
+# Block from the start (up to 120s):
 permission-slip request --action email.send --params '{}' --wait
 
 # Block with custom timeout:

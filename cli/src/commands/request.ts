@@ -69,9 +69,10 @@ export function requestCommand(program: Command): void {
             {
               ...result,
               next_step:
-                "Approval requested. To check the result once approved, run: " +
-                `permission-slip status ${shellQuote(result.approval_id)}` +
-                (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
+                "Approval requested. To wait for the result, run: " +
+                `permission-slip status --wait ${shellQuote(result.approval_id)}` +
+                (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : "") +
+                " (omit --wait for a single status snapshot)",
             },
             outputOpts,
           );
