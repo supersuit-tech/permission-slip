@@ -42,6 +42,7 @@ The credential `auth_type` in the database is `custom`. Credentials are stored e
 | `protonmail.read_inbox` | Read Inbox | low | Fetch recent emails from a mailbox folder |
 | `protonmail.search_emails` | Search Emails | low | Search emails by subject, sender, or date range |
 | `protonmail.read_email` | Read Email | low | Fetch a specific email by sequence number with full body |
+| `protonmail.archive_email` | Archive Email | medium | Move one or more emails to the Archive folder |
 
 ### `protonmail.send_email`
 
@@ -173,6 +174,33 @@ Fetches a specific email by sequence number with full body content.
 
 **Note:** Uses `BODY[].PEEK` so reading an email does not mark it as read. Body content is truncated at 1 MB.
 
+---
+
+### `protonmail.archive_email`
+
+Moves one or more emails to the Archive folder via IMAP MOVE. If the server doesn't support the MOVE extension (RFC 6851), the client falls back to COPY + STORE \Deleted + EXPUNGE automatically.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `message_ids` | integer[] | Yes | — | Sequence numbers of emails to archive (1–50 items) |
+| `folder` | string | No | `INBOX` | Source mailbox folder containing the emails |
+
+**Response:**
+
+```json
+{
+  "status": "archived",
+  "folder": "INBOX",
+  "archived": 2
+}
+```
+
+**Note:** Sequence numbers are volatile — they can change if messages are deleted or moved. Use them promptly after retrieving them from `read_inbox` or `search_emails`. The source folder cannot be "Archive" (archiving emails already in Archive is rejected).
+
 ## Error Handling
 
 | Scenario | Connector Error | Likely Cause |
@@ -212,6 +240,7 @@ connectors/protonmail/
 ├── read_inbox.go          # protonmail.read_inbox action (IMAP)
 ├── search_emails.go       # protonmail.search_emails action (IMAP)
 ├── read_email.go          # protonmail.read_email action (IMAP)
+├── archive_email.go       # protonmail.archive_email action (IMAP MOVE)
 ├── *_test.go              # Tests for each action + connector
 ├── helpers_test.go        # Shared test helpers (validCreds)
 └── README.md              # This file

@@ -2,7 +2,7 @@
 // Slip connector execution layer. It uses IMAP/SMTP to communicate with
 // Proton Mail Bridge, which must be running locally.
 //
-// Actions: send_email (SMTP), read_inbox, search_emails, read_email (IMAP).
+// Actions: send_email (SMTP), read_inbox, search_emails, read_email, archive_email (IMAP).
 // Registration is gated behind the ENABLE_PROTONMAIL_CONNECTOR env var.
 package protonmail
 
@@ -197,6 +197,30 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "protonmail.archive_email",
+				Name:        "Archive Email",
+				Description: "Move one or more emails to the Archive folder via IMAP MOVE",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_ids"],
+					"properties": {
+						"message_ids": {
+							"type": "array",
+							"items": {"type": "integer", "minimum": 1},
+							"minItems": 1,
+							"maxItems": 50,
+							"description": "Sequence numbers of emails to archive"
+						},
+						"folder": {
+							"type": "string",
+							"default": "INBOX",
+							"description": "Source mailbox folder containing the emails"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -234,6 +258,13 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can read the full content of a specific email.",
 				Parameters:  json.RawMessage(`{"folder":"INBOX"}`),
 			},
+			{
+				ID:          "tpl_protonmail_archive",
+				ActionType:  "protonmail.archive_email",
+				Name:        "Archive emails",
+				Description: "Agent can move emails to the Archive folder.",
+				Parameters:  json.RawMessage(`{"folder":"INBOX"}`),
+			},
 		},
 	}
 }
@@ -245,6 +276,7 @@ func (c *ProtonMailConnector) Actions() map[string]connectors.Action {
 		"protonmail.read_inbox":    &readInboxAction{conn: c},
 		"protonmail.search_emails": &searchEmailsAction{conn: c},
 		"protonmail.read_email":    &readEmailAction{conn: c},
+		"protonmail.archive_email": &archiveEmailAction{conn: c},
 	}
 }
 
