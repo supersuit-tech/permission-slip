@@ -68,6 +68,16 @@ func TestExecutionCountLabel_WithMax(t *testing.T) {
 	}
 }
 
+func TestExecutionCountLabel_ZeroCountWithMax(t *testing.T) {
+	t.Parallel()
+	// When execution_count is 0 but max_executions is set, the label should
+	// be empty — not "0 of 10" which contradicts the notification.
+	info := standingExecutionInfo{ExecutionCount: 0, MaxExecutions: 10}
+	if info.executionCountLabel() != "" {
+		t.Errorf("expected empty label for zero count, got %q", info.executionCountLabel())
+	}
+}
+
 func TestExecutionCountLabel_NoCount(t *testing.T) {
 	t.Parallel()
 	info := standingExecutionInfo{}

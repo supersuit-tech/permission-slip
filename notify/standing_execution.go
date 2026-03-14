@@ -82,7 +82,7 @@ func extractStandingExecutionInfo(approval Approval) standingExecutionInfo {
 // executionCountLabel returns a human-readable execution count string
 // like "3 of 10" or "3" (when unlimited).
 func (info standingExecutionInfo) executionCountLabel() string {
-	if info.MaxExecutions > 0 {
+	if info.MaxExecutions > 0 && info.ExecutionCount > 0 {
 		return fmt.Sprintf("%d of %d", info.ExecutionCount, info.MaxExecutions)
 	}
 	if info.ExecutionCount > 0 {
