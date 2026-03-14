@@ -683,6 +683,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"message_id": {
 							"type": "string",
 							"description": "The Gmail message ID to read (from list_emails results)"
+						},
+						"format": {
+							"type": "string",
+							"enum": ["full", "metadata", "minimal"],
+							"default": "full",
+							"description": "The format to return the message in (defaults to full)"
 						}
 					}
 				}`)),

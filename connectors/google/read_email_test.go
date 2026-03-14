@@ -316,6 +316,165 @@ func TestReadEmail_AttachmentFilenameFromContentType(t *testing.T) {
 	}
 }
 
+func TestReadEmail_FormatMetadata(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+		if r.URL.Query().Get("format") != "metadata" {
+			t.Errorf("expected format=metadata, got %s", r.URL.Query().Get("format"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gmailFullMessage{
+			ID:       "msg-meta",
+			ThreadID: "thread-meta",
+			LabelIDs: []string{"INBOX"},
+			Snippet:  "Hello snippet",
+			Payload: gmailMessagePart{
+				MimeType: "text/plain",
+				Headers: []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				}{
+					{Name: "From", Value: "meta@example.com"},
+					{Name: "Subject", Value: "Metadata Only"},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &readEmailAction{conn: conn}
+
+	params, _ := json.Marshal(readEmailParams{MessageID: "msg-meta", Format: "metadata"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.read_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var detail emailFullDetail
+	if err := json.Unmarshal(result.Data, &detail); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	if detail.ID != "msg-meta" {
+		t.Errorf("expected ID msg-meta, got %s", detail.ID)
+	}
+	if detail.From != "meta@example.com" {
+		t.Errorf("expected From meta@example.com, got %s", detail.From)
+	}
+	if detail.Subject != "Metadata Only" {
+		t.Errorf("expected Subject 'Metadata Only', got %s", detail.Subject)
+	}
+}
+
+func TestReadEmail_FormatMinimal(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("format") != "minimal" {
+			t.Errorf("expected format=minimal, got %s", r.URL.Query().Get("format"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gmailFullMessage{
+			ID:       "msg-min",
+			ThreadID: "thread-min",
+			LabelIDs: []string{"INBOX", "UNREAD"},
+			Snippet:  "Short snippet",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &readEmailAction{conn: conn}
+
+	params, _ := json.Marshal(readEmailParams{MessageID: "msg-min", Format: "minimal"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.read_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var detail emailFullDetail
+	if err := json.Unmarshal(result.Data, &detail); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	if detail.ID != "msg-min" {
+		t.Errorf("expected ID msg-min, got %s", detail.ID)
+	}
+	if detail.ThreadID != "thread-min" {
+		t.Errorf("expected ThreadID thread-min, got %s", detail.ThreadID)
+	}
+}
+
+func TestReadEmail_DefaultFormatIsFull(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("format") != "full" {
+			t.Errorf("expected format=full (default), got %s", r.URL.Query().Get("format"))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gmailFullMessage{
+			ID:       "msg-default",
+			ThreadID: "thread-default",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &readEmailAction{conn: conn}
+
+	// No format specified — should default to "full".
+	params, _ := json.Marshal(readEmailParams{MessageID: "msg-default"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.read_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadEmail_InvalidFormat(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &readEmailAction{conn: conn}
+
+	params, _ := json.Marshal(readEmailParams{MessageID: "msg-123", Format: "raw"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.read_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid format")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestReadEmail_MissingMessageID(t *testing.T) {
 	t.Parallel()
 
