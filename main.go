@@ -273,18 +273,8 @@ func main() {
 	// Each connector package registers itself via init() + connectors.RegisterBuiltIn().
 	// The blank import of connectors/all triggers all init() functions.
 	//
-	// Gating note: ProtonMail depends on a local Bridge daemon and is not
-	// cloud-safe. Its env-var check is here (not in init()) so that .env
-	// values loaded by godotenv above are visible.
-	protonmailEnabled := false
-	if v := os.Getenv("ENABLE_PROTONMAIL_CONNECTOR"); strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") {
-		protonmailEnabled = true
-	}
 	registry := connectors.NewRegistry()
 	for _, c := range connectors.BuiltInConnectors() {
-		if c.ID() == "protonmail" && !protonmailEnabled {
-			continue
-		}
 		registry.Register(c)
 	}
 

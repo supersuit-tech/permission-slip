@@ -42,7 +42,6 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/pagerduty"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/protonmail"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/quickbooks"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/redis"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/salesforce"
