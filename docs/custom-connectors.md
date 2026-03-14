@@ -128,6 +128,119 @@ The `parameters_schema` is a JSON Schema object that describes the action's expe
 | `enum` | Allowed values for the field | `["merge", "squash", "rebase"]` |
 | `default` | Default value (shown when value matches) | `"Task"` |
 
+### UI Rendering Hints (`x-ui`)
+
+Connectors can customize how their parameter forms appear in the frontend by adding `x-ui` vendor extensions to `parameters_schema`. This uses the [standard JSON Schema mechanism](https://json-schema.org/understanding-json-schema/reference/generic.html) for custom metadata — no new DB tables, API endpoints, or migrations required.
+
+When `x-ui` is absent, parameters render with the default behavior (text inputs with constraint mode dropdowns). Connectors opt in incrementally — you can add `x-ui` to a single field without touching the rest.
+
+#### Property-level `x-ui` fields
+
+Add `x-ui` to individual properties to control how each field renders:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `widget` | `string` | Input widget type (see [Widget types](#widget-types) below). Defaults to `"text"`. |
+| `label` | `string` | Display label override. Defaults to the property key. |
+| `placeholder` | `string` | Input placeholder text. |
+| `group` | `string` | ID of the group this field belongs to (must match a group defined in root-level `x-ui.groups`). |
+| `help_url` | `string` | Link to external documentation, rendered as a help icon next to the field. |
+| `help_text` | `string` | Additional help text displayed below the field, beyond `description`. |
+| `visible_when` | `object` | Conditional visibility: `{ "field": "<key>", "equals": <value> }`. The field is hidden unless the referenced field has the specified value. `<value>` should match the type of the referenced field (string, number, or boolean). |
+
+#### Root-level `x-ui` fields
+
+Add `x-ui` at the schema root to control field ordering and grouping:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `groups` | `array` | Field group definitions: `[{ "id", "label", "description?", "collapsed?" }]`. Groups render as collapsible sections. |
+| `order` | `string[]` | Explicit field ordering. Fields not listed appear after ordered fields in their original order. |
+
+#### Widget types
+
+| Widget | Renders as | Best for |
+|--------|-----------|----------|
+| `text` | Standard text input (default) | Free-form strings |
+| `select` | Dropdown menu | Fields with `enum` values |
+| `textarea` | Multi-line text area | Long-form text, descriptions, message bodies |
+| `toggle` | On/off switch | Boolean fields |
+| `number` | Numeric input with stepper | Integer or decimal fields |
+| `date` | Date picker | Date or datetime fields |
+
+#### Field groups
+
+Groups render as collapsible sections in the parameter form. Each group has:
+
+- **`id`** — Unique identifier referenced by property-level `x-ui.group`
+- **`label`** — Display heading for the section
+- **`description`** (optional) — Subheading or explanatory text
+- **`collapsed`** (optional) — If `true`, the section starts collapsed. Useful for advanced/optional fields.
+
+Fields that don't reference a group appear in an ungrouped section at the top.
+
+#### Conditional visibility (`visible_when`)
+
+Use `visible_when` to show a field only when another field has a specific value:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "send_notification": {
+      "type": "boolean",
+      "x-ui": { "widget": "toggle", "label": "Send notification" }
+    },
+    "notification_email": {
+      "type": "string",
+      "x-ui": {
+        "label": "Notification email",
+        "visible_when": { "field": "send_notification", "equals": true }
+      }
+    }
+  }
+}
+```
+
+In this example, the "Notification email" field only appears when "Send notification" is toggled on.
+
+**Note:** Fields with `visible_when` should **not** be listed in the schema's `required` array. When a field is hidden, its value won't be submitted — but JSON Schema validation would still flag it as missing. Use application-level validation instead if the field is conditionally required.
+
+#### Full example
+
+```json
+{
+  "type": "object",
+  "required": ["customer_id"],
+  "x-ui": {
+    "groups": [
+      { "id": "billing", "label": "Billing" },
+      { "id": "options", "label": "Options", "collapsed": true }
+    ],
+    "order": ["customer_id", "currency", "auto_advance"]
+  },
+  "properties": {
+    "customer_id": {
+      "type": "string",
+      "x-ui": { "label": "Customer", "placeholder": "cus_ABC123", "group": "billing" }
+    },
+    "currency": {
+      "type": "string",
+      "enum": ["usd", "eur", "gbp"],
+      "x-ui": { "widget": "select", "group": "billing" }
+    },
+    "auto_advance": {
+      "type": "boolean",
+      "x-ui": { "widget": "toggle", "label": "Auto-send invoice", "group": "options" }
+    }
+  }
+}
+```
+
+This renders:
+1. A **Billing** section (expanded) with "Customer" (text input with placeholder) and "currency" (dropdown)
+2. An **Options** section (collapsed by default) with an "Auto-send invoice" toggle
+
 **Manifest rules:**
 
 | Field | Requirements |
