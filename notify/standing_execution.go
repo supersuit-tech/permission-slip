@@ -138,8 +138,9 @@ func isSensitiveKey(key string) bool {
 
 // summarizeParameters extracts a human-readable parameter summary from the
 // action JSON's "parameters" field. Values for keys that look sensitive
-// (contain "secret", "password", "token", "key", etc.) are redacted to
-// "***". Output is sorted by key for deterministic ordering.
+// (see sensitiveSubstrings) are redacted to "***". Non-string primitives
+// (numbers, booleans) are rendered as-is; complex objects show key-only.
+// Output is sorted by key for deterministic ordering.
 // Returns "" if no parameters are present.
 func summarizeParameters(action json.RawMessage) string {
 	if len(action) == 0 {
