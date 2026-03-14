@@ -1,5 +1,4 @@
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ExternalLink } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
@@ -140,9 +139,9 @@ function ToggleWidget({ inputId, value, onChange, disabled, className }: WidgetR
         disabled={disabled}
         className={className}
       />
-      <Label htmlFor={inputId} className="text-muted-foreground text-sm">
+      <span className="text-muted-foreground text-sm" aria-hidden="true">
         {checked ? "Enabled" : "Disabled"}
-      </Label>
+      </span>
     </div>
   );
 }

@@ -232,6 +232,9 @@ describe("ParameterFieldWidget", () => {
       await user.type(input, "2025-06-01");
 
       expect(onChange).toHaveBeenCalled();
+      // Verify the handler forwards a string (not undefined/hardcoded)
+      const lastCall = onChange.mock.calls.at(-1)?.[0] as unknown;
+      expect(typeof lastCall).toBe("string");
     });
   });
 
