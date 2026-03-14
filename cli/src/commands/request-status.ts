@@ -1,9 +1,11 @@
 /**
  * permission-slip request-status --approval-id <id> [--server <url>]
  *
- * Checks the status of a previously submitted approval request. By default,
- * blocks until the approval reaches a terminal state. Pass --no-wait for a
- * single status check.
+ * Checks the status of a previously submitted approval request.
+ * Returns the current status immediately by default. Pass --wait to block
+ * until the approval reaches a terminal state.
+ *
+ * Deprecated: prefer `permission-slip status <approval_id>` instead.
  */
 
 import type { Command } from "commander";
@@ -15,7 +17,7 @@ import { pollUntilResolved, parseTimeout } from "../util/poll.js";
 export function requestStatusCommand(program: Command): void {
   program
     .command("request-status")
-    .description("Check the status of an approval request")
+    .description("Check approval status (deprecated: use 'status <approval_id>' instead)")
     .requiredOption("--approval-id <id>", "Approval ID returned by the request command")
     .option(
       "--server <url>",
@@ -23,14 +25,14 @@ export function requestStatusCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
-    .option("--no-wait", "Return immediately without waiting for resolution")
-    .option("--timeout <seconds>", "Max seconds to wait for resolution (default: 120)", "120")
+    .option("--wait", "Block until the approval reaches a terminal state")
+    .option("--timeout <seconds>", "Max seconds to wait when using --wait (default: 120)", "120")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       approvalId: string;
       server: string;
       agentId?: string;
-      wait: boolean;
+      wait?: boolean;
       timeout: string;
       pretty?: boolean;
     }) => {
@@ -40,13 +42,13 @@ export function requestStatusCommand(program: Command): void {
         const client = new ApiClient({ serverUrl: opts.server, agentId });
 
         if (!opts.wait) {
-          // Single check, no waiting.
+          // Default: single check, return immediately.
           const result = await client.approvalStatus(opts.approvalId);
           output(result, outputOpts);
           return;
         }
 
-        // Wait for terminal state.
+        // --wait: block until terminal state.
         const timeoutSeconds = parseTimeout(opts.timeout);
 
         process.stderr.write(`Waiting for approval ${opts.approvalId}...\n`);
