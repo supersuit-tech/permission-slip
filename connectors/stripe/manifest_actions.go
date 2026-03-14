@@ -20,28 +20,36 @@ func stripeActions() []connectors.ManifestAction {
 				"type": "object",
 				"required": ["email"],
 				"additionalProperties": false,
+				"x-ui": {
+					"order": ["email", "name", "phone", "description", "metadata"]
+				},
 				"properties": {
 					"email": {
 						"type": "string",
 						"format": "email",
-						"description": "Customer email address (e.g. \"billing@acme.com\")"
+						"description": "Customer email address (e.g. \"billing@acme.com\")",
+						"x-ui": { "label": "Email Address", "placeholder": "billing@acme.com", "help_text": "Primary contact email used for invoices and receipts" }
 					},
 					"name": {
 						"type": "string",
-						"description": "Customer full name or company name"
+						"description": "Customer full name or company name",
+						"x-ui": { "label": "Full Name", "placeholder": "Acme Inc." }
 					},
 					"description": {
 						"type": "string",
-						"description": "Free-form description of the customer"
+						"description": "Free-form description of the customer",
+						"x-ui": { "label": "Description", "placeholder": "Enterprise client, annual billing", "widget": "textarea" }
 					},
 					"phone": {
 						"type": "string",
-						"description": "Customer phone number in E.164 format (e.g. \"+14155551234\")"
+						"description": "Customer phone number in E.164 format (e.g. \"+14155551234\")",
+						"x-ui": { "label": "Phone Number", "placeholder": "+14155551234", "help_text": "Use E.164 format with country code" }
 					},
 					"metadata": {
 						"type": "object",
 						"description": "Key-value pairs for storing additional information (max 50 keys, values must be strings)",
-						"additionalProperties": { "type": "string" }
+						"additionalProperties": { "type": "string" },
+						"x-ui": { "help_text": "Add custom key-value pairs (e.g. internal_id, account_manager)" }
 					}
 				}
 			}`)),
@@ -55,32 +63,45 @@ func stripeActions() []connectors.ManifestAction {
 				"type": "object",
 				"required": ["customer_id"],
 				"additionalProperties": false,
+				"x-ui": {
+					"groups": [
+						{ "id": "billing", "label": "Billing" },
+						{ "id": "options", "label": "Options", "collapsed": true }
+					],
+					"order": ["customer_id", "currency", "description", "due_date", "line_items", "auto_advance", "metadata"]
+				},
 				"properties": {
 					"customer_id": {
 						"type": "string",
-						"description": "Stripe customer ID (e.g. \"cus_ABC123\")"
+						"description": "Stripe customer ID (e.g. \"cus_ABC123\")",
+						"x-ui": { "label": "Customer", "placeholder": "cus_ABC123", "group": "billing" }
 					},
 					"description": {
 						"type": "string",
-						"description": "Invoice memo or description shown to the customer"
+						"description": "Invoice memo or description shown to the customer",
+						"x-ui": { "label": "Memo", "placeholder": "Invoice for March 2026 services", "widget": "textarea", "group": "billing" }
 					},
 					"due_date": {
 						"type": "integer",
-						"description": "Due date as Unix timestamp (seconds since epoch)"
+						"description": "Due date as Unix timestamp (seconds since epoch)",
+						"x-ui": { "label": "Due Date", "group": "billing" }
 					},
 					"auto_advance": {
 						"type": "boolean",
 						"default": true,
-						"description": "When true, automatically finalize and send the invoice to the customer"
+						"description": "When true, automatically finalize and send the invoice to the customer",
+						"x-ui": { "widget": "toggle", "label": "Auto-send invoice", "group": "options" }
 					},
 					"currency": {
 						"type": "string",
 						"default": "usd",
-						"description": "Three-letter ISO 4217 currency code (e.g. \"usd\", \"eur\", \"gbp\")"
+						"description": "Three-letter ISO 4217 currency code (e.g. \"usd\", \"eur\", \"gbp\")",
+						"x-ui": { "label": "Currency", "group": "billing" }
 					},
 					"line_items": {
 						"type": "array",
 						"description": "Invoice line items — each becomes an InvoiceItem attached to the invoice",
+						"x-ui": { "label": "Line Items", "group": "billing" },
 						"items": {
 							"type": "object",
 							"additionalProperties": false,
@@ -106,7 +127,8 @@ func stripeActions() []connectors.ManifestAction {
 					"metadata": {
 						"type": "object",
 						"description": "Key-value pairs for storing additional information (max 50 keys)",
-						"additionalProperties": { "type": "string" }
+						"additionalProperties": { "type": "string" },
+						"x-ui": { "group": "options" }
 					}
 				}
 			}`)),
@@ -539,17 +561,27 @@ func stripeActions() []connectors.ManifestAction {
 				"type": "object",
 				"required": ["mode", "line_items"],
 				"additionalProperties": false,
+				"x-ui": {
+					"groups": [
+						{ "id": "products", "label": "Products" },
+						{ "id": "session", "label": "Session Options" },
+						{ "id": "customer", "label": "Customer", "collapsed": true }
+					],
+					"order": ["mode", "line_items", "success_url", "cancel_url", "customer", "customer_email", "allow_promotion_codes", "metadata"]
+				},
 				"properties": {
 					"mode": {
 						"type": "string",
 						"enum": ["payment", "subscription", "setup"],
-						"description": "Checkout mode: payment (one-time), subscription (recurring), or setup (save payment method)"
+						"description": "Checkout mode: payment (one-time), subscription (recurring), or setup (save payment method)",
+						"x-ui": { "widget": "select", "label": "Checkout Mode", "group": "session" }
 					},
 					"line_items": {
 						"type": "array",
 						"minItems": 1,
 						"maxItems": 20,
 						"description": "Products to include in the checkout session",
+						"x-ui": { "label": "Line Items", "group": "products" },
 						"items": {
 							"type": "object",
 							"required": ["price", "quantity"],
@@ -570,30 +602,36 @@ func stripeActions() []connectors.ManifestAction {
 					"success_url": {
 						"type": "string",
 						"format": "uri",
-						"description": "https URL to redirect to after successful payment (must use https)"
+						"description": "https URL to redirect to after successful payment (must use https)",
+						"x-ui": { "label": "Success URL", "placeholder": "https://example.com/success", "group": "session" }
 					},
 					"cancel_url": {
 						"type": "string",
 						"format": "uri",
-						"description": "https URL to redirect to if customer cancels checkout (must use https)"
+						"description": "https URL to redirect to if customer cancels checkout (must use https)",
+						"x-ui": { "label": "Cancel URL", "placeholder": "https://example.com/cancel", "group": "session" }
 					},
 					"customer": {
 						"type": "string",
-						"description": "Stripe customer ID to associate with this session (mutually exclusive with customer_email)"
+						"description": "Stripe customer ID to associate with this session (mutually exclusive with customer_email)",
+						"x-ui": { "label": "Customer ID", "placeholder": "cus_ABC123", "group": "customer" }
 					},
 					"customer_email": {
 						"type": "string",
 						"format": "email",
-						"description": "Pre-fill the customer email field (mutually exclusive with customer)"
+						"description": "Pre-fill the customer email field (mutually exclusive with customer)",
+						"x-ui": { "label": "Customer Email", "placeholder": "billing@acme.com", "group": "customer" }
 					},
 					"allow_promotion_codes": {
 						"type": "boolean",
-						"description": "Allow customers to enter promotion codes at checkout"
+						"description": "Allow customers to enter promotion codes at checkout",
+						"x-ui": { "widget": "toggle", "label": "Allow Promo Codes", "group": "session" }
 					},
 					"metadata": {
 						"type": "object",
 						"description": "Key-value pairs for storing additional information (max 50 keys)",
-						"additionalProperties": { "type": "string" }
+						"additionalProperties": { "type": "string" },
+						"x-ui": { "group": "session" }
 					}
 				}
 			}`)),
