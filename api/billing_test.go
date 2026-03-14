@@ -148,17 +148,13 @@ func TestGetBillingPlan_ZeroUsage(t *testing.T) {
 func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
 	uid := testhelper.GenerateUID(t)
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Set Stripe customer ID to verify has_payment_method.
-	customerID := "cus_test_plan"
-	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &customerID, nil); err != nil {
-		t.Fatalf("UpdateSubscriptionStripe: %v", err)
-	}
+	// Insert a payment method to verify has_payment_method.
+	testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{IsDefault: true})
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
@@ -185,7 +181,7 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 		t.Error("expected can_downgrade=true for paid plan")
 	}
 	if !resp.Subscription.HasPaymentMethod {
-		t.Error("expected has_payment_method=true when stripe_customer_id is set")
+		t.Error("expected has_payment_method=true when payment method exists")
 	}
 }
 
@@ -349,20 +345,16 @@ func TestCreateCheckout_AlreadyPaid(t *testing.T) {
 	}
 }
 
-func TestGetSubscription_HasPaymentMethodWhenStripeCustomerSet(t *testing.T) {
+func TestGetSubscription_HasPaymentMethodWhenPaymentMethodExists(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
 	uid := testhelper.GenerateUID(t)
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Set Stripe customer ID.
-	customerID := "cus_test_payment"
-	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &customerID, nil); err != nil {
-		t.Fatalf("UpdateSubscriptionStripe: %v", err)
-	}
+	// Insert a payment method.
+	testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{IsDefault: true})
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
@@ -380,7 +372,7 @@ func TestGetSubscription_HasPaymentMethodWhenStripeCustomerSet(t *testing.T) {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 	if !resp.HasPaymentMethod {
-		t.Error("expected has_payment_method=true when stripe_customer_id is set")
+		t.Error("expected has_payment_method=true when payment method exists")
 	}
 	if resp.CanUpgrade {
 		t.Error("expected can_upgrade=false for pay_as_you_go plan")

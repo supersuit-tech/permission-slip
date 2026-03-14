@@ -150,7 +150,7 @@ func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 		Status:             string(sub.Status),
 		CurrentPeriodStart: sub.CurrentPeriodStart,
 		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
-		HasPaymentMethod:   sub.StripeCustomerID != nil,
+		HasPaymentMethod:   false,
 		CanUpgrade:         sub.PlanID == db.PlanFree,
 		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
 		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
@@ -236,6 +236,14 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			Subscription: newBillingSubscription(sub),
 		}
 
+		// Check actual payment methods rather than relying on Stripe customer ID.
+		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
+			log.Printf("[%s] GetBillingPlan: count payment methods: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+		} else {
+			resp.Subscription.HasPaymentMethod = pmCount > 0
+		}
+
 		// Gather usage counts (non-fatal — return zeros on error).
 		usage, err := db.GetCurrentPeriodUsage(r.Context(), deps.DB, profile.ID)
 		if err != nil {
@@ -294,6 +302,14 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			PlanName:            sub.Plan.Name,
 			billingSubscription: newBillingSubscription(sub),
 			PlanLimits:          newPlanLimits(&sub.Plan),
+		}
+
+		// Check actual payment methods rather than relying on Stripe customer ID.
+		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
+			log.Printf("[%s] GetSubscription: count payment methods: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+		} else {
+			resp.HasPaymentMethod = pmCount > 0
 		}
 
 		// Attach current period usage if available (non-fatal — subscription
