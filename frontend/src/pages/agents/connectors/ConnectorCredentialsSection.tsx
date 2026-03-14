@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Settings } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,12 @@ export function ConnectorCredentialsSection({
   connectorId,
   requiredCredentials,
 }: ConnectorCredentialsSectionProps) {
+  // Collect all service IDs from required credentials so the dropdown can
+  // include credentials stored under any of them (e.g. "github" + "github_pat").
+  const credentialServiceIds = useMemo(
+    () => new Set([connectorId, ...requiredCredentials.map((rc) => rc.service)]),
+    [connectorId, requiredCredentials],
+  );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
 
   const hasRequiredCredentials = requiredCredentials.length > 0;
@@ -92,6 +98,7 @@ export function ConnectorCredentialsSection({
         <AgentCredentialBinding
           agentId={agentId}
           connectorId={connectorId}
+          credentialServiceIds={credentialServiceIds}
           credentials={credentials}
           connections={connections}
           anyLoading={anyLoading}
@@ -138,12 +145,14 @@ const selectClassName =
 function AgentCredentialBinding({
   agentId,
   connectorId,
+  credentialServiceIds,
   credentials,
   connections,
   anyLoading,
 }: {
   agentId: number;
   connectorId: string;
+  credentialServiceIds: Set<string>;
   credentials: CredentialSummary[];
   connections: OAuthConnection[];
   anyLoading: boolean;
@@ -157,7 +166,7 @@ function AgentCredentialBinding({
   const isPending = assigning;
 
   const scopedCredentials = credentials.filter(
-    (c) => c.service === connectorId,
+    (c) => credentialServiceIds.has(c.service),
   );
   const activeConnections = connections.filter(
     (c) => c.status === "active" && c.id && c.provider === connectorId,
@@ -241,9 +250,10 @@ function AgentCredentialBinding({
           ))}
           {scopedCredentials.map((cred) => (
             <option key={`cred:${cred.id}`} value={`cred:${cred.id}`}>
-              {serviceLabel(cred.service)}
-              {cred.label ? ` — ${cred.label}` : ""} (added{" "}
-              {new Date(cred.created_at).toLocaleDateString()})
+              {cred.label
+                ? `${cred.label} — ${serviceLabel(cred.service)}`
+                : serviceLabel(cred.service)}{" "}
+              (added {new Date(cred.created_at).toLocaleDateString()})
             </option>
           ))}
         </select>

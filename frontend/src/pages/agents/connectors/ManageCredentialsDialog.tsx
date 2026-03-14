@@ -71,6 +71,14 @@ export function ManageCredentialsDialog({
   error,
   oauthError,
 }: ManageCredentialsDialogProps) {
+  // Precompute loop-invariant values used inside sorted.map().
+  const connectorIdIsExplicitService = sorted.some(
+    (c) => c.auth_type !== "oauth2" && c.service === connectorId,
+  );
+  const firstStaticIdx = sorted.findIndex(
+    (c) => c.auth_type !== "oauth2",
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
@@ -129,6 +137,31 @@ export function ManageCredentialsDialog({
                 prevCred.auth_type === "oauth2" &&
                 cred.auth_type !== "oauth2";
 
+              // Collect stored credentials for this row. For the first
+              // static row, also include credentials stored under the
+              // connectorId itself — these are "orphans" that don't match
+              // any specific required credential service (e.g. a PAT stored
+              // with service "github" instead of "github_pat").
+              // Skip if connectorId is already an explicit static service
+              // to avoid showing the same credentials in two rows.
+              const isFirstStatic = idx === firstStaticIdx;
+              let storedCredentials =
+                storedByService.get(cred.service) ?? [];
+              if (
+                isFirstStatic &&
+                connectorId !== cred.service &&
+                !connectorIdIsExplicitService &&
+                storedByService.has(connectorId)
+              ) {
+                const seenIds = new Set(storedCredentials.map((c) => c.id));
+                const orphans = (
+                  storedByService.get(connectorId) ?? []
+                ).filter((c) => !seenIds.has(c.id));
+                if (orphans.length > 0) {
+                  storedCredentials = [...storedCredentials, ...orphans];
+                }
+              }
+
               return (
                 <div key={`${cred.service}:${cred.auth_type}`}>
                   {showOrSeparator && (
@@ -149,9 +182,7 @@ export function ManageCredentialsDialog({
                   ) : (
                     <StaticCredentialRow
                       requiredCredential={cred}
-                      storedCredentials={
-                        storedByService.get(cred.service) ?? []
-                      }
+                      storedCredentials={storedCredentials}
                       isAlternative={hasOAuth}
                     />
                   )}

@@ -27,6 +27,11 @@ describe("serviceLabel", () => {
     expect(serviceLabel("github_pat")).toBe("GitHub Personal Access Token");
   });
 
+  it("falls back to provider label for bare provider IDs", () => {
+    expect(serviceLabel("github")).toBe("GitHub");
+    expect(serviceLabel("slack")).toBe("Slack");
+  });
+
   it("falls back to raw service ID for unknown services", () => {
     expect(serviceLabel("some-service")).toBe("some-service");
   });
