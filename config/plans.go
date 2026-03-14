@@ -45,8 +45,8 @@ func DefaultPlanID(billingEnabled bool) string {
 }
 
 // validPlanID restricts plan IDs to alphanumeric characters and underscores.
-// This is validated at load time to prevent SQL injection when plan IDs are
-// interpolated into CASE expressions (e.g. in data_retention.go).
+// data_retention.go uses parameterized queries as the primary defense against
+// SQL injection. This regex validation is a secondary safeguard.
 var validPlanID = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 var (

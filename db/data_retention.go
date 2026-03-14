@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/config"
 )
@@ -33,30 +34,51 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 		defaultRetention = freePlan.AuditRetentionDays
 	}
 
-	// Build "CASE s.plan_id WHEN 'free' THEN 7 WHEN 'pay_as_you_go' THEN 90 ELSE 7 END"
-	caseExpr := "CASE s.plan_id"
+	// Build parameterized VALUES list for plan_id → retention_days mapping.
+	// Uses ($1::text, $2::int), ($3::text, $4::int), ... to avoid interpolating
+	// plan IDs into SQL strings.
+	var valuesClauses []string
+	var args []any
+	paramIdx := 1
 	for _, p := range plans {
-		caseExpr += fmt.Sprintf(" WHEN '%s' THEN %d", p.ID, p.AuditRetentionDays)
+		valuesClauses = append(valuesClauses,
+			fmt.Sprintf("($%d::text, $%d::int)", paramIdx, paramIdx+1))
+		args = append(args, p.ID, p.AuditRetentionDays)
+		paramIdx += 2
 	}
-	caseExpr += fmt.Sprintf(" ELSE %d END", defaultRetention)
 
 	// Derive grace period days from the DowngradeGracePeriod constant so both
 	// the Go logic and the SQL query stay in sync automatically.
 	gracePeriodDays := int(DowngradeGracePeriod.Hours() / 24)
 
+	// Append remaining parameters: grace period, paid retention, default retention.
+	gracePeriodParam := paramIdx
+	paidRetentionParam := paramIdx + 1
+	defaultRetentionParam := paramIdx + 2
+	args = append(args, gracePeriodDays, PaidPlanRetentionDays(), defaultRetention)
+
 	// Pass 1: Purge events for users with a subscription, using their plan's
 	// retention period. During the downgrade grace period, use the paid plan's
 	// retention instead so users have time to export data.
-	tag1, err := db.Exec(ctx, fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		DELETE FROM audit_events ae
 		USING subscriptions s
+		LEFT JOIN (VALUES %s) AS plan_retention(plan_id, retention_days)
+		    ON s.plan_id = plan_retention.plan_id
 		WHERE ae.user_id = s.user_id
 		  AND ae.created_at < now() - make_interval(days =>
 		      CASE WHEN s.downgraded_at IS NOT NULL
-		                AND s.downgraded_at > now() - interval '%d days'
-		           THEN %d
-		           ELSE %s
-		      END)`, gracePeriodDays, PaidPlanRetentionDays(), caseExpr))
+		                AND s.downgraded_at > now() - make_interval(days => $%d)
+		           THEN $%d
+		           ELSE COALESCE(plan_retention.retention_days, $%d)
+		      END)`,
+		strings.Join(valuesClauses, ", "),
+		gracePeriodParam,
+		paidRetentionParam,
+		defaultRetentionParam,
+	)
+
+	tag1, err := db.Exec(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("purge expired audit events (subscribed users): %w", err)
 	}
@@ -64,10 +86,11 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	// Pass 2: Purge events for users without a subscription row, using the
 	// free-tier default. This is defensive — every user should have
 	// a subscription, but we don't want orphaned events to accumulate.
-	tag2, err := db.Exec(ctx, fmt.Sprintf(`
-		DELETE FROM audit_events ae
-		WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = ae.user_id)
-		  AND ae.created_at < now() - interval '%d days'`, defaultRetention))
+	tag2, err := db.Exec(ctx,
+		`DELETE FROM audit_events ae
+		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = ae.user_id)
+		   AND ae.created_at < now() - make_interval(days => $1)`,
+		defaultRetention)
 	if err != nil {
 		return tag1.RowsAffected(), fmt.Errorf("purge expired audit events (unsubscribed users): %w", err)
 	}
