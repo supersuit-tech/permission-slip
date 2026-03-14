@@ -100,7 +100,7 @@ export function TermsOfServicePage() {
 
       <h3>5.2 Free Tier &mdash; $0/month</h3>
       <ul>
-        <li>{formatLimit(freePlan.max_requests_per_month!)} requests per month</li>
+        <li>{formatLimit(freePlan.max_requests_per_month)} requests per month</li>
         <li>{freePlan.max_agents} agents</li>
         <li>All built-in connectors</li>
         <li>{freePlan.max_standing_approvals} active standing approvals</li>
@@ -112,7 +112,7 @@ export function TermsOfServicePage() {
 
       <h3>5.3 Pay-as-You-Go &mdash; ${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}/request</h3>
       <ul>
-        <li>First {formatLimit(freePlan.max_requests_per_month!)} requests per month free</li>
+        <li>First {formatLimit(freePlan.max_requests_per_month)} requests per month free</li>
         <li>
           Unlimited agents, connectors, standing approvals, and credentials
         </li>

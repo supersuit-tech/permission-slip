@@ -40,7 +40,7 @@ export default defineConfig({
     fs: {
       allow: [
         // Allow Vite dev server to read config/ from repo root.
-        path.resolve(__dirname, ".."),
+        path.resolve(__dirname, "../config"),
       ],
     },
     // Proxy routes for local dev (npm run dev). Keep in sync with

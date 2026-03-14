@@ -116,7 +116,7 @@ export function DowngradeConfirmDialog({
                 {FREE_PLAN_LIMITS.standing_approvals.limit} approvals,{" "}
                 {FREE_PLAN_LIMITS.credentials.limit} credentials)
               </li>
-              <li>{formatLimit(freePlan.max_requests_per_month!)} request/month limit</li>
+              <li>{formatLimit(freePlan.max_requests_per_month)} request/month limit</li>
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
               A 7-day grace period preserves your {paidPlan.audit_retention_days}-day audit retention so you
