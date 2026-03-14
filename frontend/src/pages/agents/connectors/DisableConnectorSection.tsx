@@ -29,6 +29,8 @@ interface DisableConnectorSectionProps {
   oauthProvider?: string;
   /** Active OAuth connection ID for this connector. Required to actually disconnect OAuth on Remove. */
   oauthConnectionId?: string;
+  /** Whether an API key credential is currently assigned — when true, Remove also deletes it. */
+  hasApiKeyCredential?: boolean;
 }
 
 export function DisableConnectorSection({
@@ -37,6 +39,7 @@ export function DisableConnectorSection({
   connectorName,
   oauthProvider,
   oauthConnectionId,
+  hasApiKeyCredential = false,
 }: DisableConnectorSectionProps) {
   const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
@@ -133,7 +136,7 @@ export function DisableConnectorSection({
             </Button>
           </div>
 
-          {oauthProvider && (
+          {(oauthProvider || hasApiKeyCredential) && (
             <>
               <div className="border-t" />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -142,10 +145,20 @@ export function DisableConnectorSection({
                     Remove this connector
                   </p>
                   <p className="text-muted-foreground text-xs">
-                    Disable the connector, disconnect the{" "}
-                    {providerLabel(oauthProvider)} OAuth connection, and
-                    permanently delete any saved API keys. You will need to
-                    re-authorize and re-add credentials when re-enabling.
+                    {oauthProvider ? (
+                      <>
+                        Disable the connector, disconnect the{" "}
+                        {providerLabel(oauthProvider)} OAuth connection, and
+                        permanently delete any saved API keys. You will need to
+                        re-authorize and re-add credentials when re-enabling.
+                      </>
+                    ) : (
+                      <>
+                        Disable the connector and permanently delete the saved
+                        API key. You will need to re-add credentials when
+                        re-enabling.
+                      </>
+                    )}
                   </p>
                 </div>
                 <Button
@@ -201,12 +214,23 @@ export function DisableConnectorSection({
           <DialogHeader>
             <DialogTitle>Remove {connectorName}</DialogTitle>
             <DialogDescription>
-              This will disable the <strong>{connectorName}</strong> connector,
-              disconnect the{" "}
-              <strong>{providerLabel(oauthProvider ?? "")}</strong> OAuth
-              connection, and permanently delete any saved API keys. Standing
-              approvals will be revoked. You will need to re-authorize and
-              re-add credentials when re-enabling.
+              {oauthProvider ? (
+                <>
+                  This will disable the <strong>{connectorName}</strong>{" "}
+                  connector, disconnect the{" "}
+                  <strong>{providerLabel(oauthProvider)}</strong> OAuth
+                  connection, and permanently delete any saved API keys.
+                  Standing approvals will be revoked. You will need to
+                  re-authorize and re-add credentials when re-enabling.
+                </>
+              ) : (
+                <>
+                  This will disable the <strong>{connectorName}</strong>{" "}
+                  connector and permanently delete the saved API key. Standing
+                  approvals will be revoked. You will need to re-add credentials
+                  when re-enabling.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

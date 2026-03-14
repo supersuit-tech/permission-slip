@@ -176,6 +176,7 @@ export function ConnectorConfigPage() {
           )?.oauth_provider
         }
         oauthConnectionId={credentialBinding?.oauth_connection_id ?? undefined}
+        hasApiKeyCredential={!!credentialBinding?.credential_id}
       />
     </div>
   );
