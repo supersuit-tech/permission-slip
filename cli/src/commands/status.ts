@@ -39,6 +39,9 @@ export function statusCommand(program: Command): void {
         const client = new ApiClient({ serverUrl: opts.server, agentId });
 
         if (!approvalId) {
+          if (opts.wait) {
+            process.stderr.write("Warning: --wait has no effect without an approval_id (shows registration state)\n");
+          }
           // No approval_id: show registration state.
           const result = await client.status();
           output(result, outputOpts);

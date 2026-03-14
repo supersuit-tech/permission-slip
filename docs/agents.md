@@ -413,17 +413,20 @@ The user receives a notification and reviews the request on their dashboard.
 
 The user reviews and approves (or denies) the request. After approving, they see a confirmation code and share it with you.
 
-You can poll `GET /approvals/{id}/status` to check for approval resolution. The Permission Slip CLI does this automatically — by default, `permission-slip request` blocks until the approval is resolved (approved, denied, cancelled, or expired) or the `--timeout` elapses. Pass `--no-wait` if you prefer fire-and-forget behavior.
+The Permission Slip CLI returns immediately by default with an `approval_id` and a `next_step` hint. Use `permission-slip status <approval_id>` to check the result once the user has approved. Pass `--wait` to `request` if you prefer blocking behavior.
 
 ```bash
-# Default: blocks until resolved (up to 120s)
+# Default: returns immediately with approval_id
 permission-slip request --action email.send --params '{"to":["alice@example.com"]}'
 
-# Fire-and-forget:
-permission-slip request --action email.send --params '{}' --no-wait
+# Check result later:
+permission-slip status <approval_id>
 
-# Custom timeout:
-permission-slip request --action email.send --params '{}' --timeout 30
+# Block until resolved (up to 120s):
+permission-slip request --action email.send --params '{}' --wait
+
+# Block with custom timeout:
+permission-slip request --action email.send --params '{}' --wait --timeout 30
 ```
 
 Alternatively, the user can share the approval confirmation code out-of-band (paste it in chat, set it in your config, etc.).
