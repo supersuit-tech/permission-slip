@@ -87,12 +87,18 @@ func ensureLoaded() error {
 	return loadErr
 }
 
-// GetPlan returns the plan with the given ID, or nil if not found.
+// GetPlan returns a copy of the plan with the given ID, or nil if not found.
+// The returned struct is safe to modify without affecting cached config.
 func GetPlan(id string) *Plan {
 	if err := ensureLoaded(); err != nil {
 		return nil
 	}
-	return plans[id]
+	p := plans[id]
+	if p == nil {
+		return nil
+	}
+	cp := *p
+	return &cp
 }
 
 // MustGetPlan returns the plan with the given ID, panicking if not found.
