@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Settings } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,8 +38,9 @@ export function ConnectorCredentialsSection({
 }: ConnectorCredentialsSectionProps) {
   // Collect all service IDs from required credentials so the dropdown can
   // include credentials stored under any of them (e.g. "github" + "github_pat").
-  const credentialServiceIds = new Set(
-    requiredCredentials.map((rc) => rc.service),
+  const credentialServiceIds = useMemo(
+    () => new Set(requiredCredentials.map((rc) => rc.service)),
+    [requiredCredentials],
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
 
