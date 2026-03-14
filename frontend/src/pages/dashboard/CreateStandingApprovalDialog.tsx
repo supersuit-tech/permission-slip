@@ -175,6 +175,10 @@ export function CreateStandingApprovalDialog({
       }
       setStep(2);
     } else if (step === 2) {
+      if (configsLoading) {
+        toast.error("Please wait for configurations to finish loading");
+        return;
+      }
       if (!selectedConfigId) {
         toast.error("Please select an action configuration or choose custom");
         return;
@@ -431,7 +435,10 @@ export function CreateStandingApprovalDialog({
               <Button
                 type="button"
                 onClick={handleNext}
-                disabled={step === 3 && schemaLoading}
+                disabled={
+                  (step === 2 && configsLoading) ||
+                  (step === 3 && schemaLoading)
+                }
               >
                 Next
                 <ChevronRight className="size-4" />
