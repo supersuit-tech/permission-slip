@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -356,6 +357,9 @@ func TestDoPost_HTTPErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.statusCode == http.StatusTooManyRequests {
+					w.Header().Set("Retry-After", "60")
+				}
 				w.WriteHeader(tt.statusCode)
 				w.Write([]byte(tt.body))
 			}))
@@ -373,8 +377,11 @@ func TestDoPost_HTTPErrors(t *testing.T) {
 					t.Errorf("expected AuthError, got %T: %v", err, err)
 				}
 			case "rate_limit":
-				if !connectors.IsRateLimitError(err) {
+				var rle *connectors.RateLimitError
+				if !connectors.AsRateLimitError(err, &rle) {
 					t.Errorf("expected RateLimitError, got %T: %v", err, err)
+				} else if rle.RetryAfter != 60*time.Second {
+					t.Errorf("RetryAfter = %v, want 60s", rle.RetryAfter)
 				}
 			case "external":
 				if !connectors.IsExternalError(err) {

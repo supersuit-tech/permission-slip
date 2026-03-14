@@ -287,9 +287,7 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	// Slack normally returns 200 with {"ok": false} for app-level errors,
 	// but can return non-200 for rate limits, auth failures, and server errors.
 	if resp.StatusCode != http.StatusOK {
-		if err := checkHTTPStatus(resp.StatusCode, resp.Header, respBody); err != nil {
-			return err
-		}
+		return checkHTTPStatus(resp.StatusCode, resp.Header, respBody)
 	}
 
 	if err := json.Unmarshal(respBody, dest); err != nil {
