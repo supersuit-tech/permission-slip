@@ -269,6 +269,10 @@ func UpdateUsageBreakdownOnly(ctx context.Context, d DBTX, userID string, period
 // BillingPeriodBounds returns the start (inclusive) and end (exclusive) of the
 // billing month containing the given time. All calculations use UTC.
 //
+// Free-tier users share calendar-month cycles (1st to 1st) with the full
+// monthly allowance, regardless of signup date. This is intentional — see
+// docs/adr/010-calendar-month-billing-cycles.md for the rationale.
+//
 // Example:
 //
 //	BillingPeriodBounds(2026-02-15T14:30:00Z)
