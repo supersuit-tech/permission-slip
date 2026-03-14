@@ -2,7 +2,7 @@
 name: watch
 description: Poll a GitHub PR for new comments and PR reviews and act on them autonomously. Use when the user wants to monitor a PR for feedback and have Claude implement requested changes automatically.
 disable-model-invocation: true
-argument-hint: "<PR_URL> [--automerge] [--max-turns <N>]"
+argument-hint: "[PR_URL] [--automerge] [--max-turns <N>]"
 ---
 
 # Watch PR for Comments and Reviews
@@ -40,12 +40,20 @@ Agent (this skill)     — Only invoked when reasoning is needed
 
 Parse the arguments from: `$ARGUMENTS`
 
-Extract the PR URL and any flags. The format is: `<PR_URL> [--automerge] [--max-turns <N>]`
+Extract any PR URL and flags. The format is: `[PR_URL] [--automerge] [--max-turns <N>]`
+
+The PR URL is **optional**. If not provided, detect it automatically from the current branch:
+
+```bash
+PR_URL=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr view --json url --jq '.url' 2>/dev/null || echo "")
+```
+
+If auto-detection fails (no PR exists for the current branch), abort with a clear error message.
 
 Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permission-slip/pull/123` → `123`).
 
 Set these variables for the session:
-- `PR_URL` — the PR URL extracted from the arguments
+- `PR_URL` — the PR URL (from arguments or auto-detected from current branch)
 - `PR_NUMBER` — the extracted PR number
 - `AUTO_MERGE` — `true` if `--automerge` was passed, `false` otherwise
 - `MAX_TURNS` — the value of `--max-turns` if passed, `0` otherwise (0 = unlimited)
