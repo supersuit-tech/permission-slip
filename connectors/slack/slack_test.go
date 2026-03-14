@@ -1,6 +1,8 @@
 package slack
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -244,6 +246,140 @@ func TestValidateUserID(t *testing.T) {
 			err := validateUserID(tt.userID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateUserID(%q) error = %v, wantErr %v", tt.userID, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCheckHTTPStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantType   string // "auth", "rate_limit", "external"
+	}{
+		{
+			name:       "401 with Slack error",
+			statusCode: 401,
+			body:       `{"ok":false,"error":"invalid_auth"}`,
+			wantType:   "auth",
+		},
+		{
+			name:       "401 without body",
+			statusCode: 401,
+			body:       ``,
+			wantType:   "auth",
+		},
+		{
+			name:       "403 permission denied",
+			statusCode: 403,
+			body:       `{"ok":false,"error":"missing_scope"}`,
+			wantType:   "auth",
+		},
+		{
+			name:       "429 rate limited",
+			statusCode: 429,
+			body:       `{"ok":false,"error":"ratelimited"}`,
+			wantType:   "rate_limit",
+		},
+		{
+			name:       "500 server error",
+			statusCode: 500,
+			body:       `internal server error`,
+			wantType:   "external",
+		},
+		{
+			name:       "503 service unavailable with JSON",
+			statusCode: 503,
+			body:       `{"ok":false,"error":"service_unavailable"}`,
+			wantType:   "external",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkHTTPStatus(tt.statusCode, http.Header{}, []byte(tt.body))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			switch tt.wantType {
+			case "auth":
+				if !connectors.IsAuthError(err) {
+					t.Errorf("expected AuthError, got %T: %v", err, err)
+				}
+			case "rate_limit":
+				if !connectors.IsRateLimitError(err) {
+					t.Errorf("expected RateLimitError, got %T: %v", err, err)
+				}
+			case "external":
+				if !connectors.IsExternalError(err) {
+					t.Errorf("expected ExternalError, got %T: %v", err, err)
+				}
+			}
+		})
+	}
+}
+
+func TestDoPost_HTTPErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		wantType   string
+	}{
+		{
+			name:       "401 returns AuthError",
+			statusCode: 401,
+			body:       `{"ok":false,"error":"invalid_auth"}`,
+			wantType:   "auth",
+		},
+		{
+			name:       "429 returns RateLimitError",
+			statusCode: 429,
+			body:       `{"ok":false,"error":"ratelimited"}`,
+			wantType:   "rate_limit",
+		},
+		{
+			name:       "500 returns ExternalError",
+			statusCode: 500,
+			body:       `not json`,
+			wantType:   "external",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			c := newForTest(srv.Client(), srv.URL)
+			var dest slackResponse
+			err := c.doPost(t.Context(), "test.method", validCreds(), map[string]string{}, &dest)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			switch tt.wantType {
+			case "auth":
+				if !connectors.IsAuthError(err) {
+					t.Errorf("expected AuthError, got %T: %v", err, err)
+				}
+			case "rate_limit":
+				if !connectors.IsRateLimitError(err) {
+					t.Errorf("expected RateLimitError, got %T: %v", err, err)
+				}
+			case "external":
+				if !connectors.IsExternalError(err) {
+					t.Errorf("expected ExternalError, got %T: %v", err, err)
+				}
 			}
 		})
 	}

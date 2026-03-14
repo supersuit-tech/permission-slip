@@ -278,18 +278,18 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	}
 	defer resp.Body.Close()
 
-	// Slack returns 429 for rate limiting with a Retry-After header.
-	if resp.StatusCode == http.StatusTooManyRequests {
-		retryAfter := connectors.ParseRetryAfter(resp.Header.Get("Retry-After"), defaultRetryAfter)
-		return &connectors.RateLimitError{
-			Message:    "Slack API rate limit exceeded",
-			RetryAfter: retryAfter,
-		}
-	}
-
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
+	// Handle HTTP-level errors before attempting JSON unmarshal.
+	// Slack normally returns 200 with {"ok": false} for app-level errors,
+	// but can return non-200 for rate limits, auth failures, and server errors.
+	if resp.StatusCode != http.StatusOK {
+		if err := checkHTTPStatus(resp.StatusCode, resp.Header, respBody); err != nil {
+			return err
+		}
 	}
 
 	if err := json.Unmarshal(respBody, dest); err != nil {
@@ -358,6 +358,46 @@ func mapSlackError(slackErr string) error {
 		return &connectors.ExternalError{
 			StatusCode: 200,
 			Message:    fmt.Sprintf("Slack API error: %s", slackErr),
+		}
+	}
+}
+
+// checkHTTPStatus maps non-200 HTTP status codes to typed connector errors.
+// Slack normally returns 200 with {"ok": false} for application-level errors,
+// but returns standard HTTP status codes for rate limits, auth failures, and
+// server errors — especially when the request never reaches the API handler.
+func checkHTTPStatus(statusCode int, header http.Header, body []byte) error {
+	// Try to extract a Slack error string from the response body.
+	var env slackResponse
+	msg := ""
+	if json.Unmarshal(body, &env) == nil && env.Error != "" {
+		msg = env.Error
+	}
+
+	switch statusCode {
+	case http.StatusUnauthorized:
+		if msg == "" {
+			msg = "invalid or expired token"
+		}
+		return &connectors.AuthError{Message: fmt.Sprintf("Slack auth error: %s", msg)}
+	case http.StatusForbidden:
+		if msg == "" {
+			msg = "permission denied"
+		}
+		return &connectors.AuthError{Message: fmt.Sprintf("Slack permission denied: %s", msg)}
+	case http.StatusTooManyRequests:
+		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
+		return &connectors.RateLimitError{
+			Message:    "Slack API rate limit exceeded",
+			RetryAfter: retryAfter,
+		}
+	default:
+		if msg == "" {
+			msg = fmt.Sprintf("HTTP %d", statusCode)
+		}
+		return &connectors.ExternalError{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("Slack API error: %s", msg),
 		}
 	}
 }
