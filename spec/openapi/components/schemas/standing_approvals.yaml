@@ -304,12 +304,14 @@ CreateStandingApprovalRequest:
 
     source_action_configuration_id:
       type: string
-      pattern: '^ac_[a-f0-9]{32}$'
       maxLength: 128
       description: |
         Optional reference to the action configuration this standing approval
         was derived from. When provided, the backend records it for traceability.
         No foreign-key enforcement — the configuration may be deleted later.
+        Expected format: `ac_` prefix followed by 32 hex characters (e.g.,
+        `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
+        enforce the pattern — only non-empty and max 128 characters.
       example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
     max_executions:
