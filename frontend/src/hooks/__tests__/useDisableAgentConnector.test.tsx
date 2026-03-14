@@ -46,6 +46,7 @@ describe("useDisableAgentConnector", () => {
         headers: { Authorization: "Bearer token" },
         params: {
           path: { agent_id: 42, connector_id: "gmail" },
+          query: {},
         },
       },
     );
@@ -56,6 +57,41 @@ describe("useDisableAgentConnector", () => {
       revoked_standing_approvals: 2,
     });
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it("sends delete_credentials=true when deleteCredentials is set", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockDelete.mockResolvedValue({
+      data: {
+        agent_id: 42,
+        connector_id: "github",
+        disabled_at: "2026-02-18T12:00:00Z",
+        revoked_standing_approvals: 0,
+      },
+    });
+
+    const { result } = renderHook(() => useDisableAgentConnector(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.disableConnector({
+        agentId: 42,
+        connectorId: "github",
+        deleteCredentials: true,
+      });
+    });
+
+    expect(mockDelete).toHaveBeenCalledWith(
+      "/v1/agents/{agent_id}/connectors/{connector_id}",
+      {
+        headers: { Authorization: "Bearer token" },
+        params: {
+          path: { agent_id: 42, connector_id: "github" },
+          query: { delete_credentials: true },
+        },
+      },
+    );
   });
 
   it("throws when not authenticated", async () => {

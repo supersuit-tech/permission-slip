@@ -133,6 +133,20 @@ agentConnectorById:
       forgotten standing approvals from silently reactivating if the connector
       is re-enabled later.
 
+      ### Disabling vs. Removing
+
+      By default this endpoint **disables** the connector — it removes the
+      agent-connector association but leaves the user's credentials (API keys)
+      and OAuth connections intact so the connector can be re-enabled without
+      re-entering credentials.
+
+      Pass `?delete_credentials=true` to also **permanently delete** the API
+      key credential assigned to this connector. The credential row and its
+      encrypted vault secret are deleted in the same database transaction, so
+      the operation is fully atomic — either everything succeeds or nothing
+      changes. OAuth connections are unaffected by this flag and must be
+      disconnected separately via `DELETE /v1/oauth/connections/{connection_id}`.
+
       Uses session authentication (Supabase JWT).
 
     tags:
@@ -144,6 +158,22 @@ agentConnectorById:
     parameters:
       - $ref: '../parameters/common.yaml#/AgentId'
       - $ref: '../parameters/common.yaml#/ConnectorId'
+      - name: delete_credentials
+        in: query
+        required: false
+        description: |
+          When `true`, permanently delete the API key credential assigned to
+          this connector (both the credential record and its encrypted vault
+          secret) as part of the same atomic operation. Defaults to `false`.
+
+          Use this when you want a full "remove" — disabling the connector
+          **and** discarding saved API keys — rather than a temporary disable
+          that preserves credentials for re-enabling later.
+
+          OAuth connections are **not** affected by this flag. To disconnect
+          OAuth, call `DELETE /v1/oauth/connections/{connection_id}` separately.
+        schema:
+          type: boolean
 
     responses:
       '200':

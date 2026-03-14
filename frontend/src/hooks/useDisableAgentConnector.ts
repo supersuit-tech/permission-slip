@@ -9,6 +9,7 @@ type DisableResponse =
 interface DisableArgs {
   agentId: number;
   connectorId: string;
+  deleteCredentials?: boolean;
 }
 
 export function useDisableAgentConnector() {
@@ -16,7 +17,7 @@ export function useDisableAgentConnector() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async ({ agentId, connectorId }: DisableArgs) => {
+    mutationFn: async ({ agentId, connectorId, deleteCredentials }: DisableArgs) => {
       if (!session?.access_token) {
         throw new Error("Not authenticated");
       }
@@ -27,16 +28,23 @@ export function useDisableAgentConnector() {
           headers: { Authorization: `Bearer ${session.access_token}` },
           params: {
             path: { agent_id: agentId, connector_id: connectorId },
+            query: deleteCredentials ? { delete_credentials: true } : {},
           },
         },
       );
       if (error) throw new Error("Failed to disable connector");
       return data as DisableResponse;
     },
-    onSuccess: (_data, { agentId }) => {
+    onSuccess: (_data, { agentId, connectorId, deleteCredentials }) => {
       queryClient.invalidateQueries({
         queryKey: ["agent-connectors", agentId],
       });
+      if (deleteCredentials) {
+        queryClient.invalidateQueries({ queryKey: ["credentials"] });
+        queryClient.invalidateQueries({
+          queryKey: ["agent-connector-credential", agentId, connectorId],
+        });
+      }
     },
   });
 
