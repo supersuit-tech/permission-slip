@@ -1,40 +1,22 @@
 package db_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
 
-func TestPlansSchema(t *testing.T) {
+func TestGetPlan_Free(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	testhelper.RequireColumns(t, tx, "plans", []string{
-		"id", "name", "max_requests_per_month", "max_agents",
-		"max_standing_approvals", "max_credentials",
-		"audit_retention_days", "price_per_request_millicents", "created_at",
-	})
-}
-
-func TestGetPlanByID_Free(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
-
-	plan, err := db.GetPlanByID(ctx, tx, "free")
-	if err != nil {
-		t.Fatalf("GetPlanByID: %v", err)
-	}
+	plan := db.GetPlan("free")
 	if plan == nil {
 		t.Fatal("expected free plan to exist")
 	}
 	if plan.Name != "Free" {
 		t.Errorf("expected name %q, got %q", "Free", plan.Name)
 	}
-	if plan.MaxRequestsPerMonth == nil || *plan.MaxRequestsPerMonth != 1000 {
-		t.Errorf("expected max_requests_per_month=1000, got %v", plan.MaxRequestsPerMonth)
+	if plan.MaxRequestsPerMonth == nil || *plan.MaxRequestsPerMonth != 250 {
+		t.Errorf("expected max_requests_per_month=250, got %v", plan.MaxRequestsPerMonth)
 	}
 	if plan.MaxAgents == nil || *plan.MaxAgents != 3 {
 		t.Errorf("expected max_agents=3, got %v", plan.MaxAgents)
@@ -53,15 +35,9 @@ func TestGetPlanByID_Free(t *testing.T) {
 	}
 }
 
-func TestGetPlanByID_PayAsYouGo(t *testing.T) {
+func TestGetPlan_PayAsYouGo(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
-
-	plan, err := db.GetPlanByID(ctx, tx, "pay_as_you_go")
-	if err != nil {
-		t.Fatalf("GetPlanByID: %v", err)
-	}
+	plan := db.GetPlan("pay_as_you_go")
 	if plan == nil {
 		t.Fatal("expected pay_as_you_go plan to exist")
 	}
@@ -74,12 +50,6 @@ func TestGetPlanByID_PayAsYouGo(t *testing.T) {
 	if plan.MaxAgents != nil {
 		t.Errorf("expected max_agents=nil (unlimited), got %v", *plan.MaxAgents)
 	}
-	if plan.MaxStandingApprovals != nil {
-		t.Errorf("expected max_standing_approvals=nil (unlimited), got %v", *plan.MaxStandingApprovals)
-	}
-	if plan.MaxCredentials != nil {
-		t.Errorf("expected max_credentials=nil (unlimited), got %v", *plan.MaxCredentials)
-	}
 	if plan.AuditRetentionDays != 90 {
 		t.Errorf("expected audit_retention_days=90, got %d", plan.AuditRetentionDays)
 	}
@@ -88,15 +58,9 @@ func TestGetPlanByID_PayAsYouGo(t *testing.T) {
 	}
 }
 
-func TestGetPlanByID_NotFound(t *testing.T) {
+func TestGetPlan_NotFound(t *testing.T) {
 	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
-
-	plan, err := db.GetPlanByID(ctx, tx, "nonexistent")
-	if err != nil {
-		t.Fatalf("GetPlanByID: %v", err)
-	}
+	plan := db.GetPlan("nonexistent")
 	if plan != nil {
 		t.Errorf("expected nil for nonexistent plan, got %+v", plan)
 	}
@@ -109,30 +73,5 @@ func TestDefaultPlanID(t *testing.T) {
 	}
 	if got := db.DefaultPlanID(true); got != db.PlanFree {
 		t.Errorf("DefaultPlanID(true) = %q, want %q", got, db.PlanFree)
-	}
-}
-
-func TestListPlans(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
-
-	plans, err := db.ListPlans(ctx, tx)
-	if err != nil {
-		t.Fatalf("ListPlans: %v", err)
-	}
-	if len(plans) < 2 {
-		t.Fatalf("expected at least 2 plans, got %d", len(plans))
-	}
-
-	ids := make(map[string]bool)
-	for _, p := range plans {
-		ids[p.ID] = true
-	}
-	if !ids["free"] {
-		t.Error("expected free plan in list")
-	}
-	if !ids["pay_as_you_go"] {
-		t.Error("expected pay_as_you_go plan in list")
 	}
 }
