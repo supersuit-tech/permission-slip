@@ -185,8 +185,10 @@ export function CreateStandingApprovalDialog({
       }
       if (selectedConfig) {
         initConstraintsFromRecord(selectedConfig.parameters);
+        setManualConstraintsJson("");
       } else if (initialConstraints && isCustomAction) {
         initConstraintsFromRecord(initialConstraints);
+        setManualConstraintsJson(JSON.stringify(initialConstraints, null, 2));
       } else {
         setParamValues({});
         setParamModes({});
