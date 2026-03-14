@@ -901,6 +901,29 @@ func TestCreateStandingApproval_ConstraintsNullAndWildcard(t *testing.T) {
 	}
 }
 
+func TestCreateStandingApproval_ConstraintsNullWithFixed(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// Null mixed with a fixed value — null values are rejected outright.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"repo": null, "title": "my-title"}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for null+fixed constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestCreateStandingApproval_WithSourceActionConfigurationID(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

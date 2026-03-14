@@ -484,12 +484,11 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 	}
 
 	// Check that at least one constraint value is not a wildcard ("*").
-	// JSON null is treated as wildcard-equivalent (no constraint on that key).
+	// Null values are rejected outright — use "*" for a wildcard or omit the key.
 	allWildcard := true
 	for _, v := range obj {
-		// Treat JSON null as a wildcard-equivalent (unconstrained).
 		if string(v) == "null" {
-			continue
+			return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
 		}
 		var s string
 		if json.Unmarshal(v, &s) != nil || s != "*" {
