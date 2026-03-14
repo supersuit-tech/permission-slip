@@ -429,8 +429,10 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2Connected(t *testing.T) {
 	testhelper.InsertConnectorWithDescription(t, tx, connID, "Google Drive", "Upload files to Google Drive")
 	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, "google_drive", "google", []string{"https://www.googleapis.com/auth/drive"})
 
-	// User has an active OAuth connection for Google
-	testhelper.InsertOAuthConnection(t, tx, testhelper.GenerateID(t, "oc_"), uid, "google")
+	// User has an active OAuth connection for Google with the required scope
+	testhelper.InsertOAuthConnectionFull(t, tx, testhelper.GenerateID(t, "oc_"), uid, "google", testhelper.OAuthConnectionOpts{
+		Scopes: []string{"https://www.googleapis.com/auth/drive"},
+	})
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
@@ -442,7 +444,38 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2Connected(t *testing.T) {
 		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
 	}
 	if !caps.Connectors[0].CredentialsReady {
-		t.Error("expected credentials_ready=true when OAuth2 connection is active")
+		t.Error("expected credentials_ready=true when OAuth2 connection is active with required scopes")
+	}
+}
+
+func TestGetAgentCapabilities_CredentialsReady_OAuth2InsufficientScopes(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	// Connector requires Drive scope
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, "google_drive", "google", []string{"https://www.googleapis.com/auth/drive"})
+
+	// User connected Google but only with email scope (insufficient)
+	testhelper.InsertOAuthConnectionFull(t, tx, testhelper.GenerateID(t, "oc_"), uid, "google", testhelper.OAuthConnectionOpts{
+		Scopes: []string{"https://www.googleapis.com/auth/gmail.readonly"},
+	})
+
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("GetAgentCapabilities: %v", err)
+	}
+	if len(caps.Connectors) != 1 {
+		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
+	}
+	if caps.Connectors[0].CredentialsReady {
+		t.Error("expected credentials_ready=false when OAuth2 connection has insufficient scopes")
 	}
 }
 

@@ -87,6 +87,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		               WHERE oc.user_id = ac.approver_id
 		                 AND oc.provider = crc.oauth_provider
 		                 AND oc.status = 'active'
+		                 AND crc.oauth_scopes <@ oc.scopes
 		             )
 		       ) AS credentials_ready
 		FROM agent_connectors ac
