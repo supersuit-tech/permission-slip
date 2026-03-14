@@ -696,6 +696,30 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 	}
 }
 
+func TestParseManifest_XUIVisibleWhenEqualsNull(t *testing.T) {
+	// visible_when with equals: null should be valid (means "show when field is unset").
+	input := `{
+		"id": "x",
+		"name": "X",
+		"actions": [{
+			"action_type": "x.do",
+			"name": "Do",
+			"parameters_schema": {
+				"type": "object",
+				"properties": {
+					"a": {"type": "string"},
+					"b": {"type": "string", "x-ui": {"visible_when": {"field": "a", "equals": null}}}
+				}
+			}
+		}]
+	}`
+
+	_, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("visible_when with equals:null should be valid, got: %v", err)
+	}
+}
+
 func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
 	// All valid widget types should be accepted.
 	for _, widget := range []string{"text", "select", "textarea", "toggle", "number", "date"} {

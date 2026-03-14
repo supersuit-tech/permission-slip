@@ -400,8 +400,8 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 				Group       string `json:"group"`
 				HelpURL     string `json:"help_url"`
 				VisibleWhen *struct {
-					Field  string           `json:"field"`
-					Equals *json.RawMessage `json:"equals"`
+					Field  string          `json:"field"`
+					Equals json.RawMessage `json:"equals"`
 				} `json:"visible_when"`
 			} `json:"x-ui"`
 		}
@@ -433,7 +433,8 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
 			}
-			if prop.XUI.VisibleWhen.Equals == nil {
+			// len == 0 means the key was absent; null unmarshal produces []byte("null").
+			if len(prop.XUI.VisibleWhen.Equals) == 0 {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires an \"equals\" key", actionIdx, propName)
 			}
 		}

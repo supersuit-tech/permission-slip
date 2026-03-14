@@ -253,6 +253,20 @@ This renders:
 | `required_credentials[].auth_type` | `api_key`, `basic`, or `custom` |
 | `required_credentials[].instructions_url` | URL to human-readable credential setup docs (optional, must be http/https, max 2048 chars) |
 
+**`x-ui` validation rules:**
+
+The server validates `x-ui` hints during manifest parsing. Invalid schemas are rejected at startup with descriptive error messages:
+
+| Rule | Error if violated |
+|------|-------------------|
+| `widget` must be one of: `text`, `select`, `textarea`, `toggle`, `number`, `date` | Lists valid widget types |
+| `group` must reference a group defined in root `x-ui.groups` | Names the unrecognized group |
+| `x-ui.groups` entries must have unique, non-empty `id` values | Names the duplicate |
+| `x-ui.order` entries must reference existing property keys, no duplicates | Names the unknown/duplicate field |
+| `visible_when.field` must reference an existing property (not itself) | Names the invalid reference |
+| `visible_when` must include both `field` and `equals` keys | Identifies which key is missing |
+| `help_url` must use `http` or `https` scheme | Prevents `javascript:` XSS |
+
 ### Makefile
 
 Your `Makefile` must have a `build` target that produces an executable named `connector` in the repo root:
