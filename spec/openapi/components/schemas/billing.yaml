@@ -62,12 +62,12 @@ PlanLimits:
       type: integer
       nullable: true
       description: Maximum number of agents (null = unlimited)
-      example: 5
+      example: 3
     max_standing_approvals:
       type: integer
       nullable: true
       description: Maximum active standing approvals (null = unlimited)
-      example: 10
+      example: 5
     max_credentials:
       type: integer
       nullable: true

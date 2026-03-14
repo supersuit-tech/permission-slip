@@ -13,6 +13,8 @@ import (
 	"github.com/stripe/stripe-go/v82/paymentmethod"
 	"github.com/stripe/stripe-go/v82/setupintent"
 	"github.com/stripe/stripe-go/v82/subscription"
+
+	"github.com/supersuit-tech/permission-slip-web/config"
 )
 
 // Config holds Stripe configuration from environment variables.
@@ -90,8 +92,14 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, stripeCustomerID, su
 }
 
 // FreeRequestAllowance is the number of requests included for free each
-// billing period before per-request charges apply.
-const FreeRequestAllowance = 1000
+// billing period before per-request charges apply. Derived from config/plans.json.
+var FreeRequestAllowance = func() int64 {
+	p := config.GetPlan(config.PlanFree)
+	if p != nil && p.MaxRequestsPerMonth != nil {
+		return int64(*p.MaxRequestsPerMonth)
+	}
+	return 250 // fallback
+}()
 
 // OverageCostCents calculates the cost in cents for overage requests at
 // $0.005/request (0.5 cents). Uses ceiling division to avoid under-billing
