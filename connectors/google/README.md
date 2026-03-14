@@ -29,6 +29,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `drive` | `google.list_drive_files`, `google.get_drive_file`, `google.upload_drive_file`, `google.delete_drive_file`, `google.list_documents`, `google.search_drive`, `google.create_drive_folder` |
 | `calendar.events` (also used for updates/deletes) | `google.update_calendar_event`, `google.delete_calendar_event` |
 | `gmail.send` + `gmail.readonly` (both required) | `google.send_email_reply` |
+| `gmail.modify` | `google.archive_email` |
 
 Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management). The `drive` scope grants full Drive access; a narrower scope like `drive.file` would only allow access to files created by this app, which is too restrictive for file browsing and reading.
 
@@ -85,6 +86,7 @@ Lists recent emails from the Gmail inbox with metadata.
   "emails": [
     {
       "id": "18abc123def",
+      "thread_id": "18abc123def",
       "from": "sender@example.com",
       "to": "you@example.com",
       "subject": "Hello",
@@ -961,6 +963,34 @@ Moves a file to trash in Google Drive (soft delete — not permanent).
 
 ---
 
+### `google.archive_email`
+
+Archives a Gmail thread by removing the INBOX label from all messages in the thread. Archived emails remain accessible via search and All Mail — this matches Gmail's built-in Archive button behavior.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `thread_id` | string | Yes | The Gmail thread ID to archive (obtained from `list_emails` `thread_id` field) |
+
+**Response:**
+
+```json
+{
+  "thread_id": "18abc123def"
+}
+```
+
+**Gmail API:** `POST /gmail/v1/users/me/threads/{id}/modify` ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.threads/modify))
+
+**Implementation notes:**
+- Uses `threads.modify` (not `messages.modify`) to atomically remove `INBOX` from all messages in the thread, matching Gmail's native Archive behavior.
+- Thread IDs are URL-encoded via `url.PathEscape` to prevent path traversal.
+
+---
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -1019,6 +1049,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Search Drive within folder | `search_drive` | `folder_id` locked to a specific folder |
 | Create Drive folders | `create_drive_folder` | Nothing — agent controls name and parent |
 | Reply to emails | `send_email_reply` | Nothing — agent controls thread, message, and body |
+| Archive emails | `archive_email` | Nothing — agent can archive any thread |
 
 ## Adding a New Action
 
@@ -1038,12 +1069,13 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 ```
 connectors/google/
 ├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
-├── manifest.go                     # Manifest() — 27 action schemas and 39+ templates
+├── manifest.go                     # Manifest() — 28 action schemas and 40+ templates
 ├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
 ├── email_helpers.go                # buildGmailRaw() — shared RFC 2822 message builder used by send_email and send_email_reply
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
 ├── send_email_reply.go             # google.send_email_reply action (fetches headers, strips injection chars, sends reply)
+├── archive_email.go               # google.archive_email action (thread-level archive via threads.modify)
 ├── create_calendar_event.go        # google.create_calendar_event action
 ├── list_calendar_events.go         # google.list_calendar_events action
 ├── update_calendar_event.go        # google.update_calendar_event action (PATCH with map[string]any for explicit empty arrays)
