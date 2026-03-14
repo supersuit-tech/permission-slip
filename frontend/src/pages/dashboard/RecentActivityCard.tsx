@@ -22,6 +22,7 @@ import {
   OUTCOME_FILTERS,
   ACTION_EVENT_TYPES,
   AuditEventRow,
+  deduplicateEvents,
 } from "@/lib/auditEvents";
 import {
   useAuditEvents,
@@ -83,7 +84,8 @@ export function RecentActivityCard() {
     ...(outcomeFilter !== "all" && { outcome: outcomeFilter }),
   };
 
-  const { events, hasMore, isLoading, error, refetch } = useAuditEvents(filters);
+  const { events: rawEvents, hasMore, isLoading, error, refetch } = useAuditEvents(filters);
+  const events = deduplicateEvents(rawEvents);
 
   const handleRowClick = useCallback((event: AuditEvent) => {
     setSelectedEvent(event);
