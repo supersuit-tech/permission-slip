@@ -134,16 +134,22 @@ export function ManageCredentialsDialog({
               // connectorId itself — these are "orphans" that don't match
               // any specific required credential service (e.g. a PAT stored
               // with service "github" instead of "github_pat").
+              // Skip if connectorId is already an explicit static service
+              // to avoid showing the same credentials in two rows.
               const isFirstStatic =
                 cred.auth_type !== "oauth2" &&
                 !sorted
                   .slice(0, idx)
                   .some((c) => c.auth_type !== "oauth2");
+              const connectorIdIsExplicitService = sorted.some(
+                (c) => c.auth_type !== "oauth2" && c.service === connectorId,
+              );
               let storedCredentials =
                 storedByService.get(cred.service) ?? [];
               if (
                 isFirstStatic &&
                 connectorId !== cred.service &&
+                !connectorIdIsExplicitService &&
                 storedByService.has(connectorId)
               ) {
                 const seenIds = new Set(storedCredentials.map((c) => c.id));

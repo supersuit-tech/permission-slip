@@ -39,8 +39,8 @@ export function ConnectorCredentialsSection({
   // Collect all service IDs from required credentials so the dropdown can
   // include credentials stored under any of them (e.g. "github" + "github_pat").
   const credentialServiceIds = useMemo(
-    () => new Set(requiredCredentials.map((rc) => rc.service)),
-    [requiredCredentials],
+    () => new Set([connectorId, ...requiredCredentials.map((rc) => rc.service)]),
+    [connectorId, requiredCredentials],
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
 
