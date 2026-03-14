@@ -10,7 +10,7 @@
 /** Conditional visibility rule: show a field only when another field has a specific value. */
 export interface VisibleWhen {
   field: string;
-  equals: string;
+  equals: string | boolean | number;
 }
 
 /** Property-level `x-ui` rendering hints for a single parameter. */
@@ -79,7 +79,7 @@ export function parseParametersSchema(
 
   const rawProps = schema.properties;
   if (!rawProps || typeof rawProps !== "object") {
-    return { type: "object", required };
+    return { type: "object", required, "x-ui": parseSchemaUI(schema["x-ui"]) };
   }
 
   const properties: Record<string, SchemaProperty> = {};
@@ -122,8 +122,11 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
   if (typeof obj.help_text === "string") ui.help_text = obj.help_text;
   if (obj.visible_when && typeof obj.visible_when === "object") {
     const vw = obj.visible_when as Record<string, unknown>;
-    if (typeof vw.field === "string" && typeof vw.equals === "string") {
-      ui.visible_when = { field: vw.field, equals: vw.equals };
+    if (
+      typeof vw.field === "string" &&
+      (typeof vw.equals === "string" || typeof vw.equals === "boolean" || typeof vw.equals === "number")
+    ) {
+      ui.visible_when = { field: vw.field, equals: vw.equals as string | boolean | number };
     }
   }
 

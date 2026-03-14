@@ -108,6 +108,7 @@ describe("parseParametersSchema", () => {
     expect(result).toEqual({
       type: "object",
       required: ["foo"],
+      "x-ui": undefined,
     });
   });
 
@@ -189,7 +190,7 @@ describe("parseParametersSchema", () => {
       } satisfies SchemaPropertyUI);
     });
 
-    it("parses visible_when condition", () => {
+    it("parses visible_when condition with string equals", () => {
       const result = parseParametersSchema({
         type: "object",
         properties: {
@@ -205,6 +206,44 @@ describe("parseParametersSchema", () => {
       expect(result?.properties?.details?.["x-ui"]?.visible_when).toEqual({
         field: "mode",
         equals: "advanced",
+      });
+    });
+
+    it("parses visible_when condition with boolean equals", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          details: {
+            type: "string",
+            "x-ui": {
+              visible_when: { field: "enabled", equals: true },
+            },
+          },
+        },
+      });
+
+      expect(result?.properties?.details?.["x-ui"]?.visible_when).toEqual({
+        field: "enabled",
+        equals: true,
+      });
+    });
+
+    it("parses visible_when condition with number equals", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          details: {
+            type: "string",
+            "x-ui": {
+              visible_when: { field: "priority", equals: 1 },
+            },
+          },
+        },
+      });
+
+      expect(result?.properties?.details?.["x-ui"]?.visible_when).toEqual({
+        field: "priority",
+        equals: 1,
       });
     });
 
@@ -339,6 +378,20 @@ describe("parseParametersSchema", () => {
       });
 
       expect(result?.["x-ui"]?.order).toEqual(["field_a", "field_b"]);
+    });
+
+    it("preserves root-level x-ui when properties field is missing", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        "x-ui": {
+          groups: [{ id: "main", label: "Main" }],
+          order: ["field_a"],
+        },
+      });
+
+      expect(result?.["x-ui"]?.groups).toEqual([{ id: "main", label: "Main" }]);
+      expect(result?.["x-ui"]?.order).toEqual(["field_a"]);
+      expect(result?.properties).toBeUndefined();
     });
 
     it("returns undefined x-ui for empty root x-ui", () => {
