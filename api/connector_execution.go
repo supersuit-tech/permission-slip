@@ -42,8 +42,8 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 	}
 
 	// Look up all required credentials for this action's connector.
-	// A connector may support multiple auth methods (e.g. both oauth2 and api_key).
-	// We try OAuth first; if the user has no OAuth connection, fall back to static credentials.
+	// Credentials must be explicitly bound to the agent+connector pair;
+	// see resolveCredentialsWithFallback for details.
 	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
 		return nil, fmt.Errorf("look up required credentials: %w", err)
@@ -265,7 +265,7 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 		return resolveOAuthCredentialsFromConnection(ctx, deps, conn)
 	}
 	if binding.CredentialID != nil {
-		return resolveStaticCredentialByID(ctx, deps, *binding.CredentialID)
+		return resolveStaticCredentialByID(ctx, deps, userID, *binding.CredentialID)
 	}
 
 	return connectors.Credentials{}, &connectors.ValidationError{
@@ -274,13 +274,25 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 }
 
 // resolveStaticCredentialByID fetches and decrypts a specific credential by its
-// ID (from the agent_connector_credentials binding). This bypasses the
-// service-based lookup and goes straight to the vault.
-func resolveStaticCredentialByID(ctx context.Context, deps *Deps, credentialID string) (connectors.Credentials, error) {
+// ID (from the agent_connector_credentials binding). Verifies the credential
+// belongs to the executing user before decrypting.
+func resolveStaticCredentialByID(ctx context.Context, deps *Deps, userID, credentialID string) (connectors.Credentials, error) {
 	var zero connectors.Credentials
 	if deps.Vault == nil {
 		return zero, fmt.Errorf("credential vault is not configured")
 	}
+
+	// Verify the credential belongs to the executing user (defense-in-depth).
+	owned, err := db.CredentialBelongsToUser(ctx, deps.DB, credentialID, userID)
+	if err != nil {
+		return zero, fmt.Errorf("check credential ownership: %w", err)
+	}
+	if !owned {
+		return zero, &connectors.ValidationError{
+			Message: "bound credential does not belong to this user",
+		}
+	}
+
 	vaultSecretID, err := db.GetVaultSecretIDByCredentialID(ctx, deps.DB, credentialID)
 	if err != nil {
 		var credErr *db.CredentialError

@@ -408,7 +408,7 @@ func TestExecuteStandingApproval_MissingCredentials(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "testconn.need_creds")
 
-	// Connector requires credentials, but user has none stored.
+	// Connector requires credentials, but no credential binding was created for the agent.
 	testhelper.InsertConnector(t, tx, "testconn")
 	testhelper.InsertConnectorAction(t, tx, "testconn", "testconn.need_creds", "Need Creds")
 	testhelper.InsertConnectorRequiredCredential(t, tx, "testconn", "testconn_service", "api_key")

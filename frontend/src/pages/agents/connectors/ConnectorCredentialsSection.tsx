@@ -680,8 +680,10 @@ function AgentCredentialBinding({
 
   if (isLoading) return null;
 
-  // Don't show if there are no credentials or connections to choose from
-  if (credentials.length === 0 && activeConnections.length === 0) return null;
+  // Don't show if there are no credentials, connections, or existing binding.
+  // A stale binding (pointing to a deleted credential) must still be visible
+  // so the user can reassign it.
+  if (credentials.length === 0 && activeConnections.length === 0 && !binding) return null;
 
   return (
     <div className="mb-4 rounded-lg border p-3">
