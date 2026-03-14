@@ -488,3 +488,96 @@ func TestParseFilename(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeRFC5987_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"valid UTF-8", "UTF-8''hello%20world.pdf", "hello world.pdf"},
+		{"empty language tag", "UTF-8'en'doc.pdf", "doc.pdf"},
+		{"missing single quotes", "UTF-8hello.pdf", ""},
+		{"only one single quote", "UTF-8'hello.pdf", ""},
+		{"invalid percent encoding", "UTF-8''bad%ZZvalue", ""},
+		{"empty value after quotes", "UTF-8''", ""},
+		{"empty input", "", ""},
+	}
+
+	for _, tt := range tests {
+		got := decodeRFC5987(tt.input)
+		if got != tt.want {
+			t.Errorf("decodeRFC5987[%s](%q) = %q, want %q", tt.name, tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestDecodeBase64URL_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// Raw base64url (no padding) — standard Gmail format.
+	raw := base64.RawURLEncoding.EncodeToString([]byte("test data"))
+	if got := decodeBase64URL(raw); got != "test data" {
+		t.Errorf("raw base64url: got %q, want %q", got, "test data")
+	}
+
+	// Padded base64url — fallback path.
+	padded := base64.URLEncoding.EncodeToString([]byte("padded data"))
+	if got := decodeBase64URL(padded); got != "padded data" {
+		t.Errorf("padded base64url: got %q, want %q", got, "padded data")
+	}
+
+	// Totally invalid base64 — returned as-is.
+	invalid := "not-valid-base64!!!"
+	if got := decodeBase64URL(invalid); got != invalid {
+		t.Errorf("invalid base64: got %q, want %q (as-is)", got, invalid)
+	}
+}
+
+func TestTruncateEmailBody_UTF8Boundary(t *testing.T) {
+	t.Parallel()
+
+	// Short body — no truncation.
+	short := "hello"
+	if got := truncateEmailBody(short); got != short {
+		t.Errorf("short body: got %q, want %q", got, short)
+	}
+
+	// Empty body.
+	if got := truncateEmailBody(""); got != "" {
+		t.Errorf("empty body: got %q, want empty", got)
+	}
+}
+
+func TestExtractBody_DepthLimit(t *testing.T) {
+	t.Parallel()
+
+	plainData := base64.RawURLEncoding.EncodeToString([]byte("deep body"))
+
+	// Create a part at exactly the depth limit — should still return empty
+	// because the body is nested beyond maxMIMEDepth.
+	part := &gmailMessagePart{
+		MimeType: "multipart/mixed",
+		Parts: []gmailMessagePart{
+			{
+				MimeType: "text/plain",
+				Body: struct {
+					AttachmentID string `json:"attachmentId"`
+					Size         int    `json:"size"`
+					Data         string `json:"data"`
+				}{Data: plainData},
+			},
+		},
+	}
+
+	// At depth maxMIMEDepth+1, extractBody should bail out.
+	body, ct := extractBody(part, maxMIMEDepth+1)
+	if body != "" {
+		t.Errorf("expected empty body at max depth, got %q", body)
+	}
+	if ct != "text/plain" {
+		t.Errorf("expected text/plain fallback, got %s", ct)
+	}
+}
