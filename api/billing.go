@@ -429,8 +429,9 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			PeriodEnd:   sub.CurrentPeriodEnd,
 		}
 
-		// Determine included request allowance from the plan.
-		included := 0
+		// Determine included request allowance.
+		// Paid plans get the same free allowance as the free tier (250 requests).
+		included := int(pstripe.FreeRequestAllowance())
 		if sub.Plan.MaxRequestsPerMonth != nil {
 			included = *sub.Plan.MaxRequestsPerMonth
 		}

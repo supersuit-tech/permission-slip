@@ -1,5 +1,11 @@
 import { freePlan, paidPlan, formatLimit } from "@/config/plans";
 
+/** Number of free requests included per month for all plans. */
+export const FREE_REQUEST_ALLOWANCE = freePlan.max_requests_per_month;
+
+/** Formatted per-request price string (e.g. "$0.005"). */
+export const PRICE_PER_REQUEST = `$${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}`;
+
 /** Features included in the paid (Pay-as-you-go) plan. */
 export const PAID_PLAN_FEATURES = [
   "Unlimited agents",

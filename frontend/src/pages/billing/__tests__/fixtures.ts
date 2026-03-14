@@ -84,12 +84,25 @@ export const atLimitPaidPlanResponse = {
 export const usageDetailResponse = {
   period_start: "2026-03-01T00:00:00Z",
   period_end: "2026-04-01T00:00:00Z",
-  requests: { total: 1542, included: 1000, overage: 542, cost_cents: 271 },
+  requests: { total: 1542, included: 250, overage: 1292, cost_cents: 646 },
   sms: { total: 5, cost_cents: 5 },
   breakdown: {
     by_agent: { "1": 500, "2": 1042 },
     by_connector: { gmail: 300, stripe: 1242 },
     by_action_type: { "email.send": 300, "payment.create": 1242 },
+  },
+};
+
+/** Paid plan usage under the free allowance (no overage). */
+export const paidUnderAllowanceUsageResponse = {
+  period_start: "2026-03-01T00:00:00Z",
+  period_end: "2026-04-01T00:00:00Z",
+  requests: { total: 80, included: 250, overage: 0, cost_cents: 0 },
+  sms: { total: 0, cost_cents: 0 },
+  breakdown: {
+    by_agent: { "1": 80 },
+    by_connector: {},
+    by_action_type: {},
   },
 };
 

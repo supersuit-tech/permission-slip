@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { Plan, UsageSummary } from "@/hooks/useBillingPlan";
+import { FREE_REQUEST_ALLOWANCE, PRICE_PER_REQUEST } from "./constants";
 
 interface UsageSummaryCardProps {
   usage: UsageSummary;
@@ -51,7 +52,48 @@ function UsageRow({ label, current, limit }: UsageRowProps) {
   );
 }
 
+/** Request usage row for paid plans — shows progress against the free allowance. */
+function PaidRequestRow({ current }: { current: number }) {
+  const allowance = FREE_REQUEST_ALLOWANCE;
+  const overage = Math.max(0, current - allowance);
+  const hasOverage = overage > 0;
+  const percentage = Math.min((current / allowance) * 100, 100);
+  const isNearLimit = percentage >= 80;
+
+  const label = hasOverage
+    ? `${current.toLocaleString()} total (${overage.toLocaleString()} billed)`
+    : `${current.toLocaleString()} / ${allowance.toLocaleString()} free`;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium">Requests</span>
+        <span className="text-muted-foreground tabular-nums">{label}</span>
+      </div>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={current} aria-valuemin={0} aria-valuemax={allowance} aria-label={`Requests: ${label}`}>
+        <div
+          className={`h-full rounded-l-full transition-all ${
+            hasOverage ? "bg-primary" : isNearLimit ? "bg-amber-500" : "bg-primary"
+          }`}
+          style={{ width: `${hasOverage ? ((allowance / current) * 100) : percentage}%` }}
+        />
+        {hasOverage && (
+          <div
+            className="h-full rounded-r-full bg-amber-500 transition-all"
+            style={{ width: `${(overage / current) * 100}%` }}
+          />
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Then {PRICE_PER_REQUEST}/request
+      </p>
+    </div>
+  );
+}
+
 export function UsageSummaryCard({ usage, plan }: UsageSummaryCardProps) {
+  const isPaid = plan.id !== "free";
+
   return (
     <Card>
       <CardHeader>
@@ -65,11 +107,15 @@ export function UsageSummaryCard({ usage, plan }: UsageSummaryCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <UsageRow
-            label="Requests"
-            current={usage.requests}
-            limit={plan.max_requests_per_month ?? null}
-          />
+          {isPaid ? (
+            <PaidRequestRow current={usage.requests} />
+          ) : (
+            <UsageRow
+              label="Requests"
+              current={usage.requests}
+              limit={plan.max_requests_per_month ?? null}
+            />
+          )}
           <UsageRow
             label="Agents"
             current={usage.agents}

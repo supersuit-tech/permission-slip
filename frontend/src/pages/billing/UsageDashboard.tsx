@@ -86,6 +86,7 @@ export function UsageDashboard({ plan, subscription }: UsageDashboardProps) {
             <RequestUsageBar
               total={usage.requests.total}
               limit={plan.max_requests_per_month ?? null}
+              included={usage.requests.included}
             />
 
             <div className="grid grid-cols-2 gap-4">
@@ -118,6 +119,11 @@ export function UsageDashboard({ plan, subscription }: UsageDashboardProps) {
                   </p>
                   <p className="text-lg font-semibold tabular-nums">
                     {formatCents(totalCostCents)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {usage.requests.overage > 0
+                      ? `${usage.requests.overage.toLocaleString()} requests billed`
+                      : `${Math.max(0, usage.requests.included - usage.requests.total).toLocaleString()} free requests remaining`}
                   </p>
                 </div>
               )}
