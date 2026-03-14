@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sync"
 )
 
@@ -43,6 +44,11 @@ func DefaultPlanID(billingEnabled bool) string {
 	return PlanPayAsYouGo
 }
 
+// validPlanID restricts plan IDs to alphanumeric characters and underscores.
+// This is validated at load time to prevent SQL injection when plan IDs are
+// interpolated into CASE expressions (e.g. in data_retention.go).
+var validPlanID = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
 var (
 	plans    map[string]*Plan
 	planList []*Plan
@@ -65,6 +71,10 @@ func ensureLoaded() error {
 		plans = make(map[string]*Plan, len(raw))
 		planList = make([]*Plan, 0, len(raw))
 		for id, p := range raw {
+			if !validPlanID.MatchString(id) {
+				loadErr = fmt.Errorf("invalid plan ID %q: must be alphanumeric/underscore", id)
+				return
+			}
 			p.ID = id
 			plans[id] = p
 			planList = append(planList, p)

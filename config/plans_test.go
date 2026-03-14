@@ -66,6 +66,14 @@ func TestAllPlans(t *testing.T) {
 	}
 }
 
+func TestPlanIDsAreAlphanumeric(t *testing.T) {
+	for _, p := range AllPlans() {
+		if !validPlanID.MatchString(p.ID) {
+			t.Errorf("plan ID %q contains invalid characters", p.ID)
+		}
+	}
+}
+
 func TestDefaultPlanID(t *testing.T) {
 	if id := DefaultPlanID(true); id != PlanFree {
 		t.Errorf("billing enabled: expected %q, got %q", PlanFree, id)
