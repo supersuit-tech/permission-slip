@@ -359,6 +359,17 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		propertyKeys[k] = true
 	}
 
+	// Extract the "required" array so we can check for visible_when + required conflicts.
+	requiredFields := make(map[string]bool)
+	if raw, ok := s["required"]; ok {
+		var required []string
+		if err := json.Unmarshal(raw, &required); err == nil {
+			for _, f := range required {
+				requiredFields[f] = true
+			}
+		}
+	}
+
 	// Parse root-level x-ui.
 	var rootUI struct {
 		Groups []struct {
@@ -403,6 +414,7 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 	sort.Strings(sortedProps)
 
 	// First pass: collect visible_when targets for cycle detection.
+	// Maps each property to the field it depends on for visibility.
 	visibleWhenTarget := make(map[string]string) // property → field it depends on
 	for _, propName := range sortedProps {
 		var prop struct {
@@ -416,6 +428,34 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			continue
 		}
 		visibleWhenTarget[propName] = prop.XUI.VisibleWhen.Field
+	}
+
+	// Detect visible_when dependency cycles of any length (A→B→C→A).
+	// Walk the chain from each node; if we revisit the start, it's a cycle.
+	for _, start := range sortedProps {
+		if _, ok := visibleWhenTarget[start]; !ok {
+			continue
+		}
+		visited := map[string]bool{start: true}
+		cur := visibleWhenTarget[start]
+		for cur != "" {
+			if cur == start {
+				// Build the cycle path for a readable error message.
+				path := start
+				c := visibleWhenTarget[start]
+				for c != start {
+					path += " → " + c
+					c = visibleWhenTarget[c]
+				}
+				path += " → " + start
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema has a visible_when dependency cycle: %s", actionIdx, path)
+			}
+			if visited[cur] {
+				break // dead end or sub-cycle not involving start
+			}
+			visited[cur] = true
+			cur = visibleWhenTarget[cur]
+		}
 	}
 
 	// Validate property-level x-ui.
@@ -454,19 +494,19 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			if prop.XUI.VisibleWhen.Field == "" {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires a \"field\" key", actionIdx, propName)
 			}
-			if prop.XUI.VisibleWhen.Field == propName {
-				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field must not reference the property itself", actionIdx, propName)
-			}
-			// Detect mutual dependency cycles (A depends on B, B depends on A).
-			if target, ok := visibleWhenTarget[prop.XUI.VisibleWhen.Field]; ok && target == propName {
-				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s and %s have mutual visible_when dependency — neither can ever be visible", actionIdx, propName, prop.XUI.VisibleWhen.Field)
-			}
+			// Self-references and cycles are caught by the general cycle
+			// detector above, so no separate self-reference check needed.
 			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
 			}
 			// len == 0 means the key was absent; null unmarshal produces []byte("null").
 			if len(prop.XUI.VisibleWhen.Equals) == 0 {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires an \"equals\" key", actionIdx, propName)
+			}
+			// A field with visible_when can be hidden, so it should not be in "required".
+			// JSON Schema validation would reject the submission when the field is hidden.
+			if requiredFields[propName] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s has visible_when but is also listed in \"required\" — hidden fields cannot satisfy required validation", actionIdx, propName)
 			}
 		}
 	}

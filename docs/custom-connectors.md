@@ -265,6 +265,8 @@ The server validates `x-ui` hints during manifest parsing. Invalid schemas are r
 | `x-ui.order` entries must reference existing property keys, no duplicates | Names the unknown/duplicate field |
 | `visible_when.field` must reference an existing property (not itself) | Names the invalid reference |
 | `visible_when` must include both `field` and `equals` keys | Identifies which key is missing |
+| `visible_when` fields must not be in `required` | Hidden fields can't satisfy required validation |
+| `visible_when` dependencies must not form cycles (any length) | Shows the full cycle path (e.g. A → B → C → A) |
 | `help_url` must use `http` or `https` scheme | Prevents `javascript:` XSS |
 
 ### Makefile
