@@ -9,7 +9,7 @@ export const freePlanResponse = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 1000,
+    max_requests_per_month: 250,
     max_agents: 3,
     max_standing_approvals: 5,
     max_credentials: 5,
@@ -25,7 +25,7 @@ export const freePlanResponse = {
     grace_period_ends_at: null,
   },
   usage: {
-    requests: 450,
+    requests: 150,
     agents: 2,
     standing_approvals: 3,
     credentials: 1,
@@ -74,7 +74,7 @@ export const overLimitPaidPlanResponse = {
 export const atLimitPaidPlanResponse = {
   ...paidPlanResponse,
   usage: {
-    requests: 1000,
+    requests: 250,
     agents: 3,
     standing_approvals: 5,
     credentials: 5,
@@ -96,10 +96,10 @@ export const usageDetailResponse = {
 export const freeUsageDetailResponse = {
   period_start: "2026-03-01T00:00:00Z",
   period_end: "2026-04-01T00:00:00Z",
-  requests: { total: 450, included: 1000, overage: 0, cost_cents: 0 },
+  requests: { total: 150, included: 250, overage: 0, cost_cents: 0 },
   sms: { total: 0, cost_cents: 0 },
   breakdown: {
-    by_agent: { "1": 200, "2": 250 },
+    by_agent: { "1": 80, "2": 70 },
     by_connector: {},
     by_action_type: {},
   },

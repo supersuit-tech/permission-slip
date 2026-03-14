@@ -418,9 +418,9 @@ func TestEffectiveRetentionDays(t *testing.T) {
 		}
 
 		// During grace period, should use the paid plan's 90-day retention.
-		if got := sp.EffectiveRetentionDays(); got != db.PaidPlanRetentionDays {
+		if got := sp.EffectiveRetentionDays(); got != db.PaidPlanRetentionDays() {
 			t.Errorf("expected %d-day retention during grace period, got %d",
-				db.PaidPlanRetentionDays, got)
+				db.PaidPlanRetentionDays(), got)
 		}
 	})
 

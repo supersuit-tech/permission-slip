@@ -261,16 +261,26 @@ type SubscriptionWithPlan struct {
 // have time to export their data before it becomes inaccessible.
 const DowngradeGracePeriod = 7 * 24 * time.Hour // 7 days
 
-// PaidPlanRetentionDays is the retention window for the pay-as-you-go plan.
+// paidPlanRetentionDays is the retention window for the pay-as-you-go plan.
+// Derived from config/plans.json so it stays in sync with the plan definition.
+var paidPlanRetentionDays = func() int {
+	p := GetPlan(PlanPayAsYouGo)
+	if p != nil {
+		return p.AuditRetentionDays
+	}
+	return 90 // fallback
+}()
+
+// PaidPlanRetentionDays returns the audit retention window for the paid plan.
 // Used during the downgrade grace period when the plan's own retention is shorter.
-const PaidPlanRetentionDays = 90
+func PaidPlanRetentionDays() int { return paidPlanRetentionDays }
 
 // EffectiveRetentionDays returns the audit log retention window to enforce
 // for this subscription. During the downgrade grace period the previous
 // (longer) retention is used so users have time to export data.
 func (sp *SubscriptionWithPlan) EffectiveRetentionDays() int {
 	if sp.DowngradedAt != nil && time.Since(*sp.DowngradedAt) < DowngradeGracePeriod {
-		return PaidPlanRetentionDays
+		return PaidPlanRetentionDays()
 	}
 	return sp.Plan.AuditRetentionDays
 }
@@ -286,50 +296,22 @@ func (sp *SubscriptionWithPlan) GracePeriodEndsAt() *time.Time {
 	return nil
 }
 
-// GetSubscriptionWithPlan returns the user's subscription joined with plan
-// details, or nil if the user has no subscription.
+// GetSubscriptionWithPlan returns the user's subscription with plan details
+// attached from config (no DB join needed), or nil if the user has no subscription.
 func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*SubscriptionWithPlan, error) {
-	var sp SubscriptionWithPlan
-	err := db.QueryRow(ctx,
-		`SELECT s.id, s.user_id, s.plan_id, s.status,
-		        s.stripe_customer_id, s.stripe_subscription_id,
-		        s.current_period_start, s.current_period_end,
-		        s.downgraded_at, s.created_at, s.updated_at,
-		        p.id, p.name, p.max_requests_per_month, p.max_agents,
-		        p.max_standing_approvals, p.max_credentials,
-		        p.audit_retention_days, p.price_per_request_millicents,
-		        p.created_at
-		 FROM subscriptions s
-		 JOIN plans p ON p.id = s.plan_id
-		 WHERE s.user_id = $1`,
-		userID,
-	).Scan(
-		&sp.ID,
-		&sp.UserID,
-		&sp.PlanID,
-		&sp.Status,
-		&sp.StripeCustomerID,
-		&sp.StripeSubscriptionID,
-		&sp.CurrentPeriodStart,
-		&sp.CurrentPeriodEnd,
-		&sp.DowngradedAt,
-		&sp.CreatedAt,
-		&sp.UpdatedAt,
-		&sp.Plan.ID,
-		&sp.Plan.Name,
-		&sp.Plan.MaxRequestsPerMonth,
-		&sp.Plan.MaxAgents,
-		&sp.Plan.MaxStandingApprovals,
-		&sp.Plan.MaxCredentials,
-		&sp.Plan.AuditRetentionDays,
-		&sp.Plan.PricePerRequestMillicents,
-		&sp.Plan.CreatedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
+	sub, err := GetSubscriptionByUserID(ctx, db, userID)
 	if err != nil {
 		return nil, err
 	}
-	return &sp, nil
+	if sub == nil {
+		return nil, nil
+	}
+	plan := GetPlan(sub.PlanID)
+	if plan == nil {
+		return nil, fmt.Errorf("plan %q not found in config", sub.PlanID)
+	}
+	return &SubscriptionWithPlan{
+		Subscription: *sub,
+		Plan:         *plan,
+	}, nil
 }

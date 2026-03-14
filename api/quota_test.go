@@ -28,8 +28,8 @@ func TestCheckRequestQuota_FreePlan_UnderLimit_Allows(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	// 999 requests used (under limit of 1000).
-	testhelper.SetUsageCount(t, tx, uid, 999)
+	// 249 requests used (under limit of 250).
+	testhelper.SetUsageCount(t, tx, uid, 249)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
@@ -45,11 +45,11 @@ func TestCheckRequestQuota_FreePlan_UnderLimit_Allows(t *testing.T) {
 	}
 
 	// Verify informational quota headers are set on allowed requests.
-	if w.Header().Get("X-Quota-Limit") != "1000" {
-		t.Errorf("expected X-Quota-Limit=1000, got %q", w.Header().Get("X-Quota-Limit"))
+	if w.Header().Get("X-Quota-Limit") != "250" {
+		t.Errorf("expected X-Quota-Limit=250, got %q", w.Header().Get("X-Quota-Limit"))
 	}
 	if w.Header().Get("X-Quota-Remaining") != "0" {
-		t.Errorf("expected X-Quota-Remaining=0 (999 used, -1 for this request), got %q", w.Header().Get("X-Quota-Remaining"))
+		t.Errorf("expected X-Quota-Remaining=0 (249 used, +1 for this request), got %q", w.Header().Get("X-Quota-Remaining"))
 	}
 	if w.Header().Get("X-Quota-Reset") == "" {
 		t.Error("expected X-Quota-Reset header to be set")
@@ -63,8 +63,8 @@ func TestCheckRequestQuota_FreePlan_AtLimit_Returns429(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	// Exactly at the limit (1000).
-	testhelper.SetUsageCount(t, tx, uid, 1000)
+	// Exactly at the limit (250).
+	testhelper.SetUsageCount(t, tx, uid, 250)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
@@ -93,11 +93,11 @@ func TestCheckRequestQuota_FreePlan_AtLimit_Returns429(t *testing.T) {
 	if resp.Error.Details == nil {
 		t.Fatal("expected details in error response")
 	}
-	if usage, ok := resp.Error.Details["current_usage"].(float64); !ok || int(usage) != 1000 {
-		t.Errorf("expected current_usage=1000, got %v", resp.Error.Details["current_usage"])
+	if usage, ok := resp.Error.Details["current_usage"].(float64); !ok || int(usage) != 250 {
+		t.Errorf("expected current_usage=250, got %v", resp.Error.Details["current_usage"])
 	}
-	if limit, ok := resp.Error.Details["limit"].(float64); !ok || int(limit) != 1000 {
-		t.Errorf("expected limit=1000, got %v", resp.Error.Details["limit"])
+	if limit, ok := resp.Error.Details["limit"].(float64); !ok || int(limit) != 250 {
+		t.Errorf("expected limit=250, got %v", resp.Error.Details["limit"])
 	}
 	if planID, ok := resp.Error.Details["plan_id"].(string); !ok || planID != db.PlanFree {
 		t.Errorf("expected plan_id=%q, got %v", db.PlanFree, resp.Error.Details["plan_id"])
@@ -191,7 +191,7 @@ func TestCheckRequestQuota_RetryAfterHeader(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-	testhelper.SetUsageCount(t, tx, uid, 1000)
+	testhelper.SetUsageCount(t, tx, uid, 250)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/test", nil)
@@ -234,7 +234,7 @@ func TestQuota_ApprovalRequest_FreePlan_AtLimit_Returns429(t *testing.T) {
 	t.Parallel()
 	m := setupMeteringTest(t)
 	testhelper.InsertSubscription(t, m.DB, m.UserID, db.PlanFree)
-	testhelper.SetUsageCount(t, m.DB, m.UserID, 1000)
+	testhelper.SetUsageCount(t, m.DB, m.UserID, 250)
 
 	reqBody := `{"request_id":"quota_blocked_001","action":{"type":"email.send","parameters":{}},"context":{"description":"test"}}`
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, m.PrivKey, m.AgentID)
@@ -254,14 +254,14 @@ func TestQuota_ApprovalRequest_FreePlan_AtLimit_Returns429(t *testing.T) {
 	}
 
 	// Usage count should not have increased (request was rejected).
-	testhelper.RequireUsageCount(t, m.DB, m.UserID, 1000)
+	testhelper.RequireUsageCount(t, m.DB, m.UserID, 250)
 }
 
 func TestQuota_ApprovalRequest_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	t.Parallel()
 	m := setupMeteringTest(t)
 	testhelper.InsertSubscription(t, m.DB, m.UserID, db.PlanFree)
-	testhelper.SetUsageCount(t, m.DB, m.UserID, 999)
+	testhelper.SetUsageCount(t, m.DB, m.UserID, 249)
 
 	reqBody := `{"request_id":"quota_ok_001","action":{"type":"email.send","parameters":{}},"context":{"description":"test"}}`
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, m.PrivKey, m.AgentID)
@@ -272,8 +272,8 @@ func TestQuota_ApprovalRequest_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Usage should have incremented to 1000.
-	testhelper.RequireUsageCount(t, m.DB, m.UserID, 1000)
+	// Usage should have incremented to 250.
+	testhelper.RequireUsageCount(t, m.DB, m.UserID, 250)
 }
 
 func TestQuota_ApprovalRequest_PaidPlan_NoLimit(t *testing.T) {
@@ -298,7 +298,7 @@ func TestQuota_AgentStandingExecution_FreePlan_AtLimit_Returns429(t *testing.T) 
 	t.Parallel()
 	tx, _, router, agentID, privKey, _, uid := setupStandingExecuteTest(t, "email.read")
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-	testhelper.SetUsageCount(t, tx, uid, 1000)
+	testhelper.SetUsageCount(t, tx, uid, 250)
 
 	reqBody := `{"request_id":"quota_sa_001","action":{"type":"email.read","version":"1","parameters":{}}}`
 	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
@@ -310,14 +310,14 @@ func TestQuota_AgentStandingExecution_FreePlan_AtLimit_Returns429(t *testing.T) 
 	}
 
 	// Usage should not have increased.
-	testhelper.RequireUsageCount(t, tx, uid, 1000)
+	testhelper.RequireUsageCount(t, tx, uid, 250)
 }
 
 func TestQuota_AgentStandingExecution_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	t.Parallel()
 	tx, _, router, agentID, privKey, _, uid := setupStandingExecuteTest(t, "email.read")
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-	testhelper.SetUsageCount(t, tx, uid, 999)
+	testhelper.SetUsageCount(t, tx, uid, 249)
 
 	reqBody := `{"request_id":"quota_sa_ok_001","action":{"type":"email.read","version":"1","parameters":{}}}`
 	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
@@ -329,7 +329,7 @@ func TestQuota_AgentStandingExecution_FreePlan_UnderLimit_Succeeds(t *testing.T)
 	}
 
 	// Usage should have incremented.
-	testhelper.RequireUsageCount(t, tx, uid, 1000)
+	testhelper.RequireUsageCount(t, tx, uid, 250)
 }
 
 // ── Integration: standing approval execution (dashboard path) blocked by quota ──
@@ -342,7 +342,7 @@ func TestQuota_DashboardStandingExecution_FreePlan_AtLimit_Returns429(t *testing
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "email.send")
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-	testhelper.SetUsageCount(t, tx, uid, 1000)
+	testhelper.SetUsageCount(t, tx, uid, 250)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -356,7 +356,7 @@ func TestQuota_DashboardStandingExecution_FreePlan_AtLimit_Returns429(t *testing
 	}
 
 	// Usage should not have increased.
-	testhelper.RequireUsageCount(t, tx, uid, 1000)
+	testhelper.RequireUsageCount(t, tx, uid, 250)
 }
 
 func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testing.T) {
@@ -367,7 +367,7 @@ func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testin
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "email.send")
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-	testhelper.SetUsageCount(t, tx, uid, 999)
+	testhelper.SetUsageCount(t, tx, uid, 249)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -381,6 +381,6 @@ func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testin
 	}
 
 	// Usage should have incremented.
-	testhelper.RequireUsageCount(t, tx, uid, 1000)
+	testhelper.RequireUsageCount(t, tx, uid, 250)
 }
 

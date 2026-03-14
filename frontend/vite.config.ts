@@ -33,9 +33,16 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@config": path.resolve(__dirname, "../config"),
     },
   },
   server: {
+    fs: {
+      allow: [
+        // Allow Vite dev server to read config/ from repo root.
+        path.resolve(__dirname, "../config"),
+      ],
+    },
     // Proxy routes for local dev (npm run dev). Keep in sync with
     // dev-proxy.cjs which mirrors these routes for ngrok tunneling.
     proxy: {

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { PolicyLayout } from "./PolicyLayout";
 import { GITHUB_REPO_URL } from "@/lib/links";
+import { freePlan, paidPlan, formatLimit } from "@/config/plans";
 
 export function TermsOfServicePage() {
   return (
@@ -99,23 +100,23 @@ export function TermsOfServicePage() {
 
       <h3>5.2 Free Tier &mdash; $0/month</h3>
       <ul>
-        <li>1,000 requests per month</li>
-        <li>3 agents</li>
+        <li>{formatLimit(freePlan.max_requests_per_month)} requests per month</li>
+        <li>{freePlan.max_agents} agents</li>
         <li>All built-in connectors</li>
-        <li>5 active standing approvals</li>
-        <li>5 stored credentials</li>
-        <li>7-day audit log retention</li>
+        <li>{freePlan.max_standing_approvals} active standing approvals</li>
+        <li>{freePlan.max_credentials} stored credentials</li>
+        <li>{freePlan.audit_retention_days}-day audit log retention</li>
         <li>Email and web push notifications</li>
         <li>Community support (GitHub Issues)</li>
       </ul>
 
-      <h3>5.3 Pay-as-You-Go &mdash; $0.005/request</h3>
+      <h3>5.3 Pay-as-You-Go &mdash; ${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}/request</h3>
       <ul>
-        <li>First 1,000 requests per month free</li>
+        <li>First {formatLimit(freePlan.max_requests_per_month)} requests per month free</li>
         <li>
           Unlimited agents, connectors, standing approvals, and credentials
         </li>
-        <li>90-day audit log retention</li>
+        <li>{paidPlan.audit_retention_days}-day audit log retention</li>
         <li>Email and web push notifications</li>
         <li>SMS available as add-on</li>
         <li>Email support</li>

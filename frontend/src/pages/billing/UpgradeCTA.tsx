@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { useUpgradePlan } from "@/hooks/useUpgradePlan";
 import type { Plan } from "@/hooks/useBillingPlan";
+import { paidPlan } from "@/config/plans";
 import { isStripeUrl } from "./formatters";
 import { PAID_PLAN_FEATURES } from "./constants";
 import { FeatureList } from "./FeatureList";
@@ -88,7 +89,7 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
             </div>
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
               <h3 className="text-sm font-semibold">Pay-as-you-go</h3>
-              <p className="text-xs text-muted-foreground">$0.005/request after free tier</p>
+              <p className="text-xs text-muted-foreground">${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}/request after free tier</p>
               <FeatureList features={PAID_FEATURES} />
             </div>
           </div>

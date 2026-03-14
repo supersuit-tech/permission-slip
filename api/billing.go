@@ -506,15 +506,9 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 		}
 
 		// Check plan limits: count agents, standing approvals, credentials.
-		freePlan, err := db.GetPlanByID(r.Context(), deps.DB, db.PlanFree)
-		if err != nil {
-			log.Printf("[%s] Downgrade: free plan lookup: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch free plan limits"))
-			return
-		}
+		freePlan := db.GetPlan(db.PlanFree)
 		if freePlan == nil {
-			log.Printf("[%s] Downgrade: free plan not found", TraceID(r.Context()))
+			log.Printf("[%s] Downgrade: free plan not found in config", TraceID(r.Context()))
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Free plan not configured"))
 			return
 		}
