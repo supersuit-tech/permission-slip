@@ -248,8 +248,8 @@ describe("ActionConfigParameterFields", () => {
     it("renders group headers", () => {
       renderFields(groupedSchema);
 
-      expect(screen.getByText("Billing")).toBeInTheDocument();
-      expect(screen.getByText("Options")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Billing/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Options/ })).toBeInTheDocument();
     });
 
     it("shows group description", () => {
@@ -274,7 +274,7 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.queryByText("auto_advance")).not.toBeInTheDocument();
 
       // Click to expand
-      await user.click(screen.getByText("Options"));
+      await user.click(screen.getByRole("button", { name: /Options/ }));
 
       // Now auto_advance should be visible
       expect(screen.getByText("auto_advance")).toBeInTheDocument();
@@ -312,7 +312,7 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.getByText("Customer")).toBeInTheDocument();
 
       // Click to collapse
-      await user.click(screen.getByText("Billing"));
+      await user.click(screen.getByRole("button", { name: /Billing/ }));
 
       // Customer field should now be hidden
       expect(screen.queryByText("Customer")).not.toBeInTheDocument();
