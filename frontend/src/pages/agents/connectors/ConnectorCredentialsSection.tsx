@@ -644,9 +644,14 @@ function AgentCredentialBinding({
   const isLoading = anyLoading || bindingLoading;
   const isPending = assigning || removing;
 
-  // Build options for the dropdown
+  // Build options scoped to this connector — only show credentials whose
+  // service matches the connector ID and OAuth connections whose provider
+  // matches, so e.g. Slack creds don't appear in a Google connector dropdown.
+  const scopedCredentials = credentials.filter(
+    (c) => c.service === connectorId,
+  );
   const activeConnections = connections.filter(
-    (c) => c.status === "active" && c.id,
+    (c) => c.status === "active" && c.id && c.provider === connectorId,
   );
 
   const currentValue = binding?.credential_id
@@ -687,7 +692,7 @@ function AgentCredentialBinding({
   if (isLoading) return null;
 
   // Don't show if there are no credentials or connections to choose from
-  if (credentials.length === 0 && activeConnections.length === 0) return null;
+  if (scopedCredentials.length === 0 && activeConnections.length === 0) return null;
 
   return (
     <div className="mb-4 rounded-lg border p-3">
@@ -729,7 +734,7 @@ function AgentCredentialBinding({
               {new Date(conn.connected_at).toLocaleDateString()})
             </option>
           ))}
-          {credentials.map((cred) => (
+          {scopedCredentials.map((cred) => (
             <option key={`cred:${cred.id}`} value={`cred:${cred.id}`}>
               {cred.label ?? cred.service} (added{" "}
               {new Date(cred.created_at).toLocaleDateString()})
