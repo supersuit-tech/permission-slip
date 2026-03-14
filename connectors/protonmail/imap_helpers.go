@@ -91,6 +91,19 @@ func (s *imapSession) selectMailbox(folder string) (*imap.SelectData, error) {
 	return data, nil
 }
 
+// selectMailboxReadWrite opens a mailbox in read-write mode, required for
+// operations that modify messages (e.g., MOVE, STORE, EXPUNGE).
+func (s *imapSession) selectMailboxReadWrite(folder string) (*imap.SelectData, error) {
+	if folder == "" {
+		folder = "INBOX"
+	}
+	data, err := s.client.Select(folder, &imap.SelectOptions{ReadOnly: false}).Wait()
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("IMAP SELECT %q failed: %v", folder, err)}
+	}
+	return data, nil
+}
+
 // close logs out and closes the IMAP connection.
 func (s *imapSession) close() {
 	if s.client != nil {

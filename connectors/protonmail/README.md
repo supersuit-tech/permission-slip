@@ -42,6 +42,7 @@ The credential `auth_type` in the database is `custom`. Credentials are stored e
 | `protonmail.read_inbox` | Read Inbox | low | Fetch recent emails from a mailbox folder |
 | `protonmail.search_emails` | Search Emails | low | Search emails by subject, sender, or date range |
 | `protonmail.read_email` | Read Email | low | Fetch a specific email by sequence number with full body |
+| `protonmail.archive_email` | Archive Email | medium | Move one or more emails to the Archive folder |
 
 ### `protonmail.send_email`
 
@@ -173,6 +174,40 @@ Fetches a specific email by sequence number with full body content.
 
 **Note:** Uses `BODY[].PEEK` so reading an email does not mark it as read. Body content is truncated at 1 MB.
 
+---
+
+### `protonmail.archive_email`
+
+Moves one or more emails to the Archive folder via IMAP MOVE (RFC 6851). Proton Mail Bridge supports MOVE natively.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `message_id` | integer | No* | — | Sequence number of a single email to archive |
+| `message_ids` | integer[] | No* | — | Sequence numbers of emails to archive (batch, 1–50 items) |
+| `folder` | string | No | `INBOX` | Source mailbox folder containing the emails |
+
+\* At least one of `message_id` or `message_ids` is required. Both can be provided — they are merged. Duplicates are removed automatically.
+
+**Response:**
+
+```json
+{
+  "status": "archived",
+  "folder": "INBOX",
+  "archived": 2,
+  "message_ids": [1, 2]
+}
+```
+
+**Notes:**
+- Sequence numbers are volatile — they can change if messages are deleted or moved. Use them promptly after retrieving them from `read_inbox` or `search_emails`.
+- The source folder cannot be "Archive" (archiving emails already in Archive is rejected).
+- The `message_id` shorthand mirrors `read_email`'s parameter name, so you can archive an email using the same ID you used to read it.
+
 ## Error Handling
 
 | Scenario | Connector Error | Likely Cause |
@@ -212,6 +247,7 @@ connectors/protonmail/
 ├── read_inbox.go          # protonmail.read_inbox action (IMAP)
 ├── search_emails.go       # protonmail.search_emails action (IMAP)
 ├── read_email.go          # protonmail.read_email action (IMAP)
+├── archive_email.go       # protonmail.archive_email action (IMAP MOVE)
 ├── *_test.go              # Tests for each action + connector
 ├── helpers_test.go        # Shared test helpers (validCreds)
 └── README.md              # This file
