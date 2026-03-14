@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -79,6 +80,16 @@ var validRiskLevels = map[string]bool{
 	"low":    true,
 	"medium": true,
 	"high":   true,
+}
+
+// validWidgets are the allowed values for x-ui.widget on schema properties.
+var validWidgets = map[string]bool{
+	"text":     true,
+	"select":   true,
+	"textarea": true,
+	"toggle":   true,
+	"number":   true,
+	"date":     true,
 }
 
 // validAuthTypes are the allowed values for credential auth types.
@@ -182,6 +193,15 @@ func (m *ConnectorManifest) Validate() error {
 		}
 		if a.RiskLevel != "" && !validRiskLevels[a.RiskLevel] {
 			return fmt.Errorf("manifest validation: actions[%d].risk_level %q must be low, medium, or high", i, a.RiskLevel)
+		}
+	}
+
+	// Validate x-ui hints in parameters_schema (optional).
+	for i, a := range m.Actions {
+		if len(a.ParametersSchema) > 0 {
+			if err := validateParametersSchemaUI(a.ParametersSchema, i); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -310,6 +330,198 @@ func (m *ConnectorManifest) Validate() error {
 	for i, c := range m.RequiredCredentials {
 		if c.AuthType == "oauth2" && !knownProviders[c.OAuthProvider] {
 			return fmt.Errorf("manifest validation: required_credentials[%d].oauth_provider %q is not a built-in provider and not declared in oauth_providers", i, c.OAuthProvider)
+		}
+	}
+
+	return nil
+}
+
+// validateParametersSchemaUI validates x-ui rendering hints embedded in a
+// parameters_schema. It checks that widget values, group references, field
+// ordering, and visible_when references are all consistent and valid.
+func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
+	// Parse the schema into a generic map.
+	var s map[string]json.RawMessage
+	if err := json.Unmarshal(schema, &s); err != nil {
+		// Not a JSON object — nothing to validate here (other validation handles this).
+		return nil
+	}
+
+	// Extract property keys.
+	var properties map[string]json.RawMessage
+	if raw, ok := s["properties"]; ok {
+		if err := json.Unmarshal(raw, &properties); err != nil {
+			return nil // malformed properties — not our concern here
+		}
+	}
+	propertyKeys := make(map[string]bool, len(properties))
+	for k := range properties {
+		propertyKeys[k] = true
+	}
+
+	// Extract the "required" array so we can check for visible_when + required conflicts.
+	requiredFields := make(map[string]bool)
+	if raw, ok := s["required"]; ok {
+		var required []string
+		if err := json.Unmarshal(raw, &required); err == nil {
+			for _, f := range required {
+				requiredFields[f] = true
+			}
+		}
+	}
+
+	// Parse root-level x-ui.
+	var rootUI struct {
+		Groups []struct {
+			ID string `json:"id"`
+		} `json:"groups"`
+		Order []string `json:"order"`
+	}
+	groupIDs := make(map[string]bool)
+	if raw, ok := s["x-ui"]; ok {
+		if err := json.Unmarshal(raw, &rootUI); err != nil {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui is not a valid object: %w", actionIdx, err)
+		}
+		for _, g := range rootUI.Groups {
+			if g.ID == "" {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.groups contains entry with empty id", actionIdx)
+			}
+			if groupIDs[g.ID] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.groups contains duplicate id %q", actionIdx, g.ID)
+			}
+			groupIDs[g.ID] = true
+		}
+		// Validate x-ui.order references existing property keys with no duplicates.
+		orderSeen := make(map[string]bool, len(rootUI.Order))
+		for _, field := range rootUI.Order {
+			if !propertyKeys[field] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.order references unknown property %q", actionIdx, field)
+			}
+			if orderSeen[field] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.order contains duplicate entry %q", actionIdx, field)
+			}
+			orderSeen[field] = true
+		}
+	}
+
+	// Sort property keys for deterministic validation order. Unlike other
+	// validators that iterate slices, we iterate a map — sorting ensures
+	// error messages are consistent across runs.
+	sortedProps := make([]string, 0, len(properties))
+	for k := range properties {
+		sortedProps = append(sortedProps, k)
+	}
+	sort.Strings(sortedProps)
+
+	// First pass: collect visible_when targets for cycle detection.
+	// Maps each property to the field it depends on for visibility.
+	visibleWhenTarget := make(map[string]string) // property → field it depends on
+	for _, propName := range sortedProps {
+		var prop struct {
+			XUI *struct {
+				VisibleWhen *struct {
+					Field string `json:"field"`
+				} `json:"visible_when"`
+			} `json:"x-ui"`
+		}
+		if err := json.Unmarshal(properties[propName], &prop); err != nil || prop.XUI == nil || prop.XUI.VisibleWhen == nil {
+			continue
+		}
+		// Only record valid references — skip empty fields and self-references
+		// so the cycle detector operates on semantically valid edges only.
+		if vwField := prop.XUI.VisibleWhen.Field; vwField != "" && vwField != propName {
+			visibleWhenTarget[propName] = vwField
+		}
+	}
+
+	// Detect visible_when dependency cycles of any length (A→B→C→A).
+	// Walk the chain from each node; if we revisit the start, it's a cycle.
+	for _, start := range sortedProps {
+		if _, ok := visibleWhenTarget[start]; !ok {
+			continue
+		}
+		visited := map[string]bool{start: true}
+		cur := visibleWhenTarget[start]
+		for cur != "" {
+			if cur == start {
+				// Build the cycle path for a readable error message.
+				path := start
+				c := visibleWhenTarget[start]
+				for c != start {
+					path += " → " + c
+					c = visibleWhenTarget[c]
+				}
+				path += " → " + start
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema has a visible_when dependency cycle: %s", actionIdx, path)
+			}
+			if visited[cur] {
+				break // dead end or sub-cycle not involving start
+			}
+			visited[cur] = true
+			cur = visibleWhenTarget[cur]
+		}
+	}
+
+	// Validate property-level x-ui.
+	for _, propName := range sortedProps {
+		propRaw := properties[propName]
+		var prop struct {
+			XUI *struct {
+				Widget      string `json:"widget"`
+				Group       string `json:"group"`
+				HelpURL     string `json:"help_url"`
+				VisibleWhen *struct {
+					Field  string          `json:"field"`
+					Equals json.RawMessage `json:"equals"`
+				} `json:"visible_when"`
+			} `json:"x-ui"`
+		}
+		if err := json.Unmarshal(propRaw, &prop); err != nil {
+			continue // not our concern
+		}
+		if prop.XUI == nil {
+			continue
+		}
+		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, textarea, toggle, number, date", actionIdx, propName, prop.XUI.Widget)
+		}
+		// A "select" widget needs enum values to populate the dropdown.
+		if prop.XUI.Widget == "select" {
+			var propObj map[string]json.RawMessage
+			if err := json.Unmarshal(propRaw, &propObj); err == nil {
+				if _, hasEnum := propObj["enum"]; !hasEnum {
+					return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget \"select\" requires an \"enum\" array on the property", actionIdx, propName)
+				}
+			}
+		}
+		if prop.XUI.HelpURL != "" {
+			field := fmt.Sprintf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.help_url", actionIdx, propName)
+			if err := validateURL(prop.XUI.HelpURL, field, "http", "https"); err != nil {
+				return err
+			}
+		}
+		if prop.XUI.Group != "" && !groupIDs[prop.XUI.Group] {
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.group %q does not match any defined group in x-ui.groups", actionIdx, propName, prop.XUI.Group)
+		}
+		if prop.XUI.VisibleWhen != nil {
+			if prop.XUI.VisibleWhen.Field == "" {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires a \"field\" key", actionIdx, propName)
+			}
+			if prop.XUI.VisibleWhen.Field == propName {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field must not reference the property itself", actionIdx, propName)
+			}
+			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
+			}
+			// len == 0 means the key was absent; null unmarshal produces []byte("null").
+			if len(prop.XUI.VisibleWhen.Equals) == 0 {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires an \"equals\" key", actionIdx, propName)
+			}
+			// A field with visible_when can be hidden, so it should not be in "required".
+			// JSON Schema validation would reject the submission when the field is hidden.
+			if requiredFields[propName] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s has visible_when but is also listed in \"required\" — hidden fields cannot satisfy required validation", actionIdx, propName)
+			}
 		}
 	}
 
