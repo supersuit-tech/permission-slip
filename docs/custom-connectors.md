@@ -146,7 +146,7 @@ Add `x-ui` to individual properties to control how each field renders:
 | `group` | `string` | ID of the group this field belongs to (must match a group defined in root-level `x-ui.groups`). |
 | `help_url` | `string` | Link to external documentation, rendered as a help icon next to the field. |
 | `help_text` | `string` | Additional help text displayed below the field, beyond `description`. |
-| `visible_when` | `object` | Conditional visibility: `{ "field": "<key>", "equals": "<value>" }`. The field is hidden unless the referenced field has the specified value. |
+| `visible_when` | `object` | Conditional visibility: `{ "field": "<key>", "equals": <value> }`. The field is hidden unless the referenced field has the specified value. `<value>` should match the type of the referenced field (string, number, or boolean). |
 
 #### Root-level `x-ui` fields
 
@@ -185,15 +185,18 @@ Use `visible_when` to show a field only when another field has a specific value:
 
 ```json
 {
-  "send_notification": {
-    "type": "boolean",
-    "x-ui": { "widget": "toggle", "label": "Send notification" }
-  },
-  "notification_email": {
-    "type": "string",
-    "x-ui": {
-      "label": "Notification email",
-      "visible_when": { "field": "send_notification", "equals": true }
+  "type": "object",
+  "properties": {
+    "send_notification": {
+      "type": "boolean",
+      "x-ui": { "widget": "toggle", "label": "Send notification" }
+    },
+    "notification_email": {
+      "type": "string",
+      "x-ui": {
+        "label": "Notification email",
+        "visible_when": { "field": "send_notification", "equals": true }
+      }
     }
   }
 }
