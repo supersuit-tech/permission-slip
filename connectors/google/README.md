@@ -19,7 +19,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | Scope | Used by |
 |-------|---------|
 | `gmail.send` | `google.send_email` |
-| `gmail.readonly` | `google.list_emails` |
+| `gmail.readonly` | `google.list_emails`, `google.read_email` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
 | `spreadsheets` | `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
@@ -29,6 +29,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `drive` | `google.list_drive_files`, `google.get_drive_file`, `google.upload_drive_file`, `google.delete_drive_file`, `google.list_documents`, `google.search_drive`, `google.create_drive_folder` |
 | `calendar.events` (also used for updates/deletes) | `google.update_calendar_event`, `google.delete_calendar_event` |
 | `gmail.send` + `gmail.readonly` (both required) | `google.send_email_reply` |
+| `gmail.modify` | `google.archive_email` |
 
 Scopes follow the principle of least privilege — `calendar.events` (event-level access) is used instead of the broader `calendar` scope (full calendar management). The `drive` scope grants full Drive access; a narrower scope like `drive.file` would only allow access to files created by this app, which is too restrictive for file browsing and reading.
 
@@ -85,6 +86,7 @@ Lists recent emails from the Gmail inbox with metadata.
   "emails": [
     {
       "id": "18abc123def",
+      "thread_id": "18abc123def",
       "from": "sender@example.com",
       "to": "you@example.com",
       "subject": "Hello",
@@ -98,7 +100,68 @@ Lists recent emails from the Gmail inbox with metadata.
 
 **Gmail API:** `GET /gmail/v1/users/me/messages` + `GET /gmail/v1/users/me/messages/{id}` ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.messages/list))
 
-The action first lists message IDs matching the query, then fetches metadata (From, To, Subject, Date headers and snippet) for each message.
+The action first lists message IDs matching the query, then fetches metadata (From, To, Subject, Date headers and snippet) for each message. Each email includes a `thread_id` to enable seamless list → read → reply workflows.
+
+---
+
+### `google.read_email`
+
+Fetches a single email by message ID and returns the full body, headers, labels, and attachment metadata.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `message_id` | string | Yes | The Gmail message ID (from `list_emails` or other source) |
+
+**Response:**
+
+```json
+{
+  "id": "18abc123def",
+  "thread_id": "thread123",
+  "from": "sender@example.com",
+  "to": "recipient@example.com",
+  "cc": "cc@example.com",
+  "subject": "Project Update",
+  "date": "Mon, 14 Mar 2026 10:00:00 -0500",
+  "snippet": "Here is the latest update on...",
+  "labels": ["INBOX", "UNREAD"],
+  "content_type": "text/plain",
+  "body": "Full email body text...",
+  "attachments": [
+    {
+      "filename": "report.pdf",
+      "mime_type": "application/pdf",
+      "size": 12345,
+      "part_id": "1",
+      "attachment_id": "ANGjdJ8..."
+    }
+  ]
+}
+```
+
+**Gmail API:** `GET /gmail/v1/users/me/messages/{id}?format=full` ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get))
+
+**Typical workflow:** `list_emails` → `read_email` (using the `id` from the list) → `send_email_reply` (using `thread_id` and `id`).
+
+**Body extraction:**
+- For multipart messages, `text/plain` is preferred over `text/html`.
+- The MIME part tree is walked recursively (depth-limited to 20) to find the best text body.
+- Bodies exceeding 1 MB are truncated at a valid UTF-8 boundary with a `[truncated]` marker.
+
+**Attachment metadata:**
+- Filenames are extracted from `Content-Disposition` headers, falling back to `Content-Type` `name=` parameter.
+- RFC 5987 extended filenames (`filename*=UTF-8''encoded%20name`) are supported and take priority per RFC 6266.
+- Only UTF-8 encoded filenames are decoded; other charsets are skipped to avoid producing invalid strings.
+- The `attachment_id` field can be used with `GET /gmail/v1/users/me/messages/{messageId}/attachments/{attachmentId}` to download content.
+
+**Security notes:**
+- Header names are matched case-insensitively per RFC 5322.
+- MIME tree recursion is capped at depth 20 to prevent stack overflow from crafted deeply-nested messages.
+- Base64url decoding tries raw (no padding) first since that's the Gmail API format, with padded fallback.
 
 ---
 
@@ -961,6 +1024,34 @@ Moves a file to trash in Google Drive (soft delete — not permanent).
 
 ---
 
+### `google.archive_email`
+
+Archives a Gmail thread by removing the INBOX label from all messages in the thread. Archived emails remain accessible via search and All Mail — this matches Gmail's built-in Archive button behavior.
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `thread_id` | string | Yes | The Gmail thread ID to archive (obtained from `list_emails` `thread_id` field) |
+
+**Response:**
+
+```json
+{
+  "thread_id": "18abc123def"
+}
+```
+
+**Gmail API:** `POST /gmail/v1/users/me/threads/{id}/modify` ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.threads/modify))
+
+**Implementation notes:**
+- Uses `threads.modify` (not `messages.modify`) to atomically remove `INBOX` from all messages in the thread, matching Gmail's native Archive behavior.
+- Thread IDs are URL-encoded via `url.PathEscape` to prevent path traversal.
+
+---
+
 ## Error Handling
 
 The connector maps Google API HTTP status codes to typed connector errors:
@@ -1018,7 +1109,9 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Search Drive files | `search_drive` | Nothing — agent controls query, type, folder |
 | Search Drive within folder | `search_drive` | `folder_id` locked to a specific folder |
 | Create Drive folders | `create_drive_folder` | Nothing — agent controls name and parent |
+| Read any email | `read_email` | Nothing — agent controls message ID |
 | Reply to emails | `send_email_reply` | Nothing — agent controls thread, message, and body |
+| Archive emails | `archive_email` | Nothing — agent can archive any thread |
 
 ## Adding a New Action
 
@@ -1038,12 +1131,14 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 ```
 connectors/google/
 ├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
-├── manifest.go                     # Manifest() — 27 action schemas and 39+ templates
+├── manifest.go                     # Manifest() — 28 action schemas and 40+ templates
 ├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
 ├── email_helpers.go                # buildGmailRaw() — shared RFC 2822 message builder used by send_email and send_email_reply
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
+├── read_email.go                   # google.read_email action (full body, headers, attachment metadata, MIME tree walking)
 ├── send_email_reply.go             # google.send_email_reply action (fetches headers, strips injection chars, sends reply)
+├── archive_email.go               # google.archive_email action (thread-level archive via threads.modify)
 ├── create_calendar_event.go        # google.create_calendar_event action
 ├── list_calendar_events.go         # google.list_calendar_events action
 ├── update_calendar_event.go        # google.update_calendar_event action (PATCH with map[string]any for explicit empty arrays)
@@ -1075,6 +1170,7 @@ connectors/google/
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
 ├── list_emails_test.go             # List emails action tests
+├── read_email_test.go              # Read email tests (MIME parsing, attachments, RFC 5987, depth limit, edge cases)
 ├── send_email_reply_test.go        # Send email reply tests (thread validation, header injection, Re: prefix)
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests

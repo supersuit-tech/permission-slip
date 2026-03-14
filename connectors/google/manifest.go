@@ -672,6 +672,22 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "google.read_email",
+				Name:        "Read Email",
+				Description: "Read a single email message from Gmail by message ID, returning the full body, headers, and attachment metadata",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_id"],
+					"properties": {
+						"message_id": {
+							"type": "string",
+							"description": "The Gmail message ID to read (from list_emails results)"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "google.send_email_reply",
 				Name:        "Reply to Email",
 				Description: "Reply to an existing Gmail thread",
@@ -695,6 +711,22 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.archive_email",
+				Name:        "Archive Email",
+				Description: "Archive a Gmail thread (removes all messages from inbox; still accessible via search and All Mail)",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["thread_id"],
+					"properties": {
+						"thread_id": {
+							"type": "string",
+							"description": "The Gmail thread ID to archive (obtained from list_emails thread_id field)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -711,6 +743,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/chat.spaces.readonly",
 					"https://www.googleapis.com/auth/chat.messages.create",
 					"https://www.googleapis.com/auth/drive",
+					"https://www.googleapis.com/auth/gmail.modify",
 				},
 			},
 		},
@@ -980,11 +1013,25 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"name":"*","parent_id":"*"}`),
 			},
 			{
+				ID:          "tpl_google_read_email",
+				ActionType:  "google.read_email",
+				Name:        "Read any email",
+				Description: "Agent can read the full content of any email by message ID.",
+				Parameters:  json.RawMessage(`{"message_id":"*"}`),
+			},
+			{
 				ID:          "tpl_google_send_email_reply",
 				ActionType:  "google.send_email_reply",
 				Name:        "Reply to emails",
 				Description: "Agent can reply to any existing Gmail thread.",
 				Parameters:  json.RawMessage(`{"thread_id":"*","message_id":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_google_archive_email",
+				ActionType:  "google.archive_email",
+				Name:        "Archive emails",
+				Description: "Agent can archive Gmail threads (removes from inbox; still accessible via search and All Mail).",
+				Parameters:  json.RawMessage(`{"thread_id":"*"}`),
 			},
 		},
 	}
