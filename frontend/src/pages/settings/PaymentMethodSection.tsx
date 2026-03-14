@@ -168,7 +168,7 @@ export function PaymentMethodSection() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <CreditCard className="text-muted-foreground size-5" />
               <CardTitle>Payment Methods</CardTitle>
@@ -182,6 +182,7 @@ export function PaymentMethodSection() {
             <Button
               variant="outline"
               size="sm"
+              className="shrink-0 self-start sm:self-center"
               onClick={() => setAddDialogOpen(true)}
               disabled={atCardLimit}
               title={
@@ -220,7 +221,7 @@ export function PaymentMethodSection() {
               {paymentMethods.map((pm) => (
                 <div
                   key={pm.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
+                  className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex items-center gap-2">

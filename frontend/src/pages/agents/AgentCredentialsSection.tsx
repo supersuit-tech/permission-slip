@@ -58,7 +58,7 @@ export function AgentCredentialsSection({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle>Credentials</CardTitle>
         {!isLoading && !error && totalCount > 0 && (
           <span className="text-muted-foreground text-sm">
@@ -99,7 +99,7 @@ export function AgentCredentialsSection({
               return (
                 <div
                   key={service}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-3">
                     {isConnected ? (
@@ -109,7 +109,7 @@ export function AgentCredentialsSection({
                     )}
                     <p className="text-sm font-medium">{service}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2 pl-8 sm:pl-0">
                     <span
                       className={`text-xs font-medium ${
                         isConnected
