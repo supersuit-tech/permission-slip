@@ -1,3 +1,29 @@
+// Standing approval execution notification templates.
+//
+// When an agent executes an action via a standing approval, these templates
+// generate informational notifications across all channels (email, SMS, push).
+// The templates use a blue/informational tone (not red/amber) since no user
+// action is needed — the execution was pre-authorized.
+//
+// # Context JSON contract
+//
+// The Approval.Context field must be a JSON object with these optional keys:
+//
+//	{
+//	    "execution_count": 3,    // int — how many times the standing approval has been used
+//	    "max_executions": 10     // int — total allowed uses (0 = unlimited)
+//	}
+//
+// The Approval.Action field should contain the standard action JSON with a
+// "type" key and optional "parameters" object. Parameter values are included
+// in email notifications with sensitive keys automatically redacted.
+//
+// # Integration (Phase 2E)
+//
+// To dispatch a standing execution notification, construct a notify.Approval
+// with Type set to NotificationTypeStandingExecution and call
+// deps.Notifier.Dispatch(). See api/approval_notify.go for the existing
+// pattern used by approval request notifications.
 package notify
 
 import (
@@ -159,6 +185,8 @@ func summarizeParameters(action json.RawMessage) string {
 	return strings.Join(parts, ", ")
 }
 
+// buildStandingExecutionSubject returns a subject like
+// "Deploy Bot executed github.issues.create via standing approval".
 func buildStandingExecutionSubject(approval Approval) string {
 	info := extractStandingExecutionInfo(approval)
 	if info.ActionType != "" {
@@ -167,6 +195,8 @@ func buildStandingExecutionSubject(approval Approval) string {
 	return fmt.Sprintf("%s executed an action via standing approval", info.AgentName)
 }
 
+// buildStandingExecutionPlainBody returns the plain-text email body with
+// agent name, action type, parameter summary, execution count, and timestamp.
 func buildStandingExecutionPlainBody(approval Approval) string {
 	info := extractStandingExecutionInfo(approval)
 
@@ -220,6 +250,9 @@ func formatStandingExecutionSMS(a Approval) string {
 	return msg
 }
 
+// buildStandingExecutionHTMLBody returns the HTML email body with a blue
+// accent (#2563eb), details table, "View Activity" CTA button, and a footer
+// noting this was an auto-approved action.
 func buildStandingExecutionHTMLBody(approval Approval) string {
 	info := extractStandingExecutionInfo(approval)
 
