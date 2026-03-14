@@ -161,7 +161,7 @@ function NumberWidget({ inputId, value, onChange, disabled, placeholder, classNa
   );
 }
 
-function DateWidget({ inputId, value, onChange, disabled, className }: WidgetRenderProps) {
+function DateWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
   return (
     <Input
       id={inputId}
@@ -169,6 +169,7 @@ function DateWidget({ inputId, value, onChange, disabled, className }: WidgetRen
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
+      placeholder={placeholder}
       className={className}
     />
   );
