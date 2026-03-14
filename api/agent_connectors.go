@@ -1,13 +1,14 @@
 package api
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
 // --- Response types ---
@@ -139,76 +140,33 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 
 		deleteCredentials := r.URL.Query().Get("delete_credentials") == "true"
 
-		if deleteCredentials {
-			// Wrap in a transaction so connector disable + credential delete are atomic.
-			tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
-			if err != nil {
-				log.Printf("[%s] DisableAgentConnector: begin tx: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
-				return
-			}
-			if owned {
-				defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
-			}
+		// When deleting credentials, wrap everything in a transaction so
+		// connector disable + credential delete + vault delete are atomic.
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] DisableAgentConnector: begin tx: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
+		}
 
-			// Look up credential binding before disabling (cascade will delete the binding row).
-			credBinding, err := db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
+		// Look up credential binding before disabling — the cascade from
+		// agent_connectors → agent_connector_credentials will remove it.
+		var credBinding *db.AgentConnectorCredential
+		if deleteCredentials {
+			credBinding, err = db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
 			if err != nil {
 				log.Printf("[%s] DisableAgentConnector: get credential: %v", TraceID(r.Context()), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 				return
 			}
-
-			result, err := db.DisableAgentConnector(r.Context(), tx, agentID, userID, connectorID)
-			if err != nil {
-				log.Printf("[%s] DisableAgentConnector: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
-				return
-			}
-			if result == nil {
-				RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorNotFound, "Connector not enabled for this agent"))
-				return
-			}
-
-			// Delete the credential and its vault secret if one was assigned.
-			if credBinding != nil && credBinding.CredentialID != nil {
-				deleteResult, err := db.DeleteCredential(r.Context(), tx, *credBinding.CredentialID, userID)
-				if err != nil {
-					var credErr *db.CredentialError
-					if !errors.As(err, &credErr) || credErr.Code != db.CredentialErrNotFound {
-						log.Printf("[%s] DisableAgentConnector: delete credential: %v", TraceID(r.Context()), err)
-						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
-						return
-					}
-				} else if deps.Vault != nil {
-					if err := deps.Vault.DeleteSecret(r.Context(), tx, deleteResult.VaultSecretID); err != nil {
-						log.Printf("[%s] DisableAgentConnector: vault delete: %v", TraceID(r.Context()), err)
-						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
-						return
-					}
-				}
-			}
-
-			if owned {
-				if err := db.CommitTx(r.Context(), tx); err != nil {
-					log.Printf("[%s] DisableAgentConnector: commit: %v", TraceID(r.Context()), err)
-					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
-					return
-				}
-			}
-
-			RespondJSON(w, http.StatusOK, disableAgentConnectorResponse{
-				AgentID:                  result.AgentID,
-				ConnectorID:              result.ConnectorID,
-				DisabledAt:               result.DisabledAt,
-				RevokedStandingApprovals: result.RevokedStandingApprovals,
-			})
-			return
 		}
 
 		// Delete is scoped by approver_id: returns nil for both "agent not found"
 		// and "connector not enabled" to avoid leaking agent existence.
-		result, err := db.DisableAgentConnector(r.Context(), deps.DB, agentID, userID, connectorID)
+		result, err := db.DisableAgentConnector(r.Context(), tx, agentID, userID, connectorID)
 		if err != nil {
 			log.Printf("[%s] DisableAgentConnector: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
@@ -217,6 +175,22 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 		if result == nil {
 			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorNotFound, "Connector not enabled for this agent"))
 			return
+		}
+
+		if deleteCredentials && credBinding != nil && credBinding.CredentialID != nil {
+			if err := deleteCredentialAndVault(r.Context(), tx, *credBinding.CredentialID, userID, deps.Vault); err != nil {
+				log.Printf("[%s] DisableAgentConnector: delete credential: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
+				return
+			}
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] DisableAgentConnector: commit: %v", TraceID(r.Context()), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+				return
+			}
 		}
 
 		RespondJSON(w, http.StatusOK, disableAgentConnectorResponse{
@@ -228,185 +202,19 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 	}
 }
 
-// --- Credential binding ---
-
-type assignCredentialRequest struct {
-	CredentialID      *string `json:"credential_id,omitempty"`
-	OAuthConnectionID *string `json:"oauth_connection_id,omitempty"`
-}
-
-type agentConnectorCredentialResponse struct {
-	AgentID           int64   `json:"agent_id"`
-	ConnectorID       string  `json:"connector_id"`
-	CredentialID      *string `json:"credential_id,omitempty"`
-	OAuthConnectionID *string `json:"oauth_connection_id,omitempty"`
-}
-
-func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := Profile(r.Context()).ID
-
-		agentID, ok := parsePathAgentID(w, r)
-		if !ok {
-			return
+// deleteCredentialAndVault deletes a credential row and its associated vault
+// secret atomically within d. NotFound is treated as a no-op (idempotent).
+func deleteCredentialAndVault(ctx context.Context, d db.DBTX, credID, userID string, v vault.VaultStore) error {
+	result, err := db.DeleteCredential(ctx, d, credID, userID)
+	if err != nil {
+		var credErr *db.CredentialError
+		if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
+			return nil // already gone; nothing to do
 		}
-		connectorID := r.PathValue("connector_id")
-		if connectorID == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id is required"))
-			return
-		}
-
-		if !requireAgentOwnership(w, r, deps, agentID, userID) {
-			return
-		}
-
-		var req assignCredentialRequest
-		if !DecodeJSONOrReject(w, r, &req) {
-			return
-		}
-
-		// Exactly one of credential_id or oauth_connection_id must be provided.
-		if (req.CredentialID == nil) == (req.OAuthConnectionID == nil) {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "provide exactly one of credential_id or oauth_connection_id"))
-			return
-		}
-
-		// Validate ownership and service match for static credentials.
-		if req.CredentialID != nil {
-			cred, err := db.GetCredentialByID(r.Context(), deps.DB, *req.CredentialID)
-			if err != nil {
-				log.Printf("[%s] AssignCredential: credential check: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify credential"))
-				return
-			}
-			if cred == nil || cred.UserID != userID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Credential not found"))
-				return
-			}
-			if cred.Service != connectorID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
-					fmt.Sprintf("credential service %q does not match connector %q", cred.Service, connectorID)))
-				return
-			}
-		}
-		if req.OAuthConnectionID != nil {
-			conn, err := db.GetOAuthConnectionByID(r.Context(), deps.DB, *req.OAuthConnectionID)
-			if err != nil {
-				log.Printf("[%s] AssignCredential: oauth check: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify OAuth connection"))
-				return
-			}
-			if conn == nil || conn.UserID != userID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "OAuth connection not found"))
-				return
-			}
-			if conn.Provider != connectorID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
-					fmt.Sprintf("OAuth connection provider %q does not match connector %q", conn.Provider, connectorID)))
-				return
-			}
-		}
-
-		bindingID, err := generatePrefixedID("acc_", 16)
-		if err != nil {
-			log.Printf("[%s] AssignCredential: generate ID: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to assign credential"))
-			return
-		}
-
-		binding, err := db.UpsertAgentConnectorCredential(r.Context(), deps.DB, db.UpsertAgentConnectorCredentialParams{
-			ID:                bindingID,
-			AgentID:           agentID,
-			ConnectorID:       connectorID,
-			ApproverID:        userID,
-			CredentialID:      req.CredentialID,
-			OAuthConnectionID: req.OAuthConnectionID,
-		})
-		if err != nil {
-			log.Printf("[%s] AssignCredential: upsert: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to assign credential"))
-			return
-		}
-
-		RespondJSON(w, http.StatusOK, agentConnectorCredentialResponse{
-			AgentID:           binding.AgentID,
-			ConnectorID:       binding.ConnectorID,
-			CredentialID:      binding.CredentialID,
-			OAuthConnectionID: binding.OAuthConnectionID,
-		})
+		return err
 	}
-}
-
-func handleRemoveAgentConnectorCredential(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := Profile(r.Context()).ID
-
-		agentID, ok := parsePathAgentID(w, r)
-		if !ok {
-			return
-		}
-		connectorID := r.PathValue("connector_id")
-		if connectorID == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id is required"))
-			return
-		}
-
-		if !requireAgentOwnership(w, r, deps, agentID, userID) {
-			return
-		}
-
-		deleted, err := db.DeleteAgentConnectorCredential(r.Context(), deps.DB, agentID, userID, connectorID)
-		if err != nil {
-			log.Printf("[%s] RemoveCredential: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to remove credential binding"))
-			return
-		}
-		if !deleted {
-			RespondError(w, r, http.StatusNotFound, NotFound(ErrCredentialNotFound, "No credential binding found"))
-			return
-		}
-
-		RespondJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+	if v != nil {
+		return v.DeleteSecret(ctx, d, result.VaultSecretID)
 	}
-}
-
-func handleGetAgentConnectorCredential(deps *Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := Profile(r.Context()).ID
-
-		agentID, ok := parsePathAgentID(w, r)
-		if !ok {
-			return
-		}
-		connectorID := r.PathValue("connector_id")
-		if connectorID == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id is required"))
-			return
-		}
-
-		if !requireAgentOwnership(w, r, deps, agentID, userID) {
-			return
-		}
-
-		binding, err := db.GetAgentConnectorCredential(r.Context(), deps.DB, agentID, connectorID)
-		if err != nil {
-			log.Printf("[%s] GetCredentialBinding: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get credential binding"))
-			return
-		}
-		if binding == nil {
-			RespondJSON(w, http.StatusOK, agentConnectorCredentialResponse{
-				AgentID:     agentID,
-				ConnectorID: connectorID,
-			})
-			return
-		}
-
-		RespondJSON(w, http.StatusOK, agentConnectorCredentialResponse{
-			AgentID:           binding.AgentID,
-			ConnectorID:       binding.ConnectorID,
-			CredentialID:      binding.CredentialID,
-			OAuthConnectionID: binding.OAuthConnectionID,
-		})
-	}
+	return nil
 }

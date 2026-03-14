@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -431,14 +430,14 @@ func TestDisableAgentConnector_DeleteCredentials(t *testing.T) {
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
 	mockVault := vault.NewMockVaultStore()
-	vaultSecretID, err := mockVault.CreateSecret(context.Background(), tx, "cred_test", []byte("secret"))
+	vaultSecretID, err := mockVault.CreateSecret(t.Context(), tx, "cred_test", []byte("secret"))
 	if err != nil {
 		t.Fatalf("CreateSecret: %v", err)
 	}
 
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, connID, vaultSecretID)
-	if _, err = db.UpsertAgentConnectorCredential(context.Background(), tx, db.UpsertAgentConnectorCredentialParams{
+	if _, err = db.UpsertAgentConnectorCredential(t.Context(), tx, db.UpsertAgentConnectorCredentialParams{
 		ID:           testhelper.GenerateID(t, "acc_"),
 		AgentID:      agentID,
 		ConnectorID:  connID,
@@ -461,7 +460,7 @@ func TestDisableAgentConnector_DeleteCredentials(t *testing.T) {
 	}
 
 	// Credential row should be gone.
-	exists, err := db.CredentialBelongsToUser(context.Background(), tx, credID, uid)
+	exists, err := db.CredentialBelongsToUser(t.Context(), tx, credID, uid)
 	if err != nil {
 		t.Fatalf("CredentialBelongsToUser: %v", err)
 	}
