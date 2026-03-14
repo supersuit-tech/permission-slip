@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -319,8 +320,11 @@ func TestCheckHTTPStatus(t *testing.T) {
 					t.Errorf("RetryAfter = %v, want %v (default)", rle.RetryAfter, defaultRetryAfter)
 				}
 			case "external":
-				if !connectors.IsExternalError(err) {
+				var ee *connectors.ExternalError
+				if !errors.As(err, &ee) {
 					t.Errorf("expected ExternalError, got %T: %v", err, err)
+				} else if ee.StatusCode != tt.statusCode {
+					t.Errorf("StatusCode = %d, want %d", ee.StatusCode, tt.statusCode)
 				}
 			}
 		})
@@ -387,8 +391,11 @@ func TestDoPost_HTTPErrors(t *testing.T) {
 					t.Errorf("RetryAfter = %v, want 60s", rle.RetryAfter)
 				}
 			case "external":
-				if !connectors.IsExternalError(err) {
+				var ee *connectors.ExternalError
+				if !errors.As(err, &ee) {
 					t.Errorf("expected ExternalError, got %T: %v", err, err)
+				} else if ee.StatusCode != tt.statusCode {
+					t.Errorf("StatusCode = %d, want %d", ee.StatusCode, tt.statusCode)
 				}
 			}
 		})
