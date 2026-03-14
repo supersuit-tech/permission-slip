@@ -64,6 +64,10 @@ func formatSMSBody(a Approval) string {
 		return msg
 	}
 
+	if a.Type == NotificationTypeStandingExecution {
+		return formatStandingExecutionSMS(a)
+	}
+
 	if a.Type == NotificationTypeCardExpiring {
 		info := extractCardExpiringInfo(a.Context)
 		var msg string
