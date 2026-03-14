@@ -129,7 +129,7 @@ function TextareaWidget({ inputId, value, onChange, disabled, placeholder, class
   );
 }
 
-function ToggleWidget({ inputId, value, onChange, disabled }: WidgetRenderProps) {
+function ToggleWidget({ inputId, value, onChange, disabled, className }: WidgetRenderProps) {
   const checked = value === "true";
   return (
     <div className="flex items-center gap-2 py-1">
@@ -138,6 +138,7 @@ function ToggleWidget({ inputId, value, onChange, disabled }: WidgetRenderProps)
         checked={checked}
         onCheckedChange={(next) => onChange(String(next))}
         disabled={disabled}
+        className={className}
       />
       <Label htmlFor={inputId} className="text-muted-foreground text-sm">
         {checked ? "Enabled" : "Disabled"}
@@ -175,16 +176,18 @@ function DateWidget({ inputId, value, onChange, disabled, className }: WidgetRen
 
 /** Renders help_text and help_url hints below the input. */
 function FieldHints({ ui }: { ui?: SchemaPropertyUI }) {
-  if (!ui?.help_text && !ui?.help_url) return null;
+  const validHelpUrl =
+    ui?.help_url && /^https?:\/\//i.test(ui.help_url) ? ui.help_url : null;
+  if (!ui?.help_text && !validHelpUrl) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-x-2">
-      {ui.help_text && (
+      {ui?.help_text && (
         <p className="text-muted-foreground text-xs">{ui.help_text}</p>
       )}
-      {ui.help_url && /^https?:\/\//i.test(ui.help_url) && (
+      {validHelpUrl && (
         <a
-          href={ui.help_url}
+          href={validHelpUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"
