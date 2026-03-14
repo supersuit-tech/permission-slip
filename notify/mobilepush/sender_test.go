@@ -369,6 +369,71 @@ func TestSendBatch_TopLevelAPIError(t *testing.T) {
 	}
 }
 
+func TestCategoryForType_StandingExecution(t *testing.T) {
+	t.Parallel()
+	if got := categoryForType(notify.NotificationTypeStandingExecution); got != "standing_execution" {
+		t.Errorf("expected 'standing_execution', got %q", got)
+	}
+}
+
+func TestCategoryForType_DefaultApproval(t *testing.T) {
+	t.Parallel()
+	if got := categoryForType(notify.NotificationTypeApproval); got != "approval" {
+		t.Errorf("expected 'approval', got %q", got)
+	}
+}
+
+func TestCategoryForType_PaymentFailed(t *testing.T) {
+	t.Parallel()
+	if got := categoryForType(notify.NotificationTypePaymentFailed); got != "approval" {
+		t.Errorf("expected 'approval' for payment_failed, got %q", got)
+	}
+}
+
+func TestSendBatch_StandingExecution_UsesCorrectCategory(t *testing.T) {
+	t.Parallel()
+	var capturedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(expoAPIResponse{
+			Data: []expoTicketResponse{{Status: "ok", ID: "ticket-1"}},
+		})
+	}))
+	defer server.Close()
+
+	store := &mockStore{}
+	store.addToken(1, "ExponentPushToken[device1]")
+
+	sender := newTestSender(store, "", server.URL)
+	approval := notify.Approval{
+		ApprovalID:  "appr_standing_001",
+		AgentName:   "Deploy Bot",
+		Action:      json.RawMessage(`{"type":"github.issues.create"}`),
+		Context:     json.RawMessage(`{"execution_count":3,"max_executions":10}`),
+		ApprovalURL: "https://app.test/activity",
+		Type:        notify.NotificationTypeStandingExecution,
+	}
+	err := sender.Send(context.Background(), approval, notify.Recipient{
+		UserID:   "user-1",
+		Username: "alice",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var messages []expoMessage
+	if err := json.Unmarshal(capturedBody, &messages); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+	if messages[0].CategoryID != "standing_execution" {
+		t.Errorf("expected categoryId 'standing_execution', got %q", messages[0].CategoryID)
+	}
+}
+
 func TestSend_NoTokens(t *testing.T) {
 	t.Parallel()
 	requestMade := false
