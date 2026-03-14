@@ -178,7 +178,7 @@ Fetches a specific email by sequence number with full body content.
 
 ### `protonmail.archive_email`
 
-Moves one or more emails to the Archive folder via IMAP MOVE. If the server doesn't support the MOVE extension (RFC 6851), the client falls back to COPY + STORE \Deleted + EXPUNGE automatically.
+Moves one or more emails to the Archive folder via IMAP MOVE (RFC 6851). Proton Mail Bridge supports MOVE natively.
 
 **Risk level:** medium
 

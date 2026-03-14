@@ -15,8 +15,7 @@ import (
 const archiveMailbox = "Archive"
 
 // archiveEmailAction moves one or more emails to the Archive folder via IMAP
-// MOVE. If the server doesn't support MOVE (RFC 6851), the go-imap client
-// falls back to COPY + STORE \Deleted + EXPUNGE automatically.
+// MOVE (RFC 6851). Proton Mail Bridge supports MOVE natively.
 type archiveEmailAction struct {
 	conn *ProtonMailConnector
 }
@@ -121,7 +120,9 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	// Validate all sequence numbers are within range.
+	// Best-effort bounds check against the message count at SELECT time.
+	// Concurrent EXPUNGE responses can make this stale, but it catches
+	// obviously invalid IDs before hitting the server.
 	for _, id := range params.MessageIDs {
 		if id > mboxData.NumMessages {
 			return nil, &connectors.ValidationError{
@@ -135,8 +136,7 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 		seqSet.AddNum(id)
 	}
 
-	// MOVE messages to the Archive folder. The go-imap client handles fallback
-	// to COPY + STORE + EXPUNGE if the server lacks MOVE support.
+	// MOVE messages to the Archive folder (RFC 6851).
 	moveCmd := session.client.Move(seqSet, archiveMailbox)
 	if _, err := moveCmd.Wait(); err != nil {
 		imapErr := mapIMAPError(err)
