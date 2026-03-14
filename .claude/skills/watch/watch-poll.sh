@@ -3,7 +3,7 @@
 # Handles all mechanical bookkeeping (fetching, deduplication, idle timeout)
 # and only invokes the Claude agent when there's actionable work.
 #
-# Usage: bash watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>] [--max-turns <N>]
+# Usage: bash watch-poll.sh [PR_URL] [--automerge] [--work-dir <path>] [--max-turns <N>]
 #
 # Options:
 #   --automerge       Enable auto-merge after checks pass
@@ -26,20 +26,33 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Arguments
 # ---------------------------------------------------------------------------
-PR_URL="${1:?Usage: watch-poll.sh <PR_URL> [--automerge] [--work-dir <path>] [--max-turns <N>]}"
+PR_URL=""
 AUTO_MERGE=false
 EXISTING_WORK_DIR=""
 MAX_TURNS=0  # 0 = unlimited
 
-shift
+# Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --automerge) AUTO_MERGE=true; shift ;;
     --work-dir) EXISTING_WORK_DIR="$2"; shift 2 ;;
     --max-turns) MAX_TURNS="$2"; shift 2 ;;
+    https://*) PR_URL="$1"; shift ;;
     *) shift ;;
   esac
 done
+
+# Auto-detect PR URL from current branch if not provided
+if [[ -z "$PR_URL" ]]; then
+  echo "[setup] No PR URL provided, detecting from current branch..."
+  PR_URL=$(GH_HOST="${GH_HOST:-github.com}" GH_REPO="${GH_REPO:-supersuit-tech/permission-slip}" gh pr view --json url --jq '.url' 2>/dev/null || echo "")
+  if [[ -z "$PR_URL" ]]; then
+    echo "ERROR: No PR URL provided and could not detect a PR for the current branch." >&2
+    echo "Either pass a PR URL or run this from a branch with an open PR." >&2
+    exit 1
+  fi
+  echo "[setup] Detected PR: ${PR_URL}"
+fi
 
 PR_NUMBER=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+')
 if [[ -z "$PR_NUMBER" ]]; then
