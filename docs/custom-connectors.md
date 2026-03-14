@@ -162,7 +162,7 @@ Add `x-ui` at the schema root to control field ordering and grouping:
 | Widget | Renders as | Best for |
 |--------|-----------|----------|
 | `text` | Standard text input (default) | Free-form strings |
-| `select` | Dropdown menu | Fields with `enum` values or a small set of known options |
+| `select` | Dropdown menu | Fields with `enum` values |
 | `textarea` | Multi-line text area | Long-form text, descriptions, message bodies |
 | `toggle` | On/off switch | Boolean fields |
 | `number` | Numeric input with stepper | Integer or decimal fields |
@@ -203,6 +203,8 @@ Use `visible_when` to show a field only when another field has a specific value:
 ```
 
 In this example, the "Notification email" field only appears when "Send notification" is toggled on.
+
+**Note:** Fields with `visible_when` should **not** be listed in the schema's `required` array. When a field is hidden, its value won't be submitted — but JSON Schema validation would still flag it as missing. Use application-level validation instead if the field is conditionally required.
 
 #### Full example
 
