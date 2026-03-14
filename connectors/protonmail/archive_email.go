@@ -36,7 +36,8 @@ type archiveEmailParams struct {
 }
 
 // parseArchiveParams normalizes the flexible input into archiveEmailParams.
-// Accepts either "message_id": 5 (single) or "message_ids": [1,2,3] (batch).
+// Accepts "message_id": 5 (single), "message_ids": [1,2,3] (batch), or both
+// (merged). Deduplication happens later in validate().
 func parseArchiveParams(raw []byte) (*archiveEmailParams, error) {
 	var r archiveEmailRaw
 	if err := json.Unmarshal(raw, &r); err != nil {
@@ -52,7 +53,7 @@ func parseArchiveParams(raw []byte) (*archiveEmailParams, error) {
 		}
 	}
 
-	// Fall back to single message_id.
+	// Also append message_id if provided; allows combining both fields.
 	if r.MessageID != nil {
 		params.MessageIDs = append(params.MessageIDs, *r.MessageID)
 	}
