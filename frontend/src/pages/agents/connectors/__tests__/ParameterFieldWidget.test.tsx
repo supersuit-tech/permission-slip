@@ -233,7 +233,8 @@ describe("ParameterFieldWidget", () => {
 
       expect(onChange).toHaveBeenCalled();
       // Verify the handler forwards a string (not undefined/hardcoded)
-      const lastCall = onChange.mock.calls.at(-1)?.[0] as unknown;
+      const calls = onChange.mock.calls;
+      const lastCall = calls[calls.length - 1]?.[0] as unknown;
       expect(typeof lastCall).toBe("string");
     });
   });
