@@ -134,6 +134,31 @@ func TestArchiveEmail_AuthFailure(t *testing.T) {
 	}
 }
 
+func TestArchiveEmail_NotFound(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":{"code":404,"message":"Not Found"}}`))
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &archiveEmailAction{conn: conn}
+
+	params, _ := json.Marshal(archiveEmailParams{ThreadID: "nonexistent-thread"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.archive_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+}
+
 func TestArchiveEmail_RateLimit(t *testing.T) {
 	t.Parallel()
 
