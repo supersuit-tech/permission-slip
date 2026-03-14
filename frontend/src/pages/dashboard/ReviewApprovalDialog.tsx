@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { Loader2, Clock, Bot, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Loader2, Clock, Bot, AlertTriangle, CheckCircle, XCircle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +14,11 @@ import type { ApproveResult } from "@/hooks/useApproveApproval";
 import { useDenyApproval } from "@/hooks/useDenyApproval";
 import { useActionSchema } from "@/hooks/useActionSchema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
+import { useAgents } from "@/hooks/useAgents";
+import { useStandingApprovals } from "@/hooks/useStandingApprovals";
 import { ActionPreviewSummary } from "@/components/ActionPreviewSummary";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
+import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 import {
   useCountdown,
   formatCountdown,
@@ -87,6 +90,22 @@ function ExecutionStatusBanner({ result }: { result: ApproveResult }) {
   );
 }
 
+/**
+ * Derive initial constraints from an approval's action parameters.
+ * Each parameter becomes a "fixed" constraint by default.
+ */
+function deriveConstraintsFromParams(
+  parameters: Record<string, unknown>,
+): Record<string, unknown> {
+  const constraints: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parameters)) {
+    // Keep the raw value — CreateStandingApprovalDialog's
+    // initConstraintsFromRecord handles type coercion.
+    constraints[key] = value ?? "";
+  }
+  return constraints;
+}
+
 export function ReviewApprovalDialog({
   approval,
   agentDisplayName,
@@ -94,6 +113,9 @@ export function ReviewApprovalDialog({
   onOpenChange,
 }: ReviewApprovalDialogProps) {
   const [approveResult, setApproveResult] = useState<ApproveResult | null>(null);
+  const [standingDialogOpen, setStandingDialogOpen] = useState(false);
+  const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
+  const [autoCloseBlocked, setAutoCloseBlocked] = useState(false);
   const isApproved = approveResult !== null;
   const { approveApproval, isPending: isApproving } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
@@ -102,12 +124,29 @@ export function ReviewApprovalDialog({
   const isExpired = remaining <= 0;
   const isBusy = isApproving || isDenying;
 
-  // Auto-close dialog after successful approval
+  // Data for "Always Allow This"
+  const { agents } = useAgents();
+  // API defaults to status=active, so only active standing approvals are returned
+  const { standingApprovals, isLoading: standingApprovalsLoading } = useStandingApprovals();
+  const params = approval.action.parameters as Record<string, unknown>;
+  const hasParams = Object.keys(params).length > 0;
+  const hasExistingStandingApproval = useMemo(
+    () =>
+      standingApprovals.some(
+        (sa) =>
+          sa.agent_id === approval.agent_id &&
+          sa.action_type === approval.action.type,
+      ),
+    [standingApprovals, approval.agent_id, approval.action.type],
+  );
+  const showAlwaysAllow = hasParams && !standingApprovalsLoading && !hasExistingStandingApproval;
+
+  // Auto-close dialog after successful approval (unless user is creating standing approval)
   useEffect(() => {
-    if (!isApproved) return;
+    if (!isApproved || autoCloseBlocked) return;
     const timer = setTimeout(() => onOpenChange(false), SUCCESS_AUTO_CLOSE_MS);
     return () => clearTimeout(timer);
-  }, [isApproved, onOpenChange]);
+  }, [isApproved, autoCloseBlocked, onOpenChange]);
 
   const handleApprove = useCallback(async () => {
     try {
@@ -128,9 +167,25 @@ export function ReviewApprovalDialog({
     }
   }, [denyApproval, approval.approval_id, onOpenChange]);
 
+  function handleAlwaysAllow() {
+    setAutoCloseBlocked(true);
+    setStandingDialogOpen(true);
+  }
+
+  function handleStandingDialogChange(nextOpen: boolean) {
+    setStandingDialogOpen(nextOpen);
+    if (!nextOpen && !standingApprovalCreated) {
+      // SA wizard was dismissed without creating — unblock auto-close
+      // so the user can click Done or let the dialog close naturally.
+      setAutoCloseBlocked(false);
+    }
+  }
+
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
       setApproveResult(null);
+      setStandingApprovalCreated(false);
+      setAutoCloseBlocked(false);
     }
     onOpenChange(nextOpen);
   }
@@ -145,6 +200,14 @@ export function ReviewApprovalDialog({
         {isApproved ? (
           <div className="space-y-6 py-4" role="status" aria-live="polite">
             <ExecutionStatusBanner result={approveResult} />
+            {standingApprovalCreated && (
+              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950/30">
+                <ShieldCheck className="size-4 shrink-0 text-green-600 dark:text-green-400" aria-hidden="true" />
+                <p className="text-sm text-green-800 dark:text-green-300">
+                  Standing approval created. Future matching requests will be auto-approved.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-6">
@@ -246,14 +309,24 @@ export function ReviewApprovalDialog({
         )}
 
         {isApproved ? (
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
               size="lg"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleClose(false)}
             >
               Done
             </Button>
+            {showAlwaysAllow && !standingApprovalCreated && approveResult?.execution_status === "success" && (
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={handleAlwaysAllow}
+              >
+                <ShieldCheck className="mr-1 size-4" />
+                Always Allow This
+              </Button>
+            )}
           </DialogFooter>
         ) : (
           <DialogFooter>
@@ -285,6 +358,19 @@ export function ReviewApprovalDialog({
           </DialogFooter>
         )}
       </DialogContent>
+
+      {/* Standing approval creation dialog — only mounted when needed */}
+      {standingDialogOpen && (
+        <CreateStandingApprovalDialog
+          agents={agents}
+          open={standingDialogOpen}
+          onOpenChange={handleStandingDialogChange}
+          onCreated={() => setStandingApprovalCreated(true)}
+          initialAgentId={approval.agent_id}
+          initialActionType={approval.action.type}
+          initialConstraints={deriveConstraintsFromParams(params)}
+        />
+      )}
     </Dialog>
   );
 }

@@ -35,6 +35,8 @@ export interface CreateStandingApprovalDialogProps {
   initialAgentId?: number;
   initialActionType?: string;
   initialConstraints?: Record<string, unknown>;
+  /** Called after a standing approval is successfully created. */
+  onCreated?: () => void;
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -78,6 +80,7 @@ export function CreateStandingApprovalDialog({
   initialAgentId,
   initialActionType,
   initialConstraints,
+  onCreated,
 }: CreateStandingApprovalDialogProps) {
   const { createStandingApproval, isPending } = useCreateStandingApproval();
 
@@ -310,6 +313,7 @@ export function CreateStandingApprovalDialog({
       toast.success("Standing approval created");
       resetForm();
       onOpenChange(false);
+      onCreated?.();
     } catch (err) {
       toast.error(
         err instanceof Error
