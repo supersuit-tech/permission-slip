@@ -427,7 +427,11 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		if err := json.Unmarshal(properties[propName], &prop); err != nil || prop.XUI == nil || prop.XUI.VisibleWhen == nil {
 			continue
 		}
-		visibleWhenTarget[propName] = prop.XUI.VisibleWhen.Field
+		// Only record valid references — skip empty fields and self-references
+		// so the cycle detector operates on semantically valid edges only.
+		if vwField := prop.XUI.VisibleWhen.Field; vwField != "" && vwField != propName {
+			visibleWhenTarget[propName] = vwField
+		}
 	}
 
 	// Detect visible_when dependency cycles of any length (A→B→C→A).
@@ -481,6 +485,15 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
 			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, textarea, toggle, number, date", actionIdx, propName, prop.XUI.Widget)
 		}
+		// A "select" widget needs enum values to populate the dropdown.
+		if prop.XUI.Widget == "select" {
+			var propObj map[string]json.RawMessage
+			if err := json.Unmarshal(propRaw, &propObj); err == nil {
+				if _, hasEnum := propObj["enum"]; !hasEnum {
+					return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget \"select\" requires an \"enum\" array on the property", actionIdx, propName)
+				}
+			}
+		}
 		if prop.XUI.HelpURL != "" {
 			field := fmt.Sprintf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.help_url", actionIdx, propName)
 			if err := validateURL(prop.XUI.HelpURL, field, "http", "https"); err != nil {
@@ -494,8 +507,9 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			if prop.XUI.VisibleWhen.Field == "" {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires a \"field\" key", actionIdx, propName)
 			}
-			// Self-references and cycles are caught by the general cycle
-			// detector above, so no separate self-reference check needed.
+			if prop.XUI.VisibleWhen.Field == propName {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field must not reference the property itself", actionIdx, propName)
+			}
 			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
 			}

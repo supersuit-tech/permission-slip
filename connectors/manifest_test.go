@@ -686,7 +686,7 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 		{
 			"visible_when self-reference",
 			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"visible_when":{"field":"f","equals":"val"}}}}}`,
-			`dependency cycle: f`,
+			`must not reference the property itself`,
 		},
 		{
 			"visible_when mutual dependency (A↔B)",
@@ -697,6 +697,11 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 			"visible_when 3-node cycle (A→B→C→A)",
 			`{"type":"object","properties":{"a":{"type":"string","x-ui":{"visible_when":{"field":"c","equals":"x"}}},"b":{"type":"string","x-ui":{"visible_when":{"field":"a","equals":"y"}}},"c":{"type":"string","x-ui":{"visible_when":{"field":"b","equals":"z"}}}}}`,
 			`dependency cycle`,
+		},
+		{
+			"select widget without enum",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"widget":"select"}}}}`,
+			`widget "select" requires an "enum" array`,
 		},
 		{
 			"visible_when on required field",
@@ -757,6 +762,11 @@ func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
 	// All valid widget types should be accepted.
 	for _, widget := range []string{"text", "select", "textarea", "toggle", "number", "date"} {
 		t.Run(widget, func(t *testing.T) {
+			// "select" requires an enum array on the property.
+			propExtra := ""
+			if widget == "select" {
+				propExtra = `, "enum": ["a", "b"]`
+			}
 			input := fmt.Sprintf(`{
 				"id": "x",
 				"name": "X",
@@ -766,11 +776,11 @@ func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
 					"parameters_schema": {
 						"type": "object",
 						"properties": {
-							"f": {"type": "string", "x-ui": {"widget": %q}}
+							"f": {"type": "string"%s, "x-ui": {"widget": %q}}
 						}
 					}
 				}]
-			}`, widget)
+			}`, propExtra, widget)
 			_, err := ParseManifest([]byte(input))
 			if err != nil {
 				t.Fatalf("widget %q should be valid, got: %v", widget, err)

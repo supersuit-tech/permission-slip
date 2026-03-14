@@ -260,6 +260,7 @@ The server validates `x-ui` hints during manifest parsing. Invalid schemas are r
 | Rule | Error if violated |
 |------|-------------------|
 | `widget` must be one of: `text`, `select`, `textarea`, `toggle`, `number`, `date` | Lists valid widget types |
+| `widget: "select"` requires an `enum` array on the property | Names the property missing enum |
 | `group` must reference a group defined in root `x-ui.groups` | Names the unrecognized group |
 | `x-ui.groups` entries must have unique, non-empty `id` values | Names the duplicate |
 | `x-ui.order` entries must reference existing property keys, no duplicates | Names the unknown/duplicate field |
