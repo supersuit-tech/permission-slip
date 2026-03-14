@@ -1,22 +1,27 @@
 ---
 name: yolo
 description: Autonomously implement a GitHub issue end-to-end — do the work, open a PR, and watch it through to merge. Use when the user wants to hand off an issue completely.
-argument-hint: "<ISSUE_URL>"
+argument-hint: "<ISSUE_URL> [--scope \"<heading>\"]"
 ---
 
 # YOLO — Autonomous Issue Implementation
 
 Takes a GitHub issue URL, implements the work described in it, opens a pull request, and hands off to `/watch --automerge` to shepherd it through review to merge.
 
+Optionally accepts a `--scope` flag to limit work to a specific section of the issue (e.g., `--scope "Chunk 1A"` or `--scope "Phase 4"`). When scoped, only the content under that heading is implemented — everything else is ignored.
+
 ## Setup
 
-Parse the issue URL from: `$ARGUMENTS`
+Parse the arguments from: `$ARGUMENTS`
+
+Extract the issue URL and any flags. The format is: `<ISSUE_URL> [--scope "<heading>"]`
 
 Extract the issue number from the URL (e.g., `https://github.com/supersuit-tech/permission-slip/issues/42` → `42`).
 
 Set these variables:
 - `ISSUE_URL` — the full issue URL
 - `ISSUE_NUMBER` — the extracted issue number
+- `SCOPE` — the value of `--scope` if provided, empty string otherwise
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 
 ## Step 1: Fetch and Understand the Issue
@@ -27,13 +32,25 @@ Fetch the issue details:
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh issue view "$ISSUE_NUMBER" --json title,body,labels,assignees,milestone
 ```
 
-Read the issue thoroughly. Identify:
-- **What needs to be built or changed** — the core deliverable
-- **Acceptance criteria** — any checklist items, requirements, or success conditions
+Read the issue thoroughly.
+
+### Scoped Execution
+
+If `SCOPE` is set, find the section of the issue body whose heading matches the scope value. The match is **case-insensitive** and looks for any markdown heading (`#`, `##`, `###`, etc.) that contains the scope text. For example, `--scope "Chunk 1A"` matches `## Chunk 1A`, `### Chunk 1A — Database Layer`, etc.
+
+Extract only the content under that heading (up to the next heading of equal or higher level). This becomes your **entire scope of work** — ignore everything else in the issue body. Only check off checklist items that fall within this section.
+
+If no matching heading is found, abort with a comment on the issue: "Could not find a section matching `<SCOPE>` in the issue body."
+
+### Understanding the Work
+
+Identify:
+- **What needs to be built or changed** — the core deliverable (from the scoped section if `SCOPE` is set, otherwise the full issue)
+- **Acceptance criteria** — any checklist items, requirements, or success conditions within scope
 - **Scope boundaries** — what's explicitly out of scope or deferred
 - **Related files** — any files, endpoints, or components mentioned
 
-If the issue is unclear or too vague to implement confidently, post a comment on the issue asking for clarification and stop. Do NOT guess at ambiguous requirements.
+If the issue (or scoped section) is unclear or too vague to implement confidently, post a comment on the issue asking for clarification and stop. Do NOT guess at ambiguous requirements.
 
 ## Step 2: Create a Feature Branch
 
@@ -44,7 +61,7 @@ BRANCH="issue-${ISSUE_NUMBER}-<short-kebab-description>"
 git checkout -b "$BRANCH"
 ```
 
-The branch name should be concise but descriptive (e.g., `issue-42-add-user-avatars`).
+The branch name should be concise but descriptive (e.g., `issue-42-add-user-avatars`). When `SCOPE` is set, incorporate it into the branch name (e.g., `issue-42-chunk-1a-database-layer`).
 
 ## Step 3: Plan and Implement
 
@@ -64,7 +81,7 @@ Then implement the changes. Follow these principles:
 
 ### Checklist Tracking
 
-If the issue body contains checklist items (`- [ ] ...`), check them off as you complete each one:
+If the issue body contains checklist items (`- [ ] ...`), check them off as you complete each one. When `SCOPE` is set, **only check off items within the scoped section** — do not touch checklist items in other sections:
 
 ```bash
 CURRENT_BODY=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api "/repos/supersuit-tech/permission-slip/issues/${ISSUE_NUMBER}" --jq '.body')
@@ -100,7 +117,7 @@ Push the branch:
 git push -u origin "$BRANCH"
 ```
 
-Create the PR, linking it to the issue:
+Create the PR, linking it to the issue. When `SCOPE` is set, include the scope in the PR title (e.g., "Add user avatars (Chunk 1A)") and use `Part of #N` instead of `Closes #N` since a scoped run only completes a portion of the issue:
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr create \
@@ -110,7 +127,7 @@ GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr create \
 
 <1-3 bullet points describing the changes>
 
-Closes #<ISSUE_NUMBER>
+<"Closes" if unscoped, "Part of" if scoped> #<ISSUE_NUMBER>
 
 ## Test plan
 
