@@ -126,7 +126,7 @@ export function ReviewApprovalDialog({
 
   // Data for "Always Allow This"
   const { agents } = useAgents();
-  const { standingApprovals } = useStandingApprovals();
+  const { standingApprovals, isLoading: standingApprovalsLoading } = useStandingApprovals();
   const params = approval.action.parameters as Record<string, unknown>;
   const hasParams = Object.keys(params).length > 0;
   const hasExistingStandingApproval = useMemo(
@@ -138,7 +138,7 @@ export function ReviewApprovalDialog({
       ),
     [standingApprovals, approval.agent_id, approval.action.type],
   );
-  const showAlwaysAllow = hasParams && !hasExistingStandingApproval;
+  const showAlwaysAllow = hasParams && !standingApprovalsLoading && !hasExistingStandingApproval;
 
   // Auto-close dialog after successful approval (unless user is creating standing approval)
   useEffect(() => {
@@ -311,7 +311,7 @@ export function ReviewApprovalDialog({
             >
               Done
             </Button>
-            {showAlwaysAllow && !standingApprovalCreated && (
+            {showAlwaysAllow && !standingApprovalCreated && approveResult?.execution_status !== "error" && (
               <Button
                 size="lg"
                 variant="secondary"
