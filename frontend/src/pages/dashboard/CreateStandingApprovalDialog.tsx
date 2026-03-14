@@ -63,15 +63,13 @@ export function CreateStandingApprovalDialog({
 
     let constraints: Record<string, unknown>;
     try {
-      constraints = constraintsJson
-        ? (JSON.parse(constraintsJson) as Record<string, unknown>)
-        : {};
+      constraints = JSON.parse(constraintsJson) as Record<string, unknown>;
     } catch {
       toast.error("Constraints must be valid JSON");
       return;
     }
 
-    if (typeof constraints !== "object" || Array.isArray(constraints)) {
+    if (constraints === null || typeof constraints !== "object" || Array.isArray(constraints)) {
       toast.error("Constraints must be a JSON object");
       return;
     }

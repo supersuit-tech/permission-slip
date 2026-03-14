@@ -62,6 +62,7 @@ StandingApproval:
     - starts_at
     - expires_at
     - created_at
+    - source_action_configuration_id
   properties:
     standing_approval_id:
       type: string
