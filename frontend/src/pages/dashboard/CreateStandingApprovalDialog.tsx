@@ -312,11 +312,8 @@ export function CreateStandingApprovalDialog({
       });
       toast.success("Standing approval created");
       resetForm();
-      if (onCreated) {
-        onCreated();
-      } else {
-        onOpenChange(false);
-      }
+      onOpenChange(false);
+      onCreated?.();
     } catch (err) {
       toast.error(
         err instanceof Error

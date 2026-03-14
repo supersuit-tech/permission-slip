@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Loader2, Clock, Bot, AlertTriangle, CheckCircle, XCircle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ export function ReviewApprovalDialog({
   const [approveResult, setApproveResult] = useState<ApproveResult | null>(null);
   const [standingDialogOpen, setStandingDialogOpen] = useState(false);
   const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
-  const autoCloseBlocked = useRef(false);
+  const [autoCloseBlocked, setAutoCloseBlocked] = useState(false);
   const isApproved = approveResult !== null;
   const { approveApproval, isPending: isApproving } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
@@ -142,10 +142,10 @@ export function ReviewApprovalDialog({
 
   // Auto-close dialog after successful approval (unless user is creating standing approval)
   useEffect(() => {
-    if (!isApproved || autoCloseBlocked.current) return;
+    if (!isApproved || autoCloseBlocked) return;
     const timer = setTimeout(() => onOpenChange(false), SUCCESS_AUTO_CLOSE_MS);
     return () => clearTimeout(timer);
-  }, [isApproved, onOpenChange]);
+  }, [isApproved, autoCloseBlocked, onOpenChange]);
 
   const handleApprove = useCallback(async () => {
     try {
@@ -167,24 +167,19 @@ export function ReviewApprovalDialog({
   }, [denyApproval, approval.approval_id, onOpenChange]);
 
   function handleAlwaysAllow() {
-    autoCloseBlocked.current = true;
+    setAutoCloseBlocked(true);
     setStandingDialogOpen(true);
   }
 
   function handleStandingDialogChange(nextOpen: boolean) {
     setStandingDialogOpen(nextOpen);
-    if (!nextOpen) {
-      // If the standing approval was successfully created,
-      // show combined success and close after a delay.
-      // If not, just let the user continue viewing the approval result.
-    }
   }
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
       setApproveResult(null);
       setStandingApprovalCreated(false);
-      autoCloseBlocked.current = false;
+      setAutoCloseBlocked(false);
     }
     onOpenChange(nextOpen);
   }
@@ -312,7 +307,7 @@ export function ReviewApprovalDialog({
             <Button
               variant="outline"
               size="lg"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleClose(false)}
             >
               Done
             </Button>
@@ -363,10 +358,7 @@ export function ReviewApprovalDialog({
         agents={agents}
         open={standingDialogOpen}
         onOpenChange={handleStandingDialogChange}
-        onCreated={() => {
-          setStandingApprovalCreated(true);
-          setStandingDialogOpen(false);
-        }}
+        onCreated={() => setStandingApprovalCreated(true)}
         initialAgentId={approval.agent_id}
         initialActionType={approval.action.type}
         initialConstraints={deriveConstraintsFromParams(params)}
