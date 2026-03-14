@@ -4,7 +4,7 @@
 # Invoked after the polling loop ends (idle timeout) and the agent has
 # finished all its work.
 #
-# Usage: bash watch-post.sh <PR_URL> [--automerge]
+# Usage: bash watch-post.sh [PR_URL] [--automerge]
 #
 # This script handles steps 11-13 from the original SKILL.md:
 #   11. Trigger CI and audit, wait, fix failures (signals agent for fixes)
@@ -16,10 +16,27 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Arguments
 # ---------------------------------------------------------------------------
-PR_URL="${1:?Usage: watch-post.sh <PR_URL> [--automerge]}"
+PR_URL=""
 AUTO_MERGE=false
-if [[ "${2:-}" == "--automerge" ]]; then
-  AUTO_MERGE=true
+
+# Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --automerge) AUTO_MERGE=true; shift ;;
+    https://*) PR_URL="$1"; shift ;;
+    *) shift ;;
+  esac
+done
+
+# Auto-detect PR URL from current branch if not provided
+if [[ -z "$PR_URL" ]]; then
+  echo "[post] No PR URL provided, detecting from current branch..."
+  PR_URL=$(GH_HOST="${GH_HOST:-github.com}" GH_REPO="${GH_REPO:-supersuit-tech/permission-slip}" gh pr view --json url --jq '.url' 2>/dev/null || echo "")
+  if [[ -z "$PR_URL" ]]; then
+    echo "ERROR: No PR URL provided and could not detect a PR for the current branch." >&2
+    exit 1
+  fi
+  echo "[post] Detected PR: ${PR_URL}"
 fi
 
 PR_NUMBER=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+')
