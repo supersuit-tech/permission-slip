@@ -214,6 +214,16 @@ describe("ParameterFieldWidget", () => {
       expect(input).toBeInTheDocument();
       expect(input.type).toBe("date");
     });
+
+    it("fires onChange when a date is entered", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(dateProp);
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      await user.type(input, "2025-06-01");
+
+      expect(onChange).toHaveBeenCalled();
+    });
   });
 
   describe("help hints", () => {
@@ -252,14 +262,13 @@ describe("ParameterFieldWidget", () => {
       expect(screen.getByRole("link", { name: /docs/i })).toBeInTheDocument();
     });
 
-    it("sanitizes non-http help_url to '#'", () => {
+    it("does not render link for non-http help_url", () => {
       renderWidget({
         type: "string",
         "x-ui": { help_url: "javascript:alert(1)" },
       });
 
-      const link = screen.getByRole("link", { name: /docs/i });
-      expect(link).toHaveAttribute("href", "#");
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
 
     it("renders nothing when no hints provided", () => {

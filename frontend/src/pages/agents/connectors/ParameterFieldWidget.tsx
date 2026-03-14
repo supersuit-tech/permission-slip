@@ -182,9 +182,9 @@ function FieldHints({ ui }: { ui?: SchemaPropertyUI }) {
       {ui.help_text && (
         <p className="text-muted-foreground text-xs">{ui.help_text}</p>
       )}
-      {ui.help_url && (
+      {ui.help_url && /^https?:\/\//i.test(ui.help_url) && (
         <a
-          href={/^https?:\/\//i.test(ui.help_url) ? ui.help_url : "#"}
+          href={ui.help_url}
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"
