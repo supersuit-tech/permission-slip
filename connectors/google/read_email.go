@@ -227,22 +227,49 @@ func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo, dept
 }
 
 // parseFilename extracts a filename from a Content-Disposition or Content-Type
-// header value. Checks for both filename= (Content-Disposition) and name=
-// (Content-Type) parameters.
+// header value. Checks filename=, filename*= (RFC 5987), name=, and name*=.
 func parseFilename(headerValue string) string {
+	var plainName string
 	for _, param := range strings.Split(headerValue, ";") {
 		param = strings.TrimSpace(param)
 		lower := strings.ToLower(param)
-		if strings.HasPrefix(lower, "filename=") {
-			name := param[len("filename="):]
-			return strings.Trim(name, `"`)
+
+		// RFC 5987 extended filenames (filename*=UTF-8''encoded%20name)
+		// take priority over plain filenames per RFC 6266.
+		if strings.HasPrefix(lower, "filename*=") {
+			if fn := decodeRFC5987(param[len("filename*="):]); fn != "" {
+				return fn
+			}
 		}
-		if strings.HasPrefix(lower, "name=") {
-			name := param[len("name="):]
-			return strings.Trim(name, `"`)
+		if strings.HasPrefix(lower, "name*=") {
+			if fn := decodeRFC5987(param[len("name*="):]); fn != "" {
+				return fn
+			}
+		}
+
+		if strings.HasPrefix(lower, "filename=") {
+			plainName = strings.Trim(param[len("filename="):], `"`)
+		}
+		if plainName == "" && strings.HasPrefix(lower, "name=") {
+			plainName = strings.Trim(param[len("name="):], `"`)
 		}
 	}
-	return ""
+	return plainName
+}
+
+// decodeRFC5987 decodes a RFC 5987 encoded value like "UTF-8''caf%C3%A9.pdf".
+// Returns empty string if the format is unrecognized.
+func decodeRFC5987(value string) string {
+	// Format: charset'language'encoded_value
+	parts := strings.SplitN(value, "'", 3)
+	if len(parts) != 3 {
+		return ""
+	}
+	decoded, err := url.PathUnescape(parts[2])
+	if err != nil {
+		return ""
+	}
+	return decoded
 }
 
 // decodeBase64URL decodes a base64url-encoded string (Gmail API format).

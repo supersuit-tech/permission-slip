@@ -475,6 +475,8 @@ func TestParseFilename(t *testing.T) {
 		{`attachment; filename=report.pdf`, "report.pdf"},
 		{`application/pdf; name="invoice.pdf"`, "invoice.pdf"},
 		{`application/pdf; name=invoice.pdf`, "invoice.pdf"},
+		{`attachment; filename*=UTF-8''caf%C3%A9%20menu.pdf`, "café menu.pdf"},
+		{`attachment; filename="fallback.pdf"; filename*=UTF-8''preferred.pdf`, "preferred.pdf"},
 		{`inline`, ""},
 		{``, ""},
 	}
