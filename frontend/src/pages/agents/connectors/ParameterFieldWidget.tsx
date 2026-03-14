@@ -16,6 +16,8 @@ export interface ParameterFieldWidgetProps {
   disabled?: boolean;
   /** Extra className for the input element. */
   className?: string;
+  /** Override the placeholder from x-ui (e.g. for constraint mode hints). */
+  placeholder?: string;
 }
 
 /**
@@ -29,10 +31,11 @@ export function ParameterFieldWidget({
   onChange,
   disabled,
   className,
+  placeholder: placeholderOverride,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
   const widget: WidgetType = ui?.widget ?? "text";
-  const placeholder = ui?.placeholder;
+  const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
 
   return (
