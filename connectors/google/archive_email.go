@@ -11,37 +11,36 @@ import (
 )
 
 // archiveEmailAction implements connectors.Action for google.archive_email.
-// It archives a Gmail message by removing the INBOX label via
-// POST /gmail/v1/users/me/messages/{id}/modify.
+// It archives a Gmail thread by removing the INBOX label from all messages
+// via POST /gmail/v1/users/me/threads/{id}/modify, matching Gmail's built-in
+// Archive button behavior.
 type archiveEmailAction struct {
 	conn *GoogleConnector
 }
 
 // archiveEmailParams is the user-facing parameter schema.
 type archiveEmailParams struct {
-	MessageID string `json:"message_id"`
+	ThreadID string `json:"thread_id"`
 }
 
 func (p *archiveEmailParams) validate() error {
-	if p.MessageID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: message_id"}
+	if p.ThreadID == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: thread_id"}
 	}
 	return nil
 }
 
-// gmailModifyRequest is the Gmail API request body for messages.modify.
+// gmailModifyRequest is the Gmail API request body for threads.modify / messages.modify.
 type gmailModifyRequest struct {
 	RemoveLabelIDs []string `json:"removeLabelIds"`
 }
 
-// gmailModifyResponse is the Gmail API response from messages.modify.
-type gmailModifyResponse struct {
-	ID       string   `json:"id"`
-	ThreadID string   `json:"threadId"`
-	LabelIDs []string `json:"labelIds"`
+// gmailThreadModifyResponse is the Gmail API response from threads.modify.
+type gmailThreadModifyResponse struct {
+	ID string `json:"id"`
 }
 
-// Execute archives a Gmail message by removing the INBOX label.
+// Execute archives a Gmail thread by removing the INBOX label from all messages.
 func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params archiveEmailParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
@@ -51,19 +50,17 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	modifyURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/messages/" + url.PathEscape(params.MessageID) + "/modify"
+	modifyURL := a.conn.gmailBaseURL + "/gmail/v1/users/me/threads/" + url.PathEscape(params.ThreadID) + "/modify"
 	body := gmailModifyRequest{
 		RemoveLabelIDs: []string{"INBOX"},
 	}
 
-	var resp gmailModifyResponse
+	var resp gmailThreadModifyResponse
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, modifyURL, body, &resp); err != nil {
 		return nil, err
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"id":        resp.ID,
-		"thread_id": resp.ThreadID,
-		"labels":    resp.LabelIDs,
+		"thread_id": resp.ID,
 	})
 }

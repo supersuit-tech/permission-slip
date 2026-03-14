@@ -16,7 +16,7 @@ func TestArchiveEmail_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/gmail/v1/users/me/messages/msg-123/modify" {
+		if r.URL.Path != "/gmail/v1/users/me/threads/thread-456/modify" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer ya29.test-access-token-123" {
@@ -32,10 +32,8 @@ func TestArchiveEmail_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(gmailModifyResponse{
-			ID:       "msg-123",
-			ThreadID: "thread-456",
-			LabelIDs: []string{"IMPORTANT"},
+		json.NewEncoder(w).Encode(gmailThreadModifyResponse{
+			ID: "thread-456",
 		})
 	}))
 	defer srv.Close()
@@ -43,7 +41,7 @@ func TestArchiveEmail_Success(t *testing.T) {
 	conn := newGmailForTest(srv.Client(), srv.URL)
 	action := &archiveEmailAction{conn: conn}
 
-	params, _ := json.Marshal(archiveEmailParams{MessageID: "msg-123"})
+	params, _ := json.Marshal(archiveEmailParams{ThreadID: "thread-456"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "google.archive_email",
@@ -58,15 +56,12 @@ func TestArchiveEmail_Success(t *testing.T) {
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if data["id"] != "msg-123" {
-		t.Errorf("expected id 'msg-123', got %q", data["id"])
-	}
 	if data["thread_id"] != "thread-456" {
 		t.Errorf("expected thread_id 'thread-456', got %q", data["thread_id"])
 	}
 }
 
-func TestArchiveEmail_MissingMessageID(t *testing.T) {
+func TestArchiveEmail_MissingThreadID(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
@@ -80,7 +75,7 @@ func TestArchiveEmail_MissingMessageID(t *testing.T) {
 		Credentials: validCreds(),
 	})
 	if err == nil {
-		t.Fatal("expected error for missing message_id")
+		t.Fatal("expected error for missing thread_id")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
@@ -124,7 +119,7 @@ func TestArchiveEmail_AuthFailure(t *testing.T) {
 	conn := newGmailForTest(srv.Client(), srv.URL)
 	action := &archiveEmailAction{conn: conn}
 
-	params, _ := json.Marshal(archiveEmailParams{MessageID: "msg-123"})
+	params, _ := json.Marshal(archiveEmailParams{ThreadID: "thread-456"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "google.archive_email",
@@ -151,7 +146,7 @@ func TestArchiveEmail_RateLimit(t *testing.T) {
 	conn := newGmailForTest(srv.Client(), srv.URL)
 	action := &archiveEmailAction{conn: conn}
 
-	params, _ := json.Marshal(archiveEmailParams{MessageID: "msg-123"})
+	params, _ := json.Marshal(archiveEmailParams{ThreadID: "thread-456"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "google.archive_email",

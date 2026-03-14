@@ -698,15 +698,15 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "google.archive_email",
 				Name:        "Archive Email",
-				Description: "Archive a Gmail message (removes from inbox; still accessible via search and All Mail)",
+				Description: "Archive a Gmail thread (removes all messages from inbox; still accessible via search and All Mail)",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["message_id"],
+					"required": ["thread_id"],
 					"properties": {
-						"message_id": {
+						"thread_id": {
 							"type": "string",
-							"description": "The Gmail message ID to archive (obtained from list_emails)"
+							"description": "The Gmail thread ID to archive (obtained from list_emails thread_id field)"
 						}
 					}
 				}`)),
@@ -1007,8 +1007,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_google_archive_email",
 				ActionType:  "google.archive_email",
 				Name:        "Archive emails",
-				Description: "Agent can archive Gmail messages (removes from inbox; still accessible via search and All Mail).",
-				Parameters:  json.RawMessage(`{"message_id":"*"}`),
+				Description: "Agent can archive Gmail threads (removes from inbox; still accessible via search and All Mail).",
+				Parameters:  json.RawMessage(`{"thread_id":"*"}`),
 			},
 		},
 	}
