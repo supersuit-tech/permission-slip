@@ -13,9 +13,15 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// maxEmailBodySize caps the decoded email body at 1 MB to prevent memory
-// issues with large messages. Bodies exceeding this are truncated.
-const maxEmailBodySize = 1024 * 1024
+const (
+	// maxEmailBodySize caps the decoded email body at 1 MB to prevent memory
+	// issues with large messages. Bodies exceeding this are truncated.
+	maxEmailBodySize = 1024 * 1024
+
+	// maxMIMEDepth limits recursion depth when walking MIME part trees to
+	// prevent stack overflow from crafted deeply-nested messages.
+	maxMIMEDepth = 20
+)
 
 // readEmailAction implements connectors.Action for google.read_email.
 // It fetches a single email by message ID and returns the full body,
@@ -125,8 +131,8 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		}
 	}
 
-	// Extract body and attachments from the MIME tree.
-	body, contentType := extractBody(&msg.Payload)
+	// Extract body and attachments from the MIME tree (depth-limited).
+	body, contentType := extractBody(&msg.Payload, 0)
 	detail.Body = body
 	detail.ContentType = contentType
 	detail.Attachments = extractAttachments(&msg.Payload)
@@ -136,8 +142,13 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 
 // extractBody walks the MIME part tree and returns the best text body.
 // It prefers text/plain over text/html. For multipart messages it recurses
-// into alternative/mixed/related parts.
-func extractBody(part *gmailMessagePart) (body, contentType string) {
+// into alternative/mixed/related parts. Recursion is capped at maxMIMEDepth
+// to prevent stack overflow from crafted deeply-nested messages.
+func extractBody(part *gmailMessagePart, depth int) (body, contentType string) {
+	if depth > maxMIMEDepth {
+		return "", "text/plain"
+	}
+
 	// Single-part message with body data.
 	if part.Body.Data != "" && strings.HasPrefix(part.MimeType, "text/") {
 		decoded := decodeBase64URL(part.Body.Data)
@@ -149,7 +160,7 @@ func extractBody(part *gmailMessagePart) (body, contentType string) {
 	for i := range part.Parts {
 		p := &part.Parts[i]
 		if strings.HasPrefix(p.MimeType, "multipart/") {
-			b, ct := extractBody(p)
+			b, ct := extractBody(p, depth+1)
 			if b != "" {
 				if ct == "text/plain" {
 					return b, ct
@@ -177,14 +188,17 @@ func extractBody(part *gmailMessagePart) (body, contentType string) {
 // extractAttachments collects attachment metadata from the MIME part tree.
 func extractAttachments(part *gmailMessagePart) []gmailAttachmentInfo {
 	var attachments []gmailAttachmentInfo
-	collectAttachments(part, &attachments)
+	collectAttachments(part, &attachments, 0)
 	if len(attachments) == 0 {
 		return nil
 	}
 	return attachments
 }
 
-func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo) {
+func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo, depth int) {
+	if depth > maxMIMEDepth {
+		return
+	}
 	if part.Body.AttachmentID != "" {
 		info := gmailAttachmentInfo{
 			MimeType: part.MimeType,
@@ -208,7 +222,7 @@ func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo) {
 		*out = append(*out, info)
 	}
 	for i := range part.Parts {
-		collectAttachments(&part.Parts[i], out)
+		collectAttachments(&part.Parts[i], out, depth+1)
 	}
 }
 
@@ -232,11 +246,12 @@ func parseFilename(headerValue string) string {
 }
 
 // decodeBase64URL decodes a base64url-encoded string (Gmail API format).
+// Gmail uses raw (no padding) base64url, so we try that first. Padded
+// encoding is tried as a fallback for edge cases.
 func decodeBase64URL(s string) string {
-	b, err := base64.URLEncoding.DecodeString(s)
+	b, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
-		// Gmail uses raw (no padding) base64url.
-		b, err = base64.RawURLEncoding.DecodeString(s)
+		b, err = base64.URLEncoding.DecodeString(s)
 		if err != nil {
 			return s // return as-is if decoding fails
 		}

@@ -430,7 +430,7 @@ func TestExtractBody_PlainTextPreferred(t *testing.T) {
 		},
 	}
 
-	body, ct := extractBody(part)
+	body, ct := extractBody(part, 0)
 	if ct != "text/plain" {
 		t.Errorf("expected text/plain, got %s", ct)
 	}
@@ -455,7 +455,7 @@ func TestExtractBody_FallbackToHTML(t *testing.T) {
 		},
 	}
 
-	body, ct := extractBody(part)
+	body, ct := extractBody(part, 0)
 	if ct != "text/html" {
 		t.Errorf("expected text/html, got %s", ct)
 	}
