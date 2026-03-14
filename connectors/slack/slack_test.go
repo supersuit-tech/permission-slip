@@ -312,8 +312,11 @@ func TestCheckHTTPStatus(t *testing.T) {
 					t.Errorf("expected AuthError, got %T: %v", err, err)
 				}
 			case "rate_limit":
-				if !connectors.IsRateLimitError(err) {
+				var rle *connectors.RateLimitError
+				if !connectors.AsRateLimitError(err, &rle) {
 					t.Errorf("expected RateLimitError, got %T: %v", err, err)
+				} else if rle.RetryAfter != defaultRetryAfter {
+					t.Errorf("RetryAfter = %v, want %v (default)", rle.RetryAfter, defaultRetryAfter)
 				}
 			case "external":
 				if !connectors.IsExternalError(err) {
