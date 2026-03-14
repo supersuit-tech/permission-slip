@@ -294,11 +294,10 @@ func TestSummarizeParameters_WithParams(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test","parameters":{"repo":"acme/app","title":"Deploy v2.1"}}`)
 	summary := summarizeParameters(action)
-	if !strings.Contains(summary, "repo=acme/app") {
-		t.Errorf("expected repo param, got: %s", summary)
-	}
-	if !strings.Contains(summary, "title=Deploy v2.1") {
-		t.Errorf("expected title param, got: %s", summary)
+	// Output is sorted by key: repo before title.
+	expected := "repo=acme/app, title=Deploy v2.1"
+	if summary != expected {
+		t.Errorf("expected %q, got %q", expected, summary)
 	}
 }
 
@@ -317,6 +316,29 @@ func TestSummarizeParameters_RedactsSensitive(t *testing.T) {
 	}
 	if !strings.Contains(summary, "token=***") {
 		t.Errorf("expected redacted token, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_RedactsCompoundSensitiveKeys(t *testing.T) {
+	t.Parallel()
+	// Compound key names like "aws_secret_access_key" and "db_password"
+	// must also be redacted via substring matching.
+	action := json.RawMessage(`{"type":"test","parameters":{"aws_secret_access_key":"AKIA...","db_password":"hunter2","oauth_token":"ghp_abc"}}`)
+	summary := summarizeParameters(action)
+	if strings.Contains(summary, "AKIA") {
+		t.Error("summary should redact aws_secret_access_key value")
+	}
+	if strings.Contains(summary, "hunter2") {
+		t.Error("summary should redact db_password value")
+	}
+	if strings.Contains(summary, "ghp_abc") {
+		t.Error("summary should redact oauth_token value")
+	}
+	if !strings.Contains(summary, "aws_secret_access_key=***") {
+		t.Errorf("expected redacted aws_secret_access_key, got: %s", summary)
+	}
+	if !strings.Contains(summary, "db_password=***") {
+		t.Errorf("expected redacted db_password, got: %s", summary)
 	}
 }
 

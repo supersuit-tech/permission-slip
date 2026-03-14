@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"sort"
 	"strings"
 	"time"
 )
@@ -87,18 +88,32 @@ func buildStandingExecutionPushContent(approval Approval) PushContent {
 	}
 }
 
-// sensitiveParamKeys is the set of parameter keys whose values should be
-// redacted in notification content. Only the key names are shown.
-var sensitiveParamKeys = map[string]bool{
-	"api_key": true, "apikey": true, "api_secret": true,
-	"token": true, "access_token": true, "refresh_token": true,
-	"secret": true, "password": true, "credential": true,
-	"private_key": true, "auth": true, "authorization": true,
+// sensitiveSubstrings are substrings that, when found in a lowercased
+// parameter key, cause the value to be redacted. Substring matching is
+// safer than exact-match because it catches compound keys like
+// "aws_secret_access_key", "db_password", "oauth_token", etc.
+var sensitiveSubstrings = []string{
+	"secret", "password", "passwd", "token", "credential",
+	"key", "auth", "private",
+}
+
+// isSensitiveKey returns true if the parameter key looks like it holds
+// a secret value. Uses substring matching on the lowercased key.
+func isSensitiveKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, sub := range sensitiveSubstrings {
+		if strings.Contains(lower, sub) {
+			return true
+		}
+	}
+	return false
 }
 
 // summarizeParameters extracts a human-readable parameter summary from the
-// action JSON's "parameters" field. Sensitive values are redacted (shown as
-// "***"). Returns "" if no parameters are present.
+// action JSON's "parameters" field. Values for keys that look sensitive
+// (contain "secret", "password", "token", "key", etc.) are redacted to
+// "***". Output is sorted by key for deterministic ordering.
+// Returns "" if no parameters are present.
 func summarizeParameters(action json.RawMessage) string {
 	if len(action) == 0 {
 		return ""
@@ -119,14 +134,21 @@ func summarizeParameters(action json.RawMessage) string {
 		return ""
 	}
 
+	// Sort keys for deterministic output.
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	var parts []string
-	for key, val := range params {
-		if sensitiveParamKeys[strings.ToLower(key)] {
+	for _, key := range keys {
+		if isSensitiveKey(key) {
 			parts = append(parts, key+"=***")
 			continue
 		}
 		var s string
-		if json.Unmarshal(val, &s) == nil {
+		if json.Unmarshal(params[key], &s) == nil {
 			parts = append(parts, key+"="+TruncateUTF8(s, 30))
 		} else {
 			// Non-string value — show the key only
