@@ -83,7 +83,9 @@ function PaidRequestRow({ current, included }: { current: number; included: numb
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Then {PRICE_PER_REQUEST}/request
+        {hasOverage
+          ? `${allowance.toLocaleString()} free + ${overage.toLocaleString()} at ${PRICE_PER_REQUEST}/request`
+          : `First ${allowance.toLocaleString()} requests/month are free, then ${PRICE_PER_REQUEST}/request`}
       </p>
     </div>
   );
