@@ -1,7 +1,6 @@
 ---
 name: watch
 description: Poll a GitHub PR for new comments and PR reviews and act on them autonomously. Use when the user wants to monitor a PR for feedback and have Claude implement requested changes automatically.
-disable-model-invocation: true
 argument-hint: "[PR_URL] [--automerge] [--max-turns <N>]"
 ---
 
