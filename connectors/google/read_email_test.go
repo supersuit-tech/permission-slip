@@ -369,6 +369,9 @@ func TestReadEmail_FormatMetadata(t *testing.T) {
 	if detail.ID != "msg-meta" {
 		t.Errorf("expected ID msg-meta, got %s", detail.ID)
 	}
+	if len(detail.Labels) != 1 || detail.Labels[0] != "INBOX" {
+		t.Errorf("expected Labels [INBOX], got %v", detail.Labels)
+	}
 	if detail.From != "meta@example.com" {
 		t.Errorf("expected From meta@example.com, got %s", detail.From)
 	}
@@ -428,6 +431,9 @@ func TestReadEmail_FormatMinimal(t *testing.T) {
 	}
 	if detail.ThreadID != "thread-min" {
 		t.Errorf("expected ThreadID thread-min, got %s", detail.ThreadID)
+	}
+	if len(detail.Labels) != 2 || detail.Labels[0] != "INBOX" || detail.Labels[1] != "UNREAD" {
+		t.Errorf("expected Labels [INBOX UNREAD], got %v", detail.Labels)
 	}
 	if detail.Snippet != "Short snippet" {
 		t.Errorf("expected Snippet 'Short snippet', got %q", detail.Snippet)
