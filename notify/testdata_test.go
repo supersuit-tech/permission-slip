@@ -21,6 +21,21 @@ func testApproval() Approval {
 	}
 }
 
+// testStandingExecutionApproval returns a standard standing execution
+// Approval fixture for use across notify tests.
+func testStandingExecutionApproval() Approval {
+	return Approval{
+		ApprovalID:  "appr_standing_001",
+		AgentID:     42,
+		AgentName:   "Deploy Bot",
+		Action:      json.RawMessage(`{"type":"github.issues.create","parameters":{"repo":"acme/app","title":"Deploy v2.1"}}`),
+		Context:     json.RawMessage(`{"execution_count":3,"max_executions":10}`),
+		ApprovalURL: "https://app.example.com/activity",
+		CreatedAt:   time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC),
+		Type:        NotificationTypeStandingExecution,
+	}
+}
+
 // testRecipient returns a standard Recipient fixture with email and phone.
 func testRecipient() Recipient {
 	email := "alice@example.com"
