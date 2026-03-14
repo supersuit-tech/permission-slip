@@ -27,6 +27,8 @@ interface DisableConnectorSectionProps {
   connectorName: string;
   /** OAuth provider ID — when set, shows a "Remove" option that also disconnects OAuth. */
   oauthProvider?: string;
+  /** Active OAuth connection ID for this connector. Required to actually disconnect OAuth on Remove. */
+  oauthConnectionId?: string;
 }
 
 export function DisableConnectorSection({
@@ -34,6 +36,7 @@ export function DisableConnectorSection({
   connectorId,
   connectorName,
   oauthProvider,
+  oauthConnectionId,
 }: DisableConnectorSectionProps) {
   const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
@@ -73,26 +76,27 @@ export function DisableConnectorSection({
         return;
       }
 
-      // Step 2: disconnect OAuth (best-effort — connector is already disabled).
-      // The Remove button is only rendered when oauthProvider is set, so this
-      // branch is always taken. The assertion guards against future refactors.
-      if (!oauthProvider) {
-        throw new Error("handleRemove called without oauthProvider");
-      }
       const revoked = disableResult.revoked_standing_approvals;
       const revokedSuffix =
         revoked > 0
           ? ` ${revoked} standing approval${revoked === 1 ? "" : "s"} revoked.`
           : "";
-      try {
-        await disconnect(oauthProvider);
-        toast.success(
-          `Connector removed and OAuth disconnected.${revokedSuffix}`,
-        );
-      } catch {
-        toast.warning(
-          `Connector disabled, but OAuth disconnect failed.${revokedSuffix} You can disconnect manually from Settings.`,
-        );
+
+      // Step 2: disconnect OAuth (best-effort — connector is already disabled).
+      // oauthConnectionId is the specific connection to disconnect; skip if not bound.
+      if (oauthConnectionId) {
+        try {
+          await disconnect(oauthConnectionId);
+          toast.success(
+            `Connector removed and OAuth disconnected.${revokedSuffix}`,
+          );
+        } catch {
+          toast.warning(
+            `Connector disabled and API keys deleted, but OAuth disconnect failed.${revokedSuffix} You can disconnect manually from Settings.`,
+          );
+        }
+      } else {
+        toast.success(`Connector removed.${revokedSuffix}`);
       }
 
       setRemoveConfirmOpen(false);

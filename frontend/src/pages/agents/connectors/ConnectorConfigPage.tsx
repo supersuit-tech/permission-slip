@@ -6,6 +6,7 @@ import { useAgent } from "@/hooks/useAgent";
 import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
+import { useAgentConnectorCredential } from "@/hooks/useAgentConnectorCredential";
 import { ConnectorOverviewSection } from "./ConnectorOverviewSection";
 import { ConnectorActionsDialog } from "./ConnectorActionsDialog";
 import { ActionConfigurationsSection } from "./ActionConfigurationsSection";
@@ -44,6 +45,11 @@ export function ConnectorConfigPage() {
     isLoading: configsLoading,
     error: configsError,
   } = useActionConfigs(agentId);
+
+  const { binding: credentialBinding } = useAgentConnectorCredential(
+    agentId,
+    connectorId ?? "",
+  );
 
   const connectorConfigs = configs.filter((c) => c.connector_id === connectorId);
 
@@ -169,6 +175,7 @@ export function ConnectorConfigPage() {
             (c) => c.auth_type === "oauth2" && c.oauth_provider,
           )?.oauth_provider
         }
+        oauthConnectionId={credentialBinding?.oauth_connection_id ?? undefined}
       />
     </div>
   );

@@ -35,10 +35,16 @@ export function useDisableAgentConnector() {
       if (error) throw new Error("Failed to disable connector");
       return data as DisableResponse;
     },
-    onSuccess: (_data, { agentId }) => {
+    onSuccess: (_data, { agentId, connectorId, deleteCredentials }) => {
       queryClient.invalidateQueries({
         queryKey: ["agent-connectors", agentId],
       });
+      if (deleteCredentials) {
+        queryClient.invalidateQueries({ queryKey: ["credentials"] });
+        queryClient.invalidateQueries({
+          queryKey: ["agent-connector-credential", agentId, connectorId],
+        });
+      }
     },
   });
 
