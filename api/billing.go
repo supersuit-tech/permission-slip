@@ -150,7 +150,7 @@ func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 		Status:             string(sub.Status),
 		CurrentPeriodStart: sub.CurrentPeriodStart,
 		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
-		HasPaymentMethod:   sub.StripeCustomerID != nil,
+		HasPaymentMethod:   false,
 		CanUpgrade:         sub.PlanID == db.PlanFree,
 		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
 		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
