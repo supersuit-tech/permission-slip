@@ -369,6 +369,9 @@ func TestReadEmail_FormatMetadata(t *testing.T) {
 	if detail.ID != "msg-meta" {
 		t.Errorf("expected ID msg-meta, got %s", detail.ID)
 	}
+	if detail.ThreadID != "thread-meta" {
+		t.Errorf("expected ThreadID thread-meta, got %s", detail.ThreadID)
+	}
 	if len(detail.Labels) != 1 || detail.Labels[0] != "INBOX" {
 		t.Errorf("expected Labels [INBOX], got %v", detail.Labels)
 	}
