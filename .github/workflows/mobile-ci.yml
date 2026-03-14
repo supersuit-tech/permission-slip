@@ -1,0 +1,29 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  mobile:
+    name: Mobile Tests & Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: cd mobile && npm ci
+
+      - name: Type-check
+        run: make mobile-typecheck
+
+      - name: Run mobile tests
+        run: make mobile-test
