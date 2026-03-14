@@ -104,7 +104,50 @@ export function parseParametersSchema(
   return { type: "object", required, properties, "x-ui": parseSchemaUI(schema["x-ui"]) };
 }
 
-const VALID_WIDGETS = new Set(["text", "select", "textarea", "toggle", "number", "date"]);
+/** All valid widget type values. */
+export const VALID_WIDGETS = ["text", "select", "textarea", "toggle", "number", "date"] as const;
+
+/** Widget type as a union — useful for exhaustive switch checks. */
+export type WidgetType = (typeof VALID_WIDGETS)[number];
+
+const VALID_WIDGETS_SET = new Set<string>(VALID_WIDGETS);
+
+/**
+ * Get the display label for a schema property.
+ * Returns x-ui label if set, otherwise falls back to the property key.
+ */
+export function getFieldLabel(key: string, prop: SchemaProperty): string {
+  return prop["x-ui"]?.label ?? key;
+}
+
+/**
+ * Return property keys in the order specified by x-ui.order,
+ * with any unmentioned keys appended in their original order.
+ */
+export function getOrderedFieldKeys(schema: ParametersSchema): string[] {
+  const allKeys = Object.keys(schema.properties ?? {});
+  const order = schema["x-ui"]?.order;
+  if (!order || order.length === 0) return allKeys;
+
+  const allKeysSet = new Set(allKeys);
+  const ordered = order.filter((k) => allKeysSet.has(k));
+  const orderedSet = new Set(ordered);
+  const remaining = allKeys.filter((k) => !orderedSet.has(k));
+  return [...ordered, ...remaining];
+}
+
+/**
+ * Check whether a field should be visible given the current form values.
+ * Returns true if the field has no visible_when rule or if the condition is met.
+ */
+export function isFieldVisible(
+  prop: SchemaProperty,
+  values: Record<string, unknown>,
+): boolean {
+  const rule = prop["x-ui"]?.visible_when;
+  if (!rule) return true;
+  return values[rule.field] === rule.equals;
+}
 
 /** Parse a property-level `x-ui` object, returning undefined if invalid. */
 function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
@@ -112,7 +155,7 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
   const obj = raw as Record<string, unknown>;
 
   const ui: SchemaPropertyUI = {};
-  if (typeof obj.widget === "string" && VALID_WIDGETS.has(obj.widget)) {
+  if (typeof obj.widget === "string" && VALID_WIDGETS_SET.has(obj.widget)) {
     ui.widget = obj.widget as SchemaPropertyUI["widget"];
   }
   if (typeof obj.label === "string") ui.label = obj.label;

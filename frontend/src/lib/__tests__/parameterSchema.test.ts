@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   parseParametersSchema,
+  getFieldLabel,
+  getOrderedFieldKeys,
+  isFieldVisible,
   type SchemaPropertyUI,
   type SchemaUI,
 } from "../parameterSchema";
@@ -440,6 +443,80 @@ describe("parseParametersSchema", () => {
     expect(result?.properties?.customer_id?.["x-ui"]?.label).toBe("Customer");
     expect(result?.properties?.currency?.["x-ui"]?.widget).toBe("select");
     expect(result?.properties?.auto_advance?.["x-ui"]?.widget).toBe("toggle");
+  });
+
+  describe("getFieldLabel", () => {
+    it("returns x-ui label when set", () => {
+      expect(getFieldLabel("customer_id", { type: "string", "x-ui": { label: "Customer" } })).toBe("Customer");
+    });
+
+    it("falls back to property key when no x-ui label", () => {
+      expect(getFieldLabel("customer_id", { type: "string" })).toBe("customer_id");
+    });
+
+    it("falls back to property key when x-ui exists but no label", () => {
+      expect(getFieldLabel("amount", { type: "number", "x-ui": { widget: "number" } })).toBe("amount");
+    });
+  });
+
+  describe("getOrderedFieldKeys", () => {
+    it("returns keys in x-ui order with remaining appended", () => {
+      const schema = parseParametersSchema({
+        type: "object",
+        "x-ui": { order: ["b", "a"] },
+        properties: { a: { type: "string" }, b: { type: "string" }, c: { type: "string" } },
+      })!;
+      expect(getOrderedFieldKeys(schema)).toEqual(["b", "a", "c"]);
+    });
+
+    it("returns original order when no x-ui order", () => {
+      const schema = parseParametersSchema({
+        type: "object",
+        properties: { x: { type: "string" }, y: { type: "string" } },
+      })!;
+      expect(getOrderedFieldKeys(schema)).toEqual(["x", "y"]);
+    });
+
+    it("skips order keys that don't exist in properties", () => {
+      const schema = parseParametersSchema({
+        type: "object",
+        "x-ui": { order: ["missing", "a"] },
+        properties: { a: { type: "string" }, b: { type: "string" } },
+      })!;
+      expect(getOrderedFieldKeys(schema)).toEqual(["a", "b"]);
+    });
+
+    it("handles schema with no properties", () => {
+      const schema = parseParametersSchema({ type: "object" })!;
+      expect(getOrderedFieldKeys(schema)).toEqual([]);
+    });
+  });
+
+  describe("isFieldVisible", () => {
+    it("returns true when no visible_when rule", () => {
+      expect(isFieldVisible({ type: "string" }, {})).toBe(true);
+    });
+
+    it("returns true when condition is met (string)", () => {
+      const prop = { type: "string", "x-ui": { visible_when: { field: "mode", equals: "advanced" as string | boolean | number } } };
+      expect(isFieldVisible(prop, { mode: "advanced" })).toBe(true);
+    });
+
+    it("returns false when condition is not met", () => {
+      const prop = { type: "string", "x-ui": { visible_when: { field: "mode", equals: "advanced" as string | boolean | number } } };
+      expect(isFieldVisible(prop, { mode: "basic" })).toBe(false);
+    });
+
+    it("returns false when referenced field is missing", () => {
+      const prop = { type: "string", "x-ui": { visible_when: { field: "mode", equals: "advanced" as string | boolean | number } } };
+      expect(isFieldVisible(prop, {})).toBe(false);
+    });
+
+    it("works with boolean condition", () => {
+      const prop = { type: "string", "x-ui": { visible_when: { field: "enabled", equals: true as string | boolean | number } } };
+      expect(isFieldVisible(prop, { enabled: true })).toBe(true);
+      expect(isFieldVisible(prop, { enabled: false })).toBe(false);
+    });
   });
 
   it("preserves backwards compatibility — schemas without x-ui parse identically", () => {
