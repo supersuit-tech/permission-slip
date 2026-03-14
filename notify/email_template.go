@@ -17,6 +17,9 @@ func buildEmailSubject(approval Approval) string {
 	if approval.Type == NotificationTypeCardExpiring {
 		return buildCardExpiringSubject(approval)
 	}
+	if approval.Type == NotificationTypeStandingExecution {
+		return buildStandingExecutionSubject(approval)
+	}
 	actionType := extractActionType(approval.Action)
 	if actionType != "" {
 		return fmt.Sprintf("Approval needed: %s", actionType)
@@ -31,6 +34,9 @@ func buildEmailPlainBody(approval Approval) string {
 	}
 	if approval.Type == NotificationTypeCardExpiring {
 		return buildCardExpiringPlainBody(approval)
+	}
+	if approval.Type == NotificationTypeStandingExecution {
+		return buildStandingExecutionPlainBody(approval)
 	}
 
 	var b strings.Builder
@@ -89,6 +95,9 @@ func buildEmailHTMLBody(approval Approval) string {
 	}
 	if approval.Type == NotificationTypeCardExpiring {
 		return buildCardExpiringHTMLBody(approval)
+	}
+	if approval.Type == NotificationTypeStandingExecution {
+		return buildStandingExecutionHTMLBody(approval)
 	}
 
 	agentName := approval.AgentName
