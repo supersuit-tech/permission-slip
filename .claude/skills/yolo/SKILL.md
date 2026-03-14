@@ -130,13 +130,13 @@ Capture the PR URL from the output.
 
 ## Step 6: Hand Off to /watch
 
-Invoke the `/watch` skill with `--automerge` to monitor the PR through review and merge it when ready:
+Invoke the `/watch` skill with `--automerge` to monitor the PR through review and merge it when ready. Since `/watch` auto-detects the PR from the current branch, you don't need to pass the URL explicitly — just the flags:
 
 ```
-/watch <PR_URL> --automerge
+/watch --automerge
 ```
 
-Use the `Skill` tool to invoke the watch skill, passing the PR URL and `--automerge` flag as arguments.
+Use the `Skill` tool to invoke the watch skill, passing `--automerge` as the argument. The watch skill will detect the PR from the current branch automatically.
 
 ## Important Rules
 
