@@ -711,6 +711,22 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.archive_email",
+				Name:        "Archive Email",
+				Description: "Archive a Gmail thread (removes all messages from inbox; still accessible via search and All Mail)",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["thread_id"],
+					"properties": {
+						"thread_id": {
+							"type": "string",
+							"description": "The Gmail thread ID to archive (obtained from list_emails thread_id field)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -727,6 +743,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"https://www.googleapis.com/auth/chat.spaces.readonly",
 					"https://www.googleapis.com/auth/chat.messages.create",
 					"https://www.googleapis.com/auth/drive",
+					"https://www.googleapis.com/auth/gmail.modify",
 				},
 			},
 		},
@@ -1008,6 +1025,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Reply to emails",
 				Description: "Agent can reply to any existing Gmail thread.",
 				Parameters:  json.RawMessage(`{"thread_id":"*","message_id":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_google_archive_email",
+				ActionType:  "google.archive_email",
+				Name:        "Archive emails",
+				Description: "Agent can archive Gmail threads (removes from inbox; still accessible via search and All Mail).",
+				Parameters:  json.RawMessage(`{"thread_id":"*"}`),
 			},
 		},
 	}

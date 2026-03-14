@@ -80,11 +80,17 @@ func TestListEmails_Success(t *testing.T) {
 	if len(data.Emails) != 1 {
 		t.Fatalf("expected 1 email, got %d", len(data.Emails))
 	}
+	if data.Emails[0].ID != "msg-1" {
+		t.Errorf("expected id 'msg-1', got %q", data.Emails[0].ID)
+	}
 	if data.Emails[0].ThreadID != "thread-1" {
 		t.Errorf("expected thread_id 'thread-1', got %q", data.Emails[0].ThreadID)
 	}
 	if data.Emails[0].From != "sender@example.com" {
 		t.Errorf("expected from 'sender@example.com', got %q", data.Emails[0].From)
+	}
+	if data.Emails[0].Subject != "Test Email" {
+		t.Errorf("expected subject 'Test Email', got %q", data.Emails[0].Subject)
 	}
 }
 

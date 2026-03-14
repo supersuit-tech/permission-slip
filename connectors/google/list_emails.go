@@ -110,7 +110,7 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 	var wg sync.WaitGroup
 	for i, m := range listResp.Messages {
 		wg.Add(1)
-		go func(idx int, msgID string) {
+		go func(idx int, msgID, threadID string) {
 			defer wg.Done()
 
 			sem <- struct{}{}        // acquire
@@ -125,7 +125,7 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 
 			summary := emailSummary{
 				ID:       msgResp.ID,
-				ThreadID: msgResp.ThreadID,
+				ThreadID: threadID, // from list response, no need to wait for per-message fetch
 				Snippet:  msgResp.Snippet,
 			}
 			for _, h := range msgResp.Payload.Headers {
@@ -141,7 +141,7 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 				}
 			}
 			summaries[idx] = summary
-		}(i, m.ID)
+		}(i, m.ID, m.ThreadID)
 	}
 	wg.Wait()
 
