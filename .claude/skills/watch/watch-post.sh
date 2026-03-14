@@ -18,11 +18,13 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 PR_URL=""
 AUTO_MERGE=false
+NO_NOTIFY=false
 
 # Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --automerge) AUTO_MERGE=true; shift ;;
+    --no-notify) NO_NOTIFY=true; shift ;;
     https://*) PR_URL="$1"; shift ;;
     *) shift ;;
   esac
@@ -168,10 +170,14 @@ elif [[ "$AUTO_MERGE" == "true" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Trigger webhook notification
+# Trigger webhook notification (skipped with --no-notify)
 # ---------------------------------------------------------------------------
-echo "[post] Triggering webhook notification..."
-gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
+if [[ "$NO_NOTIFY" == "true" ]]; then
+  echo "[post] Skipping webhook notification (--no-notify)."
+else
+  echo "[post] Triggering webhook notification..."
+  gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
+fi
 
 echo ""
 echo "POST_COMPLETE"
