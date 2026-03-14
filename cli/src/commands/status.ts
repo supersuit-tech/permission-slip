@@ -49,6 +49,9 @@ export function statusCommand(program: Command): void {
         }
 
         // Approval status check.
+        if (!opts.wait && opts.timeout !== "120") {
+          process.stderr.write("Warning: --timeout has no effect without --wait\n");
+        }
         if (opts.wait) {
           const timeoutSeconds = parseTimeout(opts.timeout);
           process.stderr.write(`Waiting for approval ${approvalId}...\n`);
