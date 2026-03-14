@@ -86,7 +86,7 @@ type emailFullDetail struct {
 
 // gmailAttachmentInfo describes an attachment without including its content.
 type gmailAttachmentInfo struct {
-	Filename     string `json:"filename"`
+	Filename     string `json:"filename,omitempty"`
 	MimeType     string `json:"mime_type"`
 	Size         int    `json:"size"`
 	PartID       string `json:"part_id,omitempty"`
