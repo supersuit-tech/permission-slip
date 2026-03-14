@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Activity, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   ALL_OUTCOME_FILTERS,
   ACTION_EVENT_TYPES,
   AuditEventRow,
+  deduplicateEvents,
 } from "@/lib/auditEvents";
 import { useInfiniteAuditEvents } from "@/hooks/useInfiniteAuditEvents";
 import type { AuditEventFilters } from "@/hooks/useAuditEvents";
@@ -81,7 +82,7 @@ export function ActivityPage() {
   };
 
   const {
-    events,
+    events: rawEvents,
     retention,
     hasNextPage,
     isFetchingNextPage,
@@ -90,6 +91,7 @@ export function ActivityPage() {
     error,
     refetch,
   } = useInfiniteAuditEvents(filters);
+  const events = useMemo(() => deduplicateEvents(rawEvents), [rawEvents]);
 
   const { agents } = useAgents();
 
