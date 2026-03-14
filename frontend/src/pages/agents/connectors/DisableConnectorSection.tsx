@@ -25,11 +25,25 @@ interface DisableConnectorSectionProps {
   agentId: number;
   connectorId: string;
   connectorName: string;
-  /** OAuth provider ID — when set, shows a "Remove" option that also disconnects OAuth. */
+  /**
+   * OAuth provider ID (e.g. "github") from the connector spec.
+   * When set, the "Remove" option is shown and its description mentions
+   * disconnecting OAuth. Does NOT drive the actual disconnect call —
+   * see `oauthConnectionId` for that.
+   */
   oauthProvider?: string;
-  /** Active OAuth connection ID for this connector. Required to actually disconnect OAuth on Remove. */
+  /**
+   * The specific OAuth connection ID currently bound to this connector
+   * (e.g. "oconn_abc123"). Passed to `useDisconnectOAuth` on Remove so
+   * the correct connection is disconnected. If undefined, the OAuth
+   * disconnect step is skipped silently.
+   */
   oauthConnectionId?: string;
-  /** Whether an API key credential is currently assigned — when true, Remove also deletes it. */
+  /**
+   * True when an API key credential is assigned to this connector.
+   * When true (and `oauthProvider` is not set), the "Remove" option is
+   * shown so the user can permanently delete the saved API key.
+   */
   hasApiKeyCredential?: boolean;
 }
 
