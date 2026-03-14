@@ -115,12 +115,13 @@ func buildStandingExecutionPushContent(approval Approval) PushContent {
 }
 
 // sensitiveSubstrings are substrings that, when found in a lowercased
-// parameter key, cause the value to be redacted. Substring matching is
-// safer than exact-match because it catches compound keys like
-// "aws_secret_access_key", "db_password", "oauth_token", etc.
+// parameter key, cause the value to be redacted. The substrings are chosen
+// to catch compound keys like "aws_secret_access_key", "db_password",
+// "oauth_token" while avoiding false positives on benign names like
+// "author" or "hotkey".
 var sensitiveSubstrings = []string{
 	"secret", "password", "passwd", "token", "credential",
-	"key", "auth", "private",
+	"_key", "apikey", "access_key", "auth_token", "authz", "private",
 }
 
 // isSensitiveKey returns true if the parameter key looks like it holds
@@ -177,8 +178,14 @@ func summarizeParameters(action json.RawMessage) string {
 		if json.Unmarshal(params[key], &s) == nil {
 			parts = append(parts, key+"="+TruncateUTF8(s, 30))
 		} else {
-			// Non-string value — show the key only
-			parts = append(parts, key)
+			// For non-string primitives (numbers, booleans) render the raw token;
+			// for complex objects just show the key to avoid information overload.
+			raw := params[key]
+			if len(raw) > 0 && raw[0] != '{' && raw[0] != '[' {
+				parts = append(parts, key+"="+string(raw))
+			} else {
+				parts = append(parts, key)
+			}
 		}
 	}
 

@@ -337,6 +337,44 @@ func TestSummarizeParameters_RedactsCompoundSensitiveKeys(t *testing.T) {
 	}
 }
 
+func TestSummarizeParameters_NoFalsePositives(t *testing.T) {
+	t.Parallel()
+	// "author" and "hotkey" should NOT be redacted — they are benign parameter names.
+	action := json.RawMessage(`{"type":"test","parameters":{"author":"alice","hotkey":"ctrl+s","keyboard":"us"}}`)
+	summary := summarizeParameters(action)
+	if !strings.Contains(summary, "author=alice") {
+		t.Errorf("expected author to not be redacted, got: %s", summary)
+	}
+	if !strings.Contains(summary, "hotkey=ctrl+s") {
+		t.Errorf("expected hotkey to not be redacted, got: %s", summary)
+	}
+	if !strings.Contains(summary, "keyboard=us") {
+		t.Errorf("expected keyboard to not be redacted, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_NonStringPrimitives(t *testing.T) {
+	t.Parallel()
+	action := json.RawMessage(`{"type":"test","parameters":{"count":42,"enabled":true,"repo":"acme/app","nested":{"a":1}}}`)
+	summary := summarizeParameters(action)
+	if !strings.Contains(summary, "count=42") {
+		t.Errorf("expected number value to be rendered, got: %s", summary)
+	}
+	if !strings.Contains(summary, "enabled=true") {
+		t.Errorf("expected boolean value to be rendered, got: %s", summary)
+	}
+	if !strings.Contains(summary, "repo=acme/app") {
+		t.Errorf("expected string value to be rendered, got: %s", summary)
+	}
+	// Nested objects should show key only
+	if strings.Contains(summary, "nested=") {
+		t.Errorf("expected nested object to show key only, got: %s", summary)
+	}
+	if !strings.Contains(summary, "nested") {
+		t.Errorf("expected nested key to be present, got: %s", summary)
+	}
+}
+
 func TestSummarizeParameters_NoParams(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test"}`)
