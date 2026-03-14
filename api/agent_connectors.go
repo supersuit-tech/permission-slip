@@ -141,13 +141,15 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 
 		if deleteCredentials {
 			// Wrap in a transaction so connector disable + credential delete are atomic.
-			tx, _, err := db.BeginOrContinue(r.Context(), deps.DB)
+			tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 			if err != nil {
 				log.Printf("[%s] DisableAgentConnector: begin tx: %v", TraceID(r.Context()), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 				return
 			}
-			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck
+			if owned {
+				defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
+			}
 
 			// Look up credential binding before disabling (cascade will delete the binding row).
 			credBinding, err := db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
@@ -187,10 +189,12 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 				}
 			}
 
-			if err := db.CommitTx(r.Context(), tx); err != nil {
-				log.Printf("[%s] DisableAgentConnector: commit: %v", TraceID(r.Context()), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
-				return
+			if owned {
+				if err := db.CommitTx(r.Context(), tx); err != nil {
+					log.Printf("[%s] DisableAgentConnector: commit: %v", TraceID(r.Context()), err)
+					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+					return
+				}
 			}
 
 			RespondJSON(w, http.StatusOK, disableAgentConnectorResponse{
