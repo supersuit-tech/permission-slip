@@ -63,10 +63,10 @@ type emailSummary struct {
 	ID       string `json:"id"`
 	ThreadID string `json:"thread_id"`
 	From     string `json:"from,omitempty"`
-	To      string `json:"to,omitempty"`
-	Subject string `json:"subject,omitempty"`
-	Snippet string `json:"snippet,omitempty"`
-	Date    string `json:"date,omitempty"`
+	To       string `json:"to,omitempty"`
+	Subject  string `json:"subject,omitempty"`
+	Snippet  string `json:"snippet,omitempty"`
+	Date     string `json:"date,omitempty"`
 }
 
 // maxConcurrentFetches limits concurrent Gmail API requests when fetching
