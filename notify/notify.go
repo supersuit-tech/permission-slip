@@ -47,6 +47,12 @@ const (
 	// NotificationTypeCardExpiring is sent when a stored payment method is
 	// expiring soon (within 30 days) or already expired.
 	NotificationTypeCardExpiring NotificationType = "card_expiring"
+	// NotificationTypeStandingExecution is sent when an agent executes an
+	// action via a standing approval. Informational only — not an approval
+	// request. Uses a distinct template with a blue accent and activity link.
+	// The Context JSON should contain "execution_count" and "max_executions"
+	// integers; see standing_execution.go for the full contract.
+	NotificationTypeStandingExecution NotificationType = "standing_execution"
 )
 
 // Approval holds the fields a notification channel needs to construct its

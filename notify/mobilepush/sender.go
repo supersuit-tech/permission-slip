@@ -120,6 +120,7 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 	}
 
 	content := buildMessage(approval)
+	categoryID := categoryForType(approval.Type)
 
 	// Build messages for all tokens.
 	messages := make([]expoMessage, len(tokens))
@@ -131,7 +132,7 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 			Body:       content.Body,
 			Sound:      "default",
 			Priority:   "high",
-			CategoryID: "approval",
+			CategoryID: categoryID,
 			Data: expoMessageData{
 				URL:        content.URL,
 				ApprovalID: content.ApprovalID,
@@ -232,6 +233,16 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 // Delegates to notify.BuildPushContent for consistent messaging across channels.
 func buildMessage(approval notify.Approval) notify.PushContent {
 	return notify.BuildPushContent(approval)
+}
+
+// categoryForType returns the Expo push notification categoryId for the given
+// notification type. Standing executions use "standing_execution" so the
+// mobile app can suppress in-app banners; all other types use "approval".
+func categoryForType(t notify.NotificationType) string {
+	if t == notify.NotificationTypeStandingExecution {
+		return "standing_execution"
+	}
+	return "approval"
 }
 
 // truncateTokenForLog returns the last 8 characters of a token for logging,
