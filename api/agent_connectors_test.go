@@ -473,3 +473,30 @@ func TestDisableAgentConnector_DeleteCredentials(t *testing.T) {
 		t.Errorf("expected 0 vault secrets after remove, got %d", mockVault.SecretCount())
 	}
 }
+
+// TestDisableAgentConnector_DeleteCredentials_NoBinding verifies that
+// delete_credentials=true succeeds even when no credential is bound —
+// the connector is disabled and the no-op case is handled gracefully.
+func TestDisableAgentConnector_DeleteCredentials_NoBinding(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	// No credential binding inserted.
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodDelete,
+		fmt.Sprintf("/agents/%d/connectors/%s?delete_credentials=true", agentID, connID), uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
