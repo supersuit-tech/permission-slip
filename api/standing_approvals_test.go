@@ -572,7 +572,7 @@ func TestCreateStandingApproval_AgentNotFound(t *testing.T) {
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
-	body := fmt.Sprintf(`{"agent_id": 99999999, "action_type": "email.send", "expires_at": "%s"}`, expiresAt)
+	body := fmt.Sprintf(`{"agent_id": 99999999, "action_type": "email.send", "constraints": {"to": "test@example.com"}, "expires_at": "%s"}`, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
 
@@ -597,7 +597,7 @@ func TestCreateStandingApproval_OtherUsersAgent(t *testing.T) {
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
-	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "expires_at": "%s"}`, agentID, expiresAt)
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": "test@example.com"}, "expires_at": "%s"}`, agentID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid2, body)
 	w := httptest.NewRecorder()
 
@@ -728,15 +728,15 @@ func TestCreateStandingApproval_ConstraintsNull(t *testing.T) {
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
 
-	// Explicit null should be treated as "not provided" and succeed.
+	// Explicit null should be rejected — constraints are required.
 	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": null, "expires_at": "%s"}`, agentID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201 for null constraints, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for null constraints, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -760,6 +760,135 @@ func TestCreateStandingApproval_ConstraintsTooLarge(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_ConstraintsOmitted(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// Omitting constraints entirely should be rejected.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for omitted constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_ConstraintsEmptyObject(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// Empty object {} should be rejected — at least one constraint is required.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for empty constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_ConstraintsAllWildcard(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// All-wildcard constraints should be rejected.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": "*", "subject": "*"}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for all-wildcard constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_ConstraintsMixedWildcardAndFixed(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// Mix of wildcard and fixed — should succeed because at least one is non-wildcard.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": "user@example.com", "subject": "*"}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for mixed constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_WithActionConfigurationID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// Include an action_configuration_id — should be stored and returned.
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "email.send",
+		"constraints": {"to": "user@example.com"},
+		"action_configuration_id": "ac-test-123",
+		"expires_at": "%s"
+	}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.SourceActionConfigurationID == nil || *resp.SourceActionConfigurationID != "ac-test-123" {
+		t.Errorf("expected source_action_configuration_id 'ac-test-123', got %v", resp.SourceActionConfigurationID)
 	}
 }
 
