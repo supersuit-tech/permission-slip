@@ -204,7 +204,11 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
 		if err != nil {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
+			resp := BadRequest(ErrInvalidConstraints, err.Error())
+			resp.Error.Details = map[string]any{
+				"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
+			}
+			RespondError(w, r, http.StatusBadRequest, resp)
 			return
 		}
 
