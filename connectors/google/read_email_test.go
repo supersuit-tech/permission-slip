@@ -90,6 +90,9 @@ func TestReadEmail_Success(t *testing.T) {
 	if detail.ContentType != "text/plain" {
 		t.Errorf("expected content_type text/plain, got %s", detail.ContentType)
 	}
+	if detail.Snippet != "Hello, this is" {
+		t.Errorf("expected snippet 'Hello, this is', got %q", detail.Snippet)
+	}
 }
 
 func TestReadEmail_MultipartMessage(t *testing.T) {

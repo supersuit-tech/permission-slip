@@ -69,6 +69,7 @@ type emailFullDetail struct {
 	Cc          string               `json:"cc,omitempty"`
 	Subject     string               `json:"subject,omitempty"`
 	Date        string               `json:"date,omitempty"`
+	Snippet     string               `json:"snippet,omitempty"`
 	Labels      []string             `json:"labels,omitempty"`
 	ContentType string               `json:"content_type"`
 	Body        string               `json:"body"`
@@ -102,6 +103,7 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	detail := emailFullDetail{
 		ID:       msg.ID,
 		ThreadID: msg.ThreadID,
+		Snippet:  msg.Snippet,
 		Labels:   msg.LabelIDs,
 	}
 
