@@ -77,6 +77,12 @@ function setupMockGet(overrides: Record<string, unknown> = {}) {
   });
 }
 
+/** Open the "Manage credentials" modal */
+async function openManageModal(user: ReturnType<typeof userEvent.setup>) {
+  const btn = await screen.findByRole("button", { name: /Manage credentials/i });
+  await user.click(btn);
+}
+
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -84,7 +90,7 @@ describe("ConnectorCredentialsSection", () => {
     setupAuthMocks({ authenticated: true });
   });
 
-  it("shows no credentials required message when empty", () => {
+  it("does not show manage button when no credentials required", () => {
     renderWithProviders(
       <ConnectorCredentialsSection
         agentId={42}
@@ -93,8 +99,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
     expect(
-      screen.getByText("This connector does not require any credentials."),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Manage credentials/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows loading state", () => {
@@ -110,6 +116,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows connected status with stored credentials", async () => {
+    const user = userEvent.setup();
     setupMockGet({
       "/v1/credentials": { data: storedCredentials },
     });
@@ -122,6 +129,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText("Connected")).toBeInTheDocument();
     });
@@ -130,6 +139,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows not configured status when no credentials stored", async () => {
+    const user = userEvent.setup();
     setupMockGet();
 
     renderWithProviders(
@@ -139,6 +149,8 @@ describe("ConnectorCredentialsSection", () => {
         requiredCredentials={apiKeyCredentials}
       />,
     );
+
+    await openManageModal(user);
 
     await waitFor(() => {
       expect(screen.getByText("Not configured")).toBeInTheDocument();
@@ -157,6 +169,8 @@ describe("ConnectorCredentialsSection", () => {
         requiredCredentials={apiKeyCredentials}
       />,
     );
+
+    await openManageModal(user);
 
     await waitFor(() => {
       expect(screen.getByText("Connect")).toBeInTheDocument();
@@ -186,6 +200,8 @@ describe("ConnectorCredentialsSection", () => {
         requiredCredentials={apiKeyCredentials}
       />,
     );
+
+    await openManageModal(user);
 
     await waitFor(() => {
       expect(screen.getByText("Connect")).toBeInTheDocument();
@@ -220,6 +236,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText("Personal Access Token")).toBeInTheDocument();
     });
@@ -250,6 +268,8 @@ describe("ConnectorCredentialsSection", () => {
         requiredCredentials={apiKeyCredentials}
       />,
     );
+
+    await openManageModal(user);
 
     await waitFor(() => {
       expect(screen.getByText("Personal Access Token")).toBeInTheDocument();
@@ -285,6 +305,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText("Connect")).toBeInTheDocument();
     });
@@ -296,6 +318,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth connect button for oauth2 credential", async () => {
+    const user = userEvent.setup();
     setupMockGet();
 
     renderWithProviders(
@@ -306,6 +329,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
     });
@@ -314,6 +339,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth credential row for Slack oauth2 auth type", async () => {
+    const user = userEvent.setup();
     setupMockGet({
       "/v1/oauth/providers": {
         data: {
@@ -337,6 +363,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText("OAuth")).toBeInTheDocument();
     });
@@ -345,6 +373,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows OAuth connected status when user has connection", async () => {
+    const user = userEvent.setup();
     setupMockGet({
       "/v1/oauth/connections": {
         data: {
@@ -380,6 +409,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText(/^Connected/)).toBeInTheDocument();
     });
@@ -389,6 +420,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows re-authorization state for expired connection", async () => {
+    const user = userEvent.setup();
     setupMockGet({
       "/v1/oauth/connections": {
         data: {
@@ -419,6 +451,8 @@ describe("ConnectorCredentialsSection", () => {
       />,
     );
 
+    await openManageModal(user);
+
     await waitFor(() => {
       expect(screen.getByText("Re-authorization required")).toBeInTheDocument();
     });
@@ -426,6 +460,7 @@ describe("ConnectorCredentialsSection", () => {
   });
 
   it("shows both OAuth and API key options for mixed credentials", async () => {
+    const user = userEvent.setup();
     setupMockGet();
 
     renderWithProviders(
@@ -435,6 +470,8 @@ describe("ConnectorCredentialsSection", () => {
         requiredCredentials={mixedCredentials}
       />,
     );
+
+    await openManageModal(user);
 
     await waitFor(() => {
       expect(screen.getByText("Connect GitHub")).toBeInTheDocument();
