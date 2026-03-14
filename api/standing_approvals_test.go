@@ -855,6 +855,52 @@ func TestCreateStandingApproval_ConstraintsMixedWildcardAndFixed(t *testing.T) {
 	}
 }
 
+func TestCreateStandingApproval_ConstraintsAllNull(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// All null values should be treated as wildcards and rejected.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"repo": null, "title": null}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for all-null constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateStandingApproval_ConstraintsNullAndWildcard(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	// Mix of null and wildcard — all are effectively unconstrained, should be rejected.
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"repo": null, "title": "*"}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for null+wildcard constraints, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestCreateStandingApproval_WithSourceActionConfigurationID(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
