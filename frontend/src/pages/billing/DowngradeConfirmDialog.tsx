@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { UsageSummary } from "@/hooks/useBillingPlan";
+import { freePlan, paidPlan, formatLimit } from "@/config/plans";
 import { FREE_PLAN_LIMITS } from "./constants";
 
 interface DowngradeConfirmDialogProps {
@@ -109,13 +110,13 @@ export function DowngradeConfirmDialog({
           <div className="rounded-lg border p-4 space-y-1">
             <p className="text-sm font-medium">What changes</p>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>Audit retention drops from 90 days to 7 days</li>
+              <li>Audit retention drops from {paidPlan.audit_retention_days} days to {freePlan.audit_retention_days} days</li>
               <li>
                 Resource limits will be enforced ({FREE_PLAN_LIMITS.agents.limit} agents,{" "}
                 {FREE_PLAN_LIMITS.standing_approvals.limit} approvals,{" "}
                 {FREE_PLAN_LIMITS.credentials.limit} credentials)
               </li>
-              <li>1,000 request/month limit</li>
+              <li>{formatLimit(freePlan.max_requests_per_month!)} request/month limit</li>
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
               A 7-day grace period preserves your 90-day audit retention so you
