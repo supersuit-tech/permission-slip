@@ -655,6 +655,10 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 			"root x-ui groups with empty id",
 			`{"type":"object","x-ui":{"groups":[{"id":"","label":"Empty"}]},"properties":{"f":{"type":"string"}}}`,
 		},
+		{
+			"duplicate group id",
+			`{"type":"object","x-ui":{"groups":[{"id":"billing","label":"Billing"},{"id":"billing","label":"Billing 2"}]},"properties":{"f":{"type":"string"}}}`,
+		},
 	}
 
 	for _, tt := range tests {

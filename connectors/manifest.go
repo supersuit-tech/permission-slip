@@ -374,6 +374,9 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			if g.ID == "" {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.groups contains entry with empty id", actionIdx)
 			}
+			if groupIDs[g.ID] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.groups contains duplicate id %q", actionIdx, g.ID)
+			}
 			groupIDs[g.ID] = true
 		}
 		// Validate x-ui.order references existing property keys.
