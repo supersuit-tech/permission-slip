@@ -272,7 +272,6 @@ func main() {
 	// Initialize connector registry from self-registered built-in connectors.
 	// Each connector package registers itself via init() + connectors.RegisterBuiltIn().
 	// The blank import of connectors/all triggers all init() functions.
-	//
 	registry := connectors.NewRegistry()
 	for _, c := range connectors.BuiltInConnectors() {
 		registry.Register(c)
