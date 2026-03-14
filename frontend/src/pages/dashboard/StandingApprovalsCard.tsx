@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LimitBadge } from "@/components/LimitBadge";
@@ -23,10 +23,14 @@ import {
   useStandingApprovals,
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
-import { useAgents } from "@/hooks/useAgents";
+import { useAgents, type Agent } from "@/hooks/useAgents";
+import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import { useActionConfigMap } from "@/hooks/useActionConfigMap";
 import { useResourceLimit } from "@/hooks/useResourceLimit";
+import { getAgentDisplayName } from "@/lib/agents";
 import { RevokeStandingApprovalDialog } from "./RevokeStandingApprovalDialog";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
+import { ConstraintsSummary } from "./ConstraintsSummary";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
   if (!expiresAt) return "\u2014";
@@ -69,18 +73,57 @@ function ExecutionBadge({
   );
 }
 
+function resolveAgentName(
+  agentId: number,
+  agentMap: Map<number, Agent>,
+): string {
+  const agent = agentMap.get(agentId);
+  return agent ? getAgentDisplayName(agent) : `Agent ${agentId}`;
+}
+
+function resolveActionConfigName(
+  sourceId: string | null | undefined,
+  configMap: Map<string, ActionConfiguration>,
+): string | null {
+  if (!sourceId) return null;
+  const config = configMap.get(sourceId);
+  return config?.name ?? null;
+}
+
 function StandingApprovalRow({
   sa,
   onRevoke,
+  agentMap,
+  configMap,
 }: {
   sa: StandingApproval;
   onRevoke: (sa: StandingApproval) => void;
+  agentMap: Map<number, Agent>;
+  configMap: Map<string, ActionConfiguration>;
 }) {
+  const agentName = resolveAgentName(sa.agent_id, agentMap);
+  const configName = resolveActionConfigName(
+    sa.source_action_configuration_id,
+    configMap,
+  );
+
   return (
     <TableRow>
-      <TableCell className="font-medium">{sa.action_type}</TableCell>
+      <TableCell className="font-medium">
+        <div>
+          <span>{sa.action_type}</span>
+          {configName && (
+            <span className="text-muted-foreground block text-xs">
+              {configName}
+            </span>
+          )}
+        </div>
+      </TableCell>
       <TableCell className="max-w-[200px] truncate text-xs">
-        {sa.agent_id}
+        {agentName}
+      </TableCell>
+      <TableCell>
+        <ConstraintsSummary constraints={sa.constraints} />
       </TableCell>
       <TableCell>
         <ExecutionBadge
@@ -124,6 +167,18 @@ export function StandingApprovalsCard() {
   const { standingApprovals, isLoading, error, refetch } =
     useStandingApprovals();
   const { agents } = useAgents();
+  const agentIds = useMemo(
+    () => standingApprovals.map((sa) => sa.agent_id),
+    [standingApprovals],
+  );
+  const configMap = useActionConfigMap(agentIds);
+  const agentMap = useMemo(() => {
+    const map = new Map<number, Agent>();
+    for (const agent of agents) {
+      map.set(agent.agent_id, agent);
+    }
+    return map;
+  }, [agents]);
   const {
     max: maxStandingApprovals,
     current: standingApprovalCount,
@@ -167,6 +222,8 @@ export function StandingApprovalsCard() {
           <StandingApprovalsTable
             approvals={standingApprovals}
             onRevoke={(sa) => setRevokeTarget(sa)}
+            agentMap={agentMap}
+            configMap={configMap}
           />
         )}
       </CardContent>
@@ -209,13 +266,17 @@ export function StandingApprovalsCard() {
 function StandingApprovalsTable({
   approvals,
   onRevoke,
+  agentMap,
+  configMap,
 }: {
   approvals: StandingApproval[];
   onRevoke: (sa: StandingApproval) => void;
+  agentMap: Map<number, Agent>;
+  configMap: Map<string, ActionConfiguration>;
 }) {
   return (
     <div className="-mx-3 overflow-x-auto sm:mx-0">
-      <div className="min-w-[480px] overflow-hidden rounded-lg sm:min-w-0">
+      <div className="min-w-[600px] overflow-hidden rounded-lg sm:min-w-0">
         <Table>
           <TableHeader>
             <TableRow className="border-none bg-primary hover:bg-primary">
@@ -224,6 +285,9 @@ function StandingApprovalsTable({
               </TableHead>
               <TableHead className="font-semibold text-primary-foreground">
                 Agent
+              </TableHead>
+              <TableHead className="font-semibold text-primary-foreground">
+                Constraints
               </TableHead>
               <TableHead className="font-semibold text-primary-foreground">
                 Executions
@@ -242,6 +306,8 @@ function StandingApprovalsTable({
                 key={sa.standing_approval_id}
                 sa={sa}
                 onRevoke={onRevoke}
+                agentMap={agentMap}
+                configMap={configMap}
               />
             ))}
           </TableBody>
