@@ -194,6 +194,10 @@ export function CreateStandingApprovalDialog({
       }
       setStep(3);
     } else if (step === 3) {
+      if (schemaLoading) {
+        toast.error("Please wait for the parameter schema to finish loading");
+        return;
+      }
       // Use manual JSON path when no schema properties are available —
       // matches the rendering condition in StepConstraints.
       const useManualJson = !configSchema?.properties;
@@ -342,6 +346,7 @@ export function CreateStandingApprovalDialog({
               onAgentChange={(id) => {
                 setAgentId(id);
                 setSelectedConfigId("");
+                setCustomActionType(initialActionType ?? "");
                 setParamValues({});
                 setParamModes({});
               }}
@@ -421,7 +426,11 @@ export function CreateStandingApprovalDialog({
               Cancel
             </Button>
             {step < 4 ? (
-              <Button type="button" onClick={handleNext}>
+              <Button
+                type="button"
+                onClick={handleNext}
+                disabled={step === 3 && schemaLoading}
+              >
                 Next
                 <ChevronRight className="size-4" />
               </Button>
