@@ -5,6 +5,10 @@
 
 -- First, replace the purge function so it no longer JOINs the plans table.
 -- Retention days are inlined matching config/plans.json values.
+-- IMPORTANT: If retention days in config/plans.json are ever changed, a new
+-- migration must update this function to match. The Go PurgeExpiredAuditEvents
+-- in data_retention.go derives values dynamically from config, but this stored
+-- function (used by pg_cron) uses hardcoded values.
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION purge_expired_audit_events() RETURNS void
     LANGUAGE plpgsql

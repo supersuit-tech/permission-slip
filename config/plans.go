@@ -105,12 +105,16 @@ func MustGetPlan(id string) *Plan {
 	return p
 }
 
-// AllPlans returns all configured plans.
+// AllPlans returns deep copies of all configured plans.
+// Callers may safely modify the returned structs without affecting cached config.
 func AllPlans() []*Plan {
 	if err := ensureLoaded(); err != nil {
 		return nil
 	}
 	out := make([]*Plan, len(planList))
-	copy(out, planList)
+	for i, p := range planList {
+		cp := *p
+		out[i] = &cp
+	}
 	return out
 }
