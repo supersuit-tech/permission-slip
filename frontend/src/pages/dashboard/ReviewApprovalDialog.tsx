@@ -126,6 +126,7 @@ export function ReviewApprovalDialog({
 
   // Data for "Always Allow This"
   const { agents } = useAgents();
+  // API defaults to status=active, so only active standing approvals are returned
   const { standingApprovals, isLoading: standingApprovalsLoading } = useStandingApprovals();
   const params = approval.action.parameters as Record<string, unknown>;
   const hasParams = Object.keys(params).length > 0;
@@ -311,7 +312,7 @@ export function ReviewApprovalDialog({
             >
               Done
             </Button>
-            {showAlwaysAllow && !standingApprovalCreated && approveResult?.execution_status !== "error" && (
+            {showAlwaysAllow && !standingApprovalCreated && approveResult?.execution_status === "success" && (
               <Button
                 size="lg"
                 variant="secondary"
@@ -353,16 +354,18 @@ export function ReviewApprovalDialog({
         )}
       </DialogContent>
 
-      {/* Standing approval creation dialog — opened by "Always Allow This" */}
-      <CreateStandingApprovalDialog
-        agents={agents}
-        open={standingDialogOpen}
-        onOpenChange={handleStandingDialogChange}
-        onCreated={() => setStandingApprovalCreated(true)}
-        initialAgentId={approval.agent_id}
-        initialActionType={approval.action.type}
-        initialConstraints={deriveConstraintsFromParams(params)}
-      />
+      {/* Standing approval creation dialog — only mounted when needed */}
+      {standingDialogOpen && (
+        <CreateStandingApprovalDialog
+          agents={agents}
+          open={standingDialogOpen}
+          onOpenChange={handleStandingDialogChange}
+          onCreated={() => setStandingApprovalCreated(true)}
+          initialAgentId={approval.agent_id}
+          initialActionType={approval.action.type}
+          initialConstraints={deriveConstraintsFromParams(params)}
+        />
+      )}
     </Dialog>
   );
 }
