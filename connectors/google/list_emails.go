@@ -60,12 +60,13 @@ type gmailMessageResponse struct {
 
 // emailSummary is the shape returned to the agent.
 type emailSummary struct {
-	ID      string `json:"id"`
-	From    string `json:"from,omitempty"`
-	To      string `json:"to,omitempty"`
-	Subject string `json:"subject,omitempty"`
-	Snippet string `json:"snippet,omitempty"`
-	Date    string `json:"date,omitempty"`
+	ID       string `json:"id"`
+	ThreadID string `json:"thread_id"`
+	From     string `json:"from,omitempty"`
+	To       string `json:"to,omitempty"`
+	Subject  string `json:"subject,omitempty"`
+	Snippet  string `json:"snippet,omitempty"`
+	Date     string `json:"date,omitempty"`
 }
 
 // maxConcurrentFetches limits concurrent Gmail API requests when fetching
@@ -123,8 +124,9 @@ func (a *listEmailsAction) Execute(ctx context.Context, req connectors.ActionReq
 			}
 
 			summary := emailSummary{
-				ID:      msgResp.ID,
-				Snippet: msgResp.Snippet,
+				ID:       msgResp.ID,
+				ThreadID: msgResp.ThreadID,
+				Snippet:  msgResp.Snippet,
 			}
 			for _, h := range msgResp.Payload.Headers {
 				switch h.Name {

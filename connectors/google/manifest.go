@@ -672,6 +672,22 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "google.read_email",
+				Name:        "Read Email",
+				Description: "Read a single email message from Gmail by message ID, returning the full body, headers, and attachment metadata",
+				RiskLevel:   "low",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_id"],
+					"properties": {
+						"message_id": {
+							"type": "string",
+							"description": "The Gmail message ID to read (from list_emails results)"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "google.send_email_reply",
 				Name:        "Reply to Email",
 				Description: "Reply to an existing Gmail thread",
@@ -978,6 +994,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Drive folders",
 				Description: "Agent can create folders anywhere in Google Drive.",
 				Parameters:  json.RawMessage(`{"name":"*","parent_id":"*"}`),
+			},
+			{
+				ID:          "tpl_google_read_email",
+				ActionType:  "google.read_email",
+				Name:        "Read any email",
+				Description: "Agent can read the full content of any email by message ID.",
+				Parameters:  json.RawMessage(`{"message_id":"*"}`),
 			},
 			{
 				ID:          "tpl_google_send_email_reply",
