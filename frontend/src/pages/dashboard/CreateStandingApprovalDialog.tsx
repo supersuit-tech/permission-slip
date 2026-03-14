@@ -83,7 +83,9 @@ export function CreateStandingApprovalDialog({
 
   const [step, setStep] = useState<Step>(1);
   const [agentId, setAgentId] = useState<number | "">(initialAgentId ?? "");
-  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
+  const [selectedConfigId, setSelectedConfigId] = useState<string>(
+    initialActionType ? CUSTOM_ACTION_SENTINEL : "",
+  );
   const [customActionType, setCustomActionType] = useState(
     initialActionType ?? "",
   );
@@ -136,7 +138,7 @@ export function CreateStandingApprovalDialog({
   function resetForm() {
     setStep(1);
     setAgentId(initialAgentId ?? "");
-    setSelectedConfigId("");
+    setSelectedConfigId(initialActionType ? CUSTOM_ACTION_SENTINEL : "");
     setCustomActionType(initialActionType ?? "");
     setParamValues({});
     setParamModes({});
@@ -252,6 +254,7 @@ export function CreateStandingApprovalDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (step !== 4) return;
 
     if (!agentId || !effectiveActionType || !expiresAt) {
       toast.error("Please fill in all required fields");
