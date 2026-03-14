@@ -965,7 +965,7 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	pagerduty := agentIDs["PagerDuty Escalator"]
 
 	// ---------------------------------------------------------------
-	// Agent connectors — enable GitHub and/or Slack for key agents
+	// Agent connectors — enable GitHub, Slack, and/or Google for agents
 	// ---------------------------------------------------------------
 	agentConnectors := []struct {
 		agentID     int64
@@ -977,7 +977,7 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		{sentry, connectorGitHub},
 		{datadog, connectorSlack},
 		{pagerduty, connectorSlack},
-		// Google connector enabled on every registered agent
+		// Google connector on all 7 pre-seeded registered agents (Openclaw excluded)
 		{claude, connectorGoogle},
 		{github, connectorGoogle},
 		{slack, connectorGoogle},
@@ -994,6 +994,10 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 
 	// ---------------------------------------------------------------
 	// OAuth connections — two Google accounts for testing multi-account
+	//
+	// vault_secret_id values are placeholder UUIDs — they don't reference
+	// real vault secrets. Seed data is for UI development; actual vault
+	// integration is tested via MockVaultStore in Go tests.
 	// ---------------------------------------------------------------
 	exec(ctx, tx,
 		`INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, scopes, status, extra_data)
