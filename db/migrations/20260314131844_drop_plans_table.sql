@@ -47,13 +47,24 @@ END;
 $$;
 -- +goose StatementEnd
 
+-- Normalize any legacy plan_id values to 'free' before dropping the table.
+-- This prevents 500s for users with plan IDs not in config/plans.json.
+UPDATE subscriptions SET plan_id = 'free'
+WHERE plan_id NOT IN ('free', 'pay_as_you_go');
+
 -- Now safe to drop the FK constraint and table.
 ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_plan_id_fkey;
 
 DROP TABLE IF EXISTS plans;
 
+-- Add a CHECK constraint to replace the FK as a write-time guard.
+-- Only config-defined plan IDs are allowed.
+ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_plan_id_check
+    CHECK (plan_id IN ('free', 'pay_as_you_go'));
+
 -- +goose Down
--- Re-create the plans table and FK constraint.
+-- Drop the CHECK constraint and re-create the plans table and FK constraint.
+ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_plan_id_check;
 CREATE TABLE IF NOT EXISTS plans (
     id                          text PRIMARY KEY,
     name                        text NOT NULL,
@@ -68,7 +79,7 @@ CREATE TABLE IF NOT EXISTS plans (
 
 INSERT INTO plans (id, name, max_requests_per_month, max_agents, max_standing_approvals, max_credentials, audit_retention_days, price_per_request_millicents)
 VALUES
-    ('free',          'Free',          250, 3,    5,    5,    7,  0),
+    ('free',          'Free',          1000, 3,    5,    5,    7,  0),
     ('pay_as_you_go', 'Pay As You Go', NULL, NULL, NULL, NULL, 90, 500)
 ON CONFLICT (id) DO NOTHING;
 
