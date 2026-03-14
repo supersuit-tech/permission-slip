@@ -384,6 +384,7 @@ func checkHTTPStatus(statusCode int, header http.Header, body []byte) error {
 		}
 		return &connectors.AuthError{Message: fmt.Sprintf("Slack permission denied: %s", msg)}
 	case http.StatusTooManyRequests:
+		// Body message intentionally unused; rate-limit errors only need RetryAfter.
 		retryAfter := connectors.ParseRetryAfter(header.Get("Retry-After"), defaultRetryAfter)
 		return &connectors.RateLimitError{
 			Message:    "Slack API rate limit exceeded",
