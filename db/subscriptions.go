@@ -261,9 +261,16 @@ type SubscriptionWithPlan struct {
 // have time to export their data before it becomes inaccessible.
 const DowngradeGracePeriod = 7 * 24 * time.Hour // 7 days
 
-// PaidPlanRetentionDays is the retention window for the pay-as-you-go plan.
+// PaidPlanRetentionDays returns the retention window for the pay-as-you-go plan.
 // Used during the downgrade grace period when the plan's own retention is shorter.
-const PaidPlanRetentionDays = 90
+// Derived from config/plans.json so it stays in sync with the plan definition.
+var PaidPlanRetentionDays = func() int {
+	p := GetPlan(PlanPayAsYouGo)
+	if p != nil {
+		return p.AuditRetentionDays
+	}
+	return 90 // fallback
+}()
 
 // EffectiveRetentionDays returns the audit log retention window to enforce
 // for this subscription. During the downgrade grace period the previous

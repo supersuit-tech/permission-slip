@@ -57,7 +57,7 @@ PlanLimits:
       type: integer
       nullable: true
       description: Monthly request limit (null = unlimited)
-      example: 1000
+      example: 250
     max_agents:
       type: integer
       nullable: true
@@ -97,7 +97,7 @@ UsageInfo:
       type: integer
       nullable: true
       description: Monthly request limit for the current plan (null = unlimited)
-      example: 1000
+      example: 250
     over_limit:
       type: boolean
       description: Whether current usage exceeds the plan's request limit
@@ -139,7 +139,7 @@ RequestsUsage:
     included:
       type: integer
       description: Number of requests included in the plan for free (0 = unlimited on paid plans)
-      example: 1000
+      example: 250
     overage:
       type: integer
       description: Number of requests exceeding the included allowance
@@ -407,7 +407,7 @@ RequestUsageDetail:
       description: |
         Number of requests included in the plan at no extra cost.
         0 when the plan has no request limit (e.g. pay-as-you-go).
-      example: 1000
+      example: 250
     overage:
       type: integer
       description: |
@@ -638,11 +638,11 @@ QuotaExceededDetails:
     limit:
       type: integer
       description: The plan's request limit
-      example: 1000
+      example: 250
     current_count:
       type: integer
       description: Current usage count
-      example: 1001
+      example: 251
     plan_id:
       type: string
       description: The user's current plan

@@ -31,7 +31,7 @@ subscription:
               has_payment_method: false
               can_upgrade: true
               plan_limits:
-                max_requests_per_month: 1000
+                max_requests_per_month: 250
                 max_agents: 5
                 max_standing_approvals: 10
                 max_credentials: 5
@@ -39,7 +39,7 @@ subscription:
               usage:
                 request_count: 42
                 sms_count: 0
-                request_limit: 1000
+                request_limit: 250
                 over_limit: false
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
@@ -202,7 +202,7 @@ plan:
               plan:
                 id: free
                 name: Free
-                max_requests_per_month: 1000
+                max_requests_per_month: 250
                 max_agents: 3
                 max_standing_approvals: 5
                 max_credentials: 5
@@ -272,9 +272,9 @@ usage:
               period_end: '2026-04-01T00:00:00Z'
               requests:
                 total: 1542
-                included: 1000
-                overage: 542
-                cost_cents: 271
+                included: 250
+                overage: 1292
+                cost_cents: 646
               sms:
                 total: 5
                 cost_cents: 5

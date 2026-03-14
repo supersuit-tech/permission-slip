@@ -40,19 +40,23 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	}
 	caseExpr += fmt.Sprintf(" ELSE %d END", defaultRetention)
 
+	// Derive grace period days from the DowngradeGracePeriod constant so both
+	// the Go logic and the SQL query stay in sync automatically.
+	gracePeriodDays := int(DowngradeGracePeriod.Hours() / 24)
+
 	// Pass 1: Purge events for users with a subscription, using their plan's
-	// retention period. During the downgrade grace period (7 days after
-	// downgrade), use the paid plan's 90-day retention instead.
+	// retention period. During the downgrade grace period, use the paid plan's
+	// retention instead so users have time to export data.
 	tag1, err := db.Exec(ctx, fmt.Sprintf(`
 		DELETE FROM audit_events ae
 		USING subscriptions s
 		WHERE ae.user_id = s.user_id
 		  AND ae.created_at < now() - make_interval(days =>
 		      CASE WHEN s.downgraded_at IS NOT NULL
-		                AND s.downgraded_at > now() - interval '7 days'
+		                AND s.downgraded_at > now() - interval '%d days'
 		           THEN %d
 		           ELSE %s
-		      END)`, PaidPlanRetentionDays, caseExpr))
+		      END)`, gracePeriodDays, PaidPlanRetentionDays, caseExpr))
 	if err != nil {
 		return 0, fmt.Errorf("purge expired audit events (subscribed users): %w", err)
 	}

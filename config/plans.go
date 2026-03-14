@@ -68,17 +68,21 @@ func ensureLoaded() error {
 			loadErr = fmt.Errorf("parse plans.json: %w", err)
 			return
 		}
-		plans = make(map[string]*Plan, len(raw))
-		planList = make([]*Plan, 0, len(raw))
+		// Build into local variables first so package globals are never
+		// partially populated if validation fails mid-loop.
+		loaded := make(map[string]*Plan, len(raw))
+		list := make([]*Plan, 0, len(raw))
 		for id, p := range raw {
 			if !validPlanID.MatchString(id) {
 				loadErr = fmt.Errorf("invalid plan ID %q: must be alphanumeric/underscore", id)
 				return
 			}
 			p.ID = id
-			plans[id] = p
-			planList = append(planList, p)
+			loaded[id] = p
+			list = append(list, p)
 		}
+		plans = loaded
+		planList = list
 	})
 	return loadErr
 }
