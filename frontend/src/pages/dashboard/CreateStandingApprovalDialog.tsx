@@ -121,10 +121,7 @@ export function CreateStandingApprovalDialog({
   const { schema: fetchedSchema, isLoading: schemaLoading } =
     useActionSchema(effectiveActionType);
 
-  const configSchema = useMemo(
-    () => fetchedSchema,
-    [fetchedSchema],
-  );
+  const configSchema = fetchedSchema;
 
   const configsByConnector = useMemo(() => {
     const groups: Record<string, ActionConfiguration[]> = {};
@@ -258,6 +255,19 @@ export function CreateStandingApprovalDialog({
         >;
       } catch {
         toast.error("Constraints must be valid JSON");
+        return;
+      }
+      if (
+        constraints === null ||
+        typeof constraints !== "object" ||
+        Array.isArray(constraints)
+      ) {
+        toast.error("Constraints must be a JSON object");
+        return;
+      }
+      const allWildcard = Object.values(constraints).every((v) => v === "*");
+      if (Object.keys(constraints).length === 0 || allWildcard) {
+        toast.error("At least one parameter constraint must be non-wildcard");
         return;
       }
     } else {
