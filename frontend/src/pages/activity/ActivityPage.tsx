@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Activity, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -91,7 +91,7 @@ export function ActivityPage() {
     error,
     refetch,
   } = useInfiniteAuditEvents(filters);
-  const events = deduplicateEvents(rawEvents);
+  const events = useMemo(() => deduplicateEvents(rawEvents), [rawEvents]);
 
   const { agents } = useAgents();
 

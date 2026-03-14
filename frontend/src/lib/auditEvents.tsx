@@ -79,6 +79,15 @@ const FALLBACK_OUTCOME: OutcomeStyle = {
  *
  * This prevents "double entries" in the UI where an approval shows up once as
  * Pending (approval.requested) and again as Approved/Denied.
+ *
+ * Limitation: when the API is queried with outcome=pending, only pending events
+ * are returned so resolvedSourceIds stays empty and this function is a no-op.
+ * Stale pending entries for already-resolved approvals may still appear on the
+ * Pending tab; fully fixing that requires server-side filtering.
+ *
+ * Load-more ordering: the API returns events newest-first, so resolved events
+ * appear on earlier pages than their corresponding pending events. Pending rows
+ * are filtered out as soon as they arrive and never visibly flash then vanish.
  */
 export function deduplicateEvents(events: AuditEvent[]): AuditEvent[] {
   const resolvedSourceIds = new Set<string>();
