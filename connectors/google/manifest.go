@@ -695,6 +695,22 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "google.archive_email",
+				Name:        "Archive Email",
+				Description: "Archive a Gmail message by removing it from the inbox",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_id"],
+					"properties": {
+						"message_id": {
+							"type": "string",
+							"description": "The Gmail message ID to archive (obtained from list_emails)"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -703,6 +719,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				OAuthProvider: "google",
 				OAuthScopes: []string{
 					"https://www.googleapis.com/auth/gmail.send",
+						"https://www.googleapis.com/auth/gmail.modify",
 					"https://www.googleapis.com/auth/gmail.readonly",
 					"https://www.googleapis.com/auth/calendar.events",
 					"https://www.googleapis.com/auth/presentations",
@@ -985,6 +1002,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Reply to emails",
 				Description: "Agent can reply to any existing Gmail thread.",
 				Parameters:  json.RawMessage(`{"thread_id":"*","message_id":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_google_archive_email",
+				ActionType:  "google.archive_email",
+				Name:        "Archive emails",
+				Description: "Agent can archive any Gmail message by removing it from the inbox.",
+				Parameters:  json.RawMessage(`{"message_id":"*"}`),
 			},
 		},
 	}
