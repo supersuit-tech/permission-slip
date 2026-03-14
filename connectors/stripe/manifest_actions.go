@@ -95,9 +95,8 @@ func stripeActions() []connectors.ManifestAction {
 					"currency": {
 						"type": "string",
 						"default": "usd",
-						"enum": ["usd", "eur", "gbp", "cad", "aud", "jpy", "chf", "brl", "inr", "mxn"],
 						"description": "Three-letter ISO 4217 currency code (e.g. \"usd\", \"eur\", \"gbp\")",
-						"x-ui": { "widget": "select", "label": "Currency", "group": "billing" }
+						"x-ui": { "label": "Currency", "group": "billing" }
 					},
 					"line_items": {
 						"type": "array",
