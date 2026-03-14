@@ -7,17 +7,9 @@ import (
 	"time"
 )
 
+// standingExecutionApproval delegates to the shared fixture in testdata_test.go
 func standingExecutionApproval() Approval {
-	return Approval{
-		ApprovalID:  "appr_standing_001",
-		AgentID:     42,
-		AgentName:   "Deploy Bot",
-		Action:      json.RawMessage(`{"type":"github.issues.create"}`),
-		Context:     json.RawMessage(`{"execution_count":3,"max_executions":10}`),
-		ApprovalURL: "https://app.example.com/activity",
-		CreatedAt:   time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC),
-		Type:        NotificationTypeStandingExecution,
-	}
+	return testStandingExecutionApproval()
 }
 
 // ── extractStandingExecutionInfo tests ──────────────────────────────────────
@@ -124,6 +116,7 @@ func TestBuildEmailPlainBody_StandingExecution(t *testing.T) {
 	checks := []string{
 		"Deploy Bot",
 		"github.issues.create",
+		"Parameters:",
 		"3 of 10",
 		"auto-approved via a standing approval",
 		"https://app.example.com/activity",
@@ -162,6 +155,7 @@ func TestBuildEmailHTMLBody_StandingExecution(t *testing.T) {
 		"Auto-Executed",                       // header
 		"Deploy Bot",                          // agent name
 		"github.issues.create",                // action type
+		"Parameters",                          // parameter summary row
 		"3 of 10",                             // execution count
 		"View Activity",                       // CTA button
 		"https://app.example.com/activity",    // URL
@@ -291,6 +285,71 @@ func TestBuildPushContent_StandingExecution_NoCount(t *testing.T) {
 	}
 	if c.Body != "deploy" {
 		t.Errorf("expected body 'deploy', got %q", c.Body)
+	}
+}
+
+// ── summarizeParameters tests ────────────────────────────────────────────────
+
+func TestSummarizeParameters_WithParams(t *testing.T) {
+	t.Parallel()
+	action := json.RawMessage(`{"type":"test","parameters":{"repo":"acme/app","title":"Deploy v2.1"}}`)
+	summary := summarizeParameters(action)
+	if !strings.Contains(summary, "repo=acme/app") {
+		t.Errorf("expected repo param, got: %s", summary)
+	}
+	if !strings.Contains(summary, "title=Deploy v2.1") {
+		t.Errorf("expected title param, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_RedactsSensitive(t *testing.T) {
+	t.Parallel()
+	action := json.RawMessage(`{"type":"test","parameters":{"repo":"acme/app","api_key":"sk-secret123","token":"tok-abc"}}`)
+	summary := summarizeParameters(action)
+	if strings.Contains(summary, "sk-secret123") {
+		t.Error("summary should redact api_key value")
+	}
+	if strings.Contains(summary, "tok-abc") {
+		t.Error("summary should redact token value")
+	}
+	if !strings.Contains(summary, "api_key=***") {
+		t.Errorf("expected redacted api_key, got: %s", summary)
+	}
+	if !strings.Contains(summary, "token=***") {
+		t.Errorf("expected redacted token, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_NoParams(t *testing.T) {
+	t.Parallel()
+	action := json.RawMessage(`{"type":"test"}`)
+	if summary := summarizeParameters(action); summary != "" {
+		t.Errorf("expected empty summary, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_EmptyParams(t *testing.T) {
+	t.Parallel()
+	action := json.RawMessage(`{"type":"test","parameters":{}}`)
+	if summary := summarizeParameters(action); summary != "" {
+		t.Errorf("expected empty summary, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_LongValue(t *testing.T) {
+	t.Parallel()
+	longVal := strings.Repeat("x", 50)
+	action := json.RawMessage(`{"type":"test","parameters":{"desc":"` + longVal + `"}}`)
+	summary := summarizeParameters(action)
+	if !strings.Contains(summary, "...") {
+		t.Errorf("expected long value to be truncated, got: %s", summary)
+	}
+}
+
+func TestSummarizeParameters_NilAction(t *testing.T) {
+	t.Parallel()
+	if summary := summarizeParameters(nil); summary != "" {
+		t.Errorf("expected empty summary for nil, got: %s", summary)
 	}
 }
 

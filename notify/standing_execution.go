@@ -87,6 +87,56 @@ func buildStandingExecutionPushContent(approval Approval) PushContent {
 	}
 }
 
+// sensitiveParamKeys is the set of parameter keys whose values should be
+// redacted in notification content. Only the key names are shown.
+var sensitiveParamKeys = map[string]bool{
+	"api_key": true, "apikey": true, "api_secret": true,
+	"token": true, "access_token": true, "refresh_token": true,
+	"secret": true, "password": true, "credential": true,
+	"private_key": true, "auth": true, "authorization": true,
+}
+
+// summarizeParameters extracts a human-readable parameter summary from the
+// action JSON's "parameters" field. Sensitive values are redacted (shown as
+// "***"). Returns "" if no parameters are present.
+func summarizeParameters(action json.RawMessage) string {
+	if len(action) == 0 {
+		return ""
+	}
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(action, &obj) != nil {
+		return ""
+	}
+	raw, ok := obj["parameters"]
+	if !ok {
+		return ""
+	}
+	var params map[string]json.RawMessage
+	if json.Unmarshal(raw, &params) != nil {
+		return ""
+	}
+	if len(params) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for key, val := range params {
+		if sensitiveParamKeys[strings.ToLower(key)] {
+			parts = append(parts, key+"=***")
+			continue
+		}
+		var s string
+		if json.Unmarshal(val, &s) == nil {
+			parts = append(parts, key+"="+TruncateUTF8(s, 30))
+		} else {
+			// Non-string value — show the key only
+			parts = append(parts, key)
+		}
+	}
+
+	return strings.Join(parts, ", ")
+}
+
 func buildStandingExecutionSubject(approval Approval) string {
 	info := extractStandingExecutionInfo(approval)
 	if info.ActionType != "" {
@@ -104,6 +154,10 @@ func buildStandingExecutionPlainBody(approval Approval) string {
 
 	if info.ActionType != "" {
 		b.WriteString(fmt.Sprintf("Action: %s\n", info.ActionType))
+	}
+
+	if paramSummary := summarizeParameters(approval.Action); paramSummary != "" {
+		b.WriteString(fmt.Sprintf("Parameters: %s\n", paramSummary))
 	}
 
 	if countLabel := info.executionCountLabel(); countLabel != "" {
@@ -161,6 +215,9 @@ func buildStandingExecutionHTMLBody(approval Approval) string {
 	b.WriteString(`<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">`)
 	if info.ActionType != "" {
 		b.WriteString(emailDetailRow("Action", html.EscapeString(info.ActionType)))
+	}
+	if paramSummary := summarizeParameters(approval.Action); paramSummary != "" {
+		b.WriteString(emailDetailRow("Parameters", html.EscapeString(paramSummary)))
 	}
 	if countLabel := info.executionCountLabel(); countLabel != "" {
 		b.WriteString(emailDetailRow("Executions", html.EscapeString(countLabel)))
