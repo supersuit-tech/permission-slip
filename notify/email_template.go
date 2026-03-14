@@ -120,7 +120,7 @@ func buildEmailHTMLBody(approval Approval) string {
 	b.WriteString(`</div>`)
 
 	// Details table
-	b.WriteString(`<table style="width:100%%;border-collapse:collapse;margin-bottom:20px;">`)
+	b.WriteString(`<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">`)
 	if actionType != "" {
 		b.WriteString(emailDetailRow("Action", html.EscapeString(actionType)))
 	}
