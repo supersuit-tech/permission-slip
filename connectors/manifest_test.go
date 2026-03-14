@@ -659,6 +659,18 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 			"duplicate group id",
 			`{"type":"object","x-ui":{"groups":[{"id":"billing","label":"Billing"},{"id":"billing","label":"Billing 2"}]},"properties":{"f":{"type":"string"}}}`,
 		},
+		{
+			"duplicate order entry",
+			`{"type":"object","x-ui":{"order":["name","name"]},"properties":{"name":{"type":"string"}}}`,
+		},
+		{
+			"visible_when missing field key",
+			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"visible_when":{"equals":"val"}}}}}`,
+		},
+		{
+			"visible_when missing equals key",
+			`{"type":"object","properties":{"a":{"type":"string"},"f":{"type":"string","x-ui":{"visible_when":{"field":"a"}}}}}`,
+		},
 	}
 
 	for _, tt := range tests {

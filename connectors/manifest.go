@@ -379,11 +379,16 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			}
 			groupIDs[g.ID] = true
 		}
-		// Validate x-ui.order references existing property keys.
+		// Validate x-ui.order references existing property keys with no duplicates.
+		orderSeen := make(map[string]bool, len(rootUI.Order))
 		for _, field := range rootUI.Order {
 			if !propertyKeys[field] {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.order references unknown property %q", actionIdx, field)
 			}
+			if orderSeen[field] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema x-ui.order contains duplicate entry %q", actionIdx, field)
+			}
+			orderSeen[field] = true
 		}
 	}
 
@@ -394,7 +399,8 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 				Widget      string `json:"widget"`
 				Group       string `json:"group"`
 				VisibleWhen *struct {
-					Field string `json:"field"`
+					Field  string `json:"field"`
+					Equals *json.RawMessage `json:"equals"`
 				} `json:"visible_when"`
 			} `json:"x-ui"`
 		}
@@ -405,13 +411,21 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			continue
 		}
 		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
-			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q is not a valid widget type", actionIdx, propName, prop.XUI.Widget)
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, textarea, toggle, number, date", actionIdx, propName, prop.XUI.Widget)
 		}
 		if prop.XUI.Group != "" && !groupIDs[prop.XUI.Group] {
 			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.group %q does not match any defined group in x-ui.groups", actionIdx, propName, prop.XUI.Group)
 		}
-		if prop.XUI.VisibleWhen != nil && prop.XUI.VisibleWhen.Field != "" && !propertyKeys[prop.XUI.VisibleWhen.Field] {
-			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
+		if prop.XUI.VisibleWhen != nil {
+			if prop.XUI.VisibleWhen.Field == "" {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires a \"field\" key", actionIdx, propName)
+			}
+			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)
+			}
+			if prop.XUI.VisibleWhen.Equals == nil {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when requires an \"equals\" key", actionIdx, propName)
+			}
 		}
 	}
 
