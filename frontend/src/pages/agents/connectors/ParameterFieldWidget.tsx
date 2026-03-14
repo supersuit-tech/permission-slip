@@ -94,7 +94,7 @@ function TextWidget({ inputId, value, onChange, disabled, placeholder, className
   );
 }
 
-function SelectWidget({ inputId, value, onChange, disabled, enumValues, className }: WidgetRenderProps) {
+function SelectWidget({ inputId, value, onChange, disabled, placeholder, enumValues, className }: WidgetRenderProps) {
   return (
     <select
       id={inputId}
@@ -104,7 +104,7 @@ function SelectWidget({ inputId, value, onChange, disabled, enumValues, classNam
       className={`border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
       data-testid={`select-${inputId}`}
     >
-      <option value="">Select…</option>
+      <option value="">{placeholder ?? "Select…"}</option>
       {(enumValues ?? []).map((opt) => (
         <option key={opt} value={opt}>
           {opt}

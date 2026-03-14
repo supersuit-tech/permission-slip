@@ -86,6 +86,17 @@ describe("ParameterFieldWidget", () => {
       expect(screen.getByText("Select…")).toBeInTheDocument();
     });
 
+    it("uses x-ui.placeholder as default option text", () => {
+      renderWidget({
+        type: "string",
+        enum: ["usd", "eur"],
+        "x-ui": { widget: "select", placeholder: "Choose a currency" },
+      });
+
+      expect(screen.getByText("Choose a currency")).toBeInTheDocument();
+      expect(screen.queryByText("Select…")).not.toBeInTheDocument();
+    });
+
     it("fires onChange when an option is selected", async () => {
       const user = userEvent.setup();
       const { onChange } = renderWidget(selectProp);
