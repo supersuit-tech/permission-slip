@@ -1242,10 +1242,11 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		now.Add(27*24*time.Hour))
 
 	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at, expired_at)
-		 VALUES ($1, $2, $3, $4, 'expired', $5, $6, $6)`,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, starts_at, expires_at, expired_at)
+		 VALUES ($1, $2, $3, $4, 'expired', $5, $6, $7, $7)`,
 		"sa-everything-expired", github, userHasEverything,
 		"github.merge_pr",
+		`{"pr": "supersuit-tech/permission-slip#123"}`,
 		now.Add(-60*24*time.Hour),
 		now.Add(-30*24*time.Hour))
 

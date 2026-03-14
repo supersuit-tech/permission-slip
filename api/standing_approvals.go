@@ -50,7 +50,7 @@ type createStandingApprovalRequest struct {
 	ActionType             string          `json:"action_type" validate:"required"`
 	ActionVersion          string          `json:"action_version"`
 	Constraints            json.RawMessage `json:"constraints"`
-	ActionConfigurationID  *string         `json:"action_configuration_id"`
+	SourceActionConfigurationID *string     `json:"source_action_configuration_id"`
 	MaxExecutions          *int            `json:"max_executions" validate:"omitempty,gte=1"`
 	StartsAt               *time.Time      `json:"starts_at"`
 	ExpiresAt              time.Time       `json:"expires_at" validate:"required"`
@@ -202,10 +202,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if err := ValidateJSONObject(req.Constraints); err != nil {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "constraints must be a JSON object"))
-			return
-		}
 		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
 		if err != nil {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
@@ -242,7 +238,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			ActionType:                  req.ActionType,
 			ActionVersion:               req.ActionVersion,
 			Constraints:                 constraintsBytes,
-			SourceActionConfigurationID: req.ActionConfigurationID,
+			SourceActionConfigurationID: req.SourceActionConfigurationID,
 			MaxExecutions:               req.MaxExecutions,
 			StartsAt:                    startsAt,
 			ExpiresAt:                   req.ExpiresAt,
@@ -450,11 +446,12 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 	return resp
 }
 
-// validateStandingApprovalConstraints checks that constraints are present, non-empty,
-// and contain at least one non-wildcard value. Returns the raw bytes to store, or an
-// error describing why the constraints are invalid.
+// validateStandingApprovalConstraints is the single validation point for standing
+// approval constraints. It checks type, presence, and content. Returns the raw
+// bytes to store, or an error describing why the constraints are invalid.
 //
 // Rules:
+//   - non-object JSON (array, string, number) → rejected
 //   - null, empty, or {} → rejected (constraints are required)
 //   - all values are "*" → rejected (at least one must be Fixed or Pattern)
 //   - valid otherwise → returns the raw bytes

@@ -855,7 +855,7 @@ func TestCreateStandingApproval_ConstraintsMixedWildcardAndFixed(t *testing.T) {
 	}
 }
 
-func TestCreateStandingApproval_WithActionConfigurationID(t *testing.T) {
+func TestCreateStandingApproval_WithSourceActionConfigurationID(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -871,7 +871,7 @@ func TestCreateStandingApproval_WithActionConfigurationID(t *testing.T) {
 		"agent_id": %d,
 		"action_type": "email.send",
 		"constraints": {"to": "user@example.com"},
-		"action_configuration_id": "ac-test-123",
+		"source_action_configuration_id": "ac-test-123",
 		"expires_at": "%s"
 	}`, agentID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
