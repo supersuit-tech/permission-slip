@@ -305,6 +305,7 @@ CreateStandingApprovalRequest:
 
     source_action_configuration_id:
       type: string
+      minLength: 1
       maxLength: 128
       description: |
         Optional reference to the action configuration this standing approval
