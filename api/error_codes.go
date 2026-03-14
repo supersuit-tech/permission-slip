@@ -72,6 +72,9 @@ const (
 	// Parameter validation (request-time, distinct from execution-time invalid_parameters)
 	ErrMissingRequiredParameters ErrorCode = "missing_required_parameters"
 
+	// Standing approval constraint validation
+	ErrInvalidConstraints ErrorCode = "invalid_constraints"
+
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 )

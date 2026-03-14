@@ -189,14 +189,15 @@ StandingApproval:
 
     source_action_configuration_id:
       type: string
-      pattern: '^ac_[a-f0-9]{32}$'
-      maxLength: 35
+      maxLength: 128
       nullable: true
       description: |
         The action configuration this standing approval was derived from, if any.
         Nullable — `null` when the standing approval was created with a custom
         action type rather than from an existing configuration. The referenced
         configuration may have been deleted since creation.
+        Expected format: `ac_` prefix followed by 32 hex characters, but the
+        backend does not enforce the pattern.
       example: null
 
   example:
@@ -302,14 +303,17 @@ CreateStandingApprovalRequest:
         recipient_pattern: "*@mycompany.com"
         max_recipients: 5
 
-    action_configuration_id:
+    source_action_configuration_id:
       type: string
-      pattern: '^ac_[a-f0-9]{32}$'
-      maxLength: 35
+      minLength: 1
+      maxLength: 128
       description: |
         Optional reference to the action configuration this standing approval
         was derived from. When provided, the backend records it for traceability.
         No foreign-key enforcement — the configuration may be deleted later.
+        Expected format: `ac_` prefix followed by 32 hex characters (e.g.,
+        `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
+        enforce the pattern — only non-empty and max 128 characters.
       example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
     max_executions:
@@ -337,7 +341,7 @@ CreateStandingApprovalRequest:
     action_version: "1"
     constraints:
       recipient_pattern: "*@mycompany.com"
-    action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     max_executions: 100
     expires_at: "2026-03-14T00:00:00Z"
 

@@ -33,6 +33,7 @@ func TestCreateStandingApproval_FreePlan_AtLimit_Returns403(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"agent_id": %d,
 		"action_type": "test.action",
+		"constraints": {"channel": "#test"},
 		"expires_at": "%s"
 	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
@@ -82,6 +83,7 @@ func TestCreateStandingApproval_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"agent_id": %d,
 		"action_type": "test.action",
+		"constraints": {"channel": "#test"},
 		"expires_at": "%s"
 	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
@@ -113,6 +115,7 @@ func TestCreateStandingApproval_PaidPlan_NoLimit(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"agent_id": %d,
 		"action_type": "test.action",
+		"constraints": {"channel": "#test"},
 		"expires_at": "%s"
 	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
@@ -139,6 +142,7 @@ func TestCreateStandingApproval_NoSubscription_NoLimit(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"agent_id": %d,
 		"action_type": "test.action",
+		"constraints": {"channel": "#test"},
 		"expires_at": "%s"
 	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
@@ -455,6 +459,7 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"agent_id": %d,
 		"action_type": "test.action",
+		"constraints": {"channel": "#test"},
 		"expires_at": "%s"
 	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 

@@ -12,27 +12,28 @@ import (
 
 // StandingApproval represents a row from the standing_approvals table.
 type StandingApproval struct {
-	StandingApprovalID string
-	AgentID            int64
-	UserID             string
-	ActionType         string
-	ActionVersion      string
-	Constraints        []byte // raw JSONB
-	Status             string
-	MaxExecutions      *int
-	ExecutionCount     int
-	StartsAt           time.Time
-	ExpiresAt          time.Time
-	CreatedAt          time.Time
-	RevokedAt          *time.Time
-	ExpiredAt          *time.Time
-	ExhaustedAt        *time.Time
+	StandingApprovalID          string
+	AgentID                     int64
+	UserID                      string
+	ActionType                  string
+	ActionVersion               string
+	Constraints                 []byte // raw JSONB
+	SourceActionConfigurationID *string
+	Status                      string
+	MaxExecutions               *int
+	ExecutionCount              int
+	StartsAt                    time.Time
+	ExpiresAt                   time.Time
+	CreatedAt                   time.Time
+	RevokedAt                   *time.Time
+	ExpiredAt                   *time.Time
+	ExhaustedAt                 *time.Time
 }
 
 // standingApprovalColumns is the canonical column list for SELECT on the standing_approvals table.
 // Keep in sync with scanStandingApproval.
 const standingApprovalColumns = `standing_approval_id, agent_id, user_id, action_type, action_version,
-	constraints, status, max_executions, execution_count,
+	constraints, source_action_configuration_id, status, max_executions, execution_count,
 	starts_at, expires_at, created_at, revoked_at, expired_at, exhausted_at`
 
 // MaxStandingApprovalListSize is the maximum number of standing approvals returned per page.
@@ -60,7 +61,7 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 	var sa StandingApproval
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
-		&sa.Constraints, &sa.Status, &sa.MaxExecutions, &sa.ExecutionCount,
+		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.Status, &sa.MaxExecutions, &sa.ExecutionCount,
 		&sa.StartsAt, &sa.ExpiresAt, &sa.CreatedAt, &sa.RevokedAt, &sa.ExpiredAt, &sa.ExhaustedAt,
 	)
 	if err != nil {
@@ -108,15 +109,16 @@ const (
 
 // CreateStandingApprovalParams holds the parameters for creating a standing approval.
 type CreateStandingApprovalParams struct {
-	StandingApprovalID string
-	AgentID            int64
-	UserID             string
-	ActionType         string
-	ActionVersion      string
-	Constraints        []byte // raw JSONB, may be nil
-	MaxExecutions      *int
-	StartsAt           time.Time
-	ExpiresAt          time.Time
+	StandingApprovalID          string
+	AgentID                     int64
+	UserID                      string
+	ActionType                  string
+	ActionVersion               string
+	Constraints                 []byte // raw JSONB, may be nil
+	SourceActionConfigurationID *string
+	MaxExecutions               *int
+	StartsAt                    time.Time
+	ExpiresAt                   time.Time
 }
 
 // CreateStandingApproval inserts a new standing approval with status 'active'.
@@ -129,12 +131,12 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 			SELECT 1 FROM agents WHERE agent_id = $2 AND approver_id = $3
 		)
 		INSERT INTO standing_approvals
-		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, status, max_executions, starts_at, expires_at)
-		 SELECT $1, $2, $3, $4, $5, $6, 'active', $7, $8, $9
+		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, status, max_executions, starts_at, expires_at)
+		 SELECT $1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion,
-		p.Constraints, p.MaxExecutions, p.StartsAt, p.ExpiresAt,
+		p.Constraints, p.SourceActionConfigurationID, p.MaxExecutions, p.StartsAt, p.ExpiresAt,
 	)
 	sa, err := scanStandingApproval(row)
 	if err != nil {

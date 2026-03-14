@@ -17,19 +17,20 @@ import (
 // Response types for the dashboard standing approval endpoints.
 
 type standingApprovalResponse struct {
-	StandingApprovalID string     `json:"standing_approval_id"`
-	AgentID            int64      `json:"agent_id"`
-	UserID             string     `json:"user_id"`
-	ActionType         string     `json:"action_type"`
-	ActionVersion      string     `json:"action_version"`
-	Constraints        any        `json:"constraints"`
-	Status             string     `json:"status"`
-	MaxExecutions      *int       `json:"max_executions"`
-	ExecutionCount     int        `json:"execution_count"`
-	StartsAt           time.Time  `json:"starts_at"`
-	ExpiresAt          time.Time  `json:"expires_at"`
-	CreatedAt          time.Time  `json:"created_at"`
-	RevokedAt          *time.Time `json:"revoked_at,omitempty"`
+	StandingApprovalID          string     `json:"standing_approval_id"`
+	AgentID                     int64      `json:"agent_id"`
+	UserID                      string     `json:"user_id"`
+	ActionType                  string     `json:"action_type"`
+	ActionVersion               string     `json:"action_version"`
+	Constraints                 any        `json:"constraints"`
+	SourceActionConfigurationID *string    `json:"source_action_configuration_id"`
+	Status                      string     `json:"status"`
+	MaxExecutions               *int       `json:"max_executions"`
+	ExecutionCount              int        `json:"execution_count"`
+	StartsAt                    time.Time  `json:"starts_at"`
+	ExpiresAt                   time.Time  `json:"expires_at"`
+	CreatedAt                   time.Time  `json:"created_at"`
+	RevokedAt                   *time.Time `json:"revoked_at,omitempty"`
 }
 
 type standingApprovalListResponse struct {
@@ -45,13 +46,14 @@ type revokeStandingApprovalResponse struct {
 }
 
 type createStandingApprovalRequest struct {
-	AgentID       int64           `json:"agent_id" validate:"gt=0"`
-	ActionType    string          `json:"action_type" validate:"required"`
-	ActionVersion string          `json:"action_version"`
-	Constraints   json.RawMessage `json:"constraints"`
-	MaxExecutions *int            `json:"max_executions" validate:"omitempty,gte=1"`
-	StartsAt      *time.Time      `json:"starts_at"`
-	ExpiresAt     time.Time       `json:"expires_at" validate:"required"`
+	AgentID                int64           `json:"agent_id" validate:"gt=0"`
+	ActionType             string          `json:"action_type" validate:"required"`
+	ActionVersion          string          `json:"action_version"`
+	Constraints            json.RawMessage `json:"constraints"`
+	SourceActionConfigurationID *string     `json:"source_action_configuration_id"`
+	MaxExecutions          *int            `json:"max_executions" validate:"omitempty,gte=1"`
+	StartsAt               *time.Time      `json:"starts_at"`
+	ExpiresAt              time.Time       `json:"expires_at" validate:"required"`
 }
 
 type executeStandingApprovalRequest struct {
@@ -74,6 +76,10 @@ var validStandingApprovalStatusFilters = map[string]bool{
 }
 
 var actionVersionPattern = regexp.MustCompile(`^\d+$`)
+
+// maxActionConfigIDLength is the maximum length for source_action_configuration_id.
+// Generated IDs are ~35 chars (prefix + 32 hex); 128 is generous headroom.
+const maxActionConfigIDLength = 128
 
 func init() {
 	RegisterRouteGroup(RegisterStandingApprovalRoutes)
@@ -200,13 +206,19 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		var constraintsBytes []byte
-		if err := ValidateJSONObject(req.Constraints); err != nil {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "constraints must be a JSON object"))
+		if req.SourceActionConfigurationID != nil && (len(*req.SourceActionConfigurationID) == 0 || len(*req.SourceActionConfigurationID) > maxActionConfigIDLength) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must be between 1 and 128 characters"))
 			return
 		}
-		if len(req.Constraints) > 0 && string(req.Constraints) != "null" {
-			constraintsBytes = req.Constraints
+
+		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
+		if err != nil {
+			resp := BadRequest(ErrInvalidConstraints, err.Error())
+			resp.Error.Details = map[string]any{
+				"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
+			}
+			RespondError(w, r, http.StatusBadRequest, resp)
+			return
 		}
 
 		// Wrap limit check + insert in a transaction with an advisory lock
@@ -233,15 +245,16 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		sa, err := db.CreateStandingApproval(r.Context(), tx, db.CreateStandingApprovalParams{
-			StandingApprovalID: saID,
-			AgentID:            req.AgentID,
-			UserID:             profile.ID,
-			ActionType:         req.ActionType,
-			ActionVersion:      req.ActionVersion,
-			Constraints:        constraintsBytes,
-			MaxExecutions:      req.MaxExecutions,
-			StartsAt:           startsAt,
-			ExpiresAt:          req.ExpiresAt,
+			StandingApprovalID:          saID,
+			AgentID:                     req.AgentID,
+			UserID:                      profile.ID,
+			ActionType:                  req.ActionType,
+			ActionVersion:               req.ActionVersion,
+			Constraints:                 constraintsBytes,
+			SourceActionConfigurationID: req.SourceActionConfigurationID,
+			MaxExecutions:               req.MaxExecutions,
+			StartsAt:                    startsAt,
+			ExpiresAt:                   req.ExpiresAt,
 		})
 		if err != nil {
 			var saErr *db.StandingApprovalError
@@ -419,18 +432,19 @@ func emitStandingApprovalAuditEvent(ctx context.Context, d db.DBTX, userID strin
 
 func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse {
 	resp := standingApprovalResponse{
-		StandingApprovalID: sa.StandingApprovalID,
-		AgentID:            sa.AgentID,
-		UserID:             sa.UserID,
-		ActionType:         sa.ActionType,
-		ActionVersion:      sa.ActionVersion,
-		Status:             sa.Status,
-		MaxExecutions:      sa.MaxExecutions,
-		ExecutionCount:     sa.ExecutionCount,
-		StartsAt:           sa.StartsAt,
-		ExpiresAt:          sa.ExpiresAt,
-		CreatedAt:          sa.CreatedAt,
-		RevokedAt:          sa.RevokedAt,
+		StandingApprovalID:          sa.StandingApprovalID,
+		AgentID:                     sa.AgentID,
+		UserID:                      sa.UserID,
+		ActionType:                  sa.ActionType,
+		ActionVersion:               sa.ActionVersion,
+		SourceActionConfigurationID: sa.SourceActionConfigurationID,
+		Status:                      sa.Status,
+		MaxExecutions:               sa.MaxExecutions,
+		ExecutionCount:              sa.ExecutionCount,
+		StartsAt:                    sa.StartsAt,
+		ExpiresAt:                   sa.ExpiresAt,
+		CreatedAt:                   sa.CreatedAt,
+		RevokedAt:                   sa.RevokedAt,
 	}
 
 	if len(sa.Constraints) > 0 {
@@ -443,4 +457,48 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 	}
 
 	return resp
+}
+
+// validateStandingApprovalConstraints is the single validation point for standing
+// approval constraints. It checks type, presence, and content. Returns the raw
+// bytes to store, or an error describing why the constraints are invalid.
+//
+// Rules:
+//   - non-object JSON (array, string, number) → rejected
+//   - null, empty, or {} → rejected (constraints are required)
+//   - all values are "*" → rejected (at least one must be Fixed or Pattern)
+//   - valid otherwise → returns the raw bytes
+func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
+	// Null or absent.
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, errors.New("constraints are required for standing approvals")
+	}
+
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return nil, errors.New("constraints must be a JSON object")
+	}
+
+	if len(obj) == 0 {
+		return nil, errors.New("constraints are required for standing approvals")
+	}
+
+	// Check that at least one constraint value is not a wildcard ("*").
+	// Null values are rejected outright — use "*" for a wildcard or omit the key.
+	allWildcard := true
+	for _, v := range obj {
+		if string(v) == "null" {
+			return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
+		}
+		var s string
+		if json.Unmarshal(v, &s) != nil || s != "*" {
+			allWildcard = false
+			// No break — must continue iterating to check remaining values for null.
+		}
+	}
+	if allWildcard {
+		return nil, errors.New("at least one constraint must be a non-wildcard value")
+	}
+
+	return raw, nil
 }
