@@ -185,7 +185,14 @@ func TestArchiveEmail_SingleAndBatchCombined(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(params.MessageIDs) != 3 {
-		t.Errorf("expected 3 IDs, got %d: %v", len(params.MessageIDs), params.MessageIDs)
+		t.Fatalf("expected 3 IDs, got %d: %v", len(params.MessageIDs), params.MessageIDs)
+	}
+	// message_ids come first, then message_id is appended.
+	expected := []uint32{1, 2, 5}
+	for i, id := range params.MessageIDs {
+		if id != expected[i] {
+			t.Errorf("MessageIDs[%d] = %d, want %d", i, id, expected[i])
+		}
 	}
 }
 
@@ -205,6 +212,30 @@ func TestArchiveEmail_Deduplication(t *testing.T) {
 		if id != expected[i] {
 			t.Errorf("MessageIDs[%d] = %d, want %d", i, id, expected[i])
 		}
+	}
+}
+
+func TestArchiveEmail_InvalidMessageIDsType(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &archiveEmailAction{conn: conn}
+
+	// message_ids should be integers, not strings.
+	params, _ := json.Marshal(map[string]any{
+		"message_ids": []string{"abc"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "protonmail.archive_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for string message_ids")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 
