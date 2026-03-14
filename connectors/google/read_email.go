@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -47,6 +48,7 @@ type gmailFullMessage struct {
 
 // gmailMessagePart represents a MIME message part in the Gmail API response.
 type gmailMessagePart struct {
+	PartID   string `json:"partId"`
 	MimeType string `json:"mimeType"`
 	Headers  []struct {
 		Name  string `json:"name"`
@@ -107,18 +109,18 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		Labels:   msg.LabelIDs,
 	}
 
-	// Extract headers from the top-level payload.
+	// Extract headers from the top-level payload (case-insensitive per RFC 5322).
 	for _, h := range msg.Payload.Headers {
-		switch h.Name {
-		case "From":
+		switch strings.ToLower(h.Name) {
+		case "from":
 			detail.From = h.Value
-		case "To":
+		case "to":
 			detail.To = h.Value
-		case "Cc":
+		case "cc":
 			detail.Cc = h.Value
-		case "Subject":
+		case "subject":
 			detail.Subject = h.Value
-		case "Date":
+		case "date":
 			detail.Date = h.Value
 		}
 	}
@@ -187,10 +189,17 @@ func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo) {
 		info := gmailAttachmentInfo{
 			MimeType: part.MimeType,
 			Size:     part.Body.Size,
+			PartID:   part.PartID,
 		}
-		// Extract filename from Content-Disposition or part headers.
+		// Extract filename from Content-Disposition, falling back to
+		// Content-Type name= (used by some older mailers).
 		for _, h := range part.Headers {
 			if strings.EqualFold(h.Name, "Content-Disposition") {
+				if fn := parseFilename(h.Value); fn != "" {
+					info.Filename = fn
+				}
+			}
+			if info.Filename == "" && strings.EqualFold(h.Name, "Content-Type") {
 				if fn := parseFilename(h.Value); fn != "" {
 					info.Filename = fn
 				}
@@ -203,12 +212,19 @@ func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo) {
 	}
 }
 
-// parseFilename extracts a filename from a Content-Disposition header value.
-func parseFilename(disposition string) string {
-	for _, param := range strings.Split(disposition, ";") {
+// parseFilename extracts a filename from a Content-Disposition or Content-Type
+// header value. Checks for both filename= (Content-Disposition) and name=
+// (Content-Type) parameters.
+func parseFilename(headerValue string) string {
+	for _, param := range strings.Split(headerValue, ";") {
 		param = strings.TrimSpace(param)
-		if strings.HasPrefix(strings.ToLower(param), "filename=") {
+		lower := strings.ToLower(param)
+		if strings.HasPrefix(lower, "filename=") {
 			name := param[len("filename="):]
+			return strings.Trim(name, `"`)
+		}
+		if strings.HasPrefix(lower, "name=") {
+			name := param[len("name="):]
 			return strings.Trim(name, `"`)
 		}
 	}
@@ -228,10 +244,16 @@ func decodeBase64URL(s string) string {
 	return string(b)
 }
 
-// truncateEmailBody limits body content to maxEmailBodySize.
+// truncateEmailBody limits body content to maxEmailBodySize, cutting at a
+// valid UTF-8 boundary to avoid splitting multi-byte runes.
 func truncateEmailBody(s string) string {
-	if len(s) > maxEmailBodySize {
-		return s[:maxEmailBodySize] + "\n[truncated]"
+	if len(s) <= maxEmailBodySize {
+		return s
 	}
-	return s
+	// Walk backwards from the limit to avoid splitting a multi-byte rune.
+	i := maxEmailBodySize
+	for i > 0 && !utf8.RuneStart(s[i]) {
+		i--
+	}
+	return s[:i] + "\n[truncated]"
 }

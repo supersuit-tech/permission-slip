@@ -181,6 +181,7 @@ func TestReadEmail_WithAttachments(t *testing.T) {
 						}{Data: plainBody},
 					},
 					{
+						PartID:   "1",
 						MimeType: "application/pdf",
 						Headers: []struct {
 							Name  string `json:"name"`
@@ -234,6 +235,81 @@ func TestReadEmail_WithAttachments(t *testing.T) {
 	}
 	if att.Size != 12345 {
 		t.Errorf("expected size 12345, got %d", att.Size)
+	}
+	if att.PartID != "1" {
+		t.Errorf("expected part_id '1', got %q", att.PartID)
+	}
+}
+
+func TestReadEmail_AttachmentFilenameFromContentType(t *testing.T) {
+	t.Parallel()
+
+	plainBody := base64.RawURLEncoding.EncodeToString([]byte("See attached."))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gmailFullMessage{
+			ID:       "msg-ct-name",
+			ThreadID: "thread-3",
+			Payload: gmailMessagePart{
+				MimeType: "multipart/mixed",
+				Parts: []gmailMessagePart{
+					{
+						MimeType: "text/plain",
+						Body: struct {
+							AttachmentID string `json:"attachmentId"`
+							Size         int    `json:"size"`
+							Data         string `json:"data"`
+						}{Data: plainBody},
+					},
+					{
+						MimeType: "application/pdf",
+						Headers: []struct {
+							Name  string `json:"name"`
+							Value string `json:"value"`
+						}{
+							// No Content-Disposition; filename in Content-Type name= instead.
+							{Name: "Content-Type", Value: `application/pdf; name="invoice.pdf"`},
+						},
+						Body: struct {
+							AttachmentID string `json:"attachmentId"`
+							Size         int    `json:"size"`
+							Data         string `json:"data"`
+						}{
+							AttachmentID: "att-002",
+							Size:         5000,
+						},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &readEmailAction{conn: conn}
+
+	params, _ := json.Marshal(readEmailParams{MessageID: "msg-ct-name"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.read_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var detail emailFullDetail
+	if err := json.Unmarshal(result.Data, &detail); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+
+	if len(detail.Attachments) != 1 {
+		t.Fatalf("expected 1 attachment, got %d", len(detail.Attachments))
+	}
+	if detail.Attachments[0].Filename != "invoice.pdf" {
+		t.Errorf("expected filename 'invoice.pdf' from Content-Type fallback, got %q", detail.Attachments[0].Filename)
 	}
 }
 
@@ -397,6 +473,8 @@ func TestParseFilename(t *testing.T) {
 	}{
 		{`attachment; filename="report.pdf"`, "report.pdf"},
 		{`attachment; filename=report.pdf`, "report.pdf"},
+		{`application/pdf; name="invoice.pdf"`, "invoice.pdf"},
+		{`application/pdf; name=invoice.pdf`, "invoice.pdf"},
 		{`inline`, ""},
 		{``, ""},
 	}
