@@ -7,6 +7,9 @@ import type { ActionConfiguration } from "./useActionConfigs";
 /**
  * Fetches action configurations for multiple agents and returns
  * a Map keyed by config ID for quick lookups.
+ *
+ * Uses TanStack Query v5 `combine` to produce a stable return value
+ * that only recalculates when query data actually changes.
  */
 export function useActionConfigMap(agentIds: number[]) {
   const { session } = useAuth();
@@ -22,7 +25,7 @@ export function useActionConfigMap(agentIds: number[]) {
     [agentIds],
   );
 
-  const results = useQueries({
+  return useQueries({
     queries: uniqueIds.map((agentId) => ({
       queryKey: ["action-configs", agentId],
       queryFn: async () => {
@@ -37,20 +40,17 @@ export function useActionConfigMap(agentIds: number[]) {
       },
       enabled: !!accessToken,
     })),
-  });
-
-  const configMap = useMemo(() => {
-    const map = new Map<string, ActionConfiguration>();
-    for (const result of results) {
-      const configs = result.data?.data;
-      if (configs) {
-        for (const config of configs) {
-          map.set(config.id, config);
+    combine: (results) => {
+      const map = new Map<string, ActionConfiguration>();
+      for (const result of results) {
+        const configs = result.data?.data;
+        if (configs) {
+          for (const config of configs) {
+            map.set(config.id, config);
+          }
         }
       }
-    }
-    return map;
-  }, [results]);
-
-  return configMap;
+      return map;
+    },
+  });
 }
