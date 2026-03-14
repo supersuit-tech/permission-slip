@@ -493,7 +493,7 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 		var s string
 		if json.Unmarshal(v, &s) != nil || s != "*" {
 			allWildcard = false
-			break
+			// No break — must continue iterating to check remaining values for null.
 		}
 	}
 	if allWildcard {
