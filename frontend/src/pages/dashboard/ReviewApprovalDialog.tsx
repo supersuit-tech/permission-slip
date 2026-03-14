@@ -174,6 +174,11 @@ export function ReviewApprovalDialog({
 
   function handleStandingDialogChange(nextOpen: boolean) {
     setStandingDialogOpen(nextOpen);
+    if (!nextOpen && !standingApprovalCreated) {
+      // SA wizard was dismissed without creating — unblock auto-close
+      // so the user can click Done or let the dialog close naturally.
+      setAutoCloseBlocked(false);
+    }
   }
 
   function handleClose(nextOpen: boolean) {

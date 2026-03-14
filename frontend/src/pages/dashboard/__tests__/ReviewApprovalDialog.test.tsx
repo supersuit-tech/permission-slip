@@ -188,6 +188,76 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
   });
 
+  it("does NOT show 'Always Allow This' when execution_status is 'pending'", async () => {
+    setupMocks();
+    const approval = makeApproval();
+
+    mockPost.mockResolvedValueOnce({
+      data: {
+        approval_id: approval.approval_id,
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        confirmation_code: "ABC-123",
+        execution_status: "pending",
+        execution_result: null,
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReviewApprovalDialog
+        approval={approval}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await user.click(screen.getByText("Approve"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Request Approved")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
+  });
+
+  it("does NOT show 'Always Allow This' when execution_status is 'error'", async () => {
+    setupMocks();
+    const approval = makeApproval();
+
+    mockPost.mockResolvedValueOnce({
+      data: {
+        approval_id: approval.approval_id,
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        confirmation_code: "ABC-123",
+        execution_status: "error",
+        execution_result: { execution_error: "Connection failed" },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReviewApprovalDialog
+        approval={approval}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await user.click(screen.getByText("Approve"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Execution Failed")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
+  });
+
   it("opens CreateStandingApprovalDialog when 'Always Allow This' is clicked", async () => {
     setupMocks();
     const approval = makeApproval();
