@@ -77,6 +77,10 @@ var validStandingApprovalStatusFilters = map[string]bool{
 
 var actionVersionPattern = regexp.MustCompile(`^\d+$`)
 
+// maxActionConfigIDLength is the maximum length for source_action_configuration_id.
+// Generated IDs are ~35 chars (prefix + 32 hex); 128 is generous headroom.
+const maxActionConfigIDLength = 128
+
 func init() {
 	RegisterRouteGroup(RegisterStandingApprovalRoutes)
 }
@@ -199,6 +203,11 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			log.Printf("[%s] CreateStandingApproval: generate ID: %v", TraceID(r.Context()), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+			return
+		}
+
+		if req.SourceActionConfigurationID != nil && len(*req.SourceActionConfigurationID) > maxActionConfigIDLength {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id exceeds maximum length"))
 			return
 		}
 
