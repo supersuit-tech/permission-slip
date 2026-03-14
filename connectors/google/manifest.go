@@ -688,7 +688,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"enum": ["full", "metadata", "minimal"],
 							"default": "full",
-							"description": "The format to return the message in (defaults to full)"
+							"description": "Controls how much of the message is returned. 'full' (default) returns headers, body, and attachment metadata. 'metadata' returns headers only (no body). 'minimal' returns only ID, labels, and snippet."
 						}
 					}
 				}`)),

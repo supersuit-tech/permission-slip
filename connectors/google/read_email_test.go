@@ -375,6 +375,12 @@ func TestReadEmail_FormatMetadata(t *testing.T) {
 	if detail.Subject != "Metadata Only" {
 		t.Errorf("expected Subject 'Metadata Only', got %s", detail.Subject)
 	}
+	if detail.Body != "" {
+		t.Errorf("expected empty Body for format=metadata, got %q", detail.Body)
+	}
+	if detail.ContentType != "" {
+		t.Errorf("expected empty ContentType for format=metadata, got %q", detail.ContentType)
+	}
 }
 
 func TestReadEmail_FormatMinimal(t *testing.T) {
@@ -419,6 +425,12 @@ func TestReadEmail_FormatMinimal(t *testing.T) {
 	}
 	if detail.ThreadID != "thread-min" {
 		t.Errorf("expected ThreadID thread-min, got %s", detail.ThreadID)
+	}
+	if detail.Body != "" {
+		t.Errorf("expected empty Body for format=minimal, got %q", detail.Body)
+	}
+	if detail.ContentType != "" {
+		t.Errorf("expected empty ContentType for format=minimal, got %q", detail.ContentType)
 	}
 }
 

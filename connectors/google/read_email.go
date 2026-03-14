@@ -96,8 +96,8 @@ type emailFullDetail struct {
 	Date        string               `json:"date,omitempty"`
 	Snippet     string               `json:"snippet,omitempty"`
 	Labels      []string             `json:"labels,omitempty"`
-	ContentType string               `json:"content_type"`
-	Body        string               `json:"body"`
+	ContentType string               `json:"content_type,omitempty"`
+	Body        string               `json:"body,omitempty"`
 	Attachments []gmailAttachmentInfo `json:"attachments,omitempty"`
 }
 
@@ -151,9 +151,13 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}
 
 	// Extract body and attachments from the MIME tree (depth-limited).
+	// Only set content_type when a body is present to avoid misleading
+	// consumers for metadata/minimal formats that return no body data.
 	body, contentType := extractBody(&msg.Payload, 0)
-	detail.Body = body
-	detail.ContentType = contentType
+	if body != "" {
+		detail.Body = body
+		detail.ContentType = contentType
+	}
 	detail.Attachments = extractAttachments(&msg.Payload)
 
 	return connectors.JSONResult(detail)
