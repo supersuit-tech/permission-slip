@@ -38,6 +38,7 @@ export function CreateStandingApprovalDialog({
   const [agentId, setAgentId] = useState<number | "">("");
   const [actionType, setActionType] = useState("");
   const [actionVersion, setActionVersion] = useState("1");
+  const [constraintsJson, setConstraintsJson] = useState("");
   const [maxExecutions, setMaxExecutions] = useState("");
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
 
@@ -47,6 +48,7 @@ export function CreateStandingApprovalDialog({
     setAgentId("");
     setActionType("");
     setActionVersion("1");
+    setConstraintsJson("");
     setMaxExecutions("");
     setExpiresAt(defaultExpiresAt());
   }
@@ -59,11 +61,27 @@ export function CreateStandingApprovalDialog({
       return;
     }
 
+    let constraints: Record<string, unknown>;
+    try {
+      constraints = constraintsJson
+        ? (JSON.parse(constraintsJson) as Record<string, unknown>)
+        : {};
+    } catch {
+      toast.error("Constraints must be valid JSON");
+      return;
+    }
+
+    if (typeof constraints !== "object" || Array.isArray(constraints)) {
+      toast.error("Constraints must be a JSON object");
+      return;
+    }
+
     try {
       await createStandingApproval({
         agent_id: agentId,
         action_type: actionType,
         action_version: actionVersion || "1",
+        constraints,
         max_executions: maxExecutions ? Number(maxExecutions) : null,
         expires_at: new Date(expiresAt).toISOString(),
       });
@@ -124,6 +142,21 @@ export function CreateStandingApprovalDialog({
               onChange={(e) => setActionType(e.target.value)}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sa-constraints">Constraints (JSON)</Label>
+            <Input
+              id="sa-constraints"
+              placeholder='{"recipient_pattern": "*@mycompany.com"}'
+              value={constraintsJson}
+              onChange={(e) => setConstraintsJson(e.target.value)}
+              required
+            />
+            <p className="text-muted-foreground text-xs">
+              Parameter constraints for this standing approval. At least one
+              non-wildcard constraint is required.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
