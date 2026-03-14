@@ -46,10 +46,11 @@ const SERVICE_LABELS: Record<string, string> = {
 
 /**
  * Returns a human-readable label for a credential service identifier.
- * Falls back to the raw service ID if no explicit label is defined.
+ * Falls back to providerLabel() for proper casing when service IDs match
+ * provider IDs (e.g. "github" → "GitHub").
  */
 export function serviceLabel(service: string): string {
-  return SERVICE_LABELS[service] ?? service;
+  return SERVICE_LABELS[service] ?? PROVIDER_LABELS[service] ?? service;
 }
 
 const AUTH_TYPE_LABELS: Record<string, string> = {
