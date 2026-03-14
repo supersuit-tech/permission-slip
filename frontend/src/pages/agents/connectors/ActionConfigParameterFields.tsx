@@ -124,7 +124,11 @@ export function ActionConfigParameterFields({
         {ungroupedKeys.map(renderField)}
         {groups.map((group) => {
           const groupKeys = keysByGroup.get(group.id) ?? [];
-          if (groupKeys.length === 0) return null;
+          // Filter by visibility so empty groups don't render when all fields are hidden
+          const visibleGroupKeys = groupKeys.filter(
+            (k) => properties[k] !== undefined && isFieldVisible(properties[k]!, values),
+          );
+          if (visibleGroupKeys.length === 0) return null;
           return (
             <CollapsibleFieldGroup key={group.id} group={group}>
               {groupKeys.map(renderField)}

@@ -280,6 +280,30 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.getByText("auto_advance")).toBeInTheDocument();
     });
 
+    it("hides group when all its fields are hidden by visible_when", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          mode: { type: "string" },
+          secret: {
+            type: "string",
+            "x-ui": {
+              group: "advanced",
+              visible_when: { field: "mode", equals: "advanced" },
+            },
+          },
+        },
+        "x-ui": {
+          groups: [{ id: "advanced", label: "Advanced" }],
+        },
+      };
+
+      renderFields(schema, { values: { mode: "simple" } });
+
+      // The group header should not render when all children are hidden
+      expect(screen.queryByText("Advanced")).not.toBeInTheDocument();
+    });
+
     it("collapses an expanded group when clicked", async () => {
       const user = userEvent.setup();
       renderFields(groupedSchema);
@@ -331,6 +355,61 @@ describe("ActionConfigParameterFields", () => {
       });
 
       expect(screen.getByLabelText("mode")).toBeInTheDocument();
+    });
+
+    it("matches boolean equals via string coercion", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          enabled: { type: "boolean" },
+          detail: {
+            type: "string",
+            "x-ui": {
+              visible_when: { field: "enabled", equals: true },
+            },
+          },
+        },
+      };
+
+      // Form values are strings — "true" should match boolean true
+      renderFields(schema, { values: { enabled: "true" } });
+      expect(screen.getByLabelText("detail")).toBeInTheDocument();
+    });
+
+    it("hides field when boolean equals does not match", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          enabled: { type: "boolean" },
+          detail: {
+            type: "string",
+            "x-ui": {
+              visible_when: { field: "enabled", equals: true },
+            },
+          },
+        },
+      };
+
+      renderFields(schema, { values: { enabled: "false" } });
+      expect(screen.queryByLabelText("detail")).not.toBeInTheDocument();
+    });
+
+    it("matches number equals via coercion", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          count: { type: "number" },
+          bonus: {
+            type: "string",
+            "x-ui": {
+              visible_when: { field: "count", equals: 5 },
+            },
+          },
+        },
+      };
+
+      renderFields(schema, { values: { count: "5" } });
+      expect(screen.getByLabelText("bonus")).toBeInTheDocument();
     });
   });
 

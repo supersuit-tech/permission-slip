@@ -146,7 +146,16 @@ export function isFieldVisible(
 ): boolean {
   const rule = prop["x-ui"]?.visible_when;
   if (!rule) return true;
-  return values[rule.field] === rule.equals;
+  const fieldValue = values[rule.field];
+  // Form values are always strings, but rule.equals may be boolean or number.
+  // Coerce via String() so "true" matches true and "42" matches 42.
+  if (typeof rule.equals === "boolean") {
+    return String(fieldValue) === String(rule.equals);
+  }
+  if (typeof rule.equals === "number") {
+    return Number(fieldValue) === rule.equals;
+  }
+  return fieldValue === rule.equals;
 }
 
 /** Parse a property-level `x-ui` object, returning undefined if invalid. */
