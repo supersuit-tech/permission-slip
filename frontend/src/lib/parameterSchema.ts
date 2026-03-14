@@ -151,7 +151,7 @@ export function isFieldVisible(
 
 /** Parse a property-level `x-ui` object, returning undefined if invalid. */
 function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const obj = raw as Record<string, unknown>;
 
   const ui: SchemaPropertyUI = {};
@@ -167,7 +167,7 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
     const vw = obj.visible_when as Record<string, unknown>;
     if (
       typeof vw.field === "string" &&
-      (typeof vw.equals === "string" || typeof vw.equals === "boolean" || typeof vw.equals === "number")
+      (typeof vw.equals === "string" || typeof vw.equals === "boolean" || (typeof vw.equals === "number" && !Number.isNaN(vw.equals)))
     ) {
       ui.visible_when = { field: vw.field, equals: vw.equals as string | boolean | number };
     }
@@ -180,7 +180,7 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
 
 /** Parse a root-level `x-ui` object, returning undefined if invalid. */
 function parseSchemaUI(raw: unknown): SchemaUI | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const obj = raw as Record<string, unknown>;
 
   const ui: SchemaUI = {};

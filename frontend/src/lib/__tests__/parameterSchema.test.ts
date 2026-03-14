@@ -288,6 +288,31 @@ describe("parseParametersSchema", () => {
       expect(result?.properties?.field?.["x-ui"]).toBeUndefined();
     });
 
+    it("rejects NaN as visible_when equals value", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          field: {
+            type: "string",
+            "x-ui": { visible_when: { field: "priority", equals: NaN } },
+          },
+        },
+      });
+
+      expect(result?.properties?.field?.["x-ui"]).toBeUndefined();
+    });
+
+    it("returns undefined x-ui when x-ui is an array", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          field: { type: "string", "x-ui": ["not", "an", "object"] },
+        },
+      });
+
+      expect(result?.properties?.field?.["x-ui"]).toBeUndefined();
+    });
+
     it("ignores visible_when with missing fields", () => {
       const result = parseParametersSchema({
         type: "object",
@@ -401,6 +426,16 @@ describe("parseParametersSchema", () => {
       const result = parseParametersSchema({
         type: "object",
         "x-ui": {},
+        properties: { a: { type: "string" } },
+      });
+
+      expect(result?.["x-ui"]).toBeUndefined();
+    });
+
+    it("returns undefined x-ui when root x-ui is an array", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        "x-ui": ["not", "valid"],
         properties: { a: { type: "string" } },
       });
 
