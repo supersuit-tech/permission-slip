@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -392,8 +393,34 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		}
 	}
 
+	// Sort property keys for deterministic validation order. Unlike other
+	// validators that iterate slices, we iterate a map — sorting ensures
+	// error messages are consistent across runs.
+	sortedProps := make([]string, 0, len(properties))
+	for k := range properties {
+		sortedProps = append(sortedProps, k)
+	}
+	sort.Strings(sortedProps)
+
+	// First pass: collect visible_when targets for cycle detection.
+	visibleWhenTarget := make(map[string]string) // property → field it depends on
+	for _, propName := range sortedProps {
+		var prop struct {
+			XUI *struct {
+				VisibleWhen *struct {
+					Field string `json:"field"`
+				} `json:"visible_when"`
+			} `json:"x-ui"`
+		}
+		if err := json.Unmarshal(properties[propName], &prop); err != nil || prop.XUI == nil || prop.XUI.VisibleWhen == nil {
+			continue
+		}
+		visibleWhenTarget[propName] = prop.XUI.VisibleWhen.Field
+	}
+
 	// Validate property-level x-ui.
-	for propName, propRaw := range properties {
+	for _, propName := range sortedProps {
+		propRaw := properties[propName]
 		var prop struct {
 			XUI *struct {
 				Widget      string `json:"widget"`
@@ -429,6 +456,10 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			}
 			if prop.XUI.VisibleWhen.Field == propName {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field must not reference the property itself", actionIdx, propName)
+			}
+			// Detect mutual dependency cycles (A depends on B, B depends on A).
+			if target, ok := visibleWhenTarget[prop.XUI.VisibleWhen.Field]; ok && target == propName {
+				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s and %s have mutual visible_when dependency — neither can ever be visible", actionIdx, propName, prop.XUI.VisibleWhen.Field)
 			}
 			if !propertyKeys[prop.XUI.VisibleWhen.Field] {
 				return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.visible_when.field %q references unknown property", actionIdx, propName, prop.XUI.VisibleWhen.Field)

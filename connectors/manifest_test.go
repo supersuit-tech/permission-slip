@@ -676,6 +676,10 @@ func TestParseManifest_XUIValidationErrors(t *testing.T) {
 			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"visible_when":{"field":"f","equals":"val"}}}}}`,
 		},
 		{
+			"visible_when mutual dependency",
+			`{"type":"object","properties":{"a":{"type":"string","x-ui":{"visible_when":{"field":"b","equals":"x"}}},"b":{"type":"string","x-ui":{"visible_when":{"field":"a","equals":"y"}}}}}`,
+		},
+		{
 			"help_url with javascript scheme",
 			`{"type":"object","properties":{"f":{"type":"string","x-ui":{"help_url":"javascript:alert(1)"}}}}`,
 		},
