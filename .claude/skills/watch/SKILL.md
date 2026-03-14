@@ -1,7 +1,7 @@
 ---
 name: watch
 description: Poll a GitHub PR for new comments and PR reviews and act on them autonomously. Use when the user wants to monitor a PR for feedback and have Claude implement requested changes automatically.
-argument-hint: "[PR_URL] [--automerge] [--max-turns <N>]"
+argument-hint: "[PR_URL] [--automerge] [--max-turns <N>] [--no-notify]"
 ---
 
 # Watch PR for Comments and Reviews
@@ -39,7 +39,7 @@ Agent (this skill)     — Only invoked when reasoning is needed
 
 Parse the arguments from: `$ARGUMENTS`
 
-Extract any PR URL and flags. The format is: `[PR_URL] [--automerge] [--max-turns <N>]`
+Extract any PR URL and flags. The format is: `[PR_URL] [--automerge] [--max-turns <N>] [--no-notify]`
 
 The PR URL is **optional**. If not provided, detect it automatically from the current branch:
 
@@ -56,6 +56,7 @@ Set these variables for the session:
 - `PR_NUMBER` — the extracted PR number
 - `AUTO_MERGE` — `true` if `--automerge` was passed, `false` otherwise
 - `MAX_TURNS` — the value of `--max-turns` if passed, `0` otherwise (0 = unlimited)
+- `NO_NOTIFY` — `true` if `--no-notify` was passed, `false` otherwise
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 - `SKILL_DIR` — the directory containing this skill file (`.claude/skills/watch`)
 
@@ -298,7 +299,7 @@ After the agent finishes processing work items, go back to **Step 1** and run th
 When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has already been posted by the script. Run the post-session script:
 
 ```bash
-bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") 2>&1
+bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") 2>&1
 ```
 
 This handles:

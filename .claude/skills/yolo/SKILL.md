@@ -147,13 +147,13 @@ Capture the PR URL from the output.
 
 ## Step 6: Hand Off to /watch
 
-Invoke the `/watch` skill with `--automerge` to monitor the PR through review and merge it when ready. Since `/watch` auto-detects the PR from the current branch, you don't need to pass the URL explicitly — just the flags:
+Invoke the `/watch` skill with `--automerge --no-notify` to monitor the PR through review and merge it when ready. The `--no-notify` flag suppresses the webhook notification since `/yolo` is a fully autonomous flow — no human ping needed. Since `/watch` auto-detects the PR from the current branch, you don't need to pass the URL explicitly — just the flags:
 
 ```
-/watch --automerge
+/watch --automerge --no-notify
 ```
 
-Use the `Skill` tool to invoke the watch skill, passing `--automerge` as the argument. The watch skill will detect the PR from the current branch automatically.
+Use the `Skill` tool to invoke the watch skill, passing `--automerge --no-notify` as the argument. The watch skill will detect the PR from the current branch automatically.
 
 ## Important Rules
 
@@ -164,3 +164,4 @@ Use the `Skill` tool to invoke the watch skill, passing `--automerge` as the arg
 - **Link the PR to the issue** — use `Closes #N` in the PR body so the issue auto-closes on merge.
 - **Follow all CLAUDE.md guidelines** — especially around migrations, API types, component architecture, and merge conflict minimization.
 - **Post-task review** — before opening the PR, run all five review passes from CLAUDE.md (self-review, senior engineer lens, maintainability, code quality, documentation).
+- **Do NOT trigger the webhook notification** — the `/yolo` skill is fully autonomous end-to-end. Do not call the `trigger-webhook.yml` workflow at any point during this skill. The `--no-notify` flag on `/watch` handles suppressing the notification from the watch post-session as well.
