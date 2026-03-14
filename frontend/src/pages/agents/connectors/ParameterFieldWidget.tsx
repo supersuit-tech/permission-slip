@@ -94,14 +94,14 @@ function TextWidget({ inputId, value, onChange, disabled, placeholder, className
   );
 }
 
-function SelectWidget({ inputId, value, onChange, disabled, enumValues }: WidgetRenderProps) {
+function SelectWidget({ inputId, value, onChange, disabled, enumValues, className }: WidgetRenderProps) {
   return (
     <select
       id={inputId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50"
+      className={`border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
       data-testid={`select-${inputId}`}
     >
       <option value="">Select…</option>
@@ -123,7 +123,7 @@ function TextareaWidget({ inputId, value, onChange, disabled, placeholder, class
       disabled={disabled}
       placeholder={placeholder}
       rows={3}
-      className={`border-input bg-background ring-ring/50 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 ${className ?? ""}`}
+      className={`border-input bg-background ring-ring/50 w-full rounded-md border px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
       data-testid={`textarea-${inputId}`}
     />
   );
@@ -184,7 +184,7 @@ function FieldHints({ ui }: { ui?: SchemaPropertyUI }) {
       )}
       {ui.help_url && (
         <a
-          href={ui.help_url}
+          href={/^https?:\/\//i.test(ui.help_url) ? ui.help_url : "#"}
           target="_blank"
           rel="noopener noreferrer"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"

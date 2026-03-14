@@ -178,6 +178,15 @@ describe("ParameterFieldWidget", () => {
 
       expect(screen.getByPlaceholderText("0")).toBeInTheDocument();
     });
+
+    it("fires onChange when typed into", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(numberProp);
+
+      await user.type(screen.getByRole("spinbutton"), "5");
+
+      expect(onChange).toHaveBeenCalledWith("5");
+    });
   });
 
   describe("date widget", () => {
@@ -232,6 +241,16 @@ describe("ParameterFieldWidget", () => {
       expect(screen.getByRole("link", { name: /docs/i })).toBeInTheDocument();
     });
 
+    it("sanitizes non-http help_url to '#'", () => {
+      renderWidget({
+        type: "string",
+        "x-ui": { help_url: "javascript:alert(1)" },
+      });
+
+      const link = screen.getByRole("link", { name: /docs/i });
+      expect(link).toHaveAttribute("href", "#");
+    });
+
     it("renders nothing when no hints provided", () => {
       const { container } = renderWidget({ type: "string" });
 
@@ -268,6 +287,40 @@ describe("ParameterFieldWidget", () => {
       );
 
       expect(screen.getByRole("switch")).toBeDisabled();
+    });
+
+    it("disables the textarea when disabled", () => {
+      renderWidget(
+        { type: "string", "x-ui": { widget: "textarea" } },
+        "",
+        vi.fn(),
+        true,
+      );
+
+      expect(screen.getByTestId("textarea-param-test_field")).toBeDisabled();
+    });
+
+    it("disables the number input when disabled", () => {
+      renderWidget(
+        { type: "number", "x-ui": { widget: "number" } },
+        "",
+        vi.fn(),
+        true,
+      );
+
+      expect(screen.getByRole("spinbutton")).toBeDisabled();
+    });
+
+    it("disables the date input when disabled", () => {
+      renderWidget(
+        { type: "string", "x-ui": { widget: "date" } },
+        "",
+        vi.fn(),
+        true,
+      );
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input).toBeDisabled();
     });
   });
 });
