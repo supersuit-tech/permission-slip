@@ -206,8 +206,8 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.SourceActionConfigurationID != nil && len(*req.SourceActionConfigurationID) > maxActionConfigIDLength {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id exceeds maximum length"))
+		if req.SourceActionConfigurationID != nil && (len(*req.SourceActionConfigurationID) == 0 || len(*req.SourceActionConfigurationID) > maxActionConfigIDLength) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must be between 1 and 128 characters"))
 			return
 		}
 

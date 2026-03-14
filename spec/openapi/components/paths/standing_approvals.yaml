@@ -278,6 +278,10 @@ createStandingApproval:
       the authenticated user. The standing approval becomes active immediately
       (or at `starts_at` if specified).
 
+      **Constraints are required.** The `constraints` object must be non-empty and
+      contain at least one non-wildcard (`"*"`) value. This prevents "blank check"
+      standing approvals that auto-approve any parameters.
+
     tags:
       - Standing Approvals
 
@@ -296,7 +300,7 @@ createStandingApproval:
             action_version: "1"
             constraints:
               recipient_pattern: "*@mycompany.com"
-            action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+            source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
             max_executions: 100
             expires_at: "2026-03-14T00:00:00Z"
 
@@ -309,17 +313,35 @@ createStandingApproval:
               $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
 
       '400':
-        description: Invalid request (validation errors, duration exceeds 90 days, etc.)
+        description: |
+          Invalid request. Common causes:
+          - Missing or empty `constraints` (`invalid_constraints`)
+          - All constraint values are wildcards (`invalid_constraints`)
+          - Duration exceeds 90 days (`invalid_request`)
+          - Invalid field values (`invalid_request`)
         content:
           application/json:
             schema:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
-            example:
-              error:
-                code: "invalid_request"
-                message: "Duration exceeds maximum of 90 days"
-                retryable: false
-                trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+            examples:
+              invalid_constraints:
+                summary: Constraints are required
+                value:
+                  error:
+                    code: "invalid_constraints"
+                    message: "constraints are required for standing approvals"
+                    retryable: false
+                    details:
+                      hint: "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}"
+                    trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+              duration_exceeded:
+                summary: Duration exceeds maximum
+                value:
+                  error:
+                    code: "invalid_request"
+                    message: "Duration exceeds maximum of 90 days"
+                    retryable: false
+                    trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
