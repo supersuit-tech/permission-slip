@@ -204,14 +204,18 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["message_ids"],
 					"properties": {
+						"message_id": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Sequence number of a single email to archive (shorthand for message_ids with one item)"
+						},
 						"message_ids": {
 							"type": "array",
 							"items": {"type": "integer", "minimum": 1},
 							"minItems": 1,
 							"maxItems": 50,
-							"description": "Sequence numbers of emails to archive"
+							"description": "Sequence numbers of emails to archive (batch)"
 						},
 						"folder": {
 							"type": "string",

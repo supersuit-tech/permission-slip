@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -20,15 +21,53 @@ type archiveEmailAction struct {
 	conn *ProtonMailConnector
 }
 
+// archiveEmailRaw handles flexible JSON input: accepts either a single integer
+// for message_id or an array for message_ids, so callers can archive one email
+// without wrapping it in an array.
+type archiveEmailRaw struct {
+	MessageID  *uint32         `json:"message_id,omitempty"`
+	MessageIDs json.RawMessage `json:"message_ids,omitempty"`
+	Folder     string          `json:"folder"`
+}
+
 type archiveEmailParams struct {
-	MessageIDs []uint32 `json:"message_ids"`
+	MessageIDs []uint32 `json:"-"`
 	Folder     string   `json:"folder"`
+}
+
+// parseArchiveParams normalizes the flexible input into archiveEmailParams.
+// Accepts either "message_id": 5 (single) or "message_ids": [1,2,3] (batch).
+func parseArchiveParams(raw []byte) (*archiveEmailParams, error) {
+	var r archiveEmailRaw
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+
+	params := &archiveEmailParams{Folder: r.Folder}
+
+	// Prefer message_ids array if provided.
+	if len(r.MessageIDs) > 0 && string(r.MessageIDs) != "null" {
+		if err := json.Unmarshal(r.MessageIDs, &params.MessageIDs); err != nil {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid message_ids: %v", err)}
+		}
+	}
+
+	// Fall back to single message_id.
+	if r.MessageID != nil {
+		params.MessageIDs = append(params.MessageIDs, *r.MessageID)
+	}
+
+	return params, nil
 }
 
 func (p *archiveEmailParams) validate() error {
 	if len(p.MessageIDs) == 0 {
-		return &connectors.ValidationError{Message: "missing required parameter: message_ids (must contain at least one sequence number)"}
+		return &connectors.ValidationError{Message: "missing required parameter: provide message_id (single) or message_ids (array)"}
 	}
+
+	// Deduplicate: callers may accidentally pass the same ID twice.
+	p.MessageIDs = deduplicateUint32(p.MessageIDs)
+
 	if len(p.MessageIDs) > maxLimit {
 		return &connectors.ValidationError{Message: fmt.Sprintf("too many message_ids: maximum is %d", maxLimit)}
 	}
@@ -46,10 +85,24 @@ func (p *archiveEmailParams) validate() error {
 	return nil
 }
 
+// deduplicateUint32 returns a new slice with duplicate values removed,
+// preserving the original order.
+func deduplicateUint32(ids []uint32) []uint32 {
+	seen := make(map[uint32]struct{}, len(ids))
+	out := make([]uint32, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params archiveEmailParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	params, err := parseArchiveParams(req.Parameters)
+	if err != nil {
+		return nil, err
 	}
 	if err := params.validate(); err != nil {
 		return nil, err
@@ -85,12 +138,20 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 	// to COPY + STORE + EXPUNGE if the server lacks MOVE support.
 	moveCmd := session.client.Move(seqSet, archiveMailbox)
 	if _, err := moveCmd.Wait(); err != nil {
-		return nil, mapIMAPError(err)
+		imapErr := mapIMAPError(err)
+		// Provide a helpful hint if the Archive folder doesn't exist.
+		if strings.Contains(err.Error(), "TRYCREATE") || strings.Contains(err.Error(), "Mailbox doesn't exist") {
+			return nil, &connectors.ExternalError{
+				Message: fmt.Sprintf("Archive folder not found on server — the mailbox %q may not exist. Ensure Proton Mail Bridge is configured correctly: %v", archiveMailbox, err),
+			}
+		}
+		return nil, imapErr
 	}
 
 	return connectors.JSONResult(map[string]any{
-		"status":   "archived",
-		"folder":   params.Folder,
-		"archived": len(params.MessageIDs),
+		"status":      "archived",
+		"folder":      params.Folder,
+		"archived":    len(params.MessageIDs),
+		"message_ids": params.MessageIDs,
 	})
 }
