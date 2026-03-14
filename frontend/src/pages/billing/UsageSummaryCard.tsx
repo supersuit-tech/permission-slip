@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { Plan, UsageSummary } from "@/hooks/useBillingPlan";
+import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { FREE_REQUEST_ALLOWANCE, PRICE_PER_REQUEST } from "./constants";
 
 interface UsageSummaryCardProps {
@@ -53,12 +54,11 @@ function UsageRow({ label, current, limit }: UsageRowProps) {
 }
 
 /** Request usage row for paid plans — shows progress against the free allowance. */
-function PaidRequestRow({ current }: { current: number }) {
-  const allowance = FREE_REQUEST_ALLOWANCE;
+function PaidRequestRow({ current, included }: { current: number; included: number }) {
+  const allowance = included;
   const overage = Math.max(0, current - allowance);
   const hasOverage = overage > 0;
   const percentage = Math.min((current / allowance) * 100, 100);
-  const isNearLimit = percentage >= 80;
 
   const label = hasOverage
     ? `${current.toLocaleString()} total (${overage.toLocaleString()} billed)`
@@ -70,11 +70,9 @@ function PaidRequestRow({ current }: { current: number }) {
         <span className="font-medium">Requests</span>
         <span className="text-muted-foreground tabular-nums">{label}</span>
       </div>
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={current} aria-valuemin={0} aria-valuemax={allowance} aria-label={`Requests: ${label}`}>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={Math.min(current, allowance)} aria-valuemin={0} aria-valuemax={allowance} aria-label={`Requests: ${label}`}>
         <div
-          className={`h-full rounded-l-full transition-all ${
-            hasOverage ? "bg-primary" : isNearLimit ? "bg-amber-500" : "bg-primary"
-          }`}
+          className="h-full rounded-l-full transition-all bg-primary"
           style={{ width: `${hasOverage ? ((allowance / current) * 100) : percentage}%` }}
         />
         {hasOverage && (
@@ -93,6 +91,9 @@ function PaidRequestRow({ current }: { current: number }) {
 
 export function UsageSummaryCard({ usage, plan }: UsageSummaryCardProps) {
   const isPaid = plan.id !== "free";
+  const { usage: usageDetail } = useBillingUsage();
+  // Use server-provided included value, fall back to config constant.
+  const included = usageDetail?.requests.included ?? FREE_REQUEST_ALLOWANCE;
 
   return (
     <Card>
@@ -108,7 +109,7 @@ export function UsageSummaryCard({ usage, plan }: UsageSummaryCardProps) {
       <CardContent>
         <div className="space-y-4">
           {isPaid ? (
-            <PaidRequestRow current={usage.requests} />
+            <PaidRequestRow current={usage.requests} included={included} />
           ) : (
             <UsageRow
               label="Requests"

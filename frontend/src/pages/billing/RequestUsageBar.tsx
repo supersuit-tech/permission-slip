@@ -36,7 +36,7 @@ function PaidRequestBar({ total, included }: { total: number; included: number }
       <div
         className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
         role="progressbar"
-        aria-valuenow={total}
+        aria-valuenow={Math.min(total, included)}
         aria-valuemin={0}
         aria-valuemax={included}
         aria-label={`Requests: ${label}`}
