@@ -220,6 +220,9 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		return
 	}
 
+	// ── Notify user of standing approval execution (fire-and-forget) ─
+	NotifyStandingApprovalExecution(r.Context(), deps, exec, agent, req.Action.Type, params)
+
 	var actionResultPtr *json.RawMessage
 	if result != nil {
 		actionResultPtr = &result.Data
