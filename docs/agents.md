@@ -432,6 +432,13 @@ permission-slip request --action email.send --params '{}' --wait
 
 # Block with custom timeout:
 permission-slip request --action email.send --params '{}' --wait --timeout 30
+
+# Agent-friendly: poll at a fixed interval (default 5s), exit code 2 on timeout (default 600s):
+permission-slip request --action email.send --params '{}' --poll
+
+# Custom poll interval and timeout:
+permission-slip request --action email.send --params '{}' \
+  --poll --poll-interval 10 --poll-timeout 120
 ```
 
 Alternatively, the user can share the approval confirmation code out-of-band (paste it in chat, set it in your config, etc.).

@@ -91,6 +91,8 @@ export function requestCommand(program: Command): void {
         if (!opts.wait && !opts.poll && opts.timeout !== "120") {
           process.stderr.write("Warning: --timeout has no effect without --wait\n");
         }
+        // Note: these comparisons miss the case where the flag is explicitly passed
+        // with its default value, but this is consistent with the --timeout guard.
         if (!opts.poll && opts.pollInterval !== "5") {
           process.stderr.write("Warning: --poll-interval has no effect without --poll\n");
         }
@@ -119,7 +121,11 @@ export function requestCommand(program: Command): void {
         if (opts.poll) {
           // --poll: submit and poll at a regular interval.
           const pollInterval = parsePollInterval(opts.pollInterval);
-          const timeoutSeconds = parseTimeout(opts.pollTimeout);
+          const timeoutSeconds = parseTimeout(
+            opts.pollTimeout,
+            undefined,
+            { flagName: "--poll-timeout", defaultTimeout: 600 },
+          );
 
           process.stderr.write(
             `Polling for approval every ${pollInterval}s (timeout ${timeoutSeconds}s)... Approve at ${result.approval_url}\n`,

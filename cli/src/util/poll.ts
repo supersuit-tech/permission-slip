@@ -28,13 +28,19 @@ const MIN_TIMEOUT = 1;
 const MAX_TIMEOUT = 86400;
 
 /** Parses and clamps a timeout string to a valid range. Warns on invalid input. */
-export function parseTimeout(value: string | undefined, warn: (msg: string) => void = (msg) => process.stderr.write(msg)): number {
+export function parseTimeout(
+  value: string | undefined,
+  warn: (msg: string) => void = (msg) => process.stderr.write(msg),
+  options?: { flagName?: string; defaultTimeout?: number },
+): number {
+  const flagName = options?.flagName ?? "--timeout";
+  const defaultVal = options?.defaultTimeout ?? DEFAULT_TIMEOUT;
   const parsed = Number(value);
   if (value !== undefined && (isNaN(parsed) || parsed <= 0)) {
-    warn(`Warning: invalid --timeout value "${value}", using default ${DEFAULT_TIMEOUT}s\n`);
-    return DEFAULT_TIMEOUT;
+    warn(`Warning: invalid ${flagName} value "${value}", using default ${defaultVal}s\n`);
+    return defaultVal;
   }
-  return Math.max(MIN_TIMEOUT, Math.min(parsed || DEFAULT_TIMEOUT, MAX_TIMEOUT));
+  return Math.max(MIN_TIMEOUT, Math.min(parsed || defaultVal, MAX_TIMEOUT));
 }
 
 function sleep(ms: number): Promise<void> {

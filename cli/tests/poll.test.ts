@@ -409,4 +409,20 @@ describe("parseTimeout", () => {
     parseTimeout("30", (msg) => warnings.push(msg));
     expect(warnings).toHaveLength(0);
   });
+
+  it("uses custom flag name in warning", () => {
+    const warnings: string[] = [];
+    parseTimeout("bad", (msg) => warnings.push(msg), { flagName: "--poll-timeout" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("invalid --poll-timeout");
+    expect(warnings[0]).not.toContain("invalid --timeout ");
+  });
+
+  it("uses custom default timeout", () => {
+    expect(parseTimeout(undefined, noop, { defaultTimeout: 600 })).toBe(600);
+  });
+
+  it("uses custom default on invalid value", () => {
+    expect(parseTimeout("bad", noop, { defaultTimeout: 600 })).toBe(600);
+  });
 });
