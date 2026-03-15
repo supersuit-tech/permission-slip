@@ -207,6 +207,7 @@ func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /billing/downgrade", requireProfile(handleDowngrade(deps)))
 	mux.Handle("GET /billing/invoices", requireProfile(handleListInvoices(deps)))
 	mux.Handle("POST /billing/activate", requireProfile(handleActivateUpgrade(deps)))
+	mux.Handle("POST /billing/portal", requireProfile(handleBillingPortal(deps)))
 }
 
 // ── GET /billing/plan ────────────────────────────────────────────────────────
@@ -236,12 +237,17 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			Subscription: newBillingSubscription(sub),
 		}
 
-		// Check actual payment methods rather than relying on Stripe customer ID.
+		// A user "has a payment method" if they have local payment methods
+		// (for agent-initiated purchases) OR an active paid Stripe subscription.
+		// Gate on plan_id != free to avoid false positives for downgraded users
+		// whose stripe_subscription_id was never cleared.
+		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree
 		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetBillingPlan: count payment methods: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
+			resp.Subscription.HasPaymentMethod = hasStripeSubscription
 		} else {
-			resp.Subscription.HasPaymentMethod = pmCount > 0
+			resp.Subscription.HasPaymentMethod = pmCount > 0 || hasStripeSubscription
 		}
 
 		// Gather usage counts (non-fatal — return zeros on error).
@@ -304,12 +310,17 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			PlanLimits:          newPlanLimits(&sub.Plan),
 		}
 
-		// Check actual payment methods rather than relying on Stripe customer ID.
+		// A user "has a payment method" if they have local payment methods
+		// (for agent-initiated purchases) OR an active paid Stripe subscription.
+		// Gate on plan_id != free to avoid false positives for downgraded users
+		// whose stripe_subscription_id was never cleared.
+		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree
 		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetSubscription: count payment methods: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
+			resp.HasPaymentMethod = hasStripeSubscription
 		} else {
-			resp.HasPaymentMethod = pmCount > 0
+			resp.HasPaymentMethod = pmCount > 0 || hasStripeSubscription
 		}
 
 		// Attach current period usage if available (non-fatal — subscription
@@ -673,6 +684,46 @@ func handleListInvoices(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, invoiceListResponse{Invoices: invoices, HasMore: hasMore})
+	}
+}
+
+// ── POST /billing/portal ─────────────────────────────────────────────────
+
+type portalResponse struct {
+	URL string `json:"url"`
+}
+
+func handleBillingPortal(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		if deps.Stripe == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
+			return
+		}
+
+		sub, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] BillingPortal: subscription lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch subscription"))
+			return
+		}
+		if sub == nil || sub.StripeCustomerID == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No billing account found"))
+			return
+		}
+
+		returnURL := deps.BaseURL + "/settings/billing"
+		portalURL, err := deps.Stripe.CreateBillingPortalSession(r.Context(), *sub.StripeCustomerID, returnURL)
+		if err != nil {
+			log.Printf("[%s] BillingPortal: Stripe portal: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to create billing portal session"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, portalResponse{URL: portalURL})
 	}
 }
 

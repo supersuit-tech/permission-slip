@@ -185,6 +185,78 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	}
 }
 
+func TestGetBillingPlan_HasPaymentMethodTrueViaStripeSubscription(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+
+	// Set stripe_subscription_id but do NOT insert any local payment methods.
+	custID := "cus_paid"
+	subID := "sub_active"
+	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &custID, &subID); err != nil {
+		t.Fatalf("UpdateSubscriptionStripe: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if !resp.Subscription.HasPaymentMethod {
+		t.Error("expected has_payment_method=true for paid user with stripe_subscription_id and no local payment methods")
+	}
+}
+
+func TestGetBillingPlan_HasPaymentMethodFalseAfterDowngrade(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Simulate a downgraded user: free plan but stale stripe_subscription_id.
+	custID := "cus_downgraded"
+	subID := "sub_cancelled"
+	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &custID, &subID); err != nil {
+		t.Fatalf("UpdateSubscriptionStripe: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Subscription.HasPaymentMethod {
+		t.Error("expected has_payment_method=false for downgraded user with stale stripe_subscription_id")
+	}
+}
+
 // ── GET /billing/subscription ─────────────────────────────────────────────
 
 func TestGetSubscription_ReturnsSubscription(t *testing.T) {
@@ -975,6 +1047,50 @@ func TestListInvoices_NoSubscription(t *testing.T) {
 	}
 	if len(resp.Invoices) != 0 {
 		t.Errorf("expected empty invoices list, got %d", len(resp.Invoices))
+	}
+}
+
+// ── POST /billing/portal ─────────────────────────────────────────────────
+
+func TestBillingPortal_RequiresStripeClient(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// No Stripe client → 503.
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/billing/portal", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBillingPortal_NoCustomerID_Returns404(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Stripe client present but user has no stripe_customer_id → 404.
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/billing/portal", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Receipt,
-  CreditCard,
   ExternalLink,
   Loader2,
 } from "lucide-react";
@@ -15,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useDowngradePlan } from "@/hooks/useDowngradePlan";
+import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { useBillingInvoices } from "@/hooks/useBillingInvoices";
 import type { Subscription, UsageSummary } from "@/hooks/useBillingPlan";
@@ -39,6 +39,35 @@ function CostEstimate() {
 
   const totalCents = usage.requests.cost_cents + usage.sms.cost_cents;
   return <span className="text-sm text-muted-foreground tabular-nums">{formatCents(totalCents)}</span>;
+}
+
+function ManageSubscriptionLink() {
+  const { openPortal, isLoading } = useBillingPortal();
+
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium">Subscription</span>
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto p-0 text-sm"
+        onClick={() => {
+          openPortal().catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : "Failed to open billing portal";
+            toast.error(message);
+          });
+        }}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <Loader2 className="mr-1 size-3.5 animate-spin" />
+        ) : (
+          <ExternalLink className="mr-1 size-3.5" />
+        )}
+        Manage on Stripe
+      </Button>
+    </div>
+  );
 }
 
 function InvoicesList() {
@@ -161,19 +190,7 @@ export function PlanDetailsCard({ subscription, usage }: PlanDetailsCardProps) {
               <span className="text-sm font-medium">Estimated Cost (this month)</span>
               <CostEstimate />
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Payment Method</span>
-              <span className="text-sm text-muted-foreground">
-                {subscription.has_payment_method ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <CreditCard className="size-3.5" />
-                    On file
-                  </span>
-                ) : (
-                  "None"
-                )}
-              </span>
-            </div>
+            {subscription.can_downgrade && <ManageSubscriptionLink />}
           </div>
 
           <div className="space-y-2">
