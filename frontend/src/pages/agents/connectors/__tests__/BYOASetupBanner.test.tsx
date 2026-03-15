@@ -124,7 +124,7 @@ describe("BYOASetupBanner", () => {
     });
     expect(link).toHaveAttribute(
       "href",
-      "https://login.salesforce.com/",
+      "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_oauth_and_connected_apps.htm",
     );
     expect(link).toHaveAttribute("target", "_blank");
   });
@@ -209,6 +209,98 @@ describe("BYOASetupBanner", () => {
         },
       });
     });
+  });
+
+  it("hides banner and enables Connect after saving credentials", async () => {
+    const user = userEvent.setup();
+
+    // Track calls to the providers endpoint so we can switch the response
+    // after the BYOA config save triggers a React Query invalidation.
+    let providerCallCount = 0;
+    const defaults: Record<string, unknown> = {
+      "/v1/credentials": { data: { credentials: [] } },
+      "/v1/oauth/connections": { data: { connections: [] } },
+      "/v1/oauth/provider-configs": { data: { configs: [] } },
+    };
+    mockGet.mockImplementation((path: string, ..._args: unknown[]) => {
+      if (
+        path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential"
+      ) {
+        return Promise.resolve({
+          data: {
+            agent_id: 42,
+            connector_id: "salesforce",
+            credential_id: null,
+            oauth_connection_id: null,
+          },
+        });
+      }
+      if (path === "/v1/oauth/providers") {
+        providerCallCount++;
+        // After the first fetch, return has_credentials: true
+        // (simulating React Query refetch after invalidation)
+        const hasCredentials = providerCallCount > 1;
+        return Promise.resolve({
+          data: {
+            providers: [
+              {
+                id: "salesforce",
+                has_credentials: hasCredentials,
+                source: hasCredentials ? "byoa" : "manifest",
+              },
+            ],
+          },
+        });
+      }
+      const match = defaults[path];
+      if (match) return Promise.resolve(match);
+      return Promise.resolve({ data: {} });
+    });
+
+    mockPost.mockResolvedValue({
+      data: {
+        provider: "salesforce",
+        created_at: "2026-03-15T10:00:00Z",
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        agentId={42}
+        connectorId="salesforce"
+        requiredCredentials={salesforceOAuth}
+      />,
+    );
+
+    await openManageModal(user);
+
+    // Banner should be visible initially
+    await waitFor(() => {
+      expect(
+        screen.getByText("OAuth app setup required"),
+      ).toBeInTheDocument();
+    });
+
+    // Save credentials through the dialog
+    await user.click(
+      screen.getByRole("button", { name: /Configure credentials/ }),
+    );
+    await user.type(screen.getByLabelText("Client ID"), "my-client-id");
+    await user.type(screen.getByLabelText("Client Secret"), "my-secret");
+    await user.click(screen.getByRole("button", { name: "Save Credentials" }));
+
+    // After save + React Query invalidation, banner should disappear
+    // and Connect button should be enabled
+    await waitFor(() => {
+      expect(
+        screen.queryByText("OAuth app setup required"),
+      ).not.toBeInTheDocument();
+    });
+
+    const connectBtn = screen.getByRole("button", {
+      name: /Connect Salesforce/,
+    });
+    expect(connectBtn).not.toBeDisabled();
   });
 
   it("does not show banner when provider has credentials", async () => {
