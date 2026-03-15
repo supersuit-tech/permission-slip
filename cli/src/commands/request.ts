@@ -88,7 +88,7 @@ export function requestCommand(program: Command): void {
           throw new Error("--wait and --poll are mutually exclusive. Use one or the other.");
         }
 
-        if (!opts.wait && !opts.poll && opts.timeout !== "120") {
+        if (!opts.wait && opts.timeout !== "120") {
           process.stderr.write("Warning: --timeout has no effect without --wait\n");
         }
         // Note: these comparisons miss the case where the flag is explicitly passed
