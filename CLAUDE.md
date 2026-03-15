@@ -8,7 +8,7 @@
 - After making the first commit on a branch, automatically create a pull request using `gh pr create`. Use a concise title and include a descriptive body with a summary and test plan. For subsequent commits, push to the existing PR branch.
 - When suggesting a PR body that includes a checklist, **split the checklist into two sections** based on who should handle each item:
   - `### Claude Code` — items that Claude Code can address autonomously (e.g., add tests, fix lint, update docs, add error handling, run checks). The `/watch` command will pick these up and check them off.
-  - `### OpenClaw` — items that require human judgment, manual verification, design review, stakeholder input, or access to systems Claude Code can't reach.
+  - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that Claude Code can't perform.
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
@@ -210,6 +210,7 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 
 ## GitHub Issues
 
+- **Ask clarifying questions before creating the issue.** If a task has open design decisions, ambiguous requirements, or choices that need human judgment, ask the user directly in chat first. Do not create an issue with unresolved questions embedded in it — resolve them upfront so the issue is actionable from the start.
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
 
