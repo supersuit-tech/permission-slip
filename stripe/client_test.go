@@ -82,3 +82,18 @@ func TestWebhookSecret(t *testing.T) {
 		t.Errorf("expected webhook secret %q, got %q", secret, client.WebhookSecret())
 	}
 }
+
+func TestGetRequestPrice_NilWhenNotFetched(t *testing.T) {
+	client := New(Config{})
+	if rp := client.GetRequestPrice(); rp != nil {
+		t.Errorf("expected nil request price before fetch, got %+v", rp)
+	}
+}
+
+func TestRequestPriceDisplay_FallbackToPlansJSON(t *testing.T) {
+	client := New(Config{})
+	display := client.RequestPriceDisplay()
+	if display != "$0.005" {
+		t.Errorf("expected fallback $0.005, got %q", display)
+	}
+}
