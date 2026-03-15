@@ -63,6 +63,9 @@ export function requestCommand(program: Command): void {
 
         const result = await client.requestApproval(opts.action, params, context);
 
+        if (!opts.wait && opts.timeout !== "120") {
+          process.stderr.write("Warning: --timeout has no effect without --wait\n");
+        }
         if (!opts.wait) {
           // Default: return immediately with next_step hint.
           output(
