@@ -185,6 +185,42 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	}
 }
 
+func TestGetBillingPlan_HasPaymentMethodFalseAfterDowngrade(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Simulate a downgraded user: free plan but stale stripe_subscription_id.
+	custID := "cus_downgraded"
+	subID := "sub_cancelled"
+	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &custID, &subID); err != nil {
+		t.Fatalf("UpdateSubscriptionStripe: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Subscription.HasPaymentMethod {
+		t.Error("expected has_payment_method=false for downgraded user with stale stripe_subscription_id")
+	}
+}
+
 // ── GET /billing/subscription ─────────────────────────────────────────────
 
 func TestGetSubscription_ReturnsSubscription(t *testing.T) {

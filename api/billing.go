@@ -238,9 +238,10 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 		}
 
 		// A user "has a payment method" if they have local payment methods
-		// (for agent-initiated purchases) OR an active Stripe subscription
-		// (which means they provided Stripe with a payment method at checkout).
-		hasStripeSubscription := sub.StripeSubscriptionID != nil
+		// (for agent-initiated purchases) OR an active paid Stripe subscription.
+		// Gate on plan_id != free to avoid false positives for downgraded users
+		// whose stripe_subscription_id was never cleared.
+		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree
 		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetBillingPlan: count payment methods: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -310,9 +311,10 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 		}
 
 		// A user "has a payment method" if they have local payment methods
-		// (for agent-initiated purchases) OR an active Stripe subscription
-		// (which means they provided Stripe with a payment method at checkout).
-		hasStripeSubscription := sub.StripeSubscriptionID != nil
+		// (for agent-initiated purchases) OR an active paid Stripe subscription.
+		// Gate on plan_id != free to avoid false positives for downgraded users
+		// whose stripe_subscription_id was never cleared.
+		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree
 		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetSubscription: count payment methods: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
