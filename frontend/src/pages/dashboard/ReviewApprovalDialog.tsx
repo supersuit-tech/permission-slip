@@ -116,13 +116,14 @@ export function ReviewApprovalDialog({
   const [standingDialogOpen, setStandingDialogOpen] = useState(false);
   const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
   const [autoCloseBlocked, setAutoCloseBlocked] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"approve" | "alwaysAllow" | null>(null);
   const isApproved = approveResult !== null;
-  const { approveApproval, isPending: isApproving } = useApproveApproval();
+  const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName } = useActionSchema(approval.action.type);
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
-  const isBusy = isApproving || isDenying;
+  const isBusy = pendingAction !== null || isDenying;
 
   // Data for "Always Allow This"
   const { agents } = useAgents();
@@ -149,11 +150,14 @@ export function ReviewApprovalDialog({
   }, [isApproved, autoCloseBlocked, onOpenChange]);
 
   const handleApprove = useCallback(async () => {
+    setPendingAction("approve");
     try {
       const result = await approveApproval(approval.approval_id);
       setApproveResult(result);
     } catch {
       toast.error("Failed to approve request. Please try again.");
+    } finally {
+      setPendingAction(null);
     }
   }, [approveApproval, approval.approval_id]);
 
@@ -167,10 +171,21 @@ export function ReviewApprovalDialog({
     }
   }, [denyApproval, approval.approval_id, onOpenChange]);
 
-  function handleAlwaysAllow() {
-    setAutoCloseBlocked(true);
-    setStandingDialogOpen(true);
-  }
+  const handleAlwaysAllow = useCallback(async () => {
+    setPendingAction("alwaysAllow");
+    try {
+      const result = await approveApproval(approval.approval_id);
+      setApproveResult(result);
+      setAutoCloseBlocked(true);
+      if (result.execution_status !== "error") {
+        setStandingDialogOpen(true);
+      }
+    } catch {
+      toast.error("Failed to approve request. Please try again.");
+    } finally {
+      setPendingAction(null);
+    }
+  }, [approveApproval, approval.approval_id]);
 
   function handleStandingDialogChange(nextOpen: boolean) {
     setStandingDialogOpen(nextOpen);
@@ -186,6 +201,7 @@ export function ReviewApprovalDialog({
       setApproveResult(null);
       setStandingApprovalCreated(false);
       setAutoCloseBlocked(false);
+      setPendingAction(null);
     }
     onOpenChange(nextOpen);
   }
@@ -317,16 +333,6 @@ export function ReviewApprovalDialog({
             >
               Done
             </Button>
-            {showAlwaysAllow && !standingApprovalCreated && approveResult?.execution_status === "success" && (
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={handleAlwaysAllow}
-              >
-                <ShieldCheck className="mr-1 size-4" />
-                Always Allow This
-              </Button>
-            )}
           </DialogFooter>
         ) : (
           <DialogFooter>
@@ -343,13 +349,31 @@ export function ReviewApprovalDialog({
                 "Deny"
               )}
             </Button>
+            {showAlwaysAllow && (
+              <Button
+                size="lg"
+                variant="secondary"
+                disabled={isBusy || isExpired}
+                onClick={handleAlwaysAllow}
+                aria-label={pendingAction === "alwaysAllow" ? "Approving and creating rule…" : undefined}
+              >
+                {pendingAction === "alwaysAllow" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <>
+                    <ShieldCheck className="mr-1 size-4" />
+                    Always Allow
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               size="lg"
               disabled={isBusy || isExpired}
               onClick={handleApprove}
-              aria-label={isApproving ? "Approving request…" : undefined}
+              aria-label={pendingAction === "approve" ? "Approving request…" : undefined}
             >
-              {isApproving ? (
+              {pendingAction === "approve" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 "Approve"

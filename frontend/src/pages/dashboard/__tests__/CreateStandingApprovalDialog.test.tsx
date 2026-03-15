@@ -298,7 +298,7 @@ describe("CreateStandingApprovalDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("accepts initial props for pre-populated flow", () => {
+  it("accepts initial props and skips to constraints step", () => {
     render(
       <CreateStandingApprovalDialog
         agents={mockAgents}
@@ -311,9 +311,9 @@ describe("CreateStandingApprovalDialog", () => {
       { wrapper },
     );
 
-    // Agent should be pre-selected
-    const select = screen.getByLabelText("Agent") as HTMLSelectElement;
-    expect(select.value).toBe("1");
+    // Should skip to step 3 (constraints), shown as step 1 of 2
+    expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
+    expect(screen.getByText(/Set Constraints/)).toBeInTheDocument();
   });
 
   it("filters out deactivated agents", () => {
