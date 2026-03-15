@@ -81,10 +81,19 @@ export function AgentPaymentMethodSection({
     <>
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="size-5" />
-            Payment Method
-          </CardTitle>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="size-5" />
+              Payment Method
+              <Badge variant="secondary" className="text-xs font-normal">
+                Optional
+              </Badge>
+            </CardTitle>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Only needed if you want this agent to use connector actions that
+              make purchases.
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -104,8 +113,8 @@ export function AgentPaymentMethodSection({
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CreditCard className="text-muted-foreground mb-3 size-10" />
               <p className="text-muted-foreground mb-3 text-sm">
-                No payment methods stored yet. Add a card to enable
-                agent-initiated purchases.
+                No payment methods added yet. You only need a payment method if
+                this agent will use connector actions that make purchases.
               </p>
               <Button
                 variant="outline"
@@ -135,13 +144,13 @@ export function AgentPaymentMethodSection({
                         Assigned
                       </Badge>
                     ) : (
-                      <Badge variant="destructive">Not set</Badge>
+                      <Badge variant="secondary">Not set</Badge>
                     )}
                   </div>
                   <p className="text-muted-foreground text-xs">
                     {currentValue
-                      ? "This agent uses the selected payment method for purchases."
-                      : "Select a payment method for this agent to use for purchases."}
+                      ? "This agent will use the selected payment method for purchases."
+                      : "No payment method assigned. Only needed if this agent uses connector actions that make purchases."}
                   </p>
                   <select
                     id="agent-payment-method-select"

@@ -119,32 +119,17 @@ export function AgentInfoSection({ agent }: { agent: AgentDetail }) {
         </div>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <InfoItem label="Agent ID" value={String(agent.agent_id)} />
-          <InfoItem label="Status" value={agent.status} />
-          <InfoItem
-            label="Registered"
-            value={
-              agent.registered_at
-                ? new Date(agent.registered_at).toLocaleDateString()
-                : "—"
-            }
-          />
-          <InfoItem
-            label="Last Active"
-            value={formatRelativeTime(agent.last_active_at)}
-          />
-        </dl>
+        <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span>
+            Registered{" "}
+            {agent.registered_at
+              ? new Date(agent.registered_at).toLocaleDateString()
+              : "—"}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>Active {formatRelativeTime(agent.last_active_at)}</span>
+        </div>
       </CardContent>
     </Card>
-  );
-}
-
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground font-medium">{label}</dt>
-      <dd className="mt-0.5">{value}</dd>
-    </div>
   );
 }
