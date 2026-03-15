@@ -1,9 +1,9 @@
 /**
  * permission-slip request --action <action_id> [--params '{}'] [--server <url>]
  *
- * Requests one-off approval for an action. By default, blocks until the
- * approval is resolved (approved/denied/cancelled/expired) and returns the
- * execution result. Pass --no-wait for fire-and-forget behavior.
+ * Requests one-off approval for an action. Returns immediately by default
+ * with the approval_id and a next_step hint. Pass --wait to block until
+ * the approval is resolved.
  */
 
 import type { Command } from "commander";
@@ -27,8 +27,8 @@ export function requestCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
-    .option("--no-wait", "Return immediately without waiting for approval")
-    .option("--timeout <seconds>", "Max seconds to wait for approval (default: 120)", "120")
+    .option("--wait", "Block until the approval is resolved (default: return immediately)")
+    .option("--timeout <seconds>", "Max seconds to wait when using --wait (default: 120)", "120")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       action: string;
@@ -37,7 +37,7 @@ export function requestCommand(program: Command): void {
       riskLevel?: string;
       server: string;
       agentId?: string;
-      wait: boolean;
+      wait?: boolean;
       timeout: string;
       pretty?: boolean;
     }) => {
@@ -61,26 +61,29 @@ export function requestCommand(program: Command): void {
               }
             : undefined;
 
+        if (!opts.wait && opts.timeout !== "120") {
+          process.stderr.write("Warning: --timeout has no effect without --wait\n");
+        }
+
         const result = await client.requestApproval(opts.action, params, context);
 
         if (!opts.wait) {
-          // Fire-and-forget: output immediately with next_step hint.
+          // Default: return immediately with next_step hint.
           output(
             {
               ...result,
               next_step:
-                "Your request is pending approval. Once approved, the action will execute automatically — no further action is needed from you. " +
-                "To wait for the outcome, run: " +
-                `permission-slip request-status --approval-id ${shellQuote(result.approval_id)}` +
+                "Approval requested. To wait for the result, run: " +
+                `permission-slip status --wait ${shellQuote(result.approval_id)}` +
                 (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : "") +
-                " (this blocks until resolved; add --no-wait for a single status check)",
+                " (omit --wait for a single status snapshot)",
             },
             outputOpts,
           );
           return;
         }
 
-        // Wait for approval resolution.
+        // --wait: block until approval resolution.
         const timeoutSeconds = parseTimeout(opts.timeout);
 
         process.stderr.write(
