@@ -31,6 +31,7 @@ type connectorActionResponse struct {
 	RiskLevel             *string `json:"risk_level,omitempty"`
 	ParametersSchema      any     `json:"parameters_schema,omitempty"`
 	RequiresPaymentMethod bool    `json:"requires_payment_method"`
+	DisplayTemplate       *string `json:"display_template,omitempty"`
 }
 
 type requiredCredentialResponse struct {
@@ -122,6 +123,7 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 			Description:           a.Description,
 			RiskLevel:             a.RiskLevel,
 			RequiresPaymentMethod: a.RequiresPaymentMethod,
+			DisplayTemplate:       a.DisplayTemplate,
 		}
 		if len(a.ParametersSchema) > 0 {
 			var schema any

@@ -36,6 +36,7 @@ type ConnectorAction struct {
 	RiskLevel             *string
 	ParametersSchema      []byte // raw JSONB
 	RequiresPaymentMethod bool
+	DisplayTemplate       *string
 }
 
 // RequiredCredential represents a row from the connector_required_credentials table.
@@ -92,7 +93,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch actions.
 	actionRows, err := db.Query(ctx,
-		`SELECT action_type, name, description, risk_level, parameters_schema, requires_payment_method
+		`SELECT action_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template
 		 FROM connector_actions
 		 WHERE connector_id = $1
 		 ORDER BY action_type`,
@@ -105,7 +106,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for actionRows.Next() {
 		var a ConnectorAction
-		if err := actionRows.Scan(&a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod); err != nil {
+		if err := actionRows.Scan(&a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod, &a.DisplayTemplate); err != nil {
 			return nil, err
 		}
 		cd.Actions = append(cd.Actions, a)
@@ -249,6 +250,7 @@ type ExternalConnectorAction struct {
 	RiskLevel             string
 	ParametersSchema      []byte // raw JSON
 	RequiresPaymentMethod bool
+	DisplayTemplate       string
 }
 
 // ExternalConnectorCredential describes a required credential from an external connector manifest.
@@ -298,15 +300,16 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	for _, a := range m.Actions {
 		actionTypes = append(actionTypes, a.ActionType)
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_actions (connector_id, action_type, name, description, risk_level, parameters_schema, requires_payment_method)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO connector_actions (connector_id, action_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (connector_id, action_type) DO UPDATE SET
 				name = EXCLUDED.name,
 				description = EXCLUDED.description,
 				risk_level = EXCLUDED.risk_level,
 				parameters_schema = EXCLUDED.parameters_schema,
-				requires_payment_method = EXCLUDED.requires_payment_method`,
-			m.ID, a.ActionType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod)
+				requires_payment_method = EXCLUDED.requires_payment_method,
+				display_template = EXCLUDED.display_template`,
+			m.ID, a.ActionType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod, nilIfEmpty(a.DisplayTemplate))
 		if err != nil {
 			return err
 		}
