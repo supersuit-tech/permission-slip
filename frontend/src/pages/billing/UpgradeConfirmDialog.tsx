@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { BillingPricing } from "@/hooks/useBillingPlan";
 import { PAID_PLAN_FEATURES, PAID_PLAN_PRICING } from "./constants";
 import { FeatureList } from "./FeatureList";
 
@@ -16,6 +17,7 @@ interface UpgradeConfirmDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   isPending: boolean;
+  pricing?: BillingPricing;
 }
 
 export function UpgradeConfirmDialog({
@@ -23,7 +25,12 @@ export function UpgradeConfirmDialog({
   onOpenChange,
   onConfirm,
   isPending,
+  pricing,
 }: UpgradeConfirmDialogProps) {
+  const pricingText = pricing
+    ? `First ${pricing.free_request_allowance.toLocaleString()} requests/month are free. After that, ${pricing.price_per_request_display}/request.`
+    : PAID_PLAN_PRICING;
+
   return (
     <Dialog open={open} onOpenChange={isPending ? undefined : onOpenChange}>
       <DialogContent>
@@ -44,7 +51,7 @@ export function UpgradeConfirmDialog({
           <div className="rounded-lg border p-4 space-y-1">
             <h3 className="text-sm font-semibold">Pricing</h3>
             <p className="text-sm text-muted-foreground">
-              {PAID_PLAN_PRICING}
+              {pricingText}
             </p>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { PolicyLayout } from "./PolicyLayout";
 import { GITHUB_REPO_URL } from "@/lib/links";
 import { freePlan, paidPlan, formatLimit } from "@/config/plans";
+import { PRICE_PER_REQUEST } from "@/pages/billing/constants";
 
 export function TermsOfServicePage() {
   return (
@@ -110,7 +111,7 @@ export function TermsOfServicePage() {
         <li>Community support (GitHub Issues)</li>
       </ul>
 
-      <h3>5.3 Pay-as-You-Go &mdash; ${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}/request</h3>
+      <h3>5.3 Pay-as-You-Go &mdash; {PRICE_PER_REQUEST}/request</h3>
       <ul>
         <li>First {formatLimit(freePlan.max_requests_per_month)} requests per month free</li>
         <li>

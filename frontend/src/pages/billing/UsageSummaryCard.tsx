@@ -6,13 +6,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Plan, UsageSummary } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, UsageSummary } from "@/hooks/useBillingPlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { FREE_REQUEST_ALLOWANCE, PRICE_PER_REQUEST } from "./constants";
 
 interface UsageSummaryCardProps {
   usage: UsageSummary;
   plan: Plan;
+  pricing?: BillingPricing;
 }
 
 interface UsageRowProps {
@@ -54,7 +55,7 @@ function UsageRow({ label, current, limit }: UsageRowProps) {
 }
 
 /** Request usage row for paid plans — shows progress against the free allowance. */
-function PaidRequestRow({ current, included }: { current: number; included: number }) {
+function PaidRequestRow({ current, included, priceDisplay }: { current: number; included: number; priceDisplay: string }) {
   const allowance = included;
   const overage = Math.max(0, current - allowance);
   const hasOverage = overage > 0;
@@ -84,18 +85,19 @@ function PaidRequestRow({ current, included }: { current: number; included: numb
       </div>
       <p className="text-xs text-muted-foreground">
         {hasOverage
-          ? `${allowance.toLocaleString()} free + ${overage.toLocaleString()} at ${PRICE_PER_REQUEST}/request`
-          : `First ${allowance.toLocaleString()} requests/month are free, then ${PRICE_PER_REQUEST}/request`}
+          ? `${allowance.toLocaleString()} free + ${overage.toLocaleString()} at ${priceDisplay}/request`
+          : `First ${allowance.toLocaleString()} requests/month are free, then ${priceDisplay}/request`}
       </p>
     </div>
   );
 }
 
-export function UsageSummaryCard({ usage, plan }: UsageSummaryCardProps) {
+export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps) {
   const isPaid = plan.id !== "free";
   const { usage: usageDetail } = useBillingUsage();
   // Use server-provided included value, fall back to config constant.
   const included = usageDetail?.requests.included ?? FREE_REQUEST_ALLOWANCE;
+  const priceDisplay = pricing?.price_per_request_display ?? PRICE_PER_REQUEST;
 
   return (
     <Card>
@@ -111,7 +113,7 @@ export function UsageSummaryCard({ usage, plan }: UsageSummaryCardProps) {
       <CardContent>
         <div className="space-y-4">
           {isPaid ? (
-            <PaidRequestRow current={usage.requests} included={included} />
+            <PaidRequestRow current={usage.requests} included={included} priceDisplay={priceDisplay} />
           ) : (
             <UsageRow
               label="Requests"

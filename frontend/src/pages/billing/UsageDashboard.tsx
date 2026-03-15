@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
-import type { Plan, Subscription } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, Subscription } from "@/hooks/useBillingPlan";
 import { formatCents, formatDate } from "./formatters";
 import { RequestUsageBar } from "./RequestUsageBar";
 import { AgentBreakdownTable } from "./AgentBreakdownTable";
@@ -15,6 +15,7 @@ import { AgentBreakdownTable } from "./AgentBreakdownTable";
 interface UsageDashboardProps {
   plan: Plan;
   subscription: Subscription;
+  pricing?: BillingPricing;
 }
 
 function daysRemaining(periodEnd: string): number {
@@ -24,7 +25,7 @@ function daysRemaining(periodEnd: string): number {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-export function UsageDashboard({ plan, subscription }: UsageDashboardProps) {
+export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardProps) {
   const { usage, isLoading, error } = useBillingUsage();
   const isFree = plan.id === "free";
   const days = daysRemaining(subscription.current_period_end);
@@ -87,6 +88,7 @@ export function UsageDashboard({ plan, subscription }: UsageDashboardProps) {
               total={usage.requests.total}
               limit={plan.max_requests_per_month ?? null}
               included={usage.requests.included}
+              priceDisplay={pricing?.price_per_request_display}
             />
 
             <div className="grid grid-cols-2 gap-4">
