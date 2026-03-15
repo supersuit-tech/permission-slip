@@ -97,17 +97,20 @@ export function BillingPage() {
           <PlanCard
             plan={billingPlan.plan}
             subscription={billingPlan.subscription}
+            pricing={billingPlan.pricing}
           />
           <UsageSummaryCard
             usage={billingPlan.usage}
             plan={billingPlan.plan}
+            pricing={billingPlan.pricing}
           />
           <UsageDashboard
             plan={billingPlan.plan}
             subscription={billingPlan.subscription}
+            pricing={billingPlan.pricing}
           />
           {billingPlan.subscription.can_upgrade && (
-            <UpgradeCTA plan={billingPlan.plan} />
+            <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
           )}
           {billingPlan.subscription.can_downgrade && (
             <PlanDetailsCard

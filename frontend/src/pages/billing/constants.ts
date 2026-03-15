@@ -1,10 +1,10 @@
-import { freePlan, paidPlan, formatLimit } from "@/config/plans";
+import { freePlan, paidPlan, formatLimit, PRICE_PER_REQUEST } from "@/config/plans";
 
 /** Number of free requests included per month for all plans. */
 export const FREE_REQUEST_ALLOWANCE: number = freePlan.max_requests_per_month ?? 250;
 
-/** Formatted per-request price string (e.g. "$0.005"). */
-export const PRICE_PER_REQUEST = `$${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}`;
+// Re-export for backward compatibility — canonical definition is in @/config/plans.
+export { PRICE_PER_REQUEST };
 
 /** Features included in the paid (Pay-as-you-go) plan. */
 export const PAID_PLAN_FEATURES = [

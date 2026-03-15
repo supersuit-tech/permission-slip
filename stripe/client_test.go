@@ -82,3 +82,28 @@ func TestWebhookSecret(t *testing.T) {
 		t.Errorf("expected webhook secret %q, got %q", secret, client.WebhookSecret())
 	}
 }
+
+func TestGetRequestPrice_NilWhenNotFetched(t *testing.T) {
+	client := New(Config{})
+	if rp := client.GetRequestPrice(); rp != nil {
+		t.Errorf("expected nil request price before fetch, got %+v", rp)
+	}
+}
+
+func TestRequestPriceDisplay_FallbackToPlansJSON(t *testing.T) {
+	client := New(Config{})
+	display := client.RequestPriceDisplay()
+	if display != "$0.005" {
+		t.Errorf("expected fallback $0.005, got %q", display)
+	}
+}
+
+func TestRequestPriceDisplay_PackageLevel(t *testing.T) {
+	// Package-level function should work even without explicit client setup
+	// (New() sets cachedClient).
+	_ = New(Config{})
+	display := RequestPriceDisplay()
+	if display != "$0.005" {
+		t.Errorf("expected package-level fallback $0.005, got %q", display)
+	}
+}

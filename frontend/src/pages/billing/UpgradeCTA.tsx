@@ -10,15 +10,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useUpgradePlan } from "@/hooks/useUpgradePlan";
-import type { Plan } from "@/hooks/useBillingPlan";
-import { paidPlan } from "@/config/plans";
+import type { BillingPricing, Plan } from "@/hooks/useBillingPlan";
 import { isStripeUrl } from "./formatters";
-import { PAID_PLAN_FEATURES } from "./constants";
+import { PAID_PLAN_FEATURES, PRICE_PER_REQUEST } from "./constants";
 import { FeatureList } from "./FeatureList";
 import { UpgradeConfirmDialog } from "./UpgradeConfirmDialog";
 
 interface UpgradeCTAProps {
   plan: Plan;
+  pricing?: BillingPricing;
 }
 
 function formatLimit(value: number | null | undefined, unit: string): string {
@@ -41,7 +41,8 @@ const PAID_FEATURES = [
   ...PAID_PLAN_FEATURES,
 ];
 
-export function UpgradeCTA({ plan }: UpgradeCTAProps) {
+export function UpgradeCTA({ plan, pricing }: UpgradeCTAProps) {
+  const priceDisplay = pricing?.price_per_request_display ?? PRICE_PER_REQUEST;
   const { upgrade, isUpgrading } = useUpgradePlan();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -89,7 +90,7 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
             </div>
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
               <h3 className="text-sm font-semibold">Pay-as-you-go</h3>
-              <p className="text-xs text-muted-foreground">${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}/request after free tier</p>
+              <p className="text-xs text-muted-foreground">{priceDisplay}/request after free tier</p>
               <FeatureList features={PAID_FEATURES} />
             </div>
           </div>
@@ -111,6 +112,7 @@ export function UpgradeCTA({ plan }: UpgradeCTAProps) {
         onOpenChange={setShowConfirm}
         onConfirm={handleUpgrade}
         isPending={isPending}
+        pricing={pricing}
       />
     </>
   );

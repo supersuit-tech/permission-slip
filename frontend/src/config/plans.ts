@@ -52,3 +52,6 @@ export const paidPlan: PlanConfig = paidPlanRaw;
 export function formatLimit(n: number): string {
   return n.toLocaleString();
 }
+
+/** Formatted per-request price string (e.g. "$0.005"), derived from plans.json. */
+export const PRICE_PER_REQUEST = `$${(paidPlan.price_per_request_millicents / 100_000).toFixed(3)}`;

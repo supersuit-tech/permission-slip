@@ -119,6 +119,13 @@ type billingPlanResponse struct {
 	Plan         billingPlan         `json:"plan"`
 	Subscription billingSubscription `json:"subscription"`
 	Usage        billingUsageSummary `json:"usage"`
+	Pricing      *billingPricing     `json:"pricing,omitempty"`
+}
+
+// billingPricing provides pricing information sourced from Stripe.
+type billingPricing struct {
+	FreeRequestAllowance   int    `json:"free_request_allowance"`
+	PricePerRequestDisplay string `json:"price_per_request_display"`
 }
 
 type billingPlan struct {
@@ -235,6 +242,13 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 				planLimits: newPlanLimits(&sub.Plan),
 			},
 			Subscription: newBillingSubscription(sub),
+		}
+
+		// Include pricing info for all plans so the upgrade flow can show
+		// Stripe-sourced pricing to free users considering an upgrade.
+		resp.Pricing = &billingPricing{
+			FreeRequestAllowance:   int(pstripe.FreeRequestAllowance()),
+			PricePerRequestDisplay: pstripe.RequestPriceDisplay(),
 		}
 
 		// A user "has a payment method" if they have local payment methods

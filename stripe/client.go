@@ -3,7 +3,9 @@ package stripe
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	gostripe "github.com/stripe/stripe-go/v82"
 	billingportalsession "github.com/stripe/stripe-go/v82/billingportal/session"
@@ -12,6 +14,7 @@ import (
 	"github.com/stripe/stripe-go/v82/invoice"
 	"github.com/stripe/stripe-go/v82/invoiceitem"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
+	"github.com/stripe/stripe-go/v82/price"
 	"github.com/stripe/stripe-go/v82/setupintent"
 	"github.com/stripe/stripe-go/v82/subscription"
 
@@ -29,6 +32,19 @@ type Config struct {
 // All methods are context-aware and return typed errors.
 type Client struct {
 	cfg Config
+
+	// requestPrice caches the per-request price fetched from Stripe at init.
+	// Zero means Stripe was unavailable; callers should fall back to plans.json.
+	requestPriceMu sync.RWMutex
+	requestPrice   *RequestPrice
+}
+
+// RequestPrice holds the per-request pricing fetched from Stripe.
+type RequestPrice struct {
+	// UnitAmountDecimal is the price in cents (e.g. 0.5 for $0.005).
+	UnitAmountDecimal float64
+	// DisplayAmount is a human-readable string like "$0.005".
+	DisplayAmount string
 }
 
 // keyMu protects writes to gostripe.Key so parallel tests don't race.
@@ -41,12 +57,99 @@ func New(cfg Config) *Client {
 	keyMu.Lock()
 	gostripe.Key = cfg.SecretKey
 	keyMu.Unlock()
-	return &Client{cfg: cfg}
+	c := &Client{cfg: cfg}
+	cachedClientMu.Lock()
+	cachedClient = c
+	cachedClientMu.Unlock()
+	return c
 }
 
 // WebhookSecret returns the webhook signing secret for signature verification.
 func (c *Client) WebhookSecret() string {
 	return c.cfg.WebhookSecret
+}
+
+// FetchRequestPrice fetches the per-request price from Stripe and caches it.
+// Should be called once at startup. Uses a 10-second timeout to avoid blocking
+// startup if Stripe is unreachable. If Stripe is unavailable, the cached value
+// stays nil and GetRequestPrice returns the fallback from plans.json.
+func (c *Client) FetchRequestPrice() {
+	if c.cfg.PriceIDRequest == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	params := &gostripe.PriceParams{}
+	params.Context = ctx
+	p, err := price.Get(c.cfg.PriceIDRequest, params)
+	if err != nil {
+		log.Printf("stripe: failed to fetch request price %s: %v", c.cfg.PriceIDRequest, err)
+		return
+	}
+
+	// Guard against zero/null unit_amount_decimal (e.g. tiered pricing).
+	if p.UnitAmountDecimal <= 0 {
+		log.Printf("stripe: request price %s has zero/null unit_amount_decimal — using fallback", c.cfg.PriceIDRequest)
+		return
+	}
+
+	rp := &RequestPrice{
+		UnitAmountDecimal: p.UnitAmountDecimal,
+	}
+	// Format as "$X.XXX" from cents decimal (e.g. 0.5 cents = $0.005).
+	dollars := p.UnitAmountDecimal / 100.0
+	rp.DisplayAmount = fmt.Sprintf("$%.3f", dollars)
+
+	c.requestPriceMu.Lock()
+	c.requestPrice = rp
+	c.requestPriceMu.Unlock()
+}
+
+// GetRequestPrice returns the cached per-request price from Stripe.
+// Returns nil if Stripe was unavailable; callers should fall back to plans.json.
+func (c *Client) GetRequestPrice() *RequestPrice {
+	c.requestPriceMu.RLock()
+	defer c.requestPriceMu.RUnlock()
+	return c.requestPrice
+}
+
+// RequestPriceDisplay returns the display string for the per-request price.
+// Falls back to plans.json if Stripe price is not cached.
+func (c *Client) RequestPriceDisplay() string {
+	if rp := c.GetRequestPrice(); rp != nil {
+		return rp.DisplayAmount
+	}
+	return fallbackPriceDisplay()
+}
+
+// cachedClient holds a reference to the last-created Client for the package-level
+// RequestPriceDisplay function. Set by New().
+var (
+	cachedClientMu sync.RWMutex
+	cachedClient   *Client
+)
+
+// RequestPriceDisplay is a package-level function that returns the display string
+// for the per-request price. Uses the cached Stripe price if available, otherwise
+// falls back to plans.json. Safe to call even when no Stripe client is configured.
+func RequestPriceDisplay() string {
+	cachedClientMu.RLock()
+	c := cachedClient
+	cachedClientMu.RUnlock()
+	if c != nil {
+		return c.RequestPriceDisplay()
+	}
+	return fallbackPriceDisplay()
+}
+
+// fallbackPriceDisplay derives the price display from plans.json.
+func fallbackPriceDisplay() string {
+	p := config.GetPlan(config.PlanPayAsYouGo)
+	if p != nil && p.PricePerRequestMillicents > 0 {
+		dollars := float64(p.PricePerRequestMillicents) / 100_000.0
+		return fmt.Sprintf("$%.3f", dollars)
+	}
+	return "$0.005"
 }
 
 // CreateCustomer creates a new Stripe Customer linked to a user.

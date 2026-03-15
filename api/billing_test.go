@@ -183,6 +183,48 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	if !resp.Subscription.HasPaymentMethod {
 		t.Error("expected has_payment_method=true when payment method exists")
 	}
+	// Pricing should be present for paid plans with fallback values.
+	if resp.Pricing == nil {
+		t.Fatal("expected pricing to be present for paid plan")
+	}
+	if resp.Pricing.FreeRequestAllowance != 250 {
+		t.Errorf("expected free_request_allowance=250, got %d", resp.Pricing.FreeRequestAllowance)
+	}
+	if resp.Pricing.PricePerRequestDisplay != "$0.005" {
+		t.Errorf("expected price_per_request_display=$0.005, got %s", resp.Pricing.PricePerRequestDisplay)
+	}
+}
+
+func TestGetBillingPlan_FreePlan_IncludesPricing(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	// Pricing is included for all plans so the upgrade flow can show Stripe-sourced pricing.
+	if resp.Pricing == nil {
+		t.Fatal("expected pricing to be present for free plan (for upgrade flow)")
+	}
+	if resp.Pricing.FreeRequestAllowance != 250 {
+		t.Errorf("expected free_request_allowance=250, got %d", resp.Pricing.FreeRequestAllowance)
+	}
 }
 
 func TestGetBillingPlan_HasPaymentMethodTrueViaStripeSubscription(t *testing.T) {

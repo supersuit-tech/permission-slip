@@ -8,6 +8,7 @@ export type BillingPlanResponse = components["schemas"]["BillingPlanResponse"];
 export type Plan = components["schemas"]["Plan"];
 export type Subscription = components["schemas"]["Subscription"];
 export type UsageSummary = components["schemas"]["UsageSummary"];
+export type BillingPricing = components["schemas"]["BillingPricing"];
 
 export function useBillingPlan() {
   const { session } = useAuth();

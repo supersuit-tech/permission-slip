@@ -5,13 +5,15 @@ interface RequestUsageBarProps {
   limit: number | null;
   /** Free request allowance for paid plans (e.g. 250). */
   included?: number;
+  /** Per-request price display string from API (e.g. "$0.005"). Falls back to config constant. */
+  priceDisplay?: string;
 }
 
 /**
  * Segmented bar for paid plans showing free vs billed requests.
  * Green portion = free allowance, amber = billed overage.
  */
-function PaidRequestBar({ total, included }: { total: number; included: number }) {
+function PaidRequestBar({ total, included, priceDisplay }: { total: number; included: number; priceDisplay: string }) {
   const overage = Math.max(0, total - included);
   const hasOverage = overage > 0;
 
@@ -54,17 +56,18 @@ function PaidRequestBar({ total, included }: { total: number; included: number }
       </div>
       <p className="text-xs text-muted-foreground">
         {hasOverage
-          ? `${included.toLocaleString()} free + ${overage.toLocaleString()} at ${PRICE_PER_REQUEST}/request`
-          : `First ${included.toLocaleString()} requests/month are free, then ${PRICE_PER_REQUEST}/request`}
+          ? `${included.toLocaleString()} free + ${overage.toLocaleString()} at ${priceDisplay}/request`
+          : `First ${included.toLocaleString()} requests/month are free, then ${priceDisplay}/request`}
       </p>
     </div>
   );
 }
 
-export function RequestUsageBar({ total, limit, included }: RequestUsageBarProps) {
+export function RequestUsageBar({ total, limit, included, priceDisplay }: RequestUsageBarProps) {
+  const price = priceDisplay ?? PRICE_PER_REQUEST;
   // Paid plan with free allowance: show segmented bar.
   if (limit === null && included != null && included > 0) {
-    return <PaidRequestBar total={total} included={included} />;
+    return <PaidRequestBar total={total} included={included} priceDisplay={price} />;
   }
 
   const isUnlimited = limit === null;
