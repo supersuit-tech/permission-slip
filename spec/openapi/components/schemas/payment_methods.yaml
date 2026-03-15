@@ -141,7 +141,12 @@ DeletePaymentMethodResponse:
   type: object
   required:
     - deleted
+    - affected_agents
   properties:
     deleted:
       type: boolean
       description: Always true on successful deletion
+    affected_agents:
+      type: integer
+      minimum: 0
+      description: Number of agents that had this payment method assigned (bindings are cascade-deleted)
