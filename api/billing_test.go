@@ -185,6 +185,42 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	}
 }
 
+func TestGetBillingPlan_HasPaymentMethodTrueViaStripeSubscription(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+
+	// Set stripe_subscription_id but do NOT insert any local payment methods.
+	custID := "cus_paid"
+	subID := "sub_active"
+	if _, err := db.UpdateSubscriptionStripe(ctx, tx, uid, &custID, &subID); err != nil {
+		t.Fatalf("UpdateSubscriptionStripe: %v", err)
+	}
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if !resp.Subscription.HasPaymentMethod {
+		t.Error("expected has_payment_method=true for paid user with stripe_subscription_id and no local payment methods")
+	}
+}
+
 func TestGetBillingPlan_HasPaymentMethodFalseAfterDowngrade(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
