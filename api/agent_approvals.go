@@ -209,17 +209,18 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		// Best-effort: resolve human-readable resource details for the action.
 		var resourceDetails []byte
 		if deps.Connectors != nil {
-			connectorID := connectorIDFromActionType(actionType)
-			if conn, ok := deps.Connectors.Get(connectorID); ok {
-				if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
-					resolveCtx, resolveCancel := context.WithTimeout(r.Context(), 5*time.Second)
-					details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCredentialsForResolver(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, connectorID))
-					resolveCancel()
-					if resolveErr != nil {
-						log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
-					} else if details != nil {
-						if encoded, encErr := json.Marshal(details); encErr == nil {
-							resourceDetails = encoded
+			if cid := strings.SplitN(actionType, ".", 2); len(cid) == 2 {
+				if conn, ok := deps.Connectors.Get(cid[0]); ok {
+					if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
+						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), 5*time.Second)
+						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCredentialsForResolver(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0]))
+						resolveCancel()
+						if resolveErr != nil {
+							log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
+						} else if details != nil {
+							if encoded, encErr := json.Marshal(details); encErr == nil {
+								resourceDetails = encoded
+							}
 						}
 					}
 				}
