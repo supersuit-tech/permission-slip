@@ -226,7 +226,6 @@ func (c *GoogleConnector) resolveEmail(ctx context.Context, creds connectors.Cre
 		}
 		return nil, fmt.Errorf("missing message_id or thread_id")
 	}
-	}
 
 	return c.fetchEmailMetadata(ctx, creds, messageID)
 }
