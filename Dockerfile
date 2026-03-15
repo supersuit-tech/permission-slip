@@ -36,7 +36,7 @@ ARG SENTRY_PROJECT
 COPY shared/ /app/shared/
 
 # Copy config directory (frontend/src/config/plans.ts imports @config/plans.json)
-COPY config/ /app/config/
+COPY config/plans.json /app/config/plans.json
 
 # Copy frontend source and build
 COPY frontend/ ./
