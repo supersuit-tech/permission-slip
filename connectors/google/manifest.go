@@ -223,7 +223,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Worksheets",
 				Description: "List all worksheets (tabs) in a Google Sheets spreadsheet",
 				RiskLevel:   "low",
-				DisplayTemplate: "List worksheets in spreadsheet",
+				DisplayTemplate: "List worksheets in spreadsheet {{spreadsheet_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["spreadsheet_id"],
@@ -412,7 +412,6 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Chat Spaces",
 				Description: "List Google Chat spaces accessible to the user",
 				RiskLevel:   "low",
-				DisplayTemplate: "List chat spaces",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {

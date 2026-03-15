@@ -124,9 +124,8 @@ function renderDisplayTemplate(
       display = String(rawValue.length);
     }
 
-    if (display === null) {
+    if (display === null && rawValue != null) {
       display = formatParamValue(rawValue);
-      if (display === "null") display = null;
     }
 
     if (display !== null) {
@@ -145,7 +144,7 @@ function renderDisplayTemplate(
 function tryFormatDateTime(value: string): string | null {
   if (!/^\d{4}-\d{2}/.test(value)) return null;
   const d = new Date(value);
-  if (isNaN(d.getTime())) return value;
+  if (isNaN(d.getTime())) return null;
   return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",

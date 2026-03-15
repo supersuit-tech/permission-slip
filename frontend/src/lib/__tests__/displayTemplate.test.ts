@@ -73,13 +73,15 @@ describe("renderTemplate", () => {
     FORMATTERS.set("upper", (v) =>
       typeof v === "string" ? v.toUpperCase() : null,
     );
-    const parts = renderTemplate("Hello {{name:upper}}", { name: "alice" });
-    expect(parts).toEqual([
-      { kind: "text", text: "Hello " },
-      { kind: "value", text: "ALICE" },
-    ]);
-    // Clean up
-    FORMATTERS.delete("upper");
+    try {
+      const parts = renderTemplate("Hello {{name:upper}}", { name: "alice" });
+      expect(parts).toEqual([
+        { kind: "text", text: "Hello " },
+        { kind: "value", text: "ALICE" },
+      ]);
+    } finally {
+      FORMATTERS.delete("upper");
+    }
   });
 
   it("truncates long string values", () => {
