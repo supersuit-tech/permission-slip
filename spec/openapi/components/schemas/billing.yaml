@@ -235,6 +235,18 @@ CheckoutResponse:
       description: Stripe Checkout Session URL — redirect the user here to complete payment. Always HTTPS.
       example: https://checkout.stripe.com/c/pay/cs_test_...
 
+PortalResponse:
+  type: object
+  required:
+    - url
+  properties:
+    url:
+      type: string
+      format: uri
+      pattern: '^https://'
+      description: Stripe Billing Portal URL — redirect the user here to manage their subscription. Always HTTPS.
+      example: https://billing.stripe.com/p/session/test_...
+
 Plan:
   description: |
     A billing plan with its resource limits. Composes `PlanLimits` with

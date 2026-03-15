@@ -509,3 +509,46 @@ invoices:
         $ref: '../responses/errors.yaml#/Unauthorized'
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+portal:
+  post:
+    summary: Create billing portal session
+    description: |
+      Creates a Stripe Billing Portal session for the authenticated user.
+      Returns a URL to redirect the user to Stripe's hosted portal where they
+      can manage their subscription, update payment methods, and view invoices.
+
+      Requires the user to have a Stripe customer ID (i.e., has previously
+      been on a paid plan or initiated checkout).
+
+      Only available when `billing_enabled` is `true` and Stripe is configured.
+    operationId: createBillingPortal
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    responses:
+      '200':
+        description: Portal session created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/PortalResponse'
+            example:
+              url: https://billing.stripe.com/p/session/test_...
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: No billing account found (user has no Stripe customer ID)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '502':
+        description: Stripe API error
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

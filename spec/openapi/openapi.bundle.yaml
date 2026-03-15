@@ -5507,6 +5507,48 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/portal:
+    post:
+      summary: Create billing portal session
+      description: |
+        Creates a Stripe Billing Portal session for the authenticated user.
+        Returns a URL to redirect the user to Stripe's hosted portal where they
+        can manage their subscription, update payment methods, and view invoices.
+
+        Requires the user to have a Stripe customer ID (i.e., has previously
+        been on a paid plan or initiated checkout).
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: createBillingPortal
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Portal session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalResponse'
+              example:
+                url: https://billing.stripe.com/p/session/test_...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No billing account found (user has no Stripe customer ID)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/admin/usage:
     get:
       summary: Get your usage for a billing period
@@ -11477,6 +11519,17 @@ components:
           type: string
           description: Human-readable per-request price string (e.g. "$0.005"), sourced from the Stripe price object.
           example: $0.005
+    PortalResponse:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          pattern: ^https://
+          description: Stripe Billing Portal URL — redirect the user here to manage their subscription. Always HTTPS.
+          example: https://billing.stripe.com/p/session/test_...
   parameters:
     ActionConfigId:
       name: config_id
