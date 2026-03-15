@@ -699,15 +699,21 @@ The X connector requires these scopes:
 2. On the connector's configuration page, enter your **Client ID** and **Client Secret** from the X Developer Portal
 3. Connect your X account via the credential configuration section
 
-## Self-Hosted BYOA Setup
+## BYOA (Bring Your Own App) Setup
 
-For self-hosted deployments without platform-level OAuth credentials, users configure their own OAuth apps through the connector configuration UI:
+Some connectors use OAuth providers that don't have platform-level credentials — for example, Salesforce, X/Twitter, or any external connector that declares its own OAuth provider in a manifest. These connectors require you to create your own OAuth app in the provider's developer console and supply the client credentials.
 
-1. Follow the Google or Microsoft setup steps above to create an OAuth app
-2. In Permission Slip, navigate to an agent's configuration page and click the relevant connector card
-3. On the connector's configuration page, enter your Client ID and Client Secret
-4. The credentials are encrypted and stored in the vault
-5. You can now connect your account via the credential configuration section
+**Self-hosted deployments** do NOT need BYOA for providers like Google or Microsoft. Set those credentials via environment variables (`GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID`, etc.) instead — see the sections above.
+
+### When is BYOA required?
+
+When you open a connector's credential management dialog and the OAuth section shows an "OAuth app setup required" banner, that provider needs BYOA. The banner walks you through the setup:
+
+1. **Create an OAuth app** in the provider's developer console (linked from the banner)
+2. **Enter your Client ID and Client Secret** in the configuration form
+3. **Connect your account** — the Connect button becomes available after credentials are saved
+
+Credentials are encrypted in the vault and never stored in plaintext.
 
 ## External Connector OAuth
 
@@ -735,7 +741,7 @@ External connectors can declare their own OAuth providers in `connector.json`:
 }
 ```
 
-The platform reads `oauth_providers` from the manifest and registers them in the provider registry. Users then supply their own OAuth app credentials via the BYOA configuration in Settings.
+The platform reads `oauth_providers` from the manifest and registers them in the provider registry. Users then supply their own OAuth app credentials via the BYOA setup banner that appears in the connector's credential management dialog.
 
 For more details on creating external connectors, see [Creating Connectors](creating-connectors.md).
 
