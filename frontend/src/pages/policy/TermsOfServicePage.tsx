@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { PolicyLayout } from "./PolicyLayout";
 import { GITHUB_REPO_URL } from "@/lib/links";
-import { freePlan, paidPlan, formatLimit } from "@/config/plans";
-import { PRICE_PER_REQUEST } from "@/pages/billing/constants";
+import { freePlan, paidPlan, formatLimit, PRICE_PER_REQUEST } from "@/config/plans";
 
 export function TermsOfServicePage() {
   return (

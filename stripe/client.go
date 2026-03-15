@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	gostripe "github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/checkout/session"
@@ -55,7 +56,11 @@ func New(cfg Config) *Client {
 	keyMu.Lock()
 	gostripe.Key = cfg.SecretKey
 	keyMu.Unlock()
-	return &Client{cfg: cfg}
+	c := &Client{cfg: cfg}
+	cachedClientMu.Lock()
+	cachedClient = c
+	cachedClientMu.Unlock()
+	return c
 }
 
 // WebhookSecret returns the webhook signing secret for signature verification.
@@ -64,13 +69,17 @@ func (c *Client) WebhookSecret() string {
 }
 
 // FetchRequestPrice fetches the per-request price from Stripe and caches it.
-// Should be called once at startup. If Stripe is unavailable, the cached value
+// Should be called once at startup. Uses a 10-second timeout to avoid blocking
+// startup if Stripe is unreachable. If Stripe is unavailable, the cached value
 // stays nil and GetRequestPrice returns the fallback from plans.json.
 func (c *Client) FetchRequestPrice() {
 	if c.cfg.PriceIDRequest == "" {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	params := &gostripe.PriceParams{}
+	params.Context = ctx
 	p, err := price.Get(c.cfg.PriceIDRequest, params)
 	if err != nil {
 		log.Printf("stripe: failed to fetch request price %s: %v", c.cfg.PriceIDRequest, err)
@@ -103,7 +112,31 @@ func (c *Client) RequestPriceDisplay() string {
 	if rp := c.GetRequestPrice(); rp != nil {
 		return rp.DisplayAmount
 	}
-	// Fallback: derive from plans.json
+	return fallbackPriceDisplay()
+}
+
+// cachedClient holds a reference to the last-created Client for the package-level
+// RequestPriceDisplay function. Set by New().
+var (
+	cachedClientMu sync.RWMutex
+	cachedClient   *Client
+)
+
+// RequestPriceDisplay is a package-level function that returns the display string
+// for the per-request price. Uses the cached Stripe price if available, otherwise
+// falls back to plans.json. Safe to call even when no Stripe client is configured.
+func RequestPriceDisplay() string {
+	cachedClientMu.RLock()
+	c := cachedClient
+	cachedClientMu.RUnlock()
+	if c != nil {
+		return c.RequestPriceDisplay()
+	}
+	return fallbackPriceDisplay()
+}
+
+// fallbackPriceDisplay derives the price display from plans.json.
+func fallbackPriceDisplay() string {
 	p := config.GetPlan(config.PlanPayAsYouGo)
 	if p != nil && p.PricePerRequestMillicents > 0 {
 		dollars := float64(p.PricePerRequestMillicents) / 100_000.0

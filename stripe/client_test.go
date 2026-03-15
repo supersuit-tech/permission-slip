@@ -97,3 +97,13 @@ func TestRequestPriceDisplay_FallbackToPlansJSON(t *testing.T) {
 		t.Errorf("expected fallback $0.005, got %q", display)
 	}
 }
+
+func TestRequestPriceDisplay_PackageLevel(t *testing.T) {
+	// Package-level function should work even without explicit client setup
+	// (New() sets cachedClient).
+	_ = New(Config{})
+	display := RequestPriceDisplay()
+	if display != "$0.005" {
+		t.Errorf("expected package-level fallback $0.005, got %q", display)
+	}
+}

@@ -244,14 +244,11 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 		}
 
 		// Include pricing info for paid plans.
+		// RequestPriceDisplay handles the full fallback chain: Stripe cache → plans.json → "$0.005".
 		if sub.PlanID != db.PlanFree {
-			priceDisplay := "$0.005" // default fallback
-			if deps.Stripe != nil {
-				priceDisplay = deps.Stripe.RequestPriceDisplay()
-			}
 			resp.Pricing = &billingPricing{
 				FreeRequestAllowance:   int(pstripe.FreeRequestAllowance()),
-				PricePerRequestDisplay: priceDisplay,
+				PricePerRequestDisplay: pstripe.RequestPriceDisplay(),
 			}
 		}
 
