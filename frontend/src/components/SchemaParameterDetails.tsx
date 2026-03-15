@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { ParametersSchema } from "@/lib/parameterSchema";
+import { formatParameterValue, humanizeKey } from "@/lib/formatValues";
 
 export type { ParametersSchema } from "@/lib/parameterSchema";
 export { parseParametersSchema } from "@/lib/parameterSchema";
@@ -16,6 +17,12 @@ interface SchemaParameterDetailsProps {
  * display. When a schema is available, parameters are shown with their
  * human-readable descriptions as labels, type annotations, and enum context.
  * Falls back to raw key-value display when no schema is available.
+ *
+ * Improvements over raw display:
+ * - humanizeKey for clean labels when no description provided
+ * - tryFormatDateTime for timestamp values
+ * - Dividers between parameter rows
+ * - Hides unprovided optional parameters
  */
 export function SchemaParameterDetails({
   parameters,
@@ -30,13 +37,18 @@ export function SchemaParameterDetails({
 
   // Render schema-known parameters first (in schema property order),
   // then any extra parameters not in the schema.
-  const schemaKeys = Object.keys(properties);
+  // Hide unprovided optional params to reduce noise.
+  const schemaKeys = Object.keys(properties).filter((key) => {
+    const isProvided = key in parameters;
+    const isRequired = requiredSet.has(key);
+    return isProvided || isRequired;
+  });
   const extraKeys = Object.keys(parameters).filter(
     (k) => !properties[k],
   );
 
   return (
-    <div className="space-y-3">
+    <div className="divide-border divide-y">
       {schemaKeys.map((key) => {
         // Safe to assert: schemaKeys come from Object.keys(properties).
         const prop = properties[key]!;
@@ -47,7 +59,7 @@ export function SchemaParameterDetails({
           <ParameterRow
             key={key}
             name={key}
-            label={prop.description ?? key}
+            label={prop.description ?? humanizeKey(key)}
             value={value}
             type={prop.type}
             enumValues={prop.enum}
@@ -61,7 +73,7 @@ export function SchemaParameterDetails({
         <ParameterRow
           key={key}
           name={key}
-          label={key}
+          label={humanizeKey(key)}
           value={parameters[key]}
           isProvided
         />
@@ -89,15 +101,15 @@ function ParameterRow({
   isRequired?: boolean;
   isProvided: boolean;
 }) {
-  const displayValue = formatValue(value);
+  const displayValue = formatParameterValue(value);
   const isDefault =
     defaultValue !== undefined && String(value) === String(defaultValue);
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-0.5 py-2 first:pt-0 last:pb-0">
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground text-xs font-medium">
-          {label !== name ? label : name}
+          {label !== name ? label : humanizeKey(name)}
         </span>
         {label !== name && (
           <code className="text-muted-foreground/60 text-[10px]">{name}</code>
@@ -139,22 +151,15 @@ function FallbackDetails({
   parameters: Record<string, unknown>;
 }) {
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+    <dl className="divide-border divide-y">
       {Object.entries(parameters).map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className="text-muted-foreground font-medium">{key}</dt>
-          <dd className="truncate">{formatValue(value)}</dd>
+        <div key={key} className="flex gap-3 py-2 first:pt-0 last:pb-0">
+          <dt className="text-muted-foreground text-xs font-medium shrink-0">
+            {humanizeKey(key)}
+          </dt>
+          <dd className="text-sm truncate">{formatParameterValue(value)}</dd>
         </div>
       ))}
     </dl>
   );
-}
-
-function formatValue(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
-  if (Array.isArray(value)) return value.join(", ");
-  if (value === null || value === undefined) return "\u2014";
-  return JSON.stringify(value);
 }

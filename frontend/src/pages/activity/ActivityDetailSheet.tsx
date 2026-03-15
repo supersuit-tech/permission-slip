@@ -158,7 +158,7 @@ function ApprovalContent({
   executionResult?: Record<string, unknown>;
   executedAt?: string;
 }) {
-  const { schema, actionName } = useActionSchema(actionType);
+  const { schema, actionName, displayTemplate } = useActionSchema(actionType);
 
   return (
     <div className="space-y-5">
@@ -190,6 +190,7 @@ function ApprovalContent({
                   parameters={parameters}
                   schema={schema}
                   actionName={actionName}
+                  displayTemplate={displayTemplate}
                 />
               </div>
             )}

@@ -21,6 +21,7 @@ function connectorIdFromActionType(actionType: string): string {
 export function useActionSchema(actionType: string): {
   schema: ParametersSchema | null;
   actionName: string | null;
+  displayTemplate: string | null;
   isLoading: boolean;
 } {
   const connectorId = connectorIdFromActionType(actionType);
@@ -28,14 +29,14 @@ export function useActionSchema(actionType: string): {
 
   const result = useMemo(() => {
     if (!connector?.actions) {
-      return { schema: null, actionName: null };
+      return { schema: null, actionName: null, displayTemplate: null };
     }
 
     const action = connector.actions.find(
       (a) => a.action_type === actionType,
     );
     if (!action) {
-      return { schema: null, actionName: null };
+      return { schema: null, actionName: null, displayTemplate: null };
     }
 
     // Safe cast: the generated API type for parameters_schema is
@@ -47,6 +48,7 @@ export function useActionSchema(actionType: string): {
     return {
       schema,
       actionName: action.name ?? null,
+      displayTemplate: action.display_template ?? null,
     };
   }, [connector, actionType]);
 
