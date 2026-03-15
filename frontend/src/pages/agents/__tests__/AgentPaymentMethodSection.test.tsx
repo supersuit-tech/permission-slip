@@ -140,6 +140,43 @@ describe("AgentPaymentMethodSection", () => {
     });
   });
 
+  it("shows Optional badge and subtitle in card header", async () => {
+    setupMocks();
+    renderWithProviders(<AgentPaymentMethodSection agentId={42} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Optional")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Only needed if you want this agent/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows unassigned description when payment methods exist but none assigned", async () => {
+    setupMocks({
+      paymentMethods: [
+        {
+          id: "pm-1",
+          brand: "visa",
+          last4: "4242",
+          exp_month: 12,
+          exp_year: 2028,
+          is_default: true,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+    });
+
+    renderWithProviders(<AgentPaymentMethodSection agentId={42} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/No payment method assigned/),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("shows manage button", async () => {
     setupMocks({
       paymentMethods: [

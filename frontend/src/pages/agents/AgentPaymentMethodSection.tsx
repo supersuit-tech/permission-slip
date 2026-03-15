@@ -144,7 +144,7 @@ export function AgentPaymentMethodSection({
                         Assigned
                       </Badge>
                     ) : (
-                      <Badge variant="destructive">Not set</Badge>
+                      <Badge variant="secondary">Not set</Badge>
                     )}
                   </div>
                   <p className="text-muted-foreground text-xs">
