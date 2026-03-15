@@ -10106,6 +10106,7 @@ components:
         - plan
         - subscription
         - usage
+        - pricing
       properties:
         plan:
           $ref: '#/components/schemas/Plan'

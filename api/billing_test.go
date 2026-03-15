@@ -195,7 +195,7 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	}
 }
 
-func TestGetBillingPlan_FreePlan_NoPricing(t *testing.T) {
+func TestGetBillingPlan_FreePlan_IncludesPricing(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -218,8 +218,12 @@ func TestGetBillingPlan_FreePlan_NoPricing(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if resp.Pricing != nil {
-		t.Error("expected pricing to be nil for free plan")
+	// Pricing is included for all plans so the upgrade flow can show Stripe-sourced pricing.
+	if resp.Pricing == nil {
+		t.Fatal("expected pricing to be present for free plan (for upgrade flow)")
+	}
+	if resp.Pricing.FreeRequestAllowance != 250 {
+		t.Errorf("expected free_request_allowance=250, got %d", resp.Pricing.FreeRequestAllowance)
 	}
 }
 

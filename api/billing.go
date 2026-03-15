@@ -243,13 +243,11 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			Subscription: newBillingSubscription(sub),
 		}
 
-		// Include pricing info for paid plans.
-		// RequestPriceDisplay handles the full fallback chain: Stripe cache → plans.json → "$0.005".
-		if sub.PlanID != db.PlanFree {
-			resp.Pricing = &billingPricing{
-				FreeRequestAllowance:   int(pstripe.FreeRequestAllowance()),
-				PricePerRequestDisplay: pstripe.RequestPriceDisplay(),
-			}
+		// Include pricing info for all plans so the upgrade flow can show
+		// Stripe-sourced pricing to free users considering an upgrade.
+		resp.Pricing = &billingPricing{
+			FreeRequestAllowance:   int(pstripe.FreeRequestAllowance()),
+			PricePerRequestDisplay: pstripe.RequestPriceDisplay(),
 		}
 
 		// Check actual payment methods rather than relying on Stripe customer ID.
