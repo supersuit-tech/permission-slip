@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	gostripe "github.com/stripe/stripe-go/v82"
+	billingportalsession "github.com/stripe/stripe-go/v82/billingportal/session"
 	"github.com/stripe/stripe-go/v82/checkout/session"
 	"github.com/stripe/stripe-go/v82/customer"
 	"github.com/stripe/stripe-go/v82/invoice"
@@ -278,6 +279,22 @@ func (c *Client) DetachPaymentMethod(ctx context.Context, paymentMethodID string
 		return nil, fmt.Errorf("stripe: detach payment method: %w", err)
 	}
 	return pm, nil
+}
+
+// CreateBillingPortalSession creates a Stripe Billing Portal session so the
+// user can manage their subscription, update payment methods, and view invoices.
+func (c *Client) CreateBillingPortalSession(ctx context.Context, stripeCustomerID, returnURL string) (string, error) {
+	params := &gostripe.BillingPortalSessionParams{
+		Customer:  gostripe.String(stripeCustomerID),
+		ReturnURL: gostripe.String(returnURL),
+	}
+	params.Context = ctx
+
+	sess, err := billingportalsession.New(params)
+	if err != nil {
+		return "", fmt.Errorf("stripe: create billing portal session: %w", err)
+	}
+	return sess.URL, nil
 }
 
 // RetrieveCheckoutSession fetches an existing Checkout Session by ID.

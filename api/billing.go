@@ -207,6 +207,7 @@ func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /billing/downgrade", requireProfile(handleDowngrade(deps)))
 	mux.Handle("GET /billing/invoices", requireProfile(handleListInvoices(deps)))
 	mux.Handle("POST /billing/activate", requireProfile(handleActivateUpgrade(deps)))
+	mux.Handle("POST /billing/portal", requireProfile(handleBillingPortal(deps)))
 }
 
 // ── GET /billing/plan ────────────────────────────────────────────────────────
@@ -681,6 +682,46 @@ func handleListInvoices(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, invoiceListResponse{Invoices: invoices, HasMore: hasMore})
+	}
+}
+
+// ── POST /billing/portal ─────────────────────────────────────────────────
+
+type portalResponse struct {
+	URL string `json:"url"`
+}
+
+func handleBillingPortal(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		if deps.Stripe == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing not configured"))
+			return
+		}
+
+		sub, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] BillingPortal: subscription lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to fetch subscription"))
+			return
+		}
+		if sub == nil || sub.StripeCustomerID == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No billing account found"))
+			return
+		}
+
+		returnURL := deps.BaseURL + "/settings/billing"
+		portalURL, err := deps.Stripe.CreateBillingPortalSession(r.Context(), *sub.StripeCustomerID, returnURL)
+		if err != nil {
+			log.Printf("[%s] BillingPortal: Stripe portal: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to create billing portal session"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, portalResponse{URL: portalURL})
 	}
 }
 
