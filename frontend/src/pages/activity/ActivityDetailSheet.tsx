@@ -124,6 +124,7 @@ function ApprovalDetails({ approvalId }: { approvalId: string }) {
   const description = typeof context?.description === "string" ? context.description : null;
   const executionResult = approval.execution_result as Record<string, unknown> | undefined;
   const executionError = typeof executionResult?.error === "string" ? executionResult.error : undefined;
+  const resourceDetails = approval.resource_details as Record<string, unknown> | undefined;
 
   return (
     <ApprovalContent
@@ -135,6 +136,7 @@ function ApprovalDetails({ approvalId }: { approvalId: string }) {
       executionError={executionError}
       executionResult={executionResult}
       executedAt={approval.executed_at ?? undefined}
+      resourceDetails={resourceDetails}
     />
   );
 }
@@ -148,6 +150,7 @@ function ApprovalContent({
   executionError,
   executionResult,
   executedAt,
+  resourceDetails,
 }: {
   actionType: string;
   parameters: Record<string, unknown>;
@@ -157,6 +160,7 @@ function ApprovalContent({
   executionError?: string;
   executionResult?: Record<string, unknown>;
   executedAt?: string;
+  resourceDetails?: Record<string, unknown>;
 }) {
   const { schema, actionName, displayTemplate } = useActionSchema(actionType);
 
@@ -191,6 +195,7 @@ function ApprovalContent({
                   schema={schema}
                   actionName={actionName}
                   displayTemplate={displayTemplate}
+                  resourceDetails={resourceDetails}
                 />
               </div>
             )}
