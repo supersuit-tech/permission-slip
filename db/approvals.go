@@ -19,9 +19,10 @@ type Approval struct {
 	Context         []byte // raw JSONB
 	Status          string
 	ExecutionStatus *string
-	ExecutionResult []byte // raw JSONB
-	ExecutedAt      *time.Time
-	ExpiresAt       time.Time
+	ExecutionResult  []byte // raw JSONB
+	ExecutedAt       *time.Time
+	ResourceDetails  []byte // raw JSONB — human-readable resource metadata
+	ExpiresAt        time.Time
 	ApprovedAt      *time.Time
 	DeniedAt        *time.Time
 	CancelledAt     *time.Time
@@ -31,7 +32,7 @@ type Approval struct {
 // approvalColumns is the canonical column list for SELECT on the approvals table.
 // Keep in sync with scanApproval.
 const approvalColumns = `approval_id, agent_id, approver_id, action, context,
-	status, execution_status, execution_result, executed_at,
+	status, execution_status, execution_result, executed_at, resource_details,
 	expires_at, approved_at, denied_at, cancelled_at, created_at`
 
 // ApprovalCursor identifies the position of the last item on a page,
@@ -53,7 +54,7 @@ func scanApproval(row pgx.Row) (*Approval, error) {
 	var a Approval
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
-		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt,
+		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt, &a.ResourceDetails,
 		&a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
 	)
 	if err != nil {
@@ -68,7 +69,7 @@ func scanApprovalWithMeta(row pgx.Row) (*Approval, []byte, error) {
 	var agentMeta []byte
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
-		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt,
+		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt, &a.ResourceDetails,
 		&a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
 		&agentMeta,
 	)

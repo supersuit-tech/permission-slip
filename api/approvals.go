@@ -61,6 +61,7 @@ type approvalDetailResponse struct {
 	ExecutionStatus *string    `json:"execution_status,omitempty"`
 	ExecutionResult any        `json:"execution_result,omitempty"`
 	ExecutedAt      *time.Time `json:"executed_at,omitempty"`
+	ResourceDetails any        `json:"resource_details,omitempty"`
 	ExpiresAt       time.Time  `json:"expires_at"`
 	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
 	DeniedAt        *time.Time `json:"denied_at,omitempty"`
@@ -417,6 +418,12 @@ func toApprovalDetailResponse(a db.Approval) approvalDetailResponse {
 		var result any
 		if err := json.Unmarshal(a.ExecutionResult, &result); err == nil {
 			resp.ExecutionResult = result
+		}
+	}
+	if len(a.ResourceDetails) > 0 {
+		var details any
+		if err := json.Unmarshal(a.ResourceDetails, &details); err == nil {
+			resp.ResourceDetails = details
 		}
 	}
 

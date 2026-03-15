@@ -206,13 +206,34 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Best-effort: resolve human-readable resource details for the action.
+		var resourceDetails []byte
+		if deps.Connectors != nil {
+			connectorID := connectorIDFromActionType(actionType)
+			if conn, ok := deps.Connectors.Get(connectorID); ok {
+				if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
+					resolveCtx, resolveCancel := context.WithTimeout(r.Context(), 5*time.Second)
+					details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCredentialsForResolver(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, connectorID))
+					resolveCancel()
+					if resolveErr != nil {
+						log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
+					} else if details != nil {
+						if encoded, encErr := json.Marshal(details); encErr == nil {
+							resourceDetails = encoded
+						}
+					}
+				}
+			}
+		}
+
 		approval, err := db.InsertApproval(r.Context(), deps.DB, db.InsertApprovalParams{
-			ApprovalID: approvalID,
-			AgentID:    agent.AgentID,
-			ApproverID: agent.ApproverID,
-			Action:     req.Action,
-			Context:    req.Context,
-			ExpiresAt:  expiresAt,
+			ApprovalID:      approvalID,
+			AgentID:         agent.AgentID,
+			ApproverID:      agent.ApproverID,
+			Action:          req.Action,
+			Context:         req.Context,
+			ResourceDetails: resourceDetails,
+			ExpiresAt:       expiresAt,
 		}, req.RequestID)
 		if err != nil {
 			var apprErr *db.ApprovalError
@@ -342,6 +363,22 @@ func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
 // handleAgentApprovalError is an alias for the shared handleApprovalError
 // in approvals.go. Both dashboard and agent endpoints use the same mapping.
 var handleAgentApprovalError = handleApprovalError
+
+// resolveCredentialsForResolver is a best-effort credential resolver for the
+// ResourceDetailResolver call. It mirrors the credential resolution logic from
+// connector execution but returns empty credentials on any failure (since
+// resource detail resolution is non-fatal).
+func resolveCredentialsForResolver(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID string) connectors.Credentials {
+	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
+	if err != nil || len(reqCreds) == 0 {
+		return connectors.NewCredentials(nil)
+	}
+	creds, err := resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, reqCreds)
+	if err != nil {
+		return connectors.NewCredentials(nil)
+	}
+	return creds
+}
 
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.
 // Only the action type is persisted — parameters are redacted.
