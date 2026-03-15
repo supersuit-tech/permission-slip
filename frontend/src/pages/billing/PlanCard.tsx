@@ -46,7 +46,7 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
           <div className="rounded-lg border p-4 space-y-3">
             <DetailRow label="Plan">
               <div className="flex items-center gap-2">
-                <span className="text-foreground">{plan.name}</span>
+                <span>{plan.name}</span>
                 <Badge variant={isFree ? "outline" : "default"}>
                   {isFree ? "Free" : "Pay-as-you-go"}
                 </Badge>
@@ -54,15 +54,17 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
             </DetailRow>
             {!isFree && pricing && (
               <DetailRow label="Pricing">
-                {pricing.free_request_allowance.toLocaleString()} requests/month included, then {pricing.price_per_request_display}/request
+                <span className="text-muted-foreground">{pricing.free_request_allowance.toLocaleString()} requests/month included, then {pricing.price_per_request_display}/request</span>
               </DetailRow>
             )}
             <DetailRow label="Status">
               <StatusBadge status={subscription.status} />
             </DetailRow>
             <DetailRow label="Billing Period">
-              {formatDate(subscription.current_period_start)} &ndash;{" "}
-              {formatDate(subscription.current_period_end)}
+              <span className="text-muted-foreground">
+                {formatDate(subscription.current_period_start)} &ndash;{" "}
+                {formatDate(subscription.current_period_end)}
+              </span>
             </DetailRow>
           </div>
           {subscription.status === "past_due" && (

@@ -138,7 +138,7 @@ export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps
             limit={plan.max_credentials ?? null}
           />
           <DetailRow label="Audit Retention">
-            {plan.audit_retention_days} days
+            <span className="text-muted-foreground">{plan.audit_retention_days} days</span>
           </DetailRow>
         </div>
       </CardContent>
