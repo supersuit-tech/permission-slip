@@ -222,6 +222,164 @@ describe("buildSummary", () => {
     });
   });
 
+  // ── Google Calendar ─────────────────────────────────────────────
+
+  describe("google.delete_calendar_event", () => {
+    it("shows event title and time from resource details", () => {
+      const result = buildSummary(
+        "google.delete_calendar_event",
+        { event_id: "evt123" },
+        null,
+        null,
+        undefined,
+        { title: "Q1 Planning", start_time: "2026-03-15T14:00:00Z" },
+      );
+      expect(result).toContain("Delete event");
+      expect(result).toContain("Q1 Planning");
+    });
+
+    it("falls back to generic when no resource details", () => {
+      const result = buildSummary(
+        "google.delete_calendar_event",
+        { event_id: "evt123" },
+        null,
+        "Delete Calendar Event",
+      );
+      expect(result).toContain("Delete Calendar Event");
+    });
+  });
+
+  describe("google.update_calendar_event", () => {
+    it("shows event title from resource details", () => {
+      const result = buildSummary(
+        "google.update_calendar_event",
+        { event_id: "evt123", summary: "New Title" },
+        null,
+        null,
+        undefined,
+        { title: "Old Title", start_time: "2026-03-15T14:00:00Z" },
+      );
+      expect(result).toContain("Update event");
+      expect(result).toContain("Old Title");
+    });
+  });
+
+  // ── Google Drive ────────────────────────────────────────────────
+
+  describe("google.delete_drive_file", () => {
+    it("shows file name from resource details", () => {
+      const result = buildSummary(
+        "google.delete_drive_file",
+        { file_id: "f123" },
+        null,
+        null,
+        undefined,
+        { file_name: "Budget 2026.xlsx" },
+      );
+      expect(result).toBe(`Delete file ${q("Budget 2026.xlsx")}`);
+    });
+  });
+
+  // ── Google Docs ─────────────────────────────────────────────────
+
+  describe("google.get_document", () => {
+    it("shows document title from resource details", () => {
+      const result = buildSummary(
+        "google.get_document",
+        { document_id: "doc123" },
+        null,
+        null,
+        undefined,
+        { title: "Project Spec" },
+      );
+      expect(result).toBe(`Get document ${q("Project Spec")}`);
+    });
+  });
+
+  // ── Google Sheets ───────────────────────────────────────────────
+
+  describe("google.sheets_read_range", () => {
+    it("shows spreadsheet name and range", () => {
+      const result = buildSummary(
+        "google.sheets_read_range",
+        { spreadsheet_id: "s123", range: "Sheet1!A1:B5" },
+        null,
+        null,
+        undefined,
+        { title: "Budget Tracker", range: "Sheet1!A1:B5" },
+      );
+      expect(result).toContain("Read");
+      expect(result).toContain("Budget Tracker");
+      expect(result).toContain("Sheet1!A1:B5");
+    });
+  });
+
+  // ── Google Slides ───────────────────────────────────────────────
+
+  describe("google.get_presentation", () => {
+    it("shows presentation title", () => {
+      const result = buildSummary(
+        "google.get_presentation",
+        { presentation_id: "p123" },
+        null,
+        null,
+        undefined,
+        { title: "Q1 Review Deck" },
+      );
+      expect(result).toBe(`Get presentation ${q("Q1 Review Deck")}`);
+    });
+  });
+
+  // ── Gmail ───────────────────────────────────────────────────────
+
+  describe("google.read_email", () => {
+    it("shows subject and sender", () => {
+      const result = buildSummary(
+        "google.read_email",
+        { message_id: "msg123" },
+        null,
+        null,
+        undefined,
+        { subject: "Weekly Update", from: "alice@example.com" },
+      );
+      expect(result).toContain("Read email");
+      expect(result).toContain("Weekly Update");
+      expect(result).toContain("alice@example.com");
+    });
+  });
+
+  describe("google.archive_email", () => {
+    it("shows subject and sender", () => {
+      const result = buildSummary(
+        "google.archive_email",
+        { thread_id: "t123" },
+        null,
+        null,
+        undefined,
+        { subject: "Old Thread", from: "bob@example.com" },
+      );
+      expect(result).toContain("Archive email");
+      expect(result).toContain("Old Thread");
+      expect(result).toContain("bob@example.com");
+    });
+  });
+
+  describe("google.send_email_reply", () => {
+    it("shows original subject", () => {
+      const result = buildSummary(
+        "google.send_email_reply",
+        { message_id: "msg456" },
+        null,
+        null,
+        undefined,
+        { subject: "Re: Budget Discussion" },
+      );
+      expect(result).toBe(`Reply to ${q("Re: Budget Discussion")}`);
+    });
+  });
+
+  // ── Existing describers still work ──────────────────────────────
+
   describe("generic / unknown action types", () => {
     it("uses actionName when available", () => {
       const schema: ParametersSchema = {
