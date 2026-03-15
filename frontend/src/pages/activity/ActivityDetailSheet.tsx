@@ -134,6 +134,7 @@ function ApprovalDetails({ approvalId }: { approvalId: string }) {
       executionStatus={approval.execution_status ?? undefined}
       executionError={executionError}
       executionResult={executionResult}
+      executedAt={approval.executed_at ?? undefined}
     />
   );
 }
@@ -146,6 +147,7 @@ function ApprovalContent({
   executionStatus,
   executionError,
   executionResult,
+  executedAt,
 }: {
   actionType: string;
   parameters: Record<string, unknown>;
@@ -154,6 +156,7 @@ function ApprovalContent({
   executionStatus?: string;
   executionError?: string;
   executionResult?: Record<string, unknown>;
+  executedAt?: string;
 }) {
   const { schema, actionName } = useActionSchema(actionType);
 
@@ -222,6 +225,13 @@ function ApprovalContent({
             {JSON.stringify(executionResult, null, 2)}
           </pre>
         </div>
+      )}
+      {executionStatus && !executionResult && executedAt &&
+        Object.keys(parameters).length === 0 &&
+        new Date(executedAt).getTime() < Date.now() - 30 * 60 * 1000 && (
+        <p className="text-muted-foreground text-xs italic">
+          Execution details are automatically removed after 30 minutes.
+        </p>
       )}
     </div>
   );
