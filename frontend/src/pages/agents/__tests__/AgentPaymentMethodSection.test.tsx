@@ -71,7 +71,7 @@ describe("AgentPaymentMethodSection", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/No payment methods stored yet/),
+        screen.getByText(/No payment methods added yet/),
       ).toBeInTheDocument();
     });
   });
