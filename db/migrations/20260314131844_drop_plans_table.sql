@@ -81,6 +81,9 @@ CREATE TABLE IF NOT EXISTS plans (
     created_at                  timestamptz NOT NULL DEFAULT now()
 );
 
+-- NOTE: The free plan limit below (1000) is stale — the authoritative value
+-- is now in config/plans.json (currently 250). This rollback only matters if
+-- rolling back past this migration.
 INSERT INTO plans (id, name, max_requests_per_month, max_agents, max_standing_approvals, max_credentials, audit_retention_days, price_per_request_millicents)
 VALUES
     ('free',          'Free',          1000, 3,    5,    5,    7,  0),
