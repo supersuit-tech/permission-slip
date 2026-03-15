@@ -212,7 +212,7 @@ func (c *GoogleConnector) resolveEmail(ctx context.Context, creds connectors.Cre
 				ID string `json:"id"`
 			} `json:"messages"`
 		}
-		threadURL := c.gmailBaseURL + "/gmail/v1/users/me/threads/" + url.PathEscape(p.ThreadID) + "?format=metadata&fields=" + url.QueryEscape("messages(id)")
+		threadURL := c.gmailBaseURL + "/gmail/v1/users/me/threads/" + url.PathEscape(p.ThreadID) + "?fields=" + url.QueryEscape("messages(id)")
 		if err := c.doJSON(ctx, creds, http.MethodGet, threadURL, nil, &thread); err != nil {
 			return nil, err
 		}
