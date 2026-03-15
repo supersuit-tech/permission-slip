@@ -1041,6 +1041,42 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	}
 
 	// ---------------------------------------------------------------
+	// Payment methods — two cards for the "has everything" user
+	// ---------------------------------------------------------------
+	exec(ctx, tx,
+		`INSERT INTO payment_methods (id, user_id, stripe_payment_method_id, label, brand, last4, exp_month, exp_year, is_default, per_transaction_limit, monthly_limit)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, 5000, 50000)`,
+		"00000000-0000-0000-0000-000000000090", userHasEverything,
+		"pm_seed_visa_4242", "Work Visa", "visa", "4242", 12, 2028)
+
+	exec(ctx, tx,
+		`INSERT INTO payment_methods (id, user_id, stripe_payment_method_id, label, brand, last4, exp_month, exp_year, is_default)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)`,
+		"00000000-0000-0000-0000-000000000091", userHasEverything,
+		"pm_seed_mc_5555", "Personal MC", "mastercard", "5555", 6, 2027)
+
+	fmt.Println("  ✓ payment_methods seeded")
+
+	// ---------------------------------------------------------------
+	// Agent payment method assignments — bind cards to agents
+	// ---------------------------------------------------------------
+	agentPMs := []struct {
+		agentID         int64
+		paymentMethodID string
+	}{
+		{claude, "00000000-0000-0000-0000-000000000090"},
+		{github, "00000000-0000-0000-0000-000000000090"},
+		{slack, "00000000-0000-0000-0000-000000000091"},
+		{sentry, "00000000-0000-0000-0000-000000000090"},
+	}
+	for _, apm := range agentPMs {
+		exec(ctx, tx,
+			`INSERT INTO agent_payment_methods (agent_id, payment_method_id) VALUES ($1, $2)`,
+			apm.agentID, apm.paymentMethodID)
+	}
+	fmt.Println("  ✓ agent_payment_methods seeded")
+
+	// ---------------------------------------------------------------
 	// Approvals — pending (3, 24h expiry so they survive dev sessions)
 	// ---------------------------------------------------------------
 	exec(ctx, tx,

@@ -12,7 +12,6 @@ import { PlanDetailsCard } from "../billing/PlanDetailsCard";
 import { BillingPageSkeleton } from "../billing/BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "../billing/UpgradeSuccessBanner";
 import { activateUpgrade } from "../billing/activateUpgrade";
-import { PaymentMethodSection } from "./PaymentMethodSection";
 import { DataRetentionSection } from "./DataRetentionSection";
 
 const RETRY_DELAYS = [1000, 2000, 3000];
@@ -118,8 +117,7 @@ export function BillingSettingsPage() {
         </>
       ) : null}
 
-      {/* These sections manage their own loading/error states independently of the billing plan. */}
-      <PaymentMethodSection />
+      {/* Data retention manages its own loading/error state independently of the billing plan. */}
       <DataRetentionSection />
     </>
   );
