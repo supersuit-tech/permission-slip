@@ -9,6 +9,7 @@ import {
 import type { BillingPricing, Plan, UsageSummary } from "@/hooks/useBillingPlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { FREE_REQUEST_ALLOWANCE, PRICE_PER_REQUEST } from "./constants";
+import { DetailRow } from "./DetailRow";
 
 interface UsageSummaryCardProps {
   usage: UsageSummary;
@@ -136,12 +137,9 @@ export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps
             current={usage.credentials}
             limit={plan.max_credentials ?? null}
           />
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">Audit Retention</span>
-            <span className="text-muted-foreground">
-              {plan.audit_retention_days} days
-            </span>
-          </div>
+          <DetailRow label="Audit Retention">
+            {plan.audit_retention_days} days
+          </DetailRow>
         </div>
       </CardContent>
     </Card>
