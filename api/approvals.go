@@ -17,16 +17,17 @@ import (
 // Response types for the dashboard approval endpoints.
 
 type approvalResponse struct {
-	ApprovalID  string     `json:"approval_id"`
-	AgentID     int64      `json:"agent_id"`
-	Action      any        `json:"action"`
-	Context     any        `json:"context"`
-	Status      string     `json:"status"`
-	ExpiresAt   time.Time  `json:"expires_at"`
-	ApprovedAt  *time.Time `json:"approved_at,omitempty"`
-	DeniedAt    *time.Time `json:"denied_at,omitempty"`
-	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ApprovalID      string     `json:"approval_id"`
+	AgentID         int64      `json:"agent_id"`
+	Action          any        `json:"action"`
+	Context         any        `json:"context"`
+	Status          string     `json:"status"`
+	ResourceDetails any        `json:"resource_details,omitempty"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
+	DeniedAt        *time.Time `json:"denied_at,omitempty"`
+	CancelledAt     *time.Time `json:"cancelled_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 type approvalListResponse struct {
@@ -380,6 +381,12 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Context = ctx
 		} else {
 			log.Printf("WARNING: corrupt context JSONB for approval %s: %v", a.ApprovalID, err)
+		}
+	}
+	if len(a.ResourceDetails) > 0 {
+		var details any
+		if err := json.Unmarshal(a.ResourceDetails, &details); err == nil {
+			resp.ResourceDetails = details
 		}
 	}
 

@@ -463,9 +463,12 @@ function formatDateTime(iso: string): string {
   try {
     const date = new Date(iso);
     if (isNaN(date.getTime())) return iso;
+    const now = new Date();
+    const sameYear = date.getFullYear() === now.getFullYear();
     return date.toLocaleString(undefined, {
       month: "short",
       day: "numeric",
+      year: sameYear ? undefined : "numeric",
       hour: "numeric",
       minute: "2-digit",
     });
