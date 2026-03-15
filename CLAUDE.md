@@ -214,6 +214,44 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
 
+### Issue Structure: Phases & Model Allocation
+
+When creating issues with multiple tasks, **organize them into phases** and annotate each task with the recommended Claude model. This enables parallel execution by multiple agents and ensures expensive models are only used where they add value.
+
+**Phase structure:**
+- Group tasks into sequential phases where each phase depends on the previous one completing.
+- Within each phase, mark which tasks can run **in parallel** vs. which must be **sequential**.
+- Use checklists within each phase for trackability.
+
+**Model allocation — annotate every task with one of:**
+- **`[haiku]`** — Mechanical, well-specified changes: token/config swaps, class string replacements, simple mappings where the exact before→after is spelled out, running tests. Rule of thumb: if the issue describes the exact code to write, it's Haiku.
+- **`[sonnet]`** — Structural changes requiring reasoning: refactoring component architecture, modifying type systems (generics, unions, CVA configs), applying a pattern across multiple files where judgment is needed about how to adapt it to each context.
+- **`[opus]`** — Design decisions, ambiguous requirements, cross-cutting review: tasks where there's discretion about *what* to build (not just *how*), component extraction decisions, holistic code review of a full diff, anything where getting it wrong undermines the quality of the whole effort.
+
+**Example phase block in an issue:**
+
+```markdown
+## Phase 1: Foundation (sequential)
+> Each step depends on the previous.
+- [ ] **1A. Add color tokens** `[haiku]` — mechanical CSS value changes
+- [ ] **1B. Add badge variants** `[sonnet]` — CVA config + TypeScript type union changes
+
+## Phase 2: Component Updates (parallel, after Phase 1)
+- [ ] **2A. Update status mappings** `[haiku]` — lookup table swap, all mappings listed above
+- [ ] **2B. Refactor filter controls** `[sonnet]` — structural JSX change across 3 components
+- [ ] **2C. Extract metadata component** `[opus]` — design discretion on what to extract and how to compose
+
+## Verification
+- [ ] Run tests + build `[haiku]`
+- [ ] Final diff review `[opus]` — holistic quality check before merge
+```
+
+**Key principles:**
+- Default to the cheapest model that can reliably do the job. Most tasks in a well-specified issue are Haiku.
+- Bump to Sonnet when the task requires understanding type systems, adapting patterns to context, or structural refactoring.
+- Reserve Opus for tasks with design ambiguity, component extraction decisions, or final review where a holistic view matters.
+- If you're unsure, Sonnet is the safe middle ground — it's cheaper than over-using Opus and more reliable than under-specifying for Haiku.
+
 ## Go Toolchain Setup
 
 At the start of each session, set these environment variables for **every shell that runs Go commands**. The sandbox blocks most outbound network access (GCS, sum DB, direct git), so Go must use only the local toolchain and pre-cached modules:
