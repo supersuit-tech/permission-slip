@@ -35,6 +35,9 @@ ARG SENTRY_PROJECT
 # Copy shared validation config (imported by frontend/src/lib/validation.ts)
 COPY shared/ /app/shared/
 
+# Copy config directory (frontend/src/config/plans.ts imports @config/plans.json)
+COPY config/plans.json /app/config/plans.json
+
 # Copy frontend source and build
 COPY frontend/ ./
 RUN npm run build
