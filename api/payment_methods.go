@@ -55,7 +55,8 @@ type updatePaymentMethodRequest struct {
 }
 
 type deletePaymentMethodResponse struct {
-	Deleted bool `json:"deleted"`
+	Deleted        bool `json:"deleted"`
+	AffectedAgents int  `json:"affected_agents"`
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -447,6 +448,15 @@ func handleDeletePaymentMethod(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Count affected agents before deletion (cascade will remove bindings).
+		affectedAgents, err := db.CountAgentsByPaymentMethod(r.Context(), deps.DB, pmID)
+		if err != nil {
+			log.Printf("[%s] DeletePaymentMethod: count agents: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			// Non-fatal — continue with deletion.
+			affectedAgents = 0
+		}
+
 		// Detach from Stripe customer (best-effort — we still delete locally even if this fails).
 		if deps.Stripe != nil {
 			if _, err := deps.Stripe.DetachPaymentMethod(r.Context(), pm.StripePaymentMethodID); err != nil {
@@ -467,6 +477,6 @@ func handleDeletePaymentMethod(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, deletePaymentMethodResponse{Deleted: true})
+		RespondJSON(w, http.StatusOK, deletePaymentMethodResponse{Deleted: true, AffectedAgents: affectedAgents})
 	}
 }
