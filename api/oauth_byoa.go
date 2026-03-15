@@ -1,9 +1,14 @@
 // BYOA (Bring Your Own OAuth App) endpoints.
 //
 // These endpoints let users register their own OAuth client credentials for
-// any provider declared in a connector manifest. This is essential for:
-//   - Providers that don't have platform-level credentials (e.g. Salesforce)
-//   - Self-hosted deployments where users bring their own Google/Microsoft apps
+// any provider declared in a connector manifest. This is needed when a
+// connector's OAuth provider has no platform-level credentials — i.e. the
+// manifest declares endpoints and scopes but no client ID/secret (e.g.
+// Salesforce, X/Twitter). Users create an OAuth app in the provider's
+// developer console, then enter the client ID and secret here.
+//
+// Self-hosted deployments do NOT need BYOA — they should set provider
+// credentials via environment variables (GOOGLE_CLIENT_ID, etc.) instead.
 //
 // Provider resolution order: platform-level built-in → user-level BYOA config.
 // BYOA credentials are merged into the existing provider config (preserving

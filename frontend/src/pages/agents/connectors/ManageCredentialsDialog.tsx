@@ -35,6 +35,7 @@ import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
+import { BYOASetupBanner } from "./BYOASetupBanner";
 
 export interface ManageCredentialsDialogProps {
   open: boolean;
@@ -372,11 +373,8 @@ function OAuthCredentialRow({
           </div>
         )}
 
-        {!hasAnyConnection && !provider?.has_credentials && (
-          <p className="text-muted-foreground mt-2 pl-8 text-xs">
-            OAuth is not available yet — ask your admin to configure{" "}
-            {providerLabel(providerId)} OAuth credentials.
-          </p>
+        {!hasAnyConnection && provider != null && !provider.has_credentials && (
+          <BYOASetupBanner providerId={providerId} />
         )}
       </div>
 
