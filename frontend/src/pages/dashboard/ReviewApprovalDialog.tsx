@@ -281,6 +281,7 @@ export function ReviewApprovalDialog({
                   schema={schema}
                   actionName={actionName}
                   displayTemplate={displayTemplate}
+                  resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
                 />
               </div>
             </div>

@@ -45,6 +45,8 @@ interface ActionPreviewSummaryProps {
   actionName: string | null;
   /** Display template from the connector manifest, e.g. "Send email to {{to}}". */
   displayTemplate?: string | null;
+  /** Resource details resolved at approval creation time. */
+  resourceDetails?: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,8 +109,9 @@ export function ActionPreviewSummary({
   schema,
   actionName,
   displayTemplate,
+  resourceDetails,
 }: ActionPreviewSummaryProps) {
-  const parts = buildParts(actionType, parameters, schema, actionName, displayTemplate);
+  const parts = buildParts(actionType, parameters, schema, actionName, displayTemplate, resourceDetails);
 
   return (
     <p className="text-sm leading-relaxed" data-testid="action-preview-summary">
@@ -127,8 +130,9 @@ export function buildSummary(
   schema: ParametersSchema | null,
   actionName: string | null,
   displayTemplate?: string | null,
+  resourceDetails?: Record<string, unknown> | null,
 ): string {
-  return renderPlain(buildParts(actionType, parameters, schema, actionName, displayTemplate));
+  return renderPlain(buildParts(actionType, parameters, schema, actionName, displayTemplate, resourceDetails));
 }
 
 /**
@@ -141,6 +145,7 @@ function buildParts(
   schema: ParametersSchema | null,
   actionName: string | null,
   displayTemplate?: string | null,
+  resourceDetails?: Record<string, unknown> | null,
 ): SummaryPart[] {
   // 1. Try display template from manifest.
   if (displayTemplate) {
@@ -148,10 +153,10 @@ function buildParts(
     if (templateParts) return templateParts;
   }
 
-  // 2. Try action-specific describer.
+  // 2. Try action-specific describer (with resource details).
   const formatter = ACTION_DESCRIBERS[actionType];
   if (formatter) {
-    const result = formatter(parameters);
+    const result = formatter(parameters, resourceDetails ?? undefined);
     if (result) return result;
   }
 
@@ -167,7 +172,7 @@ function buildParts(
  * Returns structured summary parts for a specific action type,
  * or null to fall through to the generic schema-based summary.
  */
-type ActionDescriber = (params: Record<string, unknown>) => SummaryPart[] | null;
+type ActionDescriber = (params: Record<string, unknown>, resourceDetails?: Record<string, unknown>) => SummaryPart[] | null;
 
 /** Registry of action-type-specific formatters. Keyed by action_type string. */
 const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
@@ -231,6 +236,129 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     const desc = strVal(params.description);
     const parts: SummaryPart[] = [text("Charge "), val(formatted)];
     if (desc) parts.push(text(" for "), val(desc));
+    return parts;
+  },
+
+  // ── Google Calendar ─────────────────────────────────────────────
+
+  "google.delete_calendar_event": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    const parts: SummaryPart[] = [text("Delete event "), val(title)];
+    const startTime = strVal(rd?.start_time);
+    if (startTime) parts.push(text(" on "), val(formatDateTime(startTime)));
+    return parts;
+  },
+
+  "google.update_calendar_event": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    const parts: SummaryPart[] = [text("Update event "), val(title)];
+    const startTime = strVal(rd?.start_time);
+    if (startTime) parts.push(text(" on "), val(formatDateTime(startTime)));
+    return parts;
+  },
+
+  // ── Google Drive ────────────────────────────────────────────────
+
+  "google.delete_drive_file": (_params, rd) => {
+    const name = strVal(rd?.file_name);
+    if (!name) return null;
+    return [text("Delete file "), val(name)];
+  },
+
+  "google.get_drive_file": (_params, rd) => {
+    const name = strVal(rd?.file_name);
+    if (!name) return null;
+    return [text("Get file "), val(name)];
+  },
+
+  // ── Google Docs ─────────────────────────────────────────────────
+
+  "google.get_document": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    return [text("Get document "), val(title)];
+  },
+
+  "google.update_document": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    return [text("Update document "), val(title)];
+  },
+
+  // ── Google Sheets ───────────────────────────────────────────────
+
+  "google.sheets_read_range": (params, rd) => {
+    const title = strVal(rd?.title);
+    const range = strVal(rd?.range) ?? strVal(params.range);
+    if (!title) return null;
+    const parts: SummaryPart[] = [text("Read "), val(title)];
+    if (range) parts.push(text(" range "), val(range));
+    return parts;
+  },
+
+  "google.sheets_write_range": (params, rd) => {
+    const title = strVal(rd?.title);
+    const range = strVal(rd?.range) ?? strVal(params.range);
+    if (!title) return null;
+    const parts: SummaryPart[] = [text("Write to "), val(title)];
+    if (range) parts.push(text(" range "), val(range));
+    return parts;
+  },
+
+  "google.sheets_append_rows": (params, rd) => {
+    const title = strVal(rd?.title);
+    const range = strVal(rd?.range) ?? strVal(params.range);
+    if (!title) return null;
+    const parts: SummaryPart[] = [text("Append rows to "), val(title)];
+    if (range) parts.push(text(" range "), val(range));
+    return parts;
+  },
+
+  "google.sheets_list_sheets": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    return [text("List sheets in "), val(title)];
+  },
+
+  // ── Google Slides ───────────────────────────────────────────────
+
+  "google.get_presentation": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    return [text("Get presentation "), val(title)];
+  },
+
+  "google.add_slide": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    return [text("Add slide to "), val(title)];
+  },
+
+  // ── Gmail ───────────────────────────────────────────────────────
+
+  "google.read_email": (_params, rd) => {
+    const subject = strVal(rd?.subject);
+    if (!subject) return null;
+    const parts: SummaryPart[] = [text("Read email "), val(subject)];
+    const from = strVal(rd?.from);
+    if (from) parts.push(text(" from "), val(from));
+    return parts;
+  },
+
+  "google.send_email_reply": (_params, rd) => {
+    const subject = strVal(rd?.subject);
+    if (!subject) return null;
+    return [text("Reply to "), val(subject)];
+  },
+
+  "google.archive_email": (_params, rd) => {
+    const subject = strVal(rd?.subject);
+    if (!subject) return null;
+    const parts: SummaryPart[] = [text("Archive email "), val(subject)];
+    const from = strVal(rd?.from);
+    if (from) parts.push(text(" from "), val(from));
     return parts;
   },
 };
@@ -328,6 +456,41 @@ function pickHighlights(
 function strVal(v: unknown): string | null {
   if (typeof v === "string" && v.length > 0) return v;
   return null;
+}
+
+/** Formats an ISO datetime string for display in summaries. */
+function formatDateTime(iso: string): string {
+  try {
+    // Date-only strings (all-day events) use "YYYY-MM-DD". Parsing them with
+    // `new Date()` treats them as UTC midnight, which shifts the displayed date
+    // by one day in UTC-negative timezones. Format them without a time component
+    // by splitting the string directly to avoid any timezone conversion.
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+    if (isDateOnly) {
+      const [year, month, day] = iso.split("-").map(Number);
+      const date = new Date(year!, month! - 1, day!);
+      const now = new Date();
+      const sameYear = date.getFullYear() === now.getFullYear();
+      return date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: sameYear ? undefined : "numeric",
+      });
+    }
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return iso;
+    const now = new Date();
+    const sameYear = date.getFullYear() === now.getFullYear();
+    return date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: sameYear ? undefined : "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 function formatRecipients(v: unknown): string | null {

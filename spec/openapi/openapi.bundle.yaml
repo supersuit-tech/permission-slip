@@ -6957,6 +6957,19 @@ components:
           format: date-time
           description: When the approval request was created
           example: '2026-02-11T13:20:00Z'
+        resource_details:
+          type: object
+          nullable: true
+          description: |
+            Human-readable metadata for resources referenced by opaque IDs in the
+            action parameters. Populated at request time via the connector's
+            ResourceDetailResolver. Null when the connector doesn't support
+            resource resolution or the lookup failed.
+          additionalProperties: true
+          example:
+            title: Q1 Planning Meeting
+            start_time: '2026-03-15T14:00:00Z'
+            end_time: '2026-03-15T15:00:00Z'
         execution_status:
           allOf:
             - $ref: '#/components/schemas/ExecutionStatus'

@@ -81,6 +81,17 @@ type ActionResult struct {
 	Data json.RawMessage // service-specific response payload
 }
 
+// ResourceDetailResolver is optionally implemented by connectors that can
+// look up human-readable details for resources referenced by opaque IDs.
+// Called when an approval request is created, before the approval is stored.
+// Errors are non-fatal — the approval is stored without details on failure.
+type ResourceDetailResolver interface {
+	// ResolveResourceDetails fetches human-readable metadata for the resources
+	// referenced by the action parameters. Returns a map of display-friendly
+	// fields (e.g., {"title": "Q1 Planning", "start_time": "2026-03-15T14:00:00Z"}).
+	ResolveResourceDetails(ctx context.Context, actionType string, params json.RawMessage, creds Credentials) (map[string]any, error)
+}
+
 // ManifestProvider is optionally implemented by connectors that can
 // describe their metadata declaratively. All built-in and external
 // connectors implement this. The server uses it to auto-seed DB rows

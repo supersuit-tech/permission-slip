@@ -30,6 +30,8 @@ function ApprovalBannerItem({
     approval.action.parameters as Record<string, unknown>,
     null,
     null,
+    undefined,
+    approval.resource_details as Record<string, unknown> | undefined,
   );
 
   return (
