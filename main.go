@@ -149,6 +149,8 @@ func main() {
 				PriceIDRequest: priceID,
 			})
 			log.Println("Stripe: client initialized")
+			// Fetch and cache the per-request price from Stripe at startup.
+			deps.Stripe.FetchRequestPrice()
 			if webhookSecret == "" {
 				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
 			}

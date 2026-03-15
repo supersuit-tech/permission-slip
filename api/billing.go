@@ -119,6 +119,13 @@ type billingPlanResponse struct {
 	Plan         billingPlan         `json:"plan"`
 	Subscription billingSubscription `json:"subscription"`
 	Usage        billingUsageSummary `json:"usage"`
+	Pricing      *billingPricing     `json:"pricing,omitempty"`
+}
+
+// billingPricing provides pricing information sourced from Stripe.
+type billingPricing struct {
+	FreeRequestAllowance   int    `json:"free_request_allowance"`
+	PricePerRequestDisplay string `json:"price_per_request_display"`
 }
 
 type billingPlan struct {
@@ -234,6 +241,18 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 				planLimits: newPlanLimits(&sub.Plan),
 			},
 			Subscription: newBillingSubscription(sub),
+		}
+
+		// Include pricing info for paid plans.
+		if sub.PlanID != db.PlanFree {
+			priceDisplay := "$0.005" // default fallback
+			if deps.Stripe != nil {
+				priceDisplay = deps.Stripe.RequestPriceDisplay()
+			}
+			resp.Pricing = &billingPricing{
+				FreeRequestAllowance:   int(pstripe.FreeRequestAllowance()),
+				PricePerRequestDisplay: priceDisplay,
+			}
 		}
 
 		// Check actual payment methods rather than relying on Stripe customer ID.

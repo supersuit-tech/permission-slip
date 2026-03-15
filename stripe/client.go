@@ -3,6 +3,7 @@ package stripe
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	gostripe "github.com/stripe/stripe-go/v82"
@@ -11,6 +12,7 @@ import (
 	"github.com/stripe/stripe-go/v82/invoice"
 	"github.com/stripe/stripe-go/v82/invoiceitem"
 	"github.com/stripe/stripe-go/v82/paymentmethod"
+	"github.com/stripe/stripe-go/v82/price"
 	"github.com/stripe/stripe-go/v82/setupintent"
 	"github.com/stripe/stripe-go/v82/subscription"
 
@@ -28,6 +30,19 @@ type Config struct {
 // All methods are context-aware and return typed errors.
 type Client struct {
 	cfg Config
+
+	// requestPrice caches the per-request price fetched from Stripe at init.
+	// Zero means Stripe was unavailable; callers should fall back to plans.json.
+	requestPriceMu sync.RWMutex
+	requestPrice   *RequestPrice
+}
+
+// RequestPrice holds the per-request pricing fetched from Stripe.
+type RequestPrice struct {
+	// UnitAmountDecimal is the price in cents (e.g. 0.5 for $0.005).
+	UnitAmountDecimal float64
+	// DisplayAmount is a human-readable string like "$0.005".
+	DisplayAmount string
 }
 
 // keyMu protects writes to gostripe.Key so parallel tests don't race.
@@ -46,6 +61,55 @@ func New(cfg Config) *Client {
 // WebhookSecret returns the webhook signing secret for signature verification.
 func (c *Client) WebhookSecret() string {
 	return c.cfg.WebhookSecret
+}
+
+// FetchRequestPrice fetches the per-request price from Stripe and caches it.
+// Should be called once at startup. If Stripe is unavailable, the cached value
+// stays nil and GetRequestPrice returns the fallback from plans.json.
+func (c *Client) FetchRequestPrice() {
+	if c.cfg.PriceIDRequest == "" {
+		return
+	}
+	params := &gostripe.PriceParams{}
+	p, err := price.Get(c.cfg.PriceIDRequest, params)
+	if err != nil {
+		log.Printf("stripe: failed to fetch request price %s: %v", c.cfg.PriceIDRequest, err)
+		return
+	}
+
+	rp := &RequestPrice{
+		UnitAmountDecimal: p.UnitAmountDecimal,
+	}
+	// Format as "$X.XXX" from cents decimal (e.g. 0.5 cents = $0.005).
+	dollars := p.UnitAmountDecimal / 100.0
+	rp.DisplayAmount = fmt.Sprintf("$%.3f", dollars)
+
+	c.requestPriceMu.Lock()
+	c.requestPrice = rp
+	c.requestPriceMu.Unlock()
+}
+
+// GetRequestPrice returns the cached per-request price from Stripe.
+// Returns nil if Stripe was unavailable; callers should fall back to plans.json.
+func (c *Client) GetRequestPrice() *RequestPrice {
+	c.requestPriceMu.RLock()
+	defer c.requestPriceMu.RUnlock()
+	return c.requestPrice
+}
+
+// RequestPriceDisplay returns the display string for the per-request price.
+// Falls back to plans.json if Stripe price is not cached.
+func (c *Client) RequestPriceDisplay() string {
+	if rp := c.GetRequestPrice(); rp != nil {
+		return rp.DisplayAmount
+	}
+	// Fallback: derive from plans.json
+	p := config.GetPlan(config.PlanPayAsYouGo)
+	if p != nil && p.PricePerRequestMillicents > 0 {
+		dollars := float64(p.PricePerRequestMillicents) / 100_000.0
+		return fmt.Sprintf("$%.3f", dollars)
+	}
+	return "$0.005"
 }
 
 // CreateCustomer creates a new Stripe Customer linked to a user.
