@@ -57,6 +57,66 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 
 ---
 
+## 🔌 Connector Health
+
+> **⚠️ Permission Slip is in active development and currently in beta.** Not all features are complete, and connectors are being tested incrementally. Expect rough edges.
+
+| Connector | Status |
+|-----------|--------|
+| Google | ✅ Tested |
+| Airtable | ❌ Untested |
+| Amadeus | ❌ Untested |
+| Asana | ❌ Untested |
+| AWS | ❌ Untested |
+| Calendly | ❌ Untested |
+| Confluence | ❌ Untested |
+| Datadog | ❌ Untested |
+| Discord | ❌ Untested |
+| DocuSign | ❌ Untested |
+| DoorDash | ❌ Untested |
+| Dropbox | ❌ Untested |
+| Expedia | ❌ Untested |
+| Figma | ❌ Untested |
+| GitHub | ❌ Untested |
+| HubSpot | ❌ Untested |
+| Intercom | ❌ Untested |
+| Jira | ❌ Untested |
+| Kroger | ❌ Untested |
+| Linear | ❌ Untested |
+| LinkedIn | ❌ Untested |
+| Make | ❌ Untested |
+| Meta | ❌ Untested |
+| Microsoft | ❌ Untested |
+| Monday | ❌ Untested |
+| MongoDB | ❌ Untested |
+| MySQL | ❌ Untested |
+| Netlify | ❌ Untested |
+| Notion | ❌ Untested |
+| PagerDuty | ❌ Untested |
+| Plaid | ❌ Untested |
+| Postgres | ❌ Untested |
+| QuickBooks | ❌ Untested |
+| Redis | ❌ Untested |
+| Salesforce | ❌ Untested |
+| SendGrid | ❌ Untested |
+| Shopify | ❌ Untested |
+| Slack | ❌ Untested |
+| Square | ❌ Untested |
+| Stripe | ❌ Untested |
+| Supabase | ❌ Untested |
+| Trello | ❌ Untested |
+| Twilio | ❌ Untested |
+| Vercel | ❌ Untested |
+| Walmart | ❌ Untested |
+| X | ❌ Untested |
+| Zapier | ❌ Untested |
+| Zendesk | ❌ Untested |
+| Zoom | ❌ Untested |
+
+Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/permission-slip/issues) to let us know!
+
+---
+
 ## 🤖 Agent Compatibility
 
 Permission Slip needs agents that can **(1) make HTTP requests to arbitrary URLs** and **(2) generate Ed25519 key pairs**. If it runs locally with a real shell, it will work. Cloud-hosted agents need case-by-case verification.
