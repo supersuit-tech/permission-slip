@@ -7,12 +7,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Plan, Subscription } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, Subscription } from "@/hooks/useBillingPlan";
 import { formatDate } from "./formatters";
 
 interface PlanCardProps {
   plan: Plan;
   subscription: Subscription;
+  pricing?: BillingPricing;
 }
 
 function StatusBadge({ status }: { status: Subscription["status"] }) {
@@ -25,7 +26,7 @@ function StatusBadge({ status }: { status: Subscription["status"] }) {
   return <Badge variant="secondary">Cancelled</Badge>;
 }
 
-export function PlanCard({ plan, subscription }: PlanCardProps) {
+export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
   const isFree = plan.id === "free";
 
   return (
@@ -51,6 +52,14 @@ export function PlanCard({ plan, subscription }: PlanCardProps) {
                 </Badge>
               </div>
             </div>
+            {!isFree && pricing && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Pricing</span>
+                <span className="text-sm text-muted-foreground">
+                  {pricing.free_request_allowance.toLocaleString()} requests/month included, then {pricing.price_per_request_display}/request
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Status</span>
               <StatusBadge status={subscription.status} />

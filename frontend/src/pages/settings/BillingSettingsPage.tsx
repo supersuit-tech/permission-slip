@@ -94,6 +94,7 @@ export function BillingSettingsPage() {
           <PlanCard
             plan={billingPlan.plan}
             subscription={billingPlan.subscription}
+            pricing={billingPlan.pricing}
           />
           <UsageSummaryCard
             usage={billingPlan.usage}
