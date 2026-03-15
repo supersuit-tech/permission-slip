@@ -85,8 +85,13 @@ func scrubInterval(logger *slog.Logger) time.Duration {
 		if err == nil && d >= minInterval {
 			return d
 		}
-		logger.Warn("invalid SCRUB_EXECUTION_DATA_INTERVAL, using default 5m",
-			"value", v, "error", err, "min", minInterval.String())
+		if err != nil {
+			logger.Warn("invalid SCRUB_EXECUTION_DATA_INTERVAL, using default 5m",
+				"value", v, "error", err, "min", minInterval.String())
+		} else {
+			logger.Warn("SCRUB_EXECUTION_DATA_INTERVAL is below minimum, using default 5m",
+				"value", v, "min", minInterval.String())
+		}
 	}
 	return 5 * time.Minute
 }

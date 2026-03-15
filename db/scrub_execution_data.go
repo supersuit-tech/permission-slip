@@ -39,7 +39,7 @@ func ScrubSensitiveExecutionData(ctx context.Context, d DBTX) (int64, error) {
 		WHERE executed_at < now() - interval '30 minutes'
 		  AND parameters IS NOT NULL`)
 	if err != nil {
-		return tag1.RowsAffected(), fmt.Errorf("scrub standing_approval_executions: %w", err)
+		return 0, fmt.Errorf("scrub standing_approval_executions: %w", err)
 	}
 
 	return tag1.RowsAffected() + tag2.RowsAffected(), nil
