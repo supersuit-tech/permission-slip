@@ -223,6 +223,11 @@ function ApprovalContent({
           </pre>
         </div>
       )}
+      {executionStatus && !executionResult && (
+        <p className="text-muted-foreground text-xs italic">
+          Execution details are automatically removed after 30 minutes.
+        </p>
+      )}
     </div>
   );
 }
