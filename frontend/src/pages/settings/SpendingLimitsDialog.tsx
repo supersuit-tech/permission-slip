@@ -78,6 +78,7 @@ export function SpendingLimitsDialog({
       await updatePaymentMethod({
         id: paymentMethod.id,
         label: label || undefined,
+        clear_label: !label && !!paymentMethod.label,
         per_transaction_limit: perTxCents,
         monthly_limit: monthlyCents,
         clear_per_transaction_limit:
@@ -86,10 +87,10 @@ export function SpendingLimitsDialog({
           !monthlyDollars && paymentMethod.monthly_limit != null,
       });
 
-      toast.success("Spending limits updated.");
+      toast.success("Card settings updated.");
       onOpenChange(false);
     } catch {
-      toast.error("Failed to update spending limits.");
+      toast.error("Failed to update card settings.");
     }
   }
 
@@ -98,24 +99,28 @@ export function SpendingLimitsDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Spending Limits &mdash; {paymentMethod.last4}
+            Card Settings &mdash;{" "}
+            {paymentMethod.label ?? paymentMethod.last4}
           </DialogTitle>
           <DialogDescription>
-            Set optional spending limits to control how much agents can charge to
-            this card. Leave blank for no limit.
+            Rename this card and set optional spending limits to control how much
+            agents can charge. Leave limits blank for no limit.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="pm-label">Label</Label>
+            <Label htmlFor="pm-label">Card Nickname</Label>
             <Input
               id="pm-label"
-              placeholder="e.g. Personal Visa"
+              placeholder="e.g. Personal Visa, Groceries Card"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               disabled={isLoading}
             />
+            <p className="text-muted-foreground text-xs">
+              A friendly name to identify this card at a glance.
+            </p>
           </div>
 
           <div className="space-y-2">
