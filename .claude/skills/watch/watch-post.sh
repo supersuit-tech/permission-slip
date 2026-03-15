@@ -4,7 +4,7 @@
 # Invoked after the polling loop ends (idle timeout) and the agent has
 # finished all its work.
 #
-# Usage: bash watch-post.sh [PR_URL] [--automerge]
+# Usage: bash watch-post.sh [PR_URL] [--no-automerge]
 #
 # This script handles steps 11-13 from the original SKILL.md:
 #   11. Trigger CI and audit, wait, fix failures (signals agent for fixes)
@@ -17,13 +17,14 @@ set -euo pipefail
 # Arguments
 # ---------------------------------------------------------------------------
 PR_URL=""
-AUTO_MERGE=false
+AUTO_MERGE=true
 NO_NOTIFY=false
 
 # Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --automerge) AUTO_MERGE=true; shift ;;
+    --automerge) AUTO_MERGE=true; shift ;;  # kept for backwards compat
+    --no-automerge) AUTO_MERGE=false; shift ;;
     --no-notify) NO_NOTIFY=true; shift ;;
     https://*) PR_URL="$1"; shift ;;
     *) shift ;;

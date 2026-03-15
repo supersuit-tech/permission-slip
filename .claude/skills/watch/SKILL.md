@@ -1,7 +1,7 @@
 ---
 name: watch
 description: Poll a GitHub PR for new comments and PR reviews and act on them autonomously. Use when the user wants to monitor a PR for feedback and have Claude implement requested changes automatically.
-argument-hint: "[PR_URL] [--automerge] [--max-turns <N>] [--no-notify]"
+argument-hint: "[PR_URL] [--no-automerge] [--max-turns <N>] [--no-notify]"
 ---
 
 # Watch PR for Comments and Reviews
@@ -39,7 +39,7 @@ Agent (this skill)     — Only invoked when reasoning is needed
 
 Parse the arguments from: `$ARGUMENTS`
 
-Extract any PR URL and flags. The format is: `[PR_URL] [--automerge] [--max-turns <N>] [--no-notify]`
+Extract any PR URL and flags. The format is: `[PR_URL] [--no-automerge] [--max-turns <N>] [--no-notify]`
 
 The PR URL is **optional**. If not provided, detect it automatically from the current branch:
 
@@ -54,7 +54,7 @@ Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permi
 Set these variables for the session:
 - `PR_URL` — the PR URL (from arguments or auto-detected from current branch)
 - `PR_NUMBER` — the extracted PR number
-- `AUTO_MERGE` — `true` if `--automerge` was passed, `false` otherwise
+- `AUTO_MERGE` — `true` by default, `false` if `--no-automerge` was passed
 - `MAX_TURNS` — the value of `--max-turns` if passed, `0` otherwise (0 = unlimited)
 - `NO_NOTIFY` — `true` if `--no-notify` was passed, `false` otherwise
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
@@ -68,11 +68,11 @@ The agent orchestrates the session by running the shell scripts and only doing A
 
 ```bash
 # First run (no --work-dir):
-bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") $([[ "$MAX_TURNS" -gt 0 ]] && echo "--max-turns $MAX_TURNS") 2>&1
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$MAX_TURNS" -gt 0 ]] && echo "--max-turns $MAX_TURNS") 2>&1
 # Capture WORK_DIR from the session context JSON in the output.
 
 # Subsequent runs (reuse WORK_DIR to preserve state):
-bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") $([[ "$MAX_TURNS" -gt 0 ]] && echo "--max-turns $MAX_TURNS") --work-dir "$WORK_DIR" 2>&1
+bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$MAX_TURNS" -gt 0 ]] && echo "--max-turns $MAX_TURNS") --work-dir "$WORK_DIR" 2>&1
 ```
 
 The script handles:
@@ -299,7 +299,7 @@ After the agent finishes processing work items, go back to **Step 1** and run th
 When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has already been posted by the script. Run the post-session script:
 
 ```bash
-bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "true" ]] && echo "--automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") 2>&1
+bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") 2>&1
 ```
 
 This handles:

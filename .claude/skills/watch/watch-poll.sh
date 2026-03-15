@@ -3,10 +3,10 @@
 # Handles all mechanical bookkeeping (fetching, deduplication, idle timeout)
 # and only invokes the Claude agent when there's actionable work.
 #
-# Usage: bash watch-poll.sh [PR_URL] [--automerge] [--work-dir <path>] [--max-turns <N>]
+# Usage: bash watch-poll.sh [PR_URL] [--no-automerge] [--work-dir <path>] [--max-turns <N>]
 #
 # Options:
-#   --automerge       Enable auto-merge after checks pass
+#   --no-automerge    Disable auto-merge (enabled by default)
 #   --work-dir <path> Reuse an existing work directory (preserves state
 #                     across invocations: last-seen IDs, action log, cache)
 #   --max-turns <N>   Maximum number of agent turns before ending the session.
@@ -27,14 +27,15 @@ set -euo pipefail
 # Arguments
 # ---------------------------------------------------------------------------
 PR_URL=""
-AUTO_MERGE=false
+AUTO_MERGE=true
 EXISTING_WORK_DIR=""
 MAX_TURNS=0  # 0 = unlimited
 
 # Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --automerge) AUTO_MERGE=true; shift ;;
+    --automerge) AUTO_MERGE=true; shift ;;  # kept for backwards compat
+    --no-automerge) AUTO_MERGE=false; shift ;;
     --work-dir) EXISTING_WORK_DIR="$2"; shift 2 ;;
     --max-turns) MAX_TURNS="$2"; shift 2 ;;
     https://*) PR_URL="$1"; shift ;;
