@@ -65,8 +65,8 @@ export function OAuthProviderSection() {
           </div>
           <CardDescription>
             Configure your own OAuth client credentials for providers that
-            aren&apos;t pre-configured. Required for self-hosted deployments or
-            custom providers.
+            aren&apos;t pre-configured on this platform (e.g. Salesforce,
+            X/Twitter).
           </CardDescription>
         </CardHeader>
         <CardContent>

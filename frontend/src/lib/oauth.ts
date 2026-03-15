@@ -6,6 +6,31 @@
 export { providerLabel } from "@/lib/labels";
 
 /**
+ * Developer console URLs for OAuth providers that may need BYOA setup.
+ * Used by the BYOASetupBanner to link users to the right place when they
+ * need to create an OAuth app.
+ */
+export const PROVIDER_DEV_CONSOLE_URLS: Record<string, string> = {
+  atlassian: "https://developer.atlassian.com/console/myapps/",
+  datadog: "https://app.datadoghq.com/oauth/manage",
+  dropbox: "https://www.dropbox.com/developers/apps",
+  figma: "https://www.figma.com/developers/apps",
+  github: "https://github.com/settings/developers",
+  google: "https://console.cloud.google.com/apis/credentials",
+  hubspot: "https://developers.hubspot.com/",
+  linear: "https://linear.app/settings/api",
+  meta: "https://developers.facebook.com/apps/",
+  microsoft: "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
+  notion: "https://www.notion.so/my-integrations",
+  pagerduty: "https://developer.pagerduty.com/apps/",
+  salesforce: "https://login.salesforce.com/",
+  shopify: "https://partners.shopify.com/",
+  square: "https://developer.squareup.com/apps",
+  stripe: "https://dashboard.stripe.com/apikeys",
+  x: "https://developer.x.com/en/portal/dashboard",
+};
+
+/**
  * Providers that require a shop subdomain to construct per-shop OAuth URLs.
  * When a provider is in this set, the UI prompts the user for their store
  * subdomain (e.g. "mystore") which is appended as `&shop=mystore` to the
