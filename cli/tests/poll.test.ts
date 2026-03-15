@@ -280,6 +280,59 @@ describe("pollUntilResolved", () => {
     expect(typeof pollCalls[0]!.elapsed).toBe("number");
   });
 
+  it("uses fixed interval when fixedIntervalSeconds is set", async () => {
+    let callCount = 0;
+    const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
+      callCount++;
+      if (callCount >= 4) {
+        return makeResult({ status: "approved", execution_status: "success" });
+      }
+      return makeResult({ status: "pending" });
+    });
+    const client = { approvalStatus: mock } as unknown as ApiClient;
+
+    const promise = pollUntilResolved({
+      approvalId: "appr_test123",
+      client,
+      timeoutSeconds: 60,
+      fixedIntervalSeconds: 5,
+    });
+
+    // Poll 1 (immediate) → pending → sleep 5s
+    await jest.advanceTimersByTimeAsync(5000);
+    // Poll 2 → pending → sleep 5s (fixed, no backoff)
+    await jest.advanceTimersByTimeAsync(5000);
+    // Poll 3 → pending → sleep 5s (still fixed)
+    await jest.advanceTimersByTimeAsync(5000);
+    // Poll 4 → approved
+
+    const result = await promise;
+
+    expect(result.status).toBe("approved");
+    expect(result.timed_out).toBeUndefined();
+    expect(mock.mock.calls.length).toBe(4);
+  });
+
+  it("fixed interval polls respect timeout", async () => {
+    const pending = makeResult({ status: "pending" });
+    const { client } = makeMockClient([pending]);
+
+    const promise = pollUntilResolved({
+      approvalId: "appr_test123",
+      client,
+      timeoutSeconds: 7,
+      fixedIntervalSeconds: 5,
+    });
+
+    // Advance past timeout
+    await jest.advanceTimersByTimeAsync(10000);
+
+    const result = await promise;
+
+    expect(result.status).toBe("pending");
+    expect(result.timed_out).toBe(true);
+  });
+
   it("propagates non-transient errors immediately", async () => {
     const mock = jest.fn<() => Promise<ApprovalStatusResult>>(async () => {
       throw new PermissionSlipApiError(401, {
@@ -355,5 +408,21 @@ describe("parseTimeout", () => {
     const warnings: string[] = [];
     parseTimeout("30", (msg) => warnings.push(msg));
     expect(warnings).toHaveLength(0);
+  });
+
+  it("uses custom flag name in warning", () => {
+    const warnings: string[] = [];
+    parseTimeout("bad", (msg) => warnings.push(msg), { flagName: "--poll-timeout" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("invalid --poll-timeout");
+    expect(warnings[0]).not.toContain("invalid --timeout ");
+  });
+
+  it("uses custom default timeout", () => {
+    expect(parseTimeout(undefined, noop, { defaultTimeout: 600 })).toBe(600);
+  });
+
+  it("uses custom default on invalid value", () => {
+    expect(parseTimeout("bad", noop, { defaultTimeout: 600 })).toBe(600);
   });
 });

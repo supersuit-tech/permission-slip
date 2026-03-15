@@ -15,6 +15,8 @@ export interface PollOptions {
   client: ApiClient;
   /** Maximum seconds to wait before returning. */
   timeoutSeconds: number;
+  /** Fixed polling interval in seconds. When set, disables exponential backoff. */
+  fixedIntervalSeconds?: number;
   /** Called after each poll while still pending. Use for progress messages. */
   onPoll?: (info: { status: string; elapsed: number; timeout: number }) => void;
 }
@@ -26,13 +28,19 @@ const MIN_TIMEOUT = 1;
 const MAX_TIMEOUT = 86400;
 
 /** Parses and clamps a timeout string to a valid range. Warns on invalid input. */
-export function parseTimeout(value: string | undefined, warn: (msg: string) => void = (msg) => process.stderr.write(msg)): number {
+export function parseTimeout(
+  value: string | undefined,
+  warn: (msg: string) => void = (msg) => process.stderr.write(msg),
+  options?: { flagName?: string; defaultTimeout?: number },
+): number {
+  const flagName = options?.flagName ?? "--timeout";
+  const defaultVal = options?.defaultTimeout ?? DEFAULT_TIMEOUT;
   const parsed = Number(value);
   if (value !== undefined && (isNaN(parsed) || parsed <= 0)) {
-    warn(`Warning: invalid --timeout value "${value}", using default ${DEFAULT_TIMEOUT}s\n`);
-    return DEFAULT_TIMEOUT;
+    warn(`Warning: invalid ${flagName} value "${value}", using default ${defaultVal}s\n`);
+    return defaultVal;
   }
-  return Math.max(MIN_TIMEOUT, Math.min(parsed || DEFAULT_TIMEOUT, MAX_TIMEOUT));
+  return Math.max(MIN_TIMEOUT, Math.min(parsed || defaultVal, MAX_TIMEOUT));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -63,8 +71,9 @@ export async function pollUntilResolved(
 ): Promise<ApprovalStatusResult & { timed_out?: boolean }> {
   const start = Date.now();
   const deadline = start + opts.timeoutSeconds * 1000;
-  let interval = 2000; // start at 2 seconds
-  const maxInterval = 5000; // cap at 5 seconds
+  const useFixedInterval = opts.fixedIntervalSeconds !== undefined;
+  let interval = useFixedInterval ? Math.max(1, opts.fixedIntervalSeconds!) * 1000 : 2000;
+  const maxInterval = 5000; // cap at 5 seconds (only used with backoff)
 
   while (Date.now() < deadline) {
     try {
@@ -88,7 +97,9 @@ export async function pollUntilResolved(
     if (remaining <= 0) break;
 
     await sleep(Math.min(interval, remaining));
-    interval = Math.min(Math.ceil(interval * 1.5), maxInterval);
+    if (!useFixedInterval) {
+      interval = Math.min(Math.ceil(interval * 1.5), maxInterval);
+    }
   }
 
   // Final check after timeout — also protected from transient errors.
