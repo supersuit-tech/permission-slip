@@ -72,7 +72,7 @@ export async function pollUntilResolved(
   const start = Date.now();
   const deadline = start + opts.timeoutSeconds * 1000;
   const useFixedInterval = opts.fixedIntervalSeconds !== undefined;
-  let interval = useFixedInterval ? opts.fixedIntervalSeconds! * 1000 : 2000;
+  let interval = useFixedInterval ? Math.max(1, opts.fixedIntervalSeconds!) * 1000 : 2000;
   const maxInterval = 5000; // cap at 5 seconds (only used with backoff)
 
   while (Date.now() < deadline) {

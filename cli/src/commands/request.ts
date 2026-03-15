@@ -27,7 +27,13 @@ function parsePollInterval(value: string): number {
     );
     return DEFAULT_POLL_INTERVAL;
   }
-  return Math.max(MIN_POLL_INTERVAL, Math.min(parsed, MAX_POLL_INTERVAL));
+  const clamped = Math.max(MIN_POLL_INTERVAL, Math.min(parsed, MAX_POLL_INTERVAL));
+  if (clamped !== parsed) {
+    process.stderr.write(
+      `Warning: --poll-interval value "${value}" out of range [${MIN_POLL_INTERVAL}, ${MAX_POLL_INTERVAL}], using ${clamped}s\n`,
+    );
+  }
+  return clamped;
 }
 
 export function requestCommand(program: Command): void {
