@@ -1014,3 +1014,47 @@ func TestListInvoices_NoSubscription(t *testing.T) {
 	}
 }
 
+// ── POST /billing/portal ─────────────────────────────────────────────────
+
+func TestBillingPortal_RequiresStripeClient(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// No Stripe client → 503.
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/billing/portal", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestBillingPortal_NoCustomerID_Returns404(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	// Stripe client present but user has no stripe_customer_id → 404.
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/billing/portal", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
