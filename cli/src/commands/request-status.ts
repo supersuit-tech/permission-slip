@@ -42,6 +42,9 @@ export function requestStatusCommand(program: Command): void {
         const client = new ApiClient({ serverUrl: opts.server, agentId });
 
         if (!opts.wait) {
+          if (opts.timeout !== "120") {
+            process.stderr.write("Warning: --timeout has no effect with --no-wait\n");
+          }
           // --no-wait: single check, return immediately.
           const result = await client.approvalStatus(opts.approvalId);
           output(result, outputOpts);
