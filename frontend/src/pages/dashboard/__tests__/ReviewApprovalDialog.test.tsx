@@ -183,4 +183,44 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     // Should show step 1 of 2 (constraints), not step 1 of 4
     expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
   });
+
+  it("does NOT open standing approval wizard when execution fails after 'Always Allow'", async () => {
+    setupMocks();
+    const approval = makeApproval();
+
+    mockPost.mockResolvedValueOnce({
+      data: {
+        approval_id: approval.approval_id,
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        confirmation_code: "ABC-123",
+        execution_status: "error",
+        execution_result: { execution_error: "Connection failed" },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReviewApprovalDialog
+        approval={approval}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Always Allow")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Always Allow"));
+
+    // Should show execution failure, NOT the standing approval wizard
+    await waitFor(() => {
+      expect(screen.getByText("Execution Failed")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Create Standing Approval")).not.toBeInTheDocument();
+  });
 });

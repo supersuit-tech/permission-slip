@@ -177,7 +177,9 @@ export function ReviewApprovalDialog({
       const result = await approveApproval(approval.approval_id);
       setApproveResult(result);
       setAutoCloseBlocked(true);
-      setStandingDialogOpen(true);
+      if (result.execution_status !== "error") {
+        setStandingDialogOpen(true);
+      }
     } catch {
       toast.error("Failed to approve request. Please try again.");
     } finally {
