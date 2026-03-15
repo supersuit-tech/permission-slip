@@ -27,6 +27,12 @@
  */
 import type { ReactNode } from "react";
 import type { ParametersSchema } from "@/lib/parameterSchema";
+import { renderTemplate, type SummaryPart } from "@/lib/displayTemplate";
+import {
+  formatHighlightValue,
+  humanizeKey,
+  truncate,
+} from "@/lib/formatValues";
 
 interface ActionPreviewSummaryProps {
   /** Action type identifier, e.g. "github.create_issue". */
@@ -37,16 +43,16 @@ interface ActionPreviewSummaryProps {
   schema: ParametersSchema | null;
   /** Human-readable action name from the connector, e.g. "Create Issue". */
   actionName: string | null;
+  /** Display template from the connector manifest, e.g. "Send email to {{to}}". */
+  displayTemplate?: string | null;
 }
 
 // ---------------------------------------------------------------------------
 // Structured summary parts — single definition, dual rendering
 // ---------------------------------------------------------------------------
 
-/** A segment of the summary — either plain text or a highlighted value. */
-type SummaryPart =
-  | { kind: "text"; text: string }
-  | { kind: "value"; text: string };
+// Re-use the SummaryPart type from displayTemplate for consistency.
+// Local helpers kept for the ACTION_DESCRIBERS registry.
 
 function text(t: string): SummaryPart {
   return { kind: "text", text: t };
@@ -100,8 +106,9 @@ export function ActionPreviewSummary({
   parameters,
   schema,
   actionName,
+  displayTemplate,
 }: ActionPreviewSummaryProps) {
-  const parts = buildParts(actionType, parameters, schema, actionName);
+  const parts = buildParts(actionType, parameters, schema, actionName, displayTemplate);
 
   return (
     <p className="text-sm leading-relaxed" data-testid="action-preview-summary">
@@ -119,26 +126,36 @@ export function buildSummary(
   parameters: Record<string, unknown>,
   schema: ParametersSchema | null,
   actionName: string | null,
+  displayTemplate?: string | null,
 ): string {
-  return renderPlain(buildParts(actionType, parameters, schema, actionName));
+  return renderPlain(buildParts(actionType, parameters, schema, actionName, displayTemplate));
 }
 
 /**
  * Core formatter: returns structured parts for an action.
- * Tries action-specific formatters first, then falls back to generic.
+ * Priority: template → ACTION_DESCRIBERS → generic fallback.
  */
 function buildParts(
   actionType: string,
   parameters: Record<string, unknown>,
   schema: ParametersSchema | null,
   actionName: string | null,
+  displayTemplate?: string | null,
 ): SummaryPart[] {
+  // 1. Try display template from manifest.
+  if (displayTemplate) {
+    const templateParts = renderTemplate(displayTemplate, parameters);
+    if (templateParts) return templateParts;
+  }
+
+  // 2. Try action-specific describer.
   const formatter = ACTION_DESCRIBERS[actionType];
   if (formatter) {
     const result = formatter(parameters);
     if (result) return result;
   }
 
+  // 3. Fall back to generic.
   return buildGenericParts(actionType, parameters, schema, actionName);
 }
 
@@ -296,7 +313,8 @@ function pickHighlights(
     if (value == null) continue;
     const displayVal = formatHighlightValue(value);
     if (!displayVal) continue;
-    const label = properties?.[key]?.description ?? key;
+    const prop = properties?.[key];
+    const label = prop?.description ?? humanizeKey(key);
     highlights.push({ label, displayVal });
   }
 
@@ -310,11 +328,6 @@ function pickHighlights(
 function strVal(v: unknown): string | null {
   if (typeof v === "string" && v.length > 0) return v;
   return null;
-}
-
-function truncate(s: string, maxLen: number): string {
-  if (s.length <= maxLen) return s;
-  return s.slice(0, maxLen - 1) + "\u2026";
 }
 
 function formatRecipients(v: unknown): string | null {
@@ -366,17 +379,3 @@ function humanizeActionType(actionType: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-function formatHighlightValue(value: unknown): string | null {
-  if (typeof value === "string") return truncate(value, 60);
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
-  if (Array.isArray(value)) {
-    const strs = value
-      .filter((x) => typeof x === "string" || typeof x === "number")
-      .map(String);
-    if (strs.length === 0) return null;
-    if (strs.length <= 2) return strs.join(", ");
-    return `${strs[0] ?? ""}, ${strs[1] ?? ""}, +${strs.length - 2} more`;
-  }
-  return null;
-}

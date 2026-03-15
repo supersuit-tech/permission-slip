@@ -70,16 +70,89 @@ export function humanizeActionType(actionType: string): string {
 export function buildActionSummary(
   actionType: string,
   parameters: Record<string, unknown>,
+  displayTemplate?: string | null,
 ): string {
+  // 1. Try display template from manifest.
+  if (displayTemplate) {
+    const result = renderDisplayTemplate(displayTemplate, parameters);
+    if (result) return result;
+  }
+
+  // 2. Try action-specific formatter.
   const formatter = ACTION_FORMATTERS[actionType];
   if (formatter) {
     const result = formatter(parameters);
     if (result) return result;
   }
+
+  // 3. Fall back to generic.
   return buildGenericSummary(actionType, parameters);
 }
 
 type ActionFormatter = (params: Record<string, unknown>) => string | null;
+
+/** Pattern matching {{param}} and {{param:directive}} placeholders. */
+const TEMPLATE_RE = /\{\{(\w+)(?::(\w+))?\}\}/g;
+
+/**
+ * Plain-text display template renderer for mobile.
+ * Mirrors the web displayTemplate.ts logic but outputs a plain string
+ * instead of SummaryPart[].
+ *
+ * Supports directives: :datetime (human-readable date), :count (array length).
+ */
+function renderDisplayTemplate(
+  template: string,
+  parameters: Record<string, unknown>,
+): string | null {
+  let result = "";
+  let lastIndex = 0;
+  let hasValue = false;
+
+  TEMPLATE_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = TEMPLATE_RE.exec(template)) !== null) {
+    result += template.slice(lastIndex, match.index);
+    const paramName = match[1]!;
+    const directive = match[2];
+    const rawValue = parameters[paramName];
+
+    let display: string | null = null;
+    if (directive === "datetime" && typeof rawValue === "string") {
+      display = tryFormatDateTime(rawValue);
+    } else if (directive === "count" && Array.isArray(rawValue)) {
+      display = String(rawValue.length);
+    }
+
+    if (display === null && rawValue != null) {
+      display = formatParamValue(rawValue);
+    }
+
+    if (display !== null) {
+      result += `\u201C${display}\u201D`;
+      hasValue = true;
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  result += template.slice(lastIndex);
+  return hasValue ? result : null;
+}
+
+/** Attempts to parse a string as an ISO datetime and return a human-readable form. */
+function tryFormatDateTime(value: string): string | null {
+  if (!/^\d{4}-\d{2}/.test(value)) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 /** Extracts a non-empty string from an unknown value, or returns null. */
 function strVal(v: unknown): string | null {

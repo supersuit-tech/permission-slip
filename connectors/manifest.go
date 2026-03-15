@@ -35,6 +35,7 @@ type ManifestAction struct {
 	RiskLevel             string          `json:"risk_level"`
 	ParametersSchema      json.RawMessage `json:"parameters_schema,omitempty"`
 	RequiresPaymentMethod bool            `json:"requires_payment_method,omitempty"`
+	DisplayTemplate       string          `json:"display_template,omitempty"`
 }
 
 // ManifestCredential describes a credential requirement for an external connector.
@@ -546,6 +547,7 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 			RiskLevel:             a.RiskLevel,
 			ParametersSchema:      a.ParametersSchema,
 			RequiresPaymentMethod: a.RequiresPaymentMethod,
+			DisplayTemplate:       a.DisplayTemplate,
 		})
 	}
 	for _, c := range m.RequiredCredentials {

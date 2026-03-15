@@ -7914,12 +7914,21 @@ components:
             The payment method is resolved to a Stripe token at execution time — raw card
             details are never exposed to the agent.
           example: false
+        display_template:
+          type: string
+          maxLength: 500
+          description: |
+            Template string for rendering a human-readable summary of action parameters.
+            Uses `{{param}}` for raw value insertion, `{{param:datetime}}` for date formatting,
+            and `{{param:count}}` for array length. Falls back to generic rendering when absent.
+          example: Send email to {{to}} — {{subject}}
       example:
         action_type: github.create_issue
         name: Create Issue
         description: Create a new issue in a repository
         risk_level: low
         requires_payment_method: false
+        display_template: Create issue {{title}} in {{owner}}/{{repo}}
         parameters_schema:
           type: object
           required:

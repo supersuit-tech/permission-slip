@@ -120,7 +120,7 @@ export function ReviewApprovalDialog({
   const isApproved = approveResult !== null;
   const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
-  const { schema, actionName } = useActionSchema(approval.action.type);
+  const { schema, actionName, displayTemplate } = useActionSchema(approval.action.type);
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
   const isBusy = pendingAction !== null || isDenying;
@@ -280,6 +280,7 @@ export function ReviewApprovalDialog({
                   parameters={approval.action.parameters as Record<string, unknown>}
                   schema={schema}
                   actionName={actionName}
+                  displayTemplate={displayTemplate}
                 />
               </div>
             </div>

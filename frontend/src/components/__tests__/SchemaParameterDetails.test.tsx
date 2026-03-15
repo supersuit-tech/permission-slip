@@ -56,17 +56,18 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
-  it("shows type annotations for each schema property", () => {
+  it("shows type annotations for provided parameters", () => {
     render(
       <SchemaParameterDetails
-        parameters={{ owner: "acme" }}
+        parameters={{ owner: "acme", repo: "widgets" }}
         schema={schema}
       />,
     );
 
-    // All four schema properties have type "string"
+    // Only provided params + required missing params show type annotations.
+    // owner and repo are provided; title and merge_method are optional and hidden.
     const typeAnnotations = screen.getAllByText("string");
-    expect(typeAnnotations.length).toBe(4);
+    expect(typeAnnotations.length).toBe(2);
   });
 
   it("shows 'missing' badge for required parameters not provided", () => {
@@ -81,7 +82,7 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("missing")).toBeInTheDocument();
   });
 
-  it("shows 'not provided' for optional parameters not provided", () => {
+  it("hides unprovided optional parameters", () => {
     render(
       <SchemaParameterDetails
         parameters={{ owner: "acme", repo: "widgets" }}
@@ -89,9 +90,9 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    // "title" and "merge_method" are both optional and not provided
-    const notProvided = screen.getAllByText("not provided");
-    expect(notProvided.length).toBe(2);
+    // "title" and "merge_method" are optional and not provided — should be hidden
+    expect(screen.queryByText("not provided")).not.toBeInTheDocument();
+    expect(screen.queryByText("Issue title")).not.toBeInTheDocument();
   });
 
   it("shows enum options for enum parameters", () => {
@@ -116,7 +117,7 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("default")).toBeInTheDocument();
   });
 
-  it("renders extra parameters not in schema", () => {
+  it("renders extra parameters not in schema with humanized keys", () => {
     render(
       <SchemaParameterDetails
         parameters={{ owner: "acme", repo: "widgets", custom_field: "hello" }}
@@ -124,7 +125,8 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("custom_field")).toBeInTheDocument();
+    // humanizeKey turns "custom_field" into "Custom field"
+    expect(screen.getByText("Custom field")).toBeInTheDocument();
     expect(screen.getByText("hello")).toBeInTheDocument();
   });
 
@@ -136,9 +138,10 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("foo")).toBeInTheDocument();
+    // humanizeKey capitalizes the first letter
+    expect(screen.getByText("Foo")).toBeInTheDocument();
     expect(screen.getByText("bar")).toBeInTheDocument();
-    expect(screen.getByText("count")).toBeInTheDocument();
+    expect(screen.getByText("Count")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
   });
 
@@ -152,7 +155,7 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("key")).toBeInTheDocument();
+    expect(screen.getByText("Key")).toBeInTheDocument();
     expect(screen.getByText("value")).toBeInTheDocument();
   });
 
