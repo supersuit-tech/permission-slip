@@ -10113,6 +10113,8 @@ components:
           $ref: '#/components/schemas/Subscription'
         usage:
           $ref: '#/components/schemas/UsageSummary'
+        pricing:
+          $ref: '#/components/schemas/BillingPricing'
     UsageDetail:
       type: object
       description: |
@@ -11452,6 +11454,24 @@ components:
           type: boolean
           description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
           example: false
+    BillingPricing:
+      type: object
+      description: |
+        Per-request pricing information sourced from Stripe. Only present for
+        paid plans. The frontend should use these values instead of deriving
+        pricing from plans.json, so Stripe remains the single source of truth.
+      required:
+        - free_request_allowance
+        - price_per_request_display
+      properties:
+        free_request_allowance:
+          type: integer
+          description: Number of requests included free each billing period before per-request charges apply.
+          example: 250
+        price_per_request_display:
+          type: string
+          description: Human-readable per-request price string (e.g. "$0.005"), sourced from the Stripe price object.
+          example: $0.005
   parameters:
     ActionConfigId:
       name: config_id
