@@ -310,6 +310,35 @@ describe("BYOASetupBanner", () => {
     expect(connectBtn).not.toBeDisabled();
   });
 
+  it("does not show banner when provider is absent from list", async () => {
+    const user = userEvent.setup();
+    setupMockGet({
+      "/v1/oauth/providers": {
+        data: { providers: [] },
+      },
+    });
+
+    renderWithProviders(
+      <ConnectorCredentialsSection
+        agentId={42}
+        connectorId="salesforce"
+        requiredCredentials={salesforceOAuth}
+      />,
+    );
+
+    await openManageModal(user);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Connect Salesforce/ }),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByText("OAuth app setup required"),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not show banner when provider has credentials", async () => {
     const user = userEvent.setup();
     setupMockGet({

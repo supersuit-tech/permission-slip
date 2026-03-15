@@ -21,7 +21,7 @@ export const PROVIDER_DEV_CONSOLE_URLS: Partial<Record<string, string>> = {
   datadog: "https://app.datadoghq.com/oauth/manage",
   dropbox: "https://www.dropbox.com/developers/apps",
   figma: "https://www.figma.com/developers/apps",
-  hubspot: "https://developers.hubspot.com/docs/api/oauth/tokens",
+  hubspot: "https://app.hubspot.com/developer/",
   linear: "https://linear.app/settings/api",
   meta: "https://developers.facebook.com/apps/",
   notion: "https://www.notion.so/my-integrations",
