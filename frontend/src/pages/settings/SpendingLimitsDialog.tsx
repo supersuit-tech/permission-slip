@@ -78,6 +78,7 @@ export function SpendingLimitsDialog({
       await updatePaymentMethod({
         id: paymentMethod.id,
         label: label || undefined,
+        clear_label: !label && !!paymentMethod.label,
         per_transaction_limit: perTxCents,
         monthly_limit: monthlyCents,
         clear_per_transaction_limit:
@@ -98,7 +99,8 @@ export function SpendingLimitsDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            Card Settings &mdash; {paymentMethod.last4}
+            Card Settings &mdash;{" "}
+            {paymentMethod.label ?? paymentMethod.last4}
           </DialogTitle>
           <DialogDescription>
             Rename this card and set optional spending limits to control how much
