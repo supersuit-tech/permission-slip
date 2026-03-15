@@ -15,6 +15,8 @@ export interface PollOptions {
   client: ApiClient;
   /** Maximum seconds to wait before returning. */
   timeoutSeconds: number;
+  /** Fixed polling interval in seconds. When set, disables exponential backoff. */
+  fixedIntervalSeconds?: number;
   /** Called after each poll while still pending. Use for progress messages. */
   onPoll?: (info: { status: string; elapsed: number; timeout: number }) => void;
 }
@@ -63,8 +65,9 @@ export async function pollUntilResolved(
 ): Promise<ApprovalStatusResult & { timed_out?: boolean }> {
   const start = Date.now();
   const deadline = start + opts.timeoutSeconds * 1000;
-  let interval = 2000; // start at 2 seconds
-  const maxInterval = 5000; // cap at 5 seconds
+  const useFixedInterval = opts.fixedIntervalSeconds !== undefined;
+  let interval = useFixedInterval ? opts.fixedIntervalSeconds! * 1000 : 2000;
+  const maxInterval = 5000; // cap at 5 seconds (only used with backoff)
 
   while (Date.now() < deadline) {
     try {
@@ -88,7 +91,9 @@ export async function pollUntilResolved(
     if (remaining <= 0) break;
 
     await sleep(Math.min(interval, remaining));
-    interval = Math.min(Math.ceil(interval * 1.5), maxInterval);
+    if (!useFixedInterval) {
+      interval = Math.min(Math.ceil(interval * 1.5), maxInterval);
+    }
   }
 
   // Final check after timeout — also protected from transient errors.
