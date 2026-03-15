@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Bot } from "lucide-react";
 import { useApprovals, type ApprovalSummary } from "@/hooks/useApprovals";
 import { useAgents, type Agent } from "@/hooks/useAgents";
@@ -19,12 +19,12 @@ function resolveAgentName(
 function ApprovalBannerItem({
   approval,
   agentDisplayName,
+  onOpenDialog,
 }: {
   approval: ApprovalSummary;
   agentDisplayName: string;
+  onOpenDialog: (approval: ApprovalSummary, agentDisplayName: string) => void;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-
   const summary = buildSummary(
     approval.action.type,
     approval.action.parameters as Record<string, unknown>,
@@ -35,43 +35,40 @@ function ApprovalBannerItem({
   );
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setDialogOpen(true)}
-        className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-left text-sm text-blue-900 shadow-sm transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-950/70"
-        aria-label={`Pending approval: ${approval.action.type} from ${agentDisplayName}`}
-      >
-        <Bot className="size-5 shrink-0" />
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-medium">
-            {approval.action.type}
-          </span>
-          <RiskBadge level={approval.context.risk_level} />
-          <span className="text-muted-foreground truncate text-xs" title={summary}>
-            {summary}
-          </span>
-          <span className="text-xs opacity-75">{agentDisplayName}</span>
-          <CountdownBadge expiresAt={approval.expires_at} />
-        </div>
-        <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
-          Review
+    <button
+      type="button"
+      onClick={() => onOpenDialog(approval, agentDisplayName)}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-left text-sm text-blue-900 shadow-sm transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-950/70"
+      aria-label={`Pending approval: ${approval.action.type} from ${agentDisplayName}`}
+    >
+      <Bot className="size-5 shrink-0" />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-medium">
+          {approval.action.type}
         </span>
-      </button>
-
-      <ReviewApprovalDialog
-        approval={approval}
-        agentDisplayName={agentDisplayName}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-      />
-    </>
+        <RiskBadge level={approval.context.risk_level} />
+        <span className="text-muted-foreground truncate text-xs" title={summary}>
+          {summary}
+        </span>
+        <span className="text-xs opacity-75">{agentDisplayName}</span>
+        <CountdownBadge expiresAt={approval.expires_at} />
+      </div>
+      <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
+        Review
+      </span>
+    </button>
   );
 }
 
 export function PendingApprovalsBanner() {
   const { approvals, isLoading, error, refetch } = useApprovals();
   const { agents } = useAgents();
+
+  // Dialog state is lifted here so it survives the approval being removed
+  // from the pending list (e.g. after approve + query invalidation).
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const activeApprovalRef = useRef<ApprovalSummary | null>(null);
+  const activeAgentNameRef = useRef<string>("");
 
   const agentMap = useMemo(() => {
     const map = new Map<number, Agent>();
@@ -80,6 +77,23 @@ export function PendingApprovalsBanner() {
     }
     return map;
   }, [agents]);
+
+  const handleOpenDialog = useCallback(
+    (approval: ApprovalSummary, agentDisplayName: string) => {
+      activeApprovalRef.current = approval;
+      activeAgentNameRef.current = agentDisplayName;
+      setDialogOpen(true);
+    },
+    [],
+  );
+
+  const handleDialogChange = useCallback((nextOpen: boolean) => {
+    setDialogOpen(nextOpen);
+    if (!nextOpen) {
+      activeApprovalRef.current = null;
+      activeAgentNameRef.current = "";
+    }
+  }, []);
 
   if (isLoading) return null;
 
@@ -98,22 +112,35 @@ export function PendingApprovalsBanner() {
     );
   }
 
-  if (approvals.length === 0) return null;
+  if (approvals.length === 0 && !dialogOpen) return null;
 
   return (
     <>
       <span className="sr-only" aria-live="polite" aria-atomic="true">
         {approvals.length} pending approval{approvals.length !== 1 ? "s" : ""}
       </span>
-      <div className="space-y-2" aria-label="Pending approvals">
-        {approvals.map((approval) => (
-          <ApprovalBannerItem
-            key={approval.approval_id}
-            approval={approval}
-            agentDisplayName={resolveAgentName(approval.agent_id, agentMap)}
-          />
-        ))}
-      </div>
+      {approvals.length > 0 && (
+        <div className="space-y-2" aria-label="Pending approvals">
+          {approvals.map((approval) => (
+            <ApprovalBannerItem
+              key={approval.approval_id}
+              approval={approval}
+              agentDisplayName={resolveAgentName(approval.agent_id, agentMap)}
+              onOpenDialog={handleOpenDialog}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Dialog rendered at banner level so it survives approval list changes */}
+      {activeApprovalRef.current && (
+        <ReviewApprovalDialog
+          approval={activeApprovalRef.current}
+          agentDisplayName={activeAgentNameRef.current}
+          open={dialogOpen}
+          onOpenChange={handleDialogChange}
+        />
+      )}
     </>
   );
 }
