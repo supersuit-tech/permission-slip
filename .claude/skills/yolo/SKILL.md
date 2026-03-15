@@ -6,7 +6,7 @@ argument-hint: "<ISSUE_URL|prompt text> [--scope \"<heading>\"]"
 
 # YOLO — Autonomous Implementation
 
-Takes a GitHub issue URL **or a free-form prompt**, implements the work described, opens a pull request, and hands off to `/watch --automerge` to shepherd it through review to merge.
+Takes a GitHub issue URL **or a free-form prompt**, implements the work described, opens a pull request, and hands off to `/watch` to shepherd it through review to merge.
 
 Optionally accepts a `--scope` flag to limit work to a specific section of the issue (e.g., `--scope "Chunk 1A"` or `--scope "Phase 4"`). When scoped, only the content under that heading is implemented — everything else is ignored. The `--scope` flag is only valid when an issue URL is provided.
 
@@ -195,13 +195,13 @@ Capture the PR URL from the output.
 
 ## Step 6: Hand Off to /watch
 
-Invoke the `/watch` skill with `--automerge --no-notify` to monitor the PR through review and merge it when ready. The `--no-notify` flag suppresses the webhook notification since `/yolo` is a fully autonomous flow — no human ping needed. Since `/watch` auto-detects the PR from the current branch, you don't need to pass the URL explicitly — just the flags:
+Invoke the `/watch` skill with `--no-notify` to monitor the PR through review and merge it when ready. Auto-merge is enabled by default, so no flag is needed. The `--no-notify` flag suppresses the webhook notification since `/yolo` is a fully autonomous flow — no human ping needed. Since `/watch` auto-detects the PR from the current branch, you don't need to pass the URL explicitly — just the flags:
 
 ```
-/watch --automerge --no-notify
+/watch --no-notify
 ```
 
-Use the `Skill` tool to invoke the watch skill, passing `--automerge --no-notify` as the argument. The watch skill will detect the PR from the current branch automatically.
+Use the `Skill` tool to invoke the watch skill, passing `--no-notify` as the argument. The watch skill will detect the PR from the current branch automatically.
 
 ## Important Rules
 
