@@ -1,9 +1,11 @@
 /**
  * permission-slip request-status --approval-id <id> [--server <url>]
  *
- * Checks the status of a previously submitted approval request. By default,
- * blocks until the approval reaches a terminal state. Pass --no-wait for a
- * single status check.
+ * Checks the status of a previously submitted approval request. Blocks by
+ * default until the approval reaches a terminal state (preserving backward
+ * compatibility). Pass --no-wait for a single status check.
+ *
+ * Deprecated: prefer `permission-slip status <approval_id>` instead.
  */
 
 import type { Command } from "commander";
@@ -15,7 +17,7 @@ import { pollUntilResolved, parseTimeout } from "../util/poll.js";
 export function requestStatusCommand(program: Command): void {
   program
     .command("request-status")
-    .description("Check the status of an approval request")
+    .description("Check approval status (deprecated: use 'status <approval_id>' instead)")
     .requiredOption("--approval-id <id>", "Approval ID returned by the request command")
     .option(
       "--server <url>",
@@ -40,13 +42,16 @@ export function requestStatusCommand(program: Command): void {
         const client = new ApiClient({ serverUrl: opts.server, agentId });
 
         if (!opts.wait) {
-          // Single check, no waiting.
+          if (opts.timeout !== "120") {
+            process.stderr.write("Warning: --timeout has no effect with --no-wait\n");
+          }
+          // --no-wait: single check, return immediately.
           const result = await client.approvalStatus(opts.approvalId);
           output(result, outputOpts);
           return;
         }
 
-        // Wait for terminal state.
+        // Default: block until terminal state (backward compatible).
         const timeoutSeconds = parseTimeout(opts.timeout);
 
         process.stderr.write(`Waiting for approval ${opts.approvalId}...\n`);

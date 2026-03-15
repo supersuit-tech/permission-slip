@@ -8,7 +8,7 @@
  * Commands:
  *   register      Generate keys and register with a Permission Slip server
  *   verify        Complete registration with the confirmation code
- *   status        Show current registration state
+ *   status        Show registration state, or check approval status
  *   capabilities  List available action configurations and standing approvals
  *   connectors    List available connectors
  *   request        Request approval for an action (auto-executes on approval)
