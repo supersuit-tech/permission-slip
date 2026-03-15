@@ -356,9 +356,10 @@ BillingPlanResponse:
 BillingPricing:
   type: object
   description: |
-    Per-request pricing information sourced from Stripe. Only present for
-    paid plans. The frontend should use these values instead of deriving
-    pricing from plans.json, so Stripe remains the single source of truth.
+    Per-request pricing information sourced from Stripe. Included for all
+    plans so the upgrade flow can show Stripe-sourced pricing to free users.
+    The frontend should use these values instead of deriving pricing from
+    plans.json, so Stripe remains the single source of truth.
   required:
     - free_request_allowance
     - price_per_request_display
