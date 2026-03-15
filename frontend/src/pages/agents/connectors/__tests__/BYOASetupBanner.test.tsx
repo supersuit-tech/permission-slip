@@ -209,6 +209,13 @@ describe("BYOASetupBanner", () => {
         },
       });
     });
+
+    // Dialog should close after successful save
+    await waitFor(() => {
+      expect(
+        screen.queryByText("Configure Salesforce OAuth App"),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("hides banner and enables Connect after saving credentials", async () => {

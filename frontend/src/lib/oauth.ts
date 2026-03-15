@@ -9,18 +9,21 @@ export { providerLabel } from "@/lib/labels";
  * Developer console URLs for OAuth providers that may need BYOA setup.
  * Used by the BYOASetupBanner to link users to the right place when they
  * need to create an OAuth app.
+ *
+ * Only includes providers that realistically need BYOA. Built-in providers
+ * (Google, Microsoft, GitHub, etc.) are omitted because they should always
+ * have platform-level credentials via env vars — if they show up without
+ * credentials, the generic fallback text in BYOASetupBanner is more
+ * appropriate than directing users to create their own OAuth app.
  */
 export const PROVIDER_DEV_CONSOLE_URLS: Partial<Record<string, string>> = {
   atlassian: "https://developer.atlassian.com/console/myapps/",
   datadog: "https://app.datadoghq.com/oauth/manage",
   dropbox: "https://www.dropbox.com/developers/apps",
   figma: "https://www.figma.com/developers/apps",
-  github: "https://github.com/settings/developers",
-  google: "https://console.cloud.google.com/apis/credentials",
   hubspot: "https://developers.hubspot.com/docs/api/oauth/tokens",
   linear: "https://linear.app/settings/api",
   meta: "https://developers.facebook.com/apps/",
-  microsoft: "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
   notion: "https://www.notion.so/my-integrations",
   pagerduty: "https://developer.pagerduty.com/apps/",
   salesforce: "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_oauth_and_connected_apps.htm",
