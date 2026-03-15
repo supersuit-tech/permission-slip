@@ -46,7 +46,7 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
           <div className="rounded-lg border p-4 space-y-3">
             <DetailRow label="Plan">
               <div className="flex items-center gap-2">
-                <span>{plan.name}</span>
+                <span className="text-foreground">{plan.name}</span>
                 <Badge variant={isFree ? "outline" : "default"}>
                   {isFree ? "Free" : "Pay-as-you-go"}
                 </Badge>

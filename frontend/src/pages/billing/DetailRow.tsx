@@ -13,9 +13,9 @@ interface DetailRowProps {
  */
 export function DetailRow({ label, children }: DetailRowProps) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
       <span className="text-sm font-medium shrink-0">{label}</span>
-      <div className="text-sm text-muted-foreground text-right">{children}</div>
+      <div className="text-sm text-muted-foreground text-right ms-auto">{children}</div>
     </div>
   );
 }
