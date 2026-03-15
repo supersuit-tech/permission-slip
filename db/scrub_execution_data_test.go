@@ -53,16 +53,20 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 			t.Errorf("expected action type 'test.action', got %q", actionType)
 		}
 
-		// Verify parameters were stripped from action.
+		// Verify parameters were stripped but other keys preserved.
 		var actionParams *string
+		var actionVersion *string
 		err = tx.QueryRow(ctx,
-			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
-			approvalID).Scan(&actionParams)
+			`SELECT action->>'parameters', action->>'version' FROM approvals WHERE approval_id = $1`,
+			approvalID).Scan(&actionParams, &actionVersion)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
 		}
 		if actionParams != nil {
 			t.Errorf("expected action parameters to be stripped, got %s", *actionParams)
+		}
+		if actionVersion == nil || *actionVersion != "1" {
+			t.Errorf("expected action version '1' to be preserved, got %v", actionVersion)
 		}
 	})
 

@@ -22,12 +22,12 @@ func ScrubSensitiveExecutionData(ctx context.Context, d DBTX) (int64, error) {
 	tag1, err := d.Exec(ctx, `
 		UPDATE approvals
 		SET execution_result = NULL,
-		    action = jsonb_build_object('type', action->>'type')
+		    action = action - 'parameters'
 		WHERE executed_at IS NOT NULL
 		  AND executed_at < now() - interval '30 minutes'
 		  AND status IN ('approved', 'denied', 'cancelled')
 		  AND (execution_result IS NOT NULL
-		       OR action != jsonb_build_object('type', action->>'type'))`)
+		       OR action ? 'parameters')`)
 	if err != nil {
 		return 0, fmt.Errorf("scrub approvals: %w", err)
 	}

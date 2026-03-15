@@ -227,6 +227,7 @@ function ApprovalContent({
         </div>
       )}
       {executionStatus && !executionResult && executedAt &&
+        Object.keys(parameters).length === 0 &&
         new Date(executedAt).getTime() < Date.now() - 30 * 60 * 1000 && (
         <p className="text-muted-foreground text-xs italic">
           Execution details are automatically removed after 30 minutes.

@@ -23,12 +23,12 @@ BEGIN
     -- Only target resolved approvals with executed_at older than 30 minutes.
     UPDATE approvals
     SET execution_result = NULL,
-        action = jsonb_build_object('type', action->>'type')
+        action = action - 'parameters'
     WHERE executed_at IS NOT NULL
       AND executed_at < now() - interval '30 minutes'
       AND status IN ('approved', 'denied', 'cancelled')
       AND (execution_result IS NOT NULL
-           OR action != jsonb_build_object('type', action->>'type'));
+           OR action ? 'parameters');
     GET DIAGNOSTICS approvals_count = ROW_COUNT;
 
     -- Scrub standing_approval_executions: NULL out parameters.
