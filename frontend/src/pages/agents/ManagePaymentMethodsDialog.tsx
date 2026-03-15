@@ -28,23 +28,7 @@ import {
 import { AddCardDialog } from "../settings/AddCardDialog";
 import { SpendingLimitsDialog } from "../settings/SpendingLimitsDialog";
 import type { PaymentMethod } from "@/hooks/usePaymentMethods";
-
-function formatExpiry(month: number, year: number): string {
-  return `${String(month).padStart(2, "0")}/${String(year).slice(-2)}`;
-}
-
-function formatBrand(brand: string): string {
-  const brands: Record<string, string> = {
-    visa: "Visa",
-    mastercard: "Mastercard",
-    amex: "Amex",
-    discover: "Discover",
-    diners: "Diners",
-    jcb: "JCB",
-    unionpay: "UnionPay",
-  };
-  return brands[brand] ?? brand;
-}
+import { formatBrand, formatExpiry } from "@/lib/paymentMethodUtils";
 
 type ExpiryStatus = "expired" | "expiring_soon" | "ok";
 
@@ -155,8 +139,14 @@ export function ManagePaymentMethodsDialog({
 
   async function handleDelete(pm: PaymentMethod) {
     try {
-      await deletePaymentMethod(pm.id);
-      toast.success(`Card ending in ${pm.last4} removed.`);
+      const result = await deletePaymentMethod(pm.id);
+      if (result?.affected_agents && result.affected_agents > 0) {
+        toast.success(
+          `Card ending in ${pm.last4} removed. ${result.affected_agents} agent(s) had their payment method unassigned.`,
+        );
+      } else {
+        toast.success(`Card ending in ${pm.last4} removed.`);
+      }
     } catch {
       toast.error("Failed to remove payment method.");
     }

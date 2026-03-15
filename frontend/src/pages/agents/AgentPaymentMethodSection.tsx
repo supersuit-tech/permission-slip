@@ -15,28 +15,13 @@ import type { PaymentMethod } from "@/hooks/usePaymentMethods";
 import {
   useAgentPaymentMethod,
   useAssignAgentPaymentMethod,
+  useRemoveAgentPaymentMethod,
 } from "@/hooks/useAgentPaymentMethod";
+import { formatBrand, formatExpiry } from "@/lib/paymentMethodUtils";
 import { ManagePaymentMethodsDialog } from "./ManagePaymentMethodsDialog";
 
 interface AgentPaymentMethodSectionProps {
   agentId: number;
-}
-
-function formatBrand(brand: string): string {
-  const brands: Record<string, string> = {
-    visa: "Visa",
-    mastercard: "Mastercard",
-    amex: "Amex",
-    discover: "Discover",
-    diners: "Diners",
-    jcb: "JCB",
-    unionpay: "UnionPay",
-  };
-  return brands[brand] ?? brand;
-}
-
-function formatExpiry(month: number, year: number): string {
-  return `${String(month).padStart(2, "0")}/${String(year).slice(-2)}`;
 }
 
 const selectClassName =
@@ -58,21 +43,28 @@ export function AgentPaymentMethodSection({
     error: bindingError,
   } = useAgentPaymentMethod(agentId);
   const { assign, isPending: assigning } = useAssignAgentPaymentMethod();
+  const { remove, isPending: removing } = useRemoveAgentPaymentMethod();
 
   const isLoading = pmLoading || bindingLoading;
   const error = pmError ?? bindingError;
+  const busy = assigning || removing;
 
   const currentValue = binding?.payment_method_id ?? "";
 
   async function handleChange(value: string) {
-    if (assigning || !value) return;
+    if (busy) return;
 
     try {
-      await assign({ agentId, paymentMethodId: value });
-      toast.success("Payment method assigned to this agent.");
+      if (value === "") {
+        await remove({ agentId });
+        toast.success("Payment method unassigned from this agent.");
+      } else {
+        await assign({ agentId, paymentMethodId: value });
+        toast.success("Payment method assigned to this agent.");
+      }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to assign payment method.",
+        err instanceof Error ? err.message : "Failed to update payment method.",
       );
     }
   }
@@ -156,11 +148,13 @@ export function AgentPaymentMethodSection({
                     className={selectClassName}
                     value={currentValue}
                     onChange={(e) => handleChange(e.target.value)}
-                    disabled={assigning}
+                    disabled={busy}
                   >
-                    {!currentValue && (
-                      <option value="">Select a payment method…</option>
-                    )}
+                    <option value="">
+                      {currentValue
+                        ? "None (unassigned)"
+                        : "Select a payment method…"}
+                    </option>
                     {paymentMethods.map((pm) => (
                       <option key={pm.id} value={pm.id}>
                         {cardLabel(pm)}

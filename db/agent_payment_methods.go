@@ -37,7 +37,7 @@ func AssignAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64, payme
 	err := db.QueryRow(ctx,
 		`INSERT INTO agent_payment_methods (agent_id, payment_method_id)
 		 VALUES ($1, $2)
-		 ON CONFLICT (agent_id) DO UPDATE SET payment_method_id = EXCLUDED.payment_method_id, created_at = now()
+		 ON CONFLICT (agent_id) DO UPDATE SET payment_method_id = EXCLUDED.payment_method_id
 		 RETURNING agent_id, payment_method_id, created_at`,
 		agentID, paymentMethodID).Scan(&apm.AgentID, &apm.PaymentMethodID, &apm.CreatedAt)
 	if err != nil {
