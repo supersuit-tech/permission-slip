@@ -125,6 +125,7 @@ export function useUpdatePaymentMethod() {
       is_default?: boolean;
       per_transaction_limit?: number | null;
       monthly_limit?: number | null;
+      clear_label?: boolean;
       clear_per_transaction_limit?: boolean;
       clear_monthly_limit?: boolean;
     }) => {

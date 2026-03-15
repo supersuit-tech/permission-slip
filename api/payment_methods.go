@@ -49,6 +49,7 @@ type updatePaymentMethodRequest struct {
 	IsDefault           *bool   `json:"is_default,omitempty"`
 	PerTransactionLimit *int    `json:"per_transaction_limit,omitempty"`
 	MonthlyLimit        *int    `json:"monthly_limit,omitempty"`
+	ClearLabel          *bool   `json:"clear_label,omitempty"`
 	ClearPerTxLimit     *bool   `json:"clear_per_transaction_limit,omitempty"`
 	ClearMonthlyLimit   *bool   `json:"clear_monthly_limit,omitempty"`
 }
@@ -386,6 +387,9 @@ func handleUpdatePaymentMethod(deps *Deps) http.HandlerFunc {
 		}
 		if req.MonthlyLimit != nil {
 			params.MonthlyLimit = req.MonthlyLimit
+		}
+		if req.ClearLabel != nil && *req.ClearLabel {
+			params.ClearLabel = true
 		}
 		if req.ClearPerTxLimit != nil && *req.ClearPerTxLimit {
 			params.ClearPerTxLimit = true

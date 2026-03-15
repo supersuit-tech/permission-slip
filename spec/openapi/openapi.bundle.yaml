@@ -10896,6 +10896,9 @@ components:
           description: |
             Monthly spend limit in cents (rolling 30-day window). Must be >= per_transaction_limit
             if both are set. Set to a value to create/update the limit.
+        clear_label:
+          type: boolean
+          description: Set to true to remove the card nickname/label
         clear_per_transaction_limit:
           type: boolean
           description: Set to true to remove the per-transaction limit entirely

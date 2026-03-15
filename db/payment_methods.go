@@ -127,6 +127,7 @@ type UpdatePaymentMethodParams struct {
 	IsDefault           *bool
 	PerTransactionLimit *int  // use pointer-to-nil pattern: nil = don't change, non-nil = set (value can be 0 to clear)
 	MonthlyLimit        *int
+	ClearLabel          bool // when true, sets label to ''
 	ClearPerTxLimit     bool // when true, sets per_transaction_limit to NULL
 	ClearMonthlyLimit   bool // when true, sets monthly_limit to NULL
 }
@@ -135,7 +136,10 @@ type UpdatePaymentMethodParams struct {
 func UpdatePaymentMethod(ctx context.Context, db DBTX, userID, paymentMethodID string, params UpdatePaymentMethodParams) (*PaymentMethod, error) {
 	pm, err := scanPaymentMethod(db.QueryRow(ctx,
 		`UPDATE payment_methods SET
-			label = COALESCE($3, label),
+			label = CASE
+				WHEN $9 THEN ''
+				ELSE COALESCE($3, label)
+			END,
 			is_default = COALESCE($4, is_default),
 			per_transaction_limit = CASE
 				WHEN $7 THEN NULL
@@ -154,6 +158,7 @@ func UpdatePaymentMethod(ctx context.Context, db DBTX, userID, paymentMethodID s
 		params.Label, params.IsDefault,
 		params.PerTransactionLimit, params.MonthlyLimit,
 		params.ClearPerTxLimit, params.ClearMonthlyLimit,
+		params.ClearLabel,
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

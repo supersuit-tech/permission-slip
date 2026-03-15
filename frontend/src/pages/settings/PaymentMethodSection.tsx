@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CreditCard,
   Loader2,
+  Pencil,
   Plus,
   Star,
   Trash2,
@@ -225,9 +226,13 @@ export function PaymentMethodSection() {
                 >
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">
-                        {formatBrand(pm.brand)} ending in {pm.last4}
-                      </p>
+                      {pm.label ? (
+                        <p className="text-sm font-medium">{pm.label}</p>
+                      ) : (
+                        <p className="text-sm font-medium">
+                          {formatBrand(pm.brand)} ending in {pm.last4}
+                        </p>
+                      )}
                       {pm.is_default && (
                         <Badge variant="secondary" className="text-xs">
                           Default
@@ -239,7 +244,9 @@ export function PaymentMethodSection() {
                       />
                     </div>
                     <p className="text-muted-foreground text-xs">
-                      {pm.label ? `${pm.label} · ` : ""}
+                      {pm.label
+                        ? `${formatBrand(pm.brand)} ending in ${pm.last4} · `
+                        : ""}
                       Expires {formatExpiry(pm.exp_month, pm.exp_year)}
                       {pm.per_transaction_limit != null &&
                         ` · Per-tx limit: ${formatCents(pm.per_transaction_limit)}`}
@@ -268,11 +275,12 @@ export function PaymentMethodSection() {
                       />
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => setLimitsDialogPM(pm)}
                     >
-                      Limits
+                      <Pencil className="mr-1 size-3" />
+                      Edit
                     </Button>
                     <InlineConfirmButton
                       confirmLabel="Remove"
