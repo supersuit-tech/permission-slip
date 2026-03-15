@@ -18,6 +18,7 @@ import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { useBillingInvoices } from "@/hooks/useBillingInvoices";
 import type { Subscription, UsageSummary } from "@/hooks/useBillingPlan";
+import { DetailRow } from "./DetailRow";
 import { formatCents, formatDate, isStripeUrl } from "./formatters";
 import { DowngradeConfirmDialog } from "./DowngradeConfirmDialog";
 
@@ -45,8 +46,7 @@ function ManageSubscriptionLink() {
   const { openPortal, isLoading } = useBillingPortal();
 
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-medium">Subscription</span>
+    <DetailRow label="Subscription">
       <Button
         variant="link"
         size="sm"
@@ -66,7 +66,7 @@ function ManageSubscriptionLink() {
         )}
         Manage on Stripe
       </Button>
-    </div>
+    </DetailRow>
   );
 }
 
@@ -186,10 +186,9 @@ export function PlanDetailsCard({ subscription, usage }: PlanDetailsCardProps) {
       <CardContent>
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Estimated Cost (this month)</span>
+            <DetailRow label="Estimated Cost (this month)">
               <CostEstimate />
-            </div>
+            </DetailRow>
             {subscription.can_downgrade && <ManageSubscriptionLink />}
           </div>
 
