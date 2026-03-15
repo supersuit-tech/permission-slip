@@ -84,7 +84,9 @@ export function CreateStandingApprovalDialog({
 }: CreateStandingApprovalDialogProps) {
   const { createStandingApproval, isPending } = useCreateStandingApproval();
 
-  const [step, setStep] = useState<Step>(1);
+  // Skip straight to constraints when agent + action are pre-filled
+  const hasInitialContext = !!(initialAgentId && initialActionType);
+  const [step, setStep] = useState<Step>(hasInitialContext ? 3 : 1);
   const [agentId, setAgentId] = useState<number | "">(initialAgentId ?? "");
   const [selectedConfigId, setSelectedConfigId] = useState<string>(
     initialActionType ? CUSTOM_ACTION_SENTINEL : "",
@@ -92,9 +94,33 @@ export function CreateStandingApprovalDialog({
   const [customActionType, setCustomActionType] = useState(
     initialActionType ?? "",
   );
-  const [paramValues, setParamValues] = useState<Record<string, string>>({});
-  const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
-  const [manualConstraintsJson, setManualConstraintsJson] = useState("");
+  // Pre-populate constraint form values when initial constraints are provided
+  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
+    if (!hasInitialContext || !initialConstraints) return {};
+    const values: Record<string, string> = {};
+    for (const [key, value] of Object.entries(initialConstraints)) {
+      if (value === "*") values[key] = "*";
+      else if (isPatternWrapper(value)) values[key] = value.$pattern;
+      else if (value === null || value === undefined) values[key] = "";
+      else values[key] = String(value);
+    }
+    return values;
+  });
+  const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() => {
+    if (!hasInitialContext || !initialConstraints) return {};
+    const modes: Record<string, ParamMode> = {};
+    for (const [key, value] of Object.entries(initialConstraints)) {
+      if (value === "*") modes[key] = "wildcard";
+      else if (isPatternWrapper(value)) modes[key] = "pattern";
+      else modes[key] = "fixed";
+    }
+    return modes;
+  });
+  const [manualConstraintsJson, setManualConstraintsJson] = useState(
+    hasInitialContext && initialConstraints
+      ? JSON.stringify(initialConstraints, null, 2)
+      : "",
+  );
   const [maxExecutions, setMaxExecutions] = useState("");
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
 
@@ -139,13 +165,17 @@ export function CreateStandingApprovalDialog({
   }, [activeConfigs]);
 
   function resetForm() {
-    setStep(1);
+    setStep(hasInitialContext ? 3 : 1);
     setAgentId(initialAgentId ?? "");
     setSelectedConfigId(initialActionType ? CUSTOM_ACTION_SENTINEL : "");
     setCustomActionType(initialActionType ?? "");
     setParamValues({});
     setParamModes({});
-    setManualConstraintsJson("");
+    setManualConstraintsJson(
+      hasInitialContext && initialConstraints
+        ? JSON.stringify(initialConstraints, null, 2)
+        : "",
+    );
     setMaxExecutions("");
     setExpiresAt(defaultExpiresAt());
   }
@@ -250,8 +280,9 @@ export function CreateStandingApprovalDialog({
   }
 
   function handleBack() {
-    if (step === 2) setStep(1);
-    else if (step === 3) setStep(2);
+    const minStep = hasInitialContext ? 3 : 1;
+    if (step === 2 && minStep <= 1) setStep(1);
+    else if (step === 3 && minStep <= 2) setStep(2);
     else if (step === 4) setStep(3);
   }
 
@@ -337,12 +368,14 @@ export function CreateStandingApprovalDialog({
         <DialogHeader>
           <DialogTitle>Create Standing Approval</DialogTitle>
           <DialogDescription>
-            Step {step} of 4: {STEP_LABELS[step]}
+            {hasInitialContext
+              ? `Step ${step - 2} of 2: ${STEP_LABELS[step]}`
+              : `Step ${step} of 4: ${STEP_LABELS[step]}`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center gap-1 px-1">
-          {([1, 2, 3, 4] as Step[]).map((s) => (
+          {(hasInitialContext ? [3, 4] as Step[] : [1, 2, 3, 4] as Step[]).map((s) => (
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -415,7 +448,7 @@ export function CreateStandingApprovalDialog({
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            {step > 1 && (
+            {step > (hasInitialContext ? 3 : 1) && (
               <Button
                 type="button"
                 variant="outline"

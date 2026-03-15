@@ -167,10 +167,17 @@ export function ReviewApprovalDialog({
     }
   }, [denyApproval, approval.approval_id, onOpenChange]);
 
-  function handleAlwaysAllow() {
-    setAutoCloseBlocked(true);
-    setStandingDialogOpen(true);
-  }
+  const handleAlwaysAllow = useCallback(async () => {
+    // Approve the request first, then open the standing approval wizard
+    try {
+      const result = await approveApproval(approval.approval_id);
+      setApproveResult(result);
+      setAutoCloseBlocked(true);
+      setStandingDialogOpen(true);
+    } catch {
+      toast.error("Failed to approve request. Please try again.");
+    }
+  }, [approveApproval, approval.approval_id]);
 
   function handleStandingDialogChange(nextOpen: boolean) {
     setStandingDialogOpen(nextOpen);
@@ -317,16 +324,6 @@ export function ReviewApprovalDialog({
             >
               Done
             </Button>
-            {showAlwaysAllow && !standingApprovalCreated && approveResult?.execution_status === "success" && (
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={handleAlwaysAllow}
-              >
-                <ShieldCheck className="mr-1 size-4" />
-                Always Allow This
-              </Button>
-            )}
           </DialogFooter>
         ) : (
           <DialogFooter>
@@ -343,6 +340,24 @@ export function ReviewApprovalDialog({
                 "Deny"
               )}
             </Button>
+            {showAlwaysAllow && (
+              <Button
+                size="lg"
+                variant="secondary"
+                disabled={isBusy || isExpired}
+                onClick={handleAlwaysAllow}
+                aria-label={isApproving ? "Approving and creating rule…" : undefined}
+              >
+                {isApproving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <>
+                    <ShieldCheck className="mr-1 size-4" />
+                    Always Allow
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               size="lg"
               disabled={isBusy || isExpired}

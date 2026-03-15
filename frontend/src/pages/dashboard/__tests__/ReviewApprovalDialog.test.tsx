@@ -74,22 +74,10 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("shows 'Always Allow This' button after successful approval when action has parameters", async () => {
+  it("shows 'Always Allow' button on the approval screen when action has parameters", async () => {
     setupMocks();
     const approval = makeApproval();
 
-    mockPost.mockResolvedValueOnce({
-      data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC-123",
-        execution_status: "success",
-        execution_result: null,
-      },
-    });
-
-    const user = userEvent.setup();
     render(
       <ReviewApprovalDialog
         approval={approval}
@@ -100,36 +88,20 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    // Click approve
-    await user.click(screen.getByText("Approve"));
-
-    // Wait for success banner
+    // "Always Allow" button should be visible alongside Approve/Deny
     await waitFor(() => {
-      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
+      expect(screen.getByText("Always Allow")).toBeInTheDocument();
     });
-
-    // "Always Allow This" button should be visible
-    expect(screen.getByText("Always Allow This")).toBeInTheDocument();
+    expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.getByText("Deny")).toBeInTheDocument();
   });
 
-  it("does NOT show 'Always Allow This' when action has no parameters", async () => {
+  it("does NOT show 'Always Allow' when action has no parameters", () => {
     setupMocks();
     const approval = makeApproval({
       action: { type: "system.noop", version: "1", parameters: {} },
     });
 
-    mockPost.mockResolvedValueOnce({
-      data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC-123",
-        execution_status: "success",
-        execution_result: null,
-      },
-    });
-
-    const user = userEvent.setup();
     render(
       <ReviewApprovalDialog
         approval={approval}
@@ -140,16 +112,10 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    await user.click(screen.getByText("Approve"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
+    expect(screen.queryByText("Always Allow")).not.toBeInTheDocument();
   });
 
-  it("does NOT show 'Always Allow This' when a standing approval already exists for agent+action", async () => {
+  it("does NOT show 'Always Allow' when a standing approval already exists for agent+action", async () => {
     setupMocks({
       standingApprovals: [
         { agent_id: 1, action_type: "email.send" },
@@ -157,18 +123,6 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     });
     const approval = makeApproval();
 
-    mockPost.mockResolvedValueOnce({
-      data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC-123",
-        execution_status: "success",
-        execution_result: null,
-      },
-    });
-
-    const user = userEvent.setup();
     render(
       <ReviewApprovalDialog
         approval={approval}
@@ -179,86 +133,16 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    await user.click(screen.getByText("Approve"));
-
+    // Wait for standing approvals to load, then verify button is absent
     await waitFor(() => {
-      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
+      // Standing approvals have loaded (no loading state)
+      expect(screen.getByText("Approve")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
+    expect(screen.queryByText("Always Allow")).not.toBeInTheDocument();
   });
 
-  it("does NOT show 'Always Allow This' when execution_status is 'pending'", async () => {
-    setupMocks();
-    const approval = makeApproval();
-
-    mockPost.mockResolvedValueOnce({
-      data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC-123",
-        execution_status: "pending",
-        execution_result: null,
-      },
-    });
-
-    const user = userEvent.setup();
-    render(
-      <ReviewApprovalDialog
-        approval={approval}
-        agentDisplayName="Test Bot"
-        open={true}
-        onOpenChange={vi.fn()}
-      />,
-      { wrapper },
-    );
-
-    await user.click(screen.getByText("Approve"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Request Approved")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
-  });
-
-  it("does NOT show 'Always Allow This' when execution_status is 'error'", async () => {
-    setupMocks();
-    const approval = makeApproval();
-
-    mockPost.mockResolvedValueOnce({
-      data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC-123",
-        execution_status: "error",
-        execution_result: { execution_error: "Connection failed" },
-      },
-    });
-
-    const user = userEvent.setup();
-    render(
-      <ReviewApprovalDialog
-        approval={approval}
-        agentDisplayName="Test Bot"
-        open={true}
-        onOpenChange={vi.fn()}
-      />,
-      { wrapper },
-    );
-
-    await user.click(screen.getByText("Approve"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Execution Failed")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText("Always Allow This")).not.toBeInTheDocument();
-  });
-
-  it("opens CreateStandingApprovalDialog when 'Always Allow This' is clicked", async () => {
+  it("approves request and opens CreateStandingApprovalDialog when 'Always Allow' is clicked", async () => {
     setupMocks();
     const approval = makeApproval();
 
@@ -284,17 +168,19 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    await user.click(screen.getByText("Approve"));
-
+    // Click "Always Allow" from the pre-approval screen
     await waitFor(() => {
-      expect(screen.getByText("Always Allow This")).toBeInTheDocument();
+      expect(screen.getByText("Always Allow")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Always Allow This"));
+    await user.click(screen.getByText("Always Allow"));
 
-    // The CreateStandingApprovalDialog should open
+    // The CreateStandingApprovalDialog should open (skipping to constraints step)
     await waitFor(() => {
       expect(screen.getByText("Create Standing Approval")).toBeInTheDocument();
     });
+
+    // Should show step 1 of 2 (constraints), not step 1 of 4
+    expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
   });
 });
