@@ -10,14 +10,14 @@ export { providerLabel } from "@/lib/labels";
  * Used by the BYOASetupBanner to link users to the right place when they
  * need to create an OAuth app.
  */
-export const PROVIDER_DEV_CONSOLE_URLS: Record<string, string> = {
+export const PROVIDER_DEV_CONSOLE_URLS: Partial<Record<string, string>> = {
   atlassian: "https://developer.atlassian.com/console/myapps/",
   datadog: "https://app.datadoghq.com/oauth/manage",
   dropbox: "https://www.dropbox.com/developers/apps",
   figma: "https://www.figma.com/developers/apps",
   github: "https://github.com/settings/developers",
   google: "https://console.cloud.google.com/apis/credentials",
-  hubspot: "https://developers.hubspot.com/",
+  hubspot: "https://developers.hubspot.com/docs/api/oauth/tokens",
   linear: "https://linear.app/settings/api",
   meta: "https://developers.facebook.com/apps/",
   microsoft: "https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
