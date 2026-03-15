@@ -461,6 +461,22 @@ function strVal(v: unknown): string | null {
 /** Formats an ISO datetime string for display in summaries. */
 function formatDateTime(iso: string): string {
   try {
+    // Date-only strings (all-day events) use "YYYY-MM-DD". Parsing them with
+    // `new Date()` treats them as UTC midnight, which shifts the displayed date
+    // by one day in UTC-negative timezones. Format them without a time component
+    // by splitting the string directly to avoid any timezone conversion.
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+    if (isDateOnly) {
+      const [year, month, day] = iso.split("-").map(Number);
+      const date = new Date(year!, month! - 1, day!);
+      const now = new Date();
+      const sameYear = date.getFullYear() === now.getFullYear();
+      return date.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: sameYear ? undefined : "numeric",
+      });
+    }
     const date = new Date(iso);
     if (isNaN(date.getTime())) return iso;
     const now = new Date();

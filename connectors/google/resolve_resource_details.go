@@ -205,8 +205,20 @@ func (c *GoogleConnector) resolveEmail(ctx context.Context, creds connectors.Cre
 
 	messageID := p.MessageID
 	if messageID == "" && p.ThreadID != "" {
-		// For archive, we need to get the first message of the thread
-		messageID = p.ThreadID // Gmail thread ID == first message ID
+		// Fetch the thread to get the first message's ID.
+		// Thread IDs and message IDs are separate namespaces in Gmail.
+		var thread struct {
+			Messages []struct {
+				ID string `json:"id"`
+			} `json:"messages"`
+		}
+		threadURL := c.gmailBaseURL + "/gmail/v1/users/me/threads/" + url.PathEscape(p.ThreadID) + "?format=metadata&fields=" + url.QueryEscape("messages(id)")
+		if err := c.doJSON(ctx, creds, http.MethodGet, threadURL, nil, &thread); err != nil {
+			return nil, err
+		}
+		if len(thread.Messages) > 0 {
+			messageID = thread.Messages[0].ID
+		}
 	}
 	if messageID == "" {
 		return nil, fmt.Errorf("missing message_id or thread_id")
@@ -247,6 +259,9 @@ func (c *GoogleConnector) fetchEmailMetadata(ctx context.Context, creds connecto
 		case "From":
 			details["from"] = h.Value
 		}
+	}
+	if len(details) == 0 {
+		return nil, nil
 	}
 	return details, nil
 }

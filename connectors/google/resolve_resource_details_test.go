@@ -165,6 +165,7 @@ func TestResolveResourceDetails_Presentation(t *testing.T) {
 func TestResolveResourceDetails_Email(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
 		"/gmail/v1/users/me/messages/": `{"payload":{"headers":[{"name":"Subject","value":"Weekly Update"},{"name":"From","value":"alice@example.com"}]}}`,
+		"/gmail/v1/users/me/threads/":  `{"messages":[{"id":"msg_from_thread"}]}`,
 	})
 	defer srv.Close()
 
@@ -181,7 +182,7 @@ func TestResolveResourceDetails_Email(t *testing.T) {
 		t.Errorf("read_email: expected from 'alice@example.com', got %v", details["from"])
 	}
 
-	// archive_email uses thread_id
+	// archive_email uses thread_id — fetches thread first, then message
 	params, _ = json.Marshal(map[string]string{"thread_id": "thread123"})
 	details, err = conn.ResolveResourceDetails(context.Background(), "google.archive_email", params, validCreds())
 	if err != nil {
