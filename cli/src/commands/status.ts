@@ -42,6 +42,9 @@ export function statusCommand(program: Command): void {
           if (opts.wait) {
             process.stderr.write("Warning: --wait has no effect without an approval_id (shows registration state)\n");
           }
+          if (opts.timeout !== "120") {
+            process.stderr.write("Warning: --timeout has no effect without an approval_id\n");
+          }
           // No approval_id: show registration state.
           const result = await client.status();
           output(result, outputOpts);
