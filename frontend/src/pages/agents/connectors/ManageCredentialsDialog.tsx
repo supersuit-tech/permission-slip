@@ -373,7 +373,7 @@ function OAuthCredentialRow({
           </div>
         )}
 
-        {!hasAnyConnection && !provider?.has_credentials && (
+        {!hasAnyConnection && provider != null && !provider.has_credentials && (
           <BYOASetupBanner providerId={providerId} />
         )}
       </div>

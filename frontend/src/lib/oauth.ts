@@ -24,7 +24,7 @@ export const PROVIDER_DEV_CONSOLE_URLS: Record<string, string> = {
   notion: "https://www.notion.so/my-integrations",
   pagerduty: "https://developer.pagerduty.com/apps/",
   salesforce: "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_oauth_and_connected_apps.htm",
-  shopify: "https://partners.shopify.com/",
+  shopify: "https://help.shopify.com/en/manual/apps/app-types/custom-apps",
   square: "https://developer.squareup.com/apps",
   stripe: "https://dashboard.stripe.com/settings/applications",
   x: "https://developer.x.com/en/portal/dashboard",
