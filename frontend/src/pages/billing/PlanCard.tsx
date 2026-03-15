@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { BillingPricing, Plan, Subscription } from "@/hooks/useBillingPlan";
+import { DetailRow } from "./DetailRow";
 import { formatDate } from "./formatters";
 
 interface PlanCardProps {
@@ -43,34 +44,28 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
       <CardContent>
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Plan</span>
+            <DetailRow label="Plan">
               <div className="flex items-center gap-2">
-                <span className="text-sm">{plan.name}</span>
+                <span>{plan.name}</span>
                 <Badge variant={isFree ? "outline" : "default"}>
                   {isFree ? "Free" : "Pay-as-you-go"}
                 </Badge>
               </div>
-            </div>
+            </DetailRow>
             {!isFree && pricing && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Pricing</span>
-                <span className="text-sm text-muted-foreground">
-                  {pricing.free_request_allowance.toLocaleString()} requests/month included, then {pricing.price_per_request_display}/request
-                </span>
-              </div>
+              <DetailRow label="Pricing">
+                <span className="text-muted-foreground">{pricing.free_request_allowance.toLocaleString()} requests/month included, then {pricing.price_per_request_display}/request</span>
+              </DetailRow>
             )}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Status</span>
+            <DetailRow label="Status">
               <StatusBadge status={subscription.status} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Billing Period</span>
-              <span className="text-sm text-muted-foreground">
+            </DetailRow>
+            <DetailRow label="Billing Period">
+              <span className="text-muted-foreground">
                 {formatDate(subscription.current_period_start)} &ndash;{" "}
                 {formatDate(subscription.current_period_end)}
               </span>
-            </div>
+            </DetailRow>
           </div>
           {subscription.status === "past_due" && (
             <p className="text-sm text-destructive">
