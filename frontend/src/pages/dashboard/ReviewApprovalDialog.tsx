@@ -116,13 +116,14 @@ export function ReviewApprovalDialog({
   const [standingDialogOpen, setStandingDialogOpen] = useState(false);
   const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
   const [autoCloseBlocked, setAutoCloseBlocked] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"approve" | "alwaysAllow" | null>(null);
   const isApproved = approveResult !== null;
-  const { approveApproval, isPending: isApproving } = useApproveApproval();
+  const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName } = useActionSchema(approval.action.type);
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
-  const isBusy = isApproving || isDenying;
+  const isBusy = pendingAction !== null || isDenying;
 
   // Data for "Always Allow This"
   const { agents } = useAgents();
@@ -149,11 +150,14 @@ export function ReviewApprovalDialog({
   }, [isApproved, autoCloseBlocked, onOpenChange]);
 
   const handleApprove = useCallback(async () => {
+    setPendingAction("approve");
     try {
       const result = await approveApproval(approval.approval_id);
       setApproveResult(result);
     } catch {
       toast.error("Failed to approve request. Please try again.");
+    } finally {
+      setPendingAction(null);
     }
   }, [approveApproval, approval.approval_id]);
 
@@ -168,7 +172,7 @@ export function ReviewApprovalDialog({
   }, [denyApproval, approval.approval_id, onOpenChange]);
 
   const handleAlwaysAllow = useCallback(async () => {
-    // Approve the request first, then open the standing approval wizard
+    setPendingAction("alwaysAllow");
     try {
       const result = await approveApproval(approval.approval_id);
       setApproveResult(result);
@@ -176,6 +180,8 @@ export function ReviewApprovalDialog({
       setStandingDialogOpen(true);
     } catch {
       toast.error("Failed to approve request. Please try again.");
+    } finally {
+      setPendingAction(null);
     }
   }, [approveApproval, approval.approval_id]);
 
@@ -193,6 +199,7 @@ export function ReviewApprovalDialog({
       setApproveResult(null);
       setStandingApprovalCreated(false);
       setAutoCloseBlocked(false);
+      setPendingAction(null);
     }
     onOpenChange(nextOpen);
   }
@@ -346,9 +353,9 @@ export function ReviewApprovalDialog({
                 variant="secondary"
                 disabled={isBusy || isExpired}
                 onClick={handleAlwaysAllow}
-                aria-label={isApproving ? "Approving and creating rule…" : undefined}
+                aria-label={pendingAction === "alwaysAllow" ? "Approving and creating rule…" : undefined}
               >
-                {isApproving ? (
+                {pendingAction === "alwaysAllow" ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <>
@@ -362,9 +369,9 @@ export function ReviewApprovalDialog({
               size="lg"
               disabled={isBusy || isExpired}
               onClick={handleApprove}
-              aria-label={isApproving ? "Approving request…" : undefined}
+              aria-label={pendingAction === "approve" ? "Approving request…" : undefined}
             >
-              {isApproving ? (
+              {pendingAction === "approve" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 "Approve"

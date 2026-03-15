@@ -169,8 +169,20 @@ export function CreateStandingApprovalDialog({
     setAgentId(initialAgentId ?? "");
     setSelectedConfigId(initialActionType ? CUSTOM_ACTION_SENTINEL : "");
     setCustomActionType(initialActionType ?? "");
-    setParamValues({});
-    setParamModes({});
+    if (hasInitialContext && initialConstraints) {
+      const values: Record<string, string> = {};
+      const modes: Record<string, ParamMode> = {};
+      for (const [key, value] of Object.entries(initialConstraints)) {
+        if (value === "*") { values[key] = "*"; modes[key] = "wildcard"; }
+        else if (isPatternWrapper(value)) { values[key] = value.$pattern; modes[key] = "pattern"; }
+        else { values[key] = value === null || value === undefined ? "" : String(value); modes[key] = "fixed"; }
+      }
+      setParamValues(values);
+      setParamModes(modes);
+    } else {
+      setParamValues({});
+      setParamModes({});
+    }
     setManualConstraintsJson(
       hasInitialContext && initialConstraints
         ? JSON.stringify(initialConstraints, null, 2)
