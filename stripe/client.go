@@ -86,6 +86,12 @@ func (c *Client) FetchRequestPrice() {
 		return
 	}
 
+	// Guard against zero/null unit_amount_decimal (e.g. tiered pricing).
+	if p.UnitAmountDecimal <= 0 {
+		log.Printf("stripe: request price %s has zero/null unit_amount_decimal — using fallback", c.cfg.PriceIDRequest)
+		return
+	}
+
 	rp := &RequestPrice{
 		UnitAmountDecimal: p.UnitAmountDecimal,
 	}
