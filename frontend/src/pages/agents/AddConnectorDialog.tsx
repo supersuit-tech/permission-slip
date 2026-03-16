@@ -147,6 +147,7 @@ export function AddConnectorDialog({
             onOpenChange(false);
           }
         }}
+        agentId={agentId}
         connectorId={setupConnector.id}
         connectorName={setupConnector.name}
         connectorLogoSvg={setupConnector.logo_svg}

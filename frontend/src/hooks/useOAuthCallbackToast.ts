@@ -42,7 +42,11 @@ export function useOAuthCallbackToast() {
       toast.error(detail);
     }
 
-    // Remove OAuth params without a full navigation
+    // Remove OAuth params without a full navigation.
+    // Note: oauth_connection_id is left for useAutoAssignOAuthCredential
+    // which reads it on the agent connector page. On non-agent pages the
+    // param is harmless but we don't strip it here to avoid a race where
+    // the auto-assign hook hasn't read it yet.
     searchParams.delete("oauth_status");
     searchParams.delete("oauth_provider");
     searchParams.delete("oauth_error");

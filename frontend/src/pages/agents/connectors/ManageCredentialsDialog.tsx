@@ -32,6 +32,7 @@ import {
 } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
+import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
@@ -40,6 +41,7 @@ import { BYOASetupBanner } from "./BYOASetupBanner";
 export interface ManageCredentialsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  agentId?: number;
   connectorId: string;
   connectorLabel?: string;
   hasRequiredCredentials: boolean;
@@ -58,6 +60,7 @@ export interface ManageCredentialsDialogProps {
 export function ManageCredentialsDialog({
   open,
   onOpenChange,
+  agentId,
   connectorId,
   connectorLabel,
   hasRequiredCredentials,
@@ -185,6 +188,8 @@ export function ManageCredentialsDialog({
                       requiredCredential={cred}
                       storedCredentials={storedCredentials}
                       isAlternative={hasOAuth}
+                      agentId={agentId}
+                      connectorId={connectorId}
                     />
                   )}
                 </div>
@@ -488,13 +493,18 @@ function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
   isAlternative,
+  agentId,
+  connectorId,
 }: {
   requiredCredential: RequiredCredential;
   storedCredentials: CredentialSummary[];
   isAlternative: boolean;
+  agentId?: number;
+  connectorId: string;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(null);
+  const { tryAssign } = useTryAutoAssign(agentId, connectorId);
 
   const isConnected = storedCredentials.length > 0;
 
@@ -590,6 +600,9 @@ function StaticCredentialRow({
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         credential={requiredCredential}
+        onSuccess={(credentialId) => {
+          tryAssign({ credentialId });
+        }}
       />
 
       {removeTarget && (

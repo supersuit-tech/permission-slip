@@ -21,6 +21,7 @@ import {
   useAgentConnectorCredential,
   useAssignAgentConnectorCredential,
 } from "@/hooks/useAgentConnectorCredential";
+import { useAutoAssignOAuthCredential } from "@/hooks/useAutoAssignOAuthCredential";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import type { OAuthConnection } from "@/hooks/useOAuthConnections";
 import { ManageCredentialsDialog } from "./ManageCredentialsDialog";
@@ -43,6 +44,9 @@ export function ConnectorCredentialsSection({
     [connectorId, requiredCredentials],
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
+
+  // Auto-assign OAuth credential when returning from OAuth flow
+  useAutoAssignOAuthCredential(agentId, connectorId);
 
   const hasRequiredCredentials = requiredCredentials.length > 0;
   const hasExplicitOAuth = requiredCredentials.some(
@@ -121,6 +125,7 @@ export function ConnectorCredentialsSection({
       <ManageCredentialsDialog
         open={manageDialogOpen}
         onOpenChange={setManageDialogOpen}
+        agentId={agentId}
         connectorId={connectorId}
         connectorLabel={serviceLabel(connectorId)}
         hasRequiredCredentials={hasRequiredCredentials}

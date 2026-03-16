@@ -166,6 +166,7 @@ export function AgentConnectorsSection({
             navigate(`/agents/${agentId}/connectors/${connectorId}`);
           }
         }}
+        agentId={agentId}
         connectorId={setupConnector.id}
         connectorName={setupConnector.name}
         connectorLogoSvg={setupConnector.logo_svg}
