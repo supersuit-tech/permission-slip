@@ -376,7 +376,7 @@ export function CreateStandingApprovalDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Standing Approval</DialogTitle>
           <DialogDescription>
