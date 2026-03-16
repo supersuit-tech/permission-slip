@@ -1,15 +1,20 @@
 /**
  * CreateStandingApprovalDialog — Storybook stories
  *
- * Renders each step of the "Create Standing Approval" wizard using the
- * presentational sub-components directly. Hooks are not invoked — all
- * data is static mock data so stories work standalone.
+ * Renders each step of the "Create Standing Approval" wizard. The constraint
+ * step (Step 3) is rendered inline to avoid importing ActionConfigParameterFields
+ * which pulls in Radix primitives that can cause React-context issues in
+ * Storybook. Steps 1, 2, and 4 use the real presentational sub-components.
  */
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Info, Asterisk } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -21,13 +26,11 @@ import {
 import {
   StepPickAgent,
   StepPickAction,
-  StepConstraints,
   StepLimits,
   CUSTOM_ACTION_SENTINEL,
 } from "./StandingApprovalSteps";
-import type { ParamMode } from "@/pages/agents/connectors/ActionConfigFormFields";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
-import type { ParametersSchema } from "@/lib/parameterSchema";
+import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
 
 // ---------------------------------------------------------------------------
 // SVG logos (embedded to avoid API calls)
@@ -62,10 +65,7 @@ const MOCK_AGENTS = [
   },
 ];
 
-const MOCK_CONFIGS_BY_CONNECTOR: Record<
-  string,
-  ActionConfiguration[]
-> = {
+const MOCK_CONFIGS_BY_CONNECTOR: Record<string, ActionConfiguration[]> = {
   "google-calendar": [
     {
       id: "cfg-1",
@@ -174,6 +174,173 @@ function defaultExpiresAt(): string {
   d.setDate(d.getDate() + 30);
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
+}
+
+// ---------------------------------------------------------------------------
+// Inline constraint field — mirrors ActionConfigParameterFields for Storybook
+// ---------------------------------------------------------------------------
+
+type ParamMode = "fixed" | "pattern" | "wildcard";
+
+function StoryConstraintField({
+  paramKey,
+  property,
+  isRequired,
+  value,
+  mode,
+  onValueChange,
+  onModeChange,
+}: {
+  paramKey: string;
+  property: SchemaProperty;
+  isRequired: boolean;
+  value: string;
+  mode: ParamMode;
+  onValueChange: (key: string, value: string) => void;
+  onModeChange: (key: string, mode: ParamMode) => void;
+}) {
+  const isWildcard = mode === "wildcard";
+  const label =
+    property.description ??
+    paramKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
+          {label}
+        </Label>
+        {isRequired && (
+          <Badge variant="secondary" className="text-xs">
+            required
+          </Badge>
+        )}
+        {property.type && (
+          <span className="text-muted-foreground text-xs">
+            ({property.type})
+          </span>
+        )}
+      </div>
+      {property.description && (
+        <p className="text-muted-foreground text-sm">{property.description}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <Input
+          id={`param-${paramKey}`}
+          type="text"
+          value={isWildcard ? "" : value}
+          onChange={(e) => onValueChange(paramKey, e.target.value)}
+          disabled={isWildcard}
+          placeholder={isWildcard ? "Agent can use any value" : undefined}
+          className={isWildcard ? "bg-muted" : ""}
+        />
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap">
+          <Checkbox
+            checked={isWildcard}
+            onCheckedChange={(checked) => {
+              if (checked === true) {
+                onModeChange(paramKey, "wildcard");
+                onValueChange(paramKey, "*");
+              } else if (checked === false) {
+                onModeChange(paramKey, "fixed");
+                onValueChange(paramKey, "");
+              }
+            }}
+          />
+          <Asterisk className="size-3" />
+          Any value
+        </label>
+      </div>
+      {!isWildcard && value.includes("*") && (
+        <p className="text-muted-foreground text-sm">
+          <code className="rounded bg-muted px-1 font-mono">*</code> matches
+          any text
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StoryStepConstraints({
+  schema,
+  paramValues,
+  paramModes,
+  onParamValueChange,
+  onParamModeChange,
+  manualConstraintsJson,
+  onManualConstraintsJsonChange,
+}: {
+  schema: ParametersSchema | null;
+  paramValues: Record<string, string>;
+  paramModes: Record<string, ParamMode>;
+  onParamValueChange: (key: string, value: string) => void;
+  onParamModeChange: (key: string, mode: ParamMode) => void;
+  manualConstraintsJson: string;
+  onManualConstraintsJsonChange: (value: string) => void;
+}) {
+  const properties = schema?.properties;
+  const requiredFields = schema?.required ?? [];
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3">
+        <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+        <p className="text-muted-foreground text-sm">
+          Standing approvals require parameter constraints. At least one
+          parameter must be Fixed or Pattern — not all wildcards.
+        </p>
+      </div>
+
+      {properties ? (
+        <div className="space-y-3">
+          <Label>Constraints</Label>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Use{" "}
+            <code className="rounded bg-muted px-1 font-mono">*</code> as a
+            wildcard in any value (e.g.{" "}
+            <code className="rounded bg-muted px-1 font-mono">
+              *@mycompany.com
+            </code>
+            ). Check <strong>Any value</strong> to let the agent choose freely.
+          </p>
+          {Object.entries(properties).map(([key, prop]) => (
+            <StoryConstraintField
+              key={key}
+              paramKey={key}
+              property={prop}
+              isRequired={requiredFields.includes(key)}
+              value={paramValues[key] ?? ""}
+              mode={paramModes[key] ?? "fixed"}
+              onValueChange={onParamValueChange}
+              onModeChange={onParamModeChange}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor="sa-manual-constraints">Constraints (JSON)</Label>
+          <p className="text-muted-foreground text-sm">
+            No parameter schema found for this action. Enter constraints
+            manually as a JSON object.
+          </p>
+          <textarea
+            id="sa-manual-constraints"
+            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder={
+              '{\n  "recipient": "*@mycompany.com",\n  "subject": "*"\n}'
+            }
+            value={manualConstraintsJson}
+            onChange={(e) => onManualConstraintsJsonChange(e.target.value)}
+          />
+          <p className="text-muted-foreground text-sm">
+            Use{" "}
+            <code className="rounded bg-muted px-1 font-mono">&quot;*&quot;</code>{" "}
+            for wildcard parameters, but at least one must be non-wildcard.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -293,9 +460,8 @@ function CreateStandingApprovalWizard({
           )}
 
           {step === 3 && (
-            <StepConstraints
-              configSchema={effectiveSchema}
-              schemaLoading={false}
+            <StoryStepConstraints
+              schema={effectiveSchema}
               paramValues={paramValues}
               paramModes={paramModes}
               onParamValueChange={(key, value) =>
@@ -306,7 +472,6 @@ function CreateStandingApprovalWizard({
               }
               manualConstraintsJson={manualConstraintsJson}
               onManualConstraintsJsonChange={setManualConstraintsJson}
-              isPending={false}
             />
           )}
 
