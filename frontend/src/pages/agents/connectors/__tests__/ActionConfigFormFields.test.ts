@@ -46,6 +46,12 @@ describe("buildParametersFromForm", () => {
     expect(result).toEqual({ count: 42 });
   });
 
+  it("coerces number types", () => {
+    const schema = { price: { type: "number" } };
+    const result = buildParametersFromForm({ price: "3.14" }, schema);
+    expect(result).toEqual({ price: 3.14 });
+  });
+
   it("coerces boolean types", () => {
     const schema = { enabled: { type: "boolean" } };
     const result = buildParametersFromForm({ enabled: "true" }, schema);
