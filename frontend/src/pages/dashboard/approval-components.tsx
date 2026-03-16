@@ -86,10 +86,10 @@ export function RiskBadge({ level }: { level?: "low" | "medium" | "high" | null 
 
   const variant =
     level === "high"
-      ? "destructive"
+      ? "destructive-soft"
       : level === "medium"
-        ? "outline"
-        : "secondary";
+        ? "warning-soft"
+        : "success-soft";
 
   return (
     <Badge variant={variant} className="rounded-full text-[10px] capitalize">

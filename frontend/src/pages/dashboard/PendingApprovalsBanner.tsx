@@ -38,7 +38,7 @@ function ApprovalBannerItem({
     <button
       type="button"
       onClick={() => onOpenDialog(approval, agentDisplayName)}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-left text-sm text-blue-900 shadow-sm transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-950/70"
+      className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-info/30 bg-info/5 px-4 py-3 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-info/10"
       aria-label={`Pending approval: ${approval.action.type} from ${agentDisplayName}`}
     >
       <Bot className="size-5 shrink-0" />
