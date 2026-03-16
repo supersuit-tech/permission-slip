@@ -1,4 +1,5 @@
 import { useRef, useCallback, type KeyboardEvent } from "react";
+import { cn } from "@/lib/utils";
 
 interface Option<T extends string> {
   label: string;
@@ -11,6 +12,9 @@ interface SegmentedControlProps<T extends string> {
   onChange: (v: T) => void;
   ariaLabel: string;
 }
+
+const baseButtonClass =
+  "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none";
 
 export function SegmentedControl<T extends string>({
   options,
@@ -43,7 +47,9 @@ export function SegmentedControl<T extends string>({
           const buttons = groupRef.current?.querySelectorAll<HTMLButtonElement>(
             '[role="radio"]',
           );
-          buttons?.[next]?.focus();
+          const btn = buttons?.[next];
+          btn?.focus();
+          btn?.scrollIntoView({ block: "nearest", inline: "nearest" });
         }
       } else if (next >= 0) {
         e.preventDefault();
@@ -55,7 +61,7 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       ref={groupRef}
-      className="inline-flex gap-0.5 rounded-lg bg-muted p-1"
+      className="flex gap-0.5 overflow-x-auto rounded-lg bg-muted p-1"
       role="radiogroup"
       aria-label={ariaLabel}
     >
@@ -68,11 +74,12 @@ export function SegmentedControl<T extends string>({
           tabIndex={value === opt.value ? 0 : -1}
           onClick={() => onChange(opt.value)}
           onKeyDown={handleKeyDown}
-          className={
+          className={cn(
+            baseButtonClass,
             value === opt.value
-              ? "rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none"
-              : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none"
-          }
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
           {opt.label}
         </button>
