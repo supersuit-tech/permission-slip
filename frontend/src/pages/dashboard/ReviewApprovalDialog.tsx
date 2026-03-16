@@ -253,8 +253,10 @@ export function ReviewApprovalDialog({
             {/* Agent info + status */}
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="bg-amber-100 dark:bg-amber-900/30 flex size-10 shrink-0 items-center justify-center rounded-full">
-                  <span className="text-base" aria-hidden="true">&#9728;&#65039;</span>
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
+                  <span className="text-sm font-bold text-violet-700 dark:text-violet-300" aria-hidden="true">
+                    {agentDisplayName.slice(0, 2).toUpperCase()}
+                  </span>
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{agentDisplayName}</p>
@@ -306,14 +308,18 @@ export function ReviewApprovalDialog({
               />
             </div>
 
-            {/* Raw parameters (collapsible) */}
+            {/* Raw parameters (collapsible, centered divider toggle) */}
             {hasParams && (
               <details className="group">
-                <summary className="flex cursor-pointer items-center gap-1 text-sm font-medium select-none">
-                  <span className="text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true">&#9656;</span>
-                  Raw parameters
+                <summary className="flex cursor-pointer items-center select-none [&::-webkit-details-marker]:hidden [list-style:none]">
+                  <div className="border-border w-full border-t" />
+                  <span className="text-muted-foreground hover:text-foreground bg-background inline-flex shrink-0 items-center gap-1.5 px-3 text-xs font-medium transition-colors">
+                    <span className="transition-transform group-open:rotate-90" aria-hidden="true">&#9656;</span>
+                    Parameters
+                  </span>
+                  <div className="border-border w-full border-t" />
                 </summary>
-                <div className="bg-muted/50 mt-2 overflow-x-auto rounded-lg border p-3 sm:p-4">
+                <div className="bg-muted/30 mt-3 overflow-x-auto rounded-lg border p-3 sm:p-4">
                   <SchemaParameterDetails
                     parameters={params}
                     schema={schema}

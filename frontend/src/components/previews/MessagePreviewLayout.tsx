@@ -24,31 +24,32 @@ export function MessagePreviewLayout({
       : null;
 
   return (
-    <div className="bg-slate-800 dark:bg-slate-900 overflow-hidden rounded-xl p-4">
+    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
       {/* Header icon */}
       <div className="mb-3 flex items-center gap-2">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-blue-500/20">
-          <Mail className="size-4 text-blue-400" aria-hidden="true" />
+        <div className="flex size-8 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-950 dark:ring-blue-800">
+          <Mail className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
         </div>
+        <span className="text-muted-foreground text-xs font-medium">Email</span>
       </div>
 
       {/* Message details */}
       <div className="space-y-2">
         {to && (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-400">To</span>
-            <span className="truncate text-sm font-medium text-white">
+            <span className="text-muted-foreground text-xs font-medium">To</span>
+            <span className="truncate text-sm font-medium">
               {to}
             </span>
           </div>
         )}
         {subject && (
-          <p className="truncate text-base font-semibold text-white">
+          <p className="truncate text-base font-semibold">
             {subject}
           </p>
         )}
         {body && (
-          <p className="line-clamp-2 text-sm leading-relaxed text-slate-300">
+          <p className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
             {truncate(body, 200)}
           </p>
         )}

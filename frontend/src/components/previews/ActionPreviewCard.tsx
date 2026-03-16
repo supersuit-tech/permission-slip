@@ -55,8 +55,8 @@ export function ActionPreviewCard({
 
   // Fallback: render ActionPreviewSummary in a styled card
   return (
-    <div className="bg-slate-800 dark:bg-slate-900 overflow-hidden rounded-xl p-4">
-      <div className="text-sm text-slate-200">
+    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+      <div className="text-sm">
         <ActionPreviewSummary
           actionType={actionType}
           parameters={parameters}

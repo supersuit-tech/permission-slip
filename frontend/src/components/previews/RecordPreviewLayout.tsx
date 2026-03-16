@@ -36,35 +36,36 @@ export function RecordPreviewLayout({
     .filter(Boolean) as { label: string; value: string }[];
 
   return (
-    <div className="bg-slate-800 dark:bg-slate-900 overflow-hidden rounded-xl p-4">
+    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
       {/* Header icon */}
       <div className="mb-3 flex items-center gap-2">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/20">
-          <FileText className="size-4 text-emerald-400" aria-hidden="true" />
+        <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-950 dark:ring-emerald-800">
+          <FileText className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
         </div>
+        <span className="text-muted-foreground text-xs font-medium">Record</span>
       </div>
 
       {/* Record details */}
       <div className="space-y-2">
         {title && (
-          <p className="truncate text-base font-semibold text-white">
+          <p className="truncate text-base font-semibold">
             {title}
           </p>
         )}
         {subtitle && (
-          <p className="truncate text-sm text-slate-300">{subtitle}</p>
+          <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
         )}
         {extraEntries.length > 0 && (
-          <div className="mt-2 space-y-1 border-t border-slate-700 pt-2">
+          <div className="border-border mt-2 space-y-1 border-t pt-2">
             {extraEntries.map((entry) => (
               <div
                 key={entry.label}
                 className="flex items-center justify-between gap-2"
               >
-                <span className="text-xs capitalize text-slate-400">
+                <span className="text-muted-foreground text-xs capitalize">
                   {entry.label}
                 </span>
-                <span className="truncate text-xs text-slate-300">
+                <span className="text-muted-foreground truncate text-xs">
                   {entry.value}
                 </span>
               </div>
