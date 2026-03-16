@@ -193,7 +193,7 @@ export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
   if (property.format === "date-time") return "datetime";
   if (property.type === "boolean") return "toggle";
   if (property.type === "integer" || property.type === "number") return "number";
-  if (property.type === "array" && property.items?.type === "string") return "list";
+  if (property.type === "array") return "list";
 
   // Heuristic: detect datetime fields by description mentioning RFC 3339 or ISO 8601
   if (property.type === "string" && property.description) {
