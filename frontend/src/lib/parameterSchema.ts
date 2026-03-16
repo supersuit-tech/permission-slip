@@ -15,7 +15,7 @@ export interface VisibleWhen {
 
 /** Property-level `x-ui` rendering hints for a single parameter. */
 export interface SchemaPropertyUI {
-  widget?: "text" | "select" | "textarea" | "toggle" | "number" | "date";
+  widget?: "text" | "select" | "textarea" | "toggle" | "number" | "date" | "datetime";
   label?: string;
   placeholder?: string;
   group?: string;
@@ -41,6 +41,7 @@ export interface SchemaUI {
 /** JSON Schema property definition for a single action parameter. */
 export interface SchemaProperty {
   type?: string;
+  format?: string;
   description?: string;
   enum?: string[];
   default?: unknown;
@@ -88,15 +89,23 @@ export function parseParametersSchema(
   )) {
     if (typeof val === "object" && val !== null) {
       const prop = val as Record<string, unknown>;
+      const format = typeof prop.format === "string" ? prop.format : undefined;
+      const parsedUI = parsePropertyUI(prop["x-ui"]);
+      // Auto-map format: "date-time" → widget: "datetime" when no explicit widget is set
+      const ui =
+        format === "date-time" && !parsedUI?.widget
+          ? { ...parsedUI, widget: "datetime" as const }
+          : parsedUI;
       properties[key] = {
         type: typeof prop.type === "string" ? prop.type : undefined,
+        format,
         description:
           typeof prop.description === "string" ? prop.description : undefined,
         enum: Array.isArray(prop.enum)
           ? prop.enum.filter((e): e is string => typeof e === "string")
           : undefined,
         default: prop.default,
-        "x-ui": parsePropertyUI(prop["x-ui"]),
+        "x-ui": ui,
       };
     }
   }
@@ -105,7 +114,7 @@ export function parseParametersSchema(
 }
 
 /** All valid widget type values. */
-export const VALID_WIDGETS = ["text", "select", "textarea", "toggle", "number", "date"] as const;
+export const VALID_WIDGETS = ["text", "select", "textarea", "toggle", "number", "date", "datetime"] as const;
 
 /** Widget type as a union — useful for exhaustive switch checks. */
 export type WidgetType = (typeof VALID_WIDGETS)[number];
