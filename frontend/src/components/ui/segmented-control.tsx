@@ -19,15 +19,15 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       className="inline-flex gap-0.5 rounded-lg bg-muted p-1"
-      role="tablist"
+      role="radiogroup"
       aria-label={ariaLabel}
     >
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
-          role="tab"
-          aria-selected={value === opt.value}
+          role="radio"
+          aria-checked={value === opt.value}
           onClick={() => onChange(opt.value)}
           className={
             value === opt.value
