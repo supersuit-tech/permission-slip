@@ -1,10 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
-import {
-  useAgentConnectorCredential,
-  useAssignAgentConnectorCredential,
-} from "./useAgentConnectorCredential";
+import { useTryAutoAssign } from "./useTryAutoAssign";
 
 /**
  * After an OAuth flow completes, the backend redirects back with
@@ -19,37 +15,25 @@ export function useAutoAssignOAuthCredential(
   connectorId: string,
 ) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { binding, isLoading: bindingLoading } =
-    useAgentConnectorCredential(agentId, connectorId);
-  const { assign } = useAssignAgentConnectorCredential();
+  const { tryAssign, bindingLoading } = useTryAutoAssign(agentId, connectorId);
   const firedRef = useRef(false);
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
 
   useEffect(() => {
     if (firedRef.current) return;
     if (bindingLoading) return;
 
-    const connectionId = searchParams.get("oauth_connection_id");
+    const params = searchParamsRef.current;
+    const connectionId = params.get("oauth_connection_id");
     if (!connectionId) return;
 
     firedRef.current = true;
 
     // Clean up the param from the URL
-    searchParams.delete("oauth_connection_id");
-    setSearchParams(searchParams, { replace: true });
+    params.delete("oauth_connection_id");
+    setSearchParams(params, { replace: true });
 
-    // Skip if agent already has a credential assigned
-    if (binding?.credential_id || binding?.oauth_connection_id) return;
-
-    assign({ agentId, connectorId, oauthConnectionId: connectionId })
-      .then(() => {
-        toast.success("OAuth connection assigned to this agent.");
-      })
-      .catch((err) => {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : "Could not auto-assign credential — please select it manually.",
-        );
-      });
+    tryAssign({ oauthConnectionId: connectionId });
   }, [bindingLoading]); // eslint-disable-line react-hooks/exhaustive-deps -- run once when binding loads
 }

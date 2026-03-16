@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -28,10 +27,7 @@ import {
   SHOP_REQUIRED_PROVIDERS,
 } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
-import {
-  useAgentConnectorCredential,
-  useAssignAgentConnectorCredential,
-} from "@/hooks/useAgentConnectorCredential";
+import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 
 interface SetupConnectorCredentialsDialogProps {
@@ -77,8 +73,7 @@ export function SetupConnectorCredentialsDialog({
     useState(false);
   const [addCredentialTarget, setAddCredentialTarget] =
     useState<RequiredCredential | null>(null);
-  const { binding } = useAgentConnectorCredential(agentId ?? 0, connectorId);
-  const { assign } = useAssignAgentConnectorCredential();
+  const { tryAssign } = useTryAutoAssign(agentId, connectorId);
 
   const isLoading = detailLoading || providersLoading || connectionsLoading;
   const requiredCredentials = connector?.required_credentials ?? [];
@@ -267,24 +262,7 @@ export function SetupConnectorCredentialsDialog({
           }}
           credential={addCredentialTarget}
           onSuccess={(credentialId) => {
-            if (
-              agentId != null &&
-              agentId > 0 &&
-              !binding?.credential_id &&
-              !binding?.oauth_connection_id
-            ) {
-              assign({ agentId, connectorId, credentialId })
-                .then(() => {
-                  toast.success("Credential assigned to this agent.");
-                })
-                .catch((err) => {
-                  toast.error(
-                    err instanceof Error
-                      ? err.message
-                      : "Could not auto-assign credential — please select it manually.",
-                  );
-                });
-            }
+            tryAssign({ credentialId });
             onOpenChange(false);
           }}
         />

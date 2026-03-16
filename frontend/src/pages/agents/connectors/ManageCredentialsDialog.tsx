@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -33,10 +32,7 @@ import {
 } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
-import {
-  useAgentConnectorCredential,
-  useAssignAgentConnectorCredential,
-} from "@/hooks/useAgentConnectorCredential";
+import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
@@ -508,8 +504,7 @@ function StaticCredentialRow({
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(null);
-  const { binding } = useAgentConnectorCredential(agentId ?? 0, connectorId);
-  const { assign } = useAssignAgentConnectorCredential();
+  const { tryAssign } = useTryAutoAssign(agentId, connectorId);
 
   const isConnected = storedCredentials.length > 0;
 
@@ -606,24 +601,7 @@ function StaticCredentialRow({
         onOpenChange={setAddDialogOpen}
         credential={requiredCredential}
         onSuccess={(credentialId) => {
-          if (
-            agentId != null &&
-            agentId > 0 &&
-            !binding?.credential_id &&
-            !binding?.oauth_connection_id
-          ) {
-            assign({ agentId, connectorId, credentialId })
-              .then(() => {
-                toast.success("Credential assigned to this agent.");
-              })
-              .catch((err) => {
-                toast.error(
-                  err instanceof Error
-                    ? err.message
-                    : "Could not auto-assign credential — please select it manually.",
-                );
-              });
-          }
+          tryAssign({ credentialId });
         }}
       />
 

@@ -75,9 +75,7 @@ export function AddCredentialDialog({
       toast.success(`Credentials stored for ${credential.service}`);
       resetForm();
       onOpenChange(false);
-      if (result?.id) {
-        onSuccess?.(result.id);
-      }
+      onSuccess?.(result?.id ?? "");
     } catch (err) {
       toast.error(
         err instanceof Error
