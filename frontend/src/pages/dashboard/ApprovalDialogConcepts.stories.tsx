@@ -161,11 +161,17 @@ function ConceptA() {
           </div>
 
           {/* Raw parameters — styled toggle button */}
-              <button
-                type="button"
-                onClick={() => setShowRaw(!showRaw)}
-                aria-expanded={showRaw}
-                className="bg-background text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-3 text-xs font-medium transition-colors"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowRaw(!showRaw)}
+              aria-expanded={showRaw}
+              className="bg-background text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-medium transition-colors"
+            >
+              {showRaw ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+              {showRaw ? "Hide parameters" : "Show parameters"}
+            </button>
+          </div>
           {showRaw && (
             <div className="rounded-lg border bg-muted/30 p-3 sm:p-4">
               <SchemaParameterDetails parameters={emailParams} schema={emailSchema} />
