@@ -42,7 +42,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             P
           </span>
           <span className="hidden sm:inline">Permission Slip</span>
-          <span className="rounded-full bg-secondary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary">
+          <span className="rounded-full bg-secondary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground">
             Beta
           </span>
         </Link>
