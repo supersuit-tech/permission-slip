@@ -182,6 +182,10 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 			params: `{"name":"   "}`,
 		},
 		{
+			name:   "invalid characters in name",
+			params: `{"name":"my repo/here"}`,
+		},
+		{
 			name:   "invalid JSON",
 			params: `{invalid}`,
 		},

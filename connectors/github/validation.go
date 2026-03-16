@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -108,6 +109,23 @@ func setPagination(q url.Values, perPage, page int) {
 	if page > 1 {
 		q.Set("page", fmt.Sprintf("%d", page))
 	}
+}
+
+// repoNameRe matches valid GitHub repository names: alphanumeric, hyphen, underscore, dot.
+var repoNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
+// validateRepoName checks that a repository name is valid per GitHub's naming rules.
+// Names must be non-empty after trimming whitespace and contain only alphanumeric
+// characters, hyphens, underscores, and dots.
+func validateRepoName(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: name"}
+	}
+	if !repoNameRe.MatchString(name) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid repository name %q: must contain only alphanumeric characters, hyphens, underscores, and dots", name)}
+	}
+	return nil
 }
 
 // invalidRefChars contains characters forbidden in git ref names.
