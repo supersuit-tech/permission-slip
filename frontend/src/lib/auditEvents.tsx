@@ -10,7 +10,7 @@ import {
   CreditCard,
   HelpCircle,
 } from "lucide-react";
-import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Badge, type badgeVariants } from "@/components/ui/badge";
 import type { VariantProps } from "class-variance-authority";
 import {
   TableRow,
