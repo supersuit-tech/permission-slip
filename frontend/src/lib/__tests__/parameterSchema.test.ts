@@ -28,6 +28,7 @@ describe("parseParametersSchema", () => {
         owner: {
           type: "string",
           description: "Repository owner",
+          format: undefined,
           enum: undefined,
           default: undefined,
           "x-ui": undefined,
@@ -35,6 +36,7 @@ describe("parseParametersSchema", () => {
         repo: {
           type: "string",
           description: "Repository name",
+          format: undefined,
           enum: undefined,
           default: undefined,
           "x-ui": undefined,
@@ -42,6 +44,7 @@ describe("parseParametersSchema", () => {
         title: {
           type: "string",
           description: undefined,
+          format: undefined,
           enum: undefined,
           default: undefined,
           "x-ui": undefined,
@@ -65,6 +68,7 @@ describe("parseParametersSchema", () => {
 
     expect(result?.properties?.method).toEqual({
       type: "string",
+      format: undefined,
       description: "Merge strategy",
       enum: ["merge", "squash", "rebase"],
       default: "merge",
@@ -155,6 +159,7 @@ describe("parseParametersSchema", () => {
 
     expect(result?.properties?.weird).toEqual({
       type: undefined,
+      format: undefined,
       description: undefined,
       enum: undefined,
       default: undefined,
@@ -329,7 +334,7 @@ describe("parseParametersSchema", () => {
     });
 
     it("accepts all valid widget types", () => {
-      const widgets = ["text", "select", "textarea", "toggle", "number", "date"] as const;
+      const widgets = ["text", "select", "textarea", "toggle", "number", "date", "datetime"] as const;
       for (const widget of widgets) {
         const result = parseParametersSchema({
           type: "object",
@@ -554,6 +559,56 @@ describe("parseParametersSchema", () => {
     });
   });
 
+  describe("format field and datetime auto-mapping", () => {
+    it("extracts format field from property", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          start_time: { type: "string", format: "date-time" },
+        },
+      });
+
+      expect(result?.properties?.start_time?.format).toBe("date-time");
+    });
+
+    it("auto-maps format date-time to datetime widget when no explicit widget", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          start_time: { type: "string", format: "date-time" },
+        },
+      });
+
+      expect(result?.properties?.start_time?.["x-ui"]?.widget).toBe("datetime");
+    });
+
+    it("does not override explicit widget when format is date-time", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          start_time: {
+            type: "string",
+            format: "date-time",
+            "x-ui": { widget: "text" },
+          },
+        },
+      });
+
+      expect(result?.properties?.start_time?.["x-ui"]?.widget).toBe("text");
+    });
+
+    it("sets format to undefined when not present", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          name: { type: "string" },
+        },
+      });
+
+      expect(result?.properties?.name?.format).toBeUndefined();
+    });
+  });
+
   it("preserves backwards compatibility — schemas without x-ui parse identically", () => {
     const input = {
       type: "object",
@@ -573,6 +628,7 @@ describe("parseParametersSchema", () => {
         owner: {
           type: "string",
           description: "Repository owner",
+          format: undefined,
           enum: undefined,
           default: undefined,
           "x-ui": undefined,
