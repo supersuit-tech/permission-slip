@@ -132,6 +132,25 @@ export const NoSchema: Story = {
   },
 };
 
+export const WithMultilineBody: Story = {
+  args: {
+    parameters: {
+      to: "alice@example.com",
+      subject: "Weekly standup notes — March 16",
+      body: "Hi Alice,\n\nHere are this week's standup notes.\n\nThe team made great progress on the API migration. All endpoints are now versioned and the legacy routes have been deprecated with a 90-day sunset window.\n\nThe new dashboard is ready for QA — please review it before Thursday's release window. Key things to check: permissions, empty states, and the mobile breakpoints.\n\nFinally, a reminder that next Monday is a company holiday, so the standup will be moved to Tuesday at 10am EST.\n\nBest,\nChiedobot",
+    },
+    schema: {
+      type: "object",
+      required: ["to", "subject", "body"],
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Email body (plain text)" },
+      },
+    },
+  },
+};
+
 export const ManyParameters: Story = {
   args: {
     parameters: {
