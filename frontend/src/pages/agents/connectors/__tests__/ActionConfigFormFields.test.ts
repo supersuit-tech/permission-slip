@@ -78,6 +78,12 @@ describe("buildParametersFromForm", () => {
     expect(result).toEqual({ tags: ["a", "b"] });
   });
 
+  it("preserves array with wildcard item instead of treating it as a pattern", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: '["tag*","billing"]' }, schema);
+    expect(result).toEqual({ tags: ["tag*", "billing"] });
+  });
+
   it("falls through to string when array JSON is invalid", () => {
     const schema = { tags: { type: "array" } };
     const result = buildParametersFromForm({ tags: "not-json" }, schema);

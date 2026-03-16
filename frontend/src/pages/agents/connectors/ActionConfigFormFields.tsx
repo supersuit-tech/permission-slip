@@ -170,6 +170,20 @@ export function buildParametersFromForm(
       continue;
     }
 
+    const type = schemaProperties?.[key]?.type;
+
+    // Array type: parse JSON before pattern detection, since array values
+    // may contain items with "*" that should not be treated as glob patterns.
+    if (type === "array" && value.startsWith("[")) {
+      try {
+        const parsed: unknown = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          parameters[key] = (parsed as unknown[]).filter((item) => item !== "");
+          continue;
+        }
+      } catch { /* fall through */ }
+    }
+
     // Auto-detect pattern: any value containing "*" is a glob pattern.
     // Also preserves legacy "pattern" mode for backward compatibility
     // (e.g. existing $pattern values without * created by the old UI).
@@ -177,8 +191,6 @@ export function buildParametersFromForm(
       parameters[key] = { $pattern: value };
       continue;
     }
-
-    const type = schemaProperties?.[key]?.type;
     if (type === "integer") {
       const parsed = Number.parseInt(value, 10);
       if (!Number.isNaN(parsed)) { parameters[key] = parsed; continue; }
@@ -188,16 +200,6 @@ export function buildParametersFromForm(
     } else if (type === "boolean") {
       if (value === "true") { parameters[key] = true; continue; }
       if (value === "false") { parameters[key] = false; continue; }
-    } else if (type === "array") {
-      if (value.startsWith("[")) {
-        try {
-          const parsed: unknown = JSON.parse(value);
-          if (Array.isArray(parsed)) {
-            parameters[key] = (parsed as unknown[]).filter((item) => item !== "");
-            continue;
-          }
-        } catch { /* fall through to string */ }
-      }
     }
 
     parameters[key] = value;
