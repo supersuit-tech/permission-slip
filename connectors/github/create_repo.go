@@ -47,8 +47,8 @@ func (a *createRepoAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	org := strings.TrimSpace(params.Org)
-	if org != "" && !repoNameRe.MatchString(org) {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid org name %q: must contain only alphanumeric characters, hyphens, underscores, and dots", org)}
+	if org != "" && !orgNameRe.MatchString(org) {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid org name %q: must contain only alphanumeric characters and hyphens", org)}
 	}
 
 	var path string

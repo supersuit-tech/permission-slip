@@ -114,6 +114,9 @@ func setPagination(q url.Values, perPage, page int) {
 // repoNameRe matches valid GitHub repository names: alphanumeric, hyphen, underscore, dot.
 var repoNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
+// orgNameRe matches valid GitHub organization/user names: alphanumeric and hyphens only.
+var orgNameRe = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+
 // validateRepoName checks that a repository name is valid per GitHub's naming rules.
 // Names must be non-empty and contain only alphanumeric characters, hyphens,
 // underscores, and dots. Callers should TrimSpace before calling.

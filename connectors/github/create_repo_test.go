@@ -228,8 +228,16 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 			params: `{"name":"aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeaaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeX"}`,
 		},
 		{
-			name:   "invalid org name",
+			name:   "invalid org name with spaces and slashes",
 			params: `{"name":"valid-repo","org":"bad org/name"}`,
+		},
+		{
+			name:   "invalid org name with dots",
+			params: `{"name":"valid-repo","org":"my.company"}`,
+		},
+		{
+			name:   "invalid org name with underscores",
+			params: `{"name":"valid-repo","org":"my_org"}`,
 		},
 		{
 			name:   "invalid JSON",
