@@ -127,7 +127,7 @@ function SpendProgressBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-sm">
         {formatCents(monthlySpend)} of {formatCents(monthlyLimit)} used
         {remaining > 0 && ` · ${formatCents(remaining)} remaining`}
       </p>
@@ -243,7 +243,7 @@ export function PaymentMethodSection() {
                         expYear={pm.exp_year}
                       />
                     </div>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                       {pm.label
                         ? `${formatBrand(pm.brand)} ending in ${pm.last4} · `
                         : ""}

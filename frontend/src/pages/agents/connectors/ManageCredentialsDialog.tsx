@@ -279,7 +279,7 @@ function OAuthCredentialRow({
                   Recommended
                 </Badge>
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-sm">
                 {isConnected
                   ? `${activeConnections.length} account${activeConnections.length !== 1 ? "s" : ""} connected`
                   : needsReauthConnection
@@ -325,7 +325,7 @@ function OAuthCredentialRow({
                       </span>
                     )}
                   </p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground text-sm">
                     {conn.status === "active"
                       ? `Connected ${new Date(conn.connected_at).toLocaleDateString()}`
                       : conn.status === "needs_reauth"
@@ -460,7 +460,7 @@ function ShopDomainDialog({
                 .myshopify.com
               </span>
             </div>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               e.g. if your store URL is mystore.myshopify.com, enter
               &quot;mystore&quot;
             </p>
@@ -519,7 +519,7 @@ function StaticCredentialRow({
                   </Badge>
                 )}
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-sm">
                 {authTypeLabel(requiredCredential.auth_type)}
               </p>
               {requiredCredential.instructions_url && (
@@ -567,7 +567,7 @@ function StaticCredentialRow({
                   <p className="truncate text-sm">
                     {cred.label ?? cred.service}
                   </p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground text-sm">
                     Added {new Date(cred.created_at).toLocaleDateString()}
                   </p>
                 </div>

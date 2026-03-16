@@ -88,16 +88,14 @@ export function ActionConfigParameterFields({
   }
 
   const introText = (
-    <p className="text-muted-foreground text-xs">
+    <p className="text-muted-foreground text-sm leading-relaxed">
       For each parameter, choose a constraint mode: <strong>Fixed</strong>{" "}
       locks in an exact value,{" "}
       <strong>Pattern</strong> uses{" "}
-      <Badge variant="outline" className="border-dashed font-mono text-xs">
-        *
-      </Badge>{" "}
-      as a glob wildcard (e.g.{" "}
-      <code className="text-xs">*@mycompany.com</code>), or{" "}
-      <strong>Wildcard</strong> lets the agent choose freely.
+      <code className="rounded bg-muted px-1 font-mono">*</code> as a glob
+      wildcard (e.g.{" "}
+      <code className="rounded bg-muted px-1 font-mono">*@mycompany.com</code>
+      ), or <strong>Wildcard</strong> lets the agent choose freely.
     </p>
   );
 
@@ -200,7 +198,7 @@ function ParameterField({
         )}
       </div>
       {property.description && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           {property.description}
         </p>
       )}
@@ -229,9 +227,9 @@ function ParameterField({
         />
       </div>
       {mode === "pattern" && value !== "" && !value.includes("*") && (
-        <p className="text-muted-foreground text-xs">
-          Tip: Include <code className="font-mono">*</code> in the value
-          for glob matching (e.g. <code>*@mycompany.com</code>).
+        <p className="text-muted-foreground text-sm">
+          Tip: Include <code className="rounded bg-muted px-1 font-mono">*</code> in the value
+          for glob matching (e.g. <code className="rounded bg-muted px-1 font-mono">*@mycompany.com</code>).
         </p>
       )}
     </div>

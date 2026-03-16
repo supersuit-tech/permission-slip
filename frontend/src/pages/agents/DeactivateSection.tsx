@@ -45,7 +45,7 @@ export function DeactivateSection({ agentId }: { agentId: number }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-medium">Deactivate this agent</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-sm">
                 This will revoke all standing approvals and prevent the agent
                 from making further requests. This action cannot be undone.
               </p>
