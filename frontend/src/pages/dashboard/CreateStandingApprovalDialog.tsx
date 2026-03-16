@@ -413,7 +413,9 @@ export function CreateStandingApprovalDialog({
             <>
               <DialogTitle>Create Standing Approval</DialogTitle>
               <DialogDescription>
-                {`Step ${step} of 4: ${STEP_LABELS[step]}`}
+                {hasInitialContext
+                  ? `Step ${step - 2} of 2: ${STEP_LABELS[step]}`
+                  : `Step ${step} of 4: ${STEP_LABELS[step]}`}
               </DialogDescription>
             </>
           )}
