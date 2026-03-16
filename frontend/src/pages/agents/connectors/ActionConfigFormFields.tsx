@@ -171,7 +171,9 @@ export function buildParametersFromForm(
     }
 
     // Auto-detect pattern: any value containing "*" is a glob pattern.
-    if (value.includes("*")) {
+    // Also preserves legacy "pattern" mode for backward compatibility
+    // (e.g. existing $pattern values without * created by the old UI).
+    if (value.includes("*") || paramModes?.[key] === "pattern") {
       parameters[key] = { $pattern: value };
       continue;
     }

@@ -201,18 +201,16 @@ function ParameterField({
           placeholder={widgetPlaceholder}
         />
         <label
-          htmlFor={`any-value-${paramKey}`}
           className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap"
         >
           <Checkbox
-            id={`any-value-${paramKey}`}
             checked={isWildcard}
             disabled={disabled}
             onCheckedChange={(checked) => {
-              if (checked) {
+              if (checked === true) {
                 onModeChange(paramKey, "wildcard");
                 onValueChange(paramKey, "*");
-              } else {
+              } else if (checked === false) {
                 onModeChange(paramKey, "fixed");
                 onValueChange(paramKey, "");
               }
