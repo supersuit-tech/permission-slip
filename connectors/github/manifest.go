@@ -690,6 +690,44 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:  "github.create_repo",
+				Name:        "Create Repository",
+				Description: "Create a new repository for the authenticated user or an organization",
+				RiskLevel:   "medium",
+				Preview: &connectors.ActionPreview{
+					Layout: "record",
+					Fields: map[string]string{"title": "name", "subtitle": "org"},
+				},
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["name"],
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "Repository name"
+						},
+						"org": {
+							"type": "string",
+							"description": "Organization to create the repository in (omit to create under the authenticated user)"
+						},
+						"description": {
+							"type": "string",
+							"description": "Repository description"
+						},
+						"private": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether the repository is private"
+						},
+						"auto_init": {
+							"type": "boolean",
+							"default": false,
+							"description": "Whether to initialize with a README"
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -873,6 +911,21 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search issues and PRs",
 				Description: "Agent can search issues and pull requests across all accessible repositories.",
 				Parameters:  json.RawMessage(`{"q":"*","sort":"*","order":"*","per_page":"*"}`),
+			},
+			// --- Repo creation templates ---
+			{
+				ID:          "tpl_github_create_repo",
+				ActionType:  "github.create_repo",
+				Name:        "Create repositories",
+				Description: "Agent can create repositories for the authenticated user or any organization.",
+				Parameters:  json.RawMessage(`{"name":"*","org":"*","description":"*","private":"*","auto_init":"*"}`),
+			},
+			{
+				ID:          "tpl_github_create_repo_private",
+				ActionType:  "github.create_repo",
+				Name:        "Create private repositories only",
+				Description: "Agent can create repositories but they must be private.",
+				Parameters:  json.RawMessage(`{"name":"*","org":"*","description":"*","private":true,"auto_init":"*"}`),
 			},
 		},
 	}

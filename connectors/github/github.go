@@ -70,6 +70,7 @@ func (c *GitHubConnector) Actions() map[string]connectors.Action {
 		"github.create_webhook":        &createWebhookAction{conn: c},
 		"github.search_code":           &searchCodeAction{conn: c},
 		"github.search_issues":         &searchIssuesAction{conn: c},
+		"github.create_repo":           &createRepoAction{conn: c},
 	}
 }
 
