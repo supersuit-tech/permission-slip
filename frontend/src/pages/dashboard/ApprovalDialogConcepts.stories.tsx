@@ -126,15 +126,11 @@ function ConceptA() {
           </div>
 
           {/* Raw parameters — styled toggle button */}
-          <button
-            type="button"
-            onClick={() => setShowRaw(!showRaw)}
-            className="flex w-full items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
-          >
-            <Code2 className="size-3.5" />
-            <span>Raw parameters</span>
-            <ChevronDown className={`ml-auto size-3.5 transition-transform ${showRaw ? "rotate-180" : ""}`} />
-          </button>
+              <button
+                type="button"
+                onClick={() => setShowRaw(!showRaw)}
+                aria-expanded={showRaw}
+                className="bg-background text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-3 text-xs font-medium transition-colors"
           {showRaw && (
             <div className="rounded-lg border bg-muted/30 p-3 sm:p-4">
               <SchemaParameterDetails parameters={emailParams} schema={emailSchema} />
