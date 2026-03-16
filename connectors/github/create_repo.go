@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -25,6 +26,7 @@ type createRepoParams struct {
 }
 
 func (p *createRepoParams) validate() error {
+	p.Name = strings.TrimSpace(p.Name)
 	if err := validateRepoName(p.Name); err != nil {
 		return err
 	}
@@ -47,9 +49,10 @@ func (a *createRepoAction) Execute(ctx context.Context, req connectors.ActionReq
 		ghBody["description"] = params.Description
 	}
 
+	org := strings.TrimSpace(params.Org)
 	var path string
-	if params.Org != "" {
-		path = fmt.Sprintf("/orgs/%s/repos", url.PathEscape(params.Org))
+	if org != "" {
+		path = fmt.Sprintf("/orgs/%s/repos", url.PathEscape(org))
 	} else {
 		path = "/user/repos"
 	}

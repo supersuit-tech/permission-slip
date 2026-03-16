@@ -115,10 +115,9 @@ func setPagination(q url.Values, perPage, page int) {
 var repoNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 // validateRepoName checks that a repository name is valid per GitHub's naming rules.
-// Names must be non-empty after trimming whitespace and contain only alphanumeric
-// characters, hyphens, underscores, and dots.
+// Names must be non-empty and contain only alphanumeric characters, hyphens,
+// underscores, and dots. Callers should TrimSpace before calling.
 func validateRepoName(name string) error {
-	name = strings.TrimSpace(name)
 	if name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}
