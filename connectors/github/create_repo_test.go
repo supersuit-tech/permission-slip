@@ -265,6 +265,10 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 			params: `{"name":".."}`,
 		},
 		{
+			name:   "name ending in .git",
+			params: `{"name":"myrepo.git"}`,
+		},
+		{
 			name:   "invalid characters in name",
 			params: `{"name":"my repo/here"}`,
 		},
@@ -283,6 +287,14 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 		{
 			name:   "invalid org name with underscores",
 			params: `{"name":"valid-repo","org":"my_org"}`,
+		},
+		{
+			name:   "invalid org name leading hyphen",
+			params: `{"name":"valid-repo","org":"-leading"}`,
+		},
+		{
+			name:   "invalid org name trailing hyphen",
+			params: `{"name":"valid-repo","org":"trailing-"}`,
 		},
 		{
 			name:   "invalid JSON",

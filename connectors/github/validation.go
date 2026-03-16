@@ -114,8 +114,9 @@ func setPagination(q url.Values, perPage, page int) {
 // repoNameRe matches valid GitHub repository names: alphanumeric, hyphen, underscore, dot.
 var repoNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
-// orgNameRe matches valid GitHub organization/user names: alphanumeric and hyphens only.
-var orgNameRe = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+// orgNameRe matches valid GitHub organization/user names: alphanumeric and hyphens,
+// must start and end with an alphanumeric character.
+var orgNameRe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$`)
 
 // validateRepoName checks that a repository name is valid per GitHub's naming rules.
 // Names must be non-empty and contain only alphanumeric characters, hyphens,
@@ -126,6 +127,9 @@ func validateRepoName(name string) error {
 	}
 	if name == "." || name == ".." {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid repository name %q: '.' and '..' are reserved", name)}
+	}
+	if strings.HasSuffix(name, ".git") {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid repository name %q: names ending with '.git' are reserved", name)}
 	}
 	if len(name) > 100 {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid repository name: must not exceed 100 characters (got %d)", len(name))}
