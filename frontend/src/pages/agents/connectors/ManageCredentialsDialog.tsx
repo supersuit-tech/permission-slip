@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -611,7 +612,11 @@ function StaticCredentialRow({
             !binding?.credential_id &&
             !binding?.oauth_connection_id
           ) {
-            assign({ agentId, connectorId, credentialId }).catch(() => {});
+            assign({ agentId, connectorId, credentialId })
+              .then(() => {
+                toast.success("Credential assigned to this agent.");
+              })
+              .catch(() => {});
           }
         }}
       />

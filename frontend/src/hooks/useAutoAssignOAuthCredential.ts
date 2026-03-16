@@ -44,8 +44,12 @@ export function useAutoAssignOAuthCredential(
       .then(() => {
         toast.success("OAuth connection assigned to this agent.");
       })
-      .catch(() => {
-        // Assignment failed — user can still assign manually via dropdown
+      .catch((err) => {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : "Could not auto-assign credential — please select it manually.",
+        );
       });
   }, [bindingLoading]); // eslint-disable-line react-hooks/exhaustive-deps -- run once when binding loads
 }
