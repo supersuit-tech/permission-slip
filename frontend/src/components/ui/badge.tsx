@@ -26,7 +26,7 @@ const badgeVariants = cva(
         "success-soft":
           "border-success/20 bg-success/10 text-success [a&]:hover:bg-success/15",
         "warning-soft":
-          "border-warning/20 bg-warning/10 text-warning/80 [a&]:hover:bg-warning/15",
+          "border-transparent bg-[var(--warning-soft-bg)] text-[var(--warning-soft-text)] [a&]:hover:opacity-90",
         "info-soft":
           "border-info/20 bg-info/10 text-info [a&]:hover:bg-info/15",
         "destructive-soft":
