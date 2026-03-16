@@ -255,7 +255,7 @@ export function ReviewApprovalDialog({
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
                   <span className="text-sm font-bold text-violet-700 dark:text-violet-300" aria-hidden="true">
-                    {agentDisplayName.slice(0, 2).toUpperCase()}
+                    {getInitials(agentDisplayName)}
                   </span>
                 </div>
                 <div className="min-w-0">
