@@ -247,21 +247,30 @@ function ApprovalDialogStory({
             />
           </div>
 
-          {/* Raw parameters (collapsible, centered divider toggle) */}
+          {/* Raw parameters (collapsible pill toggle) */}
           {hasParams && (
-            <details className="group" open={rawOpen} onToggle={(e) => setRawOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="flex cursor-pointer items-center select-none [&::-webkit-details-marker]:hidden [list-style:none]">
-                <div className="border-border w-full border-t" />
-                <span className="text-muted-foreground hover:text-foreground bg-background inline-flex shrink-0 items-center gap-1.5 px-3 text-xs font-medium transition-colors">
-                  <span className="transition-transform group-open:rotate-90" aria-hidden="true">&#9656;</span>
-                  Parameters
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setRawOpen((o) => !o)}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+                aria-expanded={rawOpen}
+              >
+                <span
+                  className="transition-transform duration-150"
+                  style={{ display: "inline-block", transform: rawOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+                  aria-hidden="true"
+                >
+                  &#9656;
                 </span>
-                <div className="border-border w-full border-t" />
-              </summary>
-              <div className="bg-muted/30 mt-3 overflow-x-auto rounded-lg border p-3 sm:p-4">
-                <SchemaParameterDetails parameters={parameters} schema={schema} />
-              </div>
-            </details>
+                Parameters
+              </button>
+              {rawOpen && (
+                <div className="bg-muted/30 overflow-x-auto rounded-xl border p-3 sm:p-4">
+                  <SchemaParameterDetails parameters={parameters} schema={schema} />
+                </div>
+              )}
+            </div>
           )}
 
           {/* Expired notice */}
@@ -1608,4 +1617,271 @@ export const SlackSearchMessages: Story = {
       },
     },
   },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI CONCEPTS — Parameters toggle + line-height fixes
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Shared email params for concepts
+const CONCEPT_EMAIL_PARAMS = {
+  to: "alice@example.com",
+  subject: "Weekly standup notes — March 16",
+  body: "Hi Alice,\n\nHere are this week's standup notes. The team made great progress on the API migration and the new dashboard is nearly ready for QA.\n\nBest,\nChiedobot",
+};
+
+const CONCEPT_EMAIL_SCHEMA = {
+  type: "object" as const,
+  required: ["to", "subject", "body"],
+  properties: {
+    to: { type: "string" as const, description: "Recipient email address" },
+    subject: { type: "string" as const, description: "Email subject line" },
+    body: { type: "string" as const, description: "Email body (plain text)" },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Concept A: "Pill Toggle" — small pill button left-aligned, box below
+// ---------------------------------------------------------------------------
+
+function ConceptA() {
+  const [open, setOpen] = useState(false);
+  const params = CONCEPT_EMAIL_PARAMS;
+  const schema = CONCEPT_EMAIL_SCHEMA;
+
+  return (
+    <Dialog open>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <ConnectorLogo name="Google" logoSvg={GOOGLE_LOGO} size="lg" />
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base">Send Email</DialogTitle>
+              <p className="text-muted-foreground text-sm">Google</p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 sm:space-y-5">
+          {/* Agent row */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100">
+                <span className="text-sm font-bold text-violet-700">CB</span>
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">Chiedobot</p>
+                <p className="text-muted-foreground text-xs">wants to perform an action</p>
+              </div>
+            </div>
+            <Badge variant="warning-soft" className="shrink-0 uppercase">Pending</Badge>
+          </div>
+
+          {/* Action header */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="truncate text-sm font-semibold">Send Email</span>
+              <div className="flex items-center gap-2">
+                <RiskBadge level="medium" />
+                <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+                  <Clock className="size-3" />
+                  9:30
+                </span>
+              </div>
+            </div>
+
+            {/* CONCEPT A: Email preview with line-height fix */}
+            <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-blue-200">
+                  <svg className="size-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </div>
+                <span className="text-muted-foreground text-xs font-medium">Email</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs font-medium">To</span>
+                  <span className="truncate text-sm font-medium">{params.to}</span>
+                </div>
+                <p className="truncate text-base font-semibold">{params.subject}</p>
+                {/* FIX: whitespace-pre-line preserves \n, leading-relaxed adds breathing room */}
+                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line line-clamp-4">
+                  {params.body}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* CONCEPT A: Parameters — pill button toggle, clean rounded box */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+            >
+              <span
+                className="transition-transform duration-150"
+                style={{ display: "inline-block", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+                aria-hidden="true"
+              >
+                ▸
+              </span>
+              Parameters
+            </button>
+            {open && (
+              <div className="bg-muted/30 overflow-x-auto rounded-xl border p-3 sm:p-4">
+                <SchemaParameterDetails parameters={params} schema={schema} />
+              </div>
+            )}
+          </div>
+
+          {/* Buttons */}
+          <div className="space-y-2 pt-2">
+            <Button size="lg" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
+              <Check className="mr-1 size-4" /> Approve
+            </Button>
+            <Button variant="outline" size="lg" className="w-full">Deny</Button>
+            <button
+              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
+              type="button"
+            >
+              <ShieldCheck className="size-3" />
+              Always allow this action
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Concept B: "Boxed Section" — whole parameters area is one rounded box
+// ---------------------------------------------------------------------------
+
+function ConceptB() {
+  const [open, setOpen] = useState(false);
+  const params = CONCEPT_EMAIL_PARAMS;
+  const schema = CONCEPT_EMAIL_SCHEMA;
+
+  return (
+    <Dialog open>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <ConnectorLogo name="Google" logoSvg={GOOGLE_LOGO} size="lg" />
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base">Send Email</DialogTitle>
+              <p className="text-muted-foreground text-sm">Google</p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 sm:space-y-5">
+          {/* Agent row */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100">
+                <span className="text-sm font-bold text-violet-700">CB</span>
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">Chiedobot</p>
+                <p className="text-muted-foreground text-xs">wants to perform an action</p>
+              </div>
+            </div>
+            <Badge variant="warning-soft" className="shrink-0 uppercase">Pending</Badge>
+          </div>
+
+          {/* Action header */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="truncate text-sm font-semibold">Send Email</span>
+              <div className="flex items-center gap-2">
+                <RiskBadge level="medium" />
+                <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+                  <Clock className="size-3" />
+                  9:30
+                </span>
+              </div>
+            </div>
+
+            {/* CONCEPT B: Email preview with line-height fix */}
+            <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-blue-50 ring-1 ring-blue-200">
+                  <svg className="size-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </div>
+                <span className="text-muted-foreground text-xs font-medium">Email</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs font-medium">To</span>
+                  <span className="truncate text-sm font-medium">{params.to}</span>
+                </div>
+                <p className="truncate text-base font-semibold">{params.subject}</p>
+                {/* FIX: whitespace-pre-line + leading-loose for clear paragraph breaks */}
+                <p className="text-muted-foreground text-sm leading-loose whitespace-pre-line line-clamp-4">
+                  {params.body}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* CONCEPT B: Parameters — single rounded box, toggle is the header row */}
+          <div className="overflow-hidden rounded-xl border">
+            {/* Toggle header — full-width button, rounded corners only if closed */}
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className="bg-muted/40 hover:bg-muted/70 flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors"
+            >
+              <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                Parameters
+              </span>
+              <span
+                className="text-muted-foreground transition-transform duration-150"
+                style={{ display: "inline-block", transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+                aria-hidden="true"
+              >
+                ▸
+              </span>
+            </button>
+            {/* Content — separated by inner border */}
+            {open && (
+              <div className="border-t p-3 sm:p-4">
+                <SchemaParameterDetails parameters={params} schema={schema} />
+              </div>
+            )}
+          </div>
+
+          {/* Buttons */}
+          <div className="space-y-2 pt-2">
+            <Button size="lg" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
+              <Check className="mr-1 size-4" /> Approve
+            </Button>
+            <Button variant="outline" size="lg" className="w-full">Deny</Button>
+            <button
+              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
+              type="button"
+            >
+              <ShieldCheck className="size-3" />
+              Always allow this action
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export const UIConceptA: Story = {
+  name: "UI Concept A: Pill Toggle",
+  render: () => <ConceptA />,
+  args: {} as never,
+};
+
+export const UIConceptB: Story = {
+  name: "UI Concept B: Boxed Section",
+  render: () => <ConceptB />,
+  args: {} as never,
 };

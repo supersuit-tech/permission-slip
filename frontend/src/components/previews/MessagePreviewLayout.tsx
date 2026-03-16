@@ -49,7 +49,7 @@ export function MessagePreviewLayout({
           </p>
         )}
         {body && (
-          <p className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
+          <p className="text-muted-foreground line-clamp-4 text-sm leading-relaxed whitespace-pre-line">
             {truncate(body, 200)}
           </p>
         )}

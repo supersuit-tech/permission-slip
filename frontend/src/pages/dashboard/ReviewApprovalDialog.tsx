@@ -117,6 +117,7 @@ export function ReviewApprovalDialog({
   const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
   const [autoCloseBlocked, setAutoCloseBlocked] = useState(false);
   const [pendingAction, setPendingAction] = useState<"approve" | "alwaysAllow" | null>(null);
+  const [paramsOpen, setParamsOpen] = useState(false);
   const isApproved = approveResult !== null;
   const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
@@ -309,24 +310,33 @@ export function ReviewApprovalDialog({
               />
             </div>
 
-            {/* Raw parameters (collapsible, centered divider toggle) */}
+            {/* Raw parameters (collapsible pill toggle) */}
             {hasParams && (
-              <details className="group">
-                <summary className="flex cursor-pointer items-center select-none [&::-webkit-details-marker]:hidden [list-style:none]">
-                  <div className="border-border w-full border-t" />
-                  <span className="text-muted-foreground hover:text-foreground bg-background inline-flex shrink-0 items-center gap-1.5 px-3 text-xs font-medium transition-colors">
-                    <span className="transition-transform group-open:rotate-90" aria-hidden="true">&#9656;</span>
-                    Parameters
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setParamsOpen((o) => !o)}
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+                  aria-expanded={paramsOpen}
+                >
+                  <span
+                    className="transition-transform duration-150"
+                    style={{ display: "inline-block", transform: paramsOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+                    aria-hidden="true"
+                  >
+                    &#9656;
                   </span>
-                  <div className="border-border w-full border-t" />
-                </summary>
-                <div className="bg-muted/30 mt-3 overflow-x-auto rounded-lg border p-3 sm:p-4">
-                  <SchemaParameterDetails
-                    parameters={params}
-                    schema={schema}
-                  />
-                </div>
-              </details>
+                  Parameters
+                </button>
+                {paramsOpen && (
+                  <div className="bg-muted/30 overflow-x-auto rounded-xl border p-3 sm:p-4">
+                    <SchemaParameterDetails
+                      parameters={params}
+                      schema={schema}
+                    />
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Expired notice */}
