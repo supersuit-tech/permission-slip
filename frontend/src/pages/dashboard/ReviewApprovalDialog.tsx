@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Loader2, Clock, AlertTriangle, CheckCircle, XCircle, ShieldCheck, Check } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ export function ReviewApprovalDialog({
   const isApproved = approveResult !== null;
   const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
-  const { schema, actionName, displayTemplate, preview, connectorName, connectorLogoSvg } =
+  const { schema, actionName, displayTemplate, preview, connectorName, connectorLogoSvg, isLoading: schemaLoading } =
     useActionSchema(approval.action.type);
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
@@ -211,21 +212,34 @@ export function ReviewApprovalDialog({
         {/* Connector header with logo, action name, and connector name */}
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <ConnectorLogo
-              name={connectorName ?? approval.action.type}
-              logoSvg={connectorLogoSvg}
-              size="lg"
-            />
-            <div className="min-w-0">
-              <DialogTitle className="truncate text-base">
-                {actionName ?? approval.action.type}
-              </DialogTitle>
-              {connectorName && (
-                <p className="text-muted-foreground text-sm">
-                  {connectorName}
-                </p>
-              )}
-            </div>
+            {schemaLoading ? (
+              <>
+                <Skeleton className="size-10 rounded-lg shrink-0" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <DialogTitle className="sr-only">Loading action details…</DialogTitle>
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </>
+            ) : (
+              <>
+                <ConnectorLogo
+                  name={connectorName ?? approval.action.type}
+                  logoSvg={connectorLogoSvg}
+                  size="lg"
+                />
+                <div className="min-w-0">
+                  <DialogTitle className="truncate text-base">
+                    {actionName ?? approval.action.type}
+                  </DialogTitle>
+                  {connectorName && (
+                    <p className="text-muted-foreground text-sm">
+                      {connectorName}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </DialogHeader>
 
@@ -298,16 +312,29 @@ export function ReviewApprovalDialog({
                 </p>
               )}
 
-              {/* Preview card — connector-driven or fallback */}
-              <ActionPreviewCard
-                preview={preview}
-                parameters={params}
-                actionType={approval.action.type}
-                schema={schema}
-                actionName={actionName}
-                displayTemplate={displayTemplate}
-                resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
-              />
+              {/* Preview card — show skeleton while connector metadata loads */}
+              {schemaLoading ? (
+                <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="size-10 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              ) : (
+                <ActionPreviewCard
+                  preview={preview}
+                  parameters={params}
+                  actionType={approval.action.type}
+                  schema={schema}
+                  actionName={actionName}
+                  displayTemplate={displayTemplate}
+                  resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
+                />
+              )}
             </div>
 
             {/* Raw parameters (collapsible pill toggle) */}
