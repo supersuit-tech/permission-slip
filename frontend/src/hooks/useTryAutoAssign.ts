@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   useAgentConnectorCredential,
@@ -21,11 +21,13 @@ export function useTryAutoAssign(
   const { binding, isLoading: bindingLoading } =
     useAgentConnectorCredential(effectiveId, connectorId);
   const { assign } = useAssignAgentConnectorCredential();
+  const bindingRef = useRef(binding);
+  bindingRef.current = binding;
 
   const tryAssign = useCallback(
     (params: { credentialId?: string; oauthConnectionId?: string }) => {
       if (!effectiveId || effectiveId <= 0) return;
-      if (binding?.credential_id || binding?.oauth_connection_id) return;
+      if (bindingRef.current?.credential_id || bindingRef.current?.oauth_connection_id) return;
 
       assign({
         agentId: effectiveId,
@@ -48,7 +50,7 @@ export function useTryAutoAssign(
           );
         });
     },
-    [effectiveId, connectorId, binding, assign],
+    [effectiveId, connectorId, assign],
   );
 
   return { tryAssign, bindingLoading };

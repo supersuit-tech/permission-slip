@@ -30,9 +30,11 @@ export function useAutoAssignOAuthCredential(
 
     firedRef.current = true;
 
-    // Clean up the param from the URL
-    params.delete("oauth_connection_id");
-    setSearchParams(params, { replace: true });
+    // Clean up the param from the URL (work on a copy to avoid mutating
+    // the live URLSearchParams instance before React Router re-renders).
+    const cleaned = new URLSearchParams(params);
+    cleaned.delete("oauth_connection_id");
+    setSearchParams(cleaned, { replace: true });
 
     // connectionId comes from the URL (set by our backend's OAuth redirect).
     // The assign endpoint validates ownership and provider match server-side.

@@ -75,7 +75,8 @@ export function AddCredentialDialog({
       toast.success(`Credentials stored for ${credential.service}`);
       resetForm();
       onOpenChange(false);
-      onSuccess?.(result?.id ?? "");
+      if (!result?.id) throw new Error("Unexpected response: missing credential id");
+      onSuccess?.(result.id);
     } catch (err) {
       toast.error(
         err instanceof Error
