@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { type OutcomeFilter, ALL_OUTCOME_FILTERS } from "@/lib/auditEvents";
 import { getAgentDisplayName } from "@/lib/agents";
 import type { Agent } from "@/hooks/useAgents";
@@ -86,21 +85,24 @@ export function ActivityFilters({
 
       {/* Outcome filter tabs */}
       <div
-        className="flex flex-wrap gap-1"
+        className="inline-flex gap-0.5 rounded-lg bg-muted p-1"
         role="tablist"
         aria-label="Filter activity by outcome"
       >
         {ALL_OUTCOME_FILTERS.map((f) => (
-          <Button
+          <button
             key={f.value}
-            variant={outcomeFilter === f.value ? "default" : "ghost"}
-            size="sm"
             role="tab"
             aria-selected={outcomeFilter === f.value}
             onClick={() => onOutcomeChange(f.value)}
+            className={
+              outcomeFilter === f.value
+                ? "rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+                : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            }
           >
             {f.label}
-          </Button>
+          </button>
         ))}
       </div>
     </div>

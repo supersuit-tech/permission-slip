@@ -39,21 +39,24 @@ function OutcomeFilterTabs({
 }) {
   return (
     <div
-      className="flex flex-wrap gap-1"
+      className="inline-flex gap-0.5 rounded-lg bg-muted p-1"
       role="tablist"
       aria-label="Filter activity by outcome"
     >
       {OUTCOME_FILTERS.map((f) => (
-        <Button
+        <button
           key={f.value}
-          variant={value === f.value ? "default" : "ghost"}
-          size="sm"
           role="tab"
           aria-selected={value === f.value}
           onClick={() => onChange(f.value)}
+          className={
+            value === f.value
+              ? "rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+              : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+          }
         >
           {f.label}
-        </Button>
+        </button>
       ))}
     </div>
   );
