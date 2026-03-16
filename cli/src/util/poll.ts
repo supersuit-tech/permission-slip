@@ -17,6 +17,8 @@ export interface PollOptions {
   timeoutSeconds: number;
   /** Fixed polling interval in seconds. When set, disables exponential backoff. */
   fixedIntervalSeconds?: number;
+  /** Maximum backoff interval in seconds (default: 512). Only used with exponential backoff. */
+  maxBackoffSeconds?: number;
   /** Called after each poll while still pending. Use for progress messages. */
   onPoll?: (info: { status: string; elapsed: number; timeout: number }) => void;
 }
@@ -73,7 +75,7 @@ export async function pollUntilResolved(
   const deadline = start + opts.timeoutSeconds * 1000;
   const useFixedInterval = opts.fixedIntervalSeconds !== undefined;
   let interval = useFixedInterval ? Math.max(1, opts.fixedIntervalSeconds!) * 1000 : 2000;
-  const maxInterval = 5000; // cap at 5 seconds (only used with backoff)
+  const maxInterval = useFixedInterval ? Infinity : (opts.maxBackoffSeconds ?? 512) * 1000;
 
   while (Date.now() < deadline) {
     try {
@@ -98,7 +100,7 @@ export async function pollUntilResolved(
 
     await sleep(Math.min(interval, remaining));
     if (!useFixedInterval) {
-      interval = Math.min(Math.ceil(interval * 1.5), maxInterval);
+      interval = Math.min(interval * 2, maxInterval);
     }
   }
 

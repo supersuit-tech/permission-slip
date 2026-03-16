@@ -3,8 +3,8 @@
  *
  * Requests one-off approval for an action. Returns immediately by default
  * with the approval_id and a next_step hint. Pass --wait to block until
- * the approval is resolved, or --poll to poll at a regular interval with
- * a configurable timeout (ideal for agents).
+ * the approval is resolved, or --poll to poll with exponential backoff
+ * (2s → 4s → … → 512s) until resolved or timed out (ideal for agents).
  */
 
 import type { Command } from "commander";
@@ -17,6 +17,8 @@ import { pollUntilResolved, parseTimeout } from "../util/poll.js";
 const DEFAULT_POLL_INTERVAL = 5;
 const MIN_POLL_INTERVAL = 1;
 const MAX_POLL_INTERVAL = 300;
+
+const DEFAULT_POLL_TIMEOUT = 3600;
 
 /** Parses and clamps --poll-interval to a valid range. */
 function parsePollInterval(value: string): number {
@@ -52,9 +54,9 @@ export function requestCommand(program: Command): void {
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--wait", "Block until the approval is resolved (default: return immediately)")
     .option("--timeout <seconds>", "Max seconds to wait when using --wait (default: 120)", "120")
-    .option("--poll", "Submit and poll for approval at a regular interval (default: return immediately)")
-    .option("--poll-interval <seconds>", "Seconds between polls when using --poll (default: 5)", "5")
-    .option("--poll-timeout <seconds>", "Max seconds to poll before giving up (default: 600)", "600")
+    .option("--poll", "Poll with exponential backoff until resolved (default: return immediately)")
+    .option("--poll-interval <seconds>", "Use fixed polling interval instead of exponential backoff")
+    .option("--poll-timeout <seconds>", `Max seconds to poll before giving up (default: ${DEFAULT_POLL_TIMEOUT})`, String(DEFAULT_POLL_TIMEOUT))
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       action: string;
@@ -66,7 +68,7 @@ export function requestCommand(program: Command): void {
       wait?: boolean;
       timeout: string;
       poll?: boolean;
-      pollInterval: string;
+      pollInterval?: string;
       pollTimeout: string;
       pretty?: boolean;
     }) => {
@@ -97,12 +99,10 @@ export function requestCommand(program: Command): void {
         if (!opts.wait && opts.timeout !== "120") {
           process.stderr.write("Warning: --timeout has no effect without --wait\n");
         }
-        // Note: these comparisons miss the case where the flag is explicitly passed
-        // with its default value, but this is consistent with the --timeout guard.
-        if (!opts.poll && opts.pollInterval !== "5") {
+        if (!opts.poll && opts.pollInterval !== undefined) {
           process.stderr.write("Warning: --poll-interval has no effect without --poll\n");
         }
-        if (!opts.poll && opts.pollTimeout !== "600") {
+        if (!opts.poll && opts.pollTimeout !== String(DEFAULT_POLL_TIMEOUT)) {
           process.stderr.write("Warning: --poll-timeout has no effect without --poll\n");
         }
 
@@ -125,23 +125,30 @@ export function requestCommand(program: Command): void {
         }
 
         if (opts.poll) {
-          // --poll: submit and poll at a regular interval.
-          const pollInterval = parsePollInterval(opts.pollInterval);
+          // --poll: exponential backoff by default, or fixed interval with --poll-interval.
           const timeoutSeconds = parseTimeout(
             opts.pollTimeout,
             undefined,
-            { flagName: "--poll-timeout", defaultTimeout: 600 },
+            { flagName: "--poll-timeout", defaultTimeout: DEFAULT_POLL_TIMEOUT },
           );
 
+          const fixedIntervalSeconds = opts.pollInterval !== undefined
+            ? parsePollInterval(opts.pollInterval)
+            : undefined;
+
+          const intervalDesc = fixedIntervalSeconds !== undefined
+            ? `every ${fixedIntervalSeconds}s`
+            : "with exponential backoff";
+
           process.stderr.write(
-            `Polling for approval every ${pollInterval}s (timeout ${timeoutSeconds}s)... Approve at ${result.approval_url}\n`,
+            `Polling for approval ${intervalDesc} (timeout ${timeoutSeconds}s)... Approve at ${result.approval_url}\n`,
           );
 
           const statusResult = await pollUntilResolved({
             approvalId: result.approval_id,
             client,
             timeoutSeconds,
-            fixedIntervalSeconds: pollInterval,
+            fixedIntervalSeconds,
             onPoll: ({ elapsed, timeout }) => {
               process.stderr.write(
                 `Polling... ${elapsed}s / ${timeout}s\n`,
