@@ -1,10 +1,9 @@
 /**
  * CreateStandingApprovalDialog — Storybook stories
  *
- * Renders each step of the "Create Standing Approval" wizard. The constraint
- * step (Step 3) is rendered inline to avoid importing ActionConfigParameterFields
- * which pulls in Radix primitives that can cause React-context issues in
- * Storybook. Steps 1, 2, and 4 use the real presentational sub-components.
+ * Renders each step of the "Create Standing Approval" wizard.
+ * Steps 1, 2, and 4 use the real presentational sub-components.
+ * Step 3 uses ParameterFieldWidget directly (leaf component, no Radix context issues).
  */
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
@@ -13,8 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ParameterFieldWidget } from "@/pages/agents/connectors/ParameterFieldWidget";
 import {
   Dialog,
   DialogContent,
@@ -225,11 +224,11 @@ function StoryConstraintField({
         <p className="text-muted-foreground text-sm">{property.description}</p>
       )}
       <div className="flex items-center gap-2">
-        <Input
-          id={`param-${paramKey}`}
-          type="text"
+        <ParameterFieldWidget
+          paramKey={paramKey}
+          property={property}
           value={isWildcard ? "" : value}
-          onChange={(e) => onValueChange(paramKey, e.target.value)}
+          onChange={(v) => onValueChange(paramKey, v)}
           disabled={isWildcard}
           placeholder={isWildcard ? "Agent can use any value" : undefined}
           className={isWildcard ? "bg-muted" : ""}
