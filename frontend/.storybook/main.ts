@@ -13,7 +13,7 @@ const config: StorybookConfig = {
   },
   core: {
     // Allow external hosts (e.g. ngrok tunnels for remote preview)
-    allowedHosts: "all",
+    allowedHosts: true as unknown as string[],
   },
   viteFinal: (config) => {
     // Filter out the Sentry plugin — it warns about missing env vars
