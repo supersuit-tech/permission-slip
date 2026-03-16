@@ -29,6 +29,10 @@ export function SegmentedControl<T extends string>({
         next = (idx + 1) % options.length;
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         next = (idx - 1 + options.length) % options.length;
+      } else if (e.key === "Home") {
+        next = 0;
+      } else if (e.key === "End") {
+        next = options.length - 1;
       }
 
       if (next >= 0) {
