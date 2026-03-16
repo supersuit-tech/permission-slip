@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { type OutcomeFilter, ALL_OUTCOME_FILTERS } from "@/lib/auditEvents";
 import { getAgentDisplayName } from "@/lib/agents";
 import type { Agent } from "@/hooks/useAgents";
@@ -85,24 +85,12 @@ export function ActivityFilters({
       </div>
 
       {/* Outcome filter tabs */}
-      <div
-        className="flex flex-wrap gap-1"
-        role="tablist"
-        aria-label="Filter activity by outcome"
-      >
-        {ALL_OUTCOME_FILTERS.map((f) => (
-          <Button
-            key={f.value}
-            variant={outcomeFilter === f.value ? "default" : "ghost"}
-            size="sm"
-            role="tab"
-            aria-selected={outcomeFilter === f.value}
-            onClick={() => onOutcomeChange(f.value)}
-          >
-            {f.label}
-          </Button>
-        ))}
-      </div>
+      <SegmentedControl
+        options={ALL_OUTCOME_FILTERS}
+        value={outcomeFilter}
+        onChange={onOutcomeChange}
+        ariaLabel="Filter activity by outcome"
+      />
     </div>
   );
 }

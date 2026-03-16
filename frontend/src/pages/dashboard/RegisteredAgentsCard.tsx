@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Bot, Settings, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { CopyableCode } from "@/components/CopyableCode";
 import { LimitBadge } from "@/components/LimitBadge";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
@@ -144,6 +145,13 @@ function AgentRow({ agent }: { agent: Agent }) {
   );
 }
 
+const STATUS_FILTER_OPTIONS: { label: string; value: StatusFilter }[] = [
+  { label: "Active", value: "active" },
+  { label: "Pending", value: "pending" },
+  { label: "Deactivated", value: "deactivated" },
+  { label: "All", value: "all" },
+];
+
 function StatusFilterTabs({
   value,
   onChange,
@@ -151,28 +159,13 @@ function StatusFilterTabs({
   value: StatusFilter;
   onChange: (v: StatusFilter) => void;
 }) {
-  const filters: { label: string; value: StatusFilter }[] = [
-    { label: "Active", value: "active" },
-    { label: "Pending", value: "pending" },
-    { label: "Deactivated", value: "deactivated" },
-    { label: "All", value: "all" },
-  ];
-
   return (
-    <div className="flex gap-1" role="tablist" aria-label="Filter agents by status">
-      {filters.map((f) => (
-        <Button
-          key={f.value}
-          variant={value === f.value ? "default" : "ghost"}
-          size="sm"
-          role="tab"
-          aria-selected={value === f.value}
-          onClick={() => onChange(f.value)}
-        >
-          {f.label}
-        </Button>
-      ))}
-    </div>
+    <SegmentedControl
+      options={STATUS_FILTER_OPTIONS}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Filter agents by status"
+    />
   );
 }
 

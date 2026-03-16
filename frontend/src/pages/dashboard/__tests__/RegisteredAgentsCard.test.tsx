@@ -211,11 +211,11 @@ describe("RegisteredAgentsCard", () => {
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Active" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Active" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Pending" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Deactivated" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Pending" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Deactivated" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "All" })).toBeInTheDocument();
   });
 
   it("filters agents by status when clicking filter tabs", async () => {
@@ -248,7 +248,7 @@ describe("RegisteredAgentsCard", () => {
     expect(screen.queryByText("Agent 2")).not.toBeInTheDocument();
 
     // Click "All" to show everything
-    await user.click(screen.getByRole("tab", { name: "All" }));
+    await user.click(screen.getByRole("radio", { name: "All" }));
     await waitFor(() => {
       expect(screen.getByText("Agent 2")).toBeInTheDocument();
     });
@@ -297,9 +297,9 @@ describe("RegisteredAgentsCard", () => {
 
     // Switch to "Pending" tab to see the pending agent.
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Pending" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Pending" })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("tab", { name: "Pending" }));
+    await user.click(screen.getByRole("radio", { name: "Pending" }));
 
     await waitFor(() => {
       expect(screen.getByText("XK7-M9P")).toBeInTheDocument();
@@ -329,9 +329,9 @@ describe("RegisteredAgentsCard", () => {
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Pending" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Pending" })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("tab", { name: "Pending" }));
+    await user.click(screen.getByRole("radio", { name: "Pending" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Expires/)).toBeInTheDocument();
@@ -358,9 +358,9 @@ describe("RegisteredAgentsCard", () => {
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Pending" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Pending" })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("tab", { name: "Pending" }));
+    await user.click(screen.getByRole("radio", { name: "Pending" }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Review/ })).toBeInTheDocument();
@@ -438,9 +438,9 @@ describe("RegisteredAgentsCard", () => {
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "Pending" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Pending" })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("tab", { name: "Pending" }));
+    await user.click(screen.getByRole("radio", { name: "Pending" }));
 
     await waitFor(() => {
       expect(screen.getByText("Awaiting verification")).toBeInTheDocument();

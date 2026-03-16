@@ -155,14 +155,14 @@ describe("RecentActivityCard", () => {
     render(<RecentActivityCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "All" })).toBeInTheDocument();
     });
     expect(
-      screen.getByRole("tab", { name: "Approved" }),
+      screen.getByRole("radio", { name: "Approved" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Denied" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Denied" })).toBeInTheDocument();
     expect(
-      screen.getByRole("tab", { name: "Auto-executed" }),
+      screen.getByRole("radio", { name: "Auto-executed" }),
     ).toBeInTheDocument();
   });
 
@@ -176,7 +176,7 @@ describe("RecentActivityCard", () => {
       expect(screen.getAllByText("My Bot")).toHaveLength(2);
     });
 
-    await user.click(screen.getByRole("tab", { name: "Denied" }));
+    await user.click(screen.getByRole("radio", { name: "Denied" }));
 
     await waitFor(() => {
       // The mock should have been called with the outcome filter

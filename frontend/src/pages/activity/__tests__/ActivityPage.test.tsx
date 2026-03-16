@@ -194,14 +194,14 @@ describe("ActivityPage", () => {
     render(<ActivityPage />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "All" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "All" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Approved" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Denied" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Auto-executed" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Cancelled" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Registered" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Deactivated" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Approved" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Denied" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Auto-executed" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Cancelled" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Registered" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Deactivated" })).toBeInTheDocument();
   });
 
   it("calls API with outcome filter when tab is clicked", async () => {
@@ -214,7 +214,7 @@ describe("ActivityPage", () => {
       expect(screen.getAllByText("My Bot").length).toBeGreaterThanOrEqual(2);
     });
 
-    await user.click(screen.getByRole("tab", { name: "Denied" }));
+    await user.click(screen.getByRole("radio", { name: "Denied" }));
 
     await waitFor(() => {
       expect(getLastAuditQuery(mockGet)?.outcome).toBe("denied");
