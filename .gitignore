@@ -26,5 +26,8 @@ mobile/src/api/schema.d.ts
 # only project-specific generated files need listing here)
 mobile/src/api/schema.d.ts
 
+# Storybook build output
+storybook-static/
+
 # Custom connectors config (user-specific, not checked in)
 custom-connectors.json
