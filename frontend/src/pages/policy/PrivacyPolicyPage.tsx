@@ -3,7 +3,7 @@ import { PolicyLayout } from "./PolicyLayout";
 
 export function PrivacyPolicyPage() {
   return (
-    <PolicyLayout title="Privacy Policy" lastUpdated="February 28, 2026">
+    <PolicyLayout title="Privacy Policy" lastUpdated="March 16, 2026">
       <p>
         Supersuit Technologies LLC
         (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), operates Permission
@@ -196,6 +196,12 @@ export function PrivacyPolicyPage() {
           services on your behalf
         </li>
       </ul>
+      <p>
+        Agent request payloads and connector responses are held transiently in
+        memory solely to process and route each request. This data is{" "}
+        <strong>not written to long-term storage</strong> and is discarded
+        within 24 hours. See Section 5 for retention details.
+      </p>
 
       <h2>5. Data Retention</h2>
       <table>
@@ -221,6 +227,10 @@ export function PrivacyPolicyPage() {
           <tr>
             <td>Payment records</td>
             <td>As required by law (typically 7 years)</td>
+          </tr>
+          <tr>
+            <td>Agent request payloads and connector responses</td>
+            <td>Up to 24 hours (transient processing only, not permanently stored)</td>
           </tr>
           <tr>
             <td>Notification logs</td>
