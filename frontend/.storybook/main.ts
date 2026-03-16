@@ -11,6 +11,10 @@ const config: StorybookConfig = {
     name: "@storybook/react-vite",
     options: {},
   },
+  core: {
+    // Allow external hosts (e.g. ngrok tunnels for remote preview)
+    allowedHosts: "all",
+  },
   viteFinal: (config) => {
     // Filter out the Sentry plugin — it warns about missing env vars
     // and isn't needed for Storybook.
@@ -18,6 +22,11 @@ const config: StorybookConfig = {
       if (!plugin || Array.isArray(plugin)) return true;
       return (plugin as { name?: string }).name !== "sentry-vite-plugin";
     });
+    // Allow ngrok and other external hosts for the preview iframe
+    config.server = {
+      ...config.server,
+      allowedHosts: "all",
+    };
     return config;
   },
 };
