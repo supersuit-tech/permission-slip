@@ -24,7 +24,7 @@ Review the PR changes through the lens of a principal security engineer. Focus o
 ---
 
 ## Rule 2: Code Quality, DRY & Maintainability
-
+**Trigger:** 5 minutes after Rule 1 completes. Re-runs on every new push to the PR branch (after Rule 1 finishes).
 **Trigger:** 5 minutes after Rule 1 completes.
 
 Review the PR changes for long-term maintainability. Focus on:
