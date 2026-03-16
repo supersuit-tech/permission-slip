@@ -190,7 +190,7 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.queryByPlaceholderText("cus_ABC123")).not.toBeInTheDocument();
     });
 
-    it("overrides x-ui.placeholder in pattern mode", () => {
+    it("uses x-ui.placeholder in pattern mode (no override)", () => {
       const schema: ParametersSchema = {
         type: "object",
         properties: {
@@ -205,9 +205,8 @@ describe("ActionConfigParameterFields", () => {
         modes: { customer_id: "pattern" },
       });
 
-      expect(
-        screen.getByPlaceholderText("e.g. *@mycompany.com, supersuit-tech/*"),
-      ).toBeInTheDocument();
+      // Pattern mode no longer overrides the placeholder — the field uses x-ui.placeholder
+      expect(screen.getByPlaceholderText("cus_ABC123")).toBeInTheDocument();
     });
   });
 
@@ -486,6 +485,63 @@ describe("ActionConfigParameterFields", () => {
       await user.type(screen.getByLabelText("name"), "a");
 
       expect(onValueChange).toHaveBeenCalledWith("name", "a");
+    });
+
+    it("checking 'Any value' sets wildcard mode and value", async () => {
+      const user = userEvent.setup();
+      const onModeChange = vi.fn<(key: string, mode: ParamMode) => void>();
+      const onValueChange = vi.fn<(key: string, value: string) => void>();
+      renderFields(basicSchema, { onModeChange, onValueChange });
+
+      const checkbox = screen.getAllByRole("checkbox")[0]!;
+      await user.click(checkbox);
+
+      expect(onModeChange).toHaveBeenCalledWith("name", "wildcard");
+      expect(onValueChange).toHaveBeenCalledWith("name", "*");
+    });
+
+    it("unchecking 'Any value' sets fixed mode and clears value", async () => {
+      const user = userEvent.setup();
+      const onModeChange = vi.fn<(key: string, mode: ParamMode) => void>();
+      const onValueChange = vi.fn<(key: string, value: string) => void>();
+      renderFields(basicSchema, {
+        onModeChange,
+        onValueChange,
+        values: { name: "*" },
+        modes: { name: "wildcard" },
+      });
+
+      const checkbox = screen.getAllByRole("checkbox")[0]!;
+      await user.click(checkbox);
+
+      expect(onModeChange).toHaveBeenCalledWith("name", "fixed");
+      expect(onValueChange).toHaveBeenCalledWith("name", "");
+    });
+
+    it("disables input when mode is wildcard", () => {
+      renderFields(basicSchema, {
+        values: { name: "*" },
+        modes: { name: "wildcard" },
+      });
+
+      expect(screen.getByLabelText("name")).toBeDisabled();
+    });
+
+    it("shows wildcard hint when value contains *", () => {
+      renderFields(basicSchema, {
+        values: { name: "*@company.com" },
+      });
+
+      expect(screen.getByText("matches any text")).toBeInTheDocument();
+    });
+
+    it("does not show wildcard hint when mode is wildcard", () => {
+      renderFields(basicSchema, {
+        values: { name: "*" },
+        modes: { name: "wildcard" },
+      });
+
+      expect(screen.queryByText("matches any text")).not.toBeInTheDocument();
     });
   });
 });

@@ -151,8 +151,9 @@ export type ParamMode = "fixed" | "pattern" | "wildcard";
  * When schema properties are provided, coerces values back to their declared
  * types (integer, number, boolean) so the backend receives correct JSON types.
  *
- * When paramModes is provided, parameters in "pattern" mode are wrapped as
- * {"$pattern": "<glob>"} objects for explicit pattern matching on the backend.
+ * Wildcard parameters (mode === "wildcard") are stored as "*".
+ * Values containing "*" are auto-detected as patterns and wrapped as
+ * {"$pattern": "<glob>"} for backend pattern matching.
  */
 export function buildParametersFromForm(
   paramValues: Record<string, string>,
@@ -163,8 +164,16 @@ export function buildParametersFromForm(
   for (const [key, value] of Object.entries(paramValues)) {
     if (value === "") continue;
 
-    // Pattern mode: wrap in $pattern object for explicit backend handling.
-    if (paramModes?.[key] === "pattern") {
+    // Wildcard mode: agent can use any value.
+    if (paramModes?.[key] === "wildcard") {
+      parameters[key] = "*";
+      continue;
+    }
+
+    // Auto-detect pattern: any value containing "*" is a glob pattern.
+    // Also preserves legacy "pattern" mode for backward compatibility
+    // (e.g. existing $pattern values without * created by the old UI).
+    if (value.includes("*") || paramModes?.[key] === "pattern") {
       parameters[key] = { $pattern: value };
       continue;
     }

@@ -194,13 +194,10 @@ describe("ActionConfigurationsSection", () => {
       "my-repo",
     );
 
-    // Set title to wildcard via dropdown.
-    // Target the dropdown trigger within the "title" parameter group.
+    // Set title to wildcard via "Any value" checkbox.
     const titleInput = screen.getByLabelText("title");
     const titleGroup = titleInput.closest(".space-y-1\\.5")!;
-    await user.click(within(titleGroup as HTMLElement).getByRole("button", { name: /Fixed/ }));
-    // Select "Wildcard" from the dropdown menu.
-    await user.click(screen.getByRole("menuitemradio", { name: /Wildcard/ }));
+    await user.click(within(titleGroup as HTMLElement).getByRole("checkbox"));
 
     await user.click(screen.getByText("Create Configuration"));
 
