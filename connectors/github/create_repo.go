@@ -27,10 +27,7 @@ type createRepoParams struct {
 
 func (p *createRepoParams) validate() error {
 	p.Name = strings.TrimSpace(p.Name)
-	if err := validateRepoName(p.Name); err != nil {
-		return err
-	}
-	return nil
+	return validateRepoName(p.Name)
 }
 
 // Execute creates a GitHub repository and returns the created repo data.
