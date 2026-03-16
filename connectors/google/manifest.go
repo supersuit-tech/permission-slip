@@ -95,10 +95,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
+							"format": "date-time",
 							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')"
 						},
 						"end_time": {
 							"type": "string",
+							"format": "date-time",
 							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')"
 						},
 						"attendees": {
@@ -137,10 +139,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"time_min": {
 							"type": "string",
+							"format": "date-time",
 							"description": "Lower bound (inclusive) for event start time in RFC 3339 format. Defaults to now."
 						},
 						"time_max": {
 							"type": "string",
+							"format": "date-time",
 							"description": "Upper bound (exclusive) for event start time in RFC 3339 format"
 						}
 					}
@@ -458,10 +462,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
+							"format": "date-time",
 							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')"
 						},
 						"end_time": {
 							"type": "string",
+							"format": "date-time",
 							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')"
 						},
 						"attendees": {
@@ -607,10 +613,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
+							"format": "date-time",
 							"description": "New start time in RFC 3339 format. Must be provided together with end_time."
 						},
 						"end_time": {
 							"type": "string",
+							"format": "date-time",
 							"description": "New end time in RFC 3339 format. Must be provided together with start_time."
 						},
 						"attendees": {

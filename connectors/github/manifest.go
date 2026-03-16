@@ -47,7 +47,8 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Issue body (Markdown supported)"
+							"description": "Issue body (Markdown supported)",
+							"x-ui": {"widget": "textarea"}
 						}
 					}
 				}`)),
@@ -105,7 +106,8 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Pull request body (Markdown supported)"
+							"description": "Pull request body (Markdown supported)",
+							"x-ui": {"widget": "textarea"}
 						},
 						"head": {
 							"type": "string",
@@ -179,7 +181,8 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Release notes (Markdown supported)"
+							"description": "Release notes (Markdown supported)",
+							"x-ui": {"widget": "textarea"}
 						},
 						"draft": {
 							"type": "boolean",
@@ -280,7 +283,8 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Comment body (Markdown supported)"
+							"description": "Comment body (Markdown supported)",
+							"x-ui": {"widget": "textarea"}
 						}
 					}
 				}`)),

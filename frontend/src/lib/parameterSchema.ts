@@ -92,15 +92,15 @@ export function parseParametersSchema(
       const prop = val as Record<string, unknown>;
       const propType = typeof prop.type === "string" ? prop.type : undefined;
       const format = typeof prop.format === "string" ? prop.format : undefined;
+      const description = typeof prop.description === "string" ? prop.description : undefined;
       const parsedUI = parsePropertyUI(prop["x-ui"]);
       const items = parseItems(prop.items);
       // Auto-map types to widgets when no explicit widget is set
-      const ui = autoMapWidget(propType, format, items, parsedUI);
+      const ui = autoMapWidget(propType, format, items, description, parsedUI);
       properties[key] = {
         type: propType,
         format,
-        description:
-          typeof prop.description === "string" ? prop.description : undefined,
+        description,
         enum: Array.isArray(prop.enum)
           ? prop.enum.filter((e): e is string => typeof e === "string")
           : undefined,
@@ -194,6 +194,19 @@ export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
   if (property.type === "boolean") return "toggle";
   if (property.type === "integer" || property.type === "number") return "number";
   if (property.type === "array" && property.items?.type === "string") return "list";
+
+  // Heuristic: detect datetime fields by description mentioning RFC 3339 or ISO 8601
+  if (property.type === "string" && property.description) {
+    const desc = property.description.toLowerCase();
+    if ((desc.includes("rfc 3339") || desc.includes("rfc3339") || desc.includes("iso 8601")) && !desc.includes("epoch")) {
+      return "datetime";
+    }
+    // Heuristic: detect textarea fields for markdown body content
+    if (desc.includes("markdown")) {
+      return "textarea";
+    }
+  }
+
   return "text";
 }
 
@@ -206,11 +219,12 @@ function autoMapWidget(
   type: string | undefined,
   format: string | undefined,
   items: { type?: string } | undefined,
+  description: string | undefined,
   parsedUI: SchemaPropertyUI | undefined,
 ): SchemaPropertyUI | undefined {
   if (parsedUI?.widget) return parsedUI;
 
-  const inferred = inferWidgetFromProperty({ type, format, items });
+  const inferred = inferWidgetFromProperty({ type, format, items, description });
   if (inferred !== "text") {
     return { ...parsedUI, widget: inferred };
   }
