@@ -213,14 +213,21 @@ describe("ActivityDetailSheet", () => {
   });
 
   it("hides connector pill when connector_id is absent", async () => {
-    const event = makeEvent({ connector_id: undefined });
-    render(
-      <ActivityDetailSheet event={event as never} open={true} onOpenChange={() => {}} />,
+    // Render WITH a connector_id first to confirm the pill renders
+    const eventWith = makeEvent({ connector_id: "github" });
+    const { rerender } = render(
+      <ActivityDetailSheet event={eventWith as never} open={true} onOpenChange={() => {}} />,
       { wrapper },
     );
     await waitFor(() => {
-      expect(screen.getByText("My Bot")).toBeInTheDocument();
+      expect(screen.getByText("github")).toBeInTheDocument();
     });
+
+    // Re-render WITHOUT connector_id and confirm the pill is gone
+    const eventWithout = makeEvent({ connector_id: undefined });
+    rerender(
+      <ActivityDetailSheet event={eventWithout as never} open={true} onOpenChange={() => {}} />,
+    );
     expect(screen.queryByText("github")).not.toBeInTheDocument();
   });
 
