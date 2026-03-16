@@ -27,7 +27,14 @@ type createRepoParams struct {
 
 func (p *createRepoParams) validate() error {
 	p.Name = strings.TrimSpace(p.Name)
-	return validateRepoName(p.Name)
+	if err := validateRepoName(p.Name); err != nil {
+		return err
+	}
+	p.Org = strings.TrimSpace(p.Org)
+	if p.Org != "" && !orgNameRe.MatchString(p.Org) {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid org name %q: must contain only alphanumeric characters and hyphens", p.Org)}
+	}
+	return nil
 }
 
 // Execute creates a GitHub repository and returns the created repo data.
@@ -46,14 +53,9 @@ func (a *createRepoAction) Execute(ctx context.Context, req connectors.ActionReq
 		ghBody["description"] = params.Description
 	}
 
-	org := strings.TrimSpace(params.Org)
-	if org != "" && !orgNameRe.MatchString(org) {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid org name %q: must contain only alphanumeric characters and hyphens", org)}
-	}
-
 	var path string
-	if org != "" {
-		path = fmt.Sprintf("/orgs/%s/repos", url.PathEscape(org))
+	if params.Org != "" {
+		path = fmt.Sprintf("/orgs/%s/repos", url.PathEscape(params.Org))
 	} else {
 		path = "/user/repos"
 	}
