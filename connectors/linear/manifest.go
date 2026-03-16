@@ -39,7 +39,8 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"description": {
 							"type": "string",
-							"description": "Issue description (markdown)"
+							"description": "Issue description (markdown)",
+							"x-ui": {"widget": "textarea"}
 						},
 						"assignee_id": {
 							"type": "string",
@@ -86,7 +87,8 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"description": {
 							"type": "string",
-							"description": "New issue description (markdown)"
+							"description": "New issue description (markdown)",
+							"x-ui": {"widget": "textarea"}
 						},
 						"assignee_id": {
 							"type": "string",
@@ -125,7 +127,8 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Comment body (markdown)"
+							"description": "Comment body (markdown)",
+							"x-ui": {"widget": "textarea"}
 						}
 					}
 				}`)),

@@ -4,6 +4,7 @@ import {
   getFieldLabel,
   getOrderedFieldKeys,
   isFieldVisible,
+  inferWidgetFromProperty,
   type SchemaPropertyUI,
   type SchemaUI,
 } from "../parameterSchema";
@@ -606,6 +607,80 @@ describe("parseParametersSchema", () => {
       });
 
       expect(result?.properties?.name?.format).toBeUndefined();
+    });
+  });
+
+  describe("inferWidgetFromProperty heuristics", () => {
+    it("infers datetime for RFC 3339 description", () => {
+      expect(inferWidgetFromProperty({
+        type: "string",
+        description: "Start time in RFC 3339 format",
+      })).toBe("datetime");
+    });
+
+    it("infers datetime for ISO 8601 description", () => {
+      expect(inferWidgetFromProperty({
+        type: "string",
+        description: "Due date in ISO 8601 format",
+      })).toBe("datetime");
+    });
+
+    it("does not infer datetime when description mentions epoch", () => {
+      expect(inferWidgetFromProperty({
+        type: "string",
+        description: "Start date/time (ISO 8601 or epoch milliseconds)",
+      })).toBe("text");
+    });
+
+    it("infers textarea for markdown description", () => {
+      expect(inferWidgetFromProperty({
+        type: "string",
+        description: "Issue body (Markdown supported)",
+      })).toBe("textarea");
+    });
+
+    it("infers textarea for lowercase markdown description", () => {
+      expect(inferWidgetFromProperty({
+        type: "string",
+        description: "Comment body (markdown)",
+      })).toBe("textarea");
+    });
+
+    it("does not apply heuristics for non-string types", () => {
+      expect(inferWidgetFromProperty({
+        type: "integer",
+        description: "Some RFC 3339 thing",
+      })).toBe("number");
+    });
+  });
+
+  describe("auto-mapping heuristics in parseParametersSchema", () => {
+    it("auto-maps RFC 3339 string fields to datetime widget", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          start_time: {
+            type: "string",
+            description: "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')",
+          },
+        },
+      });
+
+      expect(result?.properties?.start_time?.["x-ui"]?.widget).toBe("datetime");
+    });
+
+    it("auto-maps markdown body fields to textarea widget", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          body: {
+            type: "string",
+            description: "Issue body (Markdown supported)",
+          },
+        },
+      });
+
+      expect(result?.properties?.body?.["x-ui"]?.widget).toBe("textarea");
     });
   });
 

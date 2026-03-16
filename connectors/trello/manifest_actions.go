@@ -30,7 +30,8 @@ func trelloActions() []connectors.ManifestAction {
 					},
 					"desc": {
 						"type": "string",
-						"description": "Card description (supports Markdown)"
+						"description": "Card description (supports Markdown)",
+						"x-ui": {"widget": "textarea"}
 					},
 					"pos": {
 						"type": "string",
@@ -70,10 +71,12 @@ func trelloActions() []connectors.ManifestAction {
 					},
 					"desc": {
 						"type": "string",
-						"description": "New card description (supports Markdown)"
+						"description": "New card description (supports Markdown)",
+						"x-ui": {"widget": "textarea"}
 					},
 					"due": {
 						"type": "string",
+						"format": "date-time",
 						"description": "Due date in ISO 8601 format"
 					},
 					"dueComplete": {
