@@ -221,6 +221,6 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       expect(screen.getByText("Execution Failed")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText("Create Standing Approval")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Step 1 of 2/)).not.toBeInTheDocument();
   });
 });
