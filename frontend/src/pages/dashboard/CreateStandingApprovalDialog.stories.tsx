@@ -252,10 +252,12 @@ function StoryConstraintField({
         </label>
       </div>
       {!isWildcard && value.includes("*") && (
-        <p className="text-muted-foreground text-sm">
-          <code className="rounded bg-muted px-1 font-mono">*</code> matches
-          any text
-        </p>
+        <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            <code className="rounded bg-muted px-1 font-mono text-foreground/70">*</code> matches
+            any text
+          </p>
+        </div>
       )}
     </div>
   );
@@ -294,15 +296,17 @@ function StoryStepConstraints({
       {properties ? (
         <div className="space-y-3">
           <Label>Constraints</Label>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            Use{" "}
-            <code className="rounded bg-muted px-1 font-mono">*</code> as a
-            wildcard in any value (e.g.{" "}
-            <code className="rounded bg-muted px-1 font-mono">
-              *@mycompany.com
-            </code>
-            ). Check <strong>Any value</strong> to let the agent choose freely.
-          </p>
+          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Use{" "}
+              <code className="rounded bg-muted px-1 font-mono text-foreground/70">*</code> as a
+              wildcard in any value (e.g.{" "}
+              <code className="rounded bg-muted px-1 font-mono text-foreground/70">
+                *@mycompany.com
+              </code>
+              ). Check <strong className="text-foreground/70">Any value</strong> to let the agent choose freely.
+            </p>
+          </div>
           {Object.entries(properties).map(([key, prop]) => (
             <StoryConstraintField
               key={key}
@@ -319,10 +323,12 @@ function StoryStepConstraints({
       ) : (
         <div className="space-y-2">
           <Label htmlFor="sa-manual-constraints">Constraints (JSON)</Label>
-          <p className="text-muted-foreground text-sm">
-            No parameter schema found for this action. Enter constraints
-            manually as a JSON object.
-          </p>
+          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              No parameter schema found for this action. Enter constraints
+              manually as a JSON object.
+            </p>
+          </div>
           <textarea
             id="sa-manual-constraints"
             className="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -332,11 +338,13 @@ function StoryStepConstraints({
             value={manualConstraintsJson}
             onChange={(e) => onManualConstraintsJsonChange(e.target.value)}
           />
-          <p className="text-muted-foreground text-sm">
-            Use{" "}
-            <code className="rounded bg-muted px-1 font-mono">&quot;*&quot;</code>{" "}
-            for wildcard parameters, but at least one must be non-wildcard.
-          </p>
+          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Use{" "}
+              <code className="rounded bg-muted px-1 font-mono text-foreground/70">&quot;*&quot;</code>{" "}
+              for wildcard parameters, but at least one must be non-wildcard.
+            </p>
+          </div>
         </div>
       )}
     </div>
