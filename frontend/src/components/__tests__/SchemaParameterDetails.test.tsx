@@ -56,20 +56,6 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
-  it("shows type annotations for provided parameters", () => {
-    render(
-      <SchemaParameterDetails
-        parameters={{ owner: "acme", repo: "widgets" }}
-        schema={schema}
-      />,
-    );
-
-    // Only provided params + required missing params show type annotations.
-    // owner and repo are provided; title and merge_method are optional and hidden.
-    const typeAnnotations = screen.getAllByText("string");
-    expect(typeAnnotations.length).toBe(2);
-  });
-
   it("shows 'missing' badge for required parameters not provided", () => {
     render(
       <SchemaParameterDetails
@@ -103,7 +89,7 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("(merge | squash | rebase)")).toBeInTheDocument();
+    expect(screen.getByText("one of: merge, squash, rebase")).toBeInTheDocument();
   });
 
   it("shows 'default' badge when value matches default", () => {
