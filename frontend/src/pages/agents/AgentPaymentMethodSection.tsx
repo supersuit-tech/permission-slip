@@ -89,7 +89,7 @@ export function AgentPaymentMethodSection({
                 Optional
               </Badge>
             </CardTitle>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="text-muted-foreground mt-1 text-sm">
               Only needed if you want this agent to use connector actions that
               make purchases.
             </p>
