@@ -17,7 +17,7 @@ Review the PR changes through the lens of a principal security engineer. Focus o
 - **Unsafe type assertions** — Are there `any` casts, unchecked type assertions, or `as` casts without justification?
 - **Error leakage** — Do error responses expose internal details (stack traces, SQL errors, file paths) to the client?
 - **Dependency risks** — Are new dependencies well-maintained and necessary? Do they introduce known vulnerabilities?
-- **Database security** — Do new migrations grant appropriate permissions to `app_backend`? Are RLS policies in place? Are extension-managed objects explicitly granted?
+- **Database security** — Do new migrations grant appropriate permissions to `app_backend`? Are RLS policies in place? Are extension-managed objects explicitly granted? Are extension-schema grants wrapped in `IF EXISTS` guards for CI compatibility (plain Postgres lacks `vault`/`pgsodium` schemas)? Do `SECURITY INVOKER` views have transitive grants on every object they touch?
 
 **Important:** Only flag real, concrete issues visible in the diff. Do not speculate or fabricate concerns. If nothing is found, say so.
 
