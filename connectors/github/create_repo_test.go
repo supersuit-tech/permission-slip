@@ -224,6 +224,14 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 			params: `{"name":"my repo/here"}`,
 		},
 		{
+			name:   "name exceeds 100 characters",
+			params: `{"name":"aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeaaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeX"}`,
+		},
+		{
+			name:   "invalid org name",
+			params: `{"name":"valid-repo","org":"bad org/name"}`,
+		},
+		{
 			name:   "invalid JSON",
 			params: `{invalid}`,
 		},

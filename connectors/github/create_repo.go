@@ -47,6 +47,10 @@ func (a *createRepoAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	org := strings.TrimSpace(params.Org)
+	if org != "" && !repoNameRe.MatchString(org) {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid org name %q: must contain only alphanumeric characters, hyphens, underscores, and dots", org)}
+	}
+
 	var path string
 	if org != "" {
 		path = fmt.Sprintf("/orgs/%s/repos", url.PathEscape(org))
