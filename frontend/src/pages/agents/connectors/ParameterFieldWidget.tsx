@@ -76,6 +76,8 @@ function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
       return <NumberWidget {...props} />;
     case "date":
       return <DateWidget {...props} />;
+    case "datetime":
+      return <DateTimeWidget {...props} />;
     case "text":
     default:
       return <TextWidget {...props} />;
@@ -175,6 +177,55 @@ function DateWidget({ inputId, value, onChange, disabled, placeholder, className
       className={className}
     />
   );
+}
+
+function DateTimeWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
+  const localValue = toDatetimeLocalValue(value);
+
+  return (
+    <Input
+      id={inputId}
+      type="datetime-local"
+      value={localValue}
+      onChange={(e) => {
+        const dtLocal = e.target.value;
+        if (!dtLocal) {
+          onChange("");
+          return;
+        }
+        onChange(toRfc3339(dtLocal));
+      }}
+      disabled={disabled}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+}
+
+/** Convert a datetime-local value ("YYYY-MM-DDTHH:mm") to an RFC 3339 string with local timezone offset. */
+function toRfc3339(dtLocal: string): string {
+  const d = new Date(dtLocal);
+  if (isNaN(d.getTime())) return dtLocal;
+  const offset = d.getTimezoneOffset();
+  const sign = offset <= 0 ? "+" : "-";
+  const absOffset = Math.abs(offset);
+  const hours = String(Math.floor(absOffset / 60)).padStart(2, "0");
+  const minutes = String(absOffset % 60).padStart(2, "0");
+  return `${dtLocal}:00${sign}${hours}:${minutes}`;
+}
+
+/** Convert an RFC 3339 string to a datetime-local value ("YYYY-MM-DDTHH:mm") for the input element. */
+function toDatetimeLocalValue(value: string): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hrs = String(d.getHours()).padStart(2, "0");
+  const mins = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hrs}:${mins}`;
 }
 
 /** Renders help_text and help_url hints below the input. */

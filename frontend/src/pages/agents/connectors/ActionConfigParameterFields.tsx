@@ -52,7 +52,7 @@ export function ActionConfigParameterFields({
   const groups = parametersSchema["x-ui"]?.groups;
 
   function getMode(key: string): ParamMode {
-    return modes[key] ?? inferModeFromValue(values[key] ?? "");
+    return modes[key] ?? "fixed";
   }
 
   function renderField(key: string) {
@@ -268,15 +268,6 @@ function CollapsibleFieldGroup({
   );
 }
 
-/**
- * Infer the mode from a plain string value. Used as a fallback when no
- * explicit mode override exists (e.g., first render before any user clicks).
- */
-function inferModeFromValue(value: string): ParamMode {
-  if (value === "*") return "wildcard";
-  if (value.includes("*")) return "pattern";
-  return "fixed";
-}
 
 // Re-export the shared parseParametersSchema so callers don't break.
 export { parseParametersSchema } from "@/lib/parameterSchema";

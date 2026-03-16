@@ -464,6 +464,19 @@ describe("ActionConfigParameterFields", () => {
   });
 
   describe("constraint mode interaction", () => {
+    it("defaults to fixed mode when no explicit mode is set, even with * value", () => {
+      renderFields(basicSchema, {
+        values: { name: "*" },
+        modes: {},
+      });
+
+      // The input should NOT be disabled (fixed mode allows editing)
+      const input = screen.getByLabelText("name");
+      expect(input).not.toBeDisabled();
+      // The value should show * as-is
+      expect(input).toHaveValue("*");
+    });
+
     it("passes value changes through to onValueChange", async () => {
       const user = userEvent.setup();
       const onValueChange = vi.fn<(key: string, value: string) => void>();
