@@ -93,10 +93,9 @@ export function parseParametersSchema(
       const propType = typeof prop.type === "string" ? prop.type : undefined;
       const format = typeof prop.format === "string" ? prop.format : undefined;
       const parsedUI = parsePropertyUI(prop["x-ui"]);
-      // Auto-map types to widgets when no explicit widget is set
-      const ui = autoMapWidget(propType, format, prop, parsedUI);
-      // Preserve items schema for array types
       const items = parseItems(prop.items);
+      // Auto-map types to widgets when no explicit widget is set
+      const ui = autoMapWidget(propType, format, items, parsedUI);
       properties[key] = {
         type: propType,
         format,
@@ -206,13 +205,11 @@ export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
 function autoMapWidget(
   type: string | undefined,
   format: string | undefined,
-  prop: Record<string, unknown>,
+  items: { type?: string } | undefined,
   parsedUI: SchemaPropertyUI | undefined,
 ): SchemaPropertyUI | undefined {
   if (parsedUI?.widget) return parsedUI;
 
-  // Build a temporary SchemaProperty for inferWidgetFromProperty
-  const items = parseItems(prop.items);
   const inferred = inferWidgetFromProperty({ type, format, items });
   if (inferred !== "text") {
     return { ...parsedUI, widget: inferred };

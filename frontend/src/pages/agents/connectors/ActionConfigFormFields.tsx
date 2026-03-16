@@ -178,7 +178,10 @@ export function buildParametersFromForm(
       try {
         const parsed: unknown = JSON.parse(value);
         if (Array.isArray(parsed)) {
-          parameters[key] = (parsed as unknown[]).filter((item) => item !== "");
+          const filtered = (parsed as unknown[]).filter((item) => item !== "");
+          if (filtered.length > 0) {
+            parameters[key] = filtered;
+          }
           continue;
         }
       } catch { /* fall through */ }

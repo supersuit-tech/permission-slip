@@ -84,6 +84,12 @@ describe("buildParametersFromForm", () => {
     expect(result).toEqual({ tags: ["tag*", "billing"] });
   });
 
+  it("omits array key when all items are empty strings", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: '["",""]' }, schema);
+    expect(result).toEqual({});
+  });
+
   it("falls through to string when array JSON is invalid", () => {
     const schema = { tags: { type: "array" } };
     const result = buildParametersFromForm({ tags: "not-json" }, schema);
