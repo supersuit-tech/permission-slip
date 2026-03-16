@@ -82,13 +82,15 @@ export function ActionConfigParameterFields({
   }
 
   const introText = (
-    <p className="text-muted-foreground text-sm leading-relaxed">
-      Use{" "}
-      <code className="rounded bg-muted px-1 font-mono">*</code>{" "}
-      as a wildcard in any value (e.g.{" "}
-      <code className="rounded bg-muted px-1 font-mono">*@mycompany.com</code>
-      ). Check <strong>Any value</strong> to let the agent choose freely.
-    </p>
+    <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        Use{" "}
+        <code className="rounded bg-muted px-1 font-mono text-foreground/70">*</code>{" "}
+        as a wildcard in any value (e.g.{" "}
+        <code className="rounded bg-muted px-1 font-mono text-foreground/70">*@mycompany.com</code>
+        ). Check <strong className="text-foreground/70">Any value</strong> to let the agent choose freely.
+      </p>
+    </div>
   );
 
   // If groups are defined, render ungrouped fields then each group section
@@ -219,9 +221,11 @@ function ParameterField({
         </label>
       </div>
       {!isWildcard && value.includes("*") && (
-        <p className="text-muted-foreground text-sm">
-          <code className="rounded bg-muted px-1 font-mono">*</code> matches any text
-        </p>
+        <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            <code className="rounded bg-muted px-1 font-mono text-foreground/70">*</code> matches any text
+          </p>
+        </div>
       )}
     </div>
   );
