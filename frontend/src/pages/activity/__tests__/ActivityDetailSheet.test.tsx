@@ -81,6 +81,7 @@ describe("ActivityDetailSheet", () => {
     await waitFor(() => {
       expect(screen.getByText("My Bot")).toBeInTheDocument();
     });
+    expect(screen.getByTitle("ID: 1")).toBeInTheDocument();
   });
 
   it("shows outcome badge", async () => {
