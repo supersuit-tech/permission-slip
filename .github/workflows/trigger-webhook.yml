@@ -2,6 +2,10 @@ name: Trigger Webhook
 on:
   workflow_dispatch:
     inputs:
+      message:
+        description: "Custom message (overrides pr_url/pr_title construction when provided)"
+        required: false
+        default: ""
       pr_url:
         description: "PR URL (optional — omitted for non-PR notifications)"
         required: false
@@ -17,6 +21,7 @@ jobs:
     steps:
       - name: Send Webhook
         env:
+          MESSAGE_OVERRIDE: ${{ inputs.message }}
           PR_URL: ${{ inputs.pr_url }}
           PR_TITLE: ${{ inputs.pr_title }}
           NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
@@ -27,7 +32,9 @@ jobs:
             exit 1
           fi
 
-          if [ -n "$PR_URL" ] && [ -n "$PR_TITLE" ]; then
+          if [ -n "$MESSAGE_OVERRIDE" ]; then
+            MESSAGE="permission-slip: ${MESSAGE_OVERRIDE}"
+          elif [ -n "$PR_URL" ] && [ -n "$PR_TITLE" ]; then
             MESSAGE="permission-slip: ${PR_TITLE} — ${PR_URL}"
           elif [ -n "$PR_URL" ]; then
             MESSAGE="permission-slip: PR needs attention — ${PR_URL}"

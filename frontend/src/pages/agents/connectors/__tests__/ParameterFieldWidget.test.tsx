@@ -239,6 +239,53 @@ describe("ParameterFieldWidget", () => {
     });
   });
 
+  describe("datetime widget", () => {
+    const datetimeProp: SchemaProperty = {
+      type: "string",
+      "x-ui": { widget: "datetime" },
+    };
+
+    it("renders a datetime-local input", () => {
+      renderWidget(datetimeProp);
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input).toBeInTheDocument();
+      expect(input.type).toBe("datetime-local");
+    });
+
+    it("converts RFC 3339 value to datetime-local format for display", () => {
+      renderWidget(datetimeProp, "2026-03-16T17:00:00Z");
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      // Should be formatted as YYYY-MM-DDTHH:mm in local time
+      expect(input.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    });
+
+    it("handles empty value", () => {
+      renderWidget(datetimeProp, "");
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input.value).toBe("");
+    });
+
+    it("fires onChange with RFC 3339 format", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(datetimeProp);
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      await user.type(input, "2026-03-16T17:00");
+
+      expect(onChange).toHaveBeenCalled();
+    });
+
+    it("disables the datetime input when disabled", () => {
+      renderWidget(datetimeProp, "", vi.fn(), true);
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input).toBeDisabled();
+    });
+  });
+
   describe("help hints", () => {
     it("renders help_text below the input", () => {
       renderWidget({
