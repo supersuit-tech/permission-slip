@@ -124,6 +124,9 @@ func validateRepoName(name string) error {
 	if name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}
+	if name == "." || name == ".." {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid repository name %q: '.' and '..' are reserved", name)}
+	}
 	if len(name) > 100 {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid repository name: must not exceed 100 characters (got %d)", len(name))}
 	}

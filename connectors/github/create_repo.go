@@ -34,6 +34,7 @@ func (p *createRepoParams) validate() error {
 	if p.Org != "" && !orgNameRe.MatchString(p.Org) {
 		return &connectors.ValidationError{Message: fmt.Sprintf("invalid org name %q: must contain only alphanumeric characters and hyphens", p.Org)}
 	}
+	p.Description = strings.TrimSpace(p.Description)
 	return nil
 }
 

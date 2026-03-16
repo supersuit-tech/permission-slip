@@ -197,6 +197,43 @@ func TestCreateRepo_DescriptionOptional(t *testing.T) {
 	}
 }
 
+func TestCreateRepo_WhitespaceDescription(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody map[string]any
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshaling request body: %v", err)
+		}
+		if _, ok := reqBody["description"]; ok {
+			t.Error("description field should not be present when whitespace-only")
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":        1,
+			"name":      "my-repo",
+			"full_name": "octocat/my-repo",
+			"html_url":  "https://github.com/octocat/my-repo",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.create_repo"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.create_repo",
+		Parameters:  json.RawMessage(`{"name":"my-repo","description":"   "}`),
+		Credentials: validCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestCreateRepo_MissingParams(t *testing.T) {
 	t.Parallel()
 
@@ -218,6 +255,14 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 		{
 			name:   "whitespace-only name",
 			params: `{"name":"   "}`,
+		},
+		{
+			name:   "dot-only name",
+			params: `{"name":"."}`,
+		},
+		{
+			name:   "double-dot name",
+			params: `{"name":".."}`,
 		},
 		{
 			name:   "invalid characters in name",
