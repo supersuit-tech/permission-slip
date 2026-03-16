@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Card,
   CardHeader,
@@ -38,27 +39,12 @@ function OutcomeFilterTabs({
   onChange: (v: OutcomeFilter) => void;
 }) {
   return (
-    <div
-      className="inline-flex gap-0.5 rounded-lg bg-muted p-1"
-      role="tablist"
-      aria-label="Filter activity by outcome"
-    >
-      {OUTCOME_FILTERS.map((f) => (
-        <button
-          key={f.value}
-          role="tab"
-          aria-selected={value === f.value}
-          onClick={() => onChange(f.value)}
-          className={
-            value === f.value
-              ? "rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
-              : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-          }
-        >
-          {f.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      options={OUTCOME_FILTERS}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Filter activity by outcome"
+    />
   );
 }
 
