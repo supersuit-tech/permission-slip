@@ -25,7 +25,25 @@ const config: StorybookConfig = {
     // Allow ngrok and other external hosts for the preview iframe
     config.server = {
       ...config.server,
-      allowedHosts: "all",
+      allowedHosts: true,
+      // Fix HMR WebSocket when accessed via ngrok/tunnel:
+      // Override the WS URL the browser uses so it connects back via wss on the public host.
+      // clientPort tells Vite what port to advertise to the browser (443 = ngrok HTTPS).
+      hmr:
+        config.server?.hmr !== false
+          ? {
+              ...(typeof config.server?.hmr === "object"
+                ? config.server.hmr
+                : {}),
+              ...(process.env.STORYBOOK_HMR_HOST
+                ? {
+                    protocol: "wss",
+                    clientPort: 443,
+                    path: "/@vite/client",
+                  }
+                : {}),
+            }
+          : false,
     };
     return config;
   },
