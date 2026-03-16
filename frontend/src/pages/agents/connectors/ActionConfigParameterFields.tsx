@@ -1,15 +1,8 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Asterisk, ChevronDown, ChevronRight, Lock, Regex } from "lucide-react";
+import { Asterisk, ChevronDown, ChevronRight } from "lucide-react";
 import type { ParamMode } from "./ActionConfigFormFields";
 import { ParameterFieldWidget } from "./ParameterFieldWidget";
 import type { ParametersSchema, SchemaProperty, FieldGroup } from "@/lib/parameterSchema";
@@ -29,9 +22,10 @@ interface ActionConfigParameterFieldsProps {
 }
 
 /**
- * Renders parameter fields for action configuration, with a constraint mode
- * dropdown (Fixed/Pattern/Wildcard) per parameter. Used in both the Add and
- * Edit action configuration dialogs.
+ * Renders parameter fields for action configuration, with an "Any value"
+ * checkbox per parameter. Wildcards in values (e.g. `*@company.com`) are
+ * auto-detected and serialized as patterns. Used in both the Add and Edit
+ * action configuration dialogs.
  *
  * Supports x-ui rendering hints: field ordering, labels, placeholders,
  * grouped collapsible sections, conditional visibility, and widget types.
@@ -89,15 +83,13 @@ export function ActionConfigParameterFields({
 
   const introText = (
     <p className="text-muted-foreground text-xs">
-      For each parameter, choose a constraint mode: <strong>Fixed</strong>{" "}
-      locks in an exact value,{" "}
-      <strong>Pattern</strong> uses{" "}
+      Use{" "}
       <Badge variant="outline" className="border-dashed font-mono text-xs">
         *
       </Badge>{" "}
-      as a glob wildcard (e.g.{" "}
-      <code className="text-xs">*@mycompany.com</code>), or{" "}
-      <strong>Wildcard</strong> lets the agent choose freely.
+      as a wildcard in any value (e.g.{" "}
+      <code className="text-xs">*@mycompany.com</code>). Check{" "}
+      <strong>Any value</strong> to let the agent choose freely.
     </p>
   );
 
@@ -148,7 +140,7 @@ export function ActionConfigParameterFields({
   );
 }
 
-/** Renders a single parameter field with label, widget, and constraint mode dropdown. */
+/** Renders a single parameter field with label, widget, and "Any value" checkbox. */
 function ParameterField({
   paramKey,
   property,
@@ -170,17 +162,11 @@ function ParameterField({
   onValueChange: (key: string, value: string) => void;
   onModeChange: (key: string, mode: ParamMode) => void;
 }) {
-  // Mode-aware placeholder: wildcard/pattern override x-ui.placeholder
-  const modePlaceholder =
-    mode === "wildcard"
-      ? "Agent can use any value"
-      : mode === "pattern"
-        ? "e.g. *@mycompany.com, supersuit-tech/*"
-        : undefined; // let ParameterFieldWidget use x-ui.placeholder or its default
-
-  const widgetValue = mode === "wildcard" ? "" : value;
-  const widgetDisabled = disabled || mode === "wildcard";
-  const widgetClassName = mode === "wildcard" ? "bg-muted" : "";
+  const isWildcard = mode === "wildcard";
+  const widgetValue = isWildcard ? "" : value;
+  const widgetDisabled = disabled || isWildcard;
+  const widgetClassName = isWildcard ? "bg-muted" : "";
+  const widgetPlaceholder = isWildcard ? "Agent can use any value" : undefined;
 
   return (
     <div className="space-y-1.5">
@@ -212,26 +198,33 @@ function ParameterField({
           onChange={(v) => onValueChange(paramKey, v)}
           disabled={widgetDisabled}
           className={widgetClassName}
-          placeholder={modePlaceholder}
+          placeholder={widgetPlaceholder}
         />
-        <ConstraintModeDropdown
-          mode={mode}
-          disabled={disabled}
-          onChange={(nextMode) => {
-            const prevMode = mode;
-            onModeChange(paramKey, nextMode);
-            if (nextMode === "wildcard") {
-              onValueChange(paramKey, "*");
-            } else if (prevMode === "wildcard") {
-              onValueChange(paramKey, "");
-            }
-          }}
-        />
+        <label
+          htmlFor={`any-value-${paramKey}`}
+          className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap"
+        >
+          <Checkbox
+            id={`any-value-${paramKey}`}
+            checked={isWildcard}
+            disabled={disabled}
+            onCheckedChange={(checked) => {
+              if (checked) {
+                onModeChange(paramKey, "wildcard");
+                onValueChange(paramKey, "*");
+              } else {
+                onModeChange(paramKey, "fixed");
+                onValueChange(paramKey, "");
+              }
+            }}
+          />
+          <Asterisk className="size-3" />
+          Any value
+        </label>
       </div>
-      {mode === "pattern" && value !== "" && !value.includes("*") && (
+      {!isWildcard && value.includes("*") && (
         <p className="text-muted-foreground text-xs">
-          Tip: Include <code className="font-mono">*</code> in the value
-          for glob matching (e.g. <code>*@mycompany.com</code>).
+          <code className="font-mono">*</code> matches any text
         </p>
       )}
     </div>
@@ -281,87 +274,8 @@ function CollapsibleFieldGroup({
  */
 function inferModeFromValue(value: string): ParamMode {
   if (value === "*") return "wildcard";
+  if (value.includes("*")) return "pattern";
   return "fixed";
-}
-
-const modeConfig: Record<
-  ParamMode,
-  { icon: React.ReactNode; label: string; description: string }
-> = {
-  fixed: {
-    icon: <Lock className="size-3" />,
-    label: "Fixed",
-    description: "Exact value",
-  },
-  pattern: {
-    icon: <Regex className="size-3" />,
-    label: "Pattern",
-    description: "Glob matching with *",
-  },
-  wildcard: {
-    icon: <Asterisk className="size-3" />,
-    label: "Wildcard",
-    description: "Agent chooses freely",
-  },
-};
-
-const allModes: ParamMode[] = ["fixed", "pattern", "wildcard"];
-
-function isParamMode(value: string): value is ParamMode {
-  return allModes.includes(value as ParamMode);
-}
-
-/** Dropdown selector for constraint mode (Fixed/Pattern/Wildcard) with radio semantics. */
-function ConstraintModeDropdown({
-  mode,
-  disabled,
-  onChange,
-}: {
-  mode: ParamMode;
-  disabled?: boolean;
-  onChange: (next: ParamMode) => void;
-}) {
-  const current = modeConfig[mode];
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          title={current.description}
-          className="shrink-0 gap-1.5"
-        >
-          {current.icon}
-          {current.label}
-          <ChevronDown className="size-3 opacity-50" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup
-          value={mode}
-          onValueChange={(v) => {
-            if (v !== mode && isParamMode(v)) onChange(v);
-          }}
-        >
-          {allModes.map((m) => {
-            const cfg = modeConfig[m];
-            return (
-              <DropdownMenuRadioItem key={m} value={m}>
-                {cfg.icon}
-                <span className="font-medium">{cfg.label}</span>
-                <span className="text-muted-foreground text-xs">
-                  {cfg.description}
-                </span>
-              </DropdownMenuRadioItem>
-            );
-          })}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 // Re-export the shared parseParametersSchema so callers don't break.
