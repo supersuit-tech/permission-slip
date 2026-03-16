@@ -1,7 +1,10 @@
+import { useRef } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
+import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -34,7 +37,7 @@ export function ParameterFieldWidget({
   placeholder: placeholderOverride,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
-  const widget: WidgetType = ui?.widget ?? "text";
+  const widget: WidgetType = ui?.widget ?? inferWidgetFromProperty(property);
   const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
 
@@ -78,6 +81,8 @@ function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
       return <DateWidget {...props} />;
     case "datetime":
       return <DateTimeWidget {...props} />;
+    case "list":
+      return <ListWidget {...props} />;
     case "text":
     default:
       return <TextWidget {...props} />;
@@ -199,6 +204,97 @@ function DateTimeWidget({ inputId, value, onChange, disabled, placeholder, class
       placeholder={placeholder}
       className={className}
     />
+  );
+}
+
+/** Parse a JSON array string into a string array, with fallback for non-JSON values. */
+function parseListValue(value: string): string[] {
+  if (!value) return [];
+  if (value.startsWith("[")) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      // fall through
+    }
+  }
+  return [value];
+}
+
+/** Serialize a string array into a JSON array string for form state. */
+function serializeListValue(items: string[]): string {
+  if (items.length === 0) return "";
+  return JSON.stringify(items);
+}
+
+function ListWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
+  const items = parseListValue(value);
+  const nextId = useRef(0);
+  const rowIds = useRef<number[]>([]);
+
+  // Keep rowIds in sync with items length, assigning stable IDs to new rows.
+  while (rowIds.current.length < items.length) {
+    rowIds.current.push(nextId.current++);
+  }
+  if (rowIds.current.length > items.length) {
+    rowIds.current = rowIds.current.slice(0, items.length);
+  }
+
+  function updateItem(index: number, newValue: string) {
+    const next = [...items];
+    next[index] = newValue;
+    onChange(serializeListValue(next));
+  }
+
+  function removeItem(index: number) {
+    const next = items.filter((_, i) => i !== index);
+    rowIds.current = rowIds.current.filter((_, i) => i !== index);
+    onChange(serializeListValue(next));
+  }
+
+  function addItem() {
+    rowIds.current.push(nextId.current++);
+    onChange(serializeListValue([...items, ""]));
+  }
+
+  return (
+    <div className="w-full space-y-2" data-testid={`list-${inputId}`}>
+      {items.map((item, index) => (
+        <div key={rowIds.current[index]} className="flex items-center gap-2">
+          <Input
+            id={index === 0 ? inputId : undefined}
+            type="text"
+            value={item}
+            onChange={(e) => updateItem(index, e.target.value)}
+            disabled={disabled}
+            placeholder={placeholder ?? `Item ${index + 1}`}
+            className={className}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={() => removeItem(index)}
+            disabled={disabled}
+            aria-label={`Remove item ${index + 1}`}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1"
+        onClick={addItem}
+        disabled={disabled}
+      >
+        <Plus className="size-4" />
+        Add item
+      </Button>
+    </div>
   );
 }
 

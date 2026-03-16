@@ -65,4 +65,34 @@ describe("buildParametersFromForm", () => {
     expect(result.field).toBe("*");
     expect(result.field).not.toEqual({ $pattern: "*" });
   });
+
+  it("coerces array types from JSON string to array", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: '["a","b"]' }, schema);
+    expect(result).toEqual({ tags: ["a", "b"] });
+  });
+
+  it("filters empty strings from array values at submission", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: '["a","","b",""]' }, schema);
+    expect(result).toEqual({ tags: ["a", "b"] });
+  });
+
+  it("preserves array with wildcard item instead of treating it as a pattern", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: '["tag*","billing"]' }, schema);
+    expect(result).toEqual({ tags: ["tag*", "billing"] });
+  });
+
+  it("omits array key when all items are empty strings", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: '["",""]' }, schema);
+    expect(result).toEqual({});
+  });
+
+  it("falls through to string when array JSON is invalid", () => {
+    const schema = { tags: { type: "array" } };
+    const result = buildParametersFromForm({ tags: "not-json" }, schema);
+    expect(result).toEqual({ tags: "not-json" });
+  });
 });

@@ -76,11 +76,11 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.getByText("required")).toBeInTheDocument();
     });
 
-    it("shows type annotation", () => {
+    it("shows friendly type annotation", () => {
       renderFields(basicSchema);
 
-      // Both fields are type: "string", so there should be two type annotations
-      expect(screen.getAllByText("(string)")).toHaveLength(2);
+      // Both fields are type: "string", displayed as "(text)"
+      expect(screen.getAllByText("(text)")).toHaveLength(2);
     });
 
     it("shows description text", () => {
@@ -542,6 +542,49 @@ describe("ActionConfigParameterFields", () => {
       });
 
       expect(screen.queryByText("matches any text")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("auto-mapping", () => {
+    it("auto-maps boolean type to toggle widget without explicit x-ui.widget", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          enabled: { type: "boolean", description: "Enable feature" },
+        },
+      };
+
+      renderFields(schema, { values: { enabled: "false" } });
+
+      expect(screen.getByRole("switch")).toBeInTheDocument();
+      expect(screen.getByText("(yes / no)")).toBeInTheDocument();
+    });
+
+    it("auto-maps array type with string items to list widget", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          tags: { type: "array", items: { type: "string" }, description: "Tags" },
+        },
+      };
+
+      renderFields(schema);
+
+      expect(screen.getByTestId("list-param-tags")).toBeInTheDocument();
+      expect(screen.getByText("(list)")).toBeInTheDocument();
+    });
+
+    it("does not show type annotation for object type", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          metadata: { type: "object", description: "Extra data" },
+        },
+      };
+
+      renderFields(schema);
+
+      expect(screen.queryByText("(object)")).not.toBeInTheDocument();
     });
   });
 });

@@ -10,6 +10,8 @@ import {
   getOrderedFieldKeys,
   getFieldLabel,
   isFieldVisible,
+  friendlyTypeLabel,
+  inferWidgetFromProperty,
 } from "@/lib/parameterSchema";
 
 interface ActionConfigParameterFieldsProps {
@@ -167,6 +169,31 @@ function ParameterField({
   const widgetDisabled = disabled || isWildcard;
   const widgetClassName = isWildcard ? "bg-muted" : "";
   const widgetPlaceholder = isWildcard ? "Agent can use any value" : undefined;
+  const typeLabel = friendlyTypeLabel(property.type);
+  const effectiveWidget = property["x-ui"]?.widget ?? inferWidgetFromProperty(property);
+  const isMultiRow = effectiveWidget === "list";
+
+  const anyValueCheckbox = (
+    <label
+      className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap"
+    >
+      <Checkbox
+        checked={isWildcard}
+        disabled={disabled}
+        onCheckedChange={(checked) => {
+          if (checked === true) {
+            onModeChange(paramKey, "wildcard");
+            onValueChange(paramKey, "*");
+          } else if (checked === false) {
+            onModeChange(paramKey, "fixed");
+            onValueChange(paramKey, "");
+          }
+        }}
+      />
+      <Asterisk className="size-3" />
+      Any value
+    </label>
+  );
 
   return (
     <div className="space-y-1.5">
@@ -179,47 +206,44 @@ function ParameterField({
             required
           </Badge>
         )}
-        {property.type && (
+        {typeLabel && (
           <span className="text-muted-foreground text-xs">
-            ({property.type})
+            ({typeLabel})
           </span>
         )}
+        {isMultiRow && anyValueCheckbox}
       </div>
       {property.description && (
         <p className="text-muted-foreground text-sm">
           {property.description}
         </p>
       )}
-      <div className="flex items-center gap-2">
-        <ParameterFieldWidget
-          paramKey={paramKey}
-          property={property}
-          value={widgetValue}
-          onChange={(v) => onValueChange(paramKey, v)}
-          disabled={widgetDisabled}
-          className={widgetClassName}
-          placeholder={widgetPlaceholder}
-        />
-        <label
-          className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap"
-        >
-          <Checkbox
-            checked={isWildcard}
-            disabled={disabled}
-            onCheckedChange={(checked) => {
-              if (checked === true) {
-                onModeChange(paramKey, "wildcard");
-                onValueChange(paramKey, "*");
-              } else if (checked === false) {
-                onModeChange(paramKey, "fixed");
-                onValueChange(paramKey, "");
-              }
-            }}
+      {isMultiRow ? (
+        !isWildcard && (
+          <ParameterFieldWidget
+            paramKey={paramKey}
+            property={property}
+            value={widgetValue}
+            onChange={(v) => onValueChange(paramKey, v)}
+            disabled={widgetDisabled}
+            className={widgetClassName}
+            placeholder={widgetPlaceholder}
           />
-          <Asterisk className="size-3" />
-          Any value
-        </label>
-      </div>
+        )
+      ) : (
+        <div className="flex items-center gap-2">
+          <ParameterFieldWidget
+            paramKey={paramKey}
+            property={property}
+            value={widgetValue}
+            onChange={(v) => onValueChange(paramKey, v)}
+            disabled={widgetDisabled}
+            className={widgetClassName}
+            placeholder={widgetPlaceholder}
+          />
+          {anyValueCheckbox}
+        </div>
+      )}
       {!isWildcard && value.includes("*") && (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
           <p className="text-muted-foreground text-xs leading-relaxed">
