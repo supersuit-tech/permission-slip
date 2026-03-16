@@ -34,6 +34,8 @@ export function useAutoAssignOAuthCredential(
     params.delete("oauth_connection_id");
     setSearchParams(params, { replace: true });
 
+    // connectionId comes from the URL (set by our backend's OAuth redirect).
+    // The assign endpoint validates ownership and provider match server-side.
     tryAssign({ oauthConnectionId: connectionId });
   }, [bindingLoading]); // eslint-disable-line react-hooks/exhaustive-deps -- run once when binding loads
 }
