@@ -39,7 +39,7 @@ export function TemplatePicker({
 
   return (
     <div className="space-y-2">
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-sm">
         Start from a template to pre-fill the form, or configure from scratch
         below.
       </p>
@@ -97,7 +97,7 @@ function TemplateCard({
           )}
         </div>
         {template.description && (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-sm">
             {template.description}
           </p>
         )}

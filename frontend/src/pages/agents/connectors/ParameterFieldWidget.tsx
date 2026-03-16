@@ -237,7 +237,7 @@ function FieldHints({ ui }: { ui?: SchemaPropertyUI }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2">
       {ui?.help_text && (
-        <p className="text-muted-foreground text-xs">{ui.help_text}</p>
+        <p className="text-muted-foreground text-sm">{ui.help_text}</p>
       )}
       {validHelpUrl && (
         <a

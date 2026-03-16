@@ -376,7 +376,7 @@ function OAuthSetupContent({
       </Button>
 
       {scopes.length > 0 && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           Permissions requested: {scopes.join(", ")}
         </p>
       )}

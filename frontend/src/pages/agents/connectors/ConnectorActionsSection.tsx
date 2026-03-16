@@ -79,7 +79,7 @@ export function ActionRow({ action }: { action: ConnectorAction }) {
         <div>
           <p className="font-medium">{action.name}</p>
           {action.description && (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               {action.description}
             </p>
           )}

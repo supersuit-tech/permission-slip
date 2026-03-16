@@ -194,7 +194,7 @@ export function ConnectedAccountsSection() {
                       </span>
                     )}
                   </p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground text-sm">
                     {conn.scopes.length} scope
                     {conn.scopes.length !== 1 ? "s" : ""} granted &middot;
                     Connected{" "}
@@ -379,7 +379,7 @@ function InstanceSubdomainDialog({
                 {config.domainSuffix}
               </span>
             </div>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               e.g. if your URL is {config.placeholder}
               {config.domainSuffix}, enter &quot;{config.placeholder}&quot;
             </p>
