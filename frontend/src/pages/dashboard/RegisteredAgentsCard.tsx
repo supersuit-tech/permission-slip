@@ -274,25 +274,17 @@ function AgentsTable({ agents }: { agents: Agent[] }) {
     <div className="overflow-hidden rounded-lg">
       <Table>
         <TableHeader>
-          <TableRow className="border-none bg-primary hover:bg-primary">
-            <TableHead className="font-semibold text-primary-foreground">
-              Agent
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
-              Status
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
-              Last Active
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
-              Requests
-            </TableHead>
-            <TableHead className="font-semibold text-primary-foreground">
+          <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
+            <TableHead>Agent</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Last Active</TableHead>
+            <TableHead>Requests</TableHead>
+            <TableHead>
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className="[&>tr:nth-child(even)]:bg-muted">
+        <TableBody>
           {agents.map((agent) => (
             <AgentRow key={agent.agent_id} agent={agent} />
           ))}

@@ -115,22 +115,14 @@ export function RecentActivityCard() {
             <div className="overflow-hidden rounded-lg">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-none bg-primary hover:bg-primary">
-                    <TableHead className="font-semibold text-primary-foreground">
-                      When
-                    </TableHead>
-                    <TableHead className="font-semibold text-primary-foreground">
-                      Agent
-                    </TableHead>
-                    <TableHead className="font-semibold text-primary-foreground">
-                      Action
-                    </TableHead>
-                    <TableHead className="font-semibold text-primary-foreground">
-                      Outcome
-                    </TableHead>
+                  <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
+                    <TableHead>When</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Outcome</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody className="[&>tr:nth-child(even)]:bg-muted">
+                <TableBody>
                   {events.map((event) => (
                     <AuditEventRow
                       key={`${event.timestamp}-${event.agent_id}-${event.event_type}`}
