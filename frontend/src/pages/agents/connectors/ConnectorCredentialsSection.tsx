@@ -233,7 +233,7 @@ function AgentCredentialBinding({
             </Badge>
           )}
         </div>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           {currentValue
             ? "This agent uses a specific credential for this connector."
             : "Select a credential for this agent. The connector won\u2019t work until one is assigned."}

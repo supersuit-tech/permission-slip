@@ -79,7 +79,7 @@ function InviteCommandDisplay({ invite }: { invite: InviteResponse }) {
         instructions={instructions}
         buttonLabel="Copy Command"
       />
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-sm">
         Invite expires at{" "}
         {new Date(invite.expires_at).toLocaleString(undefined, {
           dateStyle: "medium",

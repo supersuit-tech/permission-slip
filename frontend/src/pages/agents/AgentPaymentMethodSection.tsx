@@ -89,7 +89,7 @@ export function AgentPaymentMethodSection({
                 Optional
               </Badge>
             </CardTitle>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="text-muted-foreground mt-1 text-sm">
               Only needed if you want this agent to use connector actions that
               make purchases.
             </p>
@@ -147,7 +147,7 @@ export function AgentPaymentMethodSection({
                       <Badge variant="secondary">Not set</Badge>
                     )}
                   </div>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground text-sm">
                     {currentValue
                       ? "This agent will use the selected payment method for purchases."
                       : "No payment method assigned. Only needed if this agent uses connector actions that make purchases."}
