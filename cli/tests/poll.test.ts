@@ -112,8 +112,8 @@ describe("pollUntilResolved", () => {
     // Advance through the sleep intervals to trigger each poll.
     // Poll 1 (immediate) → pending → sleep 2s
     await jest.advanceTimersByTimeAsync(2000);
-    // Poll 2 → pending → sleep 3s
-    await jest.advanceTimersByTimeAsync(3000);
+    // Poll 2 → pending → sleep 4s (2x backoff)
+    await jest.advanceTimersByTimeAsync(4000);
     // Poll 3 → approved → returns
 
     const result = await promise;
