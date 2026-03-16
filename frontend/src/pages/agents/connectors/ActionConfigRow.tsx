@@ -33,7 +33,7 @@ export function ActionConfigRow({
         <div>
           <p className="font-medium">{config.name}</p>
           {config.description && (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               {config.description}
             </p>
           )}

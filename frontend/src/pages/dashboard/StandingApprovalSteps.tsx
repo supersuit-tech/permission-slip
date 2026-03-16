@@ -40,7 +40,7 @@ export function StepPickAgent({
           </option>
         ))}
       </select>
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-sm">
         Choose which agent this standing approval applies to.
       </p>
     </div>
@@ -98,7 +98,7 @@ export function StepPickAction({
               Custom action type...
             </option>
           </select>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-sm">
             Select an action configuration to pre-populate constraints, or
             choose &quot;Custom action type&quot; for manual entry.
           </p>
@@ -156,7 +156,7 @@ export function StepConstraints({
     <div className="space-y-3">
       <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3">
         <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           Standing approvals require parameter constraints. At least one
           parameter must be Fixed or Pattern — not all wildcards.
         </p>
@@ -177,7 +177,7 @@ export function StepConstraints({
       ) : (
         <div className="space-y-2">
           <Label htmlFor="sa-manual-constraints">Constraints (JSON)</Label>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-sm">
             No parameter schema found for this action. Enter constraints
             manually as a JSON object.
           </p>
@@ -189,8 +189,8 @@ export function StepConstraints({
             onChange={(e) => onManualConstraintsJsonChange(e.target.value)}
             disabled={isPending}
           />
-          <p className="text-muted-foreground text-xs">
-            Use <code className="font-mono">&quot;*&quot;</code> for wildcard
+          <p className="text-muted-foreground text-sm">
+            Use <code className="rounded bg-muted px-1 font-mono">&quot;*&quot;</code> for wildcard
             parameters, but at least one must be non-wildcard.
           </p>
         </div>
@@ -223,7 +223,7 @@ export function StepLimits({
           value={maxExecutions}
           onChange={(e) => onMaxExecutionsChange(e.target.value)}
         />
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           Leave empty for unlimited executions.
         </p>
       </div>
@@ -237,7 +237,7 @@ export function StepLimits({
           onChange={(e) => onExpiresAtChange(e.target.value)}
           required
         />
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           Maximum 90 days from now.
         </p>
       </div>
