@@ -27,11 +27,16 @@ import {
   SHOP_REQUIRED_PROVIDERS,
 } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
+import {
+  useAgentConnectorCredential,
+  useAssignAgentConnectorCredential,
+} from "@/hooks/useAgentConnectorCredential";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 
 interface SetupConnectorCredentialsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  agentId?: number;
   connectorId: string;
   connectorName: string;
   connectorLogoSvg?: string;
@@ -55,6 +60,7 @@ interface SetupConnectorCredentialsDialogProps {
 export function SetupConnectorCredentialsDialog({
   open,
   onOpenChange,
+  agentId,
   connectorId,
   connectorName,
   connectorLogoSvg,
@@ -70,6 +76,8 @@ export function SetupConnectorCredentialsDialog({
     useState(false);
   const [addCredentialTarget, setAddCredentialTarget] =
     useState<RequiredCredential | null>(null);
+  const { binding } = useAgentConnectorCredential(agentId ?? 0, connectorId);
+  const { assign } = useAssignAgentConnectorCredential();
 
   const isLoading = detailLoading || providersLoading || connectionsLoading;
   const requiredCredentials = connector?.required_credentials ?? [];
@@ -257,7 +265,17 @@ export function SetupConnectorCredentialsDialog({
             }
           }}
           credential={addCredentialTarget}
-          onSuccess={() => onOpenChange(false)}
+          onSuccess={(credentialId) => {
+            if (
+              agentId != null &&
+              agentId > 0 &&
+              !binding?.credential_id &&
+              !binding?.oauth_connection_id
+            ) {
+              assign({ agentId, connectorId, credentialId }).catch(() => {});
+            }
+            onOpenChange(false);
+          }}
         />
       )}
     </>

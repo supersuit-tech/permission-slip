@@ -32,6 +32,10 @@ import {
 } from "@/lib/oauth";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
+import {
+  useAgentConnectorCredential,
+  useAssignAgentConnectorCredential,
+} from "@/hooks/useAgentConnectorCredential";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
@@ -40,6 +44,7 @@ import { BYOASetupBanner } from "./BYOASetupBanner";
 export interface ManageCredentialsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  agentId?: number;
   connectorId: string;
   connectorLabel?: string;
   hasRequiredCredentials: boolean;
@@ -58,6 +63,7 @@ export interface ManageCredentialsDialogProps {
 export function ManageCredentialsDialog({
   open,
   onOpenChange,
+  agentId,
   connectorId,
   connectorLabel,
   hasRequiredCredentials,
@@ -185,6 +191,8 @@ export function ManageCredentialsDialog({
                       requiredCredential={cred}
                       storedCredentials={storedCredentials}
                       isAlternative={hasOAuth}
+                      agentId={agentId}
+                      connectorId={connectorId}
                     />
                   )}
                 </div>
@@ -488,13 +496,19 @@ function StaticCredentialRow({
   requiredCredential,
   storedCredentials,
   isAlternative,
+  agentId,
+  connectorId,
 }: {
   requiredCredential: RequiredCredential;
   storedCredentials: CredentialSummary[];
   isAlternative: boolean;
+  agentId?: number;
+  connectorId: string;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(null);
+  const { binding } = useAgentConnectorCredential(agentId ?? 0, connectorId);
+  const { assign } = useAssignAgentConnectorCredential();
 
   const isConnected = storedCredentials.length > 0;
 
@@ -590,6 +604,16 @@ function StaticCredentialRow({
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         credential={requiredCredential}
+        onSuccess={(credentialId) => {
+          if (
+            agentId != null &&
+            agentId > 0 &&
+            !binding?.credential_id &&
+            !binding?.oauth_connection_id
+          ) {
+            assign({ agentId, connectorId, credentialId }).catch(() => {});
+          }
+        }}
       />
 
       {removeTarget && (

@@ -515,18 +515,18 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		// triggering frontend redirects with arbitrary error text.
 		stateStr := r.URL.Query().Get("state")
 		if stateStr == "" {
-			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter", "")
+			redirectToFrontend(w, r, deps, providerID, "error", "Missing state parameter", "", "")
 			return
 		}
 		state, err := verifyOAuthState(deps, stateStr)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: invalid state: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Invalid or expired state token", "")
+			redirectToFrontend(w, r, deps, providerID, "error", "Invalid or expired state token", "", "")
 			return
 		}
 		if state.Provider != providerID {
 			log.Printf("[%s] OAuthCallback: provider mismatch: state=%s path=%s", TraceID(r.Context()), state.Provider, providerID)
-			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch", state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch", state.ReturnTo, "")
 			return
 		}
 
@@ -538,7 +538,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			if errDesc == "" {
 				errDesc = errCode
 			}
-			redirectToFrontend(w, r, deps, providerID, "error", errDesc, state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", errDesc, state.ReturnTo, "")
 			return
 		}
 
@@ -552,19 +552,19 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 		if err != nil || profile == nil {
 			log.Printf("[%s] OAuthCallback: profile lookup failed: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found", state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found", state.ReturnTo, "")
 			return
 		}
 
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			redirectToFrontend(w, r, deps, providerID, "error", "Missing authorization code", state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", "Missing authorization code", state.ReturnTo, "")
 			return
 		}
 
 		provider, ok := deps.OAuthProviders.Get(providerID)
 		if !ok {
-			redirectToFrontend(w, r, deps, providerID, "error", "Provider not found", state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", "Provider not found", state.ReturnTo, "")
 			return
 		}
 
@@ -590,7 +590,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		token, err := cfg.Exchange(ctx, code)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: token exchange failed: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Token exchange failed", state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", "Token exchange failed", state.ReturnTo, "")
 			return
 		}
 
@@ -629,7 +629,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			extra, err := enricher(ctx, token.AccessToken)
 			if err != nil {
 				log.Printf("[%s] OAuthCallback: post-OAuth enrichment for %q failed: %v", TraceID(r.Context()), providerID, err)
-				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again", state.ReturnTo)
+				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again", state.ReturnTo, "")
 				return
 			}
 			if stateExtraData == nil {
@@ -651,13 +651,14 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		if err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID); err != nil {
+		connID, err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID)
+		if err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
-			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection", state.ReturnTo)
+			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection", state.ReturnTo, "")
 			return
 		}
 
-		redirectToFrontend(w, r, deps, providerID, "success", "", state.ReturnTo)
+		redirectToFrontend(w, r, deps, providerID, "success", "", state.ReturnTo, connID)
 	}
 }
 
@@ -673,10 +674,10 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 // replaceID, if non-empty, is the ID of an existing connection to replace.
 // When set, only that specific connection is deleted. When empty, a new
 // connection is created alongside any existing ones for the same provider.
-func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string) error {
+func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string) (string, error) {
 	tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return "", fmt.Errorf("begin tx: %w", err)
 	}
 	if owned {
 		defer db.RollbackTx(ctx, tx) //nolint:errcheck // best-effort cleanup
@@ -692,14 +693,14 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		// connection while authorizing Google).
 		oldConn, lookupErr := db.GetOAuthConnectionByID(ctx, tx, replaceID)
 		if lookupErr != nil {
-			return fmt.Errorf("lookup connection to replace: %w", lookupErr)
+			return "", fmt.Errorf("lookup connection to replace: %w", lookupErr)
 		}
 		if oldConn != nil && oldConn.UserID == userID && oldConn.Provider == providerID {
 			existing, err = db.DeleteOAuthConnectionByID(ctx, tx, userID, replaceID)
 			if err != nil {
 				var connErr *db.OAuthConnectionError
 				if !errors.As(err, &connErr) || connErr.Code != db.OAuthConnectionErrNotFound {
-					return fmt.Errorf("delete existing connection: %w", err)
+					return "", fmt.Errorf("delete existing connection: %w", err)
 				}
 			}
 		} else if oldConn != nil && oldConn.Provider != providerID {
@@ -718,14 +719,14 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 
 		// Always clean up the old access token secret.
 		if err := deps.Vault.DeleteSecret(ctx, tx, existing.AccessTokenVaultID); err != nil {
-			return fmt.Errorf("delete orphaned access token secret: %w", err)
+			return "", fmt.Errorf("delete orphaned access token secret: %w", err)
 		}
 
 		// Only delete the old refresh token secret if the new token includes
 		// a replacement. Otherwise we reuse the existing vault entry.
 		if existing.RefreshTokenVaultID != nil && token.RefreshToken != "" {
 			if err := deps.Vault.DeleteSecret(ctx, tx, *existing.RefreshTokenVaultID); err != nil {
-				return fmt.Errorf("delete orphaned refresh token secret: %w", err)
+				return "", fmt.Errorf("delete orphaned refresh token secret: %w", err)
 			}
 			oldRefreshVaultID = nil // cleared — will create fresh below
 		}
@@ -733,19 +734,19 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 
 	connID, err := generatePrefixedID("oconn_", 16)
 	if err != nil {
-		return fmt.Errorf("generate connection ID: %w", err)
+		return "", fmt.Errorf("generate connection ID: %w", err)
 	}
 
 	accessVaultID, err := deps.Vault.CreateSecret(ctx, tx, connID+"_access", []byte(token.AccessToken))
 	if err != nil {
-		return fmt.Errorf("vault create access token: %w", err)
+		return "", fmt.Errorf("vault create access token: %w", err)
 	}
 
 	var refreshVaultID *string
 	if token.RefreshToken != "" {
 		id, err := deps.Vault.CreateSecret(ctx, tx, connID+"_refresh", []byte(token.RefreshToken))
 		if err != nil {
-			return fmt.Errorf("vault create refresh token: %w", err)
+			return "", fmt.Errorf("vault create refresh token: %w", err)
 		}
 		refreshVaultID = &id
 	} else if oldRefreshVaultID != nil {
@@ -778,15 +779,15 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		ExtraData:           extraData,
 	})
 	if err != nil {
-		return fmt.Errorf("create connection: %w", err)
+		return "", fmt.Errorf("create connection: %w", err)
 	}
 
 	if owned {
 		if err := db.CommitTx(ctx, tx); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return "", fmt.Errorf("commit: %w", err)
 		}
 	}
-	return nil
+	return connID, nil
 }
 
 // tokenExtraKeys lists the extra fields from OAuth token responses that should
@@ -1119,7 +1120,7 @@ func oauthCallbackURL(deps *Deps, providerID string) string {
 // started the OAuth flow from (returnTo), or to "/" if no return path was
 // provided. Status and error info are passed as query parameters so the
 // frontend can display an appropriate toast.
-func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, provider, status, errMsg, returnTo string) {
+func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, provider, status, errMsg, returnTo, connectionID string) {
 	path := "/"
 	if returnTo != "" && isRelativePath(returnTo) {
 		path = returnTo
@@ -1133,6 +1134,9 @@ func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, prov
 	q.Set("oauth_status", status)
 	if errMsg != "" {
 		q.Set("oauth_error", errMsg)
+	}
+	if connectionID != "" {
+		q.Set("oauth_connection_id", connectionID)
 	}
 	parsedURL.RawQuery = q.Encode()
 	http.Redirect(w, r, parsedURL.String(), http.StatusTemporaryRedirect)

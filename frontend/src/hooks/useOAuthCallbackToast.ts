@@ -42,7 +42,9 @@ export function useOAuthCallbackToast() {
       toast.error(detail);
     }
 
-    // Remove OAuth params without a full navigation
+    // Remove OAuth params without a full navigation.
+    // Note: oauth_connection_id is cleaned up separately by
+    // useAutoAssignOAuthCredential so it can read the value first.
     searchParams.delete("oauth_status");
     searchParams.delete("oauth_provider");
     searchParams.delete("oauth_error");
