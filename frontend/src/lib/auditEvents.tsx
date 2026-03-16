@@ -10,7 +10,8 @@ import {
   CreditCard,
   HelpCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import type { VariantProps } from "class-variance-authority";
 import {
   TableRow,
   TableCell,
@@ -41,7 +42,7 @@ export const ACTION_EVENT_TYPES =
 
 interface OutcomeStyle {
   label: string;
-  variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" | "success-soft" | "warning-soft" | "info-soft" | "destructive-soft";
+  variant: NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
   Icon: typeof CheckCircle2;
 }
 
