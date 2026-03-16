@@ -271,7 +271,7 @@ export function ActivityDetailSheet({
               <MetadataLabel icon={Clock} title={formatRelativeTime(event.timestamp)}>
                 {formatAbsoluteTime(event.timestamp)}
               </MetadataLabel>
-              <MetadataLabel icon={Bot}>{getAuditAgentName(event)}</MetadataLabel>
+              <MetadataLabel icon={Bot} title={`ID: ${event.agent_id}`}>{getAuditAgentName(event)}</MetadataLabel>
               {event.connector_id && (
                 <MetadataLabel icon={Plug} className="capitalize">
                   {event.connector_id}
