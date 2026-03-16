@@ -41,20 +41,20 @@ export const ACTION_EVENT_TYPES =
 
 interface OutcomeStyle {
   label: string;
-  variant: "default" | "secondary" | "destructive" | "outline";
+  variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" | "success-soft" | "warning-soft" | "info-soft" | "destructive-soft";
   Icon: typeof CheckCircle2;
 }
 
 export const OUTCOME_CONFIG: Record<string, OutcomeStyle> = {
-  approved: { label: "Approved", variant: "default", Icon: CheckCircle2 },
+  approved: { label: "Approved", variant: "success", Icon: CheckCircle2 },
   denied: { label: "Denied", variant: "destructive", Icon: XCircle },
   cancelled: { label: "Cancelled", variant: "outline", Icon: Ban },
-  auto_executed: { label: "Auto-executed", variant: "secondary", Icon: Zap },
-  registered: { label: "Registered", variant: "default", Icon: Bot },
+  auto_executed: { label: "Auto-executed", variant: "info", Icon: Zap },
+  registered: { label: "Registered", variant: "success", Icon: Bot },
   deactivated: { label: "Deactivated", variant: "destructive", Icon: Power },
-  pending: { label: "Pending", variant: "outline", Icon: Clock },
-  expired: { label: "Expired", variant: "secondary", Icon: TimerOff },
-  charged: { label: "Charged", variant: "default", Icon: CreditCard },
+  pending: { label: "Pending", variant: "warning", Icon: Clock },
+  expired: { label: "Expired", variant: "outline", Icon: TimerOff },
+  charged: { label: "Charged", variant: "info", Icon: CreditCard },
 };
 
 /** All outcome values (derived from OUTCOME_CONFIG) plus "all", for the full activity page. */
