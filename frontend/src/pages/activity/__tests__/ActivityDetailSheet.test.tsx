@@ -67,7 +67,7 @@ describe("ActivityDetailSheet", () => {
     });
   });
 
-  it("shows agent name and ID", async () => {
+  it("shows agent name in metadata pill", async () => {
     const event = makeEvent();
     render(
       <ActivityDetailSheet
@@ -81,7 +81,7 @@ describe("ActivityDetailSheet", () => {
     await waitFor(() => {
       expect(screen.getByText("My Bot")).toBeInTheDocument();
     });
-    expect(screen.getByText(/ID: 1/)).toBeInTheDocument();
+    expect(screen.getByTitle("ID: 1")).toBeInTheDocument();
   });
 
   it("shows outcome badge", async () => {
@@ -199,6 +199,36 @@ describe("ActivityDetailSheet", () => {
     await waitFor(() => {
       expect(screen.getByText("Action")).toBeInTheDocument();
     });
+  });
+
+  it("shows connector pill when connector_id is present", async () => {
+    const event = makeEvent({ connector_id: "github" });
+    render(
+      <ActivityDetailSheet event={event as never} open={true} onOpenChange={() => {}} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(screen.getByText("github")).toBeInTheDocument();
+    });
+  });
+
+  it("hides connector pill when connector_id is absent", async () => {
+    // Render WITH a connector_id first to confirm the pill renders
+    const eventWith = makeEvent({ connector_id: "github" });
+    const { rerender } = render(
+      <ActivityDetailSheet event={eventWith as never} open={true} onOpenChange={() => {}} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(screen.getByText("github")).toBeInTheDocument();
+    });
+
+    // Re-render WITHOUT connector_id and confirm the pill is gone
+    const eventWithout = makeEvent({ connector_id: undefined });
+    rerender(
+      <ActivityDetailSheet event={eventWithout as never} open={true} onOpenChange={() => {}} />,
+    );
+    expect(screen.queryByText("github")).not.toBeInTheDocument();
   });
 
   it("does not crash when event is present but open is false", () => {
