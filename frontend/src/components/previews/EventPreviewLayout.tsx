@@ -48,23 +48,24 @@ export function EventPreviewLayout({
     startDate && endDate ? formatDuration(startDate, endDate) : null;
 
   return (
-    <div className="bg-slate-800 dark:bg-slate-900 overflow-hidden rounded-xl p-4">
+    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
       {/* Action header inside the card */}
       <div className="mb-3 flex items-center gap-2">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-500/20">
-          <Calendar className="size-4 text-indigo-400" aria-hidden="true" />
+        <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-50 ring-1 ring-indigo-200 dark:bg-indigo-950 dark:ring-indigo-800">
+          <Calendar className="size-4 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
         </div>
+        <span className="text-muted-foreground text-xs font-medium">Event</span>
       </div>
 
       {/* Event details */}
       <div className="flex items-start gap-4">
         {/* Date block */}
         {monthStr && dayStr && (
-          <div className="flex flex-col items-center rounded-lg bg-slate-700/60 px-3 py-2">
-            <span className="text-[10px] font-semibold tracking-wider text-slate-400">
+          <div className="flex flex-col items-center rounded-lg bg-muted px-3 py-2">
+            <span className="text-muted-foreground text-[10px] font-semibold tracking-wider">
               {monthStr}
             </span>
-            <span className="text-2xl font-bold leading-tight text-white">
+            <span className="text-2xl font-bold leading-tight">
               {dayStr}
             </span>
           </div>
@@ -73,17 +74,17 @@ export function EventPreviewLayout({
         {/* Event info */}
         <div className="min-w-0 flex-1 space-y-1">
           {title && (
-            <p className="truncate text-base font-semibold capitalize text-white">
+            <p className="truncate text-base font-semibold capitalize">
               {title}
             </p>
           )}
           {startDate && endDate && (
-            <p className="text-sm text-slate-300">
+            <p className="text-muted-foreground text-sm">
               {formatTime(startDate)} → {formatTime(endDate)}
             </p>
           )}
           {duration && (
-            <p className="text-xs text-slate-400">{duration}</p>
+            <p className="text-muted-foreground text-xs">{duration}</p>
           )}
         </div>
       </div>

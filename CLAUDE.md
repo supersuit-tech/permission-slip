@@ -159,6 +159,16 @@ Follow this checklist whenever a migration introduces a new table, uses a new ex
 
 Whenever you make changes to database schema, tables, or migrations, review the seed file and update it to reflect the new schema. Add seed data for any new tables or columns so the seed remains comprehensive and stable. The seed should always be runnable against the current schema without errors.
 
+## Storybook ↔ Production Parity
+
+**Storybook stories must always reflect the real component implementation.** Never let stories diverge from production code:
+
+- When updating a component's styling, layout, or behavior, update both the real component AND any corresponding stories in the same commit.
+- Stories that duplicate component markup (e.g., `ApprovalDialog.stories.tsx`) must mirror the exact same JSX structure, class names, and design patterns as the real component (`ReviewApprovalDialog.tsx`).
+- If you change agent avatars, preview cards, toggles, or any visual element in the real component, apply the same change to all story files that render that element.
+- Design concept stories (e.g., `ApprovalDialogConcepts.stories.tsx`) are for exploration only. Once a concept is selected and applied to the real components, delete or archive the unused concept stories.
+- **Never introduce new styling in a story without also applying it to the real component**, and vice versa.
+
 ## React & Frontend Guidelines
 
 ### File Structure & Component Organization
