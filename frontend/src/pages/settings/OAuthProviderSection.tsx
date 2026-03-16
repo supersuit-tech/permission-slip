@@ -92,7 +92,7 @@ export function OAuthProviderSection() {
                         {providerLabel(config.provider)}
                       </p>
                     </div>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                       Custom credentials configured &middot; Added{" "}
                       {new Date(config.created_at).toLocaleDateString()}
                     </p>
@@ -125,7 +125,7 @@ export function OAuthProviderSection() {
                     <p className="text-sm font-medium">
                       {providerLabel(provider.id)}
                     </p>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                       Needs OAuth client credentials to enable connections
                     </p>
                   </div>

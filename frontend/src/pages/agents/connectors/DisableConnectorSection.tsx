@@ -133,7 +133,7 @@ export function DisableConnectorSection({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-medium">Disable this connector</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-sm">
                 Temporarily prevent the agent from using {connectorName}. Your
                 credentials{oauthProvider && " and OAuth connections"} are
                 preserved &mdash; you can re-enable later without reconnecting.
@@ -158,7 +158,7 @@ export function DisableConnectorSection({
                   <p className="text-sm font-medium">
                     Remove this connector
                   </p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground text-sm">
                     {oauthProvider ? (
                       <>
                         Disable the connector, disconnect the{" "}

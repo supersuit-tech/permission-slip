@@ -118,7 +118,7 @@ export function SpendingLimitsDialog({
               onChange={(e) => setLabel(e.target.value)}
               disabled={isLoading}
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               A friendly name to identify this card at a glance.
             </p>
           </div>
@@ -138,7 +138,7 @@ export function SpendingLimitsDialog({
               }}
               disabled={isLoading}
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               Maximum amount per individual agent transaction.
             </p>
           </div>
@@ -158,7 +158,7 @@ export function SpendingLimitsDialog({
               }}
               disabled={isLoading}
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
               Maximum total spend across all agent transactions in the last 30
               days.
             </p>

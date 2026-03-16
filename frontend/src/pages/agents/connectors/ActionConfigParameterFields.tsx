@@ -82,14 +82,12 @@ export function ActionConfigParameterFields({
   }
 
   const introText = (
-    <p className="text-muted-foreground text-xs">
+    <p className="text-muted-foreground text-sm leading-relaxed">
       Use{" "}
-      <Badge variant="outline" className="border-dashed font-mono text-xs">
-        *
-      </Badge>{" "}
+      <code className="rounded bg-muted px-1 font-mono">*</code>{" "}
       as a wildcard in any value (e.g.{" "}
-      <code className="text-xs">*@mycompany.com</code>). Check{" "}
-      <strong>Any value</strong> to let the agent choose freely.
+      <code className="rounded bg-muted px-1 font-mono">*@mycompany.com</code>
+      ). Check <strong>Any value</strong> to let the agent choose freely.
     </p>
   );
 
@@ -186,7 +184,7 @@ function ParameterField({
         )}
       </div>
       {property.description && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-sm">
           {property.description}
         </p>
       )}
@@ -221,8 +219,8 @@ function ParameterField({
         </label>
       </div>
       {!isWildcard && value.includes("*") && (
-        <p className="text-muted-foreground text-xs">
-          <code className="font-mono">*</code> matches any text
+        <p className="text-muted-foreground text-sm">
+          <code className="rounded bg-muted px-1 font-mono">*</code> matches any text
         </p>
       )}
     </div>

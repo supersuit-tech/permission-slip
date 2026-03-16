@@ -116,6 +116,9 @@ function ParameterRow({
         {label !== name && (
           <code className="bg-muted text-muted-foreground rounded px-1 py-0.5 text-[10px] font-mono">{name}</code>
         )}
+        {type && (
+          <span className="text-muted-foreground text-[10px] font-mono">{type}</span>
+        )}
         {isRequired && !isProvided && (
           <Badge
             variant="destructive"
