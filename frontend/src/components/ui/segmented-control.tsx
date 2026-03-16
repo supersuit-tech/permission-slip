@@ -35,7 +35,7 @@ export function SegmentedControl<T extends string>({
         next = options.length - 1;
       }
 
-      if (next >= 0) {
+      if (next >= 0 && next !== idx) {
         e.preventDefault();
         const opt = options[next];
         if (opt) {
@@ -45,6 +45,8 @@ export function SegmentedControl<T extends string>({
           );
           buttons?.[next]?.focus();
         }
+      } else if (next >= 0) {
+        e.preventDefault();
       }
     },
     [options, value, onChange],
