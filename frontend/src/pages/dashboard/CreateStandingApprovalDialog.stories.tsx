@@ -199,8 +199,20 @@ function StoryConstraintField({
   onModeChange: (key: string, mode: ParamMode) => void;
 }) {
   const isWildcard = mode === "wildcard";
-  // Use a clean human-readable label from the key, not the technical description
-  const label = paramKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Use a clean human-readable label: snake_case → Title Case, with common acronym fixes
+  const label = paramKey
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bId\b/g, "ID")
+    .replace(/\bUrl\b/g, "URL");
+
+  // In constraint context, datetime fields should be plain text — users enter
+  // patterns like "2026-*" or RFC 3339 values, not pick from a calendar.
+  const constraintProperty: typeof property =
+    property["x-ui"]?.widget === "datetime" ||
+    (property.type === "string" && property.description?.toLowerCase().includes("rfc 3339"))
+      ? { ...property, "x-ui": { ...(property["x-ui"] ?? {}), widget: "text" } }
+      : property;
 
   return (
     <div className="space-y-1.5">
@@ -235,7 +247,7 @@ function StoryConstraintField({
       <div>
         <ParameterFieldWidget
           paramKey={paramKey}
-          property={property}
+          property={constraintProperty}
           value={isWildcard ? "" : value}
           onChange={(v) => onValueChange(paramKey, v)}
           disabled={isWildcard}
@@ -280,8 +292,7 @@ function StoryStepConstraints({
       <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3">
         <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
         <p className="text-muted-foreground text-sm">
-          Standing approvals require parameter constraints. At least one
-          parameter must be Fixed or Pattern — not all wildcards.
+          At least one field must have a fixed value or pattern — not all wildcards.
         </p>
       </div>
 
@@ -299,18 +310,24 @@ function StoryStepConstraints({
               ). Check <strong className="text-foreground/70">Any value</strong> to let the agent choose freely.
             </p>
           </div>
-          {Object.entries(properties).map(([key, prop]) => (
-            <StoryConstraintField
-              key={key}
-              paramKey={key}
-              property={prop}
-              isRequired={requiredFields.includes(key)}
-              value={paramValues[key] ?? ""}
-              mode={paramModes[key] ?? "fixed"}
-              onValueChange={onParamValueChange}
-              onModeChange={onParamModeChange}
-            />
-          ))}
+          {Object.entries(properties)
+            .sort(([a], [b]) => {
+              const aReq = requiredFields.includes(a) ? 0 : 1;
+              const bReq = requiredFields.includes(b) ? 0 : 1;
+              return aReq - bReq;
+            })
+            .map(([key, prop]) => (
+              <StoryConstraintField
+                key={key}
+                paramKey={key}
+                property={prop}
+                isRequired={requiredFields.includes(key)}
+                value={paramValues[key] ?? ""}
+                mode={paramModes[key] ?? "fixed"}
+                onValueChange={onParamValueChange}
+                onModeChange={onParamModeChange}
+              />
+            ))}
         </div>
       ) : (
         <div className="space-y-2">
