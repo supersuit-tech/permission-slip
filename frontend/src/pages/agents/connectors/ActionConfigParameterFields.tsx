@@ -221,9 +221,11 @@ function ParameterField({
         </label>
       </div>
       {!isWildcard && value.includes("*") && (
-        <p className="text-muted-foreground text-sm">
-          <code className="rounded bg-muted px-1 font-mono">*</code> matches any text
-        </p>
+        <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            <code className="rounded bg-muted px-1 font-mono text-foreground/70">*</code> matches any text
+          </p>
+        </div>
       )}
     </div>
   );

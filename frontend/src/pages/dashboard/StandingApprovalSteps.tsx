@@ -98,10 +98,12 @@ export function StepPickAction({
               Custom action type...
             </option>
           </select>
-          <p className="text-muted-foreground text-sm">
-            Select an action configuration to pre-populate constraints, or
-            choose &quot;Custom action type&quot; for manual entry.
-          </p>
+          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Select an action configuration to pre-populate constraints, or
+              choose &quot;Custom action type&quot; for manual entry.
+            </p>
+          </div>
         </>
       )}
 
@@ -177,10 +179,12 @@ export function StepConstraints({
       ) : (
         <div className="space-y-2">
           <Label htmlFor="sa-manual-constraints">Constraints (JSON)</Label>
-          <p className="text-muted-foreground text-sm">
-            No parameter schema found for this action. Enter constraints
-            manually as a JSON object.
-          </p>
+          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              No parameter schema found for this action. Enter constraints
+              manually as a JSON object.
+            </p>
+          </div>
           <textarea
             id="sa-manual-constraints"
             className="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -189,10 +193,12 @@ export function StepConstraints({
             onChange={(e) => onManualConstraintsJsonChange(e.target.value)}
             disabled={isPending}
           />
-          <p className="text-muted-foreground text-sm">
-            Use <code className="rounded bg-muted px-1 font-mono">&quot;*&quot;</code> for wildcard
-            parameters, but at least one must be non-wildcard.
-          </p>
+          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Use <code className="rounded bg-muted px-1 font-mono text-foreground/70">&quot;*&quot;</code> for wildcard
+              parameters, but at least one must be non-wildcard.
+            </p>
+          </div>
         </div>
       )}
     </div>
