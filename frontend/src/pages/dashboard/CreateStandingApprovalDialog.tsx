@@ -2,6 +2,7 @@ import { type FormEvent, useState, useMemo } from "react";
 import { Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConnectorLogo } from "@/components/ConnectorLogo";
 import {
   Dialog,
   DialogContent,
@@ -149,8 +150,13 @@ export function CreateStandingApprovalDialog({
     ? selectedConfig.action_type
     : customActionType;
 
-  const { schema: fetchedSchema, isLoading: schemaLoading } =
-    useActionSchema(effectiveActionType);
+  const {
+    schema: fetchedSchema,
+    isLoading: schemaLoading,
+    connectorName,
+    actionName,
+    connectorLogoSvg,
+  } = useActionSchema(effectiveActionType);
 
   const configSchema = fetchedSchema;
 
@@ -378,12 +384,39 @@ export function CreateStandingApprovalDialog({
     >
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create Standing Approval</DialogTitle>
-          <DialogDescription>
-            {hasInitialContext
-              ? `Step ${step - 2} of 2: ${STEP_LABELS[step]}`
-              : `Step ${step} of 4: ${STEP_LABELS[step]}`}
-          </DialogDescription>
+          {effectiveActionType ? (
+            <>
+              <div className="flex items-center gap-3">
+                <ConnectorLogo
+                  name={connectorName ?? effectiveActionType}
+                  logoSvg={connectorLogoSvg}
+                  size="lg"
+                />
+                <div className="min-w-0">
+                  <DialogTitle className="truncate text-base">
+                    {actionName ?? effectiveActionType}
+                  </DialogTitle>
+                  {connectorName && (
+                    <p className="text-muted-foreground text-sm">
+                      {connectorName}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <DialogDescription>
+                {hasInitialContext
+                  ? `Step ${step - 2} of 2: ${STEP_LABELS[step]}`
+                  : `Step ${step} of 4: ${STEP_LABELS[step]}`}
+              </DialogDescription>
+            </>
+          ) : (
+            <>
+              <DialogTitle>Create Standing Approval</DialogTitle>
+              <DialogDescription>
+                {`Step ${step} of 4: ${STEP_LABELS[step]}`}
+              </DialogDescription>
+            </>
+          )}
         </DialogHeader>
 
         <div className="flex items-center gap-1 px-1">
