@@ -484,7 +484,7 @@ Lists workspace users visible to the bot, with cursor-based pagination.
 
 ### `slack.search_messages`
 
-Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the `search:read` scope — bot tokens (`xoxb-`) do not support this endpoint.
+Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the granular `search:read.*` scopes (`search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`) — bot tokens (`xoxb-`) do not support this endpoint.
 
 **Risk level:** low
 
@@ -520,7 +520,7 @@ Searches messages across Slack channels. **Requires a user token** (`xoxp-`) wit
 
 **Slack API:** `POST /search.messages` ([docs](https://api.slack.com/methods/search.messages))
 
-**Required scopes:** `search:read` (user token only)
+**Required scopes:** `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files` (user token only)
 
 > **Note:** This action will return a `missing_scope` error when invoked with a bot token. To use it, the OAuth flow must persist the user's access token (the `authed_user.access_token` field from Slack's OAuth v2 response).
 
