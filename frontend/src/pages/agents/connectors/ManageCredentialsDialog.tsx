@@ -616,7 +616,13 @@ function StaticCredentialRow({
               .then(() => {
                 toast.success("Credential assigned to this agent.");
               })
-              .catch(() => {});
+              .catch((err) => {
+                toast.error(
+                  err instanceof Error
+                    ? err.message
+                    : "Could not auto-assign credential — please select it manually.",
+                );
+              });
           }
         }}
       />
