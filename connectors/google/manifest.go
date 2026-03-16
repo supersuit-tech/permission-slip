@@ -25,6 +25,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description:     "Send an email via Gmail",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Send email to {{to}} — {{subject}}",
+				Preview: &connectors.ActionPreview{
+					Layout: "message",
+					Fields: map[string]string{"to": "to", "subject": "subject", "body": "body"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["to", "subject", "body"],
@@ -73,6 +77,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Create a new event on Google Calendar",
 				RiskLevel:   "medium",
 				DisplayTemplate: "Create event {{summary}} on {{start_time:datetime}} with {{attendees:count}} attendees",
+				Preview: &connectors.ActionPreview{
+					Layout: "event",
+					Fields: map[string]string{"title": "summary", "start": "start_time", "end": "end_time"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["summary", "start_time", "end_time"],

@@ -25,6 +25,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Issue",
 				Description: "Create a new issue in a repository",
 				RiskLevel:   "low",
+				Preview: &connectors.ActionPreview{
+					Layout: "record",
+					Fields: map[string]string{"title": "title", "subtitle": "repo"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "title"],

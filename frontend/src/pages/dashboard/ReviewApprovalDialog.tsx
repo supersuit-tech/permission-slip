@@ -1,14 +1,15 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Loader2, Clock, Bot, AlertTriangle, CheckCircle, XCircle, ShieldCheck } from "lucide-react";
+import { Loader2, Clock, AlertTriangle, CheckCircle, XCircle, ShieldCheck, Check } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConnectorLogo } from "@/components/ConnectorLogo";
 import { useApproveApproval } from "@/hooks/useApproveApproval";
 import type { ApproveResult } from "@/hooks/useApproveApproval";
 import { useDenyApproval } from "@/hooks/useDenyApproval";
@@ -16,8 +17,8 @@ import { useActionSchema } from "@/hooks/useActionSchema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
 import { useAgents } from "@/hooks/useAgents";
 import { useStandingApprovals } from "@/hooks/useStandingApprovals";
-import { ActionPreviewSummary } from "@/components/ActionPreviewSummary";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
+import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 import {
   useCountdown,
@@ -99,8 +100,6 @@ function deriveConstraintsFromParams(
 ): Record<string, unknown> {
   const constraints: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(parameters)) {
-    // Keep the raw value — CreateStandingApprovalDialog's
-    // initConstraintsFromRecord handles type coercion.
     constraints[key] = value ?? "";
   }
   return constraints;
@@ -120,14 +119,14 @@ export function ReviewApprovalDialog({
   const isApproved = approveResult !== null;
   const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
-  const { schema, actionName, displayTemplate } = useActionSchema(approval.action.type);
+  const { schema, actionName, displayTemplate, preview, connectorName, connectorLogoSvg } =
+    useActionSchema(approval.action.type);
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
   const isBusy = pendingAction !== null || isDenying;
 
   // Data for "Always Allow This"
   const { agents } = useAgents();
-  // API defaults to status=active, so only active standing approvals are returned
   const { standingApprovals, isLoading: standingApprovalsLoading } = useStandingApprovals();
   const params = approval.action.parameters as Record<string, unknown>;
   const hasParams = Object.keys(params).length > 0;
@@ -142,7 +141,7 @@ export function ReviewApprovalDialog({
   );
   const showAlwaysAllow = hasParams && !standingApprovalsLoading && !hasExistingStandingApproval;
 
-  // Auto-close dialog after successful approval (unless user is creating standing approval)
+  // Auto-close dialog after successful approval
   useEffect(() => {
     if (!isApproved || autoCloseBlocked) return;
     const timer = setTimeout(() => onOpenChange(false), SUCCESS_AUTO_CLOSE_MS);
@@ -190,8 +189,6 @@ export function ReviewApprovalDialog({
   function handleStandingDialogChange(nextOpen: boolean) {
     setStandingDialogOpen(nextOpen);
     if (!nextOpen && !standingApprovalCreated) {
-      // SA wizard was dismissed without creating — unblock auto-close
-      // so the user can click Done or let the dialog close naturally.
       setAutoCloseBlocked(false);
     }
   }
@@ -209,8 +206,25 @@ export function ReviewApprovalDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        {/* Connector header with logo, action name, and connector name */}
         <DialogHeader>
-          <DialogTitle>Review Approval Request</DialogTitle>
+          <div className="flex items-center gap-3">
+            <ConnectorLogo
+              name={connectorName ?? approval.action.type}
+              logoSvg={connectorLogoSvg}
+              size="lg"
+            />
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base">
+                {actionName ?? approval.action.type}
+              </DialogTitle>
+              {connectorName && (
+                <p className="text-muted-foreground text-sm">
+                  {connectorName}
+                </p>
+              )}
+            </div>
+          </div>
         </DialogHeader>
 
         {isApproved ? (
@@ -224,78 +238,84 @@ export function ReviewApprovalDialog({
                 </p>
               </div>
             )}
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              onClick={() => handleClose(false)}
+            >
+              Done
+            </Button>
           </div>
         ) : (
-          <div className="space-y-4 sm:space-y-6">
-            {/* Agent */}
-            <div className="flex items-center gap-3">
-              <div className="bg-muted rounded-full p-2">
-                <Bot className="text-muted-foreground size-5" aria-hidden="true" />
+          <div className="space-y-4 sm:space-y-5">
+            {/* Agent info + status */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="bg-amber-100 dark:bg-amber-900/30 flex size-10 shrink-0 items-center justify-center rounded-full">
+                  <span className="text-base" aria-hidden="true">&#9728;&#65039;</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{agentDisplayName}</p>
+                  <p className="text-muted-foreground text-xs">wants to perform an action</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{agentDisplayName}</p>
-                {agentDisplayName !== String(approval.agent_id) && (
-                  <p className="text-muted-foreground truncate font-mono text-xs">
-                    {approval.agent_id}
-                  </p>
-                )}
-              </div>
+              <Badge variant="warning-soft" className="shrink-0 uppercase">
+                Pending
+              </Badge>
             </div>
 
-            {/* Action & Risk */}
-            <div className="bg-muted/50 space-y-3 rounded-lg border p-3 sm:p-4">
+            {/* Rich action preview card */}
+            <div className="space-y-2">
+              {/* Action header above the card */}
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <div className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">
-                      {actionName ?? approval.action.type}
-                    </span>
-                    {actionName && (
-                      <span className="text-muted-foreground block truncate font-mono text-xs">
-                        {approval.action.type}
-                      </span>
-                    )}
-                  </div>
-                  <RiskBadge level={approval.context.risk_level} />
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm font-semibold">
+                    {actionName ?? approval.action.type}
+                  </span>
                 </div>
-                <span
-                  aria-label={isExpired ? "Request expired" : `Time remaining: ${formatCountdown(remaining)}`}
-                  className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${urgencyColor(remaining)}`}
-                >
-                  <Clock className="size-3" aria-hidden="true" />
-                  {isExpired ? "Expired" : formatCountdown(remaining)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <RiskBadge level={approval.context.risk_level} />
+                  <span
+                    aria-label={isExpired ? "Request expired" : `Time remaining: ${formatCountdown(remaining)}`}
+                    className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${urgencyColor(remaining)}`}
+                  >
+                    <Clock className="size-3" aria-hidden="true" />
+                    {isExpired ? "Expired" : formatCountdown(remaining)}
+                  </span>
+                </div>
               </div>
 
+              {/* Context description */}
               {approval.context.description && (
                 <p className="text-muted-foreground text-sm">
                   {approval.context.description}
                 </p>
               )}
 
-              {/* Action preview summary */}
-              <div className="border-t pt-3">
-                <ActionPreviewSummary
-                  actionType={approval.action.type}
-                  parameters={approval.action.parameters as Record<string, unknown>}
-                  schema={schema}
-                  actionName={actionName}
-                  displayTemplate={displayTemplate}
-                  resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
-                />
-              </div>
+              {/* Preview card — connector-driven or fallback */}
+              <ActionPreviewCard
+                preview={preview}
+                parameters={params}
+                actionType={approval.action.type}
+                schema={schema}
+                actionName={actionName}
+                displayTemplate={displayTemplate}
+                resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
+              />
             </div>
 
-            {/* Parameters (collapsible — summary above covers the essentials) */}
-            {Object.keys(approval.action.parameters).length > 0 && (
+            {/* Raw parameters (collapsible) */}
+            {hasParams && (
               <details className="group">
                 <summary className="flex cursor-pointer items-center gap-1 text-sm font-medium select-none">
                   <span className="text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true">&#9656;</span>
-                  Parameters
+                  Raw parameters
                 </summary>
                 <div className="bg-muted/50 mt-2 overflow-x-auto rounded-lg border p-3 sm:p-4">
                   <SchemaParameterDetails
-                    parameters={approval.action.parameters as Record<string, unknown>}
+                    parameters={params}
                     schema={schema}
                   />
                 </div>
@@ -323,65 +343,61 @@ export function ReviewApprovalDialog({
                 </p>
               </div>
             )}
-          </div>
-        )}
 
-        {isApproved ? (
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => handleClose(false)}
-            >
-              Done
-            </Button>
-          </DialogFooter>
-        ) : (
-          <DialogFooter>
-            <Button
-              variant="outline"
-              size="lg"
-              disabled={isBusy || isExpired}
-              onClick={handleDeny}
-              aria-label={isDenying ? "Denying request…" : undefined}
-            >
-              {isDenying ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "Deny"
-              )}
-            </Button>
-            {showAlwaysAllow && (
+            {/* Action buttons — stacked full-width matching mockup */}
+            <div className="space-y-2 pt-2">
               <Button
                 size="lg"
-                variant="secondary"
+                className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                 disabled={isBusy || isExpired}
-                onClick={handleAlwaysAllow}
-                aria-label={pendingAction === "alwaysAllow" ? "Approving and creating rule…" : undefined}
+                onClick={handleApprove}
+                aria-label={pendingAction === "approve" ? "Approving request…" : undefined}
               >
-                {pendingAction === "alwaysAllow" ? (
+                {pendingAction === "approve" ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <>
-                    <ShieldCheck className="mr-1 size-4" />
-                    Always Allow
+                    <Check className="mr-1 size-4" />
+                    Approve
                   </>
                 )}
               </Button>
-            )}
-            <Button
-              size="lg"
-              disabled={isBusy || isExpired}
-              onClick={handleApprove}
-              aria-label={pendingAction === "approve" ? "Approving request…" : undefined}
-            >
-              {pendingAction === "approve" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "Approve"
+
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                disabled={isBusy || isExpired}
+                onClick={handleDeny}
+                aria-label={isDenying ? "Denying request…" : undefined}
+              >
+                {isDenying ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Deny"
+                )}
+              </Button>
+
+              {showAlwaysAllow && (
+                <button
+                  className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors disabled:opacity-50"
+                  disabled={isBusy || isExpired}
+                  onClick={handleAlwaysAllow}
+                  aria-label={pendingAction === "alwaysAllow" ? "Approving and creating rule…" : undefined}
+                  type="button"
+                >
+                  {pendingAction === "alwaysAllow" ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <>
+                      <ShieldCheck className="size-3" />
+                      Always allow this action
+                    </>
+                  )}
+                </button>
               )}
-            </Button>
-          </DialogFooter>
+            </div>
+          </div>
         )}
       </DialogContent>
 
