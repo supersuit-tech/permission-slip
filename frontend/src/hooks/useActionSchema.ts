@@ -73,10 +73,12 @@ export function useActionSchema(actionType: string): {
       | { layout?: string; fields?: Record<string, string> }
       | undefined;
     let preview: ActionPreviewConfig | null = null;
+    const validLayouts: ReadonlySet<string> = new Set(["event", "message", "record"]);
     if (
       rawPreview?.layout &&
-      rawPreview?.fields &&
-      typeof rawPreview.layout === "string"
+      typeof rawPreview.layout === "string" &&
+      validLayouts.has(rawPreview.layout) &&
+      rawPreview?.fields
     ) {
       preview = {
         layout: rawPreview.layout as ActionPreviewConfig["layout"],

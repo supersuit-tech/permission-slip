@@ -271,17 +271,9 @@ export function ReviewApprovalDialog({
               {/* Action header above the card */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <ConnectorLogo
-                    name={connectorName ?? approval.action.type}
-                    logoSvg={connectorLogoSvg}
-                    size="sm"
-                  />
                   <span className="truncate text-sm font-semibold">
                     {actionName ?? approval.action.type}
                   </span>
-                  {connectorName && (
-                    <span className="text-muted-foreground text-xs">{connectorName}</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <RiskBadge level={approval.context.risk_level} />

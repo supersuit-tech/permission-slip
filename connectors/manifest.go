@@ -3,6 +3,7 @@ package connectors
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"regexp"
@@ -225,6 +226,19 @@ func (m *ConnectorManifest) Validate() error {
 			}
 			if len(a.Preview.Fields) == 0 {
 				return fmt.Errorf("manifest validation: actions[%d].preview.fields is required", i)
+			}
+			// Validate that layout-specific required field roles are present.
+			requiredFieldsByLayout := map[string][]string{
+				"event":   {"title", "start", "end"},
+				"message": {"to"},
+				"record":  {"title"},
+			}
+			if required, ok := requiredFieldsByLayout[a.Preview.Layout]; ok {
+				for _, role := range required {
+					if _, exists := a.Preview.Fields[role]; !exists {
+						return fmt.Errorf("manifest validation: actions[%d].preview.fields missing required role %q for layout %q", i, role, a.Preview.Layout)
+					}
+				}
 			}
 		}
 	}
@@ -574,7 +588,11 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 	for _, a := range m.Actions {
 		var previewJSON []byte
 		if a.Preview != nil {
-			previewJSON, _ = json.Marshal(a.Preview)
+			var err error
+			previewJSON, err = json.Marshal(a.Preview)
+			if err != nil {
+				log.Printf("warning: failed to marshal preview for action %s: %v", a.ActionType, err)
+			}
 		}
 		out.Actions = append(out.Actions, db.ExternalConnectorAction{
 			ActionType:            a.ActionType,
