@@ -126,4 +126,5 @@ jobs:
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           gh workflow run trigger-webhook.yml \
-            -f message="CI failed on main — investigate: ${RUN_URL}"
+          gh workflow run trigger-webhook.yml \
+            -f message="CI failed on ${{ github.ref_name }} — investigate: ${RUN_URL}"
