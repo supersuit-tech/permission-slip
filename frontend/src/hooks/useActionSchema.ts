@@ -5,6 +5,12 @@ import {
   type ParametersSchema,
 } from "@/lib/parameterSchema";
 
+/** Structured preview layout config from the connector manifest. */
+export interface ActionPreviewConfig {
+  layout: "event" | "message" | "record";
+  fields: Record<string, string>;
+}
+
 /**
  * Extracts the connector ID from an action type string.
  * e.g., "github.create_issue" → "github"
@@ -22,6 +28,9 @@ export function useActionSchema(actionType: string): {
   schema: ParametersSchema | null;
   actionName: string | null;
   displayTemplate: string | null;
+  preview: ActionPreviewConfig | null;
+  connectorName: string | null;
+  connectorLogoSvg: string | null;
   isLoading: boolean;
 } {
   const connectorId = connectorIdFromActionType(actionType);
@@ -29,14 +38,28 @@ export function useActionSchema(actionType: string): {
 
   const result = useMemo(() => {
     if (!connector?.actions) {
-      return { schema: null, actionName: null, displayTemplate: null };
+      return {
+        schema: null,
+        actionName: null,
+        displayTemplate: null,
+        preview: null,
+        connectorName: null,
+        connectorLogoSvg: null,
+      };
     }
 
     const action = connector.actions.find(
       (a) => a.action_type === actionType,
     );
     if (!action) {
-      return { schema: null, actionName: null, displayTemplate: null };
+      return {
+        schema: null,
+        actionName: null,
+        displayTemplate: null,
+        preview: null,
+        connectorName: connector.name ?? null,
+        connectorLogoSvg: connector.logo_svg ?? null,
+      };
     }
 
     // Safe cast: the generated API type for parameters_schema is
@@ -45,10 +68,29 @@ export function useActionSchema(actionType: string): {
       action.parameters_schema as Record<string, unknown> | undefined,
     );
 
+    // Parse preview config if present.
+    const rawPreview = action.preview as
+      | { layout?: string; fields?: Record<string, string> }
+      | undefined;
+    let preview: ActionPreviewConfig | null = null;
+    if (
+      rawPreview?.layout &&
+      rawPreview?.fields &&
+      typeof rawPreview.layout === "string"
+    ) {
+      preview = {
+        layout: rawPreview.layout as ActionPreviewConfig["layout"],
+        fields: rawPreview.fields,
+      };
+    }
+
     return {
       schema,
       actionName: action.name ?? null,
       displayTemplate: action.display_template ?? null,
+      preview,
+      connectorName: connector.name ?? null,
+      connectorLogoSvg: connector.logo_svg ?? null,
     };
   }, [connector, actionType]);
 

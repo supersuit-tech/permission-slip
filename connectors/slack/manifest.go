@@ -24,6 +24,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Send Message",
 				Description: "Send a message to a Slack channel",
 				RiskLevel:   "low",
+				Preview: &connectors.ActionPreview{
+					Layout: "message",
+					Fields: map[string]string{"to": "channel", "subject": "channel", "body": "message"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "message"],

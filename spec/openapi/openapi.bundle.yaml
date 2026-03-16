@@ -7935,6 +7935,41 @@ components:
             Uses `{{param}}` for raw value insertion, `{{param:datetime}}` for date formatting,
             and `{{param:count}}` for array length. Falls back to generic rendering when absent.
           example: Send email to {{to}} — {{subject}}
+        preview:
+          type: object
+          description: |
+            Structured preview layout config for rich rendering in the approval UI.
+            Defines a layout type and maps layout-specific field roles to action parameter names.
+            When present, the frontend renders a visually rich preview card instead of plain text.
+          properties:
+            layout:
+              type: string
+              enum:
+                - event
+                - message
+                - record
+              description: |
+                Layout template type. Determines which visual layout the frontend uses.
+                - "event": Calendar-style card with date block, title, time range, duration
+                - "message": Communication card with recipient, subject, body preview
+                - "record": Entity card with title, subtitle, and key metadata fields
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+              description: |
+                Maps layout-specific field roles to action parameter names. For example,
+                an "event" layout expects "title", "start", and "end" fields mapped to
+                the corresponding parameter names from the action's schema.
+          required:
+            - layout
+            - fields
+          example:
+            layout: event
+            fields:
+              title: summary
+              start: start_time
+              end: end_time
       example:
         action_type: github.create_issue
         name: Create Issue

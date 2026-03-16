@@ -32,6 +32,7 @@ type connectorActionResponse struct {
 	ParametersSchema      any     `json:"parameters_schema,omitempty"`
 	RequiresPaymentMethod bool    `json:"requires_payment_method"`
 	DisplayTemplate       *string `json:"display_template,omitempty"`
+	Preview               any     `json:"preview,omitempty"`
 }
 
 type requiredCredentialResponse struct {
@@ -131,6 +132,14 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 				log.Printf("[%s] warning: failed to unmarshal connector %s action %s parameters_schema: %v", TraceID(ctx), c.ID, a.ActionType, err)
 			} else {
 				resp.ParametersSchema = schema
+			}
+		}
+		if len(a.Preview) > 0 {
+			var preview any
+			if err := json.Unmarshal(a.Preview, &preview); err != nil {
+				log.Printf("[%s] warning: failed to unmarshal connector %s action %s preview: %v", TraceID(ctx), c.ID, a.ActionType, err)
+			} else {
+				resp.Preview = preview
 			}
 		}
 		actions[i] = resp

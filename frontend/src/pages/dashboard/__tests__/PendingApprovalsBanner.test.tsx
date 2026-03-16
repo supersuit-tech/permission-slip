@@ -183,14 +183,13 @@ describe("PendingApprovalsBanner", () => {
     const bannerItems = screen.getAllByRole("button", { name: /Pending approval/ });
     await user.click(bannerItems[0]!);
 
+    // The dialog should open — check for the description and action buttons
     await waitFor(() => {
       expect(
-        screen.getByText("Review Approval Request"),
+        screen.getByText("Send welcome email to new user"),
       ).toBeInTheDocument();
     });
-    expect(
-      screen.getByText("Send welcome email to new user"),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Approve/i })).toBeInTheDocument();
   });
 
   it("approves via review dialog and shows success message", async () => {

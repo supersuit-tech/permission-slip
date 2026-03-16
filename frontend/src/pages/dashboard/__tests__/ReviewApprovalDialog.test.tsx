@@ -90,7 +90,7 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
 
     // "Always Allow" button should be visible alongside Approve/Deny
     await waitFor(() => {
-      expect(screen.getByText("Always Allow")).toBeInTheDocument();
+      expect(screen.getByText("Always allow this action")).toBeInTheDocument();
     });
     expect(screen.getByText("Approve")).toBeInTheDocument();
     expect(screen.getByText("Deny")).toBeInTheDocument();
@@ -112,7 +112,7 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    expect(screen.queryByText("Always Allow")).not.toBeInTheDocument();
+    expect(screen.queryByText("Always allow this action")).not.toBeInTheDocument();
   });
 
   it("does NOT show 'Always Allow' when a standing approval already exists for agent+action", async () => {
@@ -139,7 +139,7 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       expect(screen.getByText("Approve")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText("Always Allow")).not.toBeInTheDocument();
+    expect(screen.queryByText("Always allow this action")).not.toBeInTheDocument();
   });
 
   it("approves request and opens CreateStandingApprovalDialog when 'Always Allow' is clicked", async () => {
@@ -170,10 +170,10 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
 
     // Click "Always Allow" from the pre-approval screen
     await waitFor(() => {
-      expect(screen.getByText("Always Allow")).toBeInTheDocument();
+      expect(screen.getByText("Always allow this action")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Always Allow"));
+    await user.click(screen.getByText("Always allow this action"));
 
     // The CreateStandingApprovalDialog should open (skipping to constraints step)
     await waitFor(() => {
@@ -211,10 +211,10 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Always Allow")).toBeInTheDocument();
+      expect(screen.getByText("Always allow this action")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Always Allow"));
+    await user.click(screen.getByText("Always allow this action"));
 
     // Should show execution failure, NOT the standing approval wizard
     await waitFor(() => {

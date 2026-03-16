@@ -36,6 +36,20 @@ type ManifestAction struct {
 	ParametersSchema      json.RawMessage `json:"parameters_schema,omitempty"`
 	RequiresPaymentMethod bool            `json:"requires_payment_method,omitempty"`
 	DisplayTemplate       string          `json:"display_template,omitempty"`
+	Preview               *ActionPreview  `json:"preview,omitempty"`
+}
+
+// ActionPreview defines a structured layout for rich rendering of an action's
+// parameters in the approval UI. Each layout type expects specific field roles
+// that map to parameter names from the action's schema.
+//
+// Supported layouts:
+//   - "event":   fields "title", "start", "end"
+//   - "message": fields "to", "subject", "body"
+//   - "record":  fields "title", "subtitle" (plus any extras)
+type ActionPreview struct {
+	Layout string            `json:"layout"`
+	Fields map[string]string `json:"fields"`
 }
 
 // ManifestCredential describes a credential requirement for an external connector.
@@ -81,6 +95,13 @@ var validRiskLevels = map[string]bool{
 	"low":    true,
 	"medium": true,
 	"high":   true,
+}
+
+// validPreviewLayouts are the allowed values for ActionPreview.Layout.
+var validPreviewLayouts = map[string]bool{
+	"event":   true,
+	"message": true,
+	"record":  true,
 }
 
 // validWidgets are the allowed values for x-ui.widget on schema properties.
@@ -194,6 +215,17 @@ func (m *ConnectorManifest) Validate() error {
 		}
 		if a.RiskLevel != "" && !validRiskLevels[a.RiskLevel] {
 			return fmt.Errorf("manifest validation: actions[%d].risk_level %q must be low, medium, or high", i, a.RiskLevel)
+		}
+		if a.Preview != nil {
+			if a.Preview.Layout == "" {
+				return fmt.Errorf("manifest validation: actions[%d].preview.layout is required", i)
+			}
+			if !validPreviewLayouts[a.Preview.Layout] {
+				return fmt.Errorf("manifest validation: actions[%d].preview.layout %q must be event, message, or record", i, a.Preview.Layout)
+			}
+			if len(a.Preview.Fields) == 0 {
+				return fmt.Errorf("manifest validation: actions[%d].preview.fields is required", i)
+			}
 		}
 	}
 
@@ -540,6 +572,10 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		LogoSVG:     m.LogoSVG,
 	}
 	for _, a := range m.Actions {
+		var previewJSON []byte
+		if a.Preview != nil {
+			previewJSON, _ = json.Marshal(a.Preview)
+		}
 		out.Actions = append(out.Actions, db.ExternalConnectorAction{
 			ActionType:            a.ActionType,
 			Name:                  a.Name,
@@ -548,6 +584,7 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 			ParametersSchema:      a.ParametersSchema,
 			RequiresPaymentMethod: a.RequiresPaymentMethod,
 			DisplayTemplate:       a.DisplayTemplate,
+			Preview:               previewJSON,
 		})
 	}
 	for _, c := range m.RequiredCredentials {
