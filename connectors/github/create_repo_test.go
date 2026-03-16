@@ -122,6 +122,44 @@ func TestCreateRepo_OrgSuccess(t *testing.T) {
 	}
 }
 
+func TestCreateRepo_NameTrimmed(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody map[string]any
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshaling request body: %v", err)
+		}
+		// Verify the trimmed name reaches the API, not the padded original.
+		if reqBody["name"] != "my-repo" {
+			t.Errorf("name = %q, want %q (should be trimmed)", reqBody["name"], "my-repo")
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":        1,
+			"name":      "my-repo",
+			"full_name": "octocat/my-repo",
+			"html_url":  "https://github.com/octocat/my-repo",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.create_repo"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.create_repo",
+		Parameters:  json.RawMessage(`{"name":"  my-repo  "}`),
+		Credentials: validCreds(),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+}
+
 func TestCreateRepo_DescriptionOptional(t *testing.T) {
 	t.Parallel()
 
