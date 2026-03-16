@@ -10,7 +10,8 @@ import (
 // It searches messages across channels via POST /search.messages.
 //
 // IMPORTANT: This Slack endpoint requires a user token (xoxp-) with the
-// search:read scope. Bot tokens (xoxb-) do NOT support search.messages.
+// search:read.* scopes (search:read.public, search:read.private, etc.).
+// Bot tokens (xoxb-) do NOT support search.messages.
 // For this action to work, the OAuth flow must persist the authed_user
 // access_token (returned alongside the bot token in Slack's OAuth v2
 // response) into the connector's credentials. Until user-token credential
