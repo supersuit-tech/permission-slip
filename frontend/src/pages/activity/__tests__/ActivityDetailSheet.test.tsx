@@ -67,7 +67,7 @@ describe("ActivityDetailSheet", () => {
     });
   });
 
-  it("shows agent name and ID", async () => {
+  it("shows agent name in metadata pill", async () => {
     const event = makeEvent();
     render(
       <ActivityDetailSheet
@@ -81,7 +81,6 @@ describe("ActivityDetailSheet", () => {
     await waitFor(() => {
       expect(screen.getByText("My Bot")).toBeInTheDocument();
     });
-    expect(screen.getByText(/ID: 1/)).toBeInTheDocument();
   });
 
   it("shows outcome badge", async () => {

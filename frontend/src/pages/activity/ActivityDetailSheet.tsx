@@ -5,6 +5,7 @@ import {
   XCircle,
   AlertTriangle,
   Clock,
+  Plug,
 } from "lucide-react";
 import {
   Sheet,
@@ -13,7 +14,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
 import {
   type AuditEvent,
   OutcomeBadge,
@@ -26,6 +26,7 @@ import { useActionSchema } from "@/hooks/useActionSchema";
 import { ActionPreviewSummary } from "@/components/ActionPreviewSummary";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { RiskBadge } from "@/pages/dashboard/approval-components";
+import { MetadataLabel } from "@/components/MetadataLabel";
 
 /** Matches Radix Sheet exit animation duration so content stays rendered during close. */
 export const SHEET_CLOSE_DELAY_MS = 300;
@@ -263,43 +264,23 @@ export function ActivityDetailSheet({
 
         {event && (
           <div className="space-y-5 px-4 pb-6">
-          {/* Event header */}
-          <div className="flex items-center justify-between gap-3">
+          {/* Event header — outcome badge + metadata pills */}
+          <div className="space-y-3">
             <OutcomeBadge outcome={event.outcome} />
-            <span className="text-muted-foreground text-xs" title={formatRelativeTime(event.timestamp)}>
-              {formatAbsoluteTime(event.timestamp)}
-            </span>
-          </div>
-
-          {/* Agent */}
-          <div className="space-y-2">
-            <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-              Agent
-            </h4>
-            <div className="flex items-center gap-3">
-              <div className="bg-muted rounded-full p-2">
-                <Bot className="text-muted-foreground size-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">{getAuditAgentName(event)}</p>
-                <p className="text-muted-foreground font-mono text-xs">
-                  ID: {event.agent_id}
-                </p>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <MetadataLabel icon={Clock}>
+                <span title={formatRelativeTime(event.timestamp)}>
+                  {formatAbsoluteTime(event.timestamp)}
+                </span>
+              </MetadataLabel>
+              <MetadataLabel icon={Bot}>{getAuditAgentName(event)}</MetadataLabel>
+              {event.connector_id && (
+                <MetadataLabel icon={Plug} className="capitalize">
+                  {event.connector_id}
+                </MetadataLabel>
+              )}
             </div>
           </div>
-
-          {/* Connector */}
-          {event.connector_id && (
-            <div className="space-y-2">
-              <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                Connector
-              </h4>
-              <Badge variant="outline" className="capitalize">
-                {event.connector_id}
-              </Badge>
-            </div>
-          )}
 
           {/* Action summary from audit event */}
           {actionType && !shouldFetchApproval && (
