@@ -282,28 +282,18 @@ function StandingApprovalsTable({
       <div className="min-w-[600px] overflow-hidden rounded-lg sm:min-w-0">
         <Table>
           <TableHeader>
-            <TableRow className="border-none bg-primary hover:bg-primary">
-              <TableHead className="font-semibold text-primary-foreground">
-                Action
-              </TableHead>
-              <TableHead className="font-semibold text-primary-foreground">
-                Agent
-              </TableHead>
-              <TableHead className="font-semibold text-primary-foreground">
-                Constraints
-              </TableHead>
-              <TableHead className="font-semibold text-primary-foreground">
-                Executions
-              </TableHead>
-              <TableHead className="font-semibold text-primary-foreground">
-                Expires
-              </TableHead>
-              <TableHead className="font-semibold text-primary-foreground">
+            <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
+              <TableHead>Action</TableHead>
+              <TableHead>Agent</TableHead>
+              <TableHead>Constraints</TableHead>
+              <TableHead>Executions</TableHead>
+              <TableHead>Expires</TableHead>
+              <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody className="[&>tr:nth-child(even)]:bg-muted">
+          <TableBody>
             {approvals.map((sa) => (
               <StandingApprovalRow
                 key={sa.standing_approval_id}
