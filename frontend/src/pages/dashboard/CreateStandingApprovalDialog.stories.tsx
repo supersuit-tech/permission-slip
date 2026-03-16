@@ -199,40 +199,22 @@ function StoryConstraintField({
   onModeChange: (key: string, mode: ParamMode) => void;
 }) {
   const isWildcard = mode === "wildcard";
-  const label =
-    property.description ??
-    paramKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Use a clean human-readable label from the key, not the technical description
+  const label = paramKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
-          {label}
-        </Label>
-        {isRequired && (
-          <Badge variant="secondary" className="text-xs">
-            required
-          </Badge>
-        )}
-        {property.type && (
-          <span className="text-muted-foreground text-xs">
-            ({property.type})
-          </span>
-        )}
-      </div>
-      {property.description && (
-        <p className="text-muted-foreground text-sm">{property.description}</p>
-      )}
-      <div className="flex items-center gap-2">
-        <ParameterFieldWidget
-          paramKey={paramKey}
-          property={property}
-          value={isWildcard ? "" : value}
-          onChange={(v) => onValueChange(paramKey, v)}
-          disabled={isWildcard}
-          placeholder={isWildcard ? "Agent can use any value" : undefined}
-          className={isWildcard ? "bg-muted" : ""}
-        />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
+            {label}
+          </Label>
+          {isRequired && (
+            <Badge variant="secondary" className="text-xs">
+              required
+            </Badge>
+          )}
+        </div>
         <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap">
           <Checkbox
             checked={isWildcard}
@@ -249,6 +231,17 @@ function StoryConstraintField({
           <Asterisk className="size-3" />
           Any value
         </label>
+      </div>
+      <div>
+        <ParameterFieldWidget
+          paramKey={paramKey}
+          property={property}
+          value={isWildcard ? "" : value}
+          onChange={(v) => onValueChange(paramKey, v)}
+          disabled={isWildcard}
+          placeholder={isWildcard ? "Agent can use any value" : undefined}
+          className={isWildcard ? "bg-muted" : ""}
+        />
       </div>
       {!isWildcard && value.includes("*") && (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
