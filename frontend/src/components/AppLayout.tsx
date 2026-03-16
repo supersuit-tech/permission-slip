@@ -63,7 +63,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   "pb-1 font-medium",
                   isActive
                     ? "border-b-2 border-secondary text-foreground"
-                    : "text-foreground/50 hover:text-foreground transition-colors"
+                    : "text-foreground/50 hover:text-foreground focus-visible:text-foreground transition-colors"
                 )}
               >
                 <Link to={item.path} aria-current={isActive ? "page" : undefined} className="inline-flex items-center gap-1.5">
