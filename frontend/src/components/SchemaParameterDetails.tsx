@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { ParametersSchema } from "@/lib/parameterSchema";
+import { friendlyTypeLabel } from "@/lib/parameterSchema";
 import { formatParameterValue, humanizeKey } from "@/lib/formatValues";
 
 export type { ParametersSchema } from "@/lib/parameterSchema";
@@ -86,6 +87,7 @@ function ParameterRow({
   name,
   label,
   value,
+  type,
   enumValues,
   defaultValue,
   isRequired,
@@ -115,8 +117,8 @@ function ParameterRow({
         {label !== name && (
           <code className="bg-muted text-muted-foreground rounded px-1 py-0.5 text-[10px] font-mono">{name}</code>
         )}
-        {type && (
-          <span className="text-muted-foreground text-[10px] font-mono">{type}</span>
+        {friendlyTypeLabel(type) && (
+          <span className="text-muted-foreground text-[10px] font-mono">{friendlyTypeLabel(type)}</span>
         )}
         {isRequired && !isProvided && (
           <Badge

@@ -188,6 +188,13 @@ export function buildParametersFromForm(
     } else if (type === "boolean") {
       if (value === "true") { parameters[key] = true; continue; }
       if (value === "false") { parameters[key] = false; continue; }
+    } else if (type === "array") {
+      if (value.startsWith("[")) {
+        try {
+          const parsed: unknown = JSON.parse(value);
+          if (Array.isArray(parsed)) { parameters[key] = parsed; continue; }
+        } catch { /* fall through to string */ }
+      }
     }
 
     parameters[key] = value;

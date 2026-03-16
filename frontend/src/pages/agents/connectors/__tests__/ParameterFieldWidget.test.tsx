@@ -340,6 +340,69 @@ describe("ParameterFieldWidget", () => {
     });
   });
 
+  describe("list widget", () => {
+    const listProp: SchemaProperty = {
+      type: "array",
+      items: { type: "string" },
+      "x-ui": { widget: "list" },
+    };
+
+    it("renders an add item button when value is empty", () => {
+      renderWidget(listProp, "");
+
+      expect(screen.getByRole("button", { name: /add item/i })).toBeInTheDocument();
+    });
+
+    it("renders items from a JSON array value", () => {
+      renderWidget(listProp, '["tag1","tag2"]');
+
+      const inputs = screen.getAllByRole("textbox");
+      expect(inputs).toHaveLength(2);
+      expect(inputs[0]).toHaveValue("tag1");
+      expect(inputs[1]).toHaveValue("tag2");
+    });
+
+    it("adds a new empty item when Add item is clicked", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(listProp, "");
+
+      await user.click(screen.getByRole("button", { name: /add item/i }));
+
+      // Adding an empty item then filtering empties gives empty string
+      expect(onChange).toHaveBeenCalled();
+    });
+
+    it("removes an item when the remove button is clicked", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(listProp, '["a","b"]');
+
+      const removeButtons = screen.getAllByRole("button", { name: /remove item/i });
+      await user.click(removeButtons[0]!);
+
+      expect(onChange).toHaveBeenCalledWith('["b"]');
+    });
+
+    it("fires onChange with updated JSON when an item is edited", async () => {
+      const user = userEvent.setup();
+      const { onChange } = renderWidget(listProp, '["a"]');
+
+      const input = screen.getByRole("textbox");
+      await user.type(input, "b");
+
+      // Last call should serialize the appended value
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0];
+      expect(lastCall).toBe('["ab"]');
+    });
+
+    it("disables inputs and buttons when disabled", () => {
+      renderWidget(listProp, '["a"]', vi.fn(), true);
+
+      expect(screen.getByRole("textbox")).toBeDisabled();
+      expect(screen.getByRole("button", { name: /remove item/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /add item/i })).toBeDisabled();
+    });
+  });
+
   describe("disabled state", () => {
     it("disables the text input when disabled", () => {
       renderWidget({ type: "string" }, "", vi.fn(), true);

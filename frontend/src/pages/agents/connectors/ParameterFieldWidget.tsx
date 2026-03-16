@@ -1,6 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 
 export interface ParameterFieldWidgetProps {
@@ -34,7 +35,7 @@ export function ParameterFieldWidget({
   placeholder: placeholderOverride,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
-  const widget: WidgetType = ui?.widget ?? "text";
+  const widget: WidgetType = ui?.widget ?? inferWidget(property);
   const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
 
@@ -52,6 +53,14 @@ export function ParameterFieldWidget({
       <FieldHints ui={ui} />
     </div>
   );
+}
+
+/** Infer widget from schema type when no explicit x-ui.widget is set. */
+function inferWidget(property: SchemaProperty): WidgetType {
+  if (property.type === "boolean") return "toggle";
+  if (property.type === "integer" || property.type === "number") return "number";
+  if (property.type === "array" && property.items?.type === "string") return "list";
+  return "text";
 }
 
 interface WidgetRenderProps {
@@ -78,6 +87,8 @@ function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
       return <DateWidget {...props} />;
     case "datetime":
       return <DateTimeWidget {...props} />;
+    case "list":
+      return <ListWidget {...props} />;
     case "text":
     default:
       return <TextWidget {...props} />;
@@ -199,6 +210,86 @@ function DateTimeWidget({ inputId, value, onChange, disabled, placeholder, class
       placeholder={placeholder}
       className={className}
     />
+  );
+}
+
+/** Parse a JSON array string into a string array, with fallback for non-JSON values. */
+function parseListValue(value: string): string[] {
+  if (!value) return [];
+  if (value.startsWith("[")) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      // fall through
+    }
+  }
+  return [value];
+}
+
+/** Serialize a string array into a JSON array string for form state. */
+function serializeListValue(items: string[]): string {
+  const filtered = items.filter((item) => item !== "");
+  if (filtered.length === 0) return "";
+  return JSON.stringify(filtered);
+}
+
+function ListWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
+  const items = parseListValue(value);
+
+  function updateItem(index: number, newValue: string) {
+    const next = [...items];
+    next[index] = newValue;
+    onChange(serializeListValue(next));
+  }
+
+  function removeItem(index: number) {
+    const next = items.filter((_, i) => i !== index);
+    onChange(serializeListValue(next));
+  }
+
+  function addItem() {
+    onChange(serializeListValue([...items, ""]));
+  }
+
+  return (
+    <div className="w-full space-y-2" data-testid={`list-${inputId}`}>
+      {items.map((item, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <Input
+            id={index === 0 ? inputId : undefined}
+            type="text"
+            value={item}
+            onChange={(e) => updateItem(index, e.target.value)}
+            disabled={disabled}
+            placeholder={placeholder ?? `Item ${index + 1}`}
+            className={className}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={() => removeItem(index)}
+            disabled={disabled}
+            aria-label={`Remove item ${index + 1}`}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1"
+        onClick={addItem}
+        disabled={disabled}
+      >
+        <Plus className="size-4" />
+        Add item
+      </Button>
+    </div>
   );
 }
 

@@ -10,6 +10,7 @@ import {
   getOrderedFieldKeys,
   getFieldLabel,
   isFieldVisible,
+  friendlyTypeLabel,
 } from "@/lib/parameterSchema";
 
 interface ActionConfigParameterFieldsProps {
@@ -177,9 +178,9 @@ function ParameterField({
             required
           </Badge>
         )}
-        {property.type && (
+        {friendlyTypeLabel(property.type) && (
           <span className="text-muted-foreground text-xs">
-            ({property.type})
+            ({friendlyTypeLabel(property.type)})
           </span>
         )}
       </div>

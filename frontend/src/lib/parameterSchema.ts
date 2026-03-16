@@ -15,7 +15,7 @@ export interface VisibleWhen {
 
 /** Property-level `x-ui` rendering hints for a single parameter. */
 export interface SchemaPropertyUI {
-  widget?: "text" | "select" | "textarea" | "toggle" | "number" | "date" | "datetime";
+  widget?: "text" | "select" | "textarea" | "toggle" | "number" | "date" | "datetime" | "list";
   label?: string;
   placeholder?: string;
   group?: string;
@@ -45,6 +45,7 @@ export interface SchemaProperty {
   description?: string;
   enum?: string[];
   default?: unknown;
+  items?: { type?: string };
   "x-ui"?: SchemaPropertyUI;
 }
 
@@ -89,15 +90,15 @@ export function parseParametersSchema(
   )) {
     if (typeof val === "object" && val !== null) {
       const prop = val as Record<string, unknown>;
+      const propType = typeof prop.type === "string" ? prop.type : undefined;
       const format = typeof prop.format === "string" ? prop.format : undefined;
       const parsedUI = parsePropertyUI(prop["x-ui"]);
-      // Auto-map format: "date-time" → widget: "datetime" when no explicit widget is set
-      const ui =
-        format === "date-time" && !parsedUI?.widget
-          ? { ...parsedUI, widget: "datetime" as const }
-          : parsedUI;
+      // Auto-map types to widgets when no explicit widget is set
+      const ui = autoMapWidget(propType, format, prop, parsedUI);
+      // Preserve items schema for array types
+      const items = parseItems(prop.items);
       properties[key] = {
-        type: typeof prop.type === "string" ? prop.type : undefined,
+        type: propType,
         format,
         description:
           typeof prop.description === "string" ? prop.description : undefined,
@@ -105,6 +106,7 @@ export function parseParametersSchema(
           ? prop.enum.filter((e): e is string => typeof e === "string")
           : undefined,
         default: prop.default,
+        items,
         "x-ui": ui,
       };
     }
@@ -114,7 +116,7 @@ export function parseParametersSchema(
 }
 
 /** All valid widget type values. */
-export const VALID_WIDGETS = ["text", "select", "textarea", "toggle", "number", "date", "datetime"] as const;
+export const VALID_WIDGETS = ["text", "select", "textarea", "toggle", "number", "date", "datetime", "list"] as const;
 
 /** Widget type as a union — useful for exhaustive switch checks. */
 export type WidgetType = (typeof VALID_WIDGETS)[number];
@@ -165,6 +167,65 @@ export function isFieldVisible(
     return Number(fieldValue) === rule.equals;
   }
   return fieldValue === rule.equals;
+}
+
+const FRIENDLY_TYPE_LABELS: Record<string, string> = {
+  string: "text",
+  boolean: "yes / no",
+  integer: "number",
+  number: "number",
+  array: "list",
+};
+
+/**
+ * Return a user-friendly label for a JSON Schema type.
+ * Returns undefined for types that should not be displayed (object, unknown).
+ */
+export function friendlyTypeLabel(type: string | undefined): string | undefined {
+  if (!type) return undefined;
+  return FRIENDLY_TYPE_LABELS[type];
+}
+
+/**
+ * Auto-map JSON Schema type/format to a widget when no explicit widget is set.
+ * Explicit x-ui.widget always takes precedence.
+ */
+function autoMapWidget(
+  type: string | undefined,
+  format: string | undefined,
+  prop: Record<string, unknown>,
+  parsedUI: SchemaPropertyUI | undefined,
+): SchemaPropertyUI | undefined {
+  if (parsedUI?.widget) return parsedUI;
+
+  // Existing: format date-time → datetime widget
+  if (format === "date-time") {
+    return { ...parsedUI, widget: "datetime" as const };
+  }
+  // boolean → toggle
+  if (type === "boolean") {
+    return { ...parsedUI, widget: "toggle" as const };
+  }
+  // integer/number → number
+  if (type === "integer" || type === "number") {
+    return { ...parsedUI, widget: "number" as const };
+  }
+  // array with string items → list
+  if (type === "array") {
+    const items = prop.items;
+    if (items && typeof items === "object" && (items as Record<string, unknown>).type === "string") {
+      return { ...parsedUI, widget: "list" as const };
+    }
+  }
+  return parsedUI;
+}
+
+/** Parse an items schema from a JSON Schema array property. */
+function parseItems(raw: unknown): { type?: string } | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.type === "string") return { type: obj.type };
+  return undefined;
 }
 
 /** Parse a property-level `x-ui` object, returning undefined if invalid. */
