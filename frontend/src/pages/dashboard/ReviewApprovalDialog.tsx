@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
+import { getInitials } from "@/components/ui/avatar";
 import { useApproveApproval } from "@/hooks/useApproveApproval";
 import type { ApproveResult } from "@/hooks/useApproveApproval";
 import { useDenyApproval } from "@/hooks/useDenyApproval";

@@ -29,6 +29,7 @@ import { ConnectorLogo } from "@/components/ConnectorLogo";
 import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { RiskBadge } from "./approval-components";
+import { getInitials } from "@/components/ui/avatar";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 import type { ActionPreviewConfig } from "@/hooks/useActionSchema";
 
@@ -201,7 +202,7 @@ function ApprovalDialogStory({
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
                 <span className="text-sm font-bold text-violet-700 dark:text-violet-300">
-                  {agentName.slice(0, 2).toUpperCase()}
+                  {getInitials(agentName)}
                 </span>
               </div>
               <div className="min-w-0">

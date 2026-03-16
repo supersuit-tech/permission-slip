@@ -31,6 +31,7 @@ import {
 import { ConnectorLogo } from "@/components/ConnectorLogo";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { RiskBadge } from "./approval-components";
+import { getInitials } from "@/components/ui/avatar";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 
 const meta: Meta = {
@@ -56,6 +57,50 @@ const emailSchema: ParametersSchema = {
     body: { type: "string", description: "Email body (plain text)" },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Shared sub-components used by all three concepts
+// ---------------------------------------------------------------------------
+
+/** Approve / Deny / Always-allow button cluster shared across all concepts. */
+function DialogActionButtons() {
+  return (
+    <div className="space-y-2 pt-2">
+      <Button size="lg" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
+        <Check className="mr-1 size-4" />
+        Approve
+      </Button>
+      <Button variant="outline" size="lg" className="w-full">Deny</Button>
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
+      >
+        <ShieldCheck className="size-3" />
+        Always allow this action
+      </button>
+    </div>
+  );
+}
+
+/** Action name + risk badge + countdown row shared across all concepts. */
+function ActionHeader({ actionName, riskLevel, countdown }: {
+  actionName: string;
+  riskLevel: "low" | "medium" | "high";
+  countdown: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-sm font-semibold">{actionName}</span>
+      <div className="flex items-center gap-2">
+        <RiskBadge level={riskLevel} />
+        <span className="text-muted-foreground inline-flex items-center gap-1 text-xs font-medium">
+          <Clock className="size-3" />
+          {countdown}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // CONCEPT A — "Clean Card"
@@ -94,17 +139,7 @@ function ConceptA() {
             <Badge variant="warning-soft" className="shrink-0 uppercase">Pending</Badge>
           </div>
 
-          {/* Action header */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-semibold">Send Email</span>
-            <div className="flex items-center gap-2">
-              <RiskBadge level="medium" />
-              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs font-medium">
-                <Clock className="size-3" />
-                9:30
-              </span>
-            </div>
-          </div>
+          <ActionHeader actionName="Send Email" riskLevel="medium" countdown="9:30" />
 
           {/* Preview card — light, bordered, clean */}
           <div className="overflow-hidden rounded-xl border bg-gradient-to-b from-slate-50 to-white p-4 dark:from-slate-900 dark:to-slate-950 dark:border-slate-800">
@@ -137,21 +172,7 @@ function ConceptA() {
             </div>
           )}
 
-          {/* Actions */}
-          <div className="space-y-2 pt-2">
-            <Button size="lg" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
-              <Check className="mr-1 size-4" />
-              Approve
-            </Button>
-            <Button variant="outline" size="lg" className="w-full">Deny</Button>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
-            >
-              <ShieldCheck className="size-3" />
-              Always allow this action
-            </button>
-          </div>
+          <DialogActionButtons />
         </div>
       </DialogContent>
     </Dialog>
@@ -181,17 +202,7 @@ function ConceptB() {
         </DialogHeader>
 
         <div className="space-y-4 sm:space-y-5">
-          {/* Action header */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-semibold">Send Email</span>
-            <div className="flex items-center gap-2">
-              <RiskBadge level="medium" />
-              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs font-medium">
-                <Clock className="size-3" />
-                9:30
-              </span>
-            </div>
-          </div>
+          <ActionHeader actionName="Send Email" riskLevel="medium" countdown="9:30" />
 
           {/* Preview card — left accent border, clean white bg */}
           <div className="overflow-hidden rounded-lg border-l-4 border-l-blue-500 border border-border bg-card p-4">
@@ -228,21 +239,7 @@ function ConceptB() {
             </div>
           )}
 
-          {/* Actions */}
-          <div className="space-y-2 pt-2">
-            <Button size="lg" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
-              <Check className="mr-1 size-4" />
-              Approve
-            </Button>
-            <Button variant="outline" size="lg" className="w-full">Deny</Button>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
-            >
-              <ShieldCheck className="size-3" />
-              Always allow this action
-            </button>
-          </div>
+          <DialogActionButtons />
         </div>
       </DialogContent>
     </Dialog>
@@ -276,7 +273,7 @@ function ConceptC() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
-                <span className="text-sm font-bold text-violet-700 dark:text-violet-300">CB</span>
+                <span className="text-sm font-bold text-violet-700 dark:text-violet-300">{getInitials("Chiedobot")}</span>
               </div>
               <div>
                 <p className="text-sm font-semibold">Chiedobot</p>
@@ -286,17 +283,7 @@ function ConceptC() {
             <Badge variant="warning-soft" className="shrink-0 uppercase">Pending</Badge>
           </div>
 
-          {/* Action header */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-semibold">Send Email</span>
-            <div className="flex items-center gap-2">
-              <RiskBadge level="medium" />
-              <span className="text-muted-foreground inline-flex items-center gap-1 text-xs font-medium">
-                <Clock className="size-3" />
-                9:30
-              </span>
-            </div>
-          </div>
+          <ActionHeader actionName="Send Email" riskLevel="medium" countdown="9:30" />
 
           {/* Preview card — elevated with shadow */}
           <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
@@ -340,21 +327,7 @@ function ConceptC() {
             </div>
           )}
 
-          {/* Actions */}
-          <div className="space-y-2 pt-2">
-            <Button size="lg" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
-              <Check className="mr-1 size-4" />
-              Approve
-            </Button>
-            <Button variant="outline" size="lg" className="w-full">Deny</Button>
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
-            >
-              <ShieldCheck className="size-3" />
-              Always allow this action
-            </button>
-          </div>
+          <DialogActionButtons />
         </div>
       </DialogContent>
     </Dialog>
