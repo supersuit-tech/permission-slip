@@ -86,7 +86,6 @@ function ParameterRow({
   name,
   label,
   value,
-  type,
   enumValues,
   defaultValue,
   isRequired,
