@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -25,6 +26,7 @@ type createRepoParams struct {
 }
 
 func (p *createRepoParams) validate() error {
+	p.Name = strings.TrimSpace(p.Name)
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}

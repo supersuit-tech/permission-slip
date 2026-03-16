@@ -178,6 +178,10 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 			params: `{"name":""}`,
 		},
 		{
+			name:   "whitespace-only name",
+			params: `{"name":"   "}`,
+		},
+		{
 			name:   "invalid JSON",
 			params: `{invalid}`,
 		},
