@@ -55,7 +55,7 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       ref={groupRef}
-      className="inline-flex gap-0.5 rounded-lg bg-muted p-1"
+      className="flex gap-0.5 overflow-x-auto rounded-lg bg-muted p-1"
       role="radiogroup"
       aria-label={ariaLabel}
     >
@@ -70,8 +70,8 @@ export function SegmentedControl<T extends string>({
           onKeyDown={handleKeyDown}
           className={
             value === opt.value
-              ? "rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none"
-              : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none"
+              ? "shrink-0 rounded-md bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none"
+              : "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none"
           }
         >
           {opt.label}
