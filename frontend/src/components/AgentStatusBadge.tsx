@@ -2,21 +2,22 @@ import { Badge } from "@/components/ui/badge";
 
 const STATUS_CONFIG: Record<
   string,
-  { variant: "default" | "secondary" | "destructive"; label: string }
+  { dotColor: string; label: string }
 > = {
-  registered: { variant: "default", label: "Active" },
-  pending: { variant: "secondary", label: "Pending" },
-  deactivated: { variant: "destructive", label: "Deactivated" },
+  registered: { dotColor: "bg-success", label: "Active" },
+  pending: { dotColor: "bg-warning", label: "Pending" },
+  deactivated: { dotColor: "bg-destructive", label: "Deactivated" },
 };
 
 export function AgentStatusBadge({ status }: { status: string }) {
   const config = STATUS_CONFIG[status] ?? {
-    variant: "secondary" as const,
+    dotColor: "bg-muted-foreground",
     label: status,
   };
 
   return (
-    <Badge variant={config.variant} className="rounded-full">
+    <Badge variant="outline" className="gap-1.5 rounded-full">
+      <span className={`size-2 rounded-full ${config.dotColor}`} />
       {config.label}
     </Badge>
   );
