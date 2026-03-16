@@ -104,18 +104,17 @@ function ParameterRow({
   const displayValue = formatParameterValue(value);
   const isDefault =
     defaultValue !== undefined && String(value) === String(defaultValue);
+  const isMultiline = typeof value === "string" && value.includes("\n");
 
   return (
-    <div className="space-y-0.5 py-2 first:pt-0 last:pb-0">
+    <div className="space-y-1.5 py-3 first:pt-0 last:pb-0">
+      {/* Label row */}
       <div className="flex items-center gap-1.5">
-        <span className="text-muted-foreground text-xs font-medium">
+        <span className="text-foreground/70 text-xs font-semibold tracking-wide uppercase">
           {label !== name ? label : humanizeKey(name)}
         </span>
         {label !== name && (
-          <code className="text-muted-foreground/60 text-[10px]">{name}</code>
-        )}
-        {type && (
-          <span className="text-muted-foreground/50 text-[10px]">{type}</span>
+          <code className="bg-muted text-muted-foreground rounded px-1 py-0.5 text-[10px] font-mono">{name}</code>
         )}
         {isRequired && !isProvided && (
           <Badge
@@ -125,22 +124,34 @@ function ParameterRow({
             missing
           </Badge>
         )}
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-sm break-all">
-          {isProvided ? displayValue : <span className="text-muted-foreground italic">not provided</span>}
-        </span>
         {isDefault && (
-          <Badge variant="secondary" className="text-[9px] leading-tight">
+          <Badge variant="secondary" className="text-[9px] leading-tight ml-auto">
             default
           </Badge>
         )}
-        {enumValues && enumValues.length > 0 && isProvided && (
-          <span className="text-muted-foreground text-[10px]">
-            ({enumValues.join(" | ")})
-          </span>
-        )}
       </div>
+
+      {/* Value */}
+      {isProvided ? (
+        isMultiline ? (
+          <pre className="bg-muted/60 border-border rounded-md border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words font-sans text-foreground">
+            {displayValue}
+          </pre>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="bg-muted/60 border-border text-foreground inline-block rounded-md border px-2.5 py-1 text-sm font-medium break-all">
+              {displayValue}
+            </span>
+            {enumValues && enumValues.length > 0 && (
+              <span className="text-muted-foreground text-[10px]">
+                one of: {enumValues.join(", ")}
+              </span>
+            )}
+          </div>
+        )
+      ) : (
+        <span className="text-muted-foreground text-sm italic">not provided</span>
+      )}
     </div>
   );
 }
@@ -152,14 +163,28 @@ function FallbackDetails({
 }) {
   return (
     <dl className="divide-border divide-y">
-      {Object.entries(parameters).map(([key, value]) => (
-        <div key={key} className="flex gap-3 py-2 first:pt-0 last:pb-0">
-          <dt className="text-muted-foreground text-xs font-medium shrink-0">
-            {humanizeKey(key)}
-          </dt>
-          <dd className="text-sm truncate">{formatParameterValue(value)}</dd>
-        </div>
-      ))}
+      {Object.entries(parameters).map(([key, value]) => {
+        const displayValue = formatParameterValue(value);
+        const isMultiline = typeof value === "string" && value.includes("\n");
+        return (
+          <div key={key} className="space-y-1.5 py-3 first:pt-0 last:pb-0">
+            <dt className="text-foreground/70 text-xs font-semibold tracking-wide uppercase">
+              {humanizeKey(key)}
+            </dt>
+            <dd>
+              {isMultiline ? (
+                <pre className="bg-muted/60 border-border rounded-md border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words font-sans text-foreground">
+                  {displayValue}
+                </pre>
+              ) : (
+                <span className="bg-muted/60 border-border text-foreground inline-block rounded-md border px-2.5 py-1 text-sm font-medium break-all">
+                  {displayValue}
+                </span>
+              )}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
