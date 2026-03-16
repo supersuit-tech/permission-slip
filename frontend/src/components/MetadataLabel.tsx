@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MetadataLabelProps {
   icon?: LucideIcon;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   title?: string;
 }
