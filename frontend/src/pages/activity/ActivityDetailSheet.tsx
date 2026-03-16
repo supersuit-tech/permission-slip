@@ -268,10 +268,8 @@ export function ActivityDetailSheet({
           <div className="space-y-3">
             <OutcomeBadge outcome={event.outcome} />
             <div className="flex flex-wrap items-center gap-2">
-              <MetadataLabel icon={Clock}>
-                <span title={formatRelativeTime(event.timestamp)}>
-                  {formatAbsoluteTime(event.timestamp)}
-                </span>
+              <MetadataLabel icon={Clock} title={formatRelativeTime(event.timestamp)}>
+                {formatAbsoluteTime(event.timestamp)}
               </MetadataLabel>
               <MetadataLabel icon={Bot}>{getAuditAgentName(event)}</MetadataLabel>
               {event.connector_id && (

@@ -200,6 +200,29 @@ describe("ActivityDetailSheet", () => {
     });
   });
 
+  it("shows connector pill when connector_id is present", async () => {
+    const event = makeEvent({ connector_id: "github" });
+    render(
+      <ActivityDetailSheet event={event as never} open={true} onOpenChange={() => {}} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(screen.getByText("github")).toBeInTheDocument();
+    });
+  });
+
+  it("hides connector pill when connector_id is absent", async () => {
+    const event = makeEvent({ connector_id: undefined });
+    render(
+      <ActivityDetailSheet event={event as never} open={true} onOpenChange={() => {}} />,
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(screen.getByText("My Bot")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("github")).not.toBeInTheDocument();
+  });
+
   it("does not crash when event is present but open is false", () => {
     const { container } = render(
       <ActivityDetailSheet
