@@ -177,7 +177,7 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
 
     // The CreateStandingApprovalDialog should open (skipping to constraints step)
     await waitFor(() => {
-      expect(screen.getByText("Create Standing Approval")).toBeInTheDocument();
+      expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
     });
 
     // Should show step 1 of 2 (constraints), not step 1 of 4
@@ -221,6 +221,6 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       expect(screen.getByText("Execution Failed")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText("Create Standing Approval")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Step 1 of 2/)).not.toBeInTheDocument();
   });
 });
