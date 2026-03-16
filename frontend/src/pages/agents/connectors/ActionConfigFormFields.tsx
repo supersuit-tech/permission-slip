@@ -192,7 +192,10 @@ export function buildParametersFromForm(
       if (value.startsWith("[")) {
         try {
           const parsed: unknown = JSON.parse(value);
-          if (Array.isArray(parsed)) { parameters[key] = parsed; continue; }
+          if (Array.isArray(parsed)) {
+            parameters[key] = (parsed as unknown[]).filter((item) => item !== "");
+            continue;
+          }
         } catch { /* fall through to string */ }
       }
     }

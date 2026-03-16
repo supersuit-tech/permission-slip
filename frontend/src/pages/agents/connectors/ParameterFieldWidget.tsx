@@ -1,8 +1,10 @@
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
+import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -35,7 +37,7 @@ export function ParameterFieldWidget({
   placeholder: placeholderOverride,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
-  const widget: WidgetType = ui?.widget ?? inferWidget(property);
+  const widget: WidgetType = ui?.widget ?? inferWidgetFromProperty(property);
   const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
 
@@ -53,14 +55,6 @@ export function ParameterFieldWidget({
       <FieldHints ui={ui} />
     </div>
   );
-}
-
-/** Infer widget from schema type when no explicit x-ui.widget is set. */
-function inferWidget(property: SchemaProperty): WidgetType {
-  if (property.type === "boolean") return "toggle";
-  if (property.type === "integer" || property.type === "number") return "number";
-  if (property.type === "array" && property.items?.type === "string") return "list";
-  return "text";
 }
 
 interface WidgetRenderProps {
@@ -229,13 +223,22 @@ function parseListValue(value: string): string[] {
 
 /** Serialize a string array into a JSON array string for form state. */
 function serializeListValue(items: string[]): string {
-  const filtered = items.filter((item) => item !== "");
-  if (filtered.length === 0) return "";
-  return JSON.stringify(filtered);
+  if (items.length === 0) return "";
+  return JSON.stringify(items);
 }
 
 function ListWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
   const items = parseListValue(value);
+  const nextId = useRef(0);
+  const rowIds = useRef<number[]>([]);
+
+  // Keep rowIds in sync with items length, assigning stable IDs to new rows.
+  while (rowIds.current.length < items.length) {
+    rowIds.current.push(nextId.current++);
+  }
+  if (rowIds.current.length > items.length) {
+    rowIds.current = rowIds.current.slice(0, items.length);
+  }
 
   function updateItem(index: number, newValue: string) {
     const next = [...items];
@@ -245,17 +248,19 @@ function ListWidget({ inputId, value, onChange, disabled, placeholder, className
 
   function removeItem(index: number) {
     const next = items.filter((_, i) => i !== index);
+    rowIds.current = rowIds.current.filter((_, i) => i !== index);
     onChange(serializeListValue(next));
   }
 
   function addItem() {
+    rowIds.current.push(nextId.current++);
     onChange(serializeListValue([...items, ""]));
   }
 
   return (
     <div className="w-full space-y-2" data-testid={`list-${inputId}`}>
       {items.map((item, index) => (
-        <div key={index} className="flex items-center gap-2">
+        <div key={rowIds.current[index]} className="flex items-center gap-2">
           <Input
             id={index === 0 ? inputId : undefined}
             type="text"

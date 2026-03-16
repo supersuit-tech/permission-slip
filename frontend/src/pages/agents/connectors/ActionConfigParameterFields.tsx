@@ -168,6 +168,7 @@ function ParameterField({
   const widgetDisabled = disabled || isWildcard;
   const widgetClassName = isWildcard ? "bg-muted" : "";
   const widgetPlaceholder = isWildcard ? "Agent can use any value" : undefined;
+  const typeLabel = friendlyTypeLabel(property.type);
 
   return (
     <div className="space-y-1.5">
@@ -180,9 +181,9 @@ function ParameterField({
             required
           </Badge>
         )}
-        {friendlyTypeLabel(property.type) && (
+        {typeLabel && (
           <span className="text-muted-foreground text-xs">
-            ({friendlyTypeLabel(property.type)})
+            ({typeLabel})
           </span>
         )}
       </div>

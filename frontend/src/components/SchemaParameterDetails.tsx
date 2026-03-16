@@ -106,6 +106,7 @@ function ParameterRow({
   const isDefault =
     defaultValue !== undefined && String(value) === String(defaultValue);
   const isMultiline = typeof value === "string" && value.includes("\n");
+  const typeLabel = friendlyTypeLabel(type);
 
   return (
     <div className="space-y-1.5 py-3 first:pt-0 last:pb-0">
@@ -117,8 +118,8 @@ function ParameterRow({
         {label !== name && (
           <code className="bg-muted text-muted-foreground rounded px-1 py-0.5 text-[10px] font-mono">{name}</code>
         )}
-        {friendlyTypeLabel(type) && (
-          <span className="text-muted-foreground text-[10px] font-mono">{friendlyTypeLabel(type)}</span>
+        {typeLabel && (
+          <span className="text-muted-foreground text-[10px] font-mono">{typeLabel}</span>
         )}
         {isRequired && !isProvided && (
           <Badge

@@ -187,8 +187,21 @@ export function friendlyTypeLabel(type: string | undefined): string | undefined 
 }
 
 /**
+ * Infer the appropriate widget for a schema property based on its type/format.
+ * Returns "text" as default when no better match is found.
+ */
+export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
+  if (property.format === "date-time") return "datetime";
+  if (property.type === "boolean") return "toggle";
+  if (property.type === "integer" || property.type === "number") return "number";
+  if (property.type === "array" && property.items?.type === "string") return "list";
+  return "text";
+}
+
+/**
  * Auto-map JSON Schema type/format to a widget when no explicit widget is set.
- * Explicit x-ui.widget always takes precedence.
+ * Explicit x-ui.widget always takes precedence. Uses inferWidgetFromProperty
+ * for the actual mapping logic.
  */
 function autoMapWidget(
   type: string | undefined,
@@ -198,24 +211,11 @@ function autoMapWidget(
 ): SchemaPropertyUI | undefined {
   if (parsedUI?.widget) return parsedUI;
 
-  // Existing: format date-time → datetime widget
-  if (format === "date-time") {
-    return { ...parsedUI, widget: "datetime" as const };
-  }
-  // boolean → toggle
-  if (type === "boolean") {
-    return { ...parsedUI, widget: "toggle" as const };
-  }
-  // integer/number → number
-  if (type === "integer" || type === "number") {
-    return { ...parsedUI, widget: "number" as const };
-  }
-  // array with string items → list
-  if (type === "array") {
-    const items = prop.items;
-    if (items && typeof items === "object" && (items as Record<string, unknown>).type === "string") {
-      return { ...parsedUI, widget: "list" as const };
-    }
+  // Build a temporary SchemaProperty for inferWidgetFromProperty
+  const items = parseItems(prop.items);
+  const inferred = inferWidgetFromProperty({ type, format, items });
+  if (inferred !== "text") {
+    return { ...parsedUI, widget: inferred };
   }
   return parsedUI;
 }

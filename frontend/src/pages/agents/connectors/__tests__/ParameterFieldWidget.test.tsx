@@ -368,8 +368,8 @@ describe("ParameterFieldWidget", () => {
 
       await user.click(screen.getByRole("button", { name: /add item/i }));
 
-      // Adding an empty item then filtering empties gives empty string
-      expect(onChange).toHaveBeenCalled();
+      // Should serialize with the empty item so a row appears for the user to type into
+      expect(onChange).toHaveBeenCalledWith('[""]');
     });
 
     it("removes an item when the remove button is clicked", async () => {
