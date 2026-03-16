@@ -16,7 +16,6 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
-  Code2,
   Eye,
   EyeOff,
 } from "lucide-react";
