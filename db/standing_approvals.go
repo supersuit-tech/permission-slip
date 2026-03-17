@@ -471,7 +471,7 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 		     AND (max_executions IS NULL OR execution_count < max_executions)
 		   UNION ALL
 		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
-		   WHERE agent_id = $1 AND action_type = '*' AND status = 'active'
+		   WHERE agent_id = $1 AND action_type = '*' AND action_type != $2 AND status = 'active'
 		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
 		     AND (max_executions IS NULL OR execution_count < max_executions)
 		 ) combined

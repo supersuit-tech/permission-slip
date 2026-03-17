@@ -608,6 +608,9 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 			}
 			allWildcard = false
 			// Auto-wrap bare strings containing "*" as $pattern.
+			// Only plain strings are wrapped; objects (e.g. already-wrapped
+			// {"$pattern": "..."}) are left unchanged since json.Unmarshal
+			// into a string fails for non-string JSON values.
 			if strings.Contains(s, "*") {
 				wrapped, err := json.Marshal(map[string]string{db.PatternKey: s})
 				if err != nil {
