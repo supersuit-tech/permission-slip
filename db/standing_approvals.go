@@ -23,7 +23,7 @@ type StandingApproval struct {
 	MaxExecutions               *int
 	ExecutionCount              int
 	StartsAt                    time.Time
-	ExpiresAt                   time.Time
+	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 	CreatedAt                   time.Time
 	RevokedAt                   *time.Time
 	ExpiredAt                   *time.Time
@@ -72,7 +72,8 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 
 // CountActiveStandingApprovalsByUser returns the number of standing approvals
 // that are currently active for the given user. An approval counts as active
-// if its status is 'active' and it hasn't expired (expires_at > now()).
+// if its status is 'active' and either has no expiry (expires_at IS NULL) or
+// has not yet expired (expires_at > now()).
 // This excludes approvals that have technically expired but whose status
 // hasn't yet been updated by the cleanup job, so users aren't penalized
 // by stale data.
@@ -85,7 +86,7 @@ func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID str
 	var count int
 	err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM standing_approvals
-		 WHERE user_id = $1 AND status = 'active' AND expires_at > now()`,
+		 WHERE user_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > now())`,
 		userID,
 	).Scan(&count)
 	return count, err
@@ -118,7 +119,7 @@ type CreateStandingApprovalParams struct {
 	SourceActionConfigurationID *string
 	MaxExecutions               *int
 	StartsAt                    time.Time
-	ExpiresAt                   time.Time
+	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 }
 
 // CreateStandingApproval inserts a new standing approval with status 'active'.
@@ -364,6 +365,7 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 			UPDATE standing_approvals
 			SET execution_count = execution_count + 1
 			WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
+			  AND (expires_at IS NULL OR expires_at > now())
 			RETURNING standing_approval_id, agent_id, user_id, action_type
 		),
 		ins AS (
@@ -413,12 +415,12 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 		 FROM (
 		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
-		     AND starts_at <= now() AND expires_at > now()
+		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
 		     AND (max_executions IS NULL OR execution_count < max_executions)
 		   UNION ALL
 		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = '*' AND status = 'active'
-		     AND starts_at <= now() AND expires_at > now()
+		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
 		     AND (max_executions IS NULL OR execution_count < max_executions)
 		 ) combined
 		 ORDER BY priority, created_at DESC, standing_approval_id DESC
@@ -463,7 +465,7 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 			  AND agent_id = $2
 			  AND status = 'active'
 			  AND starts_at <= now()
-			  AND expires_at > now()
+			  AND (expires_at IS NULL OR expires_at > now())
 			  AND (max_executions IS NULL OR execution_count < max_executions)
 			RETURNING standing_approval_id, agent_id, user_id, action_type, max_executions, execution_count
 		),

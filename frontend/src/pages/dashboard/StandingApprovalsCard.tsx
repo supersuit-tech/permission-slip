@@ -33,6 +33,7 @@ import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 import { ConstraintsSummary } from "./ConstraintsSummary";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
+  if (expiresAt === null) return "Never";
   if (!expiresAt) return "\u2014";
 
   const exp = new Date(expiresAt);

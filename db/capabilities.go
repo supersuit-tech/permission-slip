@@ -54,7 +54,7 @@ type CapabilityStandingApproval struct {
 	Constraints         json.RawMessage // raw JSONB
 	MaxExecutions       *int
 	ExecutionsRemaining *int
-	ExpiresAt           time.Time
+	ExpiresAt           *time.Time
 }
 
 // GetAgentCapabilities retrieves all data needed for the capabilities endpoint:
@@ -157,9 +157,9 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		WHERE sa.agent_id = $1
 		  AND sa.user_id = $2
 		  AND sa.status = 'active'
-		  AND sa.expires_at > now()
+		  AND (sa.expires_at IS NULL OR sa.expires_at > now())
 		  AND sa.starts_at <= now()
-		ORDER BY sa.action_type, sa.expires_at`,
+		ORDER BY sa.action_type, sa.expires_at NULLS LAST`,
 		agentID, approverID,
 	)
 	if err != nil {

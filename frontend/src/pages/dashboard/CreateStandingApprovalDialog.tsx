@@ -123,6 +123,7 @@ export function CreateStandingApprovalDialog({
       : "",
   );
   const [maxExecutions, setMaxExecutions] = useState("");
+  const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
 
   const activeAgents = agents.filter((a) => a.status !== "deactivated");
@@ -195,6 +196,7 @@ export function CreateStandingApprovalDialog({
         : "",
     );
     setMaxExecutions("");
+    setNoExpiry(true);
     setExpiresAt(defaultExpiresAt());
   }
 
@@ -308,7 +310,7 @@ export function CreateStandingApprovalDialog({
     e.preventDefault();
     if (step !== 4) return;
 
-    if (!agentId || !effectiveActionType || !expiresAt) {
+    if (!agentId || !effectiveActionType || (!noExpiry && !expiresAt)) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -364,7 +366,7 @@ export function CreateStandingApprovalDialog({
         constraints,
         source_action_configuration_id: selectedConfig?.id,
         max_executions: maxExecutions ? Number(maxExecutions) : null,
-        expires_at: new Date(expiresAt).toISOString(),
+        ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
       });
       toast.success("Standing approval created");
       resetForm();
@@ -379,7 +381,7 @@ export function CreateStandingApprovalDialog({
     }
   }
 
-  const canCreate = !isPending && !!agentId && !!effectiveActionType && !!expiresAt;
+  const canCreate = !isPending && !!agentId && !!effectiveActionType && (noExpiry || !!expiresAt);
 
   return (
     <Dialog
@@ -498,6 +500,8 @@ export function CreateStandingApprovalDialog({
               }}
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
+              noExpiry={noExpiry}
+              onNoExpiryChange={setNoExpiry}
             />
           )}
 

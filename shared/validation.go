@@ -7,7 +7,6 @@ package shared
 import (
 	_ "embed"
 	"encoding/json"
-	"time"
 )
 
 //go:embed validation.json
@@ -33,7 +32,6 @@ type validationConfig struct {
 	ConfirmationCode         fieldLimits `json:"confirmationCode"`
 	ConstraintsBytes         fieldLimits `json:"constraintsBytes"`
 	ParametersBytes          fieldLimits `json:"parametersBytes"`
-	StandingApprovalMaxDays  fieldLimits `json:"standingApprovalMaxDays"`
 }
 
 // --- Exported constants ---
@@ -52,7 +50,6 @@ var (
 	ConfirmationCodeLength      int
 	MaxConstraintsBytes         int
 	MaxParametersBytes          int
-	StandingApprovalMaxDuration time.Duration
 )
 
 // mustInt dereferences a *int parsed from validation.json, panicking with a
@@ -83,5 +80,4 @@ func init() {
 	ConfirmationCodeLength = mustInt("confirmationCode.length", cfg.ConfirmationCode.Length)
 	MaxConstraintsBytes = mustInt("constraintsBytes.max", cfg.ConstraintsBytes.Max)
 	MaxParametersBytes = mustInt("parametersBytes.max", cfg.ParametersBytes.Max)
-	StandingApprovalMaxDuration = time.Duration(mustInt("standingApprovalMaxDays.max", cfg.StandingApprovalMaxDays.Max)) * 24 * time.Hour
 }
