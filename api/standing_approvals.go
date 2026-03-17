@@ -60,7 +60,24 @@ type createStandingApprovalRequest struct {
 type updateStandingApprovalRequest struct {
 	Constraints   json.RawMessage `json:"constraints"`
 	MaxExecutions *int            `json:"max_executions" validate:"omitempty,gte=1"`
-	ExpiresAt     time.Time       `json:"expires_at" validate:"required"`
+	ExpiresAt     *time.Time      `json:"expires_at"`
+	// ExpiresAtSet is true when the JSON payload explicitly included the "expires_at" key
+	// (even if the value was null). This distinguishes "field omitted" (preserve existing)
+	// from "field set to null" (clear expiry → until revoked).
+	ExpiresAtSet bool `json:"-"`
+}
+
+func (r *updateStandingApprovalRequest) UnmarshalJSON(data []byte) error {
+	// Check whether "expires_at" key is present in the raw JSON.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	_, r.ExpiresAtSet = raw["expires_at"]
+
+	// Unmarshal into an alias to avoid infinite recursion.
+	type alias updateStandingApprovalRequest
+	return json.Unmarshal(data, (*alias)(r))
 }
 
 type executeStandingApprovalRequest struct {
@@ -435,13 +452,13 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.ExpiresAt.Before(time.Now().UTC()) {
+		if req.ExpiresAt != nil && req.ExpiresAt.Before(time.Now().UTC()) {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expires_at must be in the future"))
 			return
 		}
 
-		// Fetch the existing approval to anchor duration check to starts_at and
-		// validate max_executions against current execution_count.
+		// Fetch the existing approval to validate max_executions against current
+		// execution_count and to preserve expires_at when the field is omitted.
 		existing, err := db.GetStandingApprovalByIDAndUser(r.Context(), deps.DB, saID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] UpdateStandingApproval: fetch existing: %v", TraceID(r.Context()), err)
@@ -459,6 +476,12 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			}
 			handleStandingApprovalError(w, r, &db.StandingApprovalError{Code: errCode, Status: existing.Status})
 			return
+		}
+
+		// When the client omits "expires_at" from the request body, preserve the
+		// existing value. Only clear the expiry when the client explicitly sends null.
+		if !req.ExpiresAtSet {
+			req.ExpiresAt = existing.ExpiresAt
 		}
 
 		// Prevent setting max_executions below the current execution count, which
