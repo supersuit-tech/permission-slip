@@ -30,25 +30,32 @@ type scheduleMessageParams struct {
 type flexDateTime string
 
 func (f *flexDateTime) UnmarshalJSON(data []byte) error {
-	// Try string first (new format)
+	// Handle null — leave the field empty for validate() to catch.
+	if string(data) == "null" {
+		*f = ""
+		return nil
+	}
+	// Try string first (new format: RFC 3339, datetime-local, or numeric string)
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
 		*f = flexDateTime(s)
 		return nil
 	}
-	// Try integer (legacy Unix timestamp)
+	// Try integer (legacy stored approvals with Unix timestamp)
 	var n int64
 	if err := json.Unmarshal(data, &n); err == nil {
 		*f = flexDateTime(time.Unix(n, 0).UTC().Format(time.RFC3339))
 		return nil
 	}
-	// Try float (JSON numbers can be floats)
+	// Try float (JSON numbers can be decoded as floats)
 	var fl float64
 	if err := json.Unmarshal(data, &fl); err == nil {
 		*f = flexDateTime(time.Unix(int64(fl), 0).UTC().Format(time.RFC3339))
 		return nil
 	}
-	return fmt.Errorf("post_at must be a datetime string or Unix timestamp, got %s", string(data))
+	return &connectors.ValidationError{
+		Message: fmt.Sprintf("post_at must be a datetime string or Unix timestamp, got %s", string(data)),
+	}
 }
 
 func (p *scheduleMessageParams) validate() error {

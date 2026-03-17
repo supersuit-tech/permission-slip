@@ -333,6 +333,70 @@ func TestScheduleMessage_InvalidPostAtFormat(t *testing.T) {
 	}
 }
 
+func TestScheduleMessage_NullPostAt(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &scheduleMessageAction{conn: conn}
+
+	// Simulate JSON with null post_at — should be caught by validate() as missing.
+	params := []byte(`{"channel":"#general","message":"Hello","post_at":null}`)
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.schedule_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for null post_at")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestScheduleMessage_NumericStringPostAt(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body scheduleMessageRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.PostAt != 1893369600 {
+			t.Errorf("expected post_at 1893369600, got %d", body.PostAt)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":                   true,
+			"scheduled_message_id": "Q1234ABCD",
+			"post_at":              1893369600,
+			"channel":              "C01234567",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &scheduleMessageAction{conn: conn}
+
+	// Numeric string (e.g. from flexDateTime converting int → RFC 3339 string,
+	// or from a user passing a Unix timestamp as a string).
+	params, _ := json.Marshal(scheduleMessageParams{
+		Channel: "#general",
+		Message: "Hello later!",
+		PostAt:  "1893369600",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.schedule_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestScheduleMessage_SlackAPIError(t *testing.T) {
 	t.Parallel()
 
