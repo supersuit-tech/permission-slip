@@ -210,11 +210,15 @@ export function StepLimits({
   onMaxExecutionsChange,
   expiresAt,
   onExpiresAtChange,
+  noExpiry,
+  onNoExpiryChange,
 }: {
   maxExecutions: string;
   onMaxExecutionsChange: (value: string) => void;
   expiresAt: string;
   onExpiresAtChange: (value: string) => void;
+  noExpiry: boolean;
+  onNoExpiryChange: (value: boolean) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -235,16 +239,31 @@ export function StepLimits({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="sa-expires-at">Expires At</Label>
-        <Input
-          id="sa-expires-at"
-          type="datetime-local"
-          value={expiresAt}
-          onChange={(e) => onExpiresAtChange(e.target.value)}
-          required
-        />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="sa-expires-at">Expires At</Label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={noExpiry}
+              onChange={(e) => onNoExpiryChange(e.target.checked)}
+              className="accent-primary size-4 rounded"
+            />
+            Until revoked
+          </label>
+        </div>
+        {!noExpiry && (
+          <Input
+            id="sa-expires-at"
+            type="datetime-local"
+            value={expiresAt}
+            onChange={(e) => onExpiresAtChange(e.target.value)}
+            required
+          />
+        )}
         <p className="text-muted-foreground text-sm">
-          Maximum 90 days from now.
+          {noExpiry
+            ? "This standing approval will remain active until you revoke it."
+            : "Set a specific expiration date, or check \"Until revoked\" for no expiry."}
         </p>
       </div>
     </div>

@@ -28,7 +28,7 @@ type standingApprovalResponse struct {
 	MaxExecutions               *int       `json:"max_executions"`
 	ExecutionCount              int        `json:"execution_count"`
 	StartsAt                    time.Time  `json:"starts_at"`
-	ExpiresAt                   time.Time  `json:"expires_at"`
+	ExpiresAt                   *time.Time `json:"expires_at"`
 	CreatedAt                   time.Time  `json:"created_at"`
 	RevokedAt                   *time.Time `json:"revoked_at,omitempty"`
 }
@@ -53,7 +53,7 @@ type createStandingApprovalRequest struct {
 	SourceActionConfigurationID *string     `json:"source_action_configuration_id"`
 	MaxExecutions          *int            `json:"max_executions" validate:"omitempty,gte=1"`
 	StartsAt               *time.Time      `json:"starts_at"`
-	ExpiresAt              time.Time       `json:"expires_at" validate:"required"`
+	ExpiresAt              *time.Time      `json:"expires_at"`
 }
 
 type executeStandingApprovalRequest struct {
@@ -189,13 +189,8 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			startsAt = *req.StartsAt
 		}
 
-		if req.ExpiresAt.Before(startsAt) {
+		if req.ExpiresAt != nil && req.ExpiresAt.Before(startsAt) {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expires_at must be after starts_at"))
-			return
-		}
-
-		if req.ExpiresAt.Sub(startsAt) > shared.StandingApprovalMaxDuration {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "duration exceeds maximum"))
 			return
 		}
 

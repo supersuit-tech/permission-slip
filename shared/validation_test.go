@@ -2,7 +2,6 @@ package shared
 
 import (
 	"testing"
-	"time"
 )
 
 func TestValidationConfigLoads(t *testing.T) {
@@ -29,10 +28,5 @@ func TestValidationConfigLoads(t *testing.T) {
 		if tt.got != tt.want {
 			t.Errorf("%s = %d, want %d", tt.name, tt.got, tt.want)
 		}
-	}
-
-	wantDuration := 90 * 24 * time.Hour
-	if StandingApprovalMaxDuration != wantDuration {
-		t.Errorf("StandingApprovalMaxDuration = %v, want %v", StandingApprovalMaxDuration, wantDuration)
 	}
 }

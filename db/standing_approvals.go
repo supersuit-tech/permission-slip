@@ -23,7 +23,7 @@ type StandingApproval struct {
 	MaxExecutions               *int
 	ExecutionCount              int
 	StartsAt                    time.Time
-	ExpiresAt                   time.Time
+	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 	CreatedAt                   time.Time
 	RevokedAt                   *time.Time
 	ExpiredAt                   *time.Time
@@ -85,7 +85,7 @@ func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID str
 	var count int
 	err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM standing_approvals
-		 WHERE user_id = $1 AND status = 'active' AND expires_at > now()`,
+		 WHERE user_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > now())`,
 		userID,
 	).Scan(&count)
 	return count, err
@@ -118,7 +118,7 @@ type CreateStandingApprovalParams struct {
 	SourceActionConfigurationID *string
 	MaxExecutions               *int
 	StartsAt                    time.Time
-	ExpiresAt                   time.Time
+	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 }
 
 // CreateStandingApproval inserts a new standing approval with status 'active'.
@@ -415,7 +415,7 @@ func FindActiveStandingApprovalForAgent(ctx context.Context, db DBTX, agentID in
 		   AND action_type = $2
 		   AND status = 'active'
 		   AND starts_at <= now()
-		   AND expires_at > now()
+		   AND (expires_at IS NULL OR expires_at > now())
 		   AND (max_executions IS NULL OR execution_count < max_executions)
 		 ORDER BY created_at DESC
 		 LIMIT 1`,
@@ -450,7 +450,7 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 			  AND agent_id = $2
 			  AND status = 'active'
 			  AND starts_at <= now()
-			  AND expires_at > now()
+			  AND (expires_at IS NULL OR expires_at > now())
 			  AND (max_executions IS NULL OR execution_count < max_executions)
 			RETURNING standing_approval_id, agent_id, user_id, action_type, max_executions, execution_count
 		),
