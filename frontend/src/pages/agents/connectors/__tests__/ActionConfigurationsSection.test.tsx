@@ -190,12 +190,12 @@ describe("ActionConfigurationsSection", () => {
 
     // Fill in repo parameter with a fixed value
     await user.type(
-      screen.getByLabelText("repo"),
+      screen.getByLabelText("Repo"),
       "my-repo",
     );
 
     // Set title to wildcard via "Any value" checkbox.
-    const titleInput = screen.getByLabelText("title");
+    const titleInput = screen.getByLabelText("Title");
     const titleGroup = titleInput.closest(".space-y-1\\.5")!;
     await user.click(within(titleGroup as HTMLElement).getByRole("checkbox"));
 

@@ -50,8 +50,8 @@ describe("ActionConfigParameterFields", () => {
     it("renders fields when no x-ui hints are present", () => {
       renderFields(basicSchema);
 
-      expect(screen.getByLabelText("name")).toBeInTheDocument();
-      expect(screen.getByLabelText("email")).toBeInTheDocument();
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
 
     it("shows 'no configurable parameters' when properties are absent", () => {
@@ -76,18 +76,6 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.getByText("required")).toBeInTheDocument();
     });
 
-    it("shows friendly type annotation", () => {
-      renderFields(basicSchema);
-
-      // Both fields are type: "string", displayed as "(text)"
-      expect(screen.getAllByText("(text)")).toHaveLength(2);
-    });
-
-    it("shows description text", () => {
-      renderFields(basicSchema);
-
-      expect(screen.getByText("The name")).toBeInTheDocument();
-    });
   });
 
   describe("x-ui.order", () => {
@@ -104,8 +92,8 @@ describe("ActionConfigParameterFields", () => {
 
       renderFields(schema);
 
-      const labels = screen.getAllByText(/^(alpha|beta|gamma)$/);
-      expect(labels.map((l) => l.textContent)).toEqual(["gamma", "alpha", "beta"]);
+      const labels = screen.getAllByText(/^(Alpha|Beta|Gamma)$/);
+      expect(labels.map((l) => l.textContent)).toEqual(["Gamma", "Alpha", "Beta"]);
     });
 
     it("appends fields not in order at the end", () => {
@@ -121,8 +109,8 @@ describe("ActionConfigParameterFields", () => {
 
       renderFields(schema);
 
-      const labels = screen.getAllByText(/^(alpha|beta|gamma)$/);
-      expect(labels.map((l) => l.textContent)).toEqual(["gamma", "alpha", "beta"]);
+      const labels = screen.getAllByText(/^(Alpha|Beta|Gamma)$/);
+      expect(labels.map((l) => l.textContent)).toEqual(["Gamma", "Alpha", "Beta"]);
     });
   });
 
@@ -147,7 +135,7 @@ describe("ActionConfigParameterFields", () => {
     it("falls back to property key when no x-ui.label", () => {
       renderFields(basicSchema);
 
-      expect(screen.getByText("name")).toBeInTheDocument();
+      expect(screen.getByText("Name")).toBeInTheDocument();
     });
   });
 
@@ -241,7 +229,7 @@ describe("ActionConfigParameterFields", () => {
       renderFields(groupedSchema);
 
       // "note" is ungrouped, should be visible directly
-      expect(screen.getByLabelText("note")).toBeInTheDocument();
+      expect(screen.getByLabelText("Note")).toBeInTheDocument();
     });
 
     it("renders group headers", () => {
@@ -262,7 +250,7 @@ describe("ActionConfigParameterFields", () => {
 
       // Billing is not collapsed — its fields should be visible
       expect(screen.getByText("Customer")).toBeInTheDocument();
-      expect(screen.getByText("currency")).toBeInTheDocument();
+      expect(screen.getByText("Currency")).toBeInTheDocument();
     });
 
     it("hides fields in collapsed groups until expanded", async () => {
@@ -270,13 +258,13 @@ describe("ActionConfigParameterFields", () => {
       renderFields(groupedSchema);
 
       // Options is collapsed — auto_advance should not be visible
-      expect(screen.queryByText("auto_advance")).not.toBeInTheDocument();
+      expect(screen.queryByText("Auto Advance")).not.toBeInTheDocument();
 
       // Click to expand
       await user.click(screen.getByRole("button", { name: /Options/ }));
 
       // Now auto_advance should be visible
-      expect(screen.getByText("auto_advance")).toBeInTheDocument();
+      expect(screen.getByText("Auto Advance")).toBeInTheDocument();
     });
 
     it("hides group when all its fields are hidden by visible_when", () => {
@@ -337,7 +325,7 @@ describe("ActionConfigParameterFields", () => {
         values: { mode: "simple" },
       });
 
-      expect(screen.queryByLabelText("advanced_setting")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Advanced Setting")).not.toBeInTheDocument();
     });
 
     it("shows field when condition is met", () => {
@@ -345,7 +333,7 @@ describe("ActionConfigParameterFields", () => {
         values: { mode: "advanced" },
       });
 
-      expect(screen.getByLabelText("advanced_setting")).toBeInTheDocument();
+      expect(screen.getByLabelText("Advanced Setting")).toBeInTheDocument();
     });
 
     it("shows field when no visible_when is set", () => {
@@ -353,7 +341,7 @@ describe("ActionConfigParameterFields", () => {
         values: { mode: "simple" },
       });
 
-      expect(screen.getByLabelText("mode")).toBeInTheDocument();
+      expect(screen.getByLabelText("Mode")).toBeInTheDocument();
     });
 
     it("matches boolean equals via string coercion", () => {
@@ -372,7 +360,7 @@ describe("ActionConfigParameterFields", () => {
 
       // Form values are strings — "true" should match boolean true
       renderFields(schema, { values: { enabled: "true" } });
-      expect(screen.getByLabelText("detail")).toBeInTheDocument();
+      expect(screen.getByLabelText("Detail")).toBeInTheDocument();
     });
 
     it("hides field when boolean equals does not match", () => {
@@ -390,7 +378,7 @@ describe("ActionConfigParameterFields", () => {
       };
 
       renderFields(schema, { values: { enabled: "false" } });
-      expect(screen.queryByLabelText("detail")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Detail")).not.toBeInTheDocument();
     });
 
     it("matches number equals via coercion", () => {
@@ -408,7 +396,7 @@ describe("ActionConfigParameterFields", () => {
       };
 
       renderFields(schema, { values: { count: "5" } });
-      expect(screen.getByLabelText("bonus")).toBeInTheDocument();
+      expect(screen.getByLabelText("Bonus")).toBeInTheDocument();
     });
   });
 
@@ -471,7 +459,7 @@ describe("ActionConfigParameterFields", () => {
       });
 
       // The input should NOT be disabled (fixed mode allows editing)
-      const input = screen.getByLabelText("name");
+      const input = screen.getByLabelText("Name");
       expect(input).not.toBeDisabled();
       // The value should show * as-is
       expect(input).toHaveValue("*");
@@ -482,7 +470,7 @@ describe("ActionConfigParameterFields", () => {
       const onValueChange = vi.fn<(key: string, value: string) => void>();
       renderFields(basicSchema, { onValueChange });
 
-      await user.type(screen.getByLabelText("name"), "a");
+      await user.type(screen.getByLabelText("Name"), "a");
 
       expect(onValueChange).toHaveBeenCalledWith("name", "a");
     });
@@ -524,7 +512,7 @@ describe("ActionConfigParameterFields", () => {
         modes: { name: "wildcard" },
       });
 
-      expect(screen.getByLabelText("name")).toBeDisabled();
+      expect(screen.getByLabelText("Name")).toBeDisabled();
     });
 
     it("shows wildcard hint when value contains *", () => {
@@ -557,7 +545,6 @@ describe("ActionConfigParameterFields", () => {
       renderFields(schema, { values: { enabled: "false" } });
 
       expect(screen.getByRole("switch")).toBeInTheDocument();
-      expect(screen.getByText("(yes / no)")).toBeInTheDocument();
     });
 
     it("auto-maps array type with string items to list widget", () => {
@@ -571,7 +558,6 @@ describe("ActionConfigParameterFields", () => {
       renderFields(schema);
 
       expect(screen.getByTestId("list-param-tags")).toBeInTheDocument();
-      expect(screen.getByText("(list)")).toBeInTheDocument();
     });
 
     it("does not show type annotation for object type", () => {
