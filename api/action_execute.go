@@ -156,6 +156,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 
 	var sa *db.StandingApproval
 	var firstConstraintErr *db.ConfigValidationError
+	var firstConstraintErrSAID string
 	for _, candidate := range approvals {
 		if len(candidate.Constraints) == 0 {
 			sa = candidate
@@ -163,10 +164,19 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		}
 		if err := db.ValidateParametersAgainstConfig(candidate.Constraints, params); err != nil {
 			var configErr *db.ConfigValidationError
-			if errors.As(err, &configErr) && firstConstraintErr == nil {
-				firstConstraintErr = configErr
+			if errors.As(err, &configErr) {
+				if firstConstraintErr == nil {
+					firstConstraintErr = configErr
+					firstConstraintErrSAID = candidate.StandingApprovalID
+				}
+				continue
 			}
-			continue
+			// Non-ConfigValidationError (e.g. corrupt constraint JSON) — fail fast.
+			log.Printf("[%s] ExecuteActionStanding: constraint validation for %s: %v",
+				TraceID(r.Context()), candidate.StandingApprovalID, err)
+			RespondError(w, r, http.StatusInternalServerError,
+				InternalError("Failed to validate parameters against constraints"))
+			return
 		}
 		sa = candidate
 		break
@@ -176,7 +186,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		if firstConstraintErr != nil {
 			resp := Forbidden(ErrConstraintViolation, "Request parameters violate standing approval constraints")
 			resp.Error.Details = map[string]any{
-				"standing_approval_id": approvals[0].StandingApprovalID,
+				"standing_approval_id": firstConstraintErrSAID,
 				"violated_constraint":  firstConstraintErr.Parameter,
 				"constraint_error":     firstConstraintErr.Reason,
 			}
