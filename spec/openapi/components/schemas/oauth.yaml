@@ -85,10 +85,11 @@ OAuthConnection:
     display_name:
       type: string
       description: >
-        A human-readable identifier for this connection, typically the
+        A human-readable identifier for this connection — the provider
+        username (e.g. GitHub login) when available, otherwise the
         authenticated user's email address. Omitted when no identifying
         information is available.
-      example: "user@example.com"
+      example: "octocat"
 
 OAuthConnectionListResponse:
   type: object

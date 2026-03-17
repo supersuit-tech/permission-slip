@@ -973,15 +973,20 @@ func instanceFromExtraData(extraData json.RawMessage) string {
 	return ""
 }
 
-// emailFromExtraData extracts the email field from an OAuth connection's
-// extra_data JSON. Returns "" if no email is present.
-func emailFromExtraData(extraData json.RawMessage) string {
+// displayNameFromExtraData extracts a human-readable display name from an
+// OAuth connection's extra_data JSON. Prefers "display_name" (e.g. GitHub
+// login or Microsoft displayName), falls back to "email". Returns "" if
+// neither is present.
+func displayNameFromExtraData(extraData json.RawMessage) string {
 	if len(extraData) == 0 {
 		return ""
 	}
 	var extra map[string]string
 	if err := json.Unmarshal(extraData, &extra); err != nil {
 		return ""
+	}
+	if dn := extra["display_name"]; dn != "" {
+		return dn
 	}
 	return extra["email"]
 }
@@ -1011,7 +1016,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 				Status:      c.Status,
 				ConnectedAt: c.CreatedAt,
 				Instance:    instanceFromExtraData(c.ExtraData),
-				DisplayName: emailFromExtraData(c.ExtraData),
+				DisplayName: displayNameFromExtraData(c.ExtraData),
 			}
 		}
 
