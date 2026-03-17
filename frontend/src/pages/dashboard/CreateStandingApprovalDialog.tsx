@@ -552,6 +552,7 @@ export function CreateStandingApprovalDialog({
               }}
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
+              currentExecutionCount={isEditMode ? editTarget.execution_count : undefined}
             />
           )}
 
