@@ -760,7 +760,7 @@ func TestParseManifest_XUIVisibleWhenEqualsNull(t *testing.T) {
 
 func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
 	// All valid widget types should be accepted.
-	for _, widget := range []string{"text", "select", "textarea", "toggle", "number", "date"} {
+	for _, widget := range []string{"text", "select", "textarea", "toggle", "number", "date", "datetime", "list"} {
 		t.Run(widget, func(t *testing.T) {
 			// "select" requires an enum array on the property.
 			propExtra := ""

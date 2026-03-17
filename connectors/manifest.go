@@ -113,6 +113,8 @@ var validWidgets = map[string]bool{
 	"toggle":   true,
 	"number":   true,
 	"date":     true,
+	"datetime": true,
+	"list":     true,
 }
 
 // validAuthTypes are the allowed values for credential auth types.
