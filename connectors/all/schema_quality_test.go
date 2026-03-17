@@ -106,10 +106,9 @@ func collectMissingAnnotations(t *testing.T) []annotationIssue {
 				// Rule 2: datetime fields should have format: "date-time"
 				if propType == "string" && widget != "datetime" {
 					format, _ := prop["format"].(string)
-					if format == "date-time" {
-						continue
-					}
-					if (strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "iso 8601")) && !strings.Contains(descLower, "epoch") {
+					if format != "date-time" &&
+						(strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "iso 8601")) &&
+						!strings.Contains(descLower, "epoch") {
 						issues = append(issues, annotationIssue{
 							fieldKey: fieldKey, actionType: action.ActionType,
 							fieldName: key, rule: "datetime", desc: desc, widget: widget,

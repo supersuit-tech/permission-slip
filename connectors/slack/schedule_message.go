@@ -40,15 +40,22 @@ func (p *scheduleMessageParams) validate() error {
 func (p *scheduleMessageParams) postAtUnix() (int64, error) {
 	// Try RFC 3339 first; also accept "datetime-local" format (no seconds, no TZ)
 	// emitted by HTML <input type="datetime-local">, treating it as UTC.
-	t, err := time.Parse(time.RFC3339, p.PostAt)
+	t, err := time.Parse(time.RFC3339Nano, p.PostAt)
 	if err != nil {
-		t2, err2 := time.Parse("2006-01-02T15:04", p.PostAt)
-		if err2 != nil {
+		// Also accept "datetime-local" formats (no TZ) emitted by HTML
+		// <input type="datetime-local">, treating them as UTC.
+		for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04"} {
+			if t2, err2 := time.Parse(layout, p.PostAt); err2 == nil {
+				t = t2.UTC()
+				err = nil
+				break
+			}
+		}
+		if err != nil {
 			return 0, &connectors.ValidationError{
 				Message: fmt.Sprintf("post_at must be a valid RFC 3339 datetime (e.g. 2026-03-20T09:00:00Z), got %q", p.PostAt),
 			}
 		}
-		t = t2.UTC()
 	}
 	unix := t.Unix()
 	if unix <= time.Now().Unix() {
