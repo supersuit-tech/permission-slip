@@ -147,7 +147,7 @@ export function CreateStandingApprovalDialog({
       ? String(editTarget.max_executions)
       : "",
   );
-  const [noExpiry, setNoExpiry] = useState(isEditMode ? false : true);
+  const [noExpiry, setNoExpiry] = useState(isEditMode ? !editTarget.expires_at : true);
   const [expiresAt, setExpiresAt] = useState(() => {
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
@@ -235,7 +235,7 @@ export function CreateStandingApprovalDialog({
     } else {
       setMaxExecutions("");
     }
-    setNoExpiry(isEditMode ? false : true);
+    setNoExpiry(isEditMode ? !editTarget.expires_at : true);
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
       const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -360,6 +360,11 @@ export function CreateStandingApprovalDialog({
       return;
     }
 
+    if (!noExpiry && Number.isNaN(new Date(expiresAt).getTime())) {
+      toast.error("Please enter a valid expiration date");
+      return;
+    }
+
     let constraints: Record<string, unknown>;
 
     // Use manual JSON path when no schema properties are available —
@@ -408,7 +413,7 @@ export function CreateStandingApprovalDialog({
         await updateStandingApproval(editTarget.standing_approval_id, {
           constraints,
           max_executions: maxExecutions ? Number(maxExecutions) : null,
-          expires_at: new Date(expiresAt).toISOString(),
+          expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
         });
         toast.success("Standing approval updated");
         resetForm();
@@ -565,8 +570,8 @@ export function CreateStandingApprovalDialog({
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
               currentExecutionCount={isEditMode ? editTarget.execution_count : undefined}
-              noExpiry={isEditMode ? undefined : noExpiry}
-              onNoExpiryChange={isEditMode ? undefined : setNoExpiry}
+              noExpiry={noExpiry}
+              onNoExpiryChange={setNoExpiry}
             />
           )}
 

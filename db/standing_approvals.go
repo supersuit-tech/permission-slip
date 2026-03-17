@@ -412,7 +412,7 @@ type UpdateStandingApprovalParams struct {
 	UserID             string
 	Constraints        []byte // raw JSONB
 	MaxExecutions      *int
-	ExpiresAt          time.Time
+	ExpiresAt          *time.Time // nil means no expiry (until revoked)
 }
 
 // UpdateStandingApproval updates the constraints, max_executions, and expires_at of an active
@@ -427,7 +427,7 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 		 SET constraints = $3, max_executions = $4, expires_at = $5
 		 WHERE standing_approval_id = $1 AND user_id = $2
 		   AND status = 'active'
-		   AND ($4 IS NULL OR $4 >= execution_count)
+		   AND ($4::int IS NULL OR $4::int >= execution_count)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.UserID, p.Constraints, p.MaxExecutions, p.ExpiresAt,
 	)
