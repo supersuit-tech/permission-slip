@@ -2,7 +2,7 @@
 
 -- Fix: scrub_sensitive_execution_data() previously required executed_at IS NOT NULL,
 -- which meant denied and cancelled approvals (whose executed_at is always NULL) were
--- never scrubbed. Use COALESCE to pick the relevant resolution timestamp instead.
+-- never scrubbed. Use per-status explicit conditions to pick the correct timestamp.
 
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION scrub_sensitive_execution_data() RETURNS void
@@ -14,16 +14,18 @@ DECLARE
     executions_count bigint;
 BEGIN
     -- Scrub approvals: NULL out execution_result, strip action to type-only.
-    -- Use COALESCE to pick the resolution timestamp for each status so that
-    -- denied/cancelled approvals (which have NULL executed_at) are also scrubbed.
+    -- Use per-status conditions so each status checks its own resolution timestamp.
+    -- For approved: require executed_at IS NOT NULL to avoid scrubbing in-flight executions.
+    -- For denied/cancelled: use denied_at/cancelled_at respectively.
     UPDATE approvals
     SET execution_result = NULL,
         action = action - 'parameters'
-    WHERE status IN ('approved', 'denied', 'cancelled')
-      AND COALESCE(executed_at, approved_at, denied_at, cancelled_at)
-          < now() - interval '30 minutes'
-      AND (execution_result IS NOT NULL
-           OR action ? 'parameters');
+    WHERE (execution_result IS NOT NULL OR action ? 'parameters')
+      AND (
+        (status = 'approved'   AND executed_at  IS NOT NULL AND executed_at  < now() - interval '30 minutes')
+        OR (status = 'denied'    AND denied_at    IS NOT NULL AND denied_at    < now() - interval '30 minutes')
+        OR (status = 'cancelled' AND cancelled_at IS NOT NULL AND cancelled_at < now() - interval '30 minutes')
+      );
     GET DIAGNOSTICS approvals_count = ROW_COUNT;
 
     -- Scrub standing_approval_executions: NULL out parameters.

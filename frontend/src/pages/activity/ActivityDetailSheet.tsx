@@ -276,7 +276,9 @@ function ApprovalSupplementalContent({
       )}
       {isScrubbed && (
         <p className="text-muted-foreground text-xs italic">
-          Execution details are automatically removed after 30 minutes.
+          {executionStatus
+            ? "Execution details are automatically removed after 30 minutes."
+            : "Action parameters are automatically removed after 30 minutes."}
         </p>
       )}
     </div>

@@ -178,6 +178,75 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		}
 	})
 
+	t.Run("PreservesRecentDeniedApprovalData", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+		approvalID := testhelper.GenerateID(t, "appr_")
+
+		// Insert a denied approval only 10 minutes ago — should NOT be scrubbed.
+		testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "denied")
+		testhelper.MustExec(t, tx,
+			`UPDATE approvals SET denied_at = now() - interval '10 minutes'
+			 WHERE approval_id = $1`, approvalID)
+
+		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if scrubbed != 0 {
+			t.Errorf("expected 0 scrubbed rows for recent denied approval, got %d", scrubbed)
+		}
+
+		// Verify parameters are still present.
+		var actionParams *string
+		err = tx.QueryRow(ctx,
+			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
+			approvalID).Scan(&actionParams)
+		if err != nil {
+			t.Fatalf("query error: %v", err)
+		}
+		if actionParams == nil {
+			t.Error("expected action parameters to be preserved for recent denied approval")
+		}
+	})
+
+	t.Run("PreservesRecentCancelledApprovalData", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+		approvalID := testhelper.GenerateID(t, "appr_")
+
+		// Insert a cancelled approval only 10 minutes ago — should NOT be scrubbed.
+		testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "cancelled")
+		testhelper.MustExec(t, tx,
+			`UPDATE approvals SET cancelled_at = now() - interval '10 minutes'
+			 WHERE approval_id = $1`, approvalID)
+
+		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if scrubbed != 0 {
+			t.Errorf("expected 0 scrubbed rows for recent cancelled approval, got %d", scrubbed)
+		}
+
+		var actionParams *string
+		err = tx.QueryRow(ctx,
+			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
+			approvalID).Scan(&actionParams)
+		if err != nil {
+			t.Fatalf("query error: %v", err)
+		}
+		if actionParams == nil {
+			t.Error("expected action parameters to be preserved for recent cancelled approval")
+		}
+	})
+
 	t.Run("PreservesPendingApprovalAction", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
