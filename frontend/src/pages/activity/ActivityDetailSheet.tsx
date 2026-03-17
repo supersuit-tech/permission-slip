@@ -105,9 +105,18 @@ function ExecutionStatusSection({
 function ApprovalSupplementalDetails({ approvalId }: { approvalId: string }) {
   const { approval, isLoading, error } = useApprovalDetail(approvalId);
 
-  // While loading or on error, render nothing — the action type header from
-  // the audit event is already visible above.
-  if (isLoading || error || !approval) return null;
+  // While loading, render nothing — the action type header from the audit
+  // event is already visible above.
+  if (isLoading || !approval) return null;
+
+  // Show a slim error message so API failures are visible to the user.
+  if (error) {
+    return (
+      <p className="text-muted-foreground text-xs py-1">
+        Could not load approval details.
+      </p>
+    );
+  }
 
   const action = approval.action as Record<string, unknown> | undefined;
   const actionType = typeof action?.type === "string" ? action.type : "";
@@ -123,6 +132,11 @@ function ApprovalSupplementalDetails({ approvalId }: { approvalId: string }) {
 
   const hasParameters = Object.keys(parameters).length > 0;
   const hasExecutionResult = executionResult && Object.keys(executionResult).length > 0;
+  // NOTE: This heuristic can false-positive on actions that legitimately have
+  // no parameters and no execution result. A backend `scrubbed_at` field would
+  // eliminate the ambiguity, but for now this matches the pre-existing pattern
+  // and is acceptable since most executed actions do produce at least one of
+  // parameters or execution_result.
   const isScrubbed = executionStatus && !hasExecutionResult && !hasParameters && executedAt &&
     new Date(executedAt).getTime() < Date.now() - 30 * 60 * 1000;
 
@@ -142,9 +156,7 @@ function ApprovalSupplementalDetails({ approvalId }: { approvalId: string }) {
 }
 
 /** Action type header — shows the action name and type immediately from the audit event. */
-function ActionTypeHeader({ actionType }: { actionType: string }) {
-  const { actionName } = useActionSchema(actionType);
-
+function ActionTypeHeader({ actionType, actionName }: { actionType: string; actionName: string | null }) {
   return (
     <div className="space-y-2">
       <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
@@ -380,6 +392,9 @@ export function ActivityDetailSheet({
 }: ActivityDetailSheetProps) {
   const actionType = event ? getActionType(event) : "";
   const shouldFetchApproval = event ? isApprovalEvent(event) : false;
+  // Single useActionSchema call — shared between ActionTypeHeader and
+  // ApprovalSupplementalContent to avoid duplicate hook subscriptions.
+  const { actionName } = useActionSchema(actionType);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -411,7 +426,7 @@ export function ActivityDetailSheet({
 
           {/* Action type — shown immediately from audit event data */}
           {actionType && shouldFetchApproval && (
-            <ActionTypeHeader actionType={actionType} />
+            <ActionTypeHeader actionType={actionType} actionName={actionName} />
           )}
 
           {/* Action summary from audit event (non-approval events) */}
