@@ -383,6 +383,13 @@ export function CreateStandingApprovalDialog({
         toast.error("Constraints must be a JSON object");
         return;
       }
+      // Auto-wrap bare strings containing "*" (except the bare wildcard "*")
+      // as pattern objects so the backend treats them as glob patterns.
+      for (const [key, value] of Object.entries(constraints)) {
+        if (typeof value === "string" && value !== "*" && value.includes("*")) {
+          constraints[key] = { $pattern: value };
+        }
+      }
       const allWildcard = Object.values(constraints).every((v) => v === "*");
       if (Object.keys(constraints).length === 0 || allWildcard) {
         toast.error("At least one parameter constraint must be non-wildcard");

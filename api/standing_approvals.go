@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -460,12 +461,6 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Anchor max-duration check to the original starts_at, consistent with create.
-		if req.ExpiresAt.Sub(existing.StartsAt) > shared.StandingApprovalMaxDuration {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "duration exceeds maximum"))
-			return
-		}
-
 		// Prevent setting max_executions below the current execution count, which
 		// would leave the approval active in the dashboard but unreachable by agents.
 		if req.MaxExecutions != nil && *req.MaxExecutions < existing.ExecutionCount {
@@ -573,14 +568,15 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 }
 
 // validateStandingApprovalConstraints is the single validation point for standing
-// approval constraints. It checks type, presence, and content. Returns the raw
-// bytes to store, or an error describing why the constraints are invalid.
+// approval constraints. It checks type, presence, and content. Returns the
+// normalized bytes to store, or an error describing why the constraints are invalid.
 //
 // Rules:
 //   - non-object JSON (array, string, number) → rejected
 //   - null, empty, or {} → rejected (constraints are required)
 //   - all values are "*" → rejected (at least one must be Fixed or Pattern)
-//   - valid otherwise → returns the raw bytes
+//   - bare strings containing "*" (except the wildcard "*") → auto-wrapped as {"$pattern": "<value>"}
+//   - valid otherwise → returns the normalized bytes
 func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 	// Null or absent.
 	if len(raw) == 0 || string(raw) == "null" {
@@ -598,19 +594,47 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 
 	// Check that at least one constraint value is not a wildcard ("*").
 	// Null values are rejected outright — use "*" for a wildcard or omit the key.
+	// Bare strings containing "*" (except the wildcard "*") are auto-wrapped as patterns.
 	allWildcard := true
-	for _, v := range obj {
+	mutated := false
+	for key, v := range obj {
 		if string(v) == "null" {
 			return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
 		}
 		var s string
-		if json.Unmarshal(v, &s) != nil || s != "*" {
+		if json.Unmarshal(v, &s) == nil {
+			if s == "*" {
+				continue // bare wildcard — stays as-is
+			}
 			allWildcard = false
-			// No break — must continue iterating to check remaining values for null.
+			// Auto-wrap bare strings containing "*" as $pattern.
+			// Only plain strings are wrapped; objects (e.g. already-wrapped
+			// {"$pattern": "..."}) are left unchanged since json.Unmarshal
+			// into a string fails for non-string JSON values.
+			// Note: other glob metacharacters (?, [...]) are NOT auto-wrapped;
+			// users who need them must use {"$pattern": "..."} explicitly.
+			if strings.Contains(s, "*") {
+				wrapped, err := json.Marshal(map[string]string{db.PatternKey: s})
+				if err != nil {
+					return nil, fmt.Errorf("failed to wrap pattern for %q: %w", key, err)
+				}
+				obj[key] = wrapped
+				mutated = true
+			}
+		} else {
+			allWildcard = false
 		}
 	}
 	if allWildcard {
 		return nil, errors.New("at least one constraint must be a non-wildcard value")
+	}
+
+	if mutated {
+		normalized, err := json.Marshal(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to normalize constraints: %w", err)
+		}
+		return normalized, nil
 	}
 
 	return raw, nil

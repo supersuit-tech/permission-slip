@@ -457,32 +457,45 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 	return nil, &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
 }
 
-// FindActiveStandingApprovalForAgent returns the best matching active standing
-// approval for the given agent and action type. "Best" is the most recently
-// created approval that is active, within its time window, and not exhausted.
-// Returns nil if no match is found.
-func FindActiveStandingApprovalForAgent(ctx context.Context, db DBTX, agentID int64, actionType string) (*StandingApproval, error) {
-	row := db.QueryRow(ctx,
+// FindActiveStandingApprovalsForAgent returns all active standing approvals for
+// the given agent and action type, ordered by most recently created first.
+// Exact action_type matches are returned before wildcard ("*") matches.
+// Returns an empty slice if no match is found.
+func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID int64, actionType string) ([]*StandingApproval, error) {
+	rows, err := db.Query(ctx,
 		`SELECT `+standingApprovalColumns+`
-		 FROM standing_approvals
-		 WHERE agent_id = $1
-		   AND action_type = $2
-		   AND status = 'active'
-		   AND starts_at <= now()
-		   AND (expires_at IS NULL OR expires_at > now())
-		   AND (max_executions IS NULL OR execution_count < max_executions)
-		 ORDER BY created_at DESC
-		 LIMIT 1`,
+		 FROM (
+		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
+		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
+		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
+		     AND (max_executions IS NULL OR execution_count < max_executions)
+		   UNION ALL
+		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
+		   WHERE agent_id = $1 AND action_type = '*' AND action_type != $2 AND status = 'active'
+		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
+		     AND (max_executions IS NULL OR execution_count < max_executions)
+		 ) combined
+		 ORDER BY priority, created_at DESC, standing_approval_id DESC
+		 LIMIT 100`,
 		agentID, actionType,
 	)
-	sa, err := scanStandingApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
-	return sa, nil
+	defer rows.Close()
+
+	var approvals []*StandingApproval
+	for rows.Next() {
+		sa, err := scanStandingApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		approvals = append(approvals, sa)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return approvals, nil
 }
 
 // RecordStandingApprovalExecutionByAgent atomically increments the standing
