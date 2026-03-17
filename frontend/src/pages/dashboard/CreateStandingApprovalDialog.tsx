@@ -547,7 +547,10 @@ export function CreateStandingApprovalDialog({
                   return;
                 }
                 const intValue = parseInt(value, 10);
-                if (Number.isNaN(intValue) || intValue < 1) return;
+                // In edit mode enforce the minimum at execution_count so the
+                // client rejects the input before it ever reaches the server.
+                const minAllowed = isEditMode ? editTarget.execution_count : 1;
+                if (Number.isNaN(intValue) || intValue < minAllowed) return;
                 setMaxExecutions(String(intValue));
               }}
               expiresAt={expiresAt}
