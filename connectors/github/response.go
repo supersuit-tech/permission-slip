@@ -16,13 +16,32 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	// Try to extract GitHub's error message.
+	// Try to extract GitHub's error message and error details.
 	var ghErr struct {
 		Message string `json:"message"`
+		Errors  []struct {
+			Message string `json:"message"`
+			Field   string `json:"field"`
+			Code    string `json:"code"`
+		} `json:"errors"`
 	}
 	msg := string(body)
-	if json.Unmarshal(body, &ghErr) == nil && ghErr.Message != "" {
-		msg = ghErr.Message
+	if json.Unmarshal(body, &ghErr) == nil {
+		if ghErr.Message != "" {
+			msg = ghErr.Message
+		}
+		// Append error details if available
+		if len(ghErr.Errors) > 0 {
+			for i, err := range ghErr.Errors {
+				if err.Message != "" {
+					if i == 0 {
+						msg += ". Details: " + err.Message
+					} else {
+						msg += "; " + err.Message
+					}
+				}
+			}
+		}
 	}
 
 	switch {
