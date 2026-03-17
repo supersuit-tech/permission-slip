@@ -319,7 +319,7 @@ function ConceptC() {
               <button
                 type="button"
                 onClick={() => setShowRaw(!showRaw)}
-                className="bg-background text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-3 text-xs font-medium transition-colors"
+                className="bg-background text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-3 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               >
                 {showRaw ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                 Parameters
