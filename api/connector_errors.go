@@ -42,19 +42,26 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsValidationError(err):
-		// ValidationError messages are safe to surface — they describe
-		// parameter/credential issues the caller can fix.
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
+		msg := "Validation failed"
+		var ve *connectors.ValidationError
+		if errors.As(err, &ve) && ve.Message != "" {
+			msg = ve.Message
+		}
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, msg))
 		return true
 
 	case connectors.IsRateLimitError(err):
+		msg := "External service rate limited"
 		var rl *connectors.RateLimitError
 		retrySeconds := 0
 		if connectors.AsRateLimitError(err, &rl) {
 			retrySeconds = int(rl.RetryAfter.Seconds())
+			if rl.Message != "" {
+				msg = rl.Message
+			}
 		}
 		log.Printf("[%s] connector rate limited: %v", traceID, err)
-		RespondError(w, r, http.StatusTooManyRequests, TooManyRequests("External service rate limited", retrySeconds))
+		RespondError(w, r, http.StatusTooManyRequests, TooManyRequests(msg, retrySeconds))
 		return true
 
 	case connectors.IsExternalError(err):
@@ -77,6 +84,9 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		}
 		if connectors.AsOAuthRefreshError(err, &oauthErr) {
 			details["provider"] = oauthErr.Provider
+			if oauthErr.Message != "" {
+				msg = oauthErr.Message
+			}
 		}
 		resp := newErrorResponse(ErrOAuthRefreshFailed, msg, false)
 		resp.Error.Details = details
