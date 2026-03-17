@@ -188,6 +188,48 @@ func TestScheduleMessage_DatetimeLocalFormat(t *testing.T) {
 	}
 }
 
+func TestScheduleMessage_DatetimeLocalWithSeconds(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body scheduleMessageRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		// 2029-12-31T00:00:05 interpreted as UTC = 1893369605
+		if body.PostAt != 1893369605 {
+			t.Errorf("expected post_at 1893369605, got %d", body.PostAt)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":                   true,
+			"scheduled_message_id": "Q1234ABCD",
+			"post_at":              1893369605,
+			"channel":              "C01234567",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &scheduleMessageAction{conn: conn}
+
+	// datetime-local with seconds but no timezone
+	params, _ := json.Marshal(scheduleMessageParams{
+		Channel: "#general",
+		Message: "Hello later!",
+		PostAt:  "2029-12-31T00:00:05",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.schedule_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestScheduleMessage_FractionalSeconds(t *testing.T) {
 	t.Parallel()
 

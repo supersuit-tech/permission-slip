@@ -107,7 +107,7 @@ func collectMissingAnnotations(t *testing.T) []annotationIssue {
 				if propType == "string" && widget != "datetime" {
 					format, _ := prop["format"].(string)
 					if format != "date-time" &&
-						(strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "iso 8601")) &&
+						(strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "rfc3339") || strings.Contains(descLower, "iso 8601")) &&
 						!strings.Contains(descLower, "epoch") {
 						issues = append(issues, annotationIssue{
 							fieldKey: fieldKey, actionType: action.ActionType,
