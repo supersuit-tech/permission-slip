@@ -180,6 +180,7 @@ func fetchMicrosoftEmail(ctx context.Context, accessToken string) (map[string]st
 		return extra, nil
 	}
 	if len(extra) > 0 {
+		log.Printf("oauth: microsoft enricher got display name but no email (non-fatal)")
 		return extra, nil
 	}
 	return nil, fmt.Errorf("no email found in Microsoft profile")
@@ -230,6 +231,9 @@ func fetchProfileFromJSON(ctx context.Context, accessToken, url, emailField, nam
 
 	if len(extra) == 0 {
 		return nil, fmt.Errorf("neither field %q nor %q found in response", emailField, nameField)
+	}
+	if _, hasEmail := extra["email"]; !hasEmail {
+		log.Printf("oauth: enricher got %q but no %q (non-fatal)", nameField, emailField)
 	}
 	return extra, nil
 }
