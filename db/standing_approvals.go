@@ -405,19 +405,23 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 
 // FindActiveStandingApprovalsForAgent returns all active standing approvals for
 // the given agent and action type, ordered by most recently created first.
-// It also matches standing approvals with the wildcard action type ("*").
+// Exact action_type matches are returned before wildcard ("*") matches.
 // Returns an empty slice if no match is found.
 func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID int64, actionType string) ([]*StandingApproval, error) {
 	rows, err := db.Query(ctx,
 		`SELECT `+standingApprovalColumns+`
-		 FROM standing_approvals
-		 WHERE agent_id = $1
-		   AND (action_type = $2 OR action_type = '*')
-		   AND status = 'active'
-		   AND starts_at <= now()
-		   AND expires_at > now()
-		   AND (max_executions IS NULL OR execution_count < max_executions)
-		 ORDER BY created_at DESC
+		 FROM (
+		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
+		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
+		     AND starts_at <= now() AND expires_at > now()
+		     AND (max_executions IS NULL OR execution_count < max_executions)
+		   UNION ALL
+		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
+		   WHERE agent_id = $1 AND action_type = '*' AND status = 'active'
+		     AND starts_at <= now() AND expires_at > now()
+		     AND (max_executions IS NULL OR execution_count < max_executions)
+		 ) combined
+		 ORDER BY priority, created_at DESC
 		 LIMIT 100`,
 		agentID, actionType,
 	)

@@ -193,7 +193,10 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 			RespondError(w, r, http.StatusForbidden, resp)
 			return
 		}
-		log.Printf("[%s] ExecuteActionStanding: all %d standing approvals failed constraint validation", TraceID(r.Context()), len(approvals))
+		// Invariant: sa can only be nil here when firstConstraintErr != nil.
+		// If this log fires, a code path was added that skips setting both sa
+		// and firstConstraintErr without returning early.
+		log.Printf("[%s] ExecuteActionStanding: BUG: sa nil but no constraint error recorded; %d approvals checked", TraceID(r.Context()), len(approvals))
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters against constraints"))
 		return
 	}
