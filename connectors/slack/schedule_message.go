@@ -18,7 +18,7 @@ type scheduleMessageAction struct {
 type scheduleMessageParams struct {
 	Channel string `json:"channel"`
 	Message string `json:"message"`
-	PostAt  int64  `json:"post_at"`
+	PostAt  string `json:"post_at"`
 }
 
 func (p *scheduleMessageParams) validate() error {
@@ -28,15 +28,29 @@ func (p *scheduleMessageParams) validate() error {
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
 	}
-	if p.PostAt <= 0 {
-		return &connectors.ValidationError{Message: "missing or invalid parameter: post_at (must be a positive Unix timestamp)"}
-	}
-	if p.PostAt <= time.Now().Unix() {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("post_at must be in the future (got %d, current time is %d)", p.PostAt, time.Now().Unix()),
-		}
+	if p.PostAt == "" {
+		return &connectors.ValidationError{Message: "missing required parameter: post_at"}
 	}
 	return nil
+}
+
+// postAtUnix parses the post_at field as RFC 3339 and returns the Unix
+// timestamp. Returns a ValidationError if the value is unparseable or in the
+// past.
+func (p *scheduleMessageParams) postAtUnix() (int64, error) {
+	t, err := time.Parse(time.RFC3339, p.PostAt)
+	if err != nil {
+		return 0, &connectors.ValidationError{
+			Message: fmt.Sprintf("post_at must be a valid RFC 3339 datetime (e.g. 2026-03-20T09:00:00Z), got %q", p.PostAt),
+		}
+	}
+	unix := t.Unix()
+	if unix <= time.Now().Unix() {
+		return 0, &connectors.ValidationError{
+			Message: fmt.Sprintf("post_at must be in the future (got %s)", p.PostAt),
+		}
+	}
+	return unix, nil
 }
 
 // scheduleMessageRequest is the Slack API request body for chat.scheduleMessage.
@@ -60,10 +74,15 @@ func (a *scheduleMessageAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
+	postAtUnix, err := params.postAtUnix()
+	if err != nil {
+		return nil, err
+	}
+
 	body := scheduleMessageRequest{
 		Channel: params.Channel,
 		Text:    params.Message,
-		PostAt:  params.PostAt,
+		PostAt:  postAtUnix,
 	}
 
 	var resp scheduleMessageResponse

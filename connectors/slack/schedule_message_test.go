@@ -27,15 +27,15 @@ func TestScheduleMessage_Success(t *testing.T) {
 		if body.Text != "Hello later!" {
 			t.Errorf("expected text 'Hello later!', got %q", body.Text)
 		}
-		if body.PostAt != 1893456000 {
-			t.Errorf("expected post_at 1893456000, got %d", body.PostAt)
+		if body.PostAt != 1893369600 {
+			t.Errorf("expected post_at 1893369600, got %d", body.PostAt)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":                   true,
 			"scheduled_message_id": "Q1234ABCD",
-			"post_at":              1893456000,
+			"post_at":              1893369600,
 			"channel":              "C01234567",
 		})
 	}))
@@ -44,10 +44,11 @@ func TestScheduleMessage_Success(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &scheduleMessageAction{conn: conn}
 
+	// 1893369600 = 2029-12-31T00:00:00Z
 	params, _ := json.Marshal(scheduleMessageParams{
 		Channel: "#general",
 		Message: "Hello later!",
-		PostAt:  1893456000,
+		PostAt:  "2029-12-31T00:00:00Z",
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -79,7 +80,7 @@ func TestScheduleMessage_MissingChannel(t *testing.T) {
 
 	params, _ := json.Marshal(map[string]any{
 		"message": "Hello",
-		"post_at": 1893456000,
+		"post_at": "2029-12-31T00:00:00Z",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -128,7 +129,7 @@ func TestScheduleMessage_PostAtInPast(t *testing.T) {
 	params, _ := json.Marshal(scheduleMessageParams{
 		Channel: "#general",
 		Message: "Hello",
-		PostAt:  1000000000, // 2001-09-08, well in the past
+		PostAt:  "2001-09-08T00:00:00Z", // well in the past
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -138,6 +139,31 @@ func TestScheduleMessage_PostAtInPast(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for post_at in the past")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestScheduleMessage_InvalidPostAtFormat(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &scheduleMessageAction{conn: conn}
+
+	params, _ := json.Marshal(scheduleMessageParams{
+		Channel: "#general",
+		Message: "Hello",
+		PostAt:  "not-a-date",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.schedule_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid post_at format")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
@@ -162,7 +188,7 @@ func TestScheduleMessage_SlackAPIError(t *testing.T) {
 	params, _ := json.Marshal(scheduleMessageParams{
 		Channel: "#general",
 		Message: "Hello",
-		PostAt:  1893456000,
+		PostAt:  "2029-12-31T00:00:00Z",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
