@@ -393,6 +393,14 @@ updateStandingApproval:
       The standing approval must belong to the authenticated user and be in `active` status.
       Agent and action type cannot be changed — only constraints and limits.
 
+      **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
+      the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
+      not a rolling window from the time of the update call.
+
+      **Execution count**: `max_executions` cannot be set below the approval's current
+      `execution_count`. The update is rejected atomically at the database level to prevent
+      a race condition where concurrent executions could otherwise create a zombie approval.
+
     tags:
       - Standing Approvals
 

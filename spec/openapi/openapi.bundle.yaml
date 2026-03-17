@@ -4345,6 +4345,14 @@ paths:
         Update the constraints, max_executions, and expires_at of an active standing approval.
         The standing approval must belong to the authenticated user and be in `active` status.
         Agent and action type cannot be changed — only constraints and limits.
+
+        **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
+        the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
+        not a rolling window from the time of the update call.
+
+        **Execution count**: `max_executions` cannot be set below the approval's current
+        `execution_count`. The update is rejected atomically at the database level to prevent
+        a race condition where concurrent executions could otherwise create a zombie approval.
       tags:
         - Standing Approvals
       security:
@@ -8565,7 +8573,7 @@ components:
         expires_at:
           type: string
           format: date-time
-          description: Updated expiration time. Must be in the future. Maximum 90 days from now.
+          description: Updated expiration time. Must be in the future. The total duration from the approval's original start date may not exceed the maximum allowed window (90 days). As the approval ages, the available headroom shrinks.
           example: '2026-04-14T00:00:00Z'
       example:
         constraints:

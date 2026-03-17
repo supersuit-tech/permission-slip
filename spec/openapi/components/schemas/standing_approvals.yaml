@@ -369,7 +369,7 @@ UpdateStandingApprovalRequest:
     expires_at:
       type: string
       format: date-time
-      description: Updated expiration time. Must be in the future. Maximum 90 days from now.
+      description: Updated expiration time. Must be in the future. The total duration from the approval's original start date may not exceed the maximum allowed window (90 days). As the approval ages, the available headroom shrinks.
       example: "2026-04-14T00:00:00Z"
 
   example:
