@@ -248,6 +248,31 @@ function buildGenericSummary(
   return `${label}: ${highlights.join(", ")}`;
 }
 
+/**
+ * Returns a consistent avatar background + text color pair based on the name.
+ * Uses a simple hash to pick from 8 soft pastel pairs.
+ */
+const AVATAR_COLORS = [
+  { bg: "#DBEAFE", text: "#1E40AF" }, // blue
+  { bg: "#D1FAE5", text: "#065F46" }, // green
+  { bg: "#EDE9FE", text: "#5B21B6" }, // purple
+  { bg: "#FCE7F3", text: "#9D174D" }, // pink
+  { bg: "#FEF3C7", text: "#92400E" }, // amber
+  { bg: "#CFFAFE", text: "#155E75" }, // cyan
+  { bg: "#FFEDD5", text: "#9A3412" }, // orange
+  { bg: "#FFE4E6", text: "#9F1239" }, // rose
+] as const;
+
+export function getAvatarColors(name: string): { bg: string; text: string } {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  const entry = AVATAR_COLORS[index]!;
+  return { bg: entry.bg, text: entry.text };
+}
+
 /** Formats an unknown value as a short display string for generic summaries. */
 function formatValue(value: unknown): string | null {
   if (typeof value === "string") return truncate(value, 40);
