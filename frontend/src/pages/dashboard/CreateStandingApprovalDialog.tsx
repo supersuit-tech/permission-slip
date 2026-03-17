@@ -147,6 +147,7 @@ export function CreateStandingApprovalDialog({
       ? String(editTarget.max_executions)
       : "",
   );
+  const [noExpiry, setNoExpiry] = useState(isEditMode ? false : true);
   const [expiresAt, setExpiresAt] = useState(() => {
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
@@ -234,6 +235,7 @@ export function CreateStandingApprovalDialog({
     } else {
       setMaxExecutions("");
     }
+    setNoExpiry(isEditMode ? false : true);
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
       const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -353,7 +355,7 @@ export function CreateStandingApprovalDialog({
     e.preventDefault();
     if (step !== 4) return;
 
-    if (!agentId || !effectiveActionType || !expiresAt) {
+    if (!agentId || !effectiveActionType || (!noExpiry && !expiresAt)) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -413,7 +415,7 @@ export function CreateStandingApprovalDialog({
           constraints,
           source_action_configuration_id: selectedConfig?.id,
           max_executions: maxExecutions ? Number(maxExecutions) : null,
-          expires_at: new Date(expiresAt).toISOString(),
+          ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
         });
         toast.success("Standing approval created");
         resetForm();
@@ -431,7 +433,7 @@ export function CreateStandingApprovalDialog({
     }
   }
 
-  const canCreate = !isPending && !!agentId && !!effectiveActionType && !!expiresAt;
+  const canCreate = !isPending && !!agentId && !!effectiveActionType && (noExpiry || !!expiresAt);
 
   return (
     <Dialog
@@ -556,6 +558,8 @@ export function CreateStandingApprovalDialog({
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
               currentExecutionCount={isEditMode ? editTarget.execution_count : undefined}
+              noExpiry={isEditMode ? undefined : noExpiry}
+              onNoExpiryChange={isEditMode ? undefined : setNoExpiry}
             />
           )}
 

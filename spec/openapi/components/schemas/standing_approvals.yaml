@@ -60,7 +60,6 @@ StandingApproval:
     - status
     - execution_count
     - starts_at
-    - expires_at
     - created_at
     - source_action_configuration_id
   properties:
@@ -165,11 +164,12 @@ StandingApproval:
     expires_at:
       type: string
       format: date-time
+      nullable: true
       description: |
         ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval expires.
-        Required when creating a standing approval. Maximum duration is 90 days from
-        `starts_at`.
-      example: "2026-02-21T00:00:00Z"
+        `null` means the standing approval never expires and remains active until
+        explicitly revoked.
+      example: null
 
     created_at:
       type: string
@@ -268,7 +268,6 @@ CreateStandingApprovalRequest:
     - agent_id
     - action_type
     - constraints
-    - expires_at
   properties:
     agent_id:
       type: integer
@@ -332,8 +331,11 @@ CreateStandingApprovalRequest:
     expires_at:
       type: string
       format: date-time
-      description: When this standing approval expires. Required. Maximum 90 days from starts_at.
-      example: "2026-03-14T00:00:00Z"
+      nullable: true
+      description: |
+        When this standing approval expires. Omit or set to null for no expiry
+        (the approval remains active until revoked).
+      example: null
 
   example:
     agent_id: 42
@@ -343,7 +345,7 @@ CreateStandingApprovalRequest:
       recipient_pattern: "*@mycompany.com"
     source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     max_executions: 100
-    expires_at: "2026-03-14T00:00:00Z"
+    expires_at: null
 
 UpdateStandingApprovalRequest:
   type: object
@@ -377,6 +379,7 @@ UpdateStandingApprovalRequest:
       recipient_pattern: "*@mycompany.com"
     max_executions: 200
     expires_at: "2026-04-14T00:00:00Z"
+
 
 RevokeStandingApprovalResponse:
   type: object

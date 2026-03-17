@@ -50,7 +50,7 @@ type standingApprovalCapability struct {
 	Constraints         json.RawMessage `json:"constraints"`
 	MaxExecutions       *int            `json:"max_executions"`
 	ExecutionsRemaining *int            `json:"executions_remaining"`
-	ExpiresAt           time.Time       `json:"expires_at"`
+	ExpiresAt           *time.Time      `json:"expires_at"`
 }
 
 // ── Route registration ──────────────────────────────────────────────────────

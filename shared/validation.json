@@ -9,6 +9,5 @@
   "actionVersion": { "maxLength": 10 },
   "confirmationCode": { "length": 6 },
   "constraintsBytes": { "max": 16384 },
-  "parametersBytes": { "max": 16384 },
-  "standingApprovalMaxDays": { "max": 90 }
+  "parametersBytes": { "max": 16384 }
 }

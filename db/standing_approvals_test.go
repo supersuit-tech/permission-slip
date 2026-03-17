@@ -74,7 +74,7 @@ func TestStandingApprovalsStatusCheckConstraint(t *testing.T) {
 		})
 }
 
-func TestStandingApprovals90DayMaxConstraint(t *testing.T) {
+func TestStandingApprovalsExpiryConstraints(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -84,37 +84,25 @@ func TestStandingApprovals90DayMaxConstraint(t *testing.T) {
 
 	base := testhelper.GenerateID(t, "sa_")
 
-	// Exactly 90 days should succeed
+	// NULL expires_at (no expiry) should succeed
 	_, err := tx.Exec(ctx,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at)
-		 VALUES ($1, $2, $3, 'test.action', 'active', '2026-01-01 00:00:00+00', '2026-04-01 00:00:00+00')`,
-		base+"_90d_ok", agentID, uid)
+		 VALUES ($1, $2, $3, 'test.action', 'active', '2026-01-01 00:00:00+00', NULL)`,
+		base+"_null_ok", agentID, uid)
 	if err != nil {
-		t.Errorf("exactly 90 days was rejected: %v", err)
+		t.Errorf("NULL expires_at was rejected: %v", err)
 	}
 
-	// 91 days should fail
-	err = testhelper.WithSavepoint(t, tx, func() error {
-		_, err := tx.Exec(ctx,
-			`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at)
-			 VALUES ($1, $2, $3, 'test.action', 'active', '2026-01-01 00:00:00+00', '2026-04-02 00:00:00+00')`,
-			base+"_91d_fail", agentID, uid)
-		return err
-	})
-	if err == nil {
-		t.Error("expected CHECK constraint violation for expires_at beyond 90 days, but insert succeeded")
-	}
-
-	// 30 days should succeed
+	// 365 days should succeed (no max duration limit)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at)
-		 VALUES ($1, $2, $3, 'test.action', 'active', '2026-01-01 00:00:00+00', '2026-01-31 00:00:00+00')`,
-		base+"_30d_ok", agentID, uid)
+		 VALUES ($1, $2, $3, 'test.action', 'active', '2026-01-01 00:00:00+00', '2027-01-01 00:00:00+00')`,
+		base+"_365d_ok", agentID, uid)
 	if err != nil {
-		t.Errorf("30 days was rejected: %v", err)
+		t.Errorf("365 days was rejected: %v", err)
 	}
 
-	// expires_at before starts_at should fail
+	// expires_at before starts_at should still fail
 	err = testhelper.WithSavepoint(t, tx, func() error {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at)

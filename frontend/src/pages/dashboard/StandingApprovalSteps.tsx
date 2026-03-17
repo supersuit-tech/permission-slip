@@ -1,4 +1,5 @@
 import { Loader2, Info } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
@@ -211,6 +212,8 @@ export function StepLimits({
   expiresAt,
   onExpiresAtChange,
   currentExecutionCount,
+  noExpiry,
+  onNoExpiryChange,
 }: {
   maxExecutions: string;
   onMaxExecutionsChange: (value: string) => void;
@@ -218,6 +221,8 @@ export function StepLimits({
   onExpiresAtChange: (value: string) => void;
   /** When editing an existing approval, the number of times it has already been used. */
   currentExecutionCount?: number;
+  noExpiry?: boolean;
+  onNoExpiryChange?: (value: boolean) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -244,16 +249,34 @@ export function StepLimits({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="sa-expires-at">Expires At</Label>
-        <Input
-          id="sa-expires-at"
-          type="datetime-local"
-          value={expiresAt}
-          onChange={(e) => onExpiresAtChange(e.target.value)}
-          required
-        />
+        <div className="flex items-center justify-between">
+          <Label htmlFor="sa-expires-at">Expires At</Label>
+          {onNoExpiryChange && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="sa-no-expiry"
+                checked={noExpiry ?? false}
+                onCheckedChange={(checked) => onNoExpiryChange(checked === true)}
+              />
+              <Label htmlFor="sa-no-expiry" className="text-sm font-normal">
+                Until revoked
+              </Label>
+            </div>
+          )}
+        </div>
+        {!noExpiry && (
+          <Input
+            id="sa-expires-at"
+            type="datetime-local"
+            value={expiresAt}
+            onChange={(e) => onExpiresAtChange(e.target.value)}
+            required
+          />
+        )}
         <p className="text-muted-foreground text-sm">
-          Maximum 90 days from now.
+          {noExpiry
+            ? "This standing approval will remain active until you revoke it."
+            : "Set a specific expiration date, or check \"Until revoked\" for no expiry."}
         </p>
       </div>
     </div>

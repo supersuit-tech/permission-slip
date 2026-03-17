@@ -401,6 +401,7 @@ function CreateStandingApprovalWizard({
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [manualConstraintsJson, setManualConstraintsJson] = useState("");
   const [maxExecutions, setMaxExecutions] = useState("");
+  const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
 
   const isCustomAction = selectedConfigId === CUSTOM_ACTION_SENTINEL;
@@ -512,6 +513,8 @@ function CreateStandingApprovalWizard({
               }}
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
+              noExpiry={noExpiry}
+              onNoExpiryChange={setNoExpiry}
             />
           )}
 
