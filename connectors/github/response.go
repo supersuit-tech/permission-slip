@@ -38,6 +38,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 			Message:    fmt.Sprintf("GitHub API rate limit exceeded (403): %s", msg),
 			RetryAfter: retryAfter,
 		}
+	case statusCode == http.StatusNotFound:
+		return &connectors.ValidationError{Message: fmt.Sprintf("GitHub API resource not found: %s — check that the resource exists and your token has access", msg)}
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("GitHub API auth error (%d): %s", statusCode, msg)}
 	case statusCode == http.StatusUnprocessableEntity:
