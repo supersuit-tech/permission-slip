@@ -11,7 +11,7 @@ export function BetaBanner() {
     <div
       role="banner"
       aria-label="Beta notice"
-      className="w-full border-b border-secondary/20 bg-secondary/10 px-4 py-2 text-center text-xs text-foreground"
+      className="sticky top-0 z-50 w-full border-b border-secondary/20 bg-card px-4 py-2 text-center text-xs text-foreground"
     >
       <span className="font-semibold">Beta</span>
       {" — "}
