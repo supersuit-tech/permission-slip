@@ -72,7 +72,8 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 
 // CountActiveStandingApprovalsByUser returns the number of standing approvals
 // that are currently active for the given user. An approval counts as active
-// if its status is 'active' and it hasn't expired (expires_at > now()).
+// if its status is 'active' and either has no expiry (expires_at IS NULL) or
+// has not yet expired (expires_at > now()).
 // This excludes approvals that have technically expired but whose status
 // hasn't yet been updated by the cleanup job, so users aren't penalized
 // by stale data.
@@ -364,6 +365,7 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 			UPDATE standing_approvals
 			SET execution_count = execution_count + 1
 			WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
+			  AND (expires_at IS NULL OR expires_at > now())
 			RETURNING standing_approval_id, agent_id, user_id, action_type
 		),
 		ins AS (

@@ -17,6 +17,8 @@ BEGIN
       AND pg_get_constraintdef(oid) LIKE '%expires_at - starts_at%90 days%';
     IF constraint_name IS NOT NULL THEN
         EXECUTE format('ALTER TABLE standing_approvals DROP CONSTRAINT %I', constraint_name);
+    ELSE
+        RAISE EXCEPTION 'Could not find 90-day duration CHECK constraint on standing_approvals – migration cannot proceed safely';
     END IF;
 END $$;
 -- +goose StatementEnd
@@ -35,6 +37,8 @@ BEGIN
       AND pg_get_constraintdef(oid) LIKE '%expires_at >= starts_at%';
     IF constraint_name IS NOT NULL THEN
         EXECUTE format('ALTER TABLE standing_approvals DROP CONSTRAINT %I', constraint_name);
+    ELSE
+        RAISE EXCEPTION 'Could not find expires_at >= starts_at CHECK constraint on standing_approvals – migration cannot proceed safely';
     END IF;
 END $$;
 -- +goose StatementEnd

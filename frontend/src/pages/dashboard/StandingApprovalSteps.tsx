@@ -1,4 +1,5 @@
 import { Loader2, Info } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
@@ -241,15 +242,16 @@ export function StepLimits({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="sa-expires-at">Expires At</Label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="sa-no-expiry"
               checked={noExpiry}
-              onChange={(e) => onNoExpiryChange(e.target.checked)}
-              className="accent-primary size-4 rounded"
+              onCheckedChange={(checked) => onNoExpiryChange(checked === true)}
             />
-            Until revoked
-          </label>
+            <Label htmlFor="sa-no-expiry" className="text-sm font-normal">
+              Until revoked
+            </Label>
+          </div>
         </div>
         {!noExpiry && (
           <Input
