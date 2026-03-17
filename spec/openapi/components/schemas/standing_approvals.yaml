@@ -373,8 +373,8 @@ UpdateStandingApprovalRequest:
       nullable: true
       description: |
         Updated expiration time. Must be in the future. Null means the approval remains active until revoked.
-        The total duration from the approval's original start date may not exceed the maximum allowed window
-        (90 days) when a date is specified. As the approval ages, the available headroom shrinks.
+        Omitting the field preserves the current expiration
+        (the approval remains active until revoked).
       example: "2026-04-14T00:00:00Z"
 
   example:

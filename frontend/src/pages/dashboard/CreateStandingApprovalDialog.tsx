@@ -360,6 +360,11 @@ export function CreateStandingApprovalDialog({
       return;
     }
 
+    if (!noExpiry && Number.isNaN(new Date(expiresAt).getTime())) {
+      toast.error("Please enter a valid expiration date");
+      return;
+    }
+
     let constraints: Record<string, unknown>;
 
     // Use manual JSON path when no schema properties are available —
