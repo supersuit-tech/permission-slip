@@ -101,11 +101,12 @@ type StandingApprovalError struct {
 func (e *StandingApprovalError) Error() string { return e.Code }
 
 const (
-	StandingApprovalErrNotFound         = "not_found"
-	StandingApprovalErrAlreadyRevoked   = "already_revoked"
-	StandingApprovalErrNotActive        = "not_active"
-	StandingApprovalErrAgentNotFound    = "agent_not_found"
-	StandingApprovalErrDuplicateRequest = "duplicate_request"
+	StandingApprovalErrNotFound            = "not_found"
+	StandingApprovalErrAlreadyRevoked      = "already_revoked"
+	StandingApprovalErrNotActive           = "not_active"
+	StandingApprovalErrAgentNotFound       = "agent_not_found"
+	StandingApprovalErrDuplicateRequest    = "duplicate_request"
+	StandingApprovalErrMaxExecutionsTooLow = "max_executions_too_low"
 )
 
 // CreateStandingApprovalParams holds the parameters for creating a standing approval.
@@ -348,7 +349,7 @@ type StandingApprovalExecution struct {
 	ExecutedAt         time.Time
 	// MaxExecutions and ExecutionCount are populated by
 	// RecordStandingApprovalExecutionByAgent only.
-	MaxExecutions *int
+	MaxExecutions  *int
 	ExecutionCount int
 }
 
@@ -403,6 +404,57 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 		return &StandingApprovalError{Code: StandingApprovalErrAlreadyRevoked, Status: sa.Status}
 	}
 	return &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
+}
+
+// UpdateStandingApprovalParams holds the fields that can be updated on an active standing approval.
+type UpdateStandingApprovalParams struct {
+	StandingApprovalID string
+	UserID             string
+	Constraints        []byte // raw JSONB
+	MaxExecutions      *int
+	ExpiresAt          time.Time
+}
+
+// UpdateStandingApproval updates the constraints, max_executions, and expires_at of an active
+// standing approval belonging to the given user. Returns the updated approval, or a domain error.
+//
+// The UPDATE atomically guards against setting max_executions below the current
+// execution_count — even in the presence of concurrent executions between the
+// caller's pre-flight validation and this write.
+func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprovalParams) (*StandingApproval, error) {
+	row := db.QueryRow(ctx,
+		`UPDATE standing_approvals
+		 SET constraints = $3, max_executions = $4, expires_at = $5
+		 WHERE standing_approval_id = $1 AND user_id = $2
+		   AND status = 'active'
+		   AND ($4 IS NULL OR $4 >= execution_count)
+		 RETURNING `+standingApprovalColumns,
+		p.StandingApprovalID, p.UserID, p.Constraints, p.MaxExecutions, p.ExpiresAt,
+	)
+	updated, err := scanStandingApproval(row)
+	if err == nil {
+		return updated, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	// Diagnose why the UPDATE matched zero rows. Check for the max_executions
+	// race before falling back to generic status diagnosis.
+	sa, err := GetStandingApprovalByIDAndUser(ctx, db, p.StandingApprovalID, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if sa == nil {
+		return nil, &StandingApprovalError{Code: StandingApprovalErrNotFound}
+	}
+	if sa.Status == "active" && p.MaxExecutions != nil && *p.MaxExecutions < sa.ExecutionCount {
+		return nil, &StandingApprovalError{Code: StandingApprovalErrMaxExecutionsTooLow}
+	}
+	if sa.Status == "revoked" {
+		return nil, &StandingApprovalError{Code: StandingApprovalErrAlreadyRevoked, Status: sa.Status}
+	}
+	return nil, &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
 }
 
 // FindActiveStandingApprovalsForAgent returns all active standing approvals for

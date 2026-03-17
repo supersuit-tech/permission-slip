@@ -211,6 +211,7 @@ export function StepLimits({
   onMaxExecutionsChange,
   expiresAt,
   onExpiresAtChange,
+  currentExecutionCount,
   noExpiry,
   onNoExpiryChange,
 }: {
@@ -218,8 +219,10 @@ export function StepLimits({
   onMaxExecutionsChange: (value: string) => void;
   expiresAt: string;
   onExpiresAtChange: (value: string) => void;
-  noExpiry: boolean;
-  onNoExpiryChange: (value: boolean) => void;
+  /** When editing an existing approval, the number of times it has already been used. */
+  currentExecutionCount?: number;
+  noExpiry?: boolean;
+  onNoExpiryChange?: (value: boolean) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -228,30 +231,38 @@ export function StepLimits({
         <Input
           id="sa-max-executions"
           type="number"
-          min="1"
+          min={currentExecutionCount != null ? String(currentExecutionCount) : "1"}
           step="1"
           placeholder="Unlimited"
           value={maxExecutions}
           onChange={(e) => onMaxExecutionsChange(e.target.value)}
         />
-        <p className="text-muted-foreground text-sm">
-          Leave empty for unlimited executions.
-        </p>
+        {currentExecutionCount != null && currentExecutionCount > 0 ? (
+          <p className="text-muted-foreground text-sm">
+            Already used {currentExecutionCount} time{currentExecutionCount !== 1 ? "s" : ""} — minimum is {currentExecutionCount}. Leave empty for unlimited.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Leave empty for unlimited executions.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="sa-expires-at">Expires At</Label>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="sa-no-expiry"
-              checked={noExpiry}
-              onCheckedChange={(checked) => onNoExpiryChange(checked === true)}
-            />
-            <Label htmlFor="sa-no-expiry" className="text-sm font-normal">
-              Until revoked
-            </Label>
-          </div>
+          {onNoExpiryChange && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="sa-no-expiry"
+                checked={noExpiry ?? false}
+                onCheckedChange={(checked) => onNoExpiryChange(checked === true)}
+              />
+              <Label htmlFor="sa-no-expiry" className="text-sm font-normal">
+                Until revoked
+              </Label>
+            </div>
+          )}
         </div>
         {!noExpiry && (
           <Input

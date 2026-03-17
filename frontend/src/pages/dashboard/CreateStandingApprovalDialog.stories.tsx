@@ -631,3 +631,139 @@ export const Step4Limits: Story = {
   },
   name: "Step 4 – Limits",
 };
+
+// ---------------------------------------------------------------------------
+// Edit mode wizard — starts at step 3, pre-filled, shows "Save" button
+// and "already used N times" hint on step 4
+// ---------------------------------------------------------------------------
+
+function EditStandingApprovalWizard() {
+  type EditStep = 3 | 4;
+  const [step, setStep] = useState<EditStep>(3);
+  const [paramValues, setParamValues] = useState<Record<string, string>>({
+    summary: "Team Standup",
+    calendar_id: "primary",
+    attendees: "*",
+  });
+  const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({
+    summary: "fixed",
+    calendar_id: "fixed",
+    attendees: "wildcard",
+  });
+  const [maxExecutions, setMaxExecutions] = useState("20");
+  const [expiresAt, setExpiresAt] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  });
+
+  // Simulated execution count for the existing approval
+  const currentExecutionCount = 7;
+
+  return (
+    <Dialog open>
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <ConnectorLogo
+              name="Google Calendar"
+              logoSvg={GOOGLE_LOGO}
+              size="lg"
+            />
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-base">
+                Create Event
+              </DialogTitle>
+              <p className="text-muted-foreground text-sm">Google Calendar</p>
+            </div>
+          </div>
+          <DialogDescription>
+            Step {step - 2} of 2: {STEP_LABELS[step as Step]}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-1 px-1">
+          {([3, 4] as EditStep[]).map((s) => (
+            <div
+              key={s}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                s <= step ? "bg-primary" : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          {step === 3 && (
+            <StoryStepConstraints
+              schema={CALENDAR_SCHEMA}
+              paramValues={paramValues}
+              paramModes={paramModes}
+              onParamValueChange={(key, value) =>
+                setParamValues((prev) => ({ ...prev, [key]: value }))
+              }
+              onParamModeChange={(key, mode) =>
+                setParamModes((prev) => ({ ...prev, [key]: mode }))
+              }
+              manualConstraintsJson=""
+              onManualConstraintsJsonChange={() => {}}
+            />
+          )}
+
+          {step === 4 && (
+            <StepLimits
+              maxExecutions={maxExecutions}
+              onMaxExecutionsChange={(value) => {
+                if (value === "") {
+                  setMaxExecutions("");
+                  return;
+                }
+                const intValue = parseInt(value, 10);
+                if (Number.isNaN(intValue) || intValue < 1) return;
+                setMaxExecutions(String(intValue));
+              }}
+              expiresAt={expiresAt}
+              onExpiresAtChange={setExpiresAt}
+              currentExecutionCount={currentExecutionCount}
+            />
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            {step === 4 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(3)}
+              >
+                <ChevronLeft className="size-4" />
+                Back
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button type="button" variant="secondary">
+              Cancel
+            </Button>
+            {step === 3 ? (
+              <Button type="button" onClick={() => setStep(4)}>
+                Next
+                <ChevronRight className="size-4" />
+              </Button>
+            ) : (
+              <Button type="button">
+                <Check className="size-4" />
+                Save
+              </Button>
+            )}
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Edit mode — pre-filled constraints and limits, "Save" button, execution count hint. */
+export const EditMode: StoryObj = {
+  render: () => <EditStandingApprovalWizard />,
+  name: "Edit Mode",
+};
