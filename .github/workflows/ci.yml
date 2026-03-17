@@ -122,8 +122,17 @@ jobs:
 
       - name: Send webhook notification
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
+          NOTIFY_WEBHOOK_SECRET: ${{ secrets.NOTIFY_WEBHOOK_SECRET }}
         run: |
+          if [ -z "$NOTIFY_WEBHOOK_URL" ]; then
+            echo "::warning::NOTIFY_WEBHOOK_URL secret is not set, skipping webhook"
+            exit 0
+          fi
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          gh workflow run trigger-webhook.yml \
-            -f message="CI failed on ${{ github.ref_name }} — investigate: ${RUN_URL}"
+          MESSAGE="permission-slip: CI failed on ${{ github.ref_name }} — investigate: ${RUN_URL}"
+          PAYLOAD=$(jq -n --arg msg "$MESSAGE" --arg secret "$NOTIFY_WEBHOOK_SECRET" \
+            '{message: $msg, secret: $secret}')
+          curl -s -f -X POST "$NOTIFY_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
