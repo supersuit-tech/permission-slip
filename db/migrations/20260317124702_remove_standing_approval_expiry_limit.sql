@@ -49,8 +49,15 @@ ALTER TABLE standing_approvals ADD CONSTRAINT standing_approvals_expires_at_afte
 -- +goose Down
 
 -- Restore NOT NULL.
--- First set any NULL expires_at to starts_at + 90 days so the column can be made NOT NULL.
-UPDATE standing_approvals SET expires_at = starts_at + interval '90 days' WHERE expires_at IS NULL;
+-- Refuse to roll back if permanent approvals exist — fabricating expiry dates would silently corrupt data.
+-- +goose StatementBegin
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM standing_approvals WHERE expires_at IS NULL) THEN
+        RAISE EXCEPTION 'Cannot roll back: standing approvals with no expiry (expires_at IS NULL) exist. Revoke or delete them first to avoid data corruption.';
+    END IF;
+END $$;
+-- +goose StatementEnd
 ALTER TABLE standing_approvals ALTER COLUMN expires_at SET NOT NULL;
 
 -- Drop the conditional constraint and restore the original pair.
