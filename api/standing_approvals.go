@@ -442,8 +442,41 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if time.Until(req.ExpiresAt) > shared.StandingApprovalMaxDuration {
+		// Fetch the existing approval to anchor duration check to starts_at and
+		// validate max_executions against current execution_count.
+		existing, err := db.GetStandingApprovalByIDAndUser(r.Context(), deps.DB, saID, profile.ID)
+		if err != nil {
+			log.Printf("[%s] UpdateStandingApproval: fetch existing: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update standing approval"))
+			return
+		}
+		if existing == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Standing approval not found"))
+			return
+		}
+		if existing.Status != "active" {
+			if existing.Status == "revoked" {
+				resp := Conflict(ErrApprovalAlreadyResolved, "Standing approval already revoked")
+				resp.Error.Details = map[string]any{"status": existing.Status}
+				RespondError(w, r, http.StatusConflict, resp)
+			} else {
+				resp := Gone(ErrStandingExpired, "Standing approval is no longer active")
+				resp.Error.Details = map[string]any{"status": existing.Status}
+				RespondError(w, r, http.StatusGone, resp)
+			}
+			return
+		}
+
+		// Anchor max-duration check to the original starts_at, consistent with create.
+		if req.ExpiresAt.Sub(existing.StartsAt) > shared.StandingApprovalMaxDuration {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "duration exceeds maximum"))
+			return
+		}
+
+		// Prevent setting max_executions below the current execution count, which
+		// would leave the approval active in the dashboard but unreachable by agents.
+		if req.MaxExecutions != nil && *req.MaxExecutions < existing.ExecutionCount {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "max_executions cannot be less than the current execution count"))
 			return
 		}
 

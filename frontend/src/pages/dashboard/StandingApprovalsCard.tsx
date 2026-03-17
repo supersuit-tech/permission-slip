@@ -135,13 +135,15 @@ function StandingApprovalRow({
       </TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onEdit(sa)}
-        >
-          Edit
-        </Button>
+        {sa.status === "active" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(sa)}
+          >
+            Edit
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
