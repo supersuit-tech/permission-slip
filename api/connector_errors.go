@@ -58,11 +58,14 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsExternalError(err):
+		msg := "External service returned an error"
 		var ee *connectors.ExternalError
-		errors.As(err, &ee)
+		if errors.As(err, &ee) && ee.Message != "" {
+			msg = ee.Message
+		}
 		log.Printf("[%s] connector external error: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, ee.Message, true))
+		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	case connectors.IsOAuthRefreshError(err):
@@ -81,19 +84,25 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsAuthError(err):
+		msg := "External service rejected credentials"
 		var ae *connectors.AuthError
-		errors.As(err, &ae)
+		if errors.As(err, &ae) && ae.Message != "" {
+			msg = ae.Message
+		}
 		log.Printf("[%s] connector auth error: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, ae.Message, true))
+		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	case connectors.IsTimeoutError(err):
+		msg := "External service did not respond in time"
 		var te *connectors.TimeoutError
-		errors.As(err, &te)
+		if errors.As(err, &te) && te.Message != "" {
+			msg = te.Message
+		}
 		log.Printf("[%s] connector timeout: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, te.Message, true))
+		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	default:

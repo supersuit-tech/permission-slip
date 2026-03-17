@@ -978,7 +978,7 @@ func TestHandleConnectorError_ExternalError_SurfacesMessage(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_ext"))
 
-	extErr := &connectors.ExternalError{StatusCode: 200, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
+	extErr := &connectors.ExternalError{StatusCode: 404, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
 	handled := handleConnectorError(w, r, extErr)
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle ExternalError")
