@@ -1,8 +1,8 @@
 /**
  * Approval detail screen — displays the full details of a single approval
- * request including agent info, action parameters, risk level, expiry
- * countdown, context, and timeline. For pending approvals, shows
- * approve/deny buttons with haptic feedback.
+ * request with a hero header, action parameters, timeline, and
+ * approve/deny buttons. Uses subtle shadows and visual hierarchy
+ * for a polished, first-class feel.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -28,10 +28,12 @@ import {
   isExpired as checkExpired,
   formatTimestamp,
 } from "./approvalUtils";
-import { RiskBadge } from "./RiskBadge";
+import { HeroHeader } from "./HeroHeader";
+import { StatusPill } from "./StatusPill";
 import { CountdownBadge } from "./CountdownBadge";
 import { ApprovalActions } from "./ApprovalActions";
 import { KeyValueList, type KeyValueEntry } from "./KeyValueList";
+import { TimelineView, type TimelineEntry } from "./TimelineView";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -42,8 +44,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
   const [isApproved, setIsApproved] = useState(false);
   const [isDenied, setIsDenied] = useState(false);
-  // Capture the exact timestamp when the user approves/denies so the timeline
-  // doesn't flicker with a new Date() on every re-render.
   const [resolvedAt, setResolvedAt] = useState<string | null>(null);
 
   const {
@@ -78,19 +78,39 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const canAct = isPending && !expired;
 
   const summary = buildActionSummary(approval.action.type, parameters);
+  const actionName = humanizeActionType(approval.action.type);
 
-  const timelineEntries: KeyValueEntry[] = useMemo(() => {
-    const entries: KeyValueEntry[] = [
+  // Derive display status for the hero header
+  const displayStatus = useMemo(() => {
+    if (isApproved) return "approved" as const;
+    if (isDenied) return "denied" as const;
+    if (expired) return "expired" as const;
+    if (approval.status === "cancelled") return "cancelled" as const;
+    if (approval.status === "approved") return "approved" as const;
+    if (approval.status === "denied") return "denied" as const;
+    return "pending" as const;
+  }, [approval.status, isApproved, isDenied, expired]);
+
+  const timelineEntries: TimelineEntry[] = useMemo(() => {
+    const entries: TimelineEntry[] = [
       { label: "Created", value: formatTimestamp(approval.created_at) },
       { label: "Expires", value: formatTimestamp(approval.expires_at) },
     ];
     const approvedTime = approval.approved_at ?? (isApproved ? resolvedAt : null);
     if (approvedTime) {
-      entries.push({ label: "Approved", value: formatTimestamp(approvedTime) });
+      entries.push({
+        label: "Approved",
+        value: formatTimestamp(approvedTime),
+        dotColor: "success",
+      });
     }
     const deniedTime = approval.denied_at ?? (isDenied ? resolvedAt : null);
     if (deniedTime) {
-      entries.push({ label: "Denied", value: formatTimestamp(deniedTime) });
+      entries.push({
+        label: "Denied",
+        value: formatTimestamp(deniedTime),
+        dotColor: "error",
+      });
     }
     if (approval.cancelled_at) {
       entries.push({ label: "Cancelled", value: formatTimestamp(approval.cancelled_at) });
@@ -151,9 +171,10 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       >
         {/* Success state — shown after successful approval */}
         {isApproved && (
-          <View style={styles.section}>
-            <View style={styles.successBanner} accessibilityRole="alert">
-              <Text style={styles.successBannerText}>Request Approved</Text>
+          <View style={styles.confirmationSection}>
+            <View style={styles.confirmationCard} accessibilityRole="alert">
+              <StatusPill status="approved" />
+              <Text style={styles.confirmationText}>Request Approved</Text>
             </View>
             <TouchableOpacity
               style={styles.doneButton}
@@ -169,13 +190,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
         {/* Denied confirmation */}
         {isDenied && (
-          <View style={styles.section}>
+          <View style={styles.confirmationSection}>
             <View
-              style={styles.statusBannerDenied}
+              style={styles.confirmationCard}
               accessibilityRole="alert"
               testID="denied-banner"
             >
-              <Text style={styles.statusBannerTextDenied}>Request Denied</Text>
+              <StatusPill status="denied" />
+              <Text style={styles.confirmationText}>Request Denied</Text>
             </View>
             <TouchableOpacity
               style={styles.doneButton}
@@ -189,101 +211,28 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* Status banner for already-resolved approvals (loaded from list) */}
-        {!isApproved && !isDenied && (
-          <>
-            {approval.status === "approved" && (
-              <View
-                style={styles.statusBannerApproved}
-                accessibilityRole="alert"
-              >
-                <Text style={styles.statusBannerTextApproved}>Approved</Text>
-              </View>
-            )}
-            {approval.status === "denied" && (
-              <View
-                style={styles.statusBannerDenied}
-                accessibilityRole="alert"
-              >
-                <Text style={styles.statusBannerTextDenied}>Denied</Text>
-              </View>
-            )}
-            {approval.status === "cancelled" && (
-              <View style={styles.statusBannerCancelled}>
-                <Text style={styles.statusBannerText}>Cancelled</Text>
-              </View>
-            )}
-            {expired && (
-              <View style={styles.statusBannerCancelled}>
-                <Text style={styles.statusBannerText}>Expired</Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* Agent Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Agent</Text>
-          <View style={styles.agentRow}>
-            <View style={styles.agentAvatar}>
-              <Text style={styles.agentAvatarText}>
-                {agentName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.agentInfo}>
-              <Text style={styles.agentName}>{agentName}</Text>
-              {agentName !== `Agent ${approval.agent_id}` && (
-                <Text style={styles.agentId}>ID: {approval.agent_id}</Text>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Action & Risk */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Action</Text>
-          <View style={styles.card}>
-            <View style={styles.actionHeader}>
-              <View style={styles.actionTitleRow}>
-                <Text style={styles.actionName}>
-                  {humanizeActionType(approval.action.type)}
-                </Text>
-                <RiskBadge level={approval.context.risk_level} />
-              </View>
-              <Text style={styles.actionType}>{approval.action.type}</Text>
-              {approval.action.version && (
-                <Text style={styles.actionVersion}>
-                  v{approval.action.version}
-                </Text>
-              )}
-            </View>
-            {summary !== humanizeActionType(approval.action.type) && (
-              <Text style={styles.actionSummary}>{summary}</Text>
-            )}
-
-            {approval.context.description && (
-              <View style={styles.contextInline}>
-                <Text style={styles.contextDescription}>
-                  {approval.context.description}
-                </Text>
-              </View>
-            )}
-
-            {approval.context.risk_level &&
-              approval.context.risk_level !== "low" &&
-              RISK_DESCRIPTIONS[approval.context.risk_level] != null && (
-                <View style={styles.riskRow}>
-                  <Text style={styles.riskDescription}>
-                    {RISK_DESCRIPTIONS[approval.context.risk_level]}
-                  </Text>
-                </View>
-              )}
-          </View>
-        </View>
+        {/* Hero Header — action info, status, agent, timestamp */}
+        <HeroHeader
+          actionName={actionName}
+          actionType={approval.action.type}
+          actionVersion={approval.action.version}
+          summary={summary}
+          riskLevel={approval.context.risk_level}
+          displayStatus={displayStatus}
+          showStatus={!isApproved && !isDenied}
+          riskDescription={
+            approval.context.risk_level && approval.context.risk_level !== "low"
+              ? RISK_DESCRIPTIONS[approval.context.risk_level]
+              : null
+          }
+          agentName={agentName}
+          createdAt={approval.created_at}
+          contextDescription={approval.context.description}
+        />
 
         {/* High risk warning */}
         {approval.context.risk_level === "high" && (
-          <View style={styles.section}>
+          <View style={styles.sectionMinor}>
             <View
               style={styles.highRiskWarning}
               accessibilityRole="alert"
@@ -298,9 +247,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
         {/* Expiry Countdown */}
         {approval.status === "pending" && !isApproved && !isDenied && (
-          <View style={styles.section}>
+          <View style={styles.sectionMinor}>
             <Text style={styles.sectionLabel}>Expiry</Text>
-            <View style={styles.card}>
+            <View style={styles.cardElevated}>
               <View style={styles.expiryRow}>
                 <CountdownBadge expiresAt={approval.expires_at} />
                 <Text style={styles.expiryLabel}>
@@ -313,9 +262,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
         {/* Parameters */}
         {paramEntries.length > 0 && (
-          <View style={styles.section}>
+          <View style={styles.sectionMajor}>
             <Text style={styles.sectionLabel}>Parameters</Text>
-            <View style={styles.card}>
+            <View style={styles.cardElevated}>
               <KeyValueList entries={paramEntries} />
             </View>
           </View>
@@ -323,24 +272,24 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
         {/* Context Details */}
         {contextDetailEntries.length > 0 && (
-          <View style={styles.section}>
+          <View style={styles.sectionMinor}>
             <Text style={styles.sectionLabel}>Additional Context</Text>
-            <View style={styles.card}>
+            <View style={styles.cardElevated}>
               <KeyValueList entries={contextDetailEntries} />
             </View>
           </View>
         )}
 
         {/* Timeline */}
-        <View style={styles.section}>
+        <View style={styles.sectionMajor}>
           <Text style={styles.sectionLabel}>Timeline</Text>
-          <View style={styles.card}>
-            <KeyValueList entries={timelineEntries} />
+          <View style={styles.cardElevated}>
+            <TimelineView entries={timelineEntries} />
           </View>
         </View>
 
         {/* Approval ID */}
-        <View style={styles.section}>
+        <View style={styles.sectionMajor}>
           <Text style={styles.footerLabel}>
             ID: {approval.approval_id}
           </Text>
@@ -365,11 +314,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
 /** Human-readable explanations shown inline for each risk level. */
 const RISK_DESCRIPTIONS: Record<string, string> = {
-  low: "Minimal impact, easily reversible",
   medium: "Moderate impact, some consequences",
   high: "Significant impact, hard to reverse",
 };
-
 
 const styles = StyleSheet.create({
   outerContainer: {
@@ -379,53 +326,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  successBanner: {
-    backgroundColor: colors.riskLowBg,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#A7F3D0",
-    marginBottom: 16,
+  // --- Confirmation (post-approve/deny) ---
+  confirmationSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 4,
   },
-  successBannerText: {
+  confirmationCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  confirmationText: {
     fontSize: 16,
     fontWeight: "700",
-    color: colors.success,
+    color: colors.gray900,
   },
-  statusBannerApproved: {
-    backgroundColor: colors.riskLowBg,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  statusBannerDenied: {
-    backgroundColor: colors.riskHighBg,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  statusBannerCancelled: {
-    backgroundColor: colors.gray100,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  statusBannerText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.gray700,
-  },
-  statusBannerTextApproved: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.success,
-  },
-  statusBannerTextDenied: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.error,
-  },
-  section: {
+  // --- Sections ---
+  sectionMajor: {
     paddingHorizontal: 20,
-    marginTop: 20,
+    marginTop: 24,
+  },
+  sectionMinor: {
+    paddingHorizontal: 20,
+    marginTop: 12,
   },
   sectionLabel: {
     fontSize: 12,
@@ -435,94 +367,28 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-  card: {
+  // --- Elevated card (shadow instead of border) ---
+  cardElevated: {
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: colors.gray200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  agentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  agentAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.gray200,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  agentAvatarText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.gray700,
-  },
-  agentInfo: {
-    flex: 1,
-  },
-  agentName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.gray900,
-  },
-  agentId: {
-    fontSize: 12,
-    color: colors.gray400,
-    marginTop: 2,
-  },
-  actionHeader: {
-    marginBottom: 4,
-  },
-  actionTitleRow: {
+  // --- Expiry ---
+  expiryRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    flexWrap: "wrap",
   },
-  actionName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.gray900,
-  },
-  actionType: {
-    fontSize: 12,
-    color: colors.gray400,
-    fontFamily: "monospace",
-    marginTop: 2,
-  },
-  actionVersion: {
-    fontSize: 11,
-    color: colors.gray400,
-    marginTop: 2,
-  },
-  actionSummary: {
+  expiryLabel: {
     fontSize: 14,
     color: colors.gray500,
-    marginTop: 8,
-    lineHeight: 20,
   },
-  contextInline: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray100,
-  },
-  contextDescription: {
-    fontSize: 15,
-    color: colors.gray700,
-    lineHeight: 22,
-  },
-  riskRow: {
-    marginTop: 8,
-  },
-  riskDescription: {
-    fontSize: 13,
-    color: colors.gray500,
-    fontStyle: "italic",
-  },
+  // --- High risk ---
   highRiskWarning: {
     backgroundColor: colors.riskHighBg,
     borderRadius: 12,
@@ -535,21 +401,14 @@ const styles = StyleSheet.create({
     color: colors.riskHigh,
     fontWeight: "500",
   },
-  expiryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  expiryLabel: {
-    fontSize: 14,
-    color: colors.gray500,
-  },
+  // --- Footer ---
   footerLabel: {
     fontSize: 11,
     color: colors.gray400,
     textAlign: "center",
     fontFamily: "monospace",
   },
+  // --- Done button ---
   doneButton: {
     marginTop: 16,
     backgroundColor: colors.gray900,
@@ -562,6 +421,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  // --- Action bar ---
   actionBar: {
     backgroundColor: colors.white,
     borderTopWidth: 1,
