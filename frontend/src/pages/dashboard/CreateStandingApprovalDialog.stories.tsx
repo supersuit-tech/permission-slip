@@ -651,6 +651,7 @@ function EditStandingApprovalWizard() {
     attendees: "wildcard",
   });
   const [maxExecutions, setMaxExecutions] = useState("20");
+  const [noExpiry, setNoExpiry] = useState(false);
   const [expiresAt, setExpiresAt] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 14);
@@ -726,6 +727,8 @@ function EditStandingApprovalWizard() {
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
               currentExecutionCount={currentExecutionCount}
+              noExpiry={noExpiry}
+              onNoExpiryChange={setNoExpiry}
             />
           )}
 

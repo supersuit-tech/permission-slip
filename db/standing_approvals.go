@@ -412,7 +412,7 @@ type UpdateStandingApprovalParams struct {
 	UserID             string
 	Constraints        []byte // raw JSONB
 	MaxExecutions      *int
-	ExpiresAt          time.Time
+	ExpiresAt          *time.Time // nil means no expiry (until revoked)
 }
 
 // UpdateStandingApproval updates the constraints, max_executions, and expires_at of an active

@@ -60,7 +60,7 @@ type createStandingApprovalRequest struct {
 type updateStandingApprovalRequest struct {
 	Constraints   json.RawMessage `json:"constraints"`
 	MaxExecutions *int            `json:"max_executions" validate:"omitempty,gte=1"`
-	ExpiresAt     time.Time       `json:"expires_at" validate:"required"`
+	ExpiresAt     *time.Time      `json:"expires_at"`
 }
 
 type executeStandingApprovalRequest struct {
@@ -435,7 +435,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.ExpiresAt.Before(time.Now().UTC()) {
+		if req.ExpiresAt != nil && req.ExpiresAt.Before(time.Now().UTC()) {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expires_at must be in the future"))
 			return
 		}
