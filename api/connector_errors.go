@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -11,8 +12,10 @@ import (
 // Returns true if the error was handled, false if the caller should handle it
 // as an untyped (500) error.
 //
-// Error details are logged server-side but not exposed to the caller to avoid
-// leaking internal information (upstream URLs, service internals, etc.).
+// Connector error messages are surfaced to the caller so agents can see
+// exactly what went wrong (e.g., "Slack channel not found", "GitHub API
+// validation error: ..."). Connectors are responsible for crafting
+// user-friendly, safe-to-expose messages.
 func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) bool {
 	traceID := TraceID(r.Context())
 
@@ -55,9 +58,11 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsExternalError(err):
+		var ee *connectors.ExternalError
+		errors.As(err, &ee)
 		log.Printf("[%s] connector external error: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service returned an error", true))
+		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, ee.Message, true))
 		return true
 
 	case connectors.IsOAuthRefreshError(err):
@@ -76,15 +81,19 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsAuthError(err):
+		var ae *connectors.AuthError
+		errors.As(err, &ae)
 		log.Printf("[%s] connector auth error: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service rejected credentials", true))
+		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, ae.Message, true))
 		return true
 
 	case connectors.IsTimeoutError(err):
+		var te *connectors.TimeoutError
+		errors.As(err, &te)
 		log.Printf("[%s] connector timeout: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, "External service did not respond in time", true))
+		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, te.Message, true))
 		return true
 
 	default:
