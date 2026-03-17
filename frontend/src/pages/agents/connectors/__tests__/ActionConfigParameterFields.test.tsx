@@ -76,6 +76,12 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.getByText("required")).toBeInTheDocument();
     });
 
+    it("does not render field description text", () => {
+      renderFields(basicSchema);
+
+      // description is parsed but not displayed in the constraint form UI
+      expect(screen.queryByText("The name")).not.toBeInTheDocument();
+    });
   });
 
   describe("x-ui.order", () => {
@@ -560,7 +566,7 @@ describe("ActionConfigParameterFields", () => {
       expect(screen.getByTestId("list-param-tags")).toBeInTheDocument();
     });
 
-    it("does not show type annotation for object type", () => {
+    it("renders no type annotation for any field type", () => {
       const schema: ParametersSchema = {
         type: "object",
         properties: {
