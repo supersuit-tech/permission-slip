@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -316,6 +317,67 @@ func TestCreateRepo_MissingParams(t *testing.T) {
 				t.Errorf("expected ValidationError, got %T: %v", err, err)
 			}
 		})
+	}
+}
+
+func TestCreateRepo_OrgNotFound(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Not Found",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.create_repo"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.create_repo",
+		Parameters:  json.RawMessage(`{"name":"test-repo","org":"nonexistent-org"}`),
+		Credentials: validCreds(),
+	})
+
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+	// Should mention the org name in the error for debugging.
+	if got := err.Error(); !strings.Contains(got, "nonexistent-org") {
+		t.Errorf("error should mention org name, got: %s", got)
+	}
+}
+
+func TestCreateRepo_PersonalNotFound(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Not Found",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["github.create_repo"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "github.create_repo",
+		Parameters:  json.RawMessage(`{"name":"test-repo"}`),
+		Credentials: validCreds(),
+	})
+
+	if err == nil {
+		t.Fatal("Execute() expected error, got nil")
+	}
+	// Personal repo 404 should still be a ValidationError (from checkResponse).
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
 

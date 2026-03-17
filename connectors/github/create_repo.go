@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -72,6 +73,14 @@ func (a *createRepoAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, path, ghBody, &ghResp); err != nil {
+		if params.Org != "" {
+			var ve *connectors.ValidationError
+			if errors.As(err, &ve) {
+				return nil, &connectors.ValidationError{
+					Message: fmt.Sprintf("could not create repo in org %q: %s", params.Org, ve.Message),
+				}
+			}
+		}
 		return nil, err
 	}
 
