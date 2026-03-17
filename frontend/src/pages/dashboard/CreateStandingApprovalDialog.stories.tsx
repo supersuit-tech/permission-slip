@@ -137,6 +137,7 @@ const CALENDAR_SCHEMA: ParametersSchema = {
     summary: {
       type: "string",
       description: "Event title/summary",
+      "x-ui": { label: "Title" },
     },
   },
 };
@@ -206,11 +207,16 @@ function StoryConstraintField({
     .replace(/\bId\b/g, "ID")
     .replace(/\bUrl\b/g, "URL");
 
-  // In constraint context, datetime fields should be plain text — users enter
+  // In constraint context, datetime fields render as plain text — users enter
   // patterns like "2026-*" or RFC 3339 values, not pick from a calendar.
   const constraintProperty: typeof property =
+    property.format === "date-time" ||
     property["x-ui"]?.widget === "datetime" ||
-    (property.type === "string" && property.description?.toLowerCase().includes("rfc 3339"))
+    (property.type === "string" && property.description &&
+      (() => {
+        const d = property.description.toLowerCase();
+        return (d.includes("rfc 3339") || d.includes("rfc3339") || d.includes("iso 8601")) && !d.includes("epoch");
+      })())
       ? { ...property, "x-ui": { ...(property["x-ui"] ?? {}), widget: "text" } }
       : property;
 

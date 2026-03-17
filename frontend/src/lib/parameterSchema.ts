@@ -127,7 +127,13 @@ const VALID_WIDGETS_SET = new Set<string>(VALID_WIDGETS);
  * Returns x-ui label if set, otherwise falls back to the property key.
  */
 export function getFieldLabel(key: string, prop: SchemaProperty): string {
-  return prop["x-ui"]?.label ?? key;
+  if (prop["x-ui"]?.label) return prop["x-ui"].label;
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bId\b/g, "ID")
+    .replace(/\bUrl\b/g, "URL")
+    .replace(/\bApi\b/g, "API");
 }
 
 /**
@@ -137,13 +143,21 @@ export function getFieldLabel(key: string, prop: SchemaProperty): string {
 export function getOrderedFieldKeys(schema: ParametersSchema): string[] {
   const allKeys = Object.keys(schema.properties ?? {});
   const order = schema["x-ui"]?.order;
-  if (!order || order.length === 0) return allKeys;
 
-  const allKeysSet = new Set(allKeys);
-  const ordered = order.filter((k) => allKeysSet.has(k));
-  const orderedSet = new Set(ordered);
-  const remaining = allKeys.filter((k) => !orderedSet.has(k));
-  return [...ordered, ...remaining];
+  if (order && order.length > 0) {
+    const allKeysSet = new Set(allKeys);
+    const ordered = order.filter((k) => allKeysSet.has(k));
+    const orderedSet = new Set(ordered);
+    const remaining = allKeys.filter((k) => !orderedSet.has(k));
+    return [...ordered, ...remaining];
+  }
+
+  // No explicit order: required fields first, then optional in original order
+  const required = new Set(schema.required ?? []);
+  return [
+    ...allKeys.filter((k) => required.has(k)),
+    ...allKeys.filter((k) => !required.has(k)),
+  ];
 }
 
 /**
@@ -193,7 +207,7 @@ export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
   if (property.format === "date-time") return "datetime";
   if (property.type === "boolean") return "toggle";
   if (property.type === "integer" || property.type === "number") return "number";
-  if (property.type === "array") return "list";
+  if (property.type === "array" && (!property.items || property.items?.type === "string")) return "list";
 
   // Heuristic: detect datetime fields by description mentioning RFC 3339 or ISO 8601
   if (property.type === "string" && property.description) {
