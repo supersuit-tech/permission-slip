@@ -137,8 +137,12 @@ function ApprovalSupplementalDetails({ approvalId }: { approvalId: string }) {
   // eliminate the ambiguity, but for now this matches the pre-existing pattern
   // and is acceptable since most executed actions do produce at least one of
   // parameters or execution_result.
-  const isScrubbed = executionStatus && !hasExecutionResult && !hasParameters && executedAt &&
-    new Date(executedAt).getTime() < Date.now() - 30 * 60 * 1000;
+  // For denied/cancelled approvals, use the approval's resolved timestamp
+  // (denied_at/cancelled_at) since they have no executed_at or execution_status.
+  const resolvedAt = executedAt ?? approval?.denied_at ?? approval?.cancelled_at ?? approval?.approved_at;
+  const isResolved = !!(executionStatus || approval?.status === "denied" || approval?.status === "cancelled");
+  const isScrubbed = isResolved && !hasExecutionResult && !hasParameters && resolvedAt &&
+    new Date(resolvedAt).getTime() < Date.now() - 30 * 60 * 1000;
 
   return (
     <ApprovalSupplementalContent
@@ -272,7 +276,9 @@ function ApprovalSupplementalContent({
       )}
       {isScrubbed && (
         <p className="text-muted-foreground text-xs italic">
-          Execution details are automatically removed after 30 minutes.
+          {executionStatus
+            ? "Execution details are automatically removed after 30 minutes."
+            : "Action parameters are automatically removed after 30 minutes."}
         </p>
       )}
     </div>
