@@ -1,10 +1,9 @@
 /**
  * CreateStandingApprovalDialog — Storybook stories
  *
- * Renders each step of the "Create Standing Approval" wizard. The constraint
- * step (Step 3) is rendered inline to avoid importing ActionConfigParameterFields
- * which pulls in Radix primitives that can cause React-context issues in
- * Storybook. Steps 1, 2, and 4 use the real presentational sub-components.
+ * Renders each step of the "Create Standing Approval" wizard.
+ * Steps 1, 2, and 4 use the real presentational sub-components.
+ * Step 3 uses ParameterFieldWidget directly (leaf component, no Radix context issues).
  */
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
@@ -13,8 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ParameterFieldWidget } from "@/pages/agents/connectors/ParameterFieldWidget";
 import {
   Dialog,
   DialogContent,
@@ -138,6 +137,7 @@ const CALENDAR_SCHEMA: ParametersSchema = {
     summary: {
       type: "string",
       description: "Event title/summary",
+      "x-ui": { label: "Title" },
     },
   },
 };
@@ -200,40 +200,39 @@ function StoryConstraintField({
   onModeChange: (key: string, mode: ParamMode) => void;
 }) {
   const isWildcard = mode === "wildcard";
-  const label =
-    property.description ??
-    paramKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Use a clean human-readable label: snake_case → Title Case, with common acronym fixes
+  const label = paramKey
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bId\b/g, "ID")
+    .replace(/\bUrl\b/g, "URL");
+
+  // In constraint context, datetime fields render as plain text — users enter
+  // patterns like "2026-*" or RFC 3339 values, not pick from a calendar.
+  const constraintProperty: typeof property =
+    property.format === "date-time" ||
+    property["x-ui"]?.widget === "datetime" ||
+    (property.type === "string" && property.description &&
+      (() => {
+        const d = property.description.toLowerCase();
+        return (d.includes("rfc 3339") || d.includes("rfc3339") || d.includes("iso 8601")) && !d.includes("epoch");
+      })())
+      ? { ...property, "x-ui": { ...(property["x-ui"] ?? {}), widget: "text" } }
+      : property;
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
-          {label}
-        </Label>
-        {isRequired && (
-          <Badge variant="secondary" className="text-xs">
-            required
-          </Badge>
-        )}
-        {property.type && (
-          <span className="text-muted-foreground text-xs">
-            ({property.type})
-          </span>
-        )}
-      </div>
-      {property.description && (
-        <p className="text-muted-foreground text-sm">{property.description}</p>
-      )}
-      <div className="flex items-center gap-2">
-        <Input
-          id={`param-${paramKey}`}
-          type="text"
-          value={isWildcard ? "" : value}
-          onChange={(e) => onValueChange(paramKey, e.target.value)}
-          disabled={isWildcard}
-          placeholder={isWildcard ? "Agent can use any value" : undefined}
-          className={isWildcard ? "bg-muted" : ""}
-        />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
+            {label}
+          </Label>
+          {isRequired && (
+            <Badge variant="secondary" className="text-xs">
+              required
+            </Badge>
+          )}
+        </div>
         <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs whitespace-nowrap">
           <Checkbox
             checked={isWildcard}
@@ -250,6 +249,17 @@ function StoryConstraintField({
           <Asterisk className="size-3" />
           Any value
         </label>
+      </div>
+      <div>
+        <ParameterFieldWidget
+          paramKey={paramKey}
+          property={constraintProperty}
+          value={isWildcard ? "" : value}
+          onChange={(v) => onValueChange(paramKey, v)}
+          disabled={isWildcard}
+          placeholder={isWildcard ? "Agent can use any value" : undefined}
+          className={isWildcard ? "bg-muted" : ""}
+        />
       </div>
       {!isWildcard && value.includes("*") && (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
@@ -288,8 +298,7 @@ function StoryStepConstraints({
       <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3">
         <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
         <p className="text-muted-foreground text-sm">
-          Standing approvals require parameter constraints. At least one
-          parameter must be Fixed or Pattern — not all wildcards.
+          At least one field must have a fixed value or pattern — not all wildcards.
         </p>
       </div>
 
@@ -307,18 +316,24 @@ function StoryStepConstraints({
               ). Check <strong className="text-foreground/70">Any value</strong> to let the agent choose freely.
             </p>
           </div>
-          {Object.entries(properties).map(([key, prop]) => (
-            <StoryConstraintField
-              key={key}
-              paramKey={key}
-              property={prop}
-              isRequired={requiredFields.includes(key)}
-              value={paramValues[key] ?? ""}
-              mode={paramModes[key] ?? "fixed"}
-              onValueChange={onParamValueChange}
-              onModeChange={onParamModeChange}
-            />
-          ))}
+          {Object.entries(properties)
+            .sort(([a], [b]) => {
+              const aReq = requiredFields.includes(a) ? 0 : 1;
+              const bReq = requiredFields.includes(b) ? 0 : 1;
+              return aReq - bReq;
+            })
+            .map(([key, prop]) => (
+              <StoryConstraintField
+                key={key}
+                paramKey={key}
+                property={prop}
+                isRequired={requiredFields.includes(key)}
+                value={paramValues[key] ?? ""}
+                mode={paramModes[key] ?? "fixed"}
+                onValueChange={onParamValueChange}
+                onModeChange={onParamModeChange}
+              />
+            ))}
         </div>
       ) : (
         <div className="space-y-2">

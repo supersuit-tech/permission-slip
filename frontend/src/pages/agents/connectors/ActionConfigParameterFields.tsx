@@ -10,7 +10,6 @@ import {
   getOrderedFieldKeys,
   getFieldLabel,
   isFieldVisible,
-  friendlyTypeLabel,
   inferWidgetFromProperty,
 } from "@/lib/parameterSchema";
 
@@ -169,9 +168,21 @@ function ParameterField({
   const widgetDisabled = disabled || isWildcard;
   const widgetClassName = isWildcard ? "bg-muted" : "";
   const widgetPlaceholder = isWildcard ? "Agent can use any value" : undefined;
-  const typeLabel = friendlyTypeLabel(property.type);
   const effectiveWidget = property["x-ui"]?.widget ?? inferWidgetFromProperty(property);
   const isMultiRow = effectiveWidget === "list";
+
+  // In constraint context, datetime fields render as plain text so users can
+  // enter patterns like "2026-*" rather than being forced to use a date picker.
+  const constraintProperty: typeof property =
+    property.format === "date-time" ||
+    property["x-ui"]?.widget === "datetime" ||
+    (property.type === "string" && property.description &&
+      (() => {
+        const d = property.description.toLowerCase();
+        return (d.includes("rfc 3339") || d.includes("rfc3339") || d.includes("iso 8601")) && !d.includes("epoch");
+      })())
+      ? { ...property, "x-ui": { ...(property["x-ui"] ?? {}), widget: "text" } }
+      : property;
 
   const anyValueCheckbox = (
     <label
@@ -197,32 +208,24 @@ function ParameterField({
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
-          {label}
-        </Label>
-        {isRequired && (
-          <Badge variant="secondary" className="text-xs">
-            required
-          </Badge>
-        )}
-        {typeLabel && (
-          <span className="text-muted-foreground text-xs">
-            ({typeLabel})
-          </span>
-        )}
-        {isMultiRow && anyValueCheckbox}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label htmlFor={`param-${paramKey}`} className="text-sm font-medium">
+            {label}
+          </Label>
+          {isRequired && (
+            <Badge variant="secondary" className="text-xs">
+              required
+            </Badge>
+          )}
+        </div>
+        {anyValueCheckbox}
       </div>
-      {property.description && (
-        <p className="text-muted-foreground text-sm">
-          {property.description}
-        </p>
-      )}
       {isMultiRow ? (
         !isWildcard && (
           <ParameterFieldWidget
             paramKey={paramKey}
-            property={property}
+            property={constraintProperty}
             value={widgetValue}
             onChange={(v) => onValueChange(paramKey, v)}
             disabled={widgetDisabled}
@@ -231,18 +234,15 @@ function ParameterField({
           />
         )
       ) : (
-        <div className="flex items-center gap-2">
-          <ParameterFieldWidget
-            paramKey={paramKey}
-            property={property}
-            value={widgetValue}
-            onChange={(v) => onValueChange(paramKey, v)}
-            disabled={widgetDisabled}
-            className={widgetClassName}
-            placeholder={widgetPlaceholder}
-          />
-          {anyValueCheckbox}
-        </div>
+        <ParameterFieldWidget
+          paramKey={paramKey}
+          property={constraintProperty}
+          value={widgetValue}
+          onChange={(v) => onValueChange(paramKey, v)}
+          disabled={widgetDisabled}
+          className={widgetClassName}
+          placeholder={widgetPlaceholder}
+        />
       )}
       {!isWildcard && value.includes("*") && (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
