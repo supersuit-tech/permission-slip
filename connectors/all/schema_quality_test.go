@@ -21,29 +21,106 @@ import (
 // lint.
 var knownMissingAnnotations = map[string]bool{
 	// textarea — sendgrid HTML content fields
-	"sendgrid.sendgrid.send_campaign:html_content":              true,
-	"sendgrid.sendgrid.schedule_campaign:html_content":          true,
-	"sendgrid.sendgrid.send_transactional_email:html_content":   true,
+	"sendgrid.sendgrid.send_campaign:html_content":            true,
+	"sendgrid.sendgrid.schedule_campaign:html_content":        true,
+	"sendgrid.sendgrid.send_transactional_email:html_content": true,
 
 	// datetime — various connectors with ISO 8601 fields missing format
-	"asana.asana.create_task:due_at":                            true,
-	"asana.asana.update_task:due_at":                            true,
-	"calendly.calendly.list_scheduled_events:min_start_time":    true,
-	"calendly.calendly.list_scheduled_events:max_start_time":    true,
-	"calendly.calendly.list_available_times:start_time":         true,
-	"calendly.calendly.list_available_times:end_time":           true,
-	"dropbox.dropbox.share_file:expires":                        true,
-	"hubspot.hubspot.create_deal:closedate":                     true,
-	"hubspot.hubspot.update_deal_stage:close_date":              true,
-	"jira.jira.create_sprint:start_date":                        true,
-	"jira.jira.create_sprint:end_date":                          true,
-	"microsoft.microsoft.create_calendar_event:start":           true,
-	"microsoft.microsoft.create_calendar_event:end":             true,
-	"pagerduty.pagerduty.list_on_call:since":                    true,
-	"pagerduty.pagerduty.list_on_call:until":                    true,
-	"trello.trello.create_card:due":                             true,
-	"zoom.zoom.create_meeting:start_time":                       true,
-	"zoom.zoom.update_meeting:start_time":                       true,
+	"asana.asana.create_task:due_at":                         true,
+	"asana.asana.update_task:due_at":                         true,
+	"calendly.calendly.list_scheduled_events:min_start_time": true,
+	"calendly.calendly.list_scheduled_events:max_start_time": true,
+	"calendly.calendly.list_available_times:start_time":      true,
+	"calendly.calendly.list_available_times:end_time":        true,
+	"dropbox.dropbox.share_file:expires":                     true,
+	"hubspot.hubspot.create_deal:closedate":                  true,
+	"hubspot.hubspot.update_deal_stage:close_date":           true,
+	"jira.jira.create_sprint:start_date":                     true,
+	"jira.jira.create_sprint:end_date":                       true,
+	"microsoft.microsoft.create_calendar_event:start":        true,
+	"microsoft.microsoft.create_calendar_event:end":          true,
+	"pagerduty.pagerduty.list_on_call:since":                 true,
+	"pagerduty.pagerduty.list_on_call:until":                 true,
+	"trello.trello.create_card:due":                          true,
+	"zoom.zoom.create_meeting:start_time":                    true,
+	"zoom.zoom.update_meeting:start_time":                    true,
+}
+
+// annotationIssue describes a single missing annotation found by the lint.
+type annotationIssue struct {
+	fieldKey   string // "connector.action_type:field_name"
+	actionType string
+	fieldName  string
+	rule       string // "textarea" or "datetime"
+	desc       string // original description
+	widget     string // current widget (empty = default text)
+}
+
+// collectMissingAnnotations scans all built-in connector manifests and returns
+// every field that is missing a widget annotation. Both test functions use this
+// to avoid duplicating the detection logic.
+func collectMissingAnnotations(t *testing.T) []annotationIssue {
+	t.Helper()
+
+	var issues []annotationIssue
+
+	for _, c := range connectors.BuiltInConnectors() {
+		mp, ok := c.(connectors.ManifestProvider)
+		if !ok {
+			continue
+		}
+		m := mp.Manifest()
+
+		for _, action := range m.Actions {
+			schema := parseSchema(t, m.ID, action.ActionType, action.ParametersSchema)
+			if schema == nil {
+				continue
+			}
+
+			props, ok := schema["properties"].(map[string]any)
+			if !ok {
+				continue
+			}
+
+			for key, rawProp := range props {
+				prop, ok := rawProp.(map[string]any)
+				if !ok {
+					continue
+				}
+				propType, _ := prop["type"].(string)
+				desc, _ := prop["description"].(string)
+				descLower := strings.ToLower(desc)
+				widget := extractWidget(prop)
+				fieldKey := fmt.Sprintf("%s.%s:%s", m.ID, action.ActionType, key)
+
+				// Rule 1: rich text fields should be textarea
+				if propType == "string" && widget != "textarea" {
+					if containsAny(descLower, "markdown", "mrkdwn", "html body", "html content") {
+						issues = append(issues, annotationIssue{
+							fieldKey: fieldKey, actionType: action.ActionType,
+							fieldName: key, rule: "textarea", desc: desc, widget: widget,
+						})
+					}
+				}
+
+				// Rule 2: datetime fields should have format: "date-time"
+				if propType == "string" && widget != "datetime" {
+					format, _ := prop["format"].(string)
+					if format == "date-time" {
+						continue
+					}
+					if (strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "iso 8601")) && !strings.Contains(descLower, "epoch") {
+						issues = append(issues, annotationIssue{
+							fieldKey: fieldKey, actionType: action.ActionType,
+							fieldName: key, rule: "datetime", desc: desc, widget: widget,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return issues
 }
 
 // TestSchemaWidgetAnnotations is a quality lint that ensures all connector
@@ -57,65 +134,17 @@ var knownMissingAnnotations = map[string]bool{
 func TestSchemaWidgetAnnotations(t *testing.T) {
 	t.Parallel()
 
-	for _, c := range connectors.BuiltInConnectors() {
-		mp, ok := c.(connectors.ManifestProvider)
-		if !ok {
+	for _, issue := range collectMissingAnnotations(t) {
+		if knownMissingAnnotations[issue.fieldKey] {
 			continue
 		}
-		m := mp.Manifest()
-
-		for _, action := range m.Actions {
-			schema := parseSchema(t, m.ID, action.ActionType, action.ParametersSchema)
-			if schema == nil {
-				continue
-			}
-
-			props, ok := schema["properties"].(map[string]any)
-			if !ok {
-				continue
-			}
-
-			for key, rawProp := range props {
-				prop, ok := rawProp.(map[string]any)
-				if !ok {
-					continue
-				}
-				propType, _ := prop["type"].(string)
-				desc, _ := prop["description"].(string)
-				descLower := strings.ToLower(desc)
-				widget := extractWidget(prop)
-				fieldKey := fmt.Sprintf("%s.%s:%s", m.ID, action.ActionType, key)
-
-				// Rule 1: String fields whose description mentions "markdown",
-				// "mrkdwn", "html body", or "html content" should render as
-				// textarea — either via explicit widget or format-based auto-map.
-				if propType == "string" && widget != "textarea" {
-					if containsAny(descLower, "markdown", "mrkdwn", "html body", "html content") {
-						if knownMissingAnnotations[fieldKey] {
-							continue
-						}
-						t.Errorf("%s field %q: description mentions rich text (%q) but widget is %q — add `\"x-ui\": {\"widget\": \"textarea\"}`",
-							action.ActionType, key, desc, widgetOrDefault(widget))
-					}
-				}
-
-				// Rule 2: String fields with format "date-time" or descriptions
-				// mentioning RFC 3339 / ISO 8601 (without "epoch") should
-				// auto-map to datetime via format. Verify format is present.
-				if propType == "string" && widget != "datetime" {
-					format, _ := prop["format"].(string)
-					if format == "date-time" {
-						continue
-					}
-					if (strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "iso 8601")) && !strings.Contains(descLower, "epoch") {
-						if knownMissingAnnotations[fieldKey] {
-							continue
-						}
-						t.Errorf("%s field %q: description mentions datetime format (%q) but missing `\"format\": \"date-time\"` — add it so the frontend renders a date picker",
-							action.ActionType, key, desc)
-					}
-				}
-			}
+		switch issue.rule {
+		case "textarea":
+			t.Errorf("%s field %q: description mentions rich text (%q) but widget is %q — add `\"x-ui\": {\"widget\": \"textarea\"}`",
+				issue.actionType, issue.fieldName, issue.desc, widgetOrDefault(issue.widget))
+		case "datetime":
+			t.Errorf("%s field %q: description mentions datetime format (%q) but missing `\"format\": \"date-time\"` — add it so the frontend renders a date picker",
+				issue.actionType, issue.fieldName, issue.desc)
 		}
 	}
 }
@@ -126,47 +155,9 @@ func TestSchemaWidgetAnnotations(t *testing.T) {
 func TestKnownMissingAnnotationsAreStillMissing(t *testing.T) {
 	t.Parallel()
 
-	// Build a set of all fields that are actually missing annotations.
 	actuallyMissing := make(map[string]bool)
-
-	for _, c := range connectors.BuiltInConnectors() {
-		mp, ok := c.(connectors.ManifestProvider)
-		if !ok {
-			continue
-		}
-		m := mp.Manifest()
-
-		for _, action := range m.Actions {
-			schema := parseSchema(t, m.ID, action.ActionType, action.ParametersSchema)
-			if schema == nil {
-				continue
-			}
-			props, ok := schema["properties"].(map[string]any)
-			if !ok {
-				continue
-			}
-			for key, rawProp := range props {
-				prop, ok := rawProp.(map[string]any)
-				if !ok {
-					continue
-				}
-				propType, _ := prop["type"].(string)
-				desc, _ := prop["description"].(string)
-				descLower := strings.ToLower(desc)
-				widget := extractWidget(prop)
-				fieldKey := fmt.Sprintf("%s.%s:%s", m.ID, action.ActionType, key)
-
-				if propType == "string" && widget != "textarea" && containsAny(descLower, "markdown", "mrkdwn", "html body", "html content") {
-					actuallyMissing[fieldKey] = true
-				}
-				if propType == "string" && widget != "datetime" {
-					format, _ := prop["format"].(string)
-					if format != "date-time" && (strings.Contains(descLower, "rfc 3339") || strings.Contains(descLower, "iso 8601")) && !strings.Contains(descLower, "epoch") {
-						actuallyMissing[fieldKey] = true
-					}
-				}
-			}
-		}
+	for _, issue := range collectMissingAnnotations(t) {
+		actuallyMissing[issue.fieldKey] = true
 	}
 
 	for fieldKey := range knownMissingAnnotations {

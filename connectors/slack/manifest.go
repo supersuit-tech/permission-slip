@@ -178,7 +178,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"post_at": {
 							"type": "string",
 							"format": "date-time",
-							"description": "When the message should be sent (e.g. 2026-03-20T09:00)"
+							"description": "When the message should be sent in RFC 3339 format (e.g. 2026-03-20T09:00:00Z)"
 						}
 					}
 				}`)),
