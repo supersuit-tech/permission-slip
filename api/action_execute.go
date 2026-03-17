@@ -158,6 +158,9 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 	var firstConstraintErr *db.ConfigValidationError
 	var firstConstraintErrSAID string
 	for _, candidate := range approvals {
+		// No constraints means "match-all". Because results are ordered
+		// newest-first, a newer no-constraint approval shadows older
+		// specific ones at the same priority level (intended behavior).
 		if len(candidate.Constraints) == 0 {
 			sa = candidate
 			break

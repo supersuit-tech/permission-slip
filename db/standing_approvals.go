@@ -421,7 +421,7 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 		     AND starts_at <= now() AND expires_at > now()
 		     AND (max_executions IS NULL OR execution_count < max_executions)
 		 ) combined
-		 ORDER BY priority, created_at DESC
+		 ORDER BY priority, created_at DESC, standing_approval_id DESC
 		 LIMIT 100`,
 		agentID, actionType,
 	)
