@@ -37,7 +37,7 @@ func fetchGoogleEmail(ctx context.Context, accessToken string) (map[string]strin
 
 // fetchGitHubEmail fetches the user's email and username from GitHub's user
 // endpoint. Falls back to the /user/emails endpoint for users with private
-// emails. The "username" key in the returned map contains the GitHub login.
+// emails. The "display_name" key in the returned map contains the GitHub login.
 func fetchGitHubEmail(ctx context.Context, accessToken string) (map[string]string, error) {
 	// First, fetch the /user endpoint which has both login and email.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
@@ -69,7 +69,7 @@ func fetchGitHubEmail(ctx context.Context, accessToken string) (map[string]strin
 
 	extra := make(map[string]string)
 	if login, _ := data["login"].(string); login != "" {
-		extra["username"] = login
+		extra["display_name"] = login
 	}
 	if email, _ := data["email"].(string); email != "" {
 		extra["email"] = email
@@ -77,11 +77,26 @@ func fetchGitHubEmail(ctx context.Context, accessToken string) (map[string]strin
 	}
 
 	// GitHub users can have a private email; fall back to /user/emails.
-	emailReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user/emails", nil)
-	if err != nil {
+	fallbackExtra, fallbackErr := fetchGitHubEmailFallback(ctx, accessToken)
+	if fallbackErr != nil {
 		if len(extra) > 0 {
+			log.Printf("oauth: github email fallback failed (non-fatal, have login): %v", fallbackErr)
 			return extra, nil
 		}
+		return nil, fallbackErr
+	}
+
+	for k, v := range fallbackExtra {
+		extra[k] = v
+	}
+	return extra, nil
+}
+
+// fetchGitHubEmailFallback fetches the primary email from GitHub's /user/emails
+// endpoint. Used when the /user endpoint doesn't include an email.
+func fetchGitHubEmailFallback(ctx context.Context, accessToken string) (map[string]string, error) {
+	emailReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user/emails", nil)
+	if err != nil {
 		return nil, fmt.Errorf("create github emails request: %w", err)
 	}
 	emailReq.Header.Set("Authorization", "Bearer "+accessToken)
@@ -89,25 +104,16 @@ func fetchGitHubEmail(ctx context.Context, accessToken string) (map[string]strin
 
 	emailResp, err := emailHTTPClient.Do(emailReq)
 	if err != nil {
-		if len(extra) > 0 {
-			return extra, nil
-		}
 		return nil, fmt.Errorf("github emails request failed: %w", err)
 	}
 	defer emailResp.Body.Close()
 
 	if emailResp.StatusCode != http.StatusOK {
-		if len(extra) > 0 {
-			return extra, nil
-		}
 		return nil, fmt.Errorf("github emails returned HTTP %d", emailResp.StatusCode)
 	}
 
 	emailBody, err := io.ReadAll(io.LimitReader(emailResp.Body, 64*1024))
 	if err != nil {
-		if len(extra) > 0 {
-			return extra, nil
-		}
 		return nil, fmt.Errorf("read github emails response: %w", err)
 	}
 
@@ -116,31 +122,24 @@ func fetchGitHubEmail(ctx context.Context, accessToken string) (map[string]strin
 		Primary bool   `json:"primary"`
 	}
 	if err := json.Unmarshal(emailBody, &emails); err != nil {
-		if len(extra) > 0 {
-			return extra, nil
-		}
 		return nil, fmt.Errorf("parse github emails: %w", err)
 	}
 
 	for _, e := range emails {
 		if e.Primary && e.Email != "" {
-			extra["email"] = e.Email
-			return extra, nil
+			return map[string]string{"email": e.Email}, nil
 		}
 	}
 	if len(emails) > 0 && emails[0].Email != "" {
-		extra["email"] = emails[0].Email
-		return extra, nil
+		return map[string]string{"email": emails[0].Email}, nil
 	}
 
-	if len(extra) > 0 {
-		return extra, nil
-	}
-	return nil, fmt.Errorf("no email found in GitHub response")
+	return nil, fmt.Errorf("no email found in GitHub /user/emails response")
 }
 
-// fetchMicrosoftEmail fetches the user's email from Microsoft Graph.
-// Tries the "mail" field first, falling back to "userPrincipalName".
+// fetchMicrosoftEmail fetches the user's email and display name from Microsoft
+// Graph. Stores displayName as "display_name", tries "mail" first for email,
+// falling back to "userPrincipalName".
 func fetchMicrosoftEmail(ctx context.Context, accessToken string) (map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://graph.microsoft.com/v1.0/me", nil)
 	if err != nil {
@@ -170,7 +169,7 @@ func fetchMicrosoftEmail(ctx context.Context, accessToken string) (map[string]st
 
 	extra := make(map[string]string)
 	if name, _ := data["displayName"].(string); name != "" {
-		extra["username"] = name
+		extra["display_name"] = name
 	}
 	if mail, _ := data["mail"].(string); mail != "" {
 		extra["email"] = mail
@@ -192,7 +191,8 @@ func fetchSlackEmail(ctx context.Context, accessToken string) (map[string]string
 }
 
 // fetchProfileFromJSON is a generic helper that calls a JSON endpoint with the
-// access token and extracts an email and optional username/name field.
+// access token and extracts an email and optional display name field. The name
+// is stored under the "display_name" key in the returned map.
 func fetchProfileFromJSON(ctx context.Context, accessToken, url, emailField, nameField string) (map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -222,14 +222,14 @@ func fetchProfileFromJSON(ctx context.Context, accessToken, url, emailField, nam
 
 	extra := make(map[string]string)
 	if name, _ := data[nameField].(string); name != "" {
-		extra["username"] = name
+		extra["display_name"] = name
 	}
 	if email, _ := data[emailField].(string); email != "" {
 		extra["email"] = email
 	}
 
 	if len(extra) == 0 {
-		return nil, fmt.Errorf("fields %q and %q not found or empty", emailField, nameField)
+		return nil, fmt.Errorf("neither field %q nor %q found in response", emailField, nameField)
 	}
 	return extra, nil
 }

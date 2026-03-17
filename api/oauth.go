@@ -974,8 +974,9 @@ func instanceFromExtraData(extraData json.RawMessage) string {
 }
 
 // displayNameFromExtraData extracts a human-readable display name from an
-// OAuth connection's extra_data JSON. Prefers "username" (e.g. GitHub login),
-// falls back to "email". Returns "" if neither is present.
+// OAuth connection's extra_data JSON. Prefers "display_name" (e.g. GitHub
+// login or Microsoft displayName), falls back to "email". Returns "" if
+// neither is present.
 func displayNameFromExtraData(extraData json.RawMessage) string {
 	if len(extraData) == 0 {
 		return ""
@@ -984,8 +985,8 @@ func displayNameFromExtraData(extraData json.RawMessage) string {
 	if err := json.Unmarshal(extraData, &extra); err != nil {
 		return ""
 	}
-	if username := extra["username"]; username != "" {
-		return username
+	if dn := extra["display_name"]; dn != "" {
+		return dn
 	}
 	return extra["email"]
 }
