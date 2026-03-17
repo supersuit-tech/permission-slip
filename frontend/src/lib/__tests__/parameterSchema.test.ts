@@ -491,12 +491,12 @@ describe("parseParametersSchema", () => {
       expect(getFieldLabel("customer_id", { type: "string", "x-ui": { label: "Customer" } })).toBe("Customer");
     });
 
-    it("falls back to property key when no x-ui label", () => {
-      expect(getFieldLabel("customer_id", { type: "string" })).toBe("customer_id");
+    it("converts snake_case key to Title Case when no x-ui label", () => {
+      expect(getFieldLabel("customer_id", { type: "string" })).toBe("Customer ID");
     });
 
-    it("falls back to property key when x-ui exists but no label", () => {
-      expect(getFieldLabel("amount", { type: "number", "x-ui": { widget: "number" } })).toBe("amount");
+    it("converts key to Title Case when x-ui exists but no label", () => {
+      expect(getFieldLabel("amount", { type: "number", "x-ui": { widget: "number" } })).toBe("Amount");
     });
   });
 

@@ -38,7 +38,8 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"message": {
 							"type": "string",
-							"description": "Message text (supports Slack mrkdwn formatting)"
+							"description": "Message text (supports Slack mrkdwn formatting)",
+							"x-ui": {"widget": "textarea"}
 						}
 					}
 				}`)),
@@ -171,11 +172,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"message": {
 							"type": "string",
-							"description": "Message text (supports Slack mrkdwn formatting)"
+							"description": "Message text (supports Slack mrkdwn formatting)",
+							"x-ui": {"widget": "textarea"}
 						},
 						"post_at": {
-							"type": "integer",
-							"description": "Unix timestamp for when the message should be sent (must be in the future)"
+							"type": "string",
+							"format": "date-time",
+							"description": "When the message should be sent in RFC 3339 format (e.g. 2026-03-20T09:00:00Z)"
 						}
 					}
 				}`)),
@@ -239,7 +242,8 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"content": {
 							"type": "string",
-							"description": "File content as text"
+							"description": "File content as text",
+							"x-ui": {"widget": "textarea"}
 						},
 						"title": {
 							"type": "string",
@@ -287,7 +291,8 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"message": {
 							"type": "string",
-							"description": "Message text (supports Slack mrkdwn formatting)"
+							"description": "Message text (supports Slack mrkdwn formatting)",
+							"x-ui": {"widget": "textarea"}
 						}
 					}
 				}`)),
@@ -311,7 +316,8 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"message": {
 							"type": "string",
-							"description": "New message text (supports Slack mrkdwn formatting)"
+							"description": "New message text (supports Slack mrkdwn formatting)",
+							"x-ui": {"widget": "textarea"}
 						}
 					}
 				}`)),
