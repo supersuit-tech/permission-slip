@@ -252,12 +252,14 @@ function buildGenericSummary(
  * Returns a consistent avatar background + text color pair based on the name.
  * Uses a simple hash to pick from 8 soft pastel pairs.
  */
+import { colors } from "../../theme/colors";
+
 const AVATAR_COLORS = [
   { bg: "#DBEAFE", text: "#1E40AF" }, // blue
-  { bg: "#D1FAE5", text: "#065F46" }, // green
+  { bg: colors.approvedBg, text: colors.approvedText }, // green — reuses theme
   { bg: "#EDE9FE", text: "#5B21B6" }, // purple
   { bg: "#FCE7F3", text: "#9D174D" }, // pink
-  { bg: "#FEF3C7", text: "#92400E" }, // amber
+  { bg: colors.pendingBg, text: colors.pendingText }, // amber — reuses theme
   { bg: "#CFFAFE", text: "#155E75" }, // cyan
   { bg: "#FFEDD5", text: "#9A3412" }, // orange
   { bg: "#FFE4E6", text: "#9F1239" }, // rose

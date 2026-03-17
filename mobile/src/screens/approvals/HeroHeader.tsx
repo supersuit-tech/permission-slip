@@ -16,6 +16,10 @@ interface HeroHeaderProps {
   riskLevel?: "low" | "medium" | "high" | null;
   /** Display status — resolved from approval status + local state. */
   displayStatus: "approved" | "denied" | "cancelled" | "expired" | "pending";
+  /** Whether to show the status pill. False during live confirmation flow to avoid duplicate pills. */
+  showStatus?: boolean;
+  /** Risk description text shown for medium/high risk levels. */
+  riskDescription?: string | null;
   agentName: string;
   createdAt: string;
   contextDescription?: string | null;
@@ -28,13 +32,15 @@ export function HeroHeader({
   summary,
   riskLevel,
   displayStatus,
+  showStatus: showStatusProp,
+  riskDescription,
   agentName,
   createdAt,
   contextDescription,
 }: HeroHeaderProps) {
   const avatarColors = getAvatarColors(agentName);
   const initial = agentName.charAt(0).toUpperCase();
-  const showStatus = displayStatus !== "pending";
+  const showStatus = displayStatus !== "pending" && (showStatusProp ?? true);
 
   return (
     <View style={styles.container}>
@@ -57,6 +63,11 @@ export function HeroHeader({
       {summary !== actionName && (
         <Text style={styles.summary}>{summary}</Text>
       )}
+
+      {/* Risk description for medium/high risk */}
+      {riskDescription ? (
+        <Text style={styles.riskDescription}>{riskDescription}</Text>
+      ) : null}
 
       {/* Context description */}
       {contextDescription ? (
@@ -128,6 +139,12 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     lineHeight: 22,
     marginTop: 10,
+  },
+  riskDescription: {
+    fontSize: 13,
+    color: colors.gray500,
+    fontStyle: "italic",
+    marginTop: 6,
   },
   descriptionDivider: {
     marginTop: 12,

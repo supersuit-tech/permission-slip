@@ -30,7 +30,7 @@ export function TimelineView({ entries }: TimelineViewProps) {
               : colors.gray300;
 
         return (
-          <View key={entry.label} style={styles.row}>
+          <View key={`${index}-${entry.label}`} style={styles.row}>
             {/* Left rail: dot + connecting line */}
             <View style={styles.rail}>
               <View style={[styles.dot, { backgroundColor: dotBg }]} />

@@ -219,6 +219,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           summary={summary}
           riskLevel={approval.context.risk_level}
           displayStatus={displayStatus}
+          showStatus={!isApproved && !isDenied}
+          riskDescription={
+            approval.context.risk_level && approval.context.risk_level !== "low"
+              ? RISK_DESCRIPTIONS[approval.context.risk_level]
+              : null
+          }
           agentName={agentName}
           createdAt={approval.created_at}
           contextDescription={approval.context.description}
@@ -305,6 +311,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     </View>
   );
 }
+
+/** Human-readable explanations shown inline for each risk level. */
+const RISK_DESCRIPTIONS: Record<string, string> = {
+  medium: "Moderate impact, some consequences",
+  high: "Significant impact, hard to reverse",
+};
 
 const styles = StyleSheet.create({
   outerContainer: {
