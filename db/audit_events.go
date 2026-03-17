@@ -13,28 +13,30 @@ import (
 type AuditEventType string
 
 const (
-	AuditEventApprovalRequested AuditEventType = "approval.requested"
-	AuditEventApprovalApproved  AuditEventType = "approval.approved"
-	AuditEventApprovalDenied    AuditEventType = "approval.denied"
-	AuditEventApprovalCancelled AuditEventType = "approval.cancelled"
-	AuditEventActionExecuted    AuditEventType = "action.executed"
-	AuditEventStandingExecution AuditEventType = "standing_approval.executed"
-	AuditEventAgentRegistered   AuditEventType = "agent.registered"
-	AuditEventAgentDeactivated      AuditEventType = "agent.deactivated"
-	AuditEventPaymentMethodCharged  AuditEventType = "payment_method.charged"
+	AuditEventApprovalRequested    AuditEventType = "approval.requested"
+	AuditEventApprovalApproved     AuditEventType = "approval.approved"
+	AuditEventApprovalDenied       AuditEventType = "approval.denied"
+	AuditEventApprovalCancelled    AuditEventType = "approval.cancelled"
+	AuditEventActionExecuted       AuditEventType = "action.executed"
+	AuditEventStandingExecution    AuditEventType = "standing_approval.executed"
+	AuditEventStandingUpdated      AuditEventType = "standing_approval.updated"
+	AuditEventAgentRegistered      AuditEventType = "agent.registered"
+	AuditEventAgentDeactivated     AuditEventType = "agent.deactivated"
+	AuditEventPaymentMethodCharged AuditEventType = "payment_method.charged"
 )
 
 // validAuditEventTypes is used for input validation.
 var validAuditEventTypes = map[AuditEventType]bool{
-	AuditEventApprovalRequested: true,
-	AuditEventApprovalApproved:  true,
-	AuditEventApprovalDenied:    true,
-	AuditEventApprovalCancelled: true,
-	AuditEventActionExecuted:    true,
-	AuditEventStandingExecution: true,
-	AuditEventAgentRegistered:   true,
-	AuditEventAgentDeactivated:      true,
-	AuditEventPaymentMethodCharged:  true,
+	AuditEventApprovalRequested:    true,
+	AuditEventApprovalApproved:     true,
+	AuditEventApprovalDenied:       true,
+	AuditEventApprovalCancelled:    true,
+	AuditEventActionExecuted:       true,
+	AuditEventStandingExecution:    true,
+	AuditEventStandingUpdated:      true,
+	AuditEventAgentRegistered:      true,
+	AuditEventAgentDeactivated:     true,
+	AuditEventPaymentMethodCharged: true,
 }
 
 // IsValidAuditEventType checks if the given event type is valid.
@@ -96,8 +98,8 @@ const (
 
 // Payment audit event constants.
 const (
-	OutcomeCharged                = "charged"
-	SourceTypePaymentMethodTx     = "payment_method_transaction"
+	OutcomeCharged            = "charged"
+	SourceTypePaymentMethodTx = "payment_method_transaction"
 )
 
 // InsertAuditEventParams holds the parameters for inserting an audit event.
@@ -314,8 +316,8 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 	}
 
 	b := &queryBuilder{}
-	b.addArg(userID)            // $1
-	sincePh := b.addArg(since)  // $2
+	b.addArg(userID)           // $1
+	sincePh := b.addArg(since) // $2
 
 	where := []string{"ae.user_id = $1", fmt.Sprintf("ae.created_at >= %s", sincePh)}
 

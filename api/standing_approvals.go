@@ -334,6 +334,8 @@ func handleStandingApprovalError(w http.ResponseWriter, r *http.Request, err err
 			resp.Error.Details = map[string]any{"status": saErr.Status}
 		}
 		RespondError(w, r, http.StatusGone, resp)
+	case db.StandingApprovalErrMaxExecutionsTooLow:
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "max_executions cannot be less than the current execution count"))
 	default:
 		return false
 	}
@@ -455,15 +457,11 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if existing.Status != "active" {
+			errCode := db.StandingApprovalErrNotActive
 			if existing.Status == "revoked" {
-				resp := Conflict(ErrApprovalAlreadyResolved, "Standing approval already revoked")
-				resp.Error.Details = map[string]any{"status": existing.Status}
-				RespondError(w, r, http.StatusConflict, resp)
-			} else {
-				resp := Gone(ErrStandingExpired, "Standing approval is no longer active")
-				resp.Error.Details = map[string]any{"status": existing.Status}
-				RespondError(w, r, http.StatusGone, resp)
+				errCode = db.StandingApprovalErrAlreadyRevoked
 			}
+			handleStandingApprovalError(w, r, &db.StandingApprovalError{Code: errCode, Status: existing.Status})
 			return
 		}
 
@@ -506,8 +504,24 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		emitStandingApprovalUpdateAuditEvent(r.Context(), deps.DB, profile.ID, sa.AgentID, saID, sa.ActionType)
 		RespondJSON(w, http.StatusOK, toStandingApprovalResponse(*sa))
 	}
+}
+
+// emitStandingApprovalUpdateAuditEvent writes a standing_approval.updated audit event.
+func emitStandingApprovalUpdateAuditEvent(ctx context.Context, d db.DBTX, userID string, agentID int64, saID, actionType string) {
+	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
+	emitAuditEventWithUsage(ctx, d, db.InsertAuditEventParams{
+		UserID:      userID,
+		AgentID:     agentID,
+		EventType:   db.AuditEventStandingUpdated,
+		Outcome:     "updated",
+		SourceID:    saID,
+		SourceType:  "standing_approval",
+		Action:      actionJSON,
+		ConnectorID: connectorIDFromActionType(actionType),
+	}, false)
 }
 
 // emitStandingApprovalAuditEvent writes a standing_approval.executed audit event.
