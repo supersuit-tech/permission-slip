@@ -218,6 +218,9 @@ paths:
   /v1/standing-approvals/{standing_approval_id}/revoke:
     $ref: './components/paths/standing_approvals.yaml#/revokeStandingApproval'
 
+  /v1/standing-approvals/{standing_approval_id}/update:
+    $ref: './components/paths/standing_approvals.yaml#/updateStandingApproval'
+
   /v1/standing-approvals/{standing_approval_id}/execute:
     $ref: './components/paths/standing_approvals.yaml#/executeStandingApproval'
 
@@ -426,6 +429,8 @@ components:
       $ref: './components/schemas/standing_approvals.yaml#/CreateStandingApprovalRequest'
     RevokeStandingApprovalResponse:
       $ref: './components/schemas/standing_approvals.yaml#/RevokeStandingApprovalResponse'
+    UpdateStandingApprovalRequest:
+      $ref: './components/schemas/standing_approvals.yaml#/UpdateStandingApprovalRequest'
     UserExecuteStandingApprovalRequest:
       $ref: './components/schemas/standing_approvals.yaml#/UserExecuteStandingApprovalRequest'
     UserExecuteStandingApprovalResponse:

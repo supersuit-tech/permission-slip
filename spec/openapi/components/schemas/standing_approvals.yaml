@@ -345,6 +345,39 @@ CreateStandingApprovalRequest:
     max_executions: 100
     expires_at: "2026-03-14T00:00:00Z"
 
+UpdateStandingApprovalRequest:
+  type: object
+  required:
+    - constraints
+    - expires_at
+  properties:
+    constraints:
+      type: object
+      additionalProperties: true
+      description: |
+        Updated constraint boundaries. Must be non-empty with at least one non-wildcard value.
+      example:
+        recipient_pattern: "*@mycompany.com"
+
+    max_executions:
+      type: integer
+      minimum: 1
+      nullable: true
+      description: Updated maximum number of executions. Null means unlimited.
+      example: 200
+
+    expires_at:
+      type: string
+      format: date-time
+      description: Updated expiration time. Must be in the future. Maximum 90 days from now.
+      example: "2026-04-14T00:00:00Z"
+
+  example:
+    constraints:
+      recipient_pattern: "*@mycompany.com"
+    max_executions: 200
+    expires_at: "2026-04-14T00:00:00Z"
+
 RevokeStandingApprovalResponse:
   type: object
   required:

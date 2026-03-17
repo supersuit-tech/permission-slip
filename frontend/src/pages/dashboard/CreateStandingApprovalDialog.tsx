@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
+import { useUpdateStandingApproval } from "@/hooks/useUpdateStandingApproval";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useActionSchema } from "@/hooks/useActionSchema";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
@@ -36,8 +38,12 @@ export interface CreateStandingApprovalDialogProps {
   initialAgentId?: number;
   initialActionType?: string;
   initialConstraints?: Record<string, unknown>;
+  /** When provided, the dialog operates in edit mode for the given standing approval. */
+  editTarget?: StandingApproval;
   /** Called after a standing approval is successfully created. */
   onCreated?: () => void;
+  /** Called after a standing approval is successfully updated. */
+  onUpdated?: () => void;
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -81,25 +87,39 @@ export function CreateStandingApprovalDialog({
   initialAgentId,
   initialActionType,
   initialConstraints,
+  editTarget,
   onCreated,
+  onUpdated,
 }: CreateStandingApprovalDialogProps) {
-  const { createStandingApproval, isPending } = useCreateStandingApproval();
+  const { createStandingApproval, isPending: isCreatePending } = useCreateStandingApproval();
+  const { updateStandingApproval, isPending: isUpdatePending } = useUpdateStandingApproval();
+  const isPending = isCreatePending || isUpdatePending;
+  const isEditMode = !!editTarget;
+
+  // In edit mode, derive initial values from the target approval.
+  const ctxAgentId = isEditMode ? editTarget.agent_id : initialAgentId;
+  const ctxActionType = isEditMode ? editTarget.action_type : initialActionType;
+  const ctxConstraints = isEditMode
+    ? (editTarget.constraints as Record<string, unknown>)
+    : initialConstraints;
 
   // Skip straight to constraints when agent + action are pre-filled
-  const hasInitialContext = !!(initialAgentId && initialActionType);
+  const hasInitialContext = !!(ctxAgentId && ctxActionType);
   const [step, setStep] = useState<Step>(hasInitialContext ? 3 : 1);
-  const [agentId, setAgentId] = useState<number | "">(initialAgentId ?? "");
+  const [agentId, setAgentId] = useState<number | "">(ctxAgentId ?? "");
   const [selectedConfigId, setSelectedConfigId] = useState<string>(
-    initialActionType ? CUSTOM_ACTION_SENTINEL : "",
+    isEditMode
+      ? (editTarget.source_action_configuration_id ?? CUSTOM_ACTION_SENTINEL)
+      : (ctxActionType ? CUSTOM_ACTION_SENTINEL : ""),
   );
   const [customActionType, setCustomActionType] = useState(
-    initialActionType ?? "",
+    ctxActionType ?? "",
   );
   // Pre-populate constraint form values when initial constraints are provided
   const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
-    if (!hasInitialContext || !initialConstraints) return {};
+    if (!hasInitialContext || !ctxConstraints) return {};
     const values: Record<string, string> = {};
-    for (const [key, value] of Object.entries(initialConstraints)) {
+    for (const [key, value] of Object.entries(ctxConstraints)) {
       if (value === "*") values[key] = "*";
       else if (isPatternWrapper(value)) values[key] = value.$pattern;
       else if (value === null || value === undefined) values[key] = "";
@@ -108,9 +128,9 @@ export function CreateStandingApprovalDialog({
     return values;
   });
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() => {
-    if (!hasInitialContext || !initialConstraints) return {};
+    if (!hasInitialContext || !ctxConstraints) return {};
     const modes: Record<string, ParamMode> = {};
-    for (const [key, value] of Object.entries(initialConstraints)) {
+    for (const [key, value] of Object.entries(ctxConstraints)) {
       if (value === "*") modes[key] = "wildcard";
       else if (isPatternWrapper(value)) modes[key] = "pattern";
       else modes[key] = "fixed";
@@ -118,12 +138,23 @@ export function CreateStandingApprovalDialog({
     return modes;
   });
   const [manualConstraintsJson, setManualConstraintsJson] = useState(
-    hasInitialContext && initialConstraints
-      ? JSON.stringify(initialConstraints, null, 2)
+    hasInitialContext && ctxConstraints
+      ? JSON.stringify(ctxConstraints, null, 2)
       : "",
   );
-  const [maxExecutions, setMaxExecutions] = useState("");
-  const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
+  const [maxExecutions, setMaxExecutions] = useState(
+    isEditMode && editTarget.max_executions != null
+      ? String(editTarget.max_executions)
+      : "",
+  );
+  const [expiresAt, setExpiresAt] = useState(() => {
+    if (isEditMode && editTarget.expires_at) {
+      const d = new Date(editTarget.expires_at);
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+    return defaultExpiresAt();
+  });
 
   const activeAgents = agents.filter((a) => a.status !== "deactivated");
 
@@ -172,13 +203,17 @@ export function CreateStandingApprovalDialog({
 
   function resetForm() {
     setStep(hasInitialContext ? 3 : 1);
-    setAgentId(initialAgentId ?? "");
-    setSelectedConfigId(initialActionType ? CUSTOM_ACTION_SENTINEL : "");
-    setCustomActionType(initialActionType ?? "");
-    if (hasInitialContext && initialConstraints) {
+    setAgentId(ctxAgentId ?? "");
+    setSelectedConfigId(
+      isEditMode
+        ? (editTarget.source_action_configuration_id ?? CUSTOM_ACTION_SENTINEL)
+        : (ctxActionType ? CUSTOM_ACTION_SENTINEL : ""),
+    );
+    setCustomActionType(ctxActionType ?? "");
+    if (hasInitialContext && ctxConstraints) {
       const values: Record<string, string> = {};
       const modes: Record<string, ParamMode> = {};
-      for (const [key, value] of Object.entries(initialConstraints)) {
+      for (const [key, value] of Object.entries(ctxConstraints)) {
         if (value === "*") { values[key] = "*"; modes[key] = "wildcard"; }
         else if (isPatternWrapper(value)) { values[key] = value.$pattern; modes[key] = "pattern"; }
         else { values[key] = value === null || value === undefined ? "" : String(value); modes[key] = "fixed"; }
@@ -190,12 +225,22 @@ export function CreateStandingApprovalDialog({
       setParamModes({});
     }
     setManualConstraintsJson(
-      hasInitialContext && initialConstraints
-        ? JSON.stringify(initialConstraints, null, 2)
+      hasInitialContext && ctxConstraints
+        ? JSON.stringify(ctxConstraints, null, 2)
         : "",
     );
-    setMaxExecutions("");
-    setExpiresAt(defaultExpiresAt());
+    if (isEditMode && editTarget.max_executions != null) {
+      setMaxExecutions(String(editTarget.max_executions));
+    } else {
+      setMaxExecutions("");
+    }
+    if (isEditMode && editTarget.expires_at) {
+      const d = new Date(editTarget.expires_at);
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      setExpiresAt(local.toISOString().slice(0, 16));
+    } else {
+      setExpiresAt(defaultExpiresAt());
+    }
   }
 
   function initConstraintsFromRecord(record: Record<string, unknown>) {
@@ -243,9 +288,9 @@ export function CreateStandingApprovalDialog({
       if (selectedConfig) {
         initConstraintsFromRecord(selectedConfig.parameters);
         setManualConstraintsJson("");
-      } else if (initialConstraints && isCustomAction) {
-        initConstraintsFromRecord(initialConstraints);
-        setManualConstraintsJson(JSON.stringify(initialConstraints, null, 2));
+      } else if (ctxConstraints && isCustomAction) {
+        initConstraintsFromRecord(ctxConstraints);
+        setManualConstraintsJson(JSON.stringify(ctxConstraints, null, 2));
       } else {
         setParamValues({});
         setParamModes({});
@@ -350,24 +395,38 @@ export function CreateStandingApprovalDialog({
     }
 
     try {
-      await createStandingApproval({
-        agent_id: agentId,
-        action_type: effectiveActionType,
-        action_version: "1",
-        constraints,
-        source_action_configuration_id: selectedConfig?.id,
-        max_executions: maxExecutions ? Number(maxExecutions) : null,
-        expires_at: new Date(expiresAt).toISOString(),
-      });
-      toast.success("Standing approval created");
-      resetForm();
-      onOpenChange(false);
-      onCreated?.();
+      if (isEditMode) {
+        await updateStandingApproval(editTarget.standing_approval_id, {
+          constraints,
+          max_executions: maxExecutions ? Number(maxExecutions) : null,
+          expires_at: new Date(expiresAt).toISOString(),
+        });
+        toast.success("Standing approval updated");
+        resetForm();
+        onOpenChange(false);
+        onUpdated?.();
+      } else {
+        await createStandingApproval({
+          agent_id: agentId,
+          action_type: effectiveActionType,
+          action_version: "1",
+          constraints,
+          source_action_configuration_id: selectedConfig?.id,
+          max_executions: maxExecutions ? Number(maxExecutions) : null,
+          expires_at: new Date(expiresAt).toISOString(),
+        });
+        toast.success("Standing approval created");
+        resetForm();
+        onOpenChange(false);
+        onCreated?.();
+      }
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Failed to create standing approval",
+          : isEditMode
+            ? "Failed to update standing approval"
+            : "Failed to create standing approval",
       );
     }
   }
@@ -411,7 +470,9 @@ export function CreateStandingApprovalDialog({
             </>
           ) : (
             <>
-              <DialogTitle>Create Standing Approval</DialogTitle>
+              <DialogTitle>
+                {isEditMode ? "Edit Standing Approval" : "Create Standing Approval"}
+              </DialogTitle>
               <DialogDescription>
                 {hasInitialContext
                   ? `Step ${step - 2} of 2: ${STEP_LABELS[step]}`
@@ -439,7 +500,7 @@ export function CreateStandingApprovalDialog({
               onAgentChange={(id) => {
                 setAgentId(id);
                 setSelectedConfigId("");
-                setCustomActionType(initialActionType ?? "");
+                setCustomActionType(ctxActionType ?? "");
                 setParamValues({});
                 setParamModes({});
               }}
@@ -537,7 +598,7 @@ export function CreateStandingApprovalDialog({
                 ) : (
                   <Check className="size-4" />
                 )}
-                Create
+                {isEditMode ? "Save" : "Create"}
               </Button>
             )}
           </DialogFooter>

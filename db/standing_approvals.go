@@ -347,7 +347,7 @@ type StandingApprovalExecution struct {
 	ExecutedAt         time.Time
 	// MaxExecutions and ExecutionCount are populated by
 	// RecordStandingApprovalExecutionByAgent only.
-	MaxExecutions *int
+	MaxExecutions  *int
 	ExecutionCount int
 }
 
@@ -401,6 +401,36 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 		return &StandingApprovalError{Code: StandingApprovalErrAlreadyRevoked, Status: sa.Status}
 	}
 	return &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
+}
+
+// UpdateStandingApprovalParams holds the fields that can be updated on an active standing approval.
+type UpdateStandingApprovalParams struct {
+	StandingApprovalID string
+	UserID             string
+	Constraints        []byte // raw JSONB
+	MaxExecutions      *int
+	ExpiresAt          time.Time
+}
+
+// UpdateStandingApproval updates the constraints, max_executions, and expires_at of an active
+// standing approval belonging to the given user. Returns the updated approval, or a domain error.
+func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprovalParams) (*StandingApproval, error) {
+	row := db.QueryRow(ctx,
+		`UPDATE standing_approvals
+		 SET constraints = $3, max_executions = $4, expires_at = $5
+		 WHERE standing_approval_id = $1 AND user_id = $2
+		   AND status = 'active'
+		 RETURNING `+standingApprovalColumns,
+		p.StandingApprovalID, p.UserID, p.Constraints, p.MaxExecutions, p.ExpiresAt,
+	)
+	updated, err := scanStandingApproval(row)
+	if err == nil {
+		return updated, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	return nil, diagnoseStandingApprovalFailure(ctx, db, p.StandingApprovalID, p.UserID)
 }
 
 // FindActiveStandingApprovalForAgent returns the best matching active standing

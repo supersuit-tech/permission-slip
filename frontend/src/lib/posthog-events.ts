@@ -18,6 +18,7 @@ export const PostHogEvents = {
   // Standing approvals
   STANDING_APPROVAL_CREATED: "standing_approval_created",
   STANDING_APPROVAL_REVOKED: "standing_approval_revoked",
+  STANDING_APPROVAL_UPDATED: "standing_approval_updated",
 
   // Agent management
   AGENT_UPDATED: "agent_updated",

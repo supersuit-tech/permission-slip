@@ -46,14 +46,20 @@ type revokeStandingApprovalResponse struct {
 }
 
 type createStandingApprovalRequest struct {
-	AgentID                int64           `json:"agent_id" validate:"gt=0"`
-	ActionType             string          `json:"action_type" validate:"required"`
-	ActionVersion          string          `json:"action_version"`
-	Constraints            json.RawMessage `json:"constraints"`
-	SourceActionConfigurationID *string     `json:"source_action_configuration_id"`
-	MaxExecutions          *int            `json:"max_executions" validate:"omitempty,gte=1"`
-	StartsAt               *time.Time      `json:"starts_at"`
-	ExpiresAt              time.Time       `json:"expires_at" validate:"required"`
+	AgentID                     int64           `json:"agent_id" validate:"gt=0"`
+	ActionType                  string          `json:"action_type" validate:"required"`
+	ActionVersion               string          `json:"action_version"`
+	Constraints                 json.RawMessage `json:"constraints"`
+	SourceActionConfigurationID *string         `json:"source_action_configuration_id"`
+	MaxExecutions               *int            `json:"max_executions" validate:"omitempty,gte=1"`
+	StartsAt                    *time.Time      `json:"starts_at"`
+	ExpiresAt                   time.Time       `json:"expires_at" validate:"required"`
+}
+
+type updateStandingApprovalRequest struct {
+	Constraints   json.RawMessage `json:"constraints"`
+	MaxExecutions *int            `json:"max_executions" validate:"omitempty,gte=1"`
+	ExpiresAt     time.Time       `json:"expires_at" validate:"required"`
 }
 
 type executeStandingApprovalRequest struct {
@@ -92,6 +98,7 @@ func RegisterStandingApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /standing-approvals/create", requireProfile(handleCreateStandingApproval(deps)))
 	mux.Handle("POST /standing-approvals/{standing_approval_id}/revoke", requireProfile(handleRevokeStandingApproval(deps)))
 	mux.Handle("POST /standing-approvals/{standing_approval_id}/execute", requireProfile(handleExecuteStandingApproval(deps)))
+	mux.Handle("POST /standing-approvals/{standing_approval_id}/update", requireProfile(handleUpdateStandingApproval(deps)))
 }
 
 func handleListStandingApprovals(deps *Deps) http.HandlerFunc {
@@ -403,6 +410,70 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 			ExecutedAt:         exec.ExecutedAt,
 			ActionResult:       actionResultPtr,
 		})
+	}
+}
+
+func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+		saID := r.PathValue("standing_approval_id")
+
+		if strings.TrimSpace(saID) == "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "standing_approval_id is required"))
+			return
+		}
+
+		var req updateStandingApprovalRequest
+		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+
+		if !ValidateRequest(w, r, &req) {
+			return
+		}
+
+		if len(req.Constraints) > shared.MaxConstraintsBytes {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "constraints exceeds maximum size"))
+			return
+		}
+
+		if req.ExpiresAt.Before(time.Now().UTC()) {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expires_at must be in the future"))
+			return
+		}
+
+		if time.Until(req.ExpiresAt) > shared.StandingApprovalMaxDuration {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "duration exceeds maximum"))
+			return
+		}
+
+		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
+		if err != nil {
+			resp := BadRequest(ErrInvalidConstraints, err.Error())
+			resp.Error.Details = map[string]any{
+				"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
+			}
+			RespondError(w, r, http.StatusBadRequest, resp)
+			return
+		}
+
+		sa, err := db.UpdateStandingApproval(r.Context(), deps.DB, db.UpdateStandingApprovalParams{
+			StandingApprovalID: saID,
+			UserID:             profile.ID,
+			Constraints:        constraintsBytes,
+			MaxExecutions:      req.MaxExecutions,
+			ExpiresAt:          req.ExpiresAt,
+		})
+		if err != nil {
+			if handleStandingApprovalError(w, r, err) {
+				return
+			}
+			log.Printf("[%s] UpdateStandingApproval: %v", TraceID(r.Context()), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update standing approval"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, toStandingApprovalResponse(*sa))
 	}
 }
 
