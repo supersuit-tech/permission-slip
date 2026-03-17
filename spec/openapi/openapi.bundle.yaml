@@ -4337,6 +4337,84 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/standing-approvals/{standing_approval_id}/update:
+    post:
+      operationId: updateStandingApproval
+      summary: Update Standing Approval
+      description: |
+        Update the constraints, max_executions, and expires_at of an active standing approval.
+        The standing approval must belong to the authenticated user and be in `active` status.
+        Agent and action type cannot be changed — only constraints and limits.
+
+        **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
+        the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
+        not a rolling window from the time of the update call.
+
+        **Execution count**: `max_executions` cannot be set below the approval's current
+        `execution_count`. The update is rejected atomically at the database level to prevent
+        a race condition where concurrent executions could otherwise create a zombie approval.
+      tags:
+        - Standing Approvals
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/StandingApprovalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStandingApprovalRequest'
+            example:
+              constraints:
+                recipient_pattern: '*@mycompany.com'
+              max_executions: 200
+              expires_at: '2026-04-14T00:00:00Z'
+      responses:
+        '200':
+          description: Standing approval updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingApproval'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Standing approval not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: approval_not_found
+                  message: Standing approval not found
+                  retryable: false
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+        '409':
+          description: Standing approval already revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Standing approval no longer active (expired or exhausted)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/standing-approvals/{standing_approval_id}/execute:
     post:
       operationId: executeStandingApproval
@@ -8455,6 +8533,7 @@ components:
           recipient_pattern: '*@mycompany.com'
         source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         max_executions: 100
+        expires_at: null
     RevokeStandingApprovalResponse:
       type: object
       required:
@@ -8474,6 +8553,35 @@ components:
           type: string
           format: date-time
           example: '2026-02-21T10:30:00Z'
+    UpdateStandingApprovalRequest:
+      type: object
+      required:
+        - constraints
+        - expires_at
+      properties:
+        constraints:
+          type: object
+          additionalProperties: true
+          description: |
+            Updated constraint boundaries. Must be non-empty with at least one non-wildcard value.
+          example:
+            recipient_pattern: '*@mycompany.com'
+        max_executions:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Updated maximum number of executions. Null means unlimited.
+          example: 200
+        expires_at:
+          type: string
+          format: date-time
+          description: Updated expiration time. Must be in the future. The total duration from the approval's original start date may not exceed the maximum allowed window (90 days). As the approval ages, the available headroom shrinks.
+          example: '2026-04-14T00:00:00Z'
+      example:
+        constraints:
+          recipient_pattern: '*@mycompany.com'
+        max_executions: 200
+        expires_at: '2026-04-14T00:00:00Z'
     UserExecuteStandingApprovalRequest:
       type: object
       properties:

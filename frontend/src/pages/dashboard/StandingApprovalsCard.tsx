@@ -93,11 +93,13 @@ function resolveActionConfigName(
 
 function StandingApprovalRow({
   sa,
+  onEdit,
   onRevoke,
   agentMap,
   configMap,
 }: {
   sa: StandingApproval;
+  onEdit: (sa: StandingApproval) => void;
   onRevoke: (sa: StandingApproval) => void;
   agentMap: Map<number, Agent>;
   configMap: Map<string, ActionConfiguration>;
@@ -134,6 +136,15 @@ function StandingApprovalRow({
       </TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
+        {sa.status === "active" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(sa)}
+          >
+            Edit
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -190,6 +201,7 @@ export function StandingApprovalsCard() {
     hasData: hasBillingData,
   } = useResourceLimit("max_standing_approvals", standingApprovals.length);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<StandingApproval | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<StandingApproval | null>(
     null,
   );
@@ -225,6 +237,7 @@ export function StandingApprovalsCard() {
         ) : (
           <StandingApprovalsTable
             approvals={standingApprovals}
+            onEdit={(sa) => setEditTarget(sa)}
             onRevoke={(sa) => setRevokeTarget(sa)}
             agentMap={agentMap}
             configMap={configMap}
@@ -252,6 +265,18 @@ export function StandingApprovalsCard() {
         onOpenChange={setCreateDialogOpen}
       />
 
+      {editTarget && (
+        <CreateStandingApprovalDialog
+          agents={agents}
+          open={!!editTarget}
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          editTarget={editTarget}
+          onUpdated={() => setEditTarget(null)}
+        />
+      )}
+
       {revokeTarget && (
         <RevokeStandingApprovalDialog
           standingApprovalId={revokeTarget.standing_approval_id}
@@ -269,11 +294,13 @@ export function StandingApprovalsCard() {
 
 function StandingApprovalsTable({
   approvals,
+  onEdit,
   onRevoke,
   agentMap,
   configMap,
 }: {
   approvals: StandingApproval[];
+  onEdit: (sa: StandingApproval) => void;
   onRevoke: (sa: StandingApproval) => void;
   agentMap: Map<number, Agent>;
   configMap: Map<string, ActionConfiguration>;
@@ -299,6 +326,7 @@ function StandingApprovalsTable({
               <StandingApprovalRow
                 key={sa.standing_approval_id}
                 sa={sa}
+                onEdit={onEdit}
                 onRevoke={onRevoke}
                 agentMap={agentMap}
                 configMap={configMap}
