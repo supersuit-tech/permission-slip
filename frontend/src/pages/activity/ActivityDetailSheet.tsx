@@ -1,5 +1,4 @@
 import {
-  Loader2,
   Bot,
   CheckCircle2,
   XCircle,
@@ -97,22 +96,24 @@ function ExecutionStatusSection({
   );
 }
 
-function ApprovalDetails({ approvalId }: { approvalId: string }) {
+/**
+ * Supplemental approval details — parameters, execution result, risk, description.
+ * Does NOT show a loading spinner; the action type is already visible from the
+ * audit event. Renders nothing while loading, and shows available data or a
+ * "details removed" message once loaded.
+ */
+function ApprovalSupplementalDetails({ approvalId }: { approvalId: string }) {
   const { approval, isLoading, error } = useApprovalDetail(approvalId);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 py-4">
-        <Loader2 className="text-muted-foreground size-4 animate-spin" />
-        <span className="text-muted-foreground text-sm">Loading details...</span>
-      </div>
-    );
-  }
+  // While loading, render nothing — the action type header from the audit
+  // event is already visible above.
+  if (isLoading || !approval) return null;
 
-  if (error || !approval) {
+  // Show a slim error message so API failures are visible to the user.
+  if (error) {
     return (
-      <p className="text-muted-foreground text-sm py-2">
-        {error ?? "Approval details not available."}
+      <p className="text-muted-foreground text-xs py-1">
+        Could not load approval details.
       </p>
     );
   }
@@ -126,22 +127,162 @@ function ApprovalDetails({ approvalId }: { approvalId: string }) {
   const executionResult = approval.execution_result as Record<string, unknown> | undefined;
   const executionError = typeof executionResult?.error === "string" ? executionResult.error : undefined;
   const resourceDetails = approval.resource_details as Record<string, unknown> | undefined;
+  const executionStatus = approval.execution_status ?? undefined;
+  const executedAt = approval.executed_at ?? undefined;
+
+  const hasParameters = Object.keys(parameters).length > 0;
+  const hasExecutionResult = executionResult && Object.keys(executionResult).length > 0;
+  // NOTE: This heuristic can false-positive on actions that legitimately have
+  // no parameters and no execution result. A backend `scrubbed_at` field would
+  // eliminate the ambiguity, but for now this matches the pre-existing pattern
+  // and is acceptable since most executed actions do produce at least one of
+  // parameters or execution_result.
+  const isScrubbed = executionStatus && !hasExecutionResult && !hasParameters && executedAt &&
+    new Date(executedAt).getTime() < Date.now() - 30 * 60 * 1000;
 
   return (
-    <ApprovalContent
+    <ApprovalSupplementalContent
       actionType={actionType}
       parameters={parameters}
       riskLevel={riskLevel}
       description={description}
-      executionStatus={approval.execution_status ?? undefined}
+      executionStatus={executionStatus}
       executionError={executionError}
       executionResult={executionResult}
-      executedAt={approval.executed_at ?? undefined}
       resourceDetails={resourceDetails}
+      isScrubbed={!!isScrubbed}
     />
   );
 }
 
+/** Action type header — shows the action name and type immediately from the audit event. */
+function ActionTypeHeader({ actionType, actionName }: { actionType: string; actionName: string | null }) {
+  return (
+    <div className="space-y-2">
+      <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+        Action
+      </h4>
+      <div className="bg-muted/50 rounded-lg border p-3">
+        <span className="text-sm font-semibold">
+          {actionName ?? actionType}
+        </span>
+        {actionName && (
+          <div>
+            <span className="text-muted-foreground font-mono text-xs">
+              {actionType}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Supplemental content from the approval record: risk badge, description,
+ * parameters, execution result, and scrubbed-data notice.
+ */
+function ApprovalSupplementalContent({
+  actionType,
+  parameters,
+  riskLevel,
+  description,
+  executionStatus,
+  executionError,
+  executionResult,
+  resourceDetails,
+  isScrubbed,
+}: {
+  actionType: string;
+  parameters: Record<string, unknown>;
+  riskLevel?: "low" | "medium" | "high" | null;
+  description?: string | null;
+  executionStatus?: string;
+  executionError?: string;
+  executionResult?: Record<string, unknown>;
+  resourceDetails?: Record<string, unknown>;
+  isScrubbed: boolean;
+}) {
+  const { schema, actionName, displayTemplate } = useActionSchema(actionType);
+  const hasParameters = Object.keys(parameters).length > 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Risk & description (from approval context) */}
+      {(riskLevel || description) && (
+        <div className="bg-muted/50 rounded-lg border p-3">
+          {riskLevel && (
+            <div className="mb-2">
+              <RiskBadge level={riskLevel} />
+            </div>
+          )}
+          {description && (
+            <p className="text-muted-foreground text-sm">{description}</p>
+          )}
+        </div>
+      )}
+
+      {/* Action preview summary */}
+      {hasParameters && (
+        <div className="space-y-2">
+          <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+            Preview
+          </h4>
+          <div className="bg-muted/50 rounded-lg border p-3">
+            <ActionPreviewSummary
+              actionType={actionType}
+              parameters={parameters}
+              schema={schema}
+              actionName={actionName}
+              displayTemplate={displayTemplate}
+              resourceDetails={resourceDetails}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Parameters */}
+      {hasParameters && (
+        <div className="space-y-2">
+          <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+            Parameters
+          </h4>
+          <div className="bg-muted/50 overflow-x-auto rounded-lg border p-3">
+            <SchemaParameterDetails
+              parameters={parameters}
+              schema={schema}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Execution Result */}
+      {executionStatus && (
+        <ExecutionStatusSection status={executionStatus} error={executionError} />
+      )}
+      {executionResult && Object.keys(executionResult).length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+            Execution Result
+          </h4>
+          <pre className="bg-muted/50 overflow-x-auto rounded-lg border p-3 text-xs">
+            {JSON.stringify(executionResult, null, 2)}
+          </pre>
+        </div>
+      )}
+      {isScrubbed && (
+        <p className="text-muted-foreground text-xs italic">
+          Execution details are automatically removed after 30 minutes.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Full action content for non-approval events (standing approvals, inline events).
+ * Shows action type, parameters, and execution result in a single block.
+ */
 function ApprovalContent({
   actionType,
   parameters,
@@ -251,6 +392,9 @@ export function ActivityDetailSheet({
 }: ActivityDetailSheetProps) {
   const actionType = event ? getActionType(event) : "";
   const shouldFetchApproval = event ? isApprovalEvent(event) : false;
+  // Single useActionSchema call — shared between ActionTypeHeader and
+  // ApprovalSupplementalContent to avoid duplicate hook subscriptions.
+  const { actionName } = useActionSchema(actionType);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -280,14 +424,19 @@ export function ActivityDetailSheet({
             </div>
           </div>
 
-          {/* Action summary from audit event */}
+          {/* Action type — shown immediately from audit event data */}
+          {actionType && shouldFetchApproval && (
+            <ActionTypeHeader actionType={actionType} actionName={actionName} />
+          )}
+
+          {/* Action summary from audit event (non-approval events) */}
           {actionType && !shouldFetchApproval && (
             <InlineActionDetails event={event} actionType={actionType} />
           )}
 
-          {/* Full details from approval record */}
+          {/* Supplemental details from approval record (parameters, execution, risk) */}
           {shouldFetchApproval && event.source_id && (
-            <ApprovalDetails approvalId={event.source_id} />
+            <ApprovalSupplementalDetails approvalId={event.source_id} />
           )}
 
           {/* Execution status from audit event (for standing approvals) */}
