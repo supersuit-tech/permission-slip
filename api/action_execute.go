@@ -128,13 +128,13 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 
 	// ── Find matching standing approval ──────────────────────────
 
-	sa, err := db.FindActiveStandingApprovalForAgent(r.Context(), deps.DB, agent.AgentID, req.Action.Type)
+	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, req.Action.Type)
 	if err != nil {
-		log.Printf("[%s] ExecuteActionStanding: find standing approval: %v", TraceID(r.Context()), err)
+		log.Printf("[%s] ExecuteActionStanding: find standing approvals: %v", TraceID(r.Context()), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to find standing approval"))
 		return
 	}
-	if sa == nil {
+	if len(approvals) == 0 {
 		resp := NotFound(ErrNoMatchingStanding, "No active standing approval matches this agent, action type, and parameters")
 		resp.Error.Details = map[string]any{
 			"action_type": req.Action.Type,
@@ -152,25 +152,40 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		}
 	}
 
-	// ── Validate parameters against standing approval constraints ─
+	// ── Find first standing approval whose constraints match ─────
 
-	if len(sa.Constraints) > 0 {
-		if err := db.ValidateParametersAgainstConfig(sa.Constraints, params); err != nil {
+	var sa *db.StandingApproval
+	var firstConstraintErr *db.ConfigValidationError
+	for _, candidate := range approvals {
+		if len(candidate.Constraints) == 0 {
+			sa = candidate
+			break
+		}
+		if err := db.ValidateParametersAgainstConfig(candidate.Constraints, params); err != nil {
 			var configErr *db.ConfigValidationError
-			if errors.As(err, &configErr) {
-				resp := Forbidden(ErrConstraintViolation, "Request parameters violate standing approval constraints")
-				resp.Error.Details = map[string]any{
-					"standing_approval_id": sa.StandingApprovalID,
-					"violated_constraint":  configErr.Parameter,
-					"constraint_error":     configErr.Reason,
-				}
-				RespondError(w, r, http.StatusForbidden, resp)
-				return
+			if errors.As(err, &configErr) && firstConstraintErr == nil {
+				firstConstraintErr = configErr
 			}
-			log.Printf("[%s] ExecuteActionStanding: constraint validation: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters against constraints"))
+			continue
+		}
+		sa = candidate
+		break
+	}
+
+	if sa == nil {
+		if firstConstraintErr != nil {
+			resp := Forbidden(ErrConstraintViolation, "Request parameters violate standing approval constraints")
+			resp.Error.Details = map[string]any{
+				"standing_approval_id": approvals[0].StandingApprovalID,
+				"violated_constraint":  firstConstraintErr.Parameter,
+				"constraint_error":     firstConstraintErr.Reason,
+			}
+			RespondError(w, r, http.StatusForbidden, resp)
 			return
 		}
+		log.Printf("[%s] ExecuteActionStanding: all %d standing approvals failed constraint validation", TraceID(r.Context()), len(approvals))
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters against constraints"))
+		return
 	}
 
 	// ── Record execution ─────────────────────────────────────────

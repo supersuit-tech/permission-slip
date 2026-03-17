@@ -1234,3 +1234,63 @@ func TestRevokeStandingApproval_ConcurrentRevokes(t *testing.T) {
 		t.Errorf("expected [200, 409], got %v", codes)
 	}
 }
+
+func TestCreateStandingApproval_BareStringPatternAutoWrapped(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	// Create a standing approval with bare string "[Tracking]*" (not wrapped in $pattern).
+	// The backend should auto-normalize this to {"$pattern": "[Tracking]*"}.
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "github.create_issue",
+		"action_version": "1",
+		"constraints": {"owner":"testuser","repo":"testrepo","title":"[Tracking]*","body":"*"},
+		"expires_at": "%s"
+	}`, agentID, expiresAt)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	// Verify the title constraint was auto-wrapped as a pattern.
+	constraintsMap, ok := resp.Constraints.(map[string]any)
+	if !ok {
+		t.Fatalf("expected constraints to be a map, got %T", resp.Constraints)
+	}
+	titleConstraint, ok := constraintsMap["title"]
+	if !ok {
+		t.Fatal("expected title constraint to be present")
+	}
+	// Should be {"$pattern": "[Tracking]*"}, not a bare string.
+	patternObj, ok := titleConstraint.(map[string]any)
+	if !ok {
+		t.Fatalf("expected title constraint to be a pattern object, got %T: %v", titleConstraint, titleConstraint)
+	}
+	patternValue, ok := patternObj["$pattern"].(string)
+	if !ok || patternValue != "[Tracking]*" {
+		t.Errorf("expected title pattern to be \"[Tracking]*\", got %v", patternObj["$pattern"])
+	}
+
+	// Verify the body constraint remains a bare wildcard "*".
+	bodyConstraint, ok := constraintsMap["body"].(string)
+	if !ok || bodyConstraint != "*" {
+		t.Errorf("expected body constraint to remain \"*\", got %v", constraintsMap["body"])
+	}
+}

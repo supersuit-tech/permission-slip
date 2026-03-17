@@ -403,32 +403,40 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 	return &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
 }
 
-// FindActiveStandingApprovalForAgent returns the best matching active standing
-// approval for the given agent and action type. "Best" is the most recently
-// created approval that is active, within its time window, and not exhausted.
-// Returns nil if no match is found.
-func FindActiveStandingApprovalForAgent(ctx context.Context, db DBTX, agentID int64, actionType string) (*StandingApproval, error) {
-	row := db.QueryRow(ctx,
+// FindActiveStandingApprovalsForAgent returns all active standing approvals for
+// the given agent and action type, ordered by most recently created first.
+// It also matches standing approvals with the wildcard action type ("*").
+// Returns an empty slice if no match is found.
+func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID int64, actionType string) ([]*StandingApproval, error) {
+	rows, err := db.Query(ctx,
 		`SELECT `+standingApprovalColumns+`
 		 FROM standing_approvals
 		 WHERE agent_id = $1
-		   AND action_type = $2
+		   AND (action_type = $2 OR action_type = '*')
 		   AND status = 'active'
 		   AND starts_at <= now()
 		   AND expires_at > now()
 		   AND (max_executions IS NULL OR execution_count < max_executions)
-		 ORDER BY created_at DESC
-		 LIMIT 1`,
+		 ORDER BY created_at DESC`,
 		agentID, actionType,
 	)
-	sa, err := scanStandingApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
-	return sa, nil
+	defer rows.Close()
+
+	var approvals []*StandingApproval
+	for rows.Next() {
+		sa, err := scanStandingApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		approvals = append(approvals, sa)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return approvals, nil
 }
 
 // RecordStandingApprovalExecutionByAgent atomically increments the standing

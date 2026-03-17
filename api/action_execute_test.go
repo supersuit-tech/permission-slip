@@ -324,3 +324,86 @@ func TestExecuteActionStanding_RevokedApproval(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestExecuteActionStanding_SecondApprovalMatchesWhenFirstDoesNot(t *testing.T) {
+	t.Parallel()
+	// Create two standing approvals for the same agent+action type with different constraints.
+	// The newer one doesn't match the execution parameters, but the older one does.
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	// Older approval: matches sender=*@github.com
+	sa1ID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, sa1ID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "email.read",
+		Constraints: []byte(`{"sender":{"$pattern":"*@github.com"}}`),
+		StartsAt:    time.Now().Add(-2 * time.Hour),
+	})
+
+	// Newer approval: requires sender=*@competitor.com (won't match our request)
+	sa2ID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, sa2ID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "email.read",
+		Constraints: []byte(`{"sender":{"$pattern":"*@competitor.com"}}`),
+		StartsAt:    time.Now().Add(-1 * time.Hour),
+	})
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	// Execute with sender=alice@github.com — should match the older approval (sa1).
+	reqBody := `{"request_id":"multi-sa-test-001","action":{"type":"email.read","version":"1","parameters":{"sender":"alice@github.com"}}}`
+	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (second approval should match), got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp executeActionStandingResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.StandingApprovalID != sa1ID {
+		t.Errorf("expected standing_approval_id %q (older approval), got %q", sa1ID, resp.StandingApprovalID)
+	}
+
+	// Verify execution was recorded on sa1 (older), not sa2.
+	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa1ID, "execution_count", "1")
+	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa2ID, "execution_count", "0")
+}
+
+func TestExecuteActionStanding_WildcardActionTypeMatches(t *testing.T) {
+	t.Parallel()
+	// Create a standing approval with action_type="*" (wildcard) — should match any action type.
+	_, _, router, agentID, privKey, saID, _ := setupStandingExecuteTest(t, "any.action", testhelper.StandingApprovalOpts{
+		ActionType: "*",
+	})
+
+	reqBody := `{"request_id":"wildcard-action-test-001","action":{"type":"any.action","version":"1","parameters":{}}}`
+	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (wildcard action_type should match), got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp executeActionStandingResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.StandingApprovalID != saID {
+		t.Errorf("expected standing_approval_id %q, got %q", saID, resp.StandingApprovalID)
+	}
+}
