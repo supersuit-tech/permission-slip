@@ -2,7 +2,9 @@ package slack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -16,9 +18,37 @@ type scheduleMessageAction struct {
 
 // scheduleMessageParams is the user-facing parameter schema.
 type scheduleMessageParams struct {
-	Channel string `json:"channel"`
-	Message string `json:"message"`
-	PostAt  string `json:"post_at"`
+	Channel string       `json:"channel"`
+	Message string       `json:"message"`
+	PostAt  flexDateTime `json:"post_at"`
+}
+
+// flexDateTime accepts both a string (RFC 3339, datetime-local) and a legacy
+// integer (Unix timestamp) from JSON, converting either to a string. This
+// ensures backward compatibility with existing stored approvals that have
+// integer post_at values.
+type flexDateTime string
+
+func (f *flexDateTime) UnmarshalJSON(data []byte) error {
+	// Try string first (new format)
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = flexDateTime(s)
+		return nil
+	}
+	// Try integer (legacy Unix timestamp)
+	var n int64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = flexDateTime(time.Unix(n, 0).UTC().Format(time.RFC3339))
+		return nil
+	}
+	// Try float (JSON numbers can be floats)
+	var fl float64
+	if err := json.Unmarshal(data, &fl); err == nil {
+		*f = flexDateTime(time.Unix(int64(fl), 0).UTC().Format(time.RFC3339))
+		return nil
+	}
+	return fmt.Errorf("post_at must be a datetime string or Unix timestamp, got %s", string(data))
 }
 
 func (p *scheduleMessageParams) validate() error {
@@ -34,18 +64,30 @@ func (p *scheduleMessageParams) validate() error {
 	return nil
 }
 
-// postAtUnix parses the post_at field as RFC 3339 and returns the Unix
-// timestamp. Returns a ValidationError if the value is unparseable or in the
-// past.
+// postAtUnix parses the post_at field and returns the Unix timestamp.
+// Accepts RFC 3339 (with optional fractional seconds) and datetime-local
+// formats (with or without seconds, no timezone — treated as UTC).
+// Returns a ValidationError if the value is unparseable or in the past.
 func (p *scheduleMessageParams) postAtUnix() (int64, error) {
-	// Try RFC 3339 first; also accept "datetime-local" format (no seconds, no TZ)
-	// emitted by HTML <input type="datetime-local">, treating it as UTC.
-	t, err := time.Parse(time.RFC3339Nano, p.PostAt)
+	postAt := string(p.PostAt)
+
+	// If the value is purely numeric, it's already a Unix timestamp (legacy path).
+	if n, err := strconv.ParseInt(postAt, 10, 64); err == nil {
+		if n <= time.Now().Unix() {
+			return 0, &connectors.ValidationError{
+				Message: fmt.Sprintf("post_at must be in the future (got %s)", postAt),
+			}
+		}
+		return n, nil
+	}
+
+	// Try RFC 3339 / RFC 3339 Nano (e.g. "2026-03-20T09:00:00Z" or "…000Z").
+	t, err := time.Parse(time.RFC3339Nano, postAt)
 	if err != nil {
-		// Also accept "datetime-local" formats (no TZ) emitted by HTML
+		// Fall back to datetime-local formats (no TZ) emitted by HTML
 		// <input type="datetime-local">, treating them as UTC.
 		for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04"} {
-			if t2, err2 := time.Parse(layout, p.PostAt); err2 == nil {
+			if t2, err2 := time.Parse(layout, postAt); err2 == nil {
 				t = t2.UTC()
 				err = nil
 				break
@@ -53,14 +95,14 @@ func (p *scheduleMessageParams) postAtUnix() (int64, error) {
 		}
 		if err != nil {
 			return 0, &connectors.ValidationError{
-				Message: fmt.Sprintf("post_at must be a valid RFC 3339 datetime (e.g. 2026-03-20T09:00:00Z), got %q", p.PostAt),
+				Message: fmt.Sprintf("post_at must be a valid RFC 3339 datetime (e.g. 2026-03-20T09:00:00Z), got %q", postAt),
 			}
 		}
 	}
 	unix := t.Unix()
 	if unix <= time.Now().Unix() {
 		return 0, &connectors.ValidationError{
-			Message: fmt.Sprintf("post_at must be in the future (got %s)", p.PostAt),
+			Message: fmt.Sprintf("post_at must be in the future (got %s)", postAt),
 		}
 	}
 	return unix, nil
