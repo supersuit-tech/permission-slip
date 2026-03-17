@@ -427,7 +427,7 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 		 SET constraints = $3, max_executions = $4, expires_at = $5
 		 WHERE standing_approval_id = $1 AND user_id = $2
 		   AND status = 'active'
-		   AND ($4 IS NULL OR $4 >= execution_count)
+		   AND ($4::int IS NULL OR $4::int >= execution_count)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.UserID, p.Constraints, p.MaxExecutions, p.ExpiresAt,
 	)
