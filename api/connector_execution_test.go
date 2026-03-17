@@ -970,6 +970,220 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 	}
 }
 
+// ── handleConnectorError: ExternalError/AuthError/TimeoutError message surfacing ──
+
+func TestHandleConnectorError_ExternalError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_ext"))
+
+	extErr := &connectors.ExternalError{StatusCode: 404, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
+	handled := handleConnectorError(w, r, extErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle ExternalError")
+	}
+	if w.Code != http.StatusBadGateway {
+		t.Errorf("expected status 502, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != extErr.Message {
+		t.Errorf("expected message %q, got %q", extErr.Message, resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_AuthError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_auth"))
+
+	authErr := &connectors.AuthError{Message: "GitHub API auth error (403): Resource not accessible by integration"}
+	handled := handleConnectorError(w, r, authErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle AuthError")
+	}
+	if w.Code != http.StatusBadGateway {
+		t.Errorf("expected status 502, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != authErr.Message {
+		t.Errorf("expected message %q, got %q", authErr.Message, resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_TimeoutError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_timeout"))
+
+	timeoutErr := &connectors.TimeoutError{Message: "Slack API request timed out: context deadline exceeded"}
+	handled := handleConnectorError(w, r, timeoutErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle TimeoutError")
+	}
+	if w.Code != http.StatusGatewayTimeout {
+		t.Errorf("expected status 504, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != timeoutErr.Message {
+		t.Errorf("expected message %q, got %q", timeoutErr.Message, resp.Error.Message)
+	}
+}
+
+// ── handleConnectorError: RateLimitError/ValidationError/OAuthRefreshError message surfacing ──
+
+func TestHandleConnectorError_RateLimitError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_rl"))
+
+	rlErr := &connectors.RateLimitError{Message: "GitHub API rate limit exceeded — resets in 42 minutes", RetryAfter: 42 * time.Minute}
+	handled := handleConnectorError(w, r, rlErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle RateLimitError")
+	}
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status 429, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != rlErr.Message {
+		t.Errorf("expected message %q, got %q", rlErr.Message, resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_ValidationError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_val"))
+
+	valErr := &connectors.ValidationError{Message: "channel_id is required"}
+	handled := handleConnectorError(w, r, valErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle ValidationError")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != valErr.Message {
+		t.Errorf("expected message %q, got %q", valErr.Message, resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_OAuthRefreshError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_oauth"))
+
+	oauthErr := &connectors.OAuthRefreshError{Provider: "google", Message: "Google OAuth token expired — user must re-authorize in Settings"}
+	handled := handleConnectorError(w, r, oauthErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle OAuthRefreshError")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != oauthErr.Message {
+		t.Errorf("expected message %q, got %q", oauthErr.Message, resp.Error.Message)
+	}
+}
+
+// ── handleConnectorError: fallback messages when Message is empty ──
+
+func TestHandleConnectorError_RateLimitError_FallbackMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_rl_fallback"))
+
+	rlErr := &connectors.RateLimitError{RetryAfter: 30 * time.Second} // no Message
+	handled := handleConnectorError(w, r, rlErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle RateLimitError")
+	}
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected status 429, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != "External service rate limited" {
+		t.Errorf("expected fallback message, got %q", resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_ValidationError_FallbackMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_val_fallback"))
+
+	valErr := &connectors.ValidationError{} // no Message
+	handled := handleConnectorError(w, r, valErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle ValidationError")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != "Validation failed" {
+		t.Errorf("expected fallback message, got %q", resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_OAuthRefreshError_FallbackMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_oauth_fallback"))
+
+	oauthErr := &connectors.OAuthRefreshError{Provider: "google"} // no Message
+	handled := handleConnectorError(w, r, oauthErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle OAuthRefreshError")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected status 401, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	expected := "OAuth authorization required — user must re-connect the provider in Settings"
+	if resp.Error.Message != expected {
+		t.Errorf("expected fallback message %q, got %q", expected, resp.Error.Message)
+	}
+}
+
 // ── executeConnectorAction: payment method integration ──────────────────────
 
 // paymentExecFixture holds common setup for payment method execution tests.

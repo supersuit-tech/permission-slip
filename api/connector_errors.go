@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -11,8 +12,10 @@ import (
 // Returns true if the error was handled, false if the caller should handle it
 // as an untyped (500) error.
 //
-// Error details are logged server-side but not exposed to the caller to avoid
-// leaking internal information (upstream URLs, service internals, etc.).
+// Connector error messages are surfaced to the caller so agents can see
+// exactly what went wrong (e.g., "Slack channel not found", "GitHub API
+// validation error: ..."). Connectors are responsible for crafting
+// user-friendly, safe-to-expose messages.
 func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) bool {
 	traceID := TraceID(r.Context())
 
@@ -39,25 +42,37 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsValidationError(err):
-		// ValidationError messages are safe to surface — they describe
-		// parameter/credential issues the caller can fix.
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
+		msg := "Validation failed"
+		var ve *connectors.ValidationError
+		if errors.As(err, &ve) && ve.Message != "" {
+			msg = ve.Message
+		}
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, msg))
 		return true
 
 	case connectors.IsRateLimitError(err):
+		msg := "External service rate limited"
 		var rl *connectors.RateLimitError
 		retrySeconds := 0
 		if connectors.AsRateLimitError(err, &rl) {
 			retrySeconds = int(rl.RetryAfter.Seconds())
+			if rl.Message != "" {
+				msg = rl.Message
+			}
 		}
 		log.Printf("[%s] connector rate limited: %v", traceID, err)
-		RespondError(w, r, http.StatusTooManyRequests, TooManyRequests("External service rate limited", retrySeconds))
+		RespondError(w, r, http.StatusTooManyRequests, TooManyRequests(msg, retrySeconds))
 		return true
 
 	case connectors.IsExternalError(err):
+		msg := "External service returned an error"
+		var ee *connectors.ExternalError
+		if errors.As(err, &ee) && ee.Message != "" {
+			msg = ee.Message
+		}
 		log.Printf("[%s] connector external error: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service returned an error", true))
+		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	case connectors.IsOAuthRefreshError(err):
@@ -69,6 +84,9 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		}
 		if connectors.AsOAuthRefreshError(err, &oauthErr) {
 			details["provider"] = oauthErr.Provider
+			if oauthErr.Message != "" {
+				msg = oauthErr.Message
+			}
 		}
 		resp := newErrorResponse(ErrOAuthRefreshFailed, msg, false)
 		resp.Error.Details = details
@@ -76,15 +94,25 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 		return true
 
 	case connectors.IsAuthError(err):
+		msg := "External service rejected credentials"
+		var ae *connectors.AuthError
+		if errors.As(err, &ae) && ae.Message != "" {
+			msg = ae.Message
+		}
 		log.Printf("[%s] connector auth error: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "External service rejected credentials", true))
+		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	case connectors.IsTimeoutError(err):
+		msg := "External service did not respond in time"
+		var te *connectors.TimeoutError
+		if errors.As(err, &te) && te.Message != "" {
+			msg = te.Message
+		}
 		log.Printf("[%s] connector timeout: %v", traceID, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, "External service did not respond in time", true))
+		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	default:
