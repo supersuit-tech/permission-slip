@@ -970,6 +970,77 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 	}
 }
 
+// ── handleConnectorError: ExternalError/AuthError/TimeoutError message surfacing ──
+
+func TestHandleConnectorError_ExternalError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_ext"))
+
+	extErr := &connectors.ExternalError{StatusCode: 404, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
+	handled := handleConnectorError(w, r, extErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle ExternalError")
+	}
+	if w.Code != http.StatusBadGateway {
+		t.Errorf("expected status 502, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != extErr.Message {
+		t.Errorf("expected message %q, got %q", extErr.Message, resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_AuthError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_auth"))
+
+	authErr := &connectors.AuthError{Message: "GitHub API auth error (403): Resource not accessible by integration"}
+	handled := handleConnectorError(w, r, authErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle AuthError")
+	}
+	if w.Code != http.StatusBadGateway {
+		t.Errorf("expected status 502, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != authErr.Message {
+		t.Errorf("expected message %q, got %q", authErr.Message, resp.Error.Message)
+	}
+}
+
+func TestHandleConnectorError_TimeoutError_SurfacesMessage(t *testing.T) {
+	t.Parallel()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_timeout"))
+
+	timeoutErr := &connectors.TimeoutError{Message: "Slack API request timed out: context deadline exceeded"}
+	handled := handleConnectorError(w, r, timeoutErr)
+	if !handled {
+		t.Fatal("expected handleConnectorError to handle TimeoutError")
+	}
+	if w.Code != http.StatusGatewayTimeout {
+		t.Errorf("expected status 504, got %d", w.Code)
+	}
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Message != timeoutErr.Message {
+		t.Errorf("expected message %q, got %q", timeoutErr.Message, resp.Error.Message)
+	}
+}
+
 // ── executeConnectorAction: payment method integration ──────────────────────
 
 // paymentExecFixture holds common setup for payment method execution tests.
