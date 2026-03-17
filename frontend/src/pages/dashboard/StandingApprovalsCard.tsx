@@ -278,8 +278,8 @@ function StandingApprovalsTable({
   configMap: Map<string, ActionConfiguration>;
 }) {
   return (
-    <div className="-mx-3 overflow-x-auto sm:mx-0">
-      <div className="min-w-[600px] overflow-hidden rounded-lg sm:min-w-0">
+    <div className="overflow-x-auto">
+      <div className="min-w-[600px] overflow-hidden rounded-lg">
         <Table>
           <TableHeader>
             <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
