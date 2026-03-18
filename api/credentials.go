@@ -63,6 +63,7 @@ func handleListCredentials(deps *Deps) http.HandlerFunc {
 		creds, err := db.ListCredentialsByUser(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] ListCredentials: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list credentials"))
 			return
 		}
@@ -109,6 +110,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		credID, err := generatePrefixedID("cred_", 16)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: generate ID: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
@@ -117,6 +119,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		credJSON, err := json.Marshal(req.Credentials)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: marshal credentials: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
@@ -127,6 +130,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
@@ -136,6 +140,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 
 		if err := db.AcquireCredentialLimitLock(r.Context(), tx, profile.ID); err != nil {
 			log.Printf("[%s] StoreCredential: advisory lock: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
@@ -147,6 +152,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		vaultSecretID, err := deps.Vault.CreateSecret(r.Context(), tx, credID, credJSON)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: vault create: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
@@ -172,6 +178,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] StoreCredential: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
@@ -179,6 +186,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] StoreCredential: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 				return
 			}
@@ -207,6 +215,7 @@ func handleDeleteCredential(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] DeleteCredential: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
 			return
 		}
@@ -224,6 +233,7 @@ func handleDeleteCredential(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] DeleteCredential: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
 			return
 		}
@@ -231,6 +241,7 @@ func handleDeleteCredential(deps *Deps) http.HandlerFunc {
 		// Delete the vault secret (idempotent — no error if already gone).
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.VaultSecretID); err != nil {
 			log.Printf("[%s] DeleteCredential: vault delete: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
 			return
 		}
@@ -238,6 +249,7 @@ func handleDeleteCredential(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] DeleteCredential: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
 				return
 			}

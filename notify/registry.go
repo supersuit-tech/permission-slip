@@ -6,6 +6,8 @@ import (
 	"log"
 	"sync"
 
+	"github.com/getsentry/sentry-go"
+
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
 
@@ -103,6 +105,7 @@ func BuildSenders(ctx context.Context, bc BuildContext) []Sender {
 		ss, err := runFactory(ctx, bc, nf.fn)
 		if err != nil {
 			log.Printf("notify: %s sender factory failed: %v", nf.channel, err)
+			sentry.CaptureException(err)
 			continue
 		}
 		senders = append(senders, ss...)

@@ -76,6 +76,7 @@ func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 		prefs, err := db.GetNotificationPreferences(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] handleGetNotificationPreferences: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to load notification preferences"))
 			return
 		}
@@ -132,6 +133,7 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 		for _, p := range req.Preferences {
 			if err := db.UpsertNotificationPreference(r.Context(), deps.DB, profile.ID, p.Channel, p.Enabled); err != nil {
 				log.Printf("[%s] handleUpdateNotificationPreferences: upsert %q: %v", TraceID(r.Context()), p.Channel, err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update notification preferences"))
 				return
 			}
@@ -141,6 +143,7 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 		prefs, err := db.GetNotificationPreferences(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] handleUpdateNotificationPreferences: re-fetch: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update notification preferences"))
 			return
 		}
@@ -158,6 +161,7 @@ func userPlanID(ctx context.Context, d db.DBTX, userID string) string {
 	sub, err := db.GetSubscriptionByUserID(ctx, d, userID)
 	if err != nil {
 		log.Printf("userPlanID: get subscription for %s: %v", userID, err)
+		CaptureError(ctx, err)
 		return db.PlanFree
 	}
 	if sub == nil {

@@ -96,6 +96,7 @@ func handleGetCapabilities(deps *Deps) http.HandlerFunc {
 		caps, err := db.GetAgentCapabilities(r.Context(), deps.DB, agentID, agent.ApproverID)
 		if err != nil {
 			log.Printf("[%s] GetCapabilities: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to retrieve capabilities"))
 			return
 		}
@@ -106,6 +107,7 @@ func handleGetCapabilities(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, agent.ApproverID)
 		if err != nil {
 			log.Printf("[%s] GetCapabilities: lookup approver profile: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		} else if profile != nil {
 			resp.Approver = &approverInfo{Username: profile.Username}
 		}

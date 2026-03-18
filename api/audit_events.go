@@ -228,6 +228,7 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 		retention, err := effectiveRetention(r.Context(), deps, userID)
 		if err != nil {
 			log.Printf("[%s] effectiveRetention: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list audit events"))
 			return
 		}
@@ -235,6 +236,7 @@ func handleListAuditEvents(deps *Deps) http.HandlerFunc {
 		page, err := db.ListAuditEvents(r.Context(), deps.DB, userID, limit, cursor, filter, retention.retentionDays())
 		if err != nil {
 			log.Printf("[%s] ListAuditEvents: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list audit events"))
 			return
 		}
@@ -350,6 +352,7 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 		retention, err := effectiveRetention(r.Context(), deps, userID)
 		if err != nil {
 			log.Printf("[%s] effectiveRetention: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))
 			return
 		}
@@ -360,6 +363,7 @@ func handleExportAuditLogs(deps *Deps) http.HandlerFunc {
 		page, err := db.ExportAuditLogs(r.Context(), deps.DB, userID, since, until, eventTypes, connectorID, limit, cursor, days)
 		if err != nil {
 			log.Printf("[%s] ExportAuditLogs: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to export audit logs"))
 			return
 		}

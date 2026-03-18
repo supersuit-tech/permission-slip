@@ -68,6 +68,7 @@ func handleListConnectors(deps *Deps) http.HandlerFunc {
 		connectors, err := db.ListConnectors(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] ListConnectors: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list connectors"))
 			return
 		}
@@ -92,6 +93,7 @@ func handleGetConnector(deps *Deps) http.HandlerFunc {
 		connector, err := db.GetConnectorByID(r.Context(), deps.DB, connectorID)
 		if err != nil {
 			log.Printf("[%s] GetConnector: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get connector"))
 			return
 		}

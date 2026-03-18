@@ -57,6 +57,7 @@ func handleListExpoPushTokens(deps *Deps) http.HandlerFunc {
 		tokens, err := db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] ListExpoPushTokens: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list Expo push tokens"))
 			return
 		}
@@ -100,6 +101,7 @@ func handleCreateExpoPushToken(deps *Deps) http.HandlerFunc {
 		tok, err := db.UpsertExpoPushToken(r.Context(), deps.DB, profile.ID, req.Token)
 		if err != nil {
 			log.Printf("[%s] CreateExpoPushToken: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to register Expo push token"))
 			return
 		}
@@ -126,6 +128,7 @@ func handleDeleteExpoPushToken(deps *Deps) http.HandlerFunc {
 		deleted, err := db.DeleteExpoPushToken(r.Context(), deps.DB, profile.ID, tokenID)
 		if err != nil {
 			log.Printf("[%s] DeleteExpoPushToken: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete Expo push token"))
 			return
 		}

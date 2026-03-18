@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+
 	wplib "github.com/SherClockHolmes/webpush-go"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
@@ -91,6 +93,7 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 		resp, err := wplib.SendNotificationWithContext(ctx, payload, wpSub, opts)
 		if err != nil {
 			log.Printf("webpush: failed to send to subscription %d: %v", sub.ID, err)
+			sentry.CaptureException(err)
 			lastErr = err
 			continue
 		}
@@ -102,12 +105,14 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 			log.Printf("webpush: subscription %d expired (410 Gone), removing", sub.ID)
 			if err := db.DeletePushSubscriptionByEndpoint(ctx, s.db, derefStr(sub.Endpoint)); err != nil {
 				log.Printf("webpush: failed to delete expired subscription: %v", err)
+				sentry.CaptureException(err)
 			}
 			continue
 		}
 
 		if resp.StatusCode >= 400 {
 			log.Printf("webpush: push service returned %d for subscription %d", resp.StatusCode, sub.ID)
+			sentry.CaptureException(fmt.Errorf("webpush: push service returned %d for subscription %d", resp.StatusCode, sub.ID))
 			lastErr = fmt.Errorf("push service returned %d", resp.StatusCode)
 			continue
 		}

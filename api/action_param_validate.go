@@ -29,6 +29,7 @@ func validateActionParameters(
 	actionSchema, err := db.GetActionParametersSchema(r.Context(), d, actionType)
 	if err != nil {
 		log.Printf("[%s] validateActionParameters: schema lookup: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		// Fail-open on DB errors — don't block the request.
 		return true
 	}
@@ -43,6 +44,7 @@ func validateActionParameters(
 	}
 	if err := json.Unmarshal(actionSchema.Schema, &schemaDef); err != nil {
 		log.Printf("[%s] validateActionParameters: parse schema: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		// Malformed schema — fail-open.
 		return true
 	}

@@ -74,6 +74,7 @@ func handleAgentListStandingApprovals(deps *Deps) http.HandlerFunc {
 		page, err := db.ListStandingApprovalsByAgent(r.Context(), deps.DB, agentID, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] AgentListStandingApprovals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list standing approvals"))
 			return
 		}

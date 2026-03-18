@@ -47,6 +47,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 		existing, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 		if err != nil {
 			log.Printf("[%s] Onboarding: profile lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to check existing profile"))
 			return
 		}
@@ -86,15 +87,18 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 						owner, lookupErr := db.FindProfileByUsername(r.Context(), deps.DB, username)
 						if lookupErr != nil {
 							log.Printf("[%s] Onboarding: username owner lookup: %v", TraceID(r.Context()), lookupErr)
+							CaptureError(r.Context(), lookupErr)
 						}
 						if lookupErr == nil && owner != nil {
 							oldOwner, emailErr := db.FindProfileByAuthEmail(r.Context(), deps.DB, email)
 							if emailErr != nil {
 								log.Printf("[%s] Onboarding: email owner lookup: %v", TraceID(r.Context()), emailErr)
+								CaptureError(r.Context(), emailErr)
 							}
 							if emailErr == nil && oldOwner != nil && oldOwner.ID == owner.ID {
 								if rlErr := db.RelinkProfile(r.Context(), deps.DB, owner.ID, userID); rlErr != nil {
 									log.Printf("[%s] Onboarding: re-link on username conflict: %v", TraceID(r.Context()), rlErr)
+									CaptureError(r.Context(), rlErr)
 									// A concurrent request may have already completed the re-link.
 									if p, fetchErr := db.GetProfileByUserID(r.Context(), deps.DB, userID); fetchErr == nil && p != nil {
 										log.Printf("[%s] Onboarding: profile already re-linked (concurrent), using existing", TraceID(r.Context()))
@@ -102,6 +106,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 										return
 									} else if fetchErr != nil {
 										log.Printf("[%s] Onboarding: re-fetch after concurrent re-link failed: %v", TraceID(r.Context()), fetchErr)
+										CaptureError(r.Context(), fetchErr)
 									}
 								} else {
 									log.Printf("[%s] Onboarding: re-linked profile %s→%s via username conflict", TraceID(r.Context()), owner.ID, userID)
@@ -119,6 +124,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 					existing, fetchErr := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 					if fetchErr != nil || existing == nil {
 						log.Printf("[%s] Onboarding: re-fetch after concurrent create: %v", TraceID(r.Context()), fetchErr)
+						CaptureError(r.Context(), fetchErr)
 						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create profile"))
 						return
 					}
@@ -127,6 +133,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 				}
 			}
 			log.Printf("[%s] Onboarding: create profile: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create profile"))
 			return
 		}
@@ -136,6 +143,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 		// billing-enabled logic.
 		if _, err := db.CreateSubscription(r.Context(), deps.DB, profile.ID, db.DefaultPlanID(deps.BillingEnabled)); err != nil {
 			log.Printf("[%s] Onboarding: create subscription: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			// Non-fatal: the profile was created successfully. Log the error
 			// but still return the profile so the user isn't blocked.
 		}

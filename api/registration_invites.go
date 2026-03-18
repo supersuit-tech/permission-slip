@@ -62,6 +62,7 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 			recentCount, err := db.CountRecentInvitesByUser(r.Context(), deps.DB, userID, inviteRateWindow)
 			if err != nil {
 				log.Printf("[%s] CreateRegistrationInvite: rate limit check: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create registration invite"))
 				return
 			}
@@ -101,6 +102,7 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 			inviteCode, err = generateInviteCode()
 			if err != nil {
 				log.Printf("[%s] CreateRegistrationInvite: failed to generate invite code: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to generate invite code"))
 				return
 			}
@@ -108,6 +110,7 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 			inviteID, err := generatePrefixedID("ri_", 16)
 			if err != nil {
 				log.Printf("[%s] CreateRegistrationInvite: failed to generate invite ID: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to generate invite"))
 				return
 			}
@@ -130,6 +133,7 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 					continue
 				}
 				log.Printf("[%s] CreateRegistrationInvite: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create registration invite"))
 				return
 			}
@@ -148,6 +152,7 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 		}
 		if invite == nil {
 			log.Printf("[%s] CreateRegistrationInvite: exhausted retries due to unique violations", TraceID(r.Context()))
+			CaptureError(r.Context(), fmt.Errorf("CreateRegistrationInvite: exhausted retries due to unique violations"))
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create registration invite"))
 			return
 		}

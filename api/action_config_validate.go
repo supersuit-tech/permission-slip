@@ -40,6 +40,7 @@ func ValidateConfigurationReference(
 	ac, err := db.GetActiveActionConfigForAgent(r.Context(), deps.DB, configID, agentID)
 	if err != nil {
 		log.Printf("[%s] ValidateConfigurationReference: lookup: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate configuration"))
 		return nil
 	}
@@ -86,6 +87,7 @@ func ValidateConfigurationReference(
 				return nil
 			}
 			log.Printf("[%s] ValidateConfigurationReference: param validation: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters"))
 			return nil
 		}

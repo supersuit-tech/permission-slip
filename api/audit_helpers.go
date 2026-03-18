@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ import (
 func emitAuditEventWithUsage(ctx context.Context, d db.DBTX, p db.InsertAuditEventParams, billable bool) {
 	if err := db.InsertAuditEvent(ctx, d, p); err != nil {
 		log.Printf("audit: failed to insert %s event: %v", p.EventType, err)
+		CaptureError(ctx, err)
 	}
 
 	if !billable {
@@ -54,10 +56,12 @@ func emitAuditEventWithUsage(ctx context.Context, d db.DBTX, p db.InsertAuditEve
 		// Only update the breakdown without re-incrementing.
 		if err := db.UpdateUsageBreakdownOnly(ctx, d, p.UserID, periodStart, keys); err != nil {
 			log.Printf("audit: failed to update usage breakdown for %s event: %v", p.EventType, err)
+			CaptureError(ctx, err)
 		}
 	} else {
 		if _, err := db.IncrementRequestCountWithBreakdown(ctx, d, p.UserID, periodStart, periodEnd, keys); err != nil {
 			log.Printf("audit: failed to increment usage for %s event: %v", p.EventType, err)
+			CaptureError(ctx, err)
 		}
 	}
 }
@@ -144,6 +148,7 @@ func RecordPaymentMethodUsage(ctx context.Context, d db.DBTX, p PaymentChargePar
 	last4 := sanitiseLast4(p.Last4)
 	if p.AmountCents < 0 {
 		log.Printf("audit: refusing to record negative amount_cents=%d for payment method %s", p.AmountCents, p.PaymentMethodID)
+		CaptureError(ctx, fmt.Errorf("refusing to record negative amount_cents=%d for payment method %s", p.AmountCents, p.PaymentMethodID))
 		return
 	}
 
@@ -158,6 +163,7 @@ func RecordPaymentMethodUsage(ctx context.Context, d db.DBTX, p PaymentChargePar
 	})
 	if err != nil {
 		log.Printf("audit: failed to record payment method transaction: %v", err)
+		CaptureError(ctx, err)
 		return
 	}
 

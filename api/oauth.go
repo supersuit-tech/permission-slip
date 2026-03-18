@@ -473,6 +473,7 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID, returnTo, replaceID)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to initiate OAuth flow"))
 			return
 		}
@@ -521,11 +522,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		state, err := verifyOAuthState(deps, stateStr)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: invalid state: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Invalid or expired state token", "", "")
 			return
 		}
 		if state.Provider != providerID {
 			log.Printf("[%s] OAuthCallback: provider mismatch: state=%s path=%s", TraceID(r.Context()), state.Provider, providerID)
+			CaptureError(r.Context(), fmt.Errorf("OAuth callback provider mismatch: state=%s path=%s", state.Provider, providerID))
 			redirectToFrontend(w, r, deps, providerID, "error", "Provider mismatch", state.ReturnTo, "")
 			return
 		}
@@ -552,6 +555,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 		if err != nil || profile == nil {
 			log.Printf("[%s] OAuthCallback: profile lookup failed: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found", state.ReturnTo, "")
 			return
 		}
@@ -590,6 +594,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		token, err := cfg.Exchange(ctx, code)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: token exchange failed: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Token exchange failed", state.ReturnTo, "")
 			return
 		}
@@ -629,6 +634,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			extra, err := enricher(ctx, token.AccessToken)
 			if err != nil {
 				log.Printf("[%s] OAuthCallback: post-OAuth enrichment for %q failed: %v", TraceID(r.Context()), providerID, err)
+				CaptureError(r.Context(), err)
 				redirectToFrontend(w, r, deps, providerID, "error", "Could not retrieve account information — please try again", state.ReturnTo, "")
 				return
 			}
@@ -654,6 +660,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		connID, err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			redirectToFrontend(w, r, deps, providerID, "error", "Failed to store connection", state.ReturnTo, "")
 			return
 		}
@@ -705,6 +712,7 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 			}
 		} else if oldConn != nil && oldConn.Provider != providerID {
 			log.Printf("[%s] storeOAuthTokens: replaceID %q belongs to provider %q, not %q — ignoring", TraceID(ctx), replaceID, oldConn.Provider, providerID)
+			CaptureError(ctx, fmt.Errorf("storeOAuthTokens: replaceID %s belongs to provider %s, not %s", replaceID, oldConn.Provider, providerID))
 			// Ignore the replaceID — create a new connection instead.
 		}
 		// If oldConn is nil or belongs to another user, just ignore and create new.
@@ -1003,6 +1011,7 @@ func handleListOAuthConnections(deps *Deps) http.HandlerFunc {
 		conns, err := db.ListOAuthConnectionsByUser(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] ListOAuthConnections: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list OAuth connections"))
 			return
 		}
@@ -1043,6 +1052,7 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		conn, err := db.GetOAuthConnectionByID(r.Context(), deps.DB, connectionID)
 		if err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
@@ -1054,6 +1064,7 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
@@ -1069,6 +1080,7 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] DeleteOAuthConnection: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
@@ -1078,12 +1090,14 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		// (matching the pattern in handleDeleteCredential).
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.AccessTokenVaultID); err != nil {
 			log.Printf("[%s] DeleteOAuthConnection: vault delete access: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 			return
 		}
 		if result.RefreshTokenVaultID != nil {
 			if err := deps.Vault.DeleteSecret(r.Context(), tx, *result.RefreshTokenVaultID); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: vault delete refresh: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 				return
 			}
@@ -1092,6 +1106,7 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disconnect OAuth connection"))
 				return
 			}

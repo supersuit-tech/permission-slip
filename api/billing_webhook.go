@@ -35,6 +35,7 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 		event, err := pstripe.VerifyWebhook(r, deps.Stripe.WebhookSecret(), maxWebhookBodyBytes)
 		if err != nil {
 			log.Printf("[%s] StripeWebhook: verify: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			http.Error(w, "webhook verification failed", http.StatusBadRequest)
 			return
 		}
@@ -46,6 +47,7 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 		already, err := db.IsStripeEventProcessed(r.Context(), deps.DB, event.ID)
 		if err != nil {
 			log.Printf("[%s] StripeWebhook: idempotency check failed (event %s): %v", TraceID(r.Context()), event.ID, err)
+			CaptureError(r.Context(), err)
 			// DB error — return 500 so Stripe retries.
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -77,6 +79,7 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 
 		if handlerErr != nil {
 			log.Printf("[%s] StripeWebhook: handler failed for event %s: %v", TraceID(r.Context()), event.ID, handlerErr)
+			CaptureError(r.Context(), handlerErr)
 			// Return 500 so Stripe retries. Don't record the event.
 			http.Error(w, "processing failed", http.StatusInternalServerError)
 			return
@@ -86,6 +89,7 @@ func handleStripeWebhook(deps *Deps) http.HandlerFunc {
 		// Stripe retries and we reprocess idempotently.
 		if _, err := db.RecordStripeEvent(r.Context(), deps.DB, event.ID, event.Type); err != nil {
 			log.Printf("[%s] StripeWebhook: failed to record event %s: %v", TraceID(r.Context()), event.ID, err)
+			CaptureError(r.Context(), err)
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -99,6 +103,7 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	customerID, subscriptionID, err := pstripe.ParseCheckoutSessionCompleted(event)
 	if err != nil {
 		log.Printf("[%s] StripeWebhook: parse checkout.session.completed: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		return nil // malformed event, don't retry
 	}
 
@@ -109,6 +114,7 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	}
 	if sub == nil {
 		log.Printf("[%s] StripeWebhook: no subscription found for customer %s", TraceID(r.Context()), customerID)
+		CaptureError(r.Context(), fmt.Errorf("no subscription found for stripe customer %s", customerID))
 		return nil // no matching user, don't retry
 	}
 
@@ -152,6 +158,7 @@ func lookupSubscriptionFromInvoice(r *http.Request, deps *Deps, event *pstripe.W
 	}
 	if sub == nil {
 		log.Printf("[%s] StripeWebhook: %s (event %s): no subscription found for %s", TraceID(r.Context()), event.Type, event.ID, stripeSubID)
+		CaptureError(r.Context(), fmt.Errorf("no subscription found for stripe subscription %s", stripeSubID))
 		return nil, nil
 	}
 	return sub, nil
@@ -164,6 +171,7 @@ func handleInvoicePaid(r *http.Request, deps *Deps, event *pstripe.WebhookEvent)
 	inv, err := pstripe.ParseInvoicePaid(event)
 	if err != nil {
 		log.Printf("[%s] StripeWebhook: parse invoice.paid: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		return nil // malformed event, don't retry
 	}
 
@@ -200,6 +208,7 @@ func lookupByStripeSubscription(r *http.Request, deps *Deps, event *pstripe.Webh
 	stripeSub, err := pstripe.ParseSubscriptionEvent(event)
 	if err != nil {
 		log.Printf("[%s] StripeWebhook: parse %s (event %s): %v", TraceID(r.Context()), event.Type, event.ID, err)
+		CaptureError(r.Context(), err)
 		return nil, nil, nil // malformed event, don't retry
 	}
 
@@ -209,6 +218,7 @@ func lookupByStripeSubscription(r *http.Request, deps *Deps, event *pstripe.Webh
 	}
 	if sub == nil {
 		log.Printf("[%s] StripeWebhook: no subscription found for %s (event %s)", TraceID(r.Context()), stripeSub.ID, event.ID)
+		CaptureError(r.Context(), fmt.Errorf("no subscription found for stripe subscription %s", stripeSub.ID))
 		return nil, nil, nil // unknown subscription, don't retry
 	}
 	return sub, stripeSub, nil
@@ -275,6 +285,7 @@ func handleInvoicePaymentFailed(r *http.Request, deps *Deps, event *pstripe.Webh
 	inv, err := pstripe.ParseInvoicePaymentFailed(event)
 	if err != nil {
 		log.Printf("[%s] StripeWebhook: parse invoice.payment_failed: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		return nil // malformed event, don't retry
 	}
 
@@ -312,6 +323,7 @@ func notifyPaymentFailure(r *http.Request, deps *Deps, userID string, event *pst
 	profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
 	if err != nil || profile == nil {
 		log.Printf("[%s] StripeWebhook: notify payment failure: failed to lookup profile for %s: %v", TraceID(r.Context()), userID, err)
+		CaptureError(r.Context(), fmt.Errorf("notify payment failure: failed to lookup profile for user %s: %w", userID, err))
 		return
 	}
 

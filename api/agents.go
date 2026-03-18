@@ -73,6 +73,7 @@ func handleListAgents(deps *Deps) http.HandlerFunc {
 		page, err := db.GetAgentsByApprover(r.Context(), deps.DB, userID, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ListAgents: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list agents"))
 			return
 		}
@@ -107,6 +108,7 @@ func handleGetAgent(deps *Deps) http.HandlerFunc {
 		agent, err := db.GetAgentByID(r.Context(), deps.DB, agentID, userID)
 		if err != nil {
 			log.Printf("[%s] GetAgent: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get agent"))
 			return
 		}
@@ -151,6 +153,7 @@ func handleUpdateAgent(deps *Deps) http.HandlerFunc {
 		agent, err := db.UpdateAgentMetadata(r.Context(), deps.DB, agentID, userID, body.Metadata)
 		if err != nil {
 			log.Printf("[%s] UpdateAgent: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update agent"))
 			return
 		}
@@ -175,6 +178,7 @@ func handleDeactivateAgent(deps *Deps) http.HandlerFunc {
 		agent, err := db.DeactivateAgent(r.Context(), deps.DB, agentID, userID)
 		if err != nil {
 			log.Printf("[%s] DeactivateAgent: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to deactivate agent"))
 			return
 		}
@@ -193,6 +197,7 @@ func handleDeactivateAgent(deps *Deps) http.HandlerFunc {
 			AgentMeta:  agent.Metadata,
 		}); err != nil {
 			log.Printf("[%s] DeactivateAgent: audit event: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 
 		RespondJSON(w, http.StatusOK, toAgentResponse(*agent))
@@ -211,6 +216,7 @@ func handleRegisterAgentDashboard(deps *Deps) http.HandlerFunc {
 		agent, err := db.RegisterAgent(r.Context(), deps.DB, agentID, userID)
 		if err != nil {
 			log.Printf("[%s] RegisterAgent: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to register agent"))
 			return
 		}
@@ -219,6 +225,7 @@ func handleRegisterAgentDashboard(deps *Deps) http.HandlerFunc {
 			existing, lookupErr := db.GetAgentByID(r.Context(), deps.DB, agentID, userID)
 			if lookupErr != nil {
 				log.Printf("[%s] RegisterAgent: lookup: %v", TraceID(r.Context()), lookupErr)
+				CaptureError(r.Context(), lookupErr)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to register agent"))
 				return
 			}
@@ -242,6 +249,7 @@ func handleRegisterAgentDashboard(deps *Deps) http.HandlerFunc {
 			AgentMeta:  agent.Metadata,
 		}); err != nil {
 			log.Printf("[%s] RegisterAgent: audit event: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 
 		RespondJSON(w, http.StatusOK, toAgentResponse(*agent))
@@ -256,6 +264,7 @@ func requireAgentOwnership(w http.ResponseWriter, r *http.Request, deps *Deps, a
 	owns, err := db.AgentBelongsToUser(r.Context(), deps.DB, agentID, userID)
 	if err != nil {
 		log.Printf("[%s] ownership check: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify agent ownership"))
 		return false
 	}
@@ -277,6 +286,7 @@ func requireAgentSignature(w http.ResponseWriter, r *http.Request, deps *Deps, a
 	agent, err := db.GetAgentByIDUnscoped(r.Context(), deps.DB, agentID)
 	if err != nil {
 		log.Printf("[%s] requireAgentSignature: lookup agent: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process request"))
 		return nil, nil, false
 	}
@@ -424,6 +434,7 @@ func handleGetAgentMe(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, agent.ApproverID)
 		if err != nil {
 			log.Printf("[%s] GetAgentMe: lookup approver profile: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		} else if profile != nil {
 			resp.Approver = &approverInfo{Username: profile.Username}
 		}

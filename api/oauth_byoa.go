@@ -133,6 +133,7 @@ func updateOAuthRegistry(deps *Deps, providerID, clientID, clientSecret string) 
 		Source:       oauth.SourceBYOA,
 	}); err != nil {
 		log.Printf("BYOA registry update for %q: %v", providerID, err)
+		CaptureError(context.Background(), err)
 	}
 }
 
@@ -179,6 +180,7 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] CreateOAuthProviderConfig: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
 			return
 		}
@@ -190,6 +192,7 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		configID, err := generatePrefixedID("opc_", 16)
 		if err != nil {
 			log.Printf("[%s] CreateOAuthProviderConfig: generate ID: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
 			return
 		}
@@ -197,6 +200,7 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		clientIDVaultID, clientSecretVaultID, err := storeClientCredentials(r.Context(), deps, tx, configID, req.ClientID, req.ClientSecret)
 		if err != nil {
 			log.Printf("[%s] CreateOAuthProviderConfig: vault store: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
 			return
 		}
@@ -216,6 +220,7 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] CreateOAuthProviderConfig: db create: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
 			return
 		}
@@ -223,6 +228,7 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] CreateOAuthProviderConfig: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to save OAuth provider config"))
 				return
 			}
@@ -272,6 +278,7 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] UpdateOAuthProviderConfig: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
 			return
 		}
@@ -283,6 +290,7 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		existing, err := db.GetOAuthProviderConfig(r.Context(), tx, profile.ID, providerID)
 		if err != nil {
 			log.Printf("[%s] UpdateOAuthProviderConfig: lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
 			return
 		}
@@ -300,6 +308,7 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		newClientIDVaultID, newClientSecretVaultID, err := storeClientCredentials(r.Context(), deps, tx, existing.ID, req.ClientID, req.ClientSecret)
 		if err != nil {
 			log.Printf("[%s] UpdateOAuthProviderConfig: vault store: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
 			return
 		}
@@ -308,6 +317,7 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		config, err := db.UpdateOAuthProviderConfig(r.Context(), tx, profile.ID, providerID, newClientIDVaultID, newClientSecretVaultID)
 		if err != nil {
 			log.Printf("[%s] UpdateOAuthProviderConfig: db update: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
 			return
 		}
@@ -315,6 +325,7 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] UpdateOAuthProviderConfig: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update OAuth provider config"))
 				return
 			}
@@ -344,6 +355,7 @@ func handleListOAuthProviderConfigs(deps *Deps) http.HandlerFunc {
 		configs, err := db.ListOAuthProviderConfigsByUser(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] ListOAuthProviderConfigs: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list OAuth provider configs"))
 			return
 		}
@@ -381,6 +393,7 @@ func handleDeleteOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] DeleteOAuthProviderConfig: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete OAuth provider config"))
 			return
 		}
@@ -396,6 +409,7 @@ func handleDeleteOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] DeleteOAuthProviderConfig: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete OAuth provider config"))
 			return
 		}
@@ -403,14 +417,17 @@ func handleDeleteOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		// Delete vault secrets (best-effort — idempotent).
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.ClientIDVaultID); err != nil {
 			log.Printf("[%s] DeleteOAuthProviderConfig: vault delete client_id: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 		if err := deps.Vault.DeleteSecret(r.Context(), tx, result.ClientSecretVaultID); err != nil {
 			log.Printf("[%s] DeleteOAuthProviderConfig: vault delete client_secret: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] DeleteOAuthProviderConfig: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete OAuth provider config"))
 				return
 			}

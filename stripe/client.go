@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+
 	gostripe "github.com/stripe/stripe-go/v82"
 	billingportalsession "github.com/stripe/stripe-go/v82/billingportal/session"
 	"github.com/stripe/stripe-go/v82/checkout/session"
@@ -84,6 +86,7 @@ func (c *Client) FetchRequestPrice() {
 	p, err := price.Get(c.cfg.PriceIDRequest, params)
 	if err != nil {
 		log.Printf("stripe: failed to fetch request price %s: %v", c.cfg.PriceIDRequest, err)
+		sentry.CaptureException(err)
 		return
 	}
 

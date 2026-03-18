@@ -139,6 +139,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		confirmCode, err := generateConfirmationCodePlaintext()
 		if err != nil {
 			log.Printf("[%s] RegisterAgent: generate confirmation code: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 			return
 		}
@@ -162,6 +163,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] RegisterAgent: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 			return
 		}
@@ -173,6 +175,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		invite, err := db.ConsumeInvite(r.Context(), tx, codeHash)
 		if err != nil {
 			log.Printf("[%s] RegisterAgent: consume invite: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 			return
 		}
@@ -182,6 +185,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 			existing, lookupErr := db.LookupInviteByCodeHash(r.Context(), tx, codeHash)
 			if lookupErr != nil {
 				log.Printf("[%s] RegisterAgent: lookup invite: %v", TraceID(r.Context()), lookupErr)
+				CaptureError(r.Context(), lookupErr)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 				return
 			}
@@ -212,6 +216,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		// races where concurrent registrations could both pass the check.
 		if err := db.AcquireAgentLimitLock(r.Context(), tx, invite.UserID); err != nil {
 			log.Printf("[%s] RegisterAgent: advisory lock: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 			return
 		}
@@ -227,6 +232,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		)
 		if err != nil {
 			log.Printf("[%s] RegisterAgent: insert pending agent: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create agent registration"))
 			return
 		}
@@ -242,6 +248,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 			AgentMeta:  metadata,
 		}); err != nil {
 			log.Printf("[%s] RegisterAgent: audit event: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 			return
 		}
@@ -250,6 +257,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] RegisterAgent: commit tx: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process registration"))
 				return
 			}
@@ -265,6 +273,7 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, invite.UserID)
 		if err != nil {
 			log.Printf("[%s] RegisterAgent: lookup approver profile: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			// Non-fatal: registration succeeded, just omit the approver info.
 		} else if profile != nil {
 			resp.Approver = &approverInfo{Username: profile.Username}
@@ -360,6 +369,7 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusUnauthorized, resp)
 			default:
 				log.Printf("[%s] VerifyRegistration: %v", TraceID(r.Context()), verifyErr)
+				CaptureError(r.Context(), verifyErr)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify registration"))
 			}
 			return
@@ -380,6 +390,7 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 			AgentMeta:  registered.Metadata,
 		}); err != nil {
 			log.Printf("[%s] VerifyRegistration: audit event: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 
 		resp := verifyRegistrationResponse{
@@ -391,6 +402,7 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, registered.ApproverID)
 		if err != nil {
 			log.Printf("[%s] VerifyRegistration: lookup approver profile: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		} else if profile != nil {
 			resp.Approver = &approverInfo{Username: profile.Username}
 		}

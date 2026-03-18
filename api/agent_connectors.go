@@ -66,6 +66,7 @@ func handleListAgentConnectors(deps *Deps) http.HandlerFunc {
 		connectors, err := db.ListAgentConnectors(r.Context(), deps.DB, agentID, userID)
 		if err != nil {
 			log.Printf("[%s] ListAgentConnectors: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list agent connectors"))
 			return
 		}
@@ -111,6 +112,7 @@ func handleEnableAgentConnector(deps *Deps) http.HandlerFunc {
 				}
 			}
 			log.Printf("[%s] EnableAgentConnector: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to enable connector"))
 			return
 		}
@@ -145,6 +147,7 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] DisableAgentConnector: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 			return
 		}
@@ -159,6 +162,7 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 			credBinding, err = db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
 			if err != nil {
 				log.Printf("[%s] DisableAgentConnector: get credential: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 				return
 			}
@@ -169,6 +173,7 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 		result, err := db.DisableAgentConnector(r.Context(), tx, agentID, userID, connectorID)
 		if err != nil {
 			log.Printf("[%s] DisableAgentConnector: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 			return
 		}
@@ -180,6 +185,7 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 		if deleteCredentials && credBinding != nil && credBinding.CredentialID != nil {
 			if err := deleteCredentialAndVault(r.Context(), tx, *credBinding.CredentialID, userID, deps.Vault); err != nil {
 				log.Printf("[%s] DisableAgentConnector: delete credential: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
 				return
 			}
@@ -188,6 +194,7 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] DisableAgentConnector: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 				return
 			}

@@ -123,6 +123,7 @@ func handleListApprovals(deps *Deps) http.HandlerFunc {
 		page, err := db.ListApprovalsByApproverPaginated(r.Context(), deps.DB, profile.ID, statusFilter, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ListApprovals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list approvals"))
 			return
 		}
@@ -161,6 +162,7 @@ func handleGetApproval(deps *Deps) http.HandlerFunc {
 		appr, err := db.GetApprovalByIDAndApprover(r.Context(), deps.DB, approvalID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] GetApprovalByIDAndApprover: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get approval"))
 			return
 		}
@@ -190,6 +192,7 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] ApproveApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to approve approval"))
 			return
 		}
@@ -199,6 +202,7 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 		confirmCode, err := generateConfirmationCodePlaintext()
 		if err != nil {
 			log.Printf("[%s] generateConfirmationCodePlaintext: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to generate confirmation code"))
 			return
 		}
@@ -266,6 +270,7 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 		execStatus = "error"
 		resultJSON, _ = json.Marshal(map[string]string{"error": "no connector registered for action type"})
 		log.Printf("[%s] executeApprovalAction: no connector for approval %s action type %q", TraceID(ctx), appr.ApprovalID, actionType)
+		CaptureError(ctx, fmt.Errorf("no connector registered for approval %s action type %q", appr.ApprovalID, actionType))
 	} else {
 		execStatus = "success"
 		resultJSON = result.Data
@@ -274,6 +279,7 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 	// Persist execution result on the approval row (best-effort).
 	if err := db.UpdateApprovalExecution(ctx, deps.DB, appr.ApprovalID, execStatus, resultJSON); err != nil {
 		log.Printf("[%s] executeApprovalAction: failed to store execution result for approval %s: %v", TraceID(ctx), appr.ApprovalID, err)
+		CaptureError(ctx, err)
 	}
 
 	return execStatus, resultJSON
@@ -295,6 +301,7 @@ func handleDenyApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] DenyApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to deny approval"))
 			return
 		}
@@ -374,6 +381,7 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Action = action
 		} else {
 			log.Printf("WARNING: corrupt action JSONB for approval %s: %v", a.ApprovalID, err)
+			CaptureError(context.Background(), fmt.Errorf("corrupt action JSONB for approval %s: %w", a.ApprovalID, err))
 		}
 	}
 	if len(a.Context) > 0 {
@@ -382,6 +390,7 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Context = ctx
 		} else {
 			log.Printf("WARNING: corrupt context JSONB for approval %s: %v", a.ApprovalID, err)
+			CaptureError(context.Background(), fmt.Errorf("corrupt context JSONB for approval %s: %w", a.ApprovalID, err))
 		}
 	}
 	if len(a.ResourceDetails) > 0 {

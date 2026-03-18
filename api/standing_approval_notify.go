@@ -32,6 +32,7 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 	profile, err := db.GetProfileByUserID(ctx, deps.DB, exec.UserID)
 	if err != nil {
 		log.Printf("notify: standing execution: failed to fetch profile for user %s: %v", exec.UserID, err)
+		CaptureError(ctx, err)
 		return
 	}
 

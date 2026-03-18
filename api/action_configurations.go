@@ -127,6 +127,7 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 			exists, err := db.ConnectorActionExists(r.Context(), deps.DB, req.ConnectorID, req.ActionType)
 			if err != nil {
 				log.Printf("[%s] CreateActionConfig: check connector action: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create action configuration"))
 				return
 			}
@@ -139,6 +140,7 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 		configID, err := generatePrefixedID("ac_", 16)
 		if err != nil {
 			log.Printf("[%s] CreateActionConfig: generate ID: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create action configuration"))
 			return
 		}
@@ -166,6 +168,7 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 				}
 			}
 			log.Printf("[%s] CreateActionConfig: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create action configuration"))
 			return
 		}
@@ -192,6 +195,7 @@ func handleListActionConfigs(deps *Deps) http.HandlerFunc {
 		configs, err := db.ListActionConfigsByAgent(r.Context(), deps.DB, agentID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] ListActionConfigs: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list action configurations"))
 			return
 		}
@@ -218,6 +222,7 @@ func handleGetActionConfig(deps *Deps) http.HandlerFunc {
 		ac, err := db.GetActionConfigByID(r.Context(), deps.DB, configID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] GetActionConfig: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get action configuration"))
 			return
 		}
@@ -274,6 +279,7 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 			existing, err := db.GetActionConfigByID(r.Context(), deps.DB, configID, profile.ID)
 			if err != nil {
 				log.Printf("[%s] UpdateActionConfig: lookup for wildcard check: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
 				return
 			}
@@ -319,6 +325,7 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 				}
 			}
 			log.Printf("[%s] UpdateActionConfig: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
 			return
 		}
@@ -340,6 +347,7 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 		ac, err := db.DeleteActionConfig(r.Context(), deps.DB, configID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] DeleteActionConfig: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete action configuration"))
 			return
 		}
