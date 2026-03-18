@@ -43,6 +43,7 @@ func TestMicrosoftConnector_Actions(t *testing.T) {
 		"microsoft.excel_read_range",
 		"microsoft.excel_write_range",
 		"microsoft.excel_append_rows",
+		"microsoft.create_spreadsheet",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -110,8 +111,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	if m.Name != "Microsoft" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Microsoft")
 	}
-	if len(m.Actions) != 23 {
-		t.Fatalf("Manifest().Actions has %d items, want 23", len(m.Actions))
+	if len(m.Actions) != 24 {
+		t.Fatalf("Manifest().Actions has %d items, want 24", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -141,6 +142,7 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 		"microsoft.excel_read_range",
 		"microsoft.excel_write_range",
 		"microsoft.excel_append_rows",
+		"microsoft.create_spreadsheet",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
@@ -164,8 +166,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	}
 
 	// Validate templates.
-	if len(m.Templates) != 25 {
-		t.Errorf("Manifest().Templates has %d items, want 25", len(m.Templates))
+	if len(m.Templates) != 26 {
+		t.Errorf("Manifest().Templates has %d items, want 26", len(m.Templates))
 	}
 
 	// Validate the manifest passes validation.
