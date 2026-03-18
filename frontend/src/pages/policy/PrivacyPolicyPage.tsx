@@ -3,7 +3,7 @@ import { PolicyLayout } from "./PolicyLayout";
 
 export function PrivacyPolicyPage() {
   return (
-    <PolicyLayout title="Privacy Policy" lastUpdated="March 16, 2026">
+    <PolicyLayout title="Privacy Policy" lastUpdated="March 18, 2026">
       <p>
         Supersuit Technologies LLC
         (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), operates Permission
@@ -201,6 +201,16 @@ export function PrivacyPolicyPage() {
         memory solely to process and route each request. This data is{" "}
         <strong>not written to long-term storage</strong> and is discarded
         within 24 hours. See Section 5 for retention details.
+      </p>
+
+      <h3>4.3 Mobile Information Sharing</h3>
+      <p>
+        No mobile information will be shared with third parties and affiliates
+        for marketing or promotional purposes. Information sharing to
+        subcontractors in support services, such as customer service, is
+        permitted. All other use case categories exclude text messaging
+        originator opt-in data and consent; this information will not be shared
+        with any third parties.
       </p>
 
       <h2>5. Data Retention</h2>
