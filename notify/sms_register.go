@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -37,8 +38,7 @@ func init() {
 
 		awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 		if err != nil {
-			log.Printf("notify: failed to load AWS config for SMS: %v", err)
-			return nil, nil
+			return nil, fmt.Errorf("notify: failed to load AWS config for SMS: %w", err)
 		}
 
 		snsClient := sns.NewFromConfig(awsCfg)

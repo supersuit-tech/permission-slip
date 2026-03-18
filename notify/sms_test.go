@@ -16,8 +16,11 @@ type mockSNSPublisher struct {
 	err   error
 }
 
-func (m *mockSNSPublisher) Publish(_ context.Context, params *sns.PublishInput, _ ...func(*sns.Options)) (*sns.PublishOutput, error) {
+func (m *mockSNSPublisher) Publish(ctx context.Context, params *sns.PublishInput, _ ...func(*sns.Options)) (*sns.PublishOutput, error) {
 	m.input = params
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -164,7 +167,8 @@ func TestSMSSender_Send_SNSError(t *testing.T) {
 func TestSMSSender_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	mock := &mockSNSPublisher{err: context.Canceled}
+	// No pre-set error — the mock checks ctx.Err() to verify context propagation.
+	mock := &mockSNSPublisher{}
 	sender := NewSMSSender(SMSConfig{Region: "us-east-1"}, mock)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -178,6 +182,9 @@ func TestSMSSender_ContextCancellation(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled error, got: %v", err)
 	}
 }
 
@@ -291,5 +298,26 @@ func TestBuildSenders_SMSDisabledNoRegion(t *testing.T) {
 	senders := cfg.BuildSenders()
 	if len(senders) != 0 {
 		t.Fatalf("expected 0 senders when AWS_REGION not set, got %d", len(senders))
+	}
+}
+
+func TestBuildSenders_SMSPartialCredentials(t *testing.T) {
+	t.Parallel()
+	// Only AWSAccessKeyID set without AWSSecretAccessKey — falls through to
+	// the default credential chain. With region set, SMS is still configured
+	// (the SDK may resolve credentials from IAM role or shared config).
+	cfg := Config{
+		AWSRegion:      "us-east-1",
+		AWSAccessKeyID: "AKIAIOSFODNN7EXAMPLE",
+		// Missing AWSSecretAccessKey — static credentials not used.
+	}
+	senders := cfg.BuildSenders()
+	// SMS should still be enabled because the region is set (credentials
+	// resolved via default chain, not static).
+	if len(senders) != 1 {
+		t.Fatalf("expected 1 sender with partial static credentials (default chain fallback), got %d", len(senders))
+	}
+	if senders[0].Name() != "sms" {
+		t.Errorf("expected sender name %q, got %q", "sms", senders[0].Name())
 	}
 }
