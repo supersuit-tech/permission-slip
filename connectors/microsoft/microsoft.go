@@ -235,7 +235,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["file_path", "content"],
+					"required": ["file_path"],
 					"properties": {
 						"file_path": {
 							"type": "string",
@@ -243,7 +243,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"content": {
 							"type": "string",
-							"description": "File content to upload (max 4 MB)"
+							"description": "File content to upload (max 4 MB). Omit to create an empty file."
 						},
 						"conflict_behavior": {
 							"type": "string",
