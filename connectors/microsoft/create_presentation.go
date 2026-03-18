@@ -34,20 +34,6 @@ func (p *createPresentationParams) validate() error {
 	return validateFolderPath(p.FolderPath)
 }
 
-// graphDriveItemResponse is the Microsoft Graph API response for a DriveItem.
-type graphDriveItemResponse struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	WebURL         string `json:"webUrl"`
-	Size           int64  `json:"size"`
-	LastModifiedBy struct {
-		User struct {
-			DisplayName string `json:"displayName"`
-		} `json:"user"`
-	} `json:"lastModifiedBy"`
-	LastModified string `json:"lastModifiedDateTime"`
-}
-
 // Execute creates a new .pptx file in OneDrive.
 // It uses PUT /me/drive/root:/{path}/{filename}.pptx:/content with the minimal
 // PPTX template bytes as the request body.

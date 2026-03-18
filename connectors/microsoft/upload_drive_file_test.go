@@ -134,24 +134,44 @@ func TestUploadDriveFile_MissingFilePath(t *testing.T) {
 	}
 }
 
-func TestUploadDriveFile_MissingContent(t *testing.T) {
+func TestUploadDriveFile_EmptyContent(t *testing.T) {
 	t.Parallel()
 
-	conn := New()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if len(body) != 0 {
+			t.Errorf("expected empty body, got %d bytes", len(body))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":   "new-workbook-1",
+			"name": "report.xlsx",
+			"size": 0,
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
 	action := &uploadDriveFileAction{conn: conn}
 
-	params, _ := json.Marshal(map[string]string{"file_path": "test.txt"})
+	params, _ := json.Marshal(map[string]string{"file_path": "Documents/report.xlsx"})
 
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "microsoft.upload_drive_file",
 		Parameters:  params,
 		Credentials: validCreds(),
 	})
-	if err == nil {
-		t.Fatal("expected error for missing content")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+
+	var res uploadDriveFileResult
+	if err := json.Unmarshal(result.Data, &res); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if res.ID != "new-workbook-1" {
+		t.Errorf("expected id 'new-workbook-1', got %q", res.ID)
 	}
 }
 

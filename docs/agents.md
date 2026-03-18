@@ -413,33 +413,22 @@ The user receives a notification and reviews the request on their dashboard.
 
 The user reviews and approves (or denies) the request. After approving, they see a confirmation code and share it with you.
 
-The Permission Slip CLI returns immediately by default with an `approval_id` and a `next_step` hint. Use `permission-slip status <approval_id>` to check the result once the user has approved. Pass `--wait` to `request` if you prefer blocking behavior.
+The Permission Slip CLI always returns immediately — every command is non-blocking. Use `permission-slip request` to submit an approval, then check the result later with `permission-slip status <approval_id>`.
 
 ```bash
-# Default: returns immediately with approval_id
+# Submit approval request (returns immediately with approval_id)
 permission-slip request --action email.send --params '{"to":["alice@example.com"]}'
 
-# Check result (single snapshot):
+# Check result (returns immediately with current status):
 permission-slip status <approval_id>
 
-# Fire-and-forget, then block later when ready:
+# Agent pattern: request, do other work, then check status
 APPROVAL_ID=$(permission-slip request --action email.send --params '{}' | jq -r '.approval_id')
 # ... do other work ...
-permission-slip status --wait "$APPROVAL_ID"
-
-# Block from the start (up to 120s):
-permission-slip request --action email.send --params '{}' --wait
-
-# Block with custom timeout:
-permission-slip request --action email.send --params '{}' --wait --timeout 30
-
-# Agent-friendly: poll at a fixed interval (default 5s), exit code 2 on timeout (default 600s):
-permission-slip request --action email.send --params '{}' --poll
-
-# Custom poll interval and timeout:
-permission-slip request --action email.send --params '{}' \
-  --poll --poll-interval 10 --poll-timeout 120
+permission-slip status "$APPROVAL_ID"
 ```
+
+If your agent needs to wait for approval, implement your own polling loop externally. This gives you full control over timing, cancellation, and concurrency.
 
 Alternatively, the user can share the approval confirmation code out-of-band (paste it in chat, set it in your config, etc.).
 
