@@ -32,7 +32,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 )
@@ -123,7 +122,7 @@ func storeClientCredentials(ctx context.Context, deps *Deps, tx db.DBTX, namePre
 
 // updateOAuthRegistry merges BYOA credentials into the in-memory provider
 // registry. Non-fatal — DB is the source of truth.
-func updateOAuthRegistry(deps *Deps, providerID, clientID, clientSecret string) {
+func updateOAuthRegistry(ctx context.Context, deps *Deps, providerID, clientID, clientSecret string) {
 	if deps.OAuthProviders == nil {
 		return
 	}
@@ -134,7 +133,7 @@ func updateOAuthRegistry(deps *Deps, providerID, clientID, clientSecret string) 
 		Source:       oauth.SourceBYOA,
 	}); err != nil {
 		log.Printf("BYOA registry update for %q: %v", providerID, err)
-		sentry.CurrentHub().CaptureException(err)
+		CaptureError(ctx, err)
 	}
 }
 
@@ -237,7 +236,7 @@ func handleCreateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 
 		// Update the in-memory registry so subsequent OAuth flows pick up the
 		// new BYOA credentials immediately. Non-fatal — DB is the source of truth.
-		updateOAuthRegistry(deps, req.Provider, req.ClientID, req.ClientSecret)
+		updateOAuthRegistry(r.Context(), deps, req.Provider, req.ClientID, req.ClientSecret)
 
 		RespondJSON(w, http.StatusCreated, oauthProviderConfigResponse{
 			Provider:  config.Provider,
@@ -333,7 +332,7 @@ func handleUpdateOAuthProviderConfig(deps *Deps) http.HandlerFunc {
 		}
 
 		// Update the in-memory registry. Non-fatal — DB is the source of truth.
-		updateOAuthRegistry(deps, providerID, req.ClientID, req.ClientSecret)
+		updateOAuthRegistry(r.Context(), deps, providerID, req.ClientID, req.ClientSecret)
 
 		RespondJSON(w, http.StatusOK, oauthProviderConfigResponse{
 			Provider:  config.Provider,

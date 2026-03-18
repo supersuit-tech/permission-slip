@@ -318,9 +318,14 @@ func notifyPaymentFailure(r *http.Request, deps *Deps, userID string, event *pst
 	}
 
 	profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
-	if err != nil || profile == nil {
-		log.Printf("[%s] StripeWebhook: notify payment failure: failed to lookup profile for %s: %v", TraceID(r.Context()), userID, err)
-		CaptureError(r.Context(), fmt.Errorf("notify payment failure: failed to lookup profile for user %s: %w", userID, err))
+	if err != nil {
+		log.Printf("[%s] StripeWebhook: notify payment failure: profile lookup error for %s: %v", TraceID(r.Context()), userID, err)
+		CaptureError(r.Context(), err)
+		return
+	}
+	if profile == nil {
+		log.Printf("[%s] StripeWebhook: notify payment failure: no profile found for user %s", TraceID(r.Context()), userID)
+		CaptureError(r.Context(), fmt.Errorf("notify payment failure: no profile found for user %s", userID))
 		return
 	}
 

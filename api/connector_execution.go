@@ -441,7 +441,6 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		// Refresh failed (token revoked, expired, etc.). Mark as needs_reauth.
 		// Log the full error server-side for debugging; return a sanitized message to the caller.
 		log.Printf("oauth refresh failed for provider %q connection %s: %v", providerID, conn.ID, err)
-		CaptureError(ctx, err)
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
 			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
 			CaptureError(ctx, statusErr)

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/shared"
 )
@@ -131,7 +130,7 @@ func handleListApprovals(deps *Deps) http.HandlerFunc {
 
 		data := make([]approvalResponse, len(page.Approvals))
 		for i, a := range page.Approvals {
-			data[i] = toApprovalResponse(a)
+			data[i] = toApprovalResponse(r.Context(), a)
 		}
 
 		resp := approvalListResponse{
@@ -363,7 +362,7 @@ func parseApprovalCursor(raw string) (*db.ApprovalCursor, error) {
 	return &db.ApprovalCursor{CreatedAt: t, ApprovalID: approvalID}, nil
 }
 
-func toApprovalResponse(a db.Approval) approvalResponse {
+func toApprovalResponse(ctx context.Context, a db.Approval) approvalResponse {
 	resp := approvalResponse{
 		ApprovalID:  a.ApprovalID,
 		AgentID:     a.AgentID,
@@ -382,16 +381,16 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Action = action
 		} else {
 			log.Printf("WARNING: corrupt action JSONB for approval %s: %v", a.ApprovalID, err)
-			sentry.CurrentHub().CaptureException(fmt.Errorf("corrupt action JSONB for approval %s: %w", a.ApprovalID, err))
+			CaptureError(ctx, fmt.Errorf("corrupt action JSONB for approval %s: %w", a.ApprovalID, err))
 		}
 	}
 	if len(a.Context) > 0 {
-		var ctx any
-		if err := json.Unmarshal(a.Context, &ctx); err == nil {
-			resp.Context = ctx
+		var ctxData any
+		if err := json.Unmarshal(a.Context, &ctxData); err == nil {
+			resp.Context = ctxData
 		} else {
 			log.Printf("WARNING: corrupt context JSONB for approval %s: %v", a.ApprovalID, err)
-			sentry.CurrentHub().CaptureException(fmt.Errorf("corrupt context JSONB for approval %s: %w", a.ApprovalID, err))
+			CaptureError(ctx, fmt.Errorf("corrupt context JSONB for approval %s: %w", a.ApprovalID, err))
 		}
 	}
 	if len(a.ResourceDetails) > 0 {
@@ -427,9 +426,9 @@ func toApprovalDetailResponse(a db.Approval) approvalDetailResponse {
 		}
 	}
 	if len(a.Context) > 0 {
-		var ctx any
-		if err := json.Unmarshal(a.Context, &ctx); err == nil {
-			resp.Context = ctx
+		var ctxData any
+		if err := json.Unmarshal(a.Context, &ctxData); err == nil {
+			resp.Context = ctxData
 		}
 	}
 	if len(a.ExecutionResult) > 0 {
