@@ -101,24 +101,22 @@ jobs:
     needs: [backend, frontend, build]
     if: ${{ failure() && github.event_name == 'push' }}
     steps:
-      - name: Send Twilio SMS
+      - name: Send SNS SMS
         env:
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_PHONE_FROM: ${{ secrets.TWILIO_PHONE_FROM }}
-          TWILIO_PHONE_TO: ${{ secrets.TWILIO_PHONE_TO }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          SNS_PHONE_TO: ${{ secrets.SNS_PHONE_TO }}
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           BRANCH="${{ github.ref_name }}"
           TITLE="${{ github.workflow }}"
           MESSAGE="permission-slip CI failed: ${TITLE} on ${BRANCH} — ${RUN_URL}"
 
-          curl -s -f -X POST \
-            "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json" \
-            -u "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
-            --data-urlencode "To=${TWILIO_PHONE_TO}" \
-            --data-urlencode "From=${TWILIO_PHONE_FROM}" \
-            --data-urlencode "Body=${MESSAGE}"
+          aws sns publish \
+            --phone-number "${SNS_PHONE_TO}" \
+            --message "${MESSAGE}" \
+            --message-attributes '{"AWS.SNS.SMS.SMSType":{"DataType":"String","StringValue":"Transactional"}}'
 
       - name: Send webhook notification
         env:
