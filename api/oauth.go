@@ -553,9 +553,15 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 
 		// Look up profile for the user
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, userID)
-		if err != nil || profile == nil {
-			log.Printf("[%s] OAuthCallback: profile lookup failed: %v", TraceID(r.Context()), err)
+		if err != nil {
+			log.Printf("[%s] OAuthCallback: profile lookup error: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
+			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found", state.ReturnTo, "")
+			return
+		}
+		if profile == nil {
+			log.Printf("[%s] OAuthCallback: no profile found for user %s", TraceID(r.Context()), userID)
+			CaptureError(r.Context(), fmt.Errorf("OAuthCallback: no profile found for user %s provider %s", userID, providerID))
 			redirectToFrontend(w, r, deps, providerID, "error", "Profile not found", state.ReturnTo, "")
 			return
 		}
