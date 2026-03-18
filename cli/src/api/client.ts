@@ -117,11 +117,25 @@ export class ApiClient {
       opts.apiPath ?? `/api/v1${opts.routerPath}`;
     const url = `${this.base}${fullPath}`;
 
-    const res = await fetch(url, {
-      method: opts.method,
-      headers,
-      body: bodyStr,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: opts.method,
+        headers,
+        body: bodyStr,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        throw new Error(`Request timed out after 30s: ${opts.method} ${fullPath}`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!res.ok) {
       let apiError: ApiError;
