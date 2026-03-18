@@ -3,16 +3,30 @@ package notify
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 )
+
+// mockSNSPublisher records Publish calls and returns a configurable error.
+type mockSNSPublisher struct {
+	input *sns.PublishInput
+	err   error
+}
+
+func (m *mockSNSPublisher) Publish(_ context.Context, params *sns.PublishInput, _ ...func(*sns.Options)) (*sns.PublishOutput, error) {
+	m.input = params
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &sns.PublishOutput{}, nil
+}
 
 func TestSMSSender_Name(t *testing.T) {
 	t.Parallel()
-	s := NewSMSSender(SMSConfig{})
+	s := NewSMSSender(SMSConfig{}, &mockSNSPublisher{})
 	if s.Name() != "sms" {
 		t.Fatalf("expected name %q, got %q", "sms", s.Name())
 	}
@@ -21,27 +35,11 @@ func TestSMSSender_Name(t *testing.T) {
 func TestSMSSender_Send_Success(t *testing.T) {
 	t.Parallel()
 
-	var capturedBody string
-	var capturedAuth string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Capture basic auth.
-		user, pass, ok := r.BasicAuth()
-		if ok {
-			capturedAuth = user + ":" + pass
-		}
-
-		body, _ := io.ReadAll(r.Body)
-		capturedBody = string(body)
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"sid":"SM123"}`))
-	}))
-	defer server.Close()
-
-	sender := newTestSMSSender(SMSConfig{
-		AccountSID: "AC_test_sid",
-		AuthToken:  "test_token",
-		FromNumber: "+15550001111",
-	}, server.URL)
+	mock := &mockSNSPublisher{}
+	sender := NewSMSSender(SMSConfig{
+		Region:            "us-east-1",
+		OriginationNumber: "+15550001111",
+	}, mock)
 
 	phone := "+15559998888"
 	err := sender.Send(context.Background(), testApproval(), Recipient{
@@ -54,31 +52,72 @@ func TestSMSSender_Send_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify basic auth credentials.
-	if capturedAuth != "AC_test_sid:test_token" {
-		t.Errorf("expected auth %q, got %q", "AC_test_sid:test_token", capturedAuth)
+	if mock.input == nil {
+		t.Fatal("expected Publish to be called")
 	}
 
-	// Verify form fields.
-	if !strings.Contains(capturedBody, "To=%2B15559998888") {
-		t.Errorf("expected To phone in body, got: %s", capturedBody)
+	// Verify phone number.
+	if *mock.input.PhoneNumber != "+15559998888" {
+		t.Errorf("expected PhoneNumber %q, got %q", "+15559998888", *mock.input.PhoneNumber)
 	}
-	if !strings.Contains(capturedBody, "From=%2B15550001111") {
-		t.Errorf("expected From phone in body, got: %s", capturedBody)
+
+	// Verify message body is present.
+	if mock.input.Message == nil || *mock.input.Message == "" {
+		t.Error("expected non-empty Message")
 	}
-	if !strings.Contains(capturedBody, "Body=") {
-		t.Errorf("expected Body in form data, got: %s", capturedBody)
+
+	// Verify Transactional SMS type.
+	attr, ok := mock.input.MessageAttributes["AWS.SNS.SMS.SMSType"]
+	if !ok {
+		t.Error("expected AWS.SNS.SMS.SMSType attribute")
+	} else if *attr.StringValue != "Transactional" {
+		t.Errorf("expected SMSType %q, got %q", "Transactional", *attr.StringValue)
+	}
+
+	// Verify origination number attribute.
+	origAttr, ok := mock.input.MessageAttributes["AWS.MM.SMS.OriginationNumber"]
+	if !ok {
+		t.Error("expected AWS.MM.SMS.OriginationNumber attribute")
+	} else if *origAttr.StringValue != "+15550001111" {
+		t.Errorf("expected origination number %q, got %q", "+15550001111", *origAttr.StringValue)
+	}
+}
+
+func TestSMSSender_Send_WithSenderID(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockSNSPublisher{}
+	sender := NewSMSSender(SMSConfig{
+		Region:   "eu-west-1",
+		SenderID: "PermSlip",
+	}, mock)
+
+	phone := "+447700900000"
+	err := sender.Send(context.Background(), testApproval(), Recipient{
+		UserID: "user-001",
+		Phone:  &phone,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	attr, ok := mock.input.MessageAttributes["AWS.SNS.SMS.SenderID"]
+	if !ok {
+		t.Error("expected AWS.SNS.SMS.SenderID attribute")
+	} else if *attr.StringValue != "PermSlip" {
+		t.Errorf("expected SenderID %q, got %q", "PermSlip", *attr.StringValue)
+	}
+
+	// No origination number — attribute should be absent.
+	if _, ok := mock.input.MessageAttributes["AWS.MM.SMS.OriginationNumber"]; ok {
+		t.Error("expected no origination number attribute when not configured")
 	}
 }
 
 func TestSMSSender_Send_NoPhone(t *testing.T) {
 	t.Parallel()
 
-	sender := NewSMSSender(SMSConfig{
-		AccountSID: "AC_test",
-		AuthToken:  "token",
-		FromNumber: "+15550001111",
-	})
+	sender := NewSMSSender(SMSConfig{Region: "us-east-1"}, &mockSNSPublisher{})
 
 	// nil phone — should skip without error.
 	err := sender.Send(context.Background(), testApproval(), Recipient{
@@ -102,50 +141,11 @@ func TestSMSSender_Send_NoPhone(t *testing.T) {
 	}
 }
 
-func TestSMSSender_Send_TwilioError(t *testing.T) {
+func TestSMSSender_Send_SNSError(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"code":21211,"message":"Invalid 'To' Phone Number"}`))
-	}))
-	defer server.Close()
-
-	sender := newTestSMSSender(SMSConfig{
-		AccountSID: "AC_test",
-		AuthToken:  "token",
-		FromNumber: "+15550001111",
-	}, server.URL)
-
-	phone := "+15559998888"
-	err := sender.Send(context.Background(), testApproval(), Recipient{
-		UserID:   "user-001",
-		Username: "alice",
-		Phone:    &phone,
-	})
-
-	if err == nil {
-		t.Fatal("expected error for Twilio 400 response")
-	}
-	if !strings.Contains(err.Error(), "twilio returned 400") {
-		t.Errorf("expected error to mention status 400, got: %v", err)
-	}
-}
-
-func TestSMSSender_Send_ServerError(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`Internal Server Error`))
-	}))
-	defer server.Close()
-
-	sender := newTestSMSSender(SMSConfig{
-		AccountSID: "AC_test",
-		AuthToken:  "token",
-		FromNumber: "+15550001111",
-	}, server.URL)
+	mock := &mockSNSPublisher{err: errors.New("SNS: throttling exception")}
+	sender := NewSMSSender(SMSConfig{Region: "us-east-1"}, mock)
 
 	phone := "+15559998888"
 	err := sender.Send(context.Background(), testApproval(), Recipient{
@@ -154,31 +154,18 @@ func TestSMSSender_Send_ServerError(t *testing.T) {
 	})
 
 	if err == nil {
-		t.Fatal("expected error for 500 response")
+		t.Fatal("expected error for SNS failure")
 	}
-	if !strings.Contains(err.Error(), "twilio returned 500") {
-		t.Errorf("expected error to mention status 500, got: %v", err)
+	if !strings.Contains(err.Error(), "SNS publish failed") {
+		t.Errorf("expected error to mention SNS publish, got: %v", err)
 	}
 }
 
 func TestSMSSender_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	// Use a channel-based block instead of time.Sleep so the server handler
-	// cleans up immediately when the test ends (no lingering goroutines).
-	blocker := make(chan struct{})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		<-blocker
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-	defer close(blocker) // Unblock handler so server.Close() can finish.
-
-	sender := newTestSMSSender(SMSConfig{
-		AccountSID: "AC_test",
-		AuthToken:  "token",
-		FromNumber: "+15550001111",
-	}, server.URL)
+	mock := &mockSNSPublisher{err: context.Canceled}
+	sender := NewSMSSender(SMSConfig{Region: "us-east-1"}, mock)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately.
@@ -283,9 +270,9 @@ func TestFormatSMSBody_CardExpired(t *testing.T) {
 func TestBuildSenders_SMSEnabled(t *testing.T) {
 	t.Parallel()
 	cfg := Config{
-		TwilioAccountSID: "AC_test",
-		TwilioAuthToken:  "token",
-		TwilioFromNumber: "+15550001111",
+		AWSRegion:          "us-east-1",
+		AWSAccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
+		AWSSecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 	}
 	senders := cfg.BuildSenders()
 	if len(senders) != 1 {
@@ -296,25 +283,13 @@ func TestBuildSenders_SMSEnabled(t *testing.T) {
 	}
 }
 
-func TestBuildSenders_SMSPartialConfig(t *testing.T) {
+func TestBuildSenders_SMSDisabledNoRegion(t *testing.T) {
 	t.Parallel()
 	cfg := Config{
-		TwilioAccountSID: "AC_test",
-		// Missing AuthToken and FromNumber.
+		// No AWSRegion — SMS should be disabled.
 	}
 	senders := cfg.BuildSenders()
 	if len(senders) != 0 {
-		t.Fatalf("expected 0 senders for partial config, got %d", len(senders))
+		t.Fatalf("expected 0 senders when AWS_REGION not set, got %d", len(senders))
 	}
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-// newTestSMSSender creates an SMSSender that talks to a local test server
-// instead of the real Twilio API by overriding the sender's baseURL to
-// point at the provided testServerURL.
-func newTestSMSSender(cfg SMSConfig, testServerURL string) *SMSSender {
-	s := NewSMSSender(cfg)
-	s.baseURL = testServerURL
-	return s
 }
