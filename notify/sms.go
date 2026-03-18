@@ -3,37 +3,48 @@ package notify
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
 
-// SMSConfig holds the Twilio credentials and sender number needed to
-// deliver SMS notifications.
-type SMSConfig struct {
-	AccountSID string
-	AuthToken  string
-	FromNumber string
+// SNSPublisher is the subset of the SNS client API used by SMSSender.
+// Defined as an interface so tests can substitute a mock.
+type SNSPublisher interface {
+	Publish(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error)
 }
 
-// SMSSender delivers approval notifications via Twilio's REST API.
+// SMSConfig holds the AWS configuration needed to deliver SMS notifications
+// via Amazon SNS.
+type SMSConfig struct {
+	// Region is the AWS region for the SNS client (e.g. "us-east-1").
+	Region string
+
+	// SenderID is an optional alphanumeric Sender ID displayed on the
+	// recipient's device. Not supported in all countries (notably the US).
+	// Leave empty to use SNS defaults.
+	SenderID string
+
+	// OriginationNumber is an optional origination phone number in E.164
+	// format (e.g. "+15551234567"). Required for US destinations when a
+	// short/long code or toll-free number is registered in SNS.
+	OriginationNumber string
+}
+
+// SMSSender delivers approval notifications via Amazon SNS.
 // It is safe for concurrent use.
 type SMSSender struct {
-	cfg     SMSConfig
-	client  *http.Client
-	baseURL string // override for testing; empty uses the real Twilio API
+	cfg    SMSConfig
+	client SNSPublisher
 }
 
-// NewSMSSender creates a Sender that delivers SMS via Twilio.
-func NewSMSSender(cfg SMSConfig) *SMSSender {
+// NewSMSSender creates a Sender that delivers SMS via Amazon SNS.
+func NewSMSSender(cfg SMSConfig, client SNSPublisher) *SMSSender {
 	return &SMSSender{
-		cfg: cfg,
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		cfg:    cfg,
+		client: client,
 	}
 }
 
@@ -50,7 +61,7 @@ func (s *SMSSender) Send(ctx context.Context, approval Approval, recipient Recip
 	}
 
 	body := formatSMSBody(approval)
-	return s.sendViaTwilio(ctx, *recipient.Phone, body)
+	return s.sendViaSNS(ctx, *recipient.Phone, body)
 }
 
 // formatSMSBody constructs a concise SMS message. We aim for ≤160 characters
@@ -94,40 +105,39 @@ func formatSMSBody(a Approval) string {
 	return msg
 }
 
-// sendViaTwilio posts a message to Twilio's Messages REST API.
-func (s *SMSSender) sendViaTwilio(ctx context.Context, to, body string) error {
-	base := s.baseURL
-	if base == "" {
-		base = "https://api.twilio.com"
+// sendViaSNS publishes an SMS message using Amazon SNS.
+func (s *SMSSender) sendViaSNS(ctx context.Context, to, body string) error {
+	input := &sns.PublishInput{
+		Message:     aws.String(body),
+		PhoneNumber: aws.String(to),
 	}
-	apiURL := fmt.Sprintf(
-		"%s/2010-04-01/Accounts/%s/Messages.json",
-		base, url.PathEscape(s.cfg.AccountSID),
-	)
 
-	form := url.Values{}
-	form.Set("To", to)
-	form.Set("From", s.cfg.FromNumber)
-	form.Set("Body", body)
+	// Set SMS-specific message attributes.
+	input.MessageAttributes = map[string]snstypes.MessageAttributeValue{
+		"AWS.SNS.SMS.SMSType": {
+			DataType:    aws.String("String"),
+			StringValue: aws.String("Transactional"),
+		},
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, strings.NewReader(form.Encode()))
+	if s.cfg.SenderID != "" {
+		input.MessageAttributes["AWS.SNS.SMS.SenderID"] = snstypes.MessageAttributeValue{
+			DataType:    aws.String("String"),
+			StringValue: aws.String(s.cfg.SenderID),
+		}
+	}
+
+	if s.cfg.OriginationNumber != "" {
+		input.MessageAttributes["AWS.MM.SMS.OriginationNumber"] = snstypes.MessageAttributeValue{
+			DataType:    aws.String("String"),
+			StringValue: aws.String(s.cfg.OriginationNumber),
+		}
+	}
+
+	_, err := s.client.Publish(ctx, input)
 	if err != nil {
-		return fmt.Errorf("notify/sms: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(s.cfg.AccountSID, s.cfg.AuthToken)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("notify/sms: twilio request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return nil
+		return fmt.Errorf("notify/sms: SNS publish failed: %w", err)
 	}
 
-	// Read error body for logging (cap at 1KB to avoid memory issues).
-	errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-	return fmt.Errorf("notify/sms: twilio returned %d: %s", resp.StatusCode, string(errBody))
+	return nil
 }

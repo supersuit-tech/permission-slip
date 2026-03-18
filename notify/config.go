@@ -8,9 +8,9 @@ import (
 )
 
 // Config holds notification-related configuration loaded from environment
-// variables at startup. Individual channel configs (SendGrid API key, Twilio
-// SID, VAPID keys, etc.) are defined by their respective channel packages
-// and added to this struct as they're implemented.
+// variables at startup. Individual channel configs (SendGrid API key, AWS
+// credentials, VAPID keys, etc.) are defined by their respective channel
+// packages and added to this struct as they're implemented.
 type Config struct {
 	// Email channel — exactly one provider is used (SendGrid preferred).
 	EmailProvider  string // "twilio-sendgrid" or "smtp"; empty = disabled
@@ -21,10 +21,12 @@ type Config struct {
 	SMTPUsername   string
 	SMTPPassword   string
 
-	// SMS (Twilio) — issue #277
-	TwilioAccountSID string
-	TwilioAuthToken  string
-	TwilioFromNumber string
+	// SMS (Amazon SNS) — issue #690
+	AWSRegion            string
+	AWSAccessKeyID       string
+	AWSSecretAccessKey   string
+	SNSSenderID          string // optional alphanumeric sender ID
+	SNSOriginationNumber string // optional origination number (E.164)
 
 	// Web Push (VAPID) — issue #276
 	// VAPIDSubject is a mailto: URL identifying the server operator, required
@@ -50,9 +52,11 @@ func LoadConfig() Config {
 		SMTPPort:         EnvOrDefault("SMTP_PORT", "587"),
 		SMTPUsername:     os.Getenv("SMTP_USERNAME"),
 		SMTPPassword:     os.Getenv("SMTP_PASSWORD"),
-		TwilioAccountSID: os.Getenv("TWILIO_ACCOUNT_SID"),
-		TwilioAuthToken:  os.Getenv("TWILIO_AUTH_TOKEN"),
-		TwilioFromNumber: os.Getenv("TWILIO_FROM_NUMBER"),
+		AWSRegion:            os.Getenv("AWS_REGION"),
+		AWSAccessKeyID:       os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey:   os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		SNSSenderID:          os.Getenv("SNS_SMS_SENDER_ID"),
+		SNSOriginationNumber: os.Getenv("SNS_SMS_ORIGINATION_NUMBER"),
 		VAPIDSubject:     EnvOrDefault("VAPID_SUBJECT", ""),
 		ExpoAccessToken:  os.Getenv("EXPO_ACCESS_TOKEN"),
 	}
