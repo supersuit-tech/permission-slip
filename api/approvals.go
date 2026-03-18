@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/shared"
 )
@@ -381,7 +382,7 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Action = action
 		} else {
 			log.Printf("WARNING: corrupt action JSONB for approval %s: %v", a.ApprovalID, err)
-			CaptureError(context.Background(), fmt.Errorf("corrupt action JSONB for approval %s: %w", a.ApprovalID, err))
+			sentry.CurrentHub().CaptureException(fmt.Errorf("corrupt action JSONB for approval %s: %w", a.ApprovalID, err))
 		}
 	}
 	if len(a.Context) > 0 {
@@ -390,7 +391,7 @@ func toApprovalResponse(a db.Approval) approvalResponse {
 			resp.Context = ctx
 		} else {
 			log.Printf("WARNING: corrupt context JSONB for approval %s: %v", a.ApprovalID, err)
-			CaptureError(context.Background(), fmt.Errorf("corrupt context JSONB for approval %s: %w", a.ApprovalID, err))
+			sentry.CurrentHub().CaptureException(fmt.Errorf("corrupt context JSONB for approval %s: %w", a.ApprovalID, err))
 		}
 	}
 	if len(a.ResourceDetails) > 0 {

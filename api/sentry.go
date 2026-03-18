@@ -83,24 +83,29 @@ func CaptureConnectorError(ctx context.Context, err error, cc ConnectorContext) 
 
 // classifyConnectorError returns a short label for the error type, used as
 // the "error_type" Sentry tag for filtering and grouping.
+//
+// Case ordering matches handleConnectorError so both functions classify
+// the same error identically if a future error wraps multiple types.
 func classifyConnectorError(err error) string {
 	switch {
+	case connectors.IsPaymentError(err):
+		return "payment"
+	case connectors.IsValidationError(err):
+		return "validation"
+	case connectors.IsRateLimitError(err):
+		return "rate_limit"
 	case connectors.IsExternalError(err):
 		return "external"
+	case connectors.IsOAuthRefreshError(err):
+		return "oauth_refresh"
 	case connectors.IsAuthError(err):
 		return "auth"
 	case connectors.IsTimeoutError(err):
 		return "timeout"
-	case connectors.IsRateLimitError(err):
-		return "rate_limit"
-	case connectors.IsOAuthRefreshError(err):
-		return "oauth_refresh"
-	case connectors.IsValidationError(err):
-		return "validation"
-	case connectors.IsPaymentError(err):
-		return "payment"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "deadline_exceeded"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
 	default:
 		return "unknown"
 	}

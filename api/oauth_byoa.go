@@ -32,6 +32,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 )
@@ -133,7 +134,7 @@ func updateOAuthRegistry(deps *Deps, providerID, clientID, clientSecret string) 
 		Source:       oauth.SourceBYOA,
 	}); err != nil {
 		log.Printf("BYOA registry update for %q: %v", providerID, err)
-		CaptureError(context.Background(), err)
+		sentry.CurrentHub().CaptureException(err)
 	}
 }
 

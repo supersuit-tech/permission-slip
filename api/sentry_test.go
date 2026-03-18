@@ -226,6 +226,7 @@ func TestClassifyConnectorError(t *testing.T) {
 		{"validation", &connectors.ValidationError{Message: "bad param"}, "validation"},
 		{"payment", &connectors.PaymentError{Code: connectors.PaymentErrMissing}, "payment"},
 		{"deadline_exceeded", context.DeadlineExceeded, "deadline_exceeded"},
+		{"canceled", context.Canceled, "canceled"},
 		{"unknown", errors.New("something weird"), "unknown"},
 	}
 	for _, tc := range tests {

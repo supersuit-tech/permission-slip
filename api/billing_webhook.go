@@ -114,7 +114,6 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	}
 	if sub == nil {
 		log.Printf("[%s] StripeWebhook: no subscription found for customer %s", TraceID(r.Context()), customerID)
-		CaptureError(r.Context(), fmt.Errorf("no subscription found for stripe customer %s", customerID))
 		return nil // no matching user, don't retry
 	}
 
@@ -158,7 +157,6 @@ func lookupSubscriptionFromInvoice(r *http.Request, deps *Deps, event *pstripe.W
 	}
 	if sub == nil {
 		log.Printf("[%s] StripeWebhook: %s (event %s): no subscription found for %s", TraceID(r.Context()), event.Type, event.ID, stripeSubID)
-		CaptureError(r.Context(), fmt.Errorf("no subscription found for stripe subscription %s", stripeSubID))
 		return nil, nil
 	}
 	return sub, nil
@@ -218,7 +216,6 @@ func lookupByStripeSubscription(r *http.Request, deps *Deps, event *pstripe.Webh
 	}
 	if sub == nil {
 		log.Printf("[%s] StripeWebhook: no subscription found for %s (event %s)", TraceID(r.Context()), stripeSub.ID, event.ID)
-		CaptureError(r.Context(), fmt.Errorf("no subscription found for stripe subscription %s", stripeSub.ID))
 		return nil, nil, nil // unknown subscription, don't retry
 	}
 	return sub, stripeSub, nil
