@@ -1,6 +1,6 @@
 {
   "name": "@permission-slip/cli",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Agent-facing CLI for Permission Slip — register, verify, and interact with Permission Slip servers",
   "license": "MIT",
   "type": "module",
