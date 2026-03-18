@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -75,6 +76,7 @@ func handleActivateUpgrade(deps *Deps) http.HandlerFunc {
 		// payment mode or wrong product) shouldn't grant plan access.
 		if sess.Subscription == nil {
 			log.Printf("[%s] ActivateUpgrade: session %s has no subscription", TraceID(r.Context()), req.SessionID)
+			CaptureError(r.Context(), fmt.Errorf("ActivateUpgrade: session %s has no subscription", req.SessionID))
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Checkout session has no subscription"))
 			return
 		}
@@ -82,6 +84,7 @@ func handleActivateUpgrade(deps *Deps) http.HandlerFunc {
 		// Verify the session belongs to this user's Stripe customer.
 		if sub == nil || sub.StripeCustomerID == nil || sess.Customer == nil || *sub.StripeCustomerID != sess.Customer.ID {
 			log.Printf("[%s] ActivateUpgrade: customer mismatch for session %s", TraceID(r.Context()), req.SessionID)
+			CaptureError(r.Context(), fmt.Errorf("ActivateUpgrade: customer mismatch for session %s", req.SessionID))
 			RespondError(w, r, http.StatusForbidden, Forbidden(ErrInvalidRequest, "Checkout session does not belong to this account"))
 			return
 		}

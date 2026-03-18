@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -131,6 +132,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, req.Action.Type)
 	if err != nil {
 		log.Printf("[%s] ExecuteActionStanding: find standing approvals: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to find standing approval"))
 		return
 	}
@@ -177,6 +179,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 			// Non-ConfigValidationError (e.g. corrupt constraint JSON) — fail fast.
 			log.Printf("[%s] ExecuteActionStanding: constraint validation for %s: %v",
 				TraceID(r.Context()), candidate.StandingApprovalID, err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError,
 				InternalError("Failed to validate parameters against constraints"))
 			return
@@ -200,6 +203,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 		// If this log fires, a code path was added that skips setting both sa
 		// and firstConstraintErr without returning early.
 		log.Printf("[%s] ExecuteActionStanding: BUG: sa nil but no constraint error recorded; %d approvals checked", TraceID(r.Context()), len(approvals))
+		CaptureError(r.Context(), fmt.Errorf("ExecuteActionStanding: BUG: sa nil but no constraint error recorded; %d approvals checked", len(approvals)))
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to validate parameters against constraints"))
 		return
 	}
@@ -226,6 +230,7 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 			}
 		}
 		log.Printf("[%s] ExecuteActionStanding: record execution: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to record execution"))
 		return
 	}
@@ -242,11 +247,12 @@ func handleStandingApprovalPath(w http.ResponseWriter, r *http.Request, deps *De
 	emitStandingApprovalAuditEvent(r.Context(), deps.DB, exec.UserID, exec.AgentID, sa.StandingApprovalID, exec.ActionType, exec.AgentMeta, execErr)
 
 	if execErr != nil {
-		if handleConnectorError(w, r, execErr) {
+		cc := ConnectorContext{ActionType: req.Action.Type, AgentID: agent.AgentID}
+		if handleConnectorError(w, r, execErr, cc) {
 			return
 		}
 		log.Printf("[%s] ExecuteActionStanding: connector execution: %v", TraceID(r.Context()), execErr)
-		CaptureError(r.Context(), execErr)
+		CaptureConnectorError(r.Context(), execErr, cc)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
 		return
 	}

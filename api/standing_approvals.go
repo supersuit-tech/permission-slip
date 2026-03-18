@@ -151,6 +151,7 @@ func handleListStandingApprovals(deps *Deps) http.HandlerFunc {
 		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ListStandingApprovals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list standing approvals"))
 			return
 		}
@@ -222,6 +223,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 		saID, err := generatePrefixedID("sa_", 16)
 		if err != nil {
 			log.Printf("[%s] CreateStandingApproval: generate ID: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
 			return
 		}
@@ -247,6 +249,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] CreateStandingApproval: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
 			return
 		}
@@ -256,6 +259,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 		if err := db.AcquireStandingApprovalLimitLock(r.Context(), tx, profile.ID); err != nil {
 			log.Printf("[%s] CreateStandingApproval: advisory lock: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
 			return
 		}
@@ -283,6 +287,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] CreateStandingApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
 			return
 		}
@@ -290,6 +295,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] CreateStandingApproval: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
 				return
 			}
@@ -315,6 +321,7 @@ func handleRevokeStandingApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] RevokeStandingApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to revoke standing approval"))
 			return
 		}
@@ -393,6 +400,7 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] ExecuteStandingApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute standing approval"))
 			return
 		}
@@ -406,10 +414,12 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 		emitStandingApprovalAuditEvent(r.Context(), deps.DB, profile.ID, exec.AgentID, saID, exec.ActionType, exec.AgentMeta, execErr)
 
 		if execErr != nil {
-			if handleConnectorError(w, r, execErr) {
+			cc := ConnectorContext{ActionType: exec.ActionType, AgentID: exec.AgentID}
+			if handleConnectorError(w, r, execErr, cc) {
 				return
 			}
 			log.Printf("[%s] ExecuteStandingApproval: connector execution: %v", TraceID(r.Context()), execErr)
+			CaptureConnectorError(r.Context(), execErr, cc)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
 			return
 		}
@@ -462,6 +472,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 		existing, err := db.GetStandingApprovalByIDAndUser(r.Context(), deps.DB, saID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] UpdateStandingApproval: fetch existing: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update standing approval"))
 			return
 		}
@@ -513,6 +524,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] UpdateStandingApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update standing approval"))
 			return
 		}

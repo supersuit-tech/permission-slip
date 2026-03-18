@@ -60,6 +60,7 @@ func RequireAgentSignature(deps *Deps) func(http.Handler) http.Handler {
 			agent, err := db.GetAgentByIDUnscoped(r.Context(), deps.DB, sig.AgentID)
 			if err != nil {
 				log.Printf("[%s] RequireAgentSignature: agent lookup: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify agent"))
 				return
 			}
@@ -72,6 +73,7 @@ func RequireAgentSignature(deps *Deps) func(http.Handler) http.Handler {
 			pubKey, err := ParseEd25519PublicKey(agent.PublicKey)
 			if err != nil {
 				log.Printf("[%s] RequireAgentSignature: parse stored public key: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify agent"))
 				return
 			}

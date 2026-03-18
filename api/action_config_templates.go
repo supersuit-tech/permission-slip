@@ -54,6 +54,7 @@ func handleListActionConfigTemplates(deps *Deps) http.HandlerFunc {
 		templates, err := db.ListTemplatesByConnector(r.Context(), deps.DB, connectorID)
 		if err != nil {
 			log.Printf("[%s] ListActionConfigTemplates: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list action configuration templates"))
 			return
 		}

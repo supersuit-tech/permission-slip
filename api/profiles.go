@@ -165,6 +165,7 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 
 		if err := db.UpdateProfileFields(r.Context(), deps.DB, profile.ID, email, phone, marketingOptIn); err != nil {
 			log.Printf("[%s] handleUpdateProfile: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update profile"))
 			return
 		}
@@ -173,6 +174,7 @@ func handleUpdateProfile(deps *Deps) http.HandlerFunc {
 		updated, err := db.GetProfileByUserID(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] handleUpdateProfile: re-fetch: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update profile"))
 			return
 		}
@@ -213,6 +215,7 @@ func handleDeleteAccount(deps *Deps) http.HandlerFunc {
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] handleDeleteAccount: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete account"))
 			return
 		}
@@ -228,6 +231,7 @@ func handleDeleteAccount(deps *Deps) http.HandlerFunc {
 
 		if err := db.DeleteAccount(r.Context(), tx, profile.ID, vaultDeleteFn); err != nil {
 			log.Printf("[%s] handleDeleteAccount: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete account"))
 			return
 		}
@@ -235,6 +239,7 @@ func handleDeleteAccount(deps *Deps) http.HandlerFunc {
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] handleDeleteAccount: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete account"))
 				return
 			}
@@ -245,6 +250,7 @@ func handleDeleteAccount(deps *Deps) http.HandlerFunc {
 		// longer access any application data.
 		if err := deleteSupabaseAuthUser(r.Context(), deps, profile.ID); err != nil {
 			log.Printf("[%s] handleDeleteAccount: supabase auth cleanup (non-fatal): %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 		}
 
 		RespondJSON(w, http.StatusOK, deleteAccountResponse{
@@ -270,6 +276,7 @@ func handleGetDataRetention(deps *Deps) http.HandlerFunc {
 		sp, err := db.GetSubscriptionWithPlan(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] handleGetDataRetention: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to load data retention policy"))
 			return
 		}

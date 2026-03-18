@@ -190,6 +190,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		approvalID, err := generatePrefixedID("appr_", 16)
 		if err != nil {
 			log.Printf("[%s] AgentRequestApproval: generate ID: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create approval"))
 			return
 		}
@@ -198,6 +199,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		approverProfile, err := db.GetProfileByUserID(r.Context(), deps.DB, agent.ApproverID)
 		if err != nil {
 			log.Printf("[%s] AgentRequestApproval: profile lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create approval"))
 			return
 		}
@@ -217,6 +219,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 						resolveCancel()
 						if resolveErr != nil {
 							log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
+							CaptureError(r.Context(), resolveErr)
 						} else if details != nil {
 							if encoded, encErr := json.Marshal(details); encErr == nil {
 								resourceDetails = encoded
@@ -243,6 +246,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] AgentRequestApproval: insert: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create approval"))
 			return
 		}
@@ -291,6 +295,7 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] AgentCancelApproval: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to cancel approval"))
 			return
 		}
@@ -333,6 +338,7 @@ func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
 		appr, err := db.GetApprovalByIDAndAgent(r.Context(), deps.DB, approvalID, agent.AgentID)
 		if err != nil {
 			log.Printf("[%s] AgentApprovalStatus: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get approval status"))
 			return
 		}

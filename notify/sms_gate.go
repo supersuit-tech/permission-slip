@@ -3,6 +3,8 @@ package notify
 import (
 	"context"
 	"log"
+
+	"github.com/getsentry/sentry-go"
 )
 
 // SMSGate determines whether a user's plan allows SMS notifications and
@@ -44,6 +46,7 @@ func (s *PlanGatedSender) Send(ctx context.Context, approval Approval, recipient
 	allowed, err := s.gate.CanSendSMS(ctx, recipient.UserID)
 	if err != nil {
 		log.Printf("notify/sms: plan check failed for user %s: %v — skipping SMS", recipient.UserID, err)
+		sentry.CaptureException(err)
 		return nil
 	}
 	if !allowed {
@@ -57,6 +60,7 @@ func (s *PlanGatedSender) Send(ctx context.Context, approval Approval, recipient
 
 	if err := s.gate.RecordSMSSent(ctx, recipient.UserID); err != nil {
 		log.Printf("notify/sms: failed to record usage for user %s: %v", recipient.UserID, err)
+		sentry.CaptureException(err)
 		// Don't fail the send — usage tracking is best-effort.
 	}
 	return nil

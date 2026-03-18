@@ -83,6 +83,11 @@ func (d *Dispatcher) enabledSenders(ctx context.Context, recipient Recipient) []
 			enabled, err := d.prefs.IsChannelEnabled(ctx, recipient.UserID, s.Name())
 			if err != nil {
 				log.Printf("notify: failed to check preference for channel %q user %s: %v", s.Name(), recipient.UserID, err)
+				if hub := sentry.GetHubFromContext(ctx); hub != nil {
+					hub.CaptureException(err)
+				} else {
+					sentry.CaptureException(err)
+				}
 				// On error, default to sending — better to over-notify than miss.
 			} else if !enabled {
 				log.Printf("notify: channel %q disabled for user %s, skipping", s.Name(), recipient.UserID)

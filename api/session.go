@@ -289,6 +289,7 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 			}
 			if deps.DB == nil {
 				log.Printf("[%s] RequireProfile: database not configured", TraceID(r.Context()))
+				CaptureError(r.Context(), fmt.Errorf("RequireProfile: database not configured"))
 				RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Database not available"))
 				return
 			}
@@ -309,14 +310,17 @@ func RequireProfile(deps *Deps) func(http.Handler) http.Handler {
 					old, findErr := db.FindProfileByAuthEmail(r.Context(), deps.DB, email)
 					if findErr != nil {
 						log.Printf("[%s] RequireProfile: email fallback lookup: %v", TraceID(r.Context()), findErr)
+						CaptureError(r.Context(), findErr)
 					}
 					if old != nil && old.ID != userID {
 						if rlErr := db.RelinkProfile(r.Context(), deps.DB, old.ID, userID); rlErr != nil {
 							log.Printf("[%s] RequireProfile: re-link profile %s→%s: %v", TraceID(r.Context()), old.ID, userID, rlErr)
+							CaptureError(r.Context(), rlErr)
 							// A concurrent request may have already completed the re-link.
 							// Re-fetch by the new user ID before falling through to 404.
 							if p, fetchErr := db.GetProfileByUserID(r.Context(), deps.DB, userID); fetchErr != nil {
 								log.Printf("[%s] RequireProfile: re-fetch after concurrent re-link: %v", TraceID(r.Context()), fetchErr)
+								CaptureError(r.Context(), fetchErr)
 							} else {
 								profile = p
 							}

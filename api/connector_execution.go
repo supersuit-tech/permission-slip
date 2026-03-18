@@ -117,6 +117,7 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 			// successful execution result.
 			log.Printf("[payment] failed to record transaction for %s (pm=%s amount=%d): %v",
 				actionType, resolvedPM.paymentMethodID, resolvedPM.amount, txErr)
+			CaptureError(ctx, txErr)
 		}
 	}
 
@@ -415,6 +416,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		// No refresh token — can't refresh. Mark as needs_reauth.
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
 			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
+			CaptureError(ctx, statusErr)
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
@@ -441,6 +443,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		log.Printf("oauth refresh failed for provider %q connection %s: %v", providerID, conn.ID, err)
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
 			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
+			CaptureError(ctx, statusErr)
 		}
 		return &connectors.OAuthRefreshError{
 			Provider: providerID,
@@ -474,6 +477,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 		},
 		func(what, vaultID string, delErr error) {
 			log.Printf("oauth refresh: failed to delete old %s %s from vault: %v", what, vaultID, delErr)
+			CaptureError(ctx, delErr)
 		},
 		func(ctx context.Context, accessVaultID string, refreshVaultID *string, expiry *time.Time) error {
 			return db.UpdateOAuthConnectionTokens(ctx, tx, conn.ID, conn.UserID, accessVaultID, refreshVaultID, expiry)

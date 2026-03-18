@@ -56,6 +56,7 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 			cred, err := db.GetCredentialByID(r.Context(), deps.DB, *req.CredentialID)
 			if err != nil {
 				log.Printf("[%s] AssignCredential: credential check: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify credential"))
 				return
 			}
@@ -73,6 +74,7 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 			conn, err := db.GetOAuthConnectionByID(r.Context(), deps.DB, *req.OAuthConnectionID)
 			if err != nil {
 				log.Printf("[%s] AssignCredential: oauth check: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify OAuth connection"))
 				return
 			}
@@ -90,6 +92,7 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 		bindingID, err := generatePrefixedID("acc_", 16)
 		if err != nil {
 			log.Printf("[%s] AssignCredential: generate ID: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to assign credential"))
 			return
 		}
@@ -104,6 +107,7 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 		})
 		if err != nil {
 			log.Printf("[%s] AssignCredential: upsert: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to assign credential"))
 			return
 		}
@@ -138,6 +142,7 @@ func handleRemoveAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 		deleted, err := db.DeleteAgentConnectorCredential(r.Context(), deps.DB, agentID, userID, connectorID)
 		if err != nil {
 			log.Printf("[%s] RemoveCredential: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to remove credential binding"))
 			return
 		}
@@ -171,6 +176,7 @@ func handleGetAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 		binding, err := db.GetAgentConnectorCredential(r.Context(), deps.DB, agentID, connectorID)
 		if err != nil {
 			log.Printf("[%s] GetCredentialBinding: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get credential binding"))
 			return
 		}

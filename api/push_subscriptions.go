@@ -96,6 +96,7 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 			subs, err := db.ListWebPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
 			if err != nil {
 				log.Printf("[%s] ListPushSubscriptions (web-push): %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
 				return
 			}
@@ -105,6 +106,7 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 			tokens, err := db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
 			if err != nil {
 				log.Printf("[%s] ListPushSubscriptions (mobile-push): %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
 				return
 			}
@@ -115,6 +117,7 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 			subs, err := db.ListWebPushSubscriptionsByUserID(r.Context(), deps.DB, profile.ID)
 			if err != nil {
 				log.Printf("[%s] ListPushSubscriptions: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
 				return
 			}
@@ -125,6 +128,7 @@ func handleListPushSubscriptions(deps *Deps) http.HandlerFunc {
 			tokens, err := db.ListExpoPushTokensByUserID(r.Context(), deps.DB, profile.ID)
 			if err != nil {
 				log.Printf("[%s] ListPushSubscriptions: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list push subscriptions"))
 				return
 			}
@@ -201,6 +205,7 @@ func handleCreateWebPush(w http.ResponseWriter, r *http.Request, deps *Deps, use
 	sub, err := db.UpsertPushSubscription(r.Context(), deps.DB, userID, req.Endpoint, req.P256dh, req.Auth)
 	if err != nil {
 		log.Printf("[%s] CreatePushSubscription: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create push subscription"))
 		return
 	}
@@ -226,6 +231,7 @@ func handleCreateExpo(w http.ResponseWriter, r *http.Request, deps *Deps, userID
 	tok, err := db.UpsertExpoPushToken(r.Context(), deps.DB, userID, req.ExpoToken)
 	if err != nil {
 		log.Printf("[%s] CreateExpoPushToken: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
 		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create push subscription"))
 		return
 	}
@@ -247,6 +253,7 @@ func handleDeletePushSubscription(deps *Deps) http.HandlerFunc {
 		deleted, err := db.DeletePushSubscription(r.Context(), deps.DB, profile.ID, subID)
 		if err != nil {
 			log.Printf("[%s] DeletePushSubscription: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete push subscription"))
 			return
 		}
@@ -283,6 +290,7 @@ func handleUnregisterExpoPushToken(deps *Deps) http.HandlerFunc {
 		deleted, err := db.DeleteExpoPushTokenForUser(r.Context(), deps.DB, profile.ID, req.ExpoToken)
 		if err != nil {
 			log.Printf("[%s] UnregisterExpoPushToken: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to unregister push token"))
 			return
 		}

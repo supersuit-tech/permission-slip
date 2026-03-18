@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/notify"
 )
@@ -150,6 +152,7 @@ func (s *Sender) Send(ctx context.Context, approval notify.Approval, recipient n
 		}
 		if err := s.sendBatch(ctx, messages[i:end], tokenStrings[i:end]); err != nil {
 			log.Printf("mobilepush: batch send failed: %v", err)
+			sentry.CaptureException(err)
 			lastErr = err
 		}
 	}
@@ -218,6 +221,7 @@ func (s *Sender) sendBatch(ctx context.Context, messages []expoMessage, tokens [
 			log.Printf("mobilepush: token ending %q is no longer registered, removing", truncateTokenForLog(tokens[i]))
 			if err := s.store.DeleteToken(ctx, tokens[i]); err != nil {
 				log.Printf("mobilepush: failed to delete invalid token: %v", err)
+				sentry.CaptureException(err)
 			}
 			continue
 		}
