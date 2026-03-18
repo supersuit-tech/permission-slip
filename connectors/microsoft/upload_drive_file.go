@@ -33,10 +33,7 @@ func (p *uploadDriveFileParams) validate() error {
 	if p.FilePath == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: file_path"}
 	}
-	if p.Content == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: content"}
-	}
-	if len(p.Content) > maxUploadContentSize {
+	if p.Content != "" && len(p.Content) > maxUploadContentSize {
 		return &connectors.ValidationError{
 			Message: "content exceeds maximum upload size of 4 MB",
 		}
