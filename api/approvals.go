@@ -260,6 +260,7 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 		}
 		resultJSON, _ = json.Marshal(map[string]string{"error": errMsg})
 		log.Printf("[%s] executeApprovalAction: connector error for approval %s: %v", TraceID(ctx), appr.ApprovalID, execErr)
+		CaptureConnectorError(ctx, execErr, ConnectorContext{ActionType: actionType, AgentID: appr.AgentID})
 	} else if result == nil {
 		// No connector registered for this action type — nothing was executed.
 		execStatus = "error"
