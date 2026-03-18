@@ -503,6 +503,26 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "microsoft.create_spreadsheet",
+				Name:        "Create Spreadsheet",
+				Description: "Create a new Excel spreadsheet in OneDrive",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["filename"],
+					"properties": {
+						"filename": {
+							"type": "string",
+							"description": "Name for the spreadsheet file (.xlsx extension added if missing)"
+						},
+						"folder_path": {
+							"type": "string",
+							"description": "OneDrive folder path (e.g. Documents/Finance). Defaults to root."
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "microsoft.excel_list_worksheets",
 				Name:        "List Excel Worksheets",
 				Description: "List all worksheets in an Excel workbook stored in OneDrive",
@@ -796,6 +816,13 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Description: "Agent can read from any Excel workbook the user has access to.",
 				Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
 			},
+			{
+				ID:          "tpl_microsoft_create_spreadsheet",
+				ActionType:  "microsoft.create_spreadsheet",
+				Name:        "Create spreadsheets",
+				Description: "Agent can create new Excel spreadsheets in OneDrive.",
+				Parameters:  json.RawMessage(`{"filename":"*","folder_path":"*"}`),
+			},
 		},
 	}
 }
@@ -822,6 +849,7 @@ func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 		"microsoft.create_presentation":   &createPresentationAction{conn: c},
 		"microsoft.list_presentations":    &listPresentationsAction{conn: c},
 		"microsoft.get_presentation":      &getPresentationAction{conn: c},
+		"microsoft.create_spreadsheet":    &createSpreadsheetAction{conn: c},
 		"microsoft.excel_list_worksheets": &excelListWorksheetsAction{conn: c},
 		"microsoft.excel_read_range":      &excelReadRangeAction{conn: c},
 		"microsoft.excel_write_range":     &excelWriteRangeAction{conn: c},
