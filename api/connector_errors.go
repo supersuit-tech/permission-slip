@@ -8,7 +8,8 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// handleConnectorError maps typed connector errors to HTTP responses.
+// handleConnectorError maps typed connector errors to HTTP responses and
+// captures server-side errors to Sentry with connector-specific context.
 // Returns true if the error was handled, false if the caller should handle it
 // as an untyped (500) error.
 //
@@ -16,7 +17,7 @@ import (
 // exactly what went wrong (e.g., "Slack channel not found", "GitHub API
 // validation error: ..."). Connectors are responsible for crafting
 // user-friendly, safe-to-expose messages.
-func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) bool {
+func handleConnectorError(w http.ResponseWriter, r *http.Request, err error, cc ConnectorContext) bool {
 	traceID := TraceID(r.Context())
 
 	switch {
@@ -61,6 +62,7 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 			}
 		}
 		log.Printf("[%s] connector rate limited: %v", traceID, err)
+		CaptureConnectorError(r.Context(), err, cc)
 		RespondError(w, r, http.StatusTooManyRequests, TooManyRequests(msg, retrySeconds))
 		return true
 
@@ -71,12 +73,13 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 			msg = ee.Message
 		}
 		log.Printf("[%s] connector external error: %v", traceID, err)
-		CaptureError(r.Context(), err)
+		CaptureConnectorError(r.Context(), err, cc)
 		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
 	case connectors.IsOAuthRefreshError(err):
 		log.Printf("[%s] OAuth refresh error: %v", traceID, err)
+		CaptureConnectorError(r.Context(), err, cc)
 		var oauthErr *connectors.OAuthRefreshError
 		msg := "OAuth authorization required — user must re-connect the provider in Settings"
 		details := map[string]any{
@@ -100,7 +103,7 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 			msg = ae.Message
 		}
 		log.Printf("[%s] connector auth error: %v", traceID, err)
-		CaptureError(r.Context(), err)
+		CaptureConnectorError(r.Context(), err, cc)
 		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 
@@ -111,7 +114,7 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error) boo
 			msg = te.Message
 		}
 		log.Printf("[%s] connector timeout: %v", traceID, err)
-		CaptureError(r.Context(), err)
+		CaptureConnectorError(r.Context(), err, cc)
 		RespondError(w, r, http.StatusGatewayTimeout, newErrorResponse(ErrUpstreamError, msg, true))
 		return true
 

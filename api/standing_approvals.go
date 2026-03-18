@@ -406,10 +406,12 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 		emitStandingApprovalAuditEvent(r.Context(), deps.DB, profile.ID, exec.AgentID, saID, exec.ActionType, exec.AgentMeta, execErr)
 
 		if execErr != nil {
-			if handleConnectorError(w, r, execErr) {
+			cc := ConnectorContext{ActionType: exec.ActionType, AgentID: exec.AgentID}
+			if handleConnectorError(w, r, execErr, cc) {
 				return
 			}
 			log.Printf("[%s] ExecuteStandingApproval: connector execution: %v", TraceID(r.Context()), execErr)
+			CaptureConnectorError(r.Context(), execErr, cc)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
 			return
 		}

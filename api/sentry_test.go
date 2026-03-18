@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 func TestSentryTraceIDMiddleware_TagsHubWithTraceID(t *testing.T) {
@@ -159,6 +160,82 @@ func TestCaptureError_WithTraceID(t *testing.T) {
 	event := events[0]
 	if event.Tags["trace_id"] != "trace_test123" {
 		t.Errorf("expected trace_id tag = trace_test123, got %q", event.Tags["trace_id"])
+	}
+}
+
+func TestCaptureConnectorError_EnrichesTags(t *testing.T) {
+	t.Parallel()
+
+	transport := &sentryTestTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://key@sentry.example.com/1",
+		Transport: transport,
+	})
+	if err != nil {
+		t.Fatalf("failed to create sentry client: %v", err)
+	}
+
+	scope := sentry.NewScope()
+	hub := sentry.NewHub(client, scope)
+	ctx := sentry.SetHubOnContext(context.Background(), hub)
+	ctx = context.WithValue(ctx, traceIDKey{}, "trace_conn_123")
+
+	CaptureConnectorError(ctx, &connectors.ExternalError{Message: "upstream 500"}, ConnectorContext{
+		ActionType: "github.create_issue",
+		AgentID:    42,
+	})
+
+	events := transport.getEvents()
+	if len(events) == 0 {
+		t.Fatal("expected at least one event to be captured")
+	}
+
+	event := events[0]
+	checks := map[string]string{
+		"trace_id":     "trace_conn_123",
+		"action_type":  "github.create_issue",
+		"connector_id": "github",
+		"agent_id":     "42",
+		"error_type":   "external",
+	}
+	for tag, want := range checks {
+		if got := event.Tags[tag]; got != want {
+			t.Errorf("tag %s = %q, want %q", tag, got, want)
+		}
+	}
+}
+
+func TestCaptureConnectorError_NoHubDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	CaptureConnectorError(context.Background(), errors.New("test"), ConnectorContext{ActionType: "test.action"})
+}
+
+func TestClassifyConnectorError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"external", &connectors.ExternalError{Message: "bad"}, "external"},
+		{"auth", &connectors.AuthError{Message: "denied"}, "auth"},
+		{"timeout", &connectors.TimeoutError{Message: "slow"}, "timeout"},
+		{"rate_limit", &connectors.RateLimitError{Message: "429"}, "rate_limit"},
+		{"oauth_refresh", &connectors.OAuthRefreshError{Provider: "google"}, "oauth_refresh"},
+		{"validation", &connectors.ValidationError{Message: "bad param"}, "validation"},
+		{"payment", &connectors.PaymentError{Code: connectors.PaymentErrMissing}, "payment"},
+		{"deadline_exceeded", context.DeadlineExceeded, "deadline_exceeded"},
+		{"unknown", errors.New("something weird"), "unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := classifyConnectorError(tc.err)
+			if got != tc.want {
+				t.Errorf("classifyConnectorError(%T) = %q, want %q", tc.err, got, tc.want)
+			}
+		})
 	}
 }
 

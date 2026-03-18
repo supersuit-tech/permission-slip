@@ -901,7 +901,7 @@ func TestHandleConnectorError_OAuthRefreshError_Returns401(t *testing.T) {
 		Message:  "token refresh failed — user must re-authorize",
 	}
 
-	handled := handleConnectorError(w, r, oauthErr)
+	handled := handleConnectorError(w, r,oauthErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle OAuthRefreshError")
 	}
@@ -937,7 +937,7 @@ func TestHandleConnectorError_OAuthRefreshError_Microsoft(t *testing.T) {
 		Message:  "refresh token expired",
 	}
 
-	handled := handleConnectorError(w, r, oauthErr)
+	handled := handleConnectorError(w, r,oauthErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle OAuthRefreshError")
 	}
@@ -964,7 +964,7 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_other"))
 
-	handled := handleConnectorError(w, r, context.DeadlineExceeded)
+	handled := handleConnectorError(w, r,context.DeadlineExceeded, ConnectorContext{ActionType: "test.action"})
 	if handled {
 		t.Error("expected handleConnectorError to NOT handle generic errors")
 	}
@@ -979,7 +979,7 @@ func TestHandleConnectorError_ExternalError_SurfacesMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_ext"))
 
 	extErr := &connectors.ExternalError{StatusCode: 404, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
-	handled := handleConnectorError(w, r, extErr)
+	handled := handleConnectorError(w, r,extErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle ExternalError")
 	}
@@ -1002,7 +1002,7 @@ func TestHandleConnectorError_AuthError_SurfacesMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_auth"))
 
 	authErr := &connectors.AuthError{Message: "GitHub API auth error (403): Resource not accessible by integration"}
-	handled := handleConnectorError(w, r, authErr)
+	handled := handleConnectorError(w, r,authErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle AuthError")
 	}
@@ -1025,7 +1025,7 @@ func TestHandleConnectorError_TimeoutError_SurfacesMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_timeout"))
 
 	timeoutErr := &connectors.TimeoutError{Message: "Slack API request timed out: context deadline exceeded"}
-	handled := handleConnectorError(w, r, timeoutErr)
+	handled := handleConnectorError(w, r,timeoutErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle TimeoutError")
 	}
@@ -1050,7 +1050,7 @@ func TestHandleConnectorError_RateLimitError_SurfacesMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_rl"))
 
 	rlErr := &connectors.RateLimitError{Message: "GitHub API rate limit exceeded — resets in 42 minutes", RetryAfter: 42 * time.Minute}
-	handled := handleConnectorError(w, r, rlErr)
+	handled := handleConnectorError(w, r,rlErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle RateLimitError")
 	}
@@ -1073,7 +1073,7 @@ func TestHandleConnectorError_ValidationError_SurfacesMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_val"))
 
 	valErr := &connectors.ValidationError{Message: "channel_id is required"}
-	handled := handleConnectorError(w, r, valErr)
+	handled := handleConnectorError(w, r,valErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle ValidationError")
 	}
@@ -1096,7 +1096,7 @@ func TestHandleConnectorError_OAuthRefreshError_SurfacesMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_oauth"))
 
 	oauthErr := &connectors.OAuthRefreshError{Provider: "google", Message: "Google OAuth token expired — user must re-authorize in Settings"}
-	handled := handleConnectorError(w, r, oauthErr)
+	handled := handleConnectorError(w, r,oauthErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle OAuthRefreshError")
 	}
@@ -1121,7 +1121,7 @@ func TestHandleConnectorError_RateLimitError_FallbackMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_rl_fallback"))
 
 	rlErr := &connectors.RateLimitError{RetryAfter: 30 * time.Second} // no Message
-	handled := handleConnectorError(w, r, rlErr)
+	handled := handleConnectorError(w, r,rlErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle RateLimitError")
 	}
@@ -1144,7 +1144,7 @@ func TestHandleConnectorError_ValidationError_FallbackMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_val_fallback"))
 
 	valErr := &connectors.ValidationError{} // no Message
-	handled := handleConnectorError(w, r, valErr)
+	handled := handleConnectorError(w, r,valErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle ValidationError")
 	}
@@ -1167,7 +1167,7 @@ func TestHandleConnectorError_OAuthRefreshError_FallbackMessage(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_oauth_fallback"))
 
 	oauthErr := &connectors.OAuthRefreshError{Provider: "google"} // no Message
-	handled := handleConnectorError(w, r, oauthErr)
+	handled := handleConnectorError(w, r,oauthErr, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle OAuthRefreshError")
 	}
@@ -1513,7 +1513,7 @@ func TestHandleConnectorError_PaymentError_Missing(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm1"))
 
 	pe := &connectors.PaymentError{Code: connectors.PaymentErrMissing, Message: "payment_method_id required"}
-	handled := handleConnectorError(w, r, pe)
+	handled := handleConnectorError(w, r,pe, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle PaymentError")
 	}
@@ -1529,7 +1529,7 @@ func TestHandleConnectorError_PaymentError_LimitExceeded(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm2"))
 
 	pe := &connectors.PaymentError{Code: connectors.PaymentErrPerTxLimit, Message: "exceeds limit"}
-	handled := handleConnectorError(w, r, pe)
+	handled := handleConnectorError(w, r,pe, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle PaymentError")
 	}
@@ -1545,7 +1545,7 @@ func TestHandleConnectorError_PaymentError_InvalidAmount(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm3"))
 
 	pe := &connectors.PaymentError{Code: connectors.PaymentErrInvalidAmount, Message: "amount_cents must be non-negative"}
-	handled := handleConnectorError(w, r, pe)
+	handled := handleConnectorError(w, r,pe, ConnectorContext{ActionType: "test.action"})
 	if !handled {
 		t.Fatal("expected handleConnectorError to handle PaymentError")
 	}
