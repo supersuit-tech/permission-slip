@@ -43,6 +43,14 @@ func (p *createSpreadsheetParams) defaults() {
 	}
 }
 
+// spreadsheetResult is the simplified response returned to the caller.
+type spreadsheetResult struct {
+	ItemID     string `json:"item_id"`
+	Name       string `json:"name"`
+	WebURL     string `json:"web_url"`
+	FolderPath string `json:"folder_path"`
+}
+
 // Execute creates a new .xlsx file in OneDrive.
 // It uses PUT /me/drive/root:/{path}/{filename}.xlsx:/content with the minimal
 // XLSX template bytes as the request body.
@@ -75,10 +83,10 @@ func (a *createSpreadsheetAction) Execute(ctx context.Context, req connectors.Ac
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
-		"item_id":     resp.ID,
-		"name":        resp.Name,
-		"web_url":     resp.WebURL,
-		"folder_path": folderDisplay,
+	return connectors.JSONResult(spreadsheetResult{
+		ItemID:     resp.ID,
+		Name:       resp.Name,
+		WebURL:     resp.WebURL,
+		FolderPath: folderDisplay,
 	})
 }

@@ -18,7 +18,12 @@ func TestCreateSpreadsheet_Success(t *testing.T) {
 			t.Errorf("expected PUT, got %s", r.Method)
 		}
 		if got := r.URL.Path; got != "/me/drive/root:/Budget 2026.xlsx:/content" {
-			t.Errorf("expected path /me/drive/root:/Budget 2026.xlsx:/content, got %s", got)
+			t.Errorf("expected decoded path /me/drive/root:/Budget 2026.xlsx:/content, got %s", got)
+		}
+		// Verify percent-encoding via RequestURI (RawPath is empty when
+		// the encoding round-trips cleanly, which is standard Go behavior).
+		if got := r.RequestURI; got != "/me/drive/root:/Budget%202026.xlsx:/content" {
+			t.Errorf("expected encoded request URI /me/drive/root:/Budget%%202026.xlsx:/content, got %s", got)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer test-access-token-123" {
 			t.Errorf("expected Bearer token, got %q", got)
@@ -57,21 +62,21 @@ func TestCreateSpreadsheet_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data map[string]string
+	var data spreadsheetResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if data["item_id"] != "item-abc-123" {
-		t.Errorf("expected item_id 'item-abc-123', got %q", data["item_id"])
+	if data.ItemID != "item-abc-123" {
+		t.Errorf("expected item_id 'item-abc-123', got %q", data.ItemID)
 	}
-	if data["name"] != "Budget 2026.xlsx" {
-		t.Errorf("expected name 'Budget 2026.xlsx', got %q", data["name"])
+	if data.Name != "Budget 2026.xlsx" {
+		t.Errorf("expected name 'Budget 2026.xlsx', got %q", data.Name)
 	}
-	if data["web_url"] != "https://onedrive.live.com/edit.aspx?id=item-abc-123" {
-		t.Errorf("expected web_url, got %q", data["web_url"])
+	if data.WebURL != "https://onedrive.live.com/edit.aspx?id=item-abc-123" {
+		t.Errorf("expected web_url, got %q", data.WebURL)
 	}
-	if data["folder_path"] != "/" {
-		t.Errorf("expected folder_path '/', got %q", data["folder_path"])
+	if data.FolderPath != "/" {
+		t.Errorf("expected folder_path '/', got %q", data.FolderPath)
 	}
 }
 
@@ -109,12 +114,12 @@ func TestCreateSpreadsheet_WithFolderPath(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var data map[string]string
+	var data spreadsheetResult
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	if data["folder_path"] != "/Documents/Finance" {
-		t.Errorf("expected folder_path '/Documents/Finance', got %q", data["folder_path"])
+	if data.FolderPath != "/Documents/Finance" {
+		t.Errorf("expected folder_path '/Documents/Finance', got %q", data.FolderPath)
 	}
 }
 

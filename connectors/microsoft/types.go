@@ -69,3 +69,18 @@ type graphFileFacet struct {
 type graphDriveItemsResponse struct {
 	Value []graphDriveItem `json:"value"`
 }
+
+// graphDriveItemResponse is the Microsoft Graph API response for a single DriveItem
+// returned by create/upload endpoints.
+type graphDriveItemResponse struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	WebURL         string `json:"webUrl"`
+	Size           int64  `json:"size"`
+	LastModifiedBy struct {
+		User struct {
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+	} `json:"lastModifiedBy"`
+	LastModified string `json:"lastModifiedDateTime"`
+}
