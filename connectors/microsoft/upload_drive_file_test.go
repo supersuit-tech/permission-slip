@@ -1,6 +1,7 @@
 package microsoft
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -141,11 +142,8 @@ func TestUploadDriveFile_EmptyContentXlsx(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		// Empty .xlsx uploads should use the minimal XLSX template,
 		// not 0 bytes, so the file is a valid workbook.
-		if len(body) == 0 {
-			t.Errorf("expected XLSX template body for empty .xlsx upload, got 0 bytes")
-		}
-		if len(body) != len(minimalXLSX) {
-			t.Errorf("expected body length %d (XLSX template), got %d", len(minimalXLSX), len(body))
+		if !bytes.Equal(body, minimalXLSX) {
+			t.Errorf("expected XLSX template body, got different bytes (len=%d)", len(body))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -185,8 +183,8 @@ func TestUploadDriveFile_EmptyContentXlsxUpperCase(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		if len(body) != len(minimalXLSX) {
-			t.Errorf("expected XLSX template for .XLSX extension, got %d bytes", len(body))
+		if !bytes.Equal(body, minimalXLSX) {
+			t.Errorf("expected XLSX template body, got different bytes (len=%d)", len(body))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -236,6 +234,43 @@ func TestUploadDriveFile_EmptyContentNonXlsx(t *testing.T) {
 	action := &uploadDriveFileAction{conn: conn}
 
 	params, _ := json.Marshal(map[string]string{"file_path": "Documents/notes.txt"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUploadDriveFile_NonEmptyContentXlsx(t *testing.T) {
+	t.Parallel()
+
+	wantBody := "PK\x03\x04real xlsx bytes"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if string(body) != wantBody {
+			t.Errorf("expected caller content, got %d bytes", len(body))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":   "existing-workbook-1",
+			"name": "data.xlsx",
+			"size": len(wantBody),
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		FilePath: "Documents/data.xlsx",
+		Content:  wantBody,
+	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "microsoft.upload_drive_file",
