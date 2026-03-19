@@ -109,59 +109,82 @@ func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.C
 // allowed. If the user's email is empty (profile not set), access is denied
 // for non-public channels as a safe default.
 func (c *SlackConnector) verifyChannelAccess(ctx context.Context, creds connectors.Credentials, channelID, userEmail string) error {
-	// Public channels (C-prefixed) are accessible to everyone in the workspace.
-	// We still verify for private channels that happen to start with C by
-	// checking membership, but the common case for C-channels is public.
-	// G-prefixed = private channel or group DM, D-prefixed = DM.
+	// Fast path: public C-channels are accessible to everyone without
+	// needing the user's identity.
 	if len(channelID) > 0 && channelID[0] == 'C' {
-		// For C-channels, check if it's actually private via conversations.info.
-		// Most C-channels are public, so skip the membership check for public ones.
 		isPrivate, err := c.isChannelPrivate(ctx, creds, channelID)
 		if err != nil {
-			// If we can't determine the channel type, deny access as a safe default.
 			return &connectors.ValidationError{
 				Message: fmt.Sprintf("unable to verify access to channel %s: %v", channelID, err),
 			}
 		}
 		if !isPrivate {
-			return nil // public channel — access allowed
+			return nil
 		}
 	}
 
-	// For private channels (G), DMs (D), and private C-channels: require
-	// email-based membership verification.
+	// Private channels, DMs, and group DMs require email-based identity
+	// verification. Resolve the user's Slack identity, then check membership.
 	chType := describeChannelType(channelID)
-	if userEmail == "" {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("this action accesses a %s (%s), but your Permission Slip profile has no email address — add an email that matches your Slack account to proceed", chType, channelID),
-		}
+	slackUserID, err := c.resolveSlackUserID(ctx, creds, userEmail, chType, channelID)
+	if err != nil {
+		return err
 	}
 
-	slackUserID, err := c.lookupSlackUserByEmail(ctx, creds, userEmail)
-	if err != nil {
+	allowed, memberErr := c.hasChannelAccess(ctx, creds, channelID, slackUserID)
+	if memberErr != nil {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify Slack identity for %s access: %v", chType, err),
+			Message: fmt.Sprintf("unable to verify membership in %s %s: %v", chType, channelID, memberErr),
 		}
 	}
-	if slackUserID == "" {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account to access this %s", userEmail, chType),
-		}
-	}
-
-	isMember, err := c.isUserInChannel(ctx, creds, channelID, slackUserID)
-	if err != nil {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify membership in %s %s: %v", chType, channelID, err),
-		}
-	}
-	if !isMember {
+	if !allowed {
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("access denied: your Slack account is not a member of %s %s", chType, channelID),
 		}
 	}
 
 	return nil
+}
+
+// resolveSlackUserID maps a Permission Slip email to a Slack user ID, returning
+// a user-friendly ValidationError if the email is missing or doesn't match.
+func (c *SlackConnector) resolveSlackUserID(ctx context.Context, creds connectors.Credentials, userEmail, chType, channelID string) (string, error) {
+	if userEmail == "" {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("this action accesses a %s (%s), but your Permission Slip profile has no email address — add an email that matches your Slack account to proceed", chType, channelID),
+		}
+	}
+
+	slackUserID, err := c.lookupSlackUserByEmail(ctx, creds, userEmail)
+	if err != nil {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("unable to verify Slack identity for %s access: %v", chType, err),
+		}
+	}
+	if slackUserID == "" {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account to access this %s", userEmail, chType),
+		}
+	}
+
+	return slackUserID, nil
+}
+
+// hasChannelAccess checks whether a Slack user has access to a channel.
+// Public C-channels return (true, nil). Private channels, DMs, and group DMs
+// check membership via conversations.members. Used by both verifyChannelAccess
+// (for single-channel guards) and search result filtering (for batch checks).
+func (c *SlackConnector) hasChannelAccess(ctx context.Context, creds connectors.Credentials, channelID, slackUserID string) (bool, error) {
+	if len(channelID) > 0 && channelID[0] == 'C' {
+		isPrivate, err := c.isChannelPrivate(ctx, creds, channelID)
+		if err != nil {
+			return false, fmt.Errorf("checking channel %s visibility: %w", channelID, err)
+		}
+		if !isPrivate {
+			return true, nil
+		}
+	}
+	return c.isUserInChannel(ctx, creds, channelID, slackUserID)
 }
 
 // isChannelPrivate checks whether a C-prefixed channel is private by calling

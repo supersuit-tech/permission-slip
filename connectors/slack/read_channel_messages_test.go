@@ -280,10 +280,8 @@ func TestReadChannelMessages_LimitOutOfRange(t *testing.T) {
 func TestReadChannelMessages_MissingScope(t *testing.T) {
 	t.Parallel()
 
-	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		callCount++
 		if r.URL.Path == "/conversations.info" {
 			// Return public channel so access check passes.
 			json.NewEncoder(w).Encode(map[string]any{

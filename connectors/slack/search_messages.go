@@ -164,27 +164,10 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		chID := m.Channel.ID
 		allowed, cached := membershipCache[chID]
 		if !cached {
-			// Public channels are accessible; private/DM channels need a check.
-			if len(chID) > 0 && chID[0] == 'C' {
-				isPrivate, privErr := a.conn.isChannelPrivate(ctx, req.Credentials, chID)
-				if privErr != nil {
-					return nil, fmt.Errorf("checking channel %s visibility: %w", chID, privErr)
-				}
-				if !isPrivate {
-					allowed = true
-				} else {
-					var memberErr error
-					allowed, memberErr = a.conn.isUserInChannel(ctx, req.Credentials, chID, slackUserID)
-					if memberErr != nil {
-						return nil, fmt.Errorf("checking membership for channel %s: %w", chID, memberErr)
-					}
-				}
-			} else {
-				var memberErr error
-				allowed, memberErr = a.conn.isUserInChannel(ctx, req.Credentials, chID, slackUserID)
-				if memberErr != nil {
-					return nil, fmt.Errorf("checking membership for channel %s: %w", chID, memberErr)
-				}
+			var accessErr error
+			allowed, accessErr = a.conn.hasChannelAccess(ctx, req.Credentials, chID, slackUserID)
+			if accessErr != nil {
+				return nil, fmt.Errorf("checking access to channel %s: %w", chID, accessErr)
 			}
 			membershipCache[chID] = allowed
 		}
