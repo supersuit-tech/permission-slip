@@ -92,16 +92,17 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	// When listing private channels, group DMs, or DMs, resolve the user's
-	// Slack identity so we can filter results to channels they belong to.
-	var slackUserID string
+	// Slack identity and pre-fetch their channel memberships so we can filter
+	// results efficiently. Uses users.conversations (one paginated call) instead
+	// of per-channel isUserInChannel to avoid N+1 API calls.
+	var userChannelIDs map[string]bool
 	if channelTypesIncludePrivate(types) {
 		if req.UserEmail == "" {
 			return nil, &connectors.ValidationError{
 				Message: "listing private channels, group DMs, or DMs requires your Permission Slip profile to have an email address matching your Slack account",
 			}
 		}
-		var err error
-		slackUserID, err = a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
+		slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
 		if err != nil {
 			return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
 		}
@@ -109,6 +110,10 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 			return nil, &connectors.ValidationError{
 				Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account", req.UserEmail),
 			}
+		}
+		userChannelIDs, err = a.conn.getUserChannelIDs(ctx, req.Credentials, slackUserID, types)
+		if err != nil {
+			return nil, fmt.Errorf("fetching user channel memberships: %w", err)
 		}
 	}
 
@@ -136,12 +141,9 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 	for _, ch := range resp.Channels {
 		// For private channel types, filter to only channels the user is a member of.
-		if slackUserID != "" && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
-			isMember, err := a.conn.isUserInChannel(ctx, req.Credentials, ch.ID, slackUserID)
-			if err != nil {
-				return nil, fmt.Errorf("checking membership for channel %s: %w", ch.ID, err)
-			}
-			if !isMember {
+		// Uses the pre-fetched userChannelIDs set for O(1) lookups instead of per-channel API calls.
+		if userChannelIDs != nil && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
+			if !userChannelIDs[ch.ID] {
 				continue
 			}
 		}

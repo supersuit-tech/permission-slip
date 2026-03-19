@@ -233,6 +233,61 @@ func describeChannelType(channelID string) string {
 	}
 }
 
+// usersConversationsRequest is the Slack API request for users.conversations.
+type usersConversationsRequest struct {
+	User  string `json:"user"`
+	Types string `json:"types,omitempty"`
+	Limit int    `json:"limit,omitempty"`
+	Cursor string `json:"cursor,omitempty"`
+}
+
+type usersConversationsResponse struct {
+	slackResponse
+	Channels []struct {
+		ID string `json:"id"`
+	} `json:"channels"`
+	Meta *paginationMeta `json:"response_metadata,omitempty"`
+}
+
+// maxUserConversationPages limits pagination when fetching a user's channel list.
+const maxUserConversationPages = 50
+
+// getUserChannelIDs returns the set of channel IDs that a Slack user belongs to,
+// filtered to the given channel types (e.g., "private_channel,mpim,im"). This is
+// more efficient than per-channel isUserInChannel calls when filtering a list of
+// channels, as it makes one paginated API call instead of N.
+func (c *SlackConnector) getUserChannelIDs(ctx context.Context, creds connectors.Credentials, slackUserID, types string) (map[string]bool, error) {
+	channelSet := make(map[string]bool)
+	cursor := ""
+	for page := 0; page < maxUserConversationPages; page++ {
+		body := usersConversationsRequest{
+			User:   slackUserID,
+			Types:  types,
+			Limit:  200,
+			Cursor: cursor,
+		}
+
+		var resp usersConversationsResponse
+		if err := c.doPost(ctx, "users.conversations", creds, body, &resp); err != nil {
+			return nil, err
+		}
+		if !resp.OK {
+			return nil, mapSlackError(resp.Error)
+		}
+
+		for _, ch := range resp.Channels {
+			channelSet[ch.ID] = true
+		}
+
+		if resp.Meta == nil || resp.Meta.NextCursor == "" {
+			break
+		}
+		cursor = resp.Meta.NextCursor
+	}
+
+	return channelSet, nil
+}
+
 // channelTypesIncludePrivate checks whether a comma-separated channel types
 // string includes private channel types (private_channel, mpim, im).
 func channelTypesIncludePrivate(types string) bool {
