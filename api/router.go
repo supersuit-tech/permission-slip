@@ -39,6 +39,8 @@ type Deps struct {
 	AllowedOrigins        []string             // allowed CORS origins; empty means cross-origin requests are blocked
 	Logger                *slog.Logger         // structured logger for request logging; if nil, request logging is skipped
 	ApprovalEvents        *ApprovalEventBroker // SSE broker for real-time approval notifications; nil disables SSE
+	SlackSigningSecret    string               // Slack signing secret for verifying Events API webhook signatures; empty disables Slack events
+	EventBroker           *connectors.EventBroker // connector event dispatch; nil means inbound events are accepted but not processed
 }
 
 // NewRouter returns an http.Handler that serves all /api/v1/ routes.
