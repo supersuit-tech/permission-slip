@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plug, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,12 @@ import type { ConnectorSummary } from "@/hooks/useConnectors";
 import { useEnableAgentConnector } from "@/hooks/useEnableAgentConnector";
 import type { AgentConnector } from "@/hooks/useAgentConnectors";
 import { SetupConnectorCredentialsDialog } from "./connectors/SetupConnectorCredentialsDialog";
+
+const STATUS_SECTIONS = [
+  { key: "tested", label: "Tested", description: "Production-ready connectors" },
+  { key: "early_preview", label: "Early Preview", description: "Functional but still being validated" },
+  { key: "untested", label: "Untested", description: "Not yet verified against live services" },
+] as const;
 
 interface AgentConnectorsSectionProps {
   agentId: number;
@@ -68,6 +74,19 @@ export function AgentConnectorsSection({
       const bEnabled = enabledIds.has(b.id) ? 0 : 1;
       return aEnabled - bEnabled;
     });
+
+  const groupedByStatus = useMemo(() => {
+    const groups: Record<string, ConnectorSummary[]> = {};
+    for (const section of STATUS_SECTIONS) {
+      groups[section.key] = [];
+    }
+    for (const connector of filtered) {
+      const status = connector.status ?? "untested";
+      const bucket = groups[status] ?? groups["untested"];
+      bucket?.push(connector);
+    }
+    return groups;
+  }, [filtered]);
 
   async function handleClick(connector: ConnectorSummary) {
     if (enabledIds.has(connector.id)) {
@@ -138,17 +157,31 @@ export function AgentConnectorsSection({
                 No connectors match &ldquo;{search.trim()}&rdquo;
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {filtered.map((connector) => (
-                  <ConnectorCard
-                    key={connector.id}
-                    connector={connector}
-                    isEnabled={enabledIds.has(connector.id)}
-                    isEnabling={enablingId === connector.id}
-                    disabled={enablingId !== null}
-                    onClick={handleClick}
-                  />
-                ))}
+              <div className="space-y-4">
+                {STATUS_SECTIONS.map((section) => {
+                  const connectors = groupedByStatus[section.key];
+                  if (!connectors || connectors.length === 0) return null;
+                  return (
+                    <div key={section.key}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <StatusBadge status={section.key} label={section.label} />
+                        <span className="text-muted-foreground text-xs">{section.description}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {connectors.map((connector) => (
+                          <ConnectorCard
+                            key={connector.id}
+                            connector={connector}
+                            isEnabled={enabledIds.has(connector.id)}
+                            isEnabling={enablingId === connector.id}
+                            disabled={enablingId !== null}
+                            onClick={handleClick}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -230,4 +263,14 @@ function ConnectorCard({
       </div>
     </button>
   );
+}
+
+function StatusBadge({ status, label }: { status: string; label: string }) {
+  const variant =
+    status === "tested"
+      ? "default"
+      : status === "early_preview"
+        ? "secondary"
+        : "outline";
+  return <Badge variant={variant}>{label}</Badge>;
 }
