@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -75,7 +76,16 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 	path := fmt.Sprintf("/me/drive/root:/%s:/content?@microsoft.graph.conflictBehavior=%s",
 		params.FilePath, params.ConflictBehavior)
 
-	content, err := a.conn.doPutRaw(ctx, path, req.Credentials, []byte(params.Content))
+	// When creating an .xlsx file with no content, use the minimal XLSX template
+	// so the file is a valid workbook. An empty file (0 bytes) with an .xlsx
+	// extension is not valid Office Open XML, and the Graph API will return
+	// 501/FileCorruptTryRepair when any Excel operation is attempted on it.
+	uploadContent := []byte(params.Content)
+	if params.Content == "" && strings.HasSuffix(strings.ToLower(params.FilePath), ".xlsx") {
+		uploadContent = minimalXLSX
+	}
+
+	content, err := a.conn.doPutRaw(ctx, path, req.Credentials, uploadContent)
 	if err != nil {
 		return nil, err
 	}
