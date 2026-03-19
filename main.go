@@ -289,6 +289,24 @@ func main() {
 
 	deps.Connectors = registry
 
+	// Initialize Slack event infrastructure.
+	// SLACK_SIGNING_SECRET is the signing secret from the Slack app's Basic
+	// Information page — used for HMAC-SHA256 verification of Events API webhooks.
+	deps.SlackSigningSecret = os.Getenv("SLACK_SIGNING_SECRET")
+	deps.EventBroker = connectors.NewEventBroker()
+	// Register the message.im event handler. Currently logs structured event
+	// data; extend to trigger workflows when DM automation is implemented.
+	deps.EventBroker.Subscribe("message.im", connectors.EventHandlerFunc(
+		func(ctx context.Context, event *connectors.Event) error {
+			return handleIMMessage(ctx, logger, event)
+		},
+	))
+	if deps.SlackSigningSecret != "" {
+		log.Println("Slack events: signing secret configured, Events API webhook enabled")
+	} else {
+		log.Println("Slack events: SLACK_SIGNING_SECRET not set, Events API webhook will reject requests")
+	}
+
 	// Initialize OAuth provider registry with built-in providers (Google, Microsoft)
 	// and merge in any providers declared by connector manifests.
 	oauthRegistry := poauth.NewRegistryWithBuiltIns()
@@ -355,6 +373,11 @@ func main() {
 	// and rate-limiting middleware. Stripe verifies requests via signature
 	// (Stripe-Signature header), not Bearer tokens.
 	api.RegisterBillingWebhookRoutes(mux, &deps)
+
+	// Slack Events API webhook endpoint lives outside /api/v1/ — it must
+	// bypass auth middleware. Slack authenticates via HMAC-SHA256 signature
+	// (X-Slack-Signature header).
+	api.RegisterSlackEventRoutes(mux, &deps)
 
 	// Invite endpoint lives outside /api/v1/ — it's a user-facing onboarding
 	// URL (e.g., https://app.permissionslip.dev/invite/PS-XXXX-XXXX), not a
