@@ -274,7 +274,7 @@ func main() {
 			break
 		}
 	}
-	deps.SMSEnabled = smsConfigured && os.Getenv("SMS_NOTIFICATIONS_HIDDEN") != "true"
+	deps.SMSEnabled = smsConfigured && !strings.EqualFold(os.Getenv("SMS_NOTIFICATIONS_HIDDEN"), "true")
 	if deps.DB != nil && len(senders) > 0 {
 		deps.Notifier = notify.NewDispatcher(senders, &notify.DBPreferenceChecker{DB: deps.DB})
 	} else if len(senders) > 0 {

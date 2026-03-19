@@ -324,9 +324,10 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	// SMS is excluded when SMSEnabled=false, so expect 3 channels (email, mobile-push, web-push).
-	if len(resp.Preferences) != 3 {
-		t.Fatalf("expected 3 preferences (SMS excluded), got %d", len(resp.Preferences))
+	// SMS is excluded when SMSEnabled=false.
+	expectedChannels := len(allChannels) - 1
+	if len(resp.Preferences) != expectedChannels {
+		t.Fatalf("expected %d preferences (SMS excluded), got %d", expectedChannels, len(resp.Preferences))
 	}
 
 	// Index preferences by channel for explicit assertions.
