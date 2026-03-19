@@ -164,9 +164,7 @@ func (c *SlackConnector) resolveSlackUserID(ctx context.Context, creds connector
 
 	slackUserID, err := c.lookupSlackUserByEmail(ctx, creds, userEmail)
 	if err != nil {
-		return "", &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify Slack identity for %s access: %v", chType, err),
-		}
+		return "", fmt.Errorf("unable to verify Slack identity for %s access: %w", chType, err)
 	}
 	if slackUserID == "" {
 		return "", &connectors.ValidationError{

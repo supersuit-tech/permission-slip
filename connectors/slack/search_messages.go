@@ -115,9 +115,7 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 
 	slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
 	if err != nil {
-		return nil, &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify Slack identity: %v", err),
-		}
+		return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
 	}
 	if slackUserID == "" {
 		return nil, &connectors.ValidationError{
