@@ -40,6 +40,15 @@ type Normalizer interface {
 	Normalize(params json.RawMessage) json.RawMessage
 }
 
+// RequestValidator is an optional interface for actions that can validate
+// parameters at approval request time. Called after ParameterAliaser and
+// Normalizer but before the approval is stored. Return a ValidationError
+// to reject the request immediately — the agent receives HTTP 400 with the
+// error message and can fix the parameters before the user ever sees it.
+type RequestValidator interface {
+	ValidateRequest(params json.RawMessage) error
+}
+
 // Connector represents an integration with an external service.
 // It owns shared configuration (HTTP clients, base URLs, auth helpers)
 // and registers the actions it supports.
