@@ -140,7 +140,10 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		// For private channel types, filter to only channels the user is a member of.
 		if slackUserID != "" && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
 			isMember, err := a.conn.isUserInChannel(ctx, req.Credentials, ch.ID, slackUserID)
-			if err != nil || !isMember {
+			if err != nil {
+				return nil, fmt.Errorf("checking membership for channel %s: %w", ch.ID, err)
+			}
+			if !isMember {
 				continue
 			}
 		}

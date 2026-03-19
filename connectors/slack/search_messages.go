@@ -168,14 +168,23 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 			if len(chID) > 0 && chID[0] == 'C' {
 				isPrivate, privErr := a.conn.isChannelPrivate(ctx, req.Credentials, chID)
 				if privErr != nil {
-					allowed = false
-				} else if !isPrivate {
+					return nil, fmt.Errorf("checking channel %s visibility: %w", chID, privErr)
+				}
+				if !isPrivate {
 					allowed = true
 				} else {
-					allowed, _ = a.conn.isUserInChannel(ctx, req.Credentials, chID, slackUserID)
+					var memberErr error
+					allowed, memberErr = a.conn.isUserInChannel(ctx, req.Credentials, chID, slackUserID)
+					if memberErr != nil {
+						return nil, fmt.Errorf("checking membership for channel %s: %w", chID, memberErr)
+					}
 				}
 			} else {
-				allowed, _ = a.conn.isUserInChannel(ctx, req.Credentials, chID, slackUserID)
+				var memberErr error
+				allowed, memberErr = a.conn.isUserInChannel(ctx, req.Credentials, chID, slackUserID)
+				if memberErr != nil {
+					return nil, fmt.Errorf("checking membership for channel %s: %w", chID, memberErr)
+				}
 			}
 			membershipCache[chID] = allowed
 		}
@@ -197,7 +206,7 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		Matches: filtered,
 		Total:   len(filtered),
 		Page:    resp.Messages.Paging.Page,
-		Pages:   resp.Messages.Paging.Pages,
+		Pages:   resp.Messages.Paging.Pages, // upper bound; actual pages may be fewer after membership filtering
 	}
 
 	return connectors.JSONResult(result)

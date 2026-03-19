@@ -12,11 +12,20 @@ import (
 func TestSearchMessages_PrefersUserToken(t *testing.T) {
 	t.Parallel()
 
-	// Track which token was used in the request.
+	// Track which token was used in the search request.
 	var receivedToken string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedToken = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/users.lookupByEmail" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U_TEST"},
+			})
+			return
+		}
+		if r.URL.Path == "/search.messages" {
+			receivedToken = r.Header.Get("Authorization")
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok": true,
 			"messages": map[string]any{
@@ -42,6 +51,7 @@ func TestSearchMessages_PrefersUserToken(t *testing.T) {
 		ActionType:  "slack.search_messages",
 		Parameters:  params,
 		Credentials: creds,
+		UserEmail:   "test@example.com",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -58,8 +68,17 @@ func TestSearchMessages_FallsBackToBotToken(t *testing.T) {
 
 	var receivedToken string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedToken = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/users.lookupByEmail" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U_TEST"},
+			})
+			return
+		}
+		if r.URL.Path == "/search.messages" {
+			receivedToken = r.Header.Get("Authorization")
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok": true,
 			"messages": map[string]any{
@@ -84,6 +103,7 @@ func TestSearchMessages_FallsBackToBotToken(t *testing.T) {
 		ActionType:  "slack.search_messages",
 		Parameters:  params,
 		Credentials: creds,
+		UserEmail:   "test@example.com",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

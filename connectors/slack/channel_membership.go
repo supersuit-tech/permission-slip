@@ -3,15 +3,11 @@ package slack
 import (
 	"context"
 	"fmt"
+	neturl "net/url"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
-
-// userLookupByEmailRequest is the Slack API request for users.lookupByEmail.
-type userLookupByEmailRequest struct {
-	Email string `json:"email"`
-}
 
 type userLookupByEmailResponse struct {
 	slackResponse
@@ -37,7 +33,7 @@ func (c *SlackConnector) lookupSlackUserByEmail(ctx context.Context, creds conne
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/users.lookupByEmail?email=%s", c.baseURL, email)
+	url := c.baseURL + "/users.lookupByEmail?" + neturl.Values{"email": {email}}.Encode()
 	var resp userLookupByEmailResponse
 	if err := c.doGetURL(ctx, url, token, &resp); err != nil {
 		return "", err
