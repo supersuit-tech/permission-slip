@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
@@ -900,5 +901,83 @@ func TestAgentApprovalStatus_OtherAgentAccess(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404 for other agent's approval, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ── RequestValidator early rejection ──────────────────────────────────────
+
+func TestAgentRequestApproval_RequestValidatorRejectsInvalidChannel(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	// Register the Slack connector so RequestValidator is exercised.
+	registry := connectors.NewRegistry()
+	registry.Register(slack.New())
+	deps := &Deps{
+		DB:                tx,
+		SupabaseJWTSecret: testJWTSecret,
+		Connectors:        registry,
+	}
+	router := NewRouter(deps)
+
+	// Agent sends a user ID (U prefix) instead of a channel ID (C/G/D prefix).
+	reqBody := `{"request_id":"req_bad_channel","action":{"type":"slack.read_channel_messages","parameters":{"channel":"U0AM0RW432Q"}},"context":{"description":"Read messages"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid channel ID, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if errResp.Error.Code != ErrInvalidRequest {
+		t.Errorf("expected error code %q, got %q", ErrInvalidRequest, errResp.Error.Code)
+	}
+
+	// Verify the error message mentions the channel ID issue.
+	if errResp.Error.Message == "" {
+		t.Error("expected error message to be non-empty")
+	}
+}
+
+func TestAgentRequestApproval_RequestValidatorAllowsValidChannel(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	registry := connectors.NewRegistry()
+	registry.Register(slack.New())
+	deps := &Deps{
+		DB:                tx,
+		SupabaseJWTSecret: testJWTSecret,
+		Connectors:        registry,
+	}
+	router := NewRouter(deps)
+
+	// Valid channel ID (C prefix) should be accepted.
+	reqBody := `{"request_id":"req_good_channel","action":{"type":"slack.read_channel_messages","parameters":{"channel":"C01234567"}},"context":{"description":"Read messages"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for valid channel ID, got %d: %s", w.Code, w.Body.String())
 	}
 }
