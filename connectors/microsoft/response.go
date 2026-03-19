@@ -17,6 +17,27 @@ type graphError struct {
 	} `json:"error"`
 }
 
+// serverSideGraphErrorCodes is the set of Microsoft Graph error codes that
+// indicate a server-side or infrastructure issue rather than a bad client
+// request. Even when Graph returns HTTP 400 for these, they represent
+// unexpected service conditions (file not yet ready, internal service errors,
+// transient locks) and should be reported to Sentry as ExternalErrors rather
+// than silently treated as client ValidationErrors.
+//
+// Reference: https://learn.microsoft.com/en-us/graph/errors
+var serverSideGraphErrorCodes = map[string]bool{
+	// File is not yet ready for editing (e.g. newly created workbook).
+	"fileCorruptTryRepair":   true,
+	"FileCorruptTryRepair":   true,
+	// Transient service unavailability / internal errors.
+	"serviceNotAvailable":    true,
+	"generalException":       true,
+	"notSupported":           true,
+	"resourceModified":       true,
+	"lockMismatch":           true,
+	"editModeRequired":       true,
+}
+
 // mapGraphError converts a Microsoft Graph API error response to the
 // appropriate connector error type with actionable messages.
 //
@@ -24,6 +45,7 @@ type graphError struct {
 //
 //	401 → AuthError (token expired/invalid — suggest reconnecting)
 //	403 → AuthError (insufficient scopes — suggest re-authorizing)
+//	400 + server-side error code → ExternalError (Graph service issue, not client error)
 //	400 → ValidationError (bad request — surface the Graph error message)
 //	404 → ExternalError (resource not found)
 //	other → ExternalError (generic Graph API failure)
@@ -50,6 +72,15 @@ func mapGraphError(statusCode int, body []byte) error {
 			Message:    fmt.Sprintf("Microsoft Graph resource not found (%s): %s", code, ge.Error.Message),
 		}
 	case http.StatusBadRequest:
+		// Some Graph error codes indicate server-side / transient issues even on
+		// HTTP 400. Map those to ExternalError so they are captured in Sentry
+		// rather than silently treated as client validation errors.
+		if serverSideGraphErrorCodes[code] {
+			return &connectors.ExternalError{
+				StatusCode: statusCode,
+				Message:    fmt.Sprintf("Microsoft Graph service error (%s): %s", code, ge.Error.Message),
+			}
+		}
 		return &connectors.ValidationError{
 			Message: fmt.Sprintf("Microsoft Graph rejected the request (%s): %s", code, ge.Error.Message),
 		}
