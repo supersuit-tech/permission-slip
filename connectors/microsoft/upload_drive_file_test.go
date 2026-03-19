@@ -252,7 +252,7 @@ func TestUploadDriveFile_NonEmptyContentXlsx(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		if string(body) != wantBody {
-			t.Errorf("expected caller content, got %d bytes", len(body))
+			t.Errorf("expected caller content %q, got %q", wantBody, string(body))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
