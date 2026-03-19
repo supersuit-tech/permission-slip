@@ -102,7 +102,11 @@ func TestRequestValidator_ChannelAndTSActions(t *testing.T) {
 
 	for _, actionType := range tsActions {
 		action := actions[actionType]
-		rv := action.(connectors.RequestValidator)
+		rv, ok := action.(connectors.RequestValidator)
+		if !ok {
+			t.Errorf("%s does not implement RequestValidator", actionType)
+			continue
+		}
 
 		for _, tt := range tests {
 			t.Run(actionType+"/"+tt.name, func(t *testing.T) {
@@ -111,6 +115,9 @@ func TestRequestValidator_ChannelAndTSActions(t *testing.T) {
 				err := rv.ValidateRequest(params)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if tt.wantErr && err != nil && !connectors.IsValidationError(err) {
+					t.Errorf("expected ValidationError, got %T", err)
 				}
 			})
 		}
@@ -144,6 +151,46 @@ func TestRequestValidator_SendDM(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			params, _ := json.Marshal(map[string]string{"user_id": tt.userID})
+			err := rv.ValidateRequest(params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T", err)
+			}
+		})
+	}
+}
+
+// TestRequestValidator_InviteUsers verifies that invite_to_channel validates the
+// comma-separated users field in addition to channel.
+func TestRequestValidator_InviteUsers(t *testing.T) {
+	t.Parallel()
+	c := New()
+	action := c.Actions()["slack.invite_to_channel"]
+
+	rv, ok := action.(connectors.RequestValidator)
+	if !ok {
+		t.Fatal("slack.invite_to_channel does not implement RequestValidator")
+	}
+
+	tests := []struct {
+		name    string
+		params  map[string]string
+		wantErr bool
+	}{
+		{name: "valid channel and users", params: map[string]string{"channel": "C01234567", "users": "U111,U222"}, wantErr: false},
+		{name: "valid W-prefix user", params: map[string]string{"channel": "C01234567", "users": "W01234567"}, wantErr: false},
+		{name: "username instead of ID", params: map[string]string{"channel": "C01234567", "users": "john.doe"}, wantErr: true},
+		{name: "mixed valid and invalid", params: map[string]string{"channel": "C01234567", "users": "U111,john.doe"}, wantErr: true},
+		{name: "email instead of ID", params: map[string]string{"channel": "C01234567", "users": "john@example.com"}, wantErr: true},
+		{name: "empty users is ok", params: map[string]string{"channel": "C01234567", "users": ""}, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(tt.params)
 			err := rv.ValidateRequest(params)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)

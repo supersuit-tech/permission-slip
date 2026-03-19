@@ -2,6 +2,7 @@ package slack
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -20,6 +21,12 @@ type channelParams struct {
 type channelAndTSParams struct {
 	Channel string `json:"channel"`
 	TS      string `json:"ts"`
+}
+
+// inviteParams extracts channel + users fields for invite_to_channel.
+type inviteParams struct {
+	Channel string `json:"channel"`
+	Users   string `json:"users"`
 }
 
 // userIDParams extracts the user_id field.
@@ -73,7 +80,27 @@ func (a *scheduleMessageAction) ValidateRequest(params json.RawMessage) error {
 }
 
 func (a *inviteToChannelAction) ValidateRequest(params json.RawMessage) error {
-	return validateChannelFromRaw(params)
+	var p inviteParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+	}
+	if p.Channel != "" {
+		if err := validateChannelID(p.Channel); err != nil {
+			return err
+		}
+	}
+	if p.Users != "" {
+		for _, uid := range strings.Split(p.Users, ",") {
+			uid = strings.TrimSpace(uid)
+			if uid == "" {
+				continue
+			}
+			if err := validateUserID(uid); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (a *setTopicAction) ValidateRequest(params json.RawMessage) error {
