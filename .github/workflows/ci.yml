@@ -111,6 +111,10 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           TITLE: ${{ github.workflow }}
         run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_DEFAULT_REGION" ]; then
+            echo "::warning::AWS credentials/region not configured, skipping SNS SMS"
+            exit 0
+          fi
           if [ -z "$SNS_PHONE_TO" ]; then
             echo "::warning::SNS_PHONE_TO secret is not set, skipping SMS"
             exit 0
