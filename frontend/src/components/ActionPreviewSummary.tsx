@@ -67,7 +67,7 @@ function val(t: string): SummaryPart {
 /** Inline highlight for parameter values within the summary. */
 function ValSpan({ children }: { children: ReactNode }) {
   return (
-    <span className="bg-muted text-foreground inline rounded px-1 py-0.5 font-medium box-decoration-clone">
+    <span className="bg-muted text-foreground inline rounded px-1 py-0.5 font-medium box-decoration-clone break-all">
       {children}
     </span>
   );
@@ -114,7 +114,7 @@ export function ActionPreviewSummary({
   const parts = buildParts(actionType, parameters, schema, actionName, displayTemplate, resourceDetails);
 
   return (
-    <p className="text-sm leading-loose" data-testid="action-preview-summary">
+    <p className="text-sm leading-loose break-words" data-testid="action-preview-summary">
       {renderRich(parts)}
     </p>
   );
