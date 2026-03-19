@@ -24,10 +24,7 @@ func (c *SlackConnector) lookupSlackUserByEmail(ctx context.Context, creds conne
 		return "", nil
 	}
 
-	// users.lookupByEmail is a GET-style endpoint that requires query params,
-	// but Slack also accepts POST with application/x-www-form-urlencoded or
-	// JSON body for most endpoints. However, this specific endpoint only
-	// supports token + email as query params. Use doGet.
+	// users.lookupByEmail requires query params (GET-style), not JSON body.
 	token, err := c.getToken(creds)
 	if err != nil {
 		return "", err
@@ -127,33 +124,34 @@ func (c *SlackConnector) verifyChannelAccess(ctx context.Context, creds connecto
 
 	// For private channels (G), DMs (D), and private C-channels: require
 	// email-based membership verification.
+	chType := describeChannelType(channelID)
 	if userEmail == "" {
 		return &connectors.ValidationError{
-			Message: "this action accesses a private channel or DM, but your Permission Slip profile has no email address — add an email that matches your Slack account to proceed",
+			Message: fmt.Sprintf("this action accesses a %s (%s), but your Permission Slip profile has no email address — add an email that matches your Slack account to proceed", chType, channelID),
 		}
 	}
 
 	slackUserID, err := c.lookupSlackUserByEmail(ctx, creds, userEmail)
 	if err != nil {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify Slack identity: %v", err),
+			Message: fmt.Sprintf("unable to verify Slack identity for %s access: %v", chType, err),
 		}
 	}
 	if slackUserID == "" {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account", userEmail),
+			Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account to access this %s", userEmail, chType),
 		}
 	}
 
 	isMember, err := c.isUserInChannel(ctx, creds, channelID, slackUserID)
 	if err != nil {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify channel membership: %v", err),
+			Message: fmt.Sprintf("unable to verify membership in %s %s: %v", chType, channelID, err),
 		}
 	}
 	if !isMember {
 		return &connectors.ValidationError{
-			Message: fmt.Sprintf("access denied: your Slack account is not a member of channel %s", channelID),
+			Message: fmt.Sprintf("access denied: your Slack account is not a member of %s %s", chType, channelID),
 		}
 	}
 
@@ -181,6 +179,24 @@ func (c *SlackConnector) isChannelPrivate(ctx context.Context, creds connectors.
 	}
 
 	return resp.Channel.IsPrivate, nil
+}
+
+// describeChannelType returns a human-readable description of a Slack channel
+// type based on its ID prefix (e.g., "DM", "group DM", "private channel").
+func describeChannelType(channelID string) string {
+	if len(channelID) == 0 {
+		return "channel"
+	}
+	switch channelID[0] {
+	case 'D':
+		return "DM"
+	case 'G':
+		return "group DM or private channel"
+	case 'C':
+		return "private channel"
+	default:
+		return "channel"
+	}
 }
 
 // channelTypesIncludePrivate checks whether a comma-separated channel types
