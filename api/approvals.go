@@ -362,11 +362,20 @@ func parseApprovalCursor(raw string) (*db.ApprovalCursor, error) {
 	return &db.ApprovalCursor{CreatedAt: t, ApprovalID: approvalID}, nil
 }
 
+// resolvedApprovalStatus returns "expired" for pending approvals past their
+// expiration time, otherwise returns the stored status.
+func resolvedApprovalStatus(a db.Approval) string {
+	if a.Status == "pending" && !a.ExpiresAt.IsZero() && a.ExpiresAt.Before(time.Now()) {
+		return "expired"
+	}
+	return a.Status
+}
+
 func toApprovalResponse(ctx context.Context, a db.Approval) approvalResponse {
 	resp := approvalResponse{
 		ApprovalID:  a.ApprovalID,
 		AgentID:     a.AgentID,
-		Status:      a.Status,
+		Status:      resolvedApprovalStatus(a),
 		ExpiresAt:   a.ExpiresAt,
 		ApprovedAt:  a.ApprovedAt,
 		DeniedAt:    a.DeniedAt,
@@ -409,7 +418,7 @@ func toApprovalDetailResponse(a db.Approval) approvalDetailResponse {
 	resp := approvalDetailResponse{
 		ApprovalID:      a.ApprovalID,
 		AgentID:         a.AgentID,
-		Status:          a.Status,
+		Status:          resolvedApprovalStatus(a),
 		ExecutionStatus: a.ExecutionStatus,
 		ExecutedAt:      a.ExecutedAt,
 		ExpiresAt:       a.ExpiresAt,

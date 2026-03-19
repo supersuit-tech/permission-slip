@@ -71,6 +71,7 @@ export function buildActionSummary(
   actionType: string,
   parameters: Record<string, unknown>,
   displayTemplate?: string | null,
+  resourceDetails?: Record<string, unknown> | null,
 ): string {
   // 1. Try display template from manifest.
   if (displayTemplate) {
@@ -81,7 +82,7 @@ export function buildActionSummary(
   // 2. Try action-specific formatter.
   const formatter = ACTION_FORMATTERS[actionType];
   if (formatter) {
-    const result = formatter(parameters);
+    const result = formatter(parameters, resourceDetails ?? undefined);
     if (result) return result;
   }
 
@@ -89,7 +90,7 @@ export function buildActionSummary(
   return buildGenericSummary(actionType, parameters);
 }
 
-type ActionFormatter = (params: Record<string, unknown>) => string | null;
+type ActionFormatter = (params: Record<string, unknown>, resourceDetails?: Record<string, unknown>) => string | null;
 
 /** Pattern matching {{param}} and {{param:directive}} placeholders. */
 const TEMPLATE_RE = /\{\{(\w+)(?::(\w+))?\}\}/g;
@@ -205,11 +206,20 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     return result;
   },
 
-  "slack.send_message": (params) => {
-    const channel = strVal(params.channel);
+  "slack.send_message": (params, rd) => {
+    const channel = strVal(rd?.channel_name) ?? strVal(params.channel);
     if (!channel) return null;
     const message = strVal(params.message);
     let result = `Send message to ${channel}`;
+    if (message) result += ` \u2014 ${truncate(message, 60)}`;
+    return result;
+  },
+
+  "slack.send_dm": (params, rd) => {
+    const user = strVal(rd?.user_name) ?? strVal(params.user_id);
+    if (!user) return null;
+    const message = strVal(params.message);
+    let result = `Send DM to ${user}`;
     if (message) result += ` \u2014 ${truncate(message, 60)}`;
     return result;
   },

@@ -7008,7 +7008,8 @@ components:
             - approved
             - denied
             - cancelled
-          description: Current approval status
+            - expired
+          description: Current approval status. Pending approvals past their expiration time are returned as "expired".
           example: pending
         expires_at:
           type: string
@@ -7160,7 +7161,8 @@ components:
             - approved
             - denied
             - cancelled
-          description: Current status of the approval request.
+            - expired
+          description: Current status of the approval request. Pending approvals past their expiration time are returned as "expired".
           example: approved
         approved_at:
           type: string

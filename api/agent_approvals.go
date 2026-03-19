@@ -349,7 +349,7 @@ func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
 
 		resp := agentApprovalStatusResponse{
 			ApprovalID: appr.ApprovalID,
-			Status:     appr.Status,
+			Status:     resolvedApprovalStatus(*appr),
 			ExpiresAt:  appr.ExpiresAt,
 			CreatedAt:  appr.CreatedAt,
 		}

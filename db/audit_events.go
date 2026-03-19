@@ -133,13 +133,21 @@ func InsertAuditEvent(ctx context.Context, db DBTX, p InsertAuditEventParams) er
 }
 
 // resolvedOutcomeExpr is a SQL CASE expression that resolves "pending" audit
-// event outcomes to "expired" when the associated agent's registration has
-// timed out. This avoids the need for a background cleanup job.
+// event outcomes to "expired" when the associated entity has timed out:
+//   - Agent registrations: checks agents.expires_at via the LEFT JOIN on agents.
+//   - Approval requests: checks approvals.expires_at via the LEFT JOIN on approvals.
+//
+// This avoids the need for a background cleanup job.
 const resolvedOutcomeExpr = `CASE
 		WHEN ae.outcome = 'pending'
 		 AND a.status = 'pending'
 		 AND a.expires_at IS NOT NULL
 		 AND a.expires_at <= now()
+		THEN 'expired'
+		WHEN ae.outcome = 'pending'
+		 AND ae.source_type = 'approval'
+		 AND appr.status = 'pending'
+		 AND appr.expires_at <= now()
 		THEN 'expired'
 		ELSE ae.outcome
 	END`
@@ -230,6 +238,7 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 		        %s AS outcome, ae.source_id, ae.source_type, ae.connector_id, ae.execution_status, ae.execution_error
 		 FROM audit_events ae
 		 LEFT JOIN agents a ON ae.agent_id = a.agent_id
+		 LEFT JOIN approvals appr ON ae.source_id = appr.approval_id AND ae.source_type = 'approval'
 		 WHERE %s
 		 ORDER BY ae.created_at DESC, ae.id DESC
 		 LIMIT %s`,
@@ -253,14 +262,22 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 
 // outcomeFilter returns a WHERE clause fragment that correctly handles the
 // "expired" and "pending" virtual outcomes. "expired" matches rows stored as
-// "pending" whose agent registration has timed out; "pending" matches stored
-// "pending" rows whose registration is still active.
+// "pending" whose agent registration or approval request has timed out;
+// "pending" matches stored "pending" rows that are still active.
 func outcomeFilter(outcome string, b *queryBuilder) string {
 	switch outcome {
 	case "expired":
-		return `(ae.outcome = 'pending' AND a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= now())`
+		// Agent registration expired OR approval request expired.
+		return `(ae.outcome = 'pending' AND (
+			(a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= now())
+			OR (ae.source_type = 'approval' AND appr.status = 'pending' AND appr.expires_at <= now())
+		))`
 	case "pending":
-		return `(ae.outcome = 'pending' AND NOT (a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= now()))`
+		// Still active: neither agent registration nor approval has expired.
+		return `(ae.outcome = 'pending'
+			AND NOT (a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= now())
+			AND NOT (ae.source_type = 'approval' AND appr.status = 'pending' AND appr.expires_at <= now())
+		)`
 	default:
 		return "ae.outcome = " + b.addArg(outcome)
 	}
@@ -351,6 +368,7 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 		        %s AS outcome, ae.source_id, ae.source_type, ae.connector_id, ae.execution_status, ae.execution_error
 		 FROM audit_events ae
 		 LEFT JOIN agents a ON ae.agent_id = a.agent_id
+		 LEFT JOIN approvals appr ON ae.source_id = appr.approval_id AND ae.source_type = 'approval'
 		 WHERE %s
 		 ORDER BY ae.created_at ASC, ae.id ASC
 		 LIMIT %s`,

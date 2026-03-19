@@ -132,6 +132,56 @@ describe("buildSummary", () => {
     });
   });
 
+  describe("slack.send_message with resourceDetails", () => {
+    it("uses channel_name from resourceDetails", () => {
+      const result = buildSummary(
+        "slack.send_message",
+        { channel: "C0AMRGKRTA4", message: "Hello!" },
+        null,
+        "Send Message",
+        undefined,
+        { channel_name: "#general" },
+      );
+      expect(result).toContain(q("#general"));
+      expect(result).not.toContain("C0AMRGKRTA4");
+    });
+
+    it("falls back to raw channel when no resourceDetails", () => {
+      const result = buildSummary(
+        "slack.send_message",
+        { channel: "C0AMRGKRTA4", message: "Hello!" },
+        null,
+        "Send Message",
+      );
+      expect(result).toContain(q("C0AMRGKRTA4"));
+    });
+  });
+
+  describe("slack.send_dm", () => {
+    it("uses user_name from resourceDetails", () => {
+      const result = buildSummary(
+        "slack.send_dm",
+        { user_id: "U12345678", message: "Hey!" },
+        null,
+        "Send DM",
+        undefined,
+        { user_name: "Johnny" },
+      );
+      expect(result).toContain(q("Johnny"));
+      expect(result).not.toContain("U12345678");
+    });
+
+    it("falls back to raw user_id when no resourceDetails", () => {
+      const result = buildSummary(
+        "slack.send_dm",
+        { user_id: "U12345678", message: "Hey!" },
+        null,
+        "Send DM",
+      );
+      expect(result).toContain(q("U12345678"));
+    });
+  });
+
   describe("slack.create_channel", () => {
     it("renders public channel", () => {
       expect(

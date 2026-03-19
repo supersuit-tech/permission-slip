@@ -77,7 +77,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const expired = checkExpired(approval.status, approval.expires_at);
   const canAct = isPending && !expired;
 
-  const summary = buildActionSummary(approval.action.type, parameters);
+  const summary = buildActionSummary(approval.action.type, parameters, undefined, approval.resource_details as Record<string, unknown> | undefined);
   const actionName = humanizeActionType(approval.action.type);
 
   // Derive display status for the hero header
