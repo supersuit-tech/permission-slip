@@ -38,7 +38,7 @@ function mockAllConnectors(connectors = [
     id: "github",
     name: "GitHub",
     description: "GitHub integration",
-    status: "tested" as const,
+    status: "early_preview" as const,
     actions: ["github.create_issue"],
     required_credentials: ["github"],
   },
@@ -153,7 +153,7 @@ describe("AgentConnectorsSection", () => {
     // Need 4+ connectors to show search
     mockAllConnectors([
       { id: "gmail", name: "Gmail", description: "Email", status: "untested" as const, actions: ["a"], required_credentials: [] },
-      { id: "github", name: "GitHub", description: "Code", status: "tested" as const, actions: ["b"], required_credentials: [] },
+      { id: "github", name: "GitHub", description: "Code", status: "early_preview" as const, actions: ["b"], required_credentials: [] },
       { id: "slack", name: "Slack", description: "Chat", status: "early_preview" as const, actions: ["c"], required_credentials: [] },
       { id: "stripe", name: "Stripe", description: "Payments", status: "untested" as const, actions: ["d"], required_credentials: [] },
     ]);
@@ -182,7 +182,7 @@ describe("AgentConnectorsSection", () => {
     const user = userEvent.setup();
     mockAllConnectors([
       { id: "gmail", name: "Gmail", description: "Email", status: "untested" as const, actions: ["a"], required_credentials: [] },
-      { id: "github", name: "GitHub", description: "Code", status: "tested" as const, actions: ["b"], required_credentials: [] },
+      { id: "github", name: "GitHub", description: "Code", status: "early_preview" as const, actions: ["b"], required_credentials: [] },
       { id: "slack", name: "Slack", description: "Chat", status: "early_preview" as const, actions: ["c"], required_credentials: [] },
       { id: "stripe", name: "Stripe", description: "Payments", status: "untested" as const, actions: ["d"], required_credentials: [] },
     ]);
