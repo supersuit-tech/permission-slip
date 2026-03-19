@@ -17,6 +17,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "google",
 		Name:        "Google",
 		Description: "Google integration for Gmail, Calendar, Slides, Sheets, Docs, Chat, Meet, and Drive",
+		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{

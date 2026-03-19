@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	defaultBaseURL        = "https://slack.com/api"
-	defaultTimeout        = 30 * time.Second
-	credKeyAccessToken    = "access_token"
-	credKeyBotToken       = "bot_token"
-	botTokenPrefix        = "xoxb-"
+	defaultBaseURL           = "https://slack.com/api"
+	defaultTimeout           = 30 * time.Second
+	credKeyAccessToken       = "access_token"
+	credKeyUserAccessToken   = "user_access_token"
+	credKeyBotToken          = "bot_token"
+	botTokenPrefix           = "xoxb-"
 
 	// defaultRetryAfter is used when the Slack API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -35,9 +36,12 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
-// OAuthScopes is the canonical list of OAuth scopes required by all Slack
-// connector actions. This is the single source of truth — referenced by both
-// the connector manifest and the built-in OAuth provider registration.
+// OAuthScopes is the canonical list of bot-level OAuth scopes required by
+// Slack connector actions. These are requested via the "scope" parameter in
+// the Slack OAuth v2 authorization URL and result in a bot token (xoxb-).
+//
+// Note: search:read.* scopes have been moved to OAuthUserScopes because
+// Slack's search.messages endpoint only supports user tokens (xoxp-).
 var OAuthScopes = []string{
 	"channels:history",
 	"channels:join",
@@ -52,6 +56,14 @@ var OAuthScopes = []string{
 	"reactions:write",
 	"users:read",
 	"im:write",
+}
+
+// OAuthUserScopes is the list of user-level OAuth scopes requested via the
+// "user_scope" parameter in the Slack OAuth v2 authorization URL. These
+// result in a user token (xoxp-) returned in the authed_user field of the
+// OAuth response. The search:read.* scopes are here because Slack's
+// search.messages endpoint requires a user token — bot tokens are not supported.
+var OAuthUserScopes = []string{
 	"search:read.public",
 	"search:read.private",
 	"search:read.im",

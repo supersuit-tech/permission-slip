@@ -7779,6 +7779,7 @@ components:
       required:
         - id
         - name
+        - status
         - actions
         - required_credentials
       properties:
@@ -7801,6 +7802,19 @@ components:
           description: |
             Brief description of what this connector does.
           example: GitHub integration for repository management
+        status:
+          type: string
+          enum:
+            - tested
+            - early_preview
+            - untested
+          description: |
+            Readiness status of this connector. Indicates how thoroughly the connector
+            has been tested and whether it's ready for production use.
+            - "tested": Fully tested and production-ready.
+            - "early_preview": Functional but still being validated — expect rough edges.
+            - "untested": Connector code exists but has not been verified against the live service.
+          example: tested
         logo_svg:
           type: string
           description: |
@@ -7839,6 +7853,7 @@ components:
         id: github
         name: GitHub
         description: GitHub integration for repository management
+        status: tested
         actions:
           - github.create_issue
           - github.close_issue
@@ -7856,6 +7871,7 @@ components:
       required:
         - id
         - name
+        - status
         - actions
         - required_credentials
       properties:
@@ -7878,6 +7894,15 @@ components:
           description: |
             Brief description of what this connector does.
           example: GitHub integration for repository management
+        status:
+          type: string
+          enum:
+            - tested
+            - early_preview
+            - untested
+          description: |
+            Readiness status of this connector.
+          example: tested
         logo_svg:
           type: string
           description: |

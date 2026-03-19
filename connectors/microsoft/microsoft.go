@@ -70,6 +70,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "microsoft",
 		Name:        "Microsoft",
 		Description: "Microsoft 365 integration for email, calendar, OneDrive, Teams, presentations, and Excel via Microsoft Graph API",
+		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
