@@ -605,6 +605,15 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Slack-specific: extract the user access token from the OAuth v2
+		// response. Slack returns both a bot token (access_token) and a user
+		// token (authed_user.access_token). The user token is needed for
+		// endpoints like search.messages that don't support bot tokens.
+		var userAccessToken string
+		if providerID == "slack" {
+			userAccessToken = extractSlackUserToken(token)
+		}
+
 		// Store tokens in vault within a transaction. Use scopes from the
 		// state token (set during authorize) so extra scopes are preserved.
 		storedScopes := state.Scopes
@@ -663,7 +672,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		connID, err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID)
+		connID, err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID, userAccessToken)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -687,7 +696,12 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 // replaceID, if non-empty, is the ID of an existing connection to replace.
 // When set, only that specific connection is deleted. When empty, a new
 // connection is created alongside any existing ones for the same provider.
-func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string) (string, error) {
+//
+// userAccessToken, if non-empty, is a user-level access token returned by
+// providers that issue both bot and user tokens (e.g. Slack OAuth v2). It
+// is stored in a separate vault secret and its vault ID is persisted in
+// extra_data as "user_access_token_vault_id" for resolution at execution time.
+func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string, userAccessToken string) (string, error) {
 	tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
 	if err != nil {
 		return "", fmt.Errorf("begin tx: %w", err)
@@ -699,12 +713,14 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 	// When replaceID is set, delete that specific connection (reconnect flow).
 	// When empty, create a new connection alongside any existing ones.
 	var existing *db.DeleteOAuthConnectionResult
+	var oldConn *db.OAuthConnection
 	if replaceID != "" {
 		// Validate that the connection being replaced belongs to the same
 		// provider. Without this check a crafted URL could delete a
 		// connection for a different provider (e.g. replace a Slack
 		// connection while authorizing Google).
-		oldConn, lookupErr := db.GetOAuthConnectionByID(ctx, tx, replaceID)
+		var lookupErr error
+		oldConn, lookupErr = db.GetOAuthConnectionByID(ctx, tx, replaceID)
 		if lookupErr != nil {
 			return "", fmt.Errorf("lookup connection to replace: %w", lookupErr)
 		}
@@ -746,6 +762,16 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		}
 	}
 
+	// Clean up old user access token vault secret from the replaced connection.
+	if oldConn != nil {
+		if oldUserVaultID := userTokenVaultIDFromExtraData(oldConn.ExtraData); oldUserVaultID != "" {
+			if err := deps.Vault.DeleteSecret(ctx, tx, oldUserVaultID); err != nil {
+				log.Printf("[%s] storeOAuthTokens: failed to delete old user access token vault secret %q: %v", TraceID(ctx), oldUserVaultID, err)
+				// Non-fatal: orphaned vault secrets are cleaned up eventually.
+			}
+		}
+	}
+
 	connID, err := generatePrefixedID("oconn_", 16)
 	if err != nil {
 		return "", fmt.Errorf("generate connection ID: %w", err)
@@ -774,6 +800,19 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 	var tokenExpiry *time.Time
 	if !token.Expiry.IsZero() {
 		tokenExpiry = &token.Expiry
+	}
+
+	// Store the user access token in vault if provided (e.g. Slack OAuth v2).
+	// The vault ID is persisted in extra_data and resolved at execution time.
+	if userAccessToken != "" {
+		userVaultID, vaultErr := deps.Vault.CreateSecret(ctx, tx, connID+"_user_access", []byte(userAccessToken))
+		if vaultErr != nil {
+			return "", fmt.Errorf("vault create user access token: %w", vaultErr)
+		}
+		if stateExtra == nil {
+			stateExtra = make(map[string]string)
+		}
+		stateExtra[userTokenVaultIDKey] = userVaultID
 	}
 
 	// Extract provider-specific extra data from the token response.
@@ -1108,6 +1147,13 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 				return
 			}
 		}
+		// Clean up user access token vault secret if present (e.g. Slack).
+		if userVaultID := userTokenVaultIDFromExtraData(conn.ExtraData); userVaultID != "" {
+			if err := deps.Vault.DeleteSecret(r.Context(), tx, userVaultID); err != nil {
+				log.Printf("[%s] DeleteOAuthConnection: vault delete user access token: %v", TraceID(r.Context()), err)
+				// Non-fatal: the connection row is already deleted. Log and continue.
+			}
+		}
 
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
@@ -1166,4 +1212,34 @@ func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, prov
 	}
 	parsedURL.RawQuery = q.Encode()
 	http.Redirect(w, r, parsedURL.String(), http.StatusTemporaryRedirect)
+}
+
+// userTokenVaultIDKey is the extra_data key used to store the vault secret ID
+// for a user-level access token (e.g., Slack's authed_user.access_token).
+const userTokenVaultIDKey = "user_access_token_vault_id"
+
+// extractSlackUserToken extracts the user access token from a Slack OAuth v2
+// token response. Slack returns both a bot token (the primary access_token)
+// and a user token nested under authed_user.access_token. Returns "" if the
+// user token is not present in the response.
+func extractSlackUserToken(token *oauth2.Token) string {
+	authedUser, ok := token.Extra("authed_user").(map[string]any)
+	if !ok {
+		return ""
+	}
+	userToken, _ := authedUser["access_token"].(string)
+	return userToken
+}
+
+// userTokenVaultIDFromExtraData extracts the user access token vault ID from
+// an OAuth connection's extra_data JSON. Returns "" if not present.
+func userTokenVaultIDFromExtraData(extraData json.RawMessage) string {
+	if len(extraData) == 0 {
+		return ""
+	}
+	var extra map[string]string
+	if err := json.Unmarshal(extraData, &extra); err != nil {
+		return ""
+	}
+	return extra[userTokenVaultIDKey]
 }
