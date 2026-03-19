@@ -605,13 +605,21 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Slack-specific: extract the user access token from the OAuth v2
-		// response. Slack returns both a bot token (access_token) and a user
-		// token (authed_user.access_token). The user token is needed for
-		// endpoints like search.messages that don't support bot tokens.
+		// Slack-specific: extract the user access token and team name from
+		// the OAuth v2 response. Slack returns both a bot token (access_token)
+		// and a user token (authed_user.access_token). The user token is needed
+		// for endpoints like search.messages that don't support bot tokens.
+		// The team name is stored so the credential display shows which
+		// workspace was connected.
 		var userAccessToken string
 		if providerID == "slack" {
 			userAccessToken = extractSlackUserToken(token)
+			if teamName := extractSlackTeamName(token); teamName != "" {
+				if stateExtraData == nil {
+					stateExtraData = make(map[string]string)
+				}
+				stateExtraData["team_name"] = teamName
+			}
 		}
 
 		// Store tokens in vault within a transaction. Use scopes from the
@@ -663,7 +671,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 
 		// Run best-effort email enrichers (fetches user email from provider
 		// userinfo endpoints). Failures are logged but don't block the flow.
-		if softExtra := runSoftEnrichers(ctx, providerID, token.AccessToken); softExtra != nil {
+		// For Slack, the OIDC userinfo endpoint requires the user token (not
+		// the bot token returned as the primary access_token).
+		enricherToken := token.AccessToken
+		if providerID == "slack" && userAccessToken != "" {
+			enricherToken = userAccessToken
+		}
+		if softExtra := runSoftEnrichers(ctx, providerID, enricherToken); softExtra != nil {
 			if stateExtraData == nil {
 				stateExtraData = make(map[string]string)
 			}
@@ -1028,8 +1042,9 @@ func instanceFromExtraData(extraData json.RawMessage) string {
 
 // displayNameFromExtraData extracts a human-readable display name from an
 // OAuth connection's extra_data JSON. Prefers "display_name" (e.g. GitHub
-// login or Microsoft displayName), falls back to "email". Returns "" if
-// neither is present.
+// login or Microsoft displayName), falls back to "email". When "team_name"
+// is present (Slack), appends " @ <workspace>" to help distinguish
+// connections to different workspaces. Returns "" if no identifier is found.
 func displayNameFromExtraData(extraData json.RawMessage) string {
 	if len(extraData) == 0 {
 		return ""
@@ -1038,10 +1053,19 @@ func displayNameFromExtraData(extraData json.RawMessage) string {
 	if err := json.Unmarshal(extraData, &extra); err != nil {
 		return ""
 	}
-	if dn := extra["display_name"]; dn != "" {
-		return dn
+
+	identifier := extra["display_name"]
+	if identifier == "" {
+		identifier = extra["email"]
 	}
-	return extra["email"]
+	if identifier == "" {
+		return ""
+	}
+
+	if teamName := extra["team_name"]; teamName != "" {
+		return identifier + " @ " + teamName
+	}
+	return identifier
 }
 
 // handleListOAuthConnections returns all OAuth connections for the authenticated user.
@@ -1229,6 +1253,17 @@ func extractSlackUserToken(token *oauth2.Token) string {
 	}
 	userToken, _ := authedUser["access_token"].(string)
 	return userToken
+}
+
+// extractSlackTeamName extracts the workspace name from a Slack OAuth v2
+// token response. The team object is always present in a successful response.
+func extractSlackTeamName(token *oauth2.Token) string {
+	team, ok := token.Extra("team").(map[string]any)
+	if !ok {
+		return ""
+	}
+	name, _ := team["name"].(string)
+	return name
 }
 
 // userTokenVaultIDFromExtraData extracts the user access token vault ID from
