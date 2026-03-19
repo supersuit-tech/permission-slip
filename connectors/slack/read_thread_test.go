@@ -13,6 +13,16 @@ func TestReadThread_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if r.URL.Path == "/conversations.info" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"channel": map[string]any{"id": "C01234567", "is_private": false},
+			})
+			return
+		}
+
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
@@ -34,7 +44,6 @@ func TestReadThread_Success(t *testing.T) {
 			t.Errorf("expected limit 50, got %d", body.Limit)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok": true,
 			"messages": []map[string]any{
@@ -178,8 +187,15 @@ func TestReadThread_MissingThreadTS(t *testing.T) {
 func TestReadThread_ThreadNotFound(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/conversations.info" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"channel": map[string]any{"id": "C01234567", "is_private": false},
+			})
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":    false,
 			"error": "thread_not_found",
