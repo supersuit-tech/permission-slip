@@ -108,7 +108,24 @@ func (a *setTopicAction) ValidateRequest(params json.RawMessage) error {
 }
 
 func (a *readThreadAction) ValidateRequest(params json.RawMessage) error {
-	return validateChannelFromRaw(params)
+	var p struct {
+		Channel  string `json:"channel"`
+		ThreadTS string `json:"thread_ts"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+	}
+	if p.Channel != "" {
+		if err := validateChannelID(p.Channel); err != nil {
+			return err
+		}
+	}
+	if p.ThreadTS != "" {
+		if err := validateMessageTS(p.ThreadTS); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *uploadFileAction) ValidateRequest(params json.RawMessage) error {

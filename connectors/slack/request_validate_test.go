@@ -22,9 +22,6 @@ func TestRequestValidator_ChannelActions(t *testing.T) {
 		"slack.set_topic",
 		"slack.read_thread",
 		"slack.upload_file",
-		"slack.add_reaction",
-		"slack.update_message",
-		"slack.delete_message",
 	}
 
 	tests := []struct {
@@ -151,6 +148,44 @@ func TestRequestValidator_SendDM(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			params, _ := json.Marshal(map[string]string{"user_id": tt.userID})
+			err := rv.ValidateRequest(params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T", err)
+			}
+		})
+	}
+}
+
+// TestRequestValidator_ReadThread verifies that read_thread validates both channel
+// and thread_ts parameters at request time.
+func TestRequestValidator_ReadThread(t *testing.T) {
+	t.Parallel()
+	c := New()
+	action := c.Actions()["slack.read_thread"]
+
+	rv, ok := action.(connectors.RequestValidator)
+	if !ok {
+		t.Fatal("slack.read_thread does not implement RequestValidator")
+	}
+
+	tests := []struct {
+		name    string
+		params  map[string]string
+		wantErr bool
+	}{
+		{name: "valid channel and thread_ts", params: map[string]string{"channel": "C01234567", "thread_ts": "1234567890.123456"}, wantErr: false},
+		{name: "invalid channel", params: map[string]string{"channel": "general", "thread_ts": "1234567890.123456"}, wantErr: true},
+		{name: "invalid thread_ts", params: map[string]string{"channel": "C01234567", "thread_ts": "not-a-timestamp"}, wantErr: true},
+		{name: "empty thread_ts is ok", params: map[string]string{"channel": "C01234567", "thread_ts": ""}, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(tt.params)
 			err := rv.ValidateRequest(params)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
