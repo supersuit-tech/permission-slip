@@ -89,6 +89,36 @@ describe("buildActionSummary", () => {
     expect(result).toContain("#general");
   });
 
+  it("uses channel_name from resourceDetails for slack.send_message", () => {
+    const result = buildActionSummary(
+      "slack.send_message",
+      { channel: "C0AMRGKRTA4", message: "Hello team" },
+      undefined,
+      { channel_name: "#general" },
+    );
+    expect(result).toContain("#general");
+    expect(result).not.toContain("C0AMRGKRTA4");
+  });
+
+  it("uses user_name from resourceDetails for slack.send_dm", () => {
+    const result = buildActionSummary(
+      "slack.send_dm",
+      { user_id: "U12345678", message: "Hey!" },
+      undefined,
+      { user_name: "Johnny" },
+    );
+    expect(result).toContain("Johnny");
+    expect(result).not.toContain("U12345678");
+  });
+
+  it("falls back to raw ID when resourceDetails missing", () => {
+    const result = buildActionSummary(
+      "slack.send_dm",
+      { user_id: "U12345678", message: "Hey!" },
+    );
+    expect(result).toContain("U12345678");
+  });
+
   it("falls back to generic summary for unknown types", () => {
     const result = buildActionSummary("custom.do_thing", {
       target: "prod",

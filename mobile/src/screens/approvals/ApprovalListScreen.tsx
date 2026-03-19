@@ -213,6 +213,8 @@ const ApprovalRow = memo(function ApprovalRow({
   const summary = buildActionSummary(
     approval.action.type,
     safeParams(approval.action.parameters),
+    undefined,
+    approval.resource_details as Record<string, unknown> | undefined,
   );
   const expired = checkExpired(approval.status, approval.expires_at);
 

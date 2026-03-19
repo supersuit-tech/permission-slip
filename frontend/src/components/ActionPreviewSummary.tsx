@@ -200,11 +200,20 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     return parts;
   },
 
-  "slack.send_message": (params) => {
-    const channel = strVal(params.channel);
+  "slack.send_message": (params, rd) => {
+    const channel = strVal(rd?.channel_name) ?? strVal(params.channel);
     if (!channel) return null;
     const message = strVal(params.message);
     const parts: SummaryPart[] = [text("Send message to "), val(channel)];
+    if (message) parts.push(text(` \u2014 ${truncate(message, 80)}`));
+    return parts;
+  },
+
+  "slack.send_dm": (params, rd) => {
+    const user = strVal(rd?.user_name) ?? strVal(params.user_id);
+    if (!user) return null;
+    const message = strVal(params.message);
+    const parts: SummaryPart[] = [text("Send DM to "), val(user)];
     if (message) parts.push(text(` \u2014 ${truncate(message, 80)}`));
     return parts;
   },
