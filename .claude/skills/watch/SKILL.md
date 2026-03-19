@@ -127,7 +127,48 @@ For each item in `work-items.json`, apply the appropriate action:
 
 #### Comments and Reviews
 
-For each comment or review in the `comments` array (including `review`, `review_comment`, and `issue_comment` types — normal PR comments often contain actionable feedback just like inline review comments):
+**Default: Parallel processing.** When the `comments` array contains multiple items, process them in parallel using the Agent tool. Each comment gets its own subagent running in an isolated worktree, so they can't conflict with each other during implementation. After all agents complete, cherry-pick their commits onto the current branch, resolve any conflicts, and run tests once.
+
+**Parallel processing flow (2+ comments):**
+
+1. **Group comments by file.** If multiple comments target the same file (same `path`), group them together — they must be handled by a single agent to avoid edit conflicts. Comments on different files (or general PR-level comments) can each get their own agent.
+2. **Spawn one Agent per group** using the Agent tool with `isolation: "worktree"`. Each agent receives:
+   - The comment(s) it's responsible for (body, path, line, diff_hunk, node_id)
+   - The PR number and GH command prefix for resolving threads and reacting
+   - Instructions to: read the code, implement the change, commit, react to the comment, reply in the thread, and resolve the conversation
+   - The action log format so it can return structured log entries
+3. **Launch all agents in a single message** (parallel tool calls) so they run concurrently.
+4. **After all agents complete**, collect their results:
+   - For each agent that made changes in a worktree, cherry-pick or merge its commits onto the current branch
+   - If cherry-picks conflict, resolve the conflicts (prefer the change that matches the reviewer's intent)
+   - Collect action log entries from each agent's output
+5. **Run tests once** after all changes are integrated (`make test-backend` for Go, `make test-frontend` for frontend, `make test` if unsure).
+6. **Append all action log entries** to the action log file.
+
+**Agent prompt template** — each parallel agent should receive a prompt like:
+
+```
+You are handling a PR review comment for PR #<PR_NUMBER> on supersuit-tech/permission-slip.
+
+Comment by @<AUTHOR>:
+> <BODY>
+
+File: <PATH> (line <LINE>)
+Diff context:
+<DIFF_HUNK>
+
+Instructions:
+1. Read the file and surrounding context to understand the code.
+2. Implement the requested change. Commit with a descriptive message.
+3. React to the comment and reply in the thread:
+   - React with +1: GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api repos/supersuit-tech/permission-slip/pulls/comments/<COMMENT_ID>/reactions -f content="+1"
+   - Reply: GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api repos/supersuit-tech/permission-slip/pulls/comments/<COMMENT_ID>/replies -f body="<your reply>"
+4. Resolve the review thread using the GraphQL API (thread node_id: <NODE_ID>).
+5. Return a JSON action log entry: {"type": "implemented", "author": "<AUTHOR>", "request": "<summary>", "commit": "<hash>"}
+   Or if you disagree: {"type": "declined", "author": "<AUTHOR>", "request": "<summary>", "reason": "<explanation>"}
+```
+
+**Single comment flow (1 comment) or fallback:** Process inline without spawning a subagent:
 
 1. **Read** the instruction in the comment body.
 2. **Identify** the file and line it's attached to (for inline review comments — use `path` and `line` fields). For PR reviews, the body applies to the PR as a whole — check `state` for context (`CHANGES_REQUESTED` signals required fixes). For issue comments (normal PR conversation), treat them as general feedback that may reference specific files or areas of the code.
