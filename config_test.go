@@ -70,6 +70,9 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
 		"SALESFORCE_CLIENT_ID":       "test-sf-id",
 		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
+		"AWS_REGION":                 "",
+		"AWS_ACCESS_KEY_ID":          "",
+		"AWS_SECRET_ACCESS_KEY":      "",
 	})
 
 	errs, warnings := validateConfig()
@@ -221,6 +224,9 @@ func TestValidateConfig_AllValid(t *testing.T) {
 		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
 		"SALESFORCE_CLIENT_ID":       "test-sf-id",
 		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
+		"AWS_REGION":                 "",
+		"AWS_ACCESS_KEY_ID":          "",
+		"AWS_SECRET_ACCESS_KEY":      "",
 	})
 
 	errs, warnings := validateConfig()
@@ -433,6 +439,9 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 		"MICROSOFT_CLIENT_SECRET":    "test-msft-secret",
 		"SALESFORCE_CLIENT_ID":       "test-sf-id",
 		"SALESFORCE_CLIENT_SECRET":   "test-sf-secret",
+		"AWS_REGION":                 "",
+		"AWS_ACCESS_KEY_ID":          "",
+		"AWS_SECRET_ACCESS_KEY":      "",
 	})
 
 	errs, warnings := validateConfig()
