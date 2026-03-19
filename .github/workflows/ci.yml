@@ -107,10 +107,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
           SNS_PHONE_TO: ${{ secrets.SNS_PHONE_TO }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRANCH: ${{ github.ref_name }}
+          TITLE: ${{ github.workflow }}
         run: |
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          BRANCH="${{ github.ref_name }}"
-          TITLE="${{ github.workflow }}"
+          if [ -z "$SNS_PHONE_TO" ]; then
+            echo "::warning::SNS_PHONE_TO secret is not set, skipping SMS"
+            exit 0
+          fi
           MESSAGE="permission-slip CI failed: ${TITLE} on ${BRANCH} — ${RUN_URL}"
 
           aws sns publish \
@@ -122,13 +126,14 @@ jobs:
         env:
           NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
           NOTIFY_WEBHOOK_SECRET: ${{ secrets.NOTIFY_WEBHOOK_SECRET }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           if [ -z "$NOTIFY_WEBHOOK_URL" ]; then
             echo "::warning::NOTIFY_WEBHOOK_URL secret is not set, skipping webhook"
             exit 0
           fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="permission-slip: CI failed on ${{ github.ref_name }} — investigate: ${RUN_URL}"
+          MESSAGE="permission-slip: CI failed on ${BRANCH} — investigate: ${RUN_URL}"
           PAYLOAD=$(jq -n --arg msg "$MESSAGE" --arg secret "$NOTIFY_WEBHOOK_SECRET" \
             '{message: $msg, secret: $secret}')
           curl -s -f -X POST "$NOTIFY_WEBHOOK_URL" \
