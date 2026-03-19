@@ -605,21 +605,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Slack-specific: extract the user access token and team name from
-		// the OAuth v2 response. Slack returns both a bot token (access_token)
-		// and a user token (authed_user.access_token). The user token is needed
-		// for endpoints like search.messages that don't support bot tokens.
-		// The team name is stored so the credential display shows which
-		// workspace was connected.
+		// Slack-specific: extract the user access token from the OAuth v2
+		// response. Slack returns both a bot token (access_token) and a user
+		// token (authed_user.access_token). The user token is needed for
+		// endpoints like search.messages that don't support bot tokens.
 		var userAccessToken string
 		if providerID == "slack" {
 			userAccessToken = extractSlackUserToken(token)
-			if teamName := extractSlackTeamName(token); teamName != "" {
-				if stateExtraData == nil {
-					stateExtraData = make(map[string]string)
-				}
-				stateExtraData["team_name"] = teamName
-			}
 		}
 
 		// Store tokens in vault within a transaction. Use scopes from the
@@ -645,6 +637,17 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 				stateExtraData = map[string]string{"shop_domain": state.Shop + ".myshopify.com"}
 			}
 			// Other per-instance providers: no extra_data needed beyond the token.
+		}
+
+		// Slack-specific: extract the workspace name from the token response
+		// so the credential display shows which workspace was connected.
+		if providerID == "slack" {
+			if teamName := extractSlackTeamName(token); teamName != "" {
+				if stateExtraData == nil {
+					stateExtraData = make(map[string]string)
+				}
+				stateExtraData["team_name"] = teamName
+			}
 		}
 
 		// Run the provider's post-exchange enricher (if any). Enrichers fetch
@@ -682,7 +685,9 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 				stateExtraData = make(map[string]string)
 			}
 			for k, v := range softExtra {
-				stateExtraData[k] = v
+				if _, exists := stateExtraData[k]; !exists {
+					stateExtraData[k] = v
+				}
 			}
 		}
 
