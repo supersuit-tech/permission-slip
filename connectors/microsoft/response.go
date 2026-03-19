@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -25,17 +26,19 @@ type graphError struct {
 // than silently treated as client ValidationErrors.
 //
 // Reference: https://learn.microsoft.com/en-us/graph/errors
+// All keys are lowercase; the lookup normalises the incoming code with
+// strings.ToLower so that variant capitalisations (e.g. "FileCorruptTryRepair"
+// observed in the wild) are handled without maintaining paired entries.
 var serverSideGraphErrorCodes = map[string]bool{
 	// File is not yet ready for editing (e.g. newly created workbook).
-	"fileCorruptTryRepair":   true,
-	"FileCorruptTryRepair":   true,
+	"filecorrupttryrepair": true,
 	// Transient service unavailability / internal errors.
-	"serviceNotAvailable":    true,
-	"generalException":       true,
-	"notSupported":           true,
-	"resourceModified":       true,
-	"lockMismatch":           true,
-	"editModeRequired":       true,
+	"servicenotavailable": true,
+	"generalexception":    true,
+	"notsupported":        true,
+	"resourcemodified":    true,
+	"lockmismatch":        true,
+	"editmoderequired":    true,
 }
 
 // mapGraphError converts a Microsoft Graph API error response to the
@@ -75,7 +78,7 @@ func mapGraphError(statusCode int, body []byte) error {
 		// Some Graph error codes indicate server-side / transient issues even on
 		// HTTP 400. Map those to ExternalError so they are captured in Sentry
 		// rather than silently treated as client validation errors.
-		if serverSideGraphErrorCodes[code] {
+		if serverSideGraphErrorCodes[strings.ToLower(code)] {
 			return &connectors.ExternalError{
 				StatusCode: statusCode,
 				Message:    fmt.Sprintf("Microsoft Graph service error (%s): %s", code, ge.Error.Message),

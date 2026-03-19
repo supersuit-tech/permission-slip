@@ -2,8 +2,8 @@ package microsoft
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -51,17 +51,30 @@ func TestMapGraphError_400_ClientError_ReturnsValidationError(t *testing.T) {
 	}
 }
 
-// TestMapGraphError_400_FileCorruptTryRepair ensures that Graph errors indicating
-// server-side or transient infrastructure issues are NOT silently treated as
-// client validation errors. They must be mapped to ExternalError so they are
-// captured in Sentry and visible to operators.
-func TestMapGraphError_400_FileCorruptTryRepair_ReturnsExternalError(t *testing.T) {
+// TestMapGraphError_400_ServerSideCodes ensures that all Graph error codes
+// indicating server-side or transient infrastructure issues are mapped to
+// ExternalError (not ValidationError) even when the HTTP status is 400.
+// Covers all codes in serverSideGraphErrorCodes, including variant
+// capitalisations observed in the wild.
+func TestMapGraphError_400_ServerSideCodes_ReturnExternalError(t *testing.T) {
 	t.Parallel()
-	// Both capitalizations observed in the wild.
-	for _, code := range []string{"fileCorruptTryRepair", "FileCorruptTryRepair"} {
+	codes := []string{
+		// Both capitalisations observed in the wild.
+		"fileCorruptTryRepair",
+		"FileCorruptTryRepair",
+		// Standard codes.
+		"serviceNotAvailable",
+		"generalException",
+		"notSupported",
+		"resourceModified",
+		"lockMismatch",
+		"editModeRequired",
+	}
+	for _, code := range codes {
+		code := code
 		t.Run(code, func(t *testing.T) {
 			t.Parallel()
-			err := mapGraphError(http.StatusBadRequest, graphErrorBody(code, "The file is corrupt. Please try to repair the file."))
+			err := mapGraphError(http.StatusBadRequest, graphErrorBody(code, "server-side error"))
 			if !connectors.IsExternalError(err) {
 				t.Errorf("expected ExternalError for %q, got %T: %v", code, err, err)
 			}
@@ -69,22 +82,6 @@ func TestMapGraphError_400_FileCorruptTryRepair_ReturnsExternalError(t *testing.
 				t.Errorf("must NOT be ValidationError for %q (would be swallowed by Sentry)", code)
 			}
 		})
-	}
-}
-
-func TestMapGraphError_400_ServiceNotAvailable_ReturnsExternalError(t *testing.T) {
-	t.Parallel()
-	err := mapGraphError(http.StatusBadRequest, graphErrorBody("serviceNotAvailable", "service is unavailable"))
-	if !connectors.IsExternalError(err) {
-		t.Errorf("expected ExternalError, got %T: %v", err, err)
-	}
-}
-
-func TestMapGraphError_400_GeneralException_ReturnsExternalError(t *testing.T) {
-	t.Parallel()
-	err := mapGraphError(http.StatusBadRequest, graphErrorBody("generalException", "unexpected error"))
-	if !connectors.IsExternalError(err) {
-		t.Errorf("expected ExternalError, got %T: %v", err, err)
 	}
 }
 
@@ -108,21 +105,9 @@ func TestMapGraphError_ErrorMessageContainsCode(t *testing.T) {
 	}
 	// The error message should surface the Graph error code so operators
 	// can identify the root cause without digging into raw logs.
-	expected := "fileCorruptTryRepair"
-	if !containsString(msg, expected) {
-		t.Errorf("expected error message to contain %q, got: %q", expected, msg)
+	if !strings.Contains(msg, "fileCorruptTryRepair") {
+		t.Errorf("expected error message to contain %q, got: %q", "fileCorruptTryRepair", msg)
 	}
-}
-
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && func() bool {
-		for i := 0; i+len(substr) <= len(s); i++ {
-			if s[i:i+len(substr)] == substr {
-				return true
-			}
-		}
-		return false
-	}())
 }
 
 func TestMapGraphError_MalformedBody_FallsBackToRawBody(t *testing.T) {
@@ -137,31 +122,22 @@ func TestMapGraphError_MalformedBody_FallsBackToRawBody(t *testing.T) {
 }
 
 // TestServerSideGraphErrorCodesCompleteness ensures the serverSideGraphErrorCodes
-// map is not accidentally empty (regression guard for future refactors).
+// map contains all expected entries (regression guard for future refactors).
+// Keys are stored lowercase; the lookup normalises via strings.ToLower.
 func TestServerSideGraphErrorCodesCompleteness(t *testing.T) {
 	t.Parallel()
 	required := []string{
-		"fileCorruptTryRepair",
-		"FileCorruptTryRepair",
-		"serviceNotAvailable",
-		"generalException",
+		"filecorrupttryrepair",
+		"servicenotavailable",
+		"generalexception",
+		"notsupported",
+		"resourcemodified",
+		"lockmismatch",
+		"editmoderequired",
 	}
 	for _, code := range required {
 		if !serverSideGraphErrorCodes[code] {
 			t.Errorf("serverSideGraphErrorCodes is missing required entry %q", code)
 		}
-	}
-}
-
-// Ensure the error message includes the Graph error code for debuggability.
-func TestMapGraphError_400_FileCorruptTryRepair_MessageIncludesCode(t *testing.T) {
-	t.Parallel()
-	err := mapGraphError(http.StatusBadRequest, graphErrorBody("fileCorruptTryRepair", "workbook locked"))
-	if err == nil {
-		t.Fatal("expected non-nil error")
-	}
-	msg := fmt.Sprintf("%v", err)
-	if !containsString(msg, "fileCorruptTryRepair") {
-		t.Errorf("error message should contain the Graph error code, got: %q", msg)
 	}
 }
