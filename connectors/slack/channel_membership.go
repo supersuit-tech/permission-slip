@@ -60,11 +60,17 @@ type conversationsMembersResponse struct {
 	Meta    *paginationMeta `json:"response_metadata,omitempty"`
 }
 
+// maxMembershipPages limits the number of pagination requests when checking
+// channel membership. At 200 members per page, this covers channels with up
+// to 10,000 members. Larger channels are denied access as a safety measure
+// rather than making unbounded API calls.
+const maxMembershipPages = 50
+
 // isUserInChannel checks whether the given Slack user ID is a member of the
-// specified channel. Paginates through the full member list if necessary.
+// specified channel. Paginates through the member list up to maxMembershipPages.
 func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.Credentials, channelID, slackUserID string) (bool, error) {
 	cursor := ""
-	for {
+	for page := 0; page < maxMembershipPages; page++ {
 		body := conversationsMembersRequest{
 			Channel: channelID,
 			Limit:   200,
