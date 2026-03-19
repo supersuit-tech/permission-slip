@@ -17,6 +17,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "slack",
 		Name:        "Slack",
 		Description: "Slack integration for team communication",
+		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{

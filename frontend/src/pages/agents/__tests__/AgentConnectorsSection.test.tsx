@@ -18,6 +18,7 @@ const mockEnabledConnectors = [
     id: "gmail",
     name: "Gmail",
     description: "Send and manage emails via Gmail API",
+    status: "untested" as const,
     actions: ["email.send", "email.read"],
     required_credentials: ["gmail"],
     enabled_at: "2026-02-18T10:00:00Z",
@@ -29,6 +30,7 @@ function mockAllConnectors(connectors = [
     id: "gmail",
     name: "Gmail",
     description: "Send and manage emails via Gmail API",
+    status: "untested" as const,
     actions: ["email.send", "email.read"],
     required_credentials: ["gmail"],
   },
@@ -36,6 +38,7 @@ function mockAllConnectors(connectors = [
     id: "github",
     name: "GitHub",
     description: "GitHub integration",
+    status: "tested" as const,
     actions: ["github.create_issue"],
     required_credentials: ["github"],
   },
@@ -43,6 +46,7 @@ function mockAllConnectors(connectors = [
     id: "slack",
     name: "Slack",
     description: "Slack messaging",
+    status: "early_preview" as const,
     actions: ["slack.send_message"],
     required_credentials: ["slack"],
   },
@@ -148,10 +152,10 @@ describe("AgentConnectorsSection", () => {
     const user = userEvent.setup();
     // Need 4+ connectors to show search
     mockAllConnectors([
-      { id: "gmail", name: "Gmail", description: "Email", actions: ["a"], required_credentials: [] },
-      { id: "github", name: "GitHub", description: "Code", actions: ["b"], required_credentials: [] },
-      { id: "slack", name: "Slack", description: "Chat", actions: ["c"], required_credentials: [] },
-      { id: "stripe", name: "Stripe", description: "Payments", actions: ["d"], required_credentials: [] },
+      { id: "gmail", name: "Gmail", description: "Email", status: "untested" as const, actions: ["a"], required_credentials: [] },
+      { id: "github", name: "GitHub", description: "Code", status: "tested" as const, actions: ["b"], required_credentials: [] },
+      { id: "slack", name: "Slack", description: "Chat", status: "early_preview" as const, actions: ["c"], required_credentials: [] },
+      { id: "stripe", name: "Stripe", description: "Payments", status: "untested" as const, actions: ["d"], required_credentials: [] },
     ]);
     renderWithProviders(
       <AgentConnectorsSection
@@ -177,10 +181,10 @@ describe("AgentConnectorsSection", () => {
   it("shows no-match message when search has no results", async () => {
     const user = userEvent.setup();
     mockAllConnectors([
-      { id: "gmail", name: "Gmail", description: "Email", actions: ["a"], required_credentials: [] },
-      { id: "github", name: "GitHub", description: "Code", actions: ["b"], required_credentials: [] },
-      { id: "slack", name: "Slack", description: "Chat", actions: ["c"], required_credentials: [] },
-      { id: "stripe", name: "Stripe", description: "Payments", actions: ["d"], required_credentials: [] },
+      { id: "gmail", name: "Gmail", description: "Email", status: "untested" as const, actions: ["a"], required_credentials: [] },
+      { id: "github", name: "GitHub", description: "Code", status: "tested" as const, actions: ["b"], required_credentials: [] },
+      { id: "slack", name: "Slack", description: "Chat", status: "early_preview" as const, actions: ["c"], required_credentials: [] },
+      { id: "stripe", name: "Stripe", description: "Payments", status: "untested" as const, actions: ["d"], required_credentials: [] },
     ]);
     renderWithProviders(
       <AgentConnectorsSection
