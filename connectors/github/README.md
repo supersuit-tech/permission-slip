@@ -1,6 +1,8 @@
 # GitHub Connector
 
-**Status:** 🟢 Tested · 🟡 Early access
+**Status:** 🟢 Tested · 🟡 Early Preview
+
+The manifest `status` is `early_preview` (same grouping as **Early Preview** in the app and `/v1/connectors`). **Tested** here means the connector is covered by automated tests; it is separate from the rollout label.
 
 The GitHub connector integrates Permission Slip with the [GitHub REST API](https://docs.github.com/en/rest). It uses plain `net/http` — no third-party GitHub SDK.
 
