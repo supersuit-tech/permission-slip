@@ -95,7 +95,11 @@ func (c *SlackConnector) VerifyAndParseEvent(payload []byte, headers http.Header
 			Text:      inner.Text,
 			Timestamp: inner.TS,
 		}
-		eventPayload, _ = json.Marshal(p)
+		var marshalErr error
+		eventPayload, marshalErr = json.Marshal(p)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("marshalling message.im payload: %w", marshalErr)
+		}
 	} else {
 		eventPayload = envelope.Event
 	}

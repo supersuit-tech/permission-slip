@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -30,14 +30,14 @@ func handleSlackEvent(deps *Deps) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.SlackSigningSecret == "" {
-			log.Printf("[%s] SlackEvents: signing secret not configured", TraceID(r.Context()))
+			logWarn(deps.Logger, r, "SlackEvents: signing secret not configured")
 			http.Error(w, "slack events not configured", http.StatusServiceUnavailable)
 			return
 		}
 
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxSlackEventBodyBytes))
 		if err != nil {
-			log.Printf("[%s] SlackEvents: error reading body: %v", TraceID(r.Context()), err)
+			logError(deps.Logger, r, "SlackEvents: error reading body", "error", err)
 			http.Error(w, "error reading body", http.StatusBadRequest)
 			return
 		}
@@ -49,21 +49,21 @@ func handleSlackEvent(deps *Deps) http.HandlerFunc {
 		}
 		conn, ok := deps.Connectors.Get("slack")
 		if !ok {
-			log.Printf("[%s] SlackEvents: slack connector not registered", TraceID(r.Context()))
+			logWarn(deps.Logger, r, "SlackEvents: slack connector not registered")
 			http.Error(w, "slack connector not available", http.StatusServiceUnavailable)
 			return
 		}
 
 		eventSource, ok := conn.(connectors.EventSource)
 		if !ok {
-			log.Printf("[%s] SlackEvents: slack connector does not implement EventSource", TraceID(r.Context()))
+			logWarn(deps.Logger, r, "SlackEvents: slack connector does not implement EventSource")
 			http.Error(w, "slack connector does not support events", http.StatusServiceUnavailable)
 			return
 		}
 
 		envelope, err := eventSource.VerifyAndParseEvent(body, r.Header, deps.SlackSigningSecret)
 		if err != nil {
-			log.Printf("[%s] SlackEvents: verification failed: %v", TraceID(r.Context()), err)
+			logWarn(deps.Logger, r, "SlackEvents: verification failed", "error", err)
 			http.Error(w, "verification failed", http.StatusUnauthorized)
 			return
 		}
@@ -81,12 +81,13 @@ func handleSlackEvent(deps *Deps) http.HandlerFunc {
 		}
 
 		event := envelope.Event
-		log.Printf("[%s] SlackEvents: received event %s type=%s team=%s",
-			TraceID(r.Context()), event.EventID, event.EventType, event.TeamID)
+		logInfo(deps.Logger, r, "SlackEvents: received event",
+			"event_id", event.EventID, "event_type", event.EventType, "team_id", event.TeamID)
 
-		// Deduplication: skip events we've already processed.
-		if dedup.isDuplicate(event.EventID) {
-			log.Printf("[%s] SlackEvents: event %s already processed, skipping", TraceID(r.Context()), event.EventID)
+		// Deduplication: skip events we've already successfully processed.
+		if dedup.isSeen(event.EventID) {
+			logInfo(deps.Logger, r, "SlackEvents: event already processed, skipping",
+				"event_id", event.EventID)
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -94,19 +95,50 @@ func handleSlackEvent(deps *Deps) http.HandlerFunc {
 		// Dispatch to registered event handlers.
 		if deps.EventBroker != nil {
 			if err := deps.EventBroker.Dispatch(r.Context(), event); err != nil {
-				log.Printf("[%s] SlackEvents: handler error for event %s: %v", TraceID(r.Context()), event.EventID, err)
+				logError(deps.Logger, r, "SlackEvents: handler error",
+					"event_id", event.EventID, "error", err)
 				CaptureError(r.Context(), err)
+				// Do NOT mark as seen — return 500 so Slack retries.
 				http.Error(w, "processing failed", http.StatusInternalServerError)
 				return
 			}
 		}
 
+		// Only mark as seen after successful dispatch, so Slack retries
+		// are processed if the handler failed on the first attempt.
+		dedup.markSeen(event.EventID)
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// logInfo logs at info level using deps.Logger if available.
+func logInfo(logger *slog.Logger, r *http.Request, msg string, args ...any) {
+	if logger != nil {
+		logger.InfoContext(r.Context(), msg, append([]any{"trace_id", TraceID(r.Context())}, args...)...)
+	}
+}
+
+// logWarn logs at warn level using deps.Logger if available.
+func logWarn(logger *slog.Logger, r *http.Request, msg string, args ...any) {
+	if logger != nil {
+		logger.WarnContext(r.Context(), msg, append([]any{"trace_id", TraceID(r.Context())}, args...)...)
+	}
+}
+
+// logError logs at error level using deps.Logger if available.
+func logError(logger *slog.Logger, r *http.Request, msg string, args ...any) {
+	if logger != nil {
+		logger.ErrorContext(r.Context(), msg, append([]any{"trace_id", TraceID(r.Context())}, args...)...)
 	}
 }
 
 // eventDeduplicator tracks recently processed event IDs to prevent
 // duplicate processing when Slack retries delivery.
+//
+// TODO: This is a per-process in-memory store. For multi-instance deployments,
+// replace with a shared store (Redis SET NX EX or DB INSERT ON CONFLICT) to
+// prevent duplicate processing across pods. For single-instance Phase 2
+// deployments, the in-memory approach is sufficient.
 type eventDeduplicator struct {
 	mu   sync.Mutex
 	seen map[string]time.Time
@@ -120,9 +152,9 @@ func newEventDeduplicator(ttl time.Duration) *eventDeduplicator {
 	}
 }
 
-// isDuplicate returns true if the event ID has been seen within the TTL window.
-// If not a duplicate, it records the event ID.
-func (d *eventDeduplicator) isDuplicate(eventID string) bool {
+// isSeen returns true if the event ID has been seen within the TTL window.
+// It does NOT record the event — call markSeen after successful processing.
+func (d *eventDeduplicator) isSeen(eventID string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -135,9 +167,14 @@ func (d *eventDeduplicator) isDuplicate(eventID string) bool {
 		}
 	}
 
-	if _, ok := d.seen[eventID]; ok {
-		return true
-	}
-	d.seen[eventID] = now
-	return false
+	_, ok := d.seen[eventID]
+	return ok
+}
+
+// markSeen records an event ID as successfully processed. Call this only
+// after dispatch succeeds, so failed events can be retried by Slack.
+func (d *eventDeduplicator) markSeen(eventID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.seen[eventID] = time.Now()
 }

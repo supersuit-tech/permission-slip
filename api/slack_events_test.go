@@ -6,9 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -40,6 +43,7 @@ func newSlackEventDeps() *Deps {
 		SlackSigningSecret: testSlackSecret,
 		Connectors:         registry,
 		EventBroker:        connectors.NewEventBroker(),
+		Logger:             slog.New(slog.NewTextHandler(os.Stderr, nil)),
 	}
 }
 
@@ -192,20 +196,82 @@ func TestSlackEvents_Deduplication(t *testing.T) {
 	}
 }
 
+func TestSlackEvents_RetryAfterHandlerFailure(t *testing.T) {
+	deps := newSlackEventDeps()
+	callCount := 0
+	deps.EventBroker.Subscribe("message.im", connectors.EventHandlerFunc(func(_ context.Context, _ *connectors.Event) error {
+		callCount++
+		if callCount == 1 {
+			return errors.New("transient failure")
+		}
+		return nil
+	}))
+
+	handler := handleSlackEvent(deps)
+
+	payload := `{
+		"type": "event_callback",
+		"team_id": "T01234",
+		"event": {
+			"type": "message",
+			"channel_type": "im",
+			"channel": "D01234",
+			"user": "U01234",
+			"text": "hello",
+			"ts": "1710000000.123456"
+		},
+		"event_id": "Ev_retry_test",
+		"event_time": 1710000000
+	}`
+
+	// First attempt: handler fails, should return 500.
+	ts, sig := slackSign(t, payload, testSlackSecret)
+	req := httptest.NewRequest("POST", "/api/webhooks/slack/events", strings.NewReader(payload))
+	req.Header.Set("X-Slack-Request-Timestamp", ts)
+	req.Header.Set("X-Slack-Signature", sig)
+
+	rr := httptest.NewRecorder()
+	handler(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("first attempt: expected 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Second attempt (Slack retry): handler succeeds, should return 200.
+	ts, sig = slackSign(t, payload, testSlackSecret)
+	req = httptest.NewRequest("POST", "/api/webhooks/slack/events", strings.NewReader(payload))
+	req.Header.Set("X-Slack-Request-Timestamp", ts)
+	req.Header.Set("X-Slack-Signature", sig)
+
+	rr = httptest.NewRecorder()
+	handler(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("retry attempt: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if callCount != 2 {
+		t.Errorf("expected handler to be called twice (fail + retry), got %d", callCount)
+	}
+}
+
 func TestEventDeduplicator_TTLExpiry(t *testing.T) {
 	dedup := newEventDeduplicator(10 * time.Millisecond)
 
-	if dedup.isDuplicate("ev1") {
-		t.Fatal("first occurrence should not be duplicate")
+	if dedup.isSeen("ev1") {
+		t.Fatal("unseen event should not be seen")
 	}
-	if !dedup.isDuplicate("ev1") {
-		t.Fatal("second occurrence should be duplicate")
+
+	dedup.markSeen("ev1")
+
+	if !dedup.isSeen("ev1") {
+		t.Fatal("marked event should be seen")
 	}
 
 	// Wait for TTL to expire.
 	time.Sleep(20 * time.Millisecond)
 
-	if dedup.isDuplicate("ev1") {
-		t.Fatal("after TTL expiry, should not be duplicate")
+	if dedup.isSeen("ev1") {
+		t.Fatal("after TTL expiry, should not be seen")
 	}
 }
