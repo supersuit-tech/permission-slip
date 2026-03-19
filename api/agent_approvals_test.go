@@ -108,6 +108,50 @@ func TestAgentRequestApproval_UnknownActionType(t *testing.T) {
 	if resp.Error.Message == "" {
 		t.Error("expected error message in response")
 	}
+	if resp.Error.Code != ErrUnsupportedActionType {
+		t.Errorf("expected error code %q, got %q", ErrUnsupportedActionType, resp.Error.Code)
+	}
+}
+
+func TestAgentRequestApproval_KnownActionType(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	// Set up a connector registry with "google" connector registered.
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector("google", "google.list_emails"))
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"req_known","action":{"type":"google.list_emails","parameters":{}},"context":{"description":"List emails"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for known action type, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.ApprovalID == "" {
+		t.Error("expected non-empty approval_id")
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected status 'pending', got %q", resp.Status)
+	}
 }
 
 func TestAgentRequestApproval_CustomExpiresIn(t *testing.T) {
