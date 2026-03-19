@@ -1,6 +1,7 @@
 package microsoft
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -82,7 +83,7 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 	// 501/FileCorruptTryRepair when any Excel operation is attempted on it.
 	uploadContent := []byte(params.Content)
 	if params.Content == "" && strings.HasSuffix(strings.ToLower(params.FilePath), ".xlsx") {
-		uploadContent = minimalXLSX
+		uploadContent = bytes.Clone(minimalXLSX)
 	}
 
 	content, err := a.conn.doPutRaw(ctx, path, req.Credentials, uploadContent)
