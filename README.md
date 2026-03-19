@@ -64,7 +64,7 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 | Connector | Status |
 |-----------|--------|
 | GitHub | 🟢 Tested |
-| Google | 🟢 Tested |
+| Google | 🟡 Early Preview |
 | Microsoft | 🟡 Early Preview |
 | Slack | 🟡 Early Preview |
 | Airtable | 🔴 Untested |
