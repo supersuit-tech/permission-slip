@@ -296,7 +296,11 @@ func main() {
 	deps.EventBroker = connectors.NewEventBroker()
 	// Register the message.im event handler. Currently logs structured event
 	// data; extend to trigger workflows when DM automation is implemented.
-	deps.EventBroker.Subscribe("message.im", connectors.EventHandlerFunc(handleIMMessage))
+	deps.EventBroker.Subscribe("message.im", connectors.EventHandlerFunc(
+		func(ctx context.Context, event *connectors.Event) error {
+			return handleIMMessage(ctx, logger, event)
+		},
+	))
 	if deps.SlackSigningSecret != "" {
 		log.Println("Slack events: signing secret configured, Events API webhook enabled")
 	} else {
