@@ -52,10 +52,13 @@ var OAuthScopes = []string{
 	"groups:history",
 	"groups:read",
 	"im:history",
+	"im:read",
+	"im:write",
 	"mpim:history",
+	"mpim:read",
 	"reactions:write",
 	"users:read",
-	"im:write",
+	"users:read.email",
 }
 
 // OAuthUserScopes is the list of user-level OAuth scopes requested via the

@@ -111,16 +111,16 @@ func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.C
 func (c *SlackConnector) verifyChannelAccess(ctx context.Context, creds connectors.Credentials, channelID, userEmail string) error {
 	// Fast path: public C-channels are accessible to everyone without
 	// needing the user's identity.
+	var knownPrivate bool
 	if len(channelID) > 0 && channelID[0] == 'C' {
 		isPrivate, err := c.isChannelPrivate(ctx, creds, channelID)
 		if err != nil {
-			return &connectors.ValidationError{
-				Message: fmt.Sprintf("unable to verify access to channel %s: %v", channelID, err),
-			}
+			return fmt.Errorf("unable to verify access to channel %s: %w", channelID, err)
 		}
 		if !isPrivate {
 			return nil
 		}
+		knownPrivate = true
 	}
 
 	// Private channels, DMs, and group DMs require email-based identity
@@ -131,11 +131,18 @@ func (c *SlackConnector) verifyChannelAccess(ctx context.Context, creds connecto
 		return err
 	}
 
-	allowed, memberErr := c.hasChannelAccess(ctx, creds, channelID, slackUserID)
+	// If we already determined the channel is private via isChannelPrivate,
+	// call isUserInChannel directly to avoid a redundant conversations.info call
+	// inside hasChannelAccess.
+	var allowed bool
+	var memberErr error
+	if knownPrivate {
+		allowed, memberErr = c.isUserInChannel(ctx, creds, channelID, slackUserID)
+	} else {
+		allowed, memberErr = c.hasChannelAccess(ctx, creds, channelID, slackUserID)
+	}
 	if memberErr != nil {
-		return &connectors.ValidationError{
-			Message: fmt.Sprintf("unable to verify membership in %s %s: %v", chType, channelID, memberErr),
-		}
+		return fmt.Errorf("unable to verify membership in %s %s: %w", chType, channelID, memberErr)
 	}
 	if !allowed {
 		return &connectors.ValidationError{
