@@ -35,10 +35,20 @@ func handleSlackEvent(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		body, err := io.ReadAll(io.LimitReader(r.Body, maxSlackEventBodyBytes))
+		// Read body with a limit slightly above maxSlackEventBodyBytes to
+		// detect oversized payloads. If the body exceeds the limit, return
+		// 413 instead of letting a truncated body fail signature verification
+		// with a confusing 401.
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxSlackEventBodyBytes+1))
 		if err != nil {
 			logError(deps.Logger, r, "SlackEvents: error reading body", "error", err)
 			http.Error(w, "error reading body", http.StatusBadRequest)
+			return
+		}
+		if len(body) > maxSlackEventBodyBytes {
+			logWarn(deps.Logger, r, "SlackEvents: request body too large",
+				"size", len(body), "max", maxSlackEventBodyBytes)
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 			return
 		}
 
@@ -71,7 +81,9 @@ func handleSlackEvent(deps *Deps) http.HandlerFunc {
 		// Handle URL verification challenge.
 		if envelope.Challenge != "" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"challenge": envelope.Challenge})
+			if err := json.NewEncoder(w).Encode(map[string]string{"challenge": envelope.Challenge}); err != nil {
+				logError(deps.Logger, r, "SlackEvents: failed to write challenge response", "error", err)
+			}
 			return
 		}
 
