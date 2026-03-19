@@ -9,15 +9,11 @@ import (
 // searchMessagesAction implements connectors.Action for slack.search_messages.
 // It searches messages across channels via POST /search.messages.
 //
-// IMPORTANT: This Slack endpoint requires a user token (xoxp-) with the
-// search:read.* scopes (search:read.public, search:read.private, etc.).
-// Bot tokens (xoxb-) do NOT support search.messages.
-// For this action to work, the OAuth flow must persist the authed_user
-// access_token (returned alongside the bot token in Slack's OAuth v2
-// response) into the connector's credentials. Until user-token credential
-// support is added, this action will return a missing_scope / not_allowed
-// error when invoked with a bot token. See the manifest description for
-// user-facing guidance.
+// This Slack endpoint requires a user token (xoxp-) with the search:read.*
+// scopes. Bot tokens (xoxb-) do NOT support search.messages. The action
+// automatically uses the user_access_token credential (populated by the Slack
+// OAuth v2 flow) when available, falling back to the default access_token
+// with a clear error if search fails due to missing permissions.
 type searchMessagesAction struct {
 	conn *SlackConnector
 }
@@ -99,7 +95,9 @@ type searchMatchSummary struct {
 	Permalink   string `json:"permalink,omitempty"`
 }
 
-// Execute searches messages across Slack channels.
+// Execute searches messages across Slack channels. It prefers the user access
+// token (xoxp-) over the bot token since Slack's search.messages endpoint
+// requires a user token.
 func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params searchMessagesParams
 	if err := parseAndValidate(req.Parameters, &params); err != nil {
@@ -119,8 +117,16 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		body.Page = 1
 	}
 
+	// Use the user access token for search (bot tokens don't support search.messages).
+	// If no user token is available, fall back to the default token — the Slack API
+	// will return a clear permission error.
+	creds := req.Credentials
+	if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
+		creds = connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
+	}
+
 	var resp searchMessagesResponse
-	if err := a.conn.doPost(ctx, "search.messages", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "search.messages", creds, body, &resp); err != nil {
 		return nil, err
 	}
 

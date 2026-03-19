@@ -399,7 +399,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Service:       "slack",
 				AuthType:      "oauth2",
 				OAuthProvider: "slack",
-				OAuthScopes:   OAuthScopes,
+				OAuthScopes:   append(OAuthScopes, OAuthUserScopes...),
 			},
 			{Service: "slack_bot", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
 		},
