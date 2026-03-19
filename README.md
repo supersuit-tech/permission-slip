@@ -65,8 +65,8 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 |-----------|--------|
 | GitHub | 🟢 Tested |
 | Google | 🟢 Tested |
-| Microsoft | 🟡 In Progress |
-| Slack | 🟡 In Progress |
+| Microsoft | 🟡 Partially Tested |
+| Slack | 🟡 Partially Tested |
 | Airtable | ❌ Untested |
 | Amadeus | ❌ Untested |
 | Asana | ❌ Untested |
