@@ -51,6 +51,11 @@ func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.
 		return nil, err
 	}
 
+	// Verify the Permission Slip user has access to this channel.
+	if err := a.conn.verifyChannelAccess(ctx, req.Credentials, params.Channel, req.UserEmail); err != nil {
+		return nil, err
+	}
+
 	body := readChannelMessagesRequest{
 		Channel: params.Channel,
 		Limit:   params.Limit,

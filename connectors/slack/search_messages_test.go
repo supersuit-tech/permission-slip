@@ -13,11 +13,31 @@ func TestSearchMessages_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U_SEARCHER"},
+			})
+			return
+		case "/conversations.info":
+			// Return public channel for the access filter.
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"channel": map[string]any{"id": "C001", "is_private": false},
+			})
+			return
+		case "/search.messages":
+			// Continue with existing logic.
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+			return
+		}
+
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
-		}
-		if r.URL.Path != "/search.messages" {
-			t.Errorf("expected path /search.messages, got %s", r.URL.Path)
 		}
 
 		var body searchMessagesRequest
@@ -31,7 +51,6 @@ func TestSearchMessages_Success(t *testing.T) {
 			t.Errorf("expected count 20, got %d", body.Count)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok": true,
 			"messages": map[string]any{
@@ -74,6 +93,7 @@ func TestSearchMessages_Success(t *testing.T) {
 		ActionType:  "slack.search_messages",
 		Parameters:  params,
 		Credentials: validCreds(),
+		UserEmail:   "searcher@example.com",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -151,8 +171,15 @@ func TestSearchMessages_CountOutOfRange(t *testing.T) {
 func TestSearchMessages_SlackAPIError(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/users.lookupByEmail" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U_TEST"},
+			})
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":    false,
 			"error": "missing_scope",
@@ -171,6 +198,7 @@ func TestSearchMessages_SlackAPIError(t *testing.T) {
 		ActionType:  "slack.search_messages",
 		Parameters:  params,
 		Credentials: validCreds(),
+		UserEmail:   "test@example.com",
 	})
 	if err == nil {
 		t.Fatal("expected error for missing_scope")

@@ -64,6 +64,7 @@ type ActionRequest struct {
 	Parameters  json.RawMessage // validated against schema before reaching here
 	Credentials Credentials     // decrypted at execution time; redacted in logs and JSON
 	Payment     *PaymentInfo    // non-nil when the action requires a payment method
+	UserEmail   string          // email of the Permission Slip user executing the action (may be empty)
 }
 
 // PaymentInfo contains the resolved payment method details passed to connectors
