@@ -89,7 +89,7 @@ func TestPlanGatedSender_PlanCheckError_SkipsSMS(t *testing.T) {
 
 func TestPlanGatedSender_InnerSendError_DoesNotTrackUsage(t *testing.T) {
 	t.Parallel()
-	inner := &stubSender{name: "sms", err: errors.New("twilio error")}
+	inner := &stubSender{name: "sms", err: errors.New("SNS publish error")}
 	gate := &stubGate{allowed: true}
 	s := NewPlanGatedSender(inner, gate)
 

@@ -263,6 +263,8 @@ inactivity_timeout = "8h"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+# NOTE: This is for Supabase Auth OTP delivery only. App-level notification SMS uses Amazon SNS
+# (see notify/sms.go). The Twilio provider below is disabled and unused.
 [auth.sms.twilio]
 enabled = false
 account_sid = ""

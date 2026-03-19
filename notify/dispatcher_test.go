@@ -103,7 +103,7 @@ func TestDispatcher_MultipleSenders(t *testing.T) {
 func TestDispatcher_PartialFailure(t *testing.T) {
 	t.Parallel()
 	s1 := &stubSender{name: "email"}
-	s2 := &stubSender{name: "sms", err: errors.New("twilio timeout")}
+	s2 := &stubSender{name: "sms", err: errors.New("SNS throttling")}
 	s3 := &stubSender{name: "web-push"}
 	d := NewDispatcher([]Sender{s1, s2, s3}, nil)
 
