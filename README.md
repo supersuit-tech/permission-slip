@@ -63,55 +63,55 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 
 | Connector | Status |
 |-----------|--------|
-| GitHub | ✅ Tested |
-| Google | ✅ Tested |
-| Airtable | ❌ Untested |
-| Amadeus | ❌ Untested |
-| Asana | ❌ Untested |
-| AWS | ❌ Untested |
-| Calendly | ❌ Untested |
-| Confluence | ❌ Untested |
-| Datadog | ❌ Untested |
-| Discord | ❌ Untested |
-| DocuSign | ❌ Untested |
-| DoorDash | ❌ Untested |
-| Dropbox | ❌ Untested |
-| Expedia | ❌ Untested |
-| Figma | ❌ Untested |
-| HubSpot | ❌ Untested |
-| Intercom | ❌ Untested |
-| Jira | ❌ Untested |
-| Kroger | ❌ Untested |
-| Linear | ❌ Untested |
-| LinkedIn | ❌ Untested |
-| Make | ❌ Untested |
-| Meta | ❌ Untested |
-| Microsoft | ❌ Untested |
-| Monday | ❌ Untested |
-| MongoDB | ❌ Untested |
-| MySQL | ❌ Untested |
-| Netlify | ❌ Untested |
-| Notion | ❌ Untested |
-| PagerDuty | ❌ Untested |
-| Plaid | ❌ Untested |
-| Postgres | ❌ Untested |
-| QuickBooks | ❌ Untested |
-| Redis | ❌ Untested |
-| Salesforce | ❌ Untested |
-| SendGrid | ❌ Untested |
-| Shopify | ❌ Untested |
-| Slack | ❌ Untested |
-| Square | ❌ Untested |
-| Stripe | ❌ Untested |
-| Supabase | ❌ Untested |
-| Trello | ❌ Untested |
-| Twilio | ❌ Untested |
-| Vercel | ❌ Untested |
-| Walmart | ❌ Untested |
-| X | ❌ Untested |
-| Zapier | ❌ Untested |
-| Zendesk | ❌ Untested |
-| Zoom | ❌ Untested |
+| GitHub | 🟢 Tested |
+| Google | 🟡 Early Preview |
+| Microsoft | 🟡 Early Preview |
+| Slack | 🟡 Early Preview |
+| Airtable | 🔴 Untested |
+| Amadeus | 🔴 Untested |
+| Asana | 🔴 Untested |
+| AWS | 🔴 Untested |
+| Calendly | 🔴 Untested |
+| Confluence | 🔴 Untested |
+| Datadog | 🔴 Untested |
+| Discord | 🔴 Untested |
+| DocuSign | 🔴 Untested |
+| DoorDash | 🔴 Untested |
+| Dropbox | 🔴 Untested |
+| Expedia | 🔴 Untested |
+| Figma | 🔴 Untested |
+| HubSpot | 🔴 Untested |
+| Intercom | 🔴 Untested |
+| Jira | 🔴 Untested |
+| Kroger | 🔴 Untested |
+| Linear | 🔴 Untested |
+| LinkedIn | 🔴 Untested |
+| Make | 🔴 Untested |
+| Meta | 🔴 Untested |
+| Monday | 🔴 Untested |
+| MongoDB | 🔴 Untested |
+| MySQL | 🔴 Untested |
+| Netlify | 🔴 Untested |
+| Notion | 🔴 Untested |
+| PagerDuty | 🔴 Untested |
+| Plaid | 🔴 Untested |
+| Postgres | 🔴 Untested |
+| QuickBooks | 🔴 Untested |
+| Redis | 🔴 Untested |
+| Salesforce | 🔴 Untested |
+| SendGrid | 🔴 Untested |
+| Shopify | 🔴 Untested |
+| Square | 🔴 Untested |
+| Stripe | 🔴 Untested |
+| Supabase | 🔴 Untested |
+| Trello | 🔴 Untested |
+| Twilio | 🔴 Untested |
+| Vercel | 🔴 Untested |
+| Walmart | 🔴 Untested |
+| X | 🔴 Untested |
+| Zapier | 🔴 Untested |
+| Zendesk | 🔴 Untested |
+| Zoom | 🔴 Untested |
 
 Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/permission-slip/issues) to let us know!
 
