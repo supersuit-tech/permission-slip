@@ -179,7 +179,9 @@ Pick one provider:
 | `SNS_SMS_SENDER_ID` | Optional alphanumeric sender ID (not supported in all countries) |
 | `SNS_SMS_ORIGINATION_NUMBER` | Optional origination phone number in E.164 format |
 
-`AWS_REGION` is required to enable SMS. Credentials are optional when running on AWS with an IAM role.
+`AWS_REGION` is required to enable SMS. Credentials are optional when running on AWS with an IAM role. The IAM user/role needs `sns:Publish` permission.
+
+> **Important:** New AWS accounts are in the [SMS Sandbox](https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) by default. Request production SMS access in the SNS console before deploying, or SMS will only reach verified destination numbers.
 
 ### Error Tracking (Sentry)
 

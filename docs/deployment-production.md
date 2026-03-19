@@ -187,7 +187,8 @@ fly deploy \
 
 **SMS — Amazon SNS:**
 - Used for SMS approval notifications
-- Requires an AWS account with SNS access
+- Requires an AWS account with SNS access and `sns:Publish` IAM permission
+- **Important:** New AWS accounts are in the [SMS Sandbox](https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) by default. Request production SMS access in the SNS console before deploying, or SMS will only reach verified destination numbers.
 
 **Web Push — VAPID:**
 - Browser push notifications via FCM / Mozilla Push Service
@@ -486,7 +487,7 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `NOTIFICATION_EMAIL_PROVIDER` | Runtime secret | **Set** | `twilio-sendgrid` |
 | `SENDGRID_API_KEY` | Runtime secret | **Set** | SendGrid API key |
 | `NOTIFICATION_EMAIL_FROM` | Runtime secret | **Set** | Sender address |
-| `AWS_REGION` | Runtime secret | **Set if SMS** | AWS region for SNS (e.g. `us-east-1`) |
+| `AWS_REGION` | Runtime secret | **Set if SMS** | AWS region for SNS (e.g. `us-east-1`); IAM user/role needs `sns:Publish` |
 | `AWS_ACCESS_KEY_ID` | Runtime secret | **Optional** | AWS access key (omit to use IAM roles) |
 | `AWS_SECRET_ACCESS_KEY` | Runtime secret | **Optional** | AWS secret key (omit to use IAM roles) |
 | `SENTRY_DSN` | Runtime secret | **Set** | Backend error tracking DSN |
