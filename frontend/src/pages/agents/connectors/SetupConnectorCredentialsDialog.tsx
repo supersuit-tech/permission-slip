@@ -196,7 +196,6 @@ export function SetupConnectorCredentialsDialog({
               providerName={providerLabel(
                 effectiveOAuthProvider ?? connectorId,
               )}
-              scopes={oauthCredential?.oauth_scopes ?? []}
               needsShopDomain={needsShopDomain}
               shopSubdomain={shopSubdomain}
               onShopSubdomainChange={setShopSubdomain}
@@ -339,14 +338,12 @@ function NeedsReauthContent({
 
 function OAuthSetupContent({
   providerName,
-  scopes,
   needsShopDomain,
   shopSubdomain,
   onShopSubdomainChange,
   onConnect,
 }: {
   providerName: string;
-  scopes: string[];
   needsShopDomain: boolean;
   shopSubdomain: string;
   onShopSubdomainChange: (value: string) => void;
@@ -382,11 +379,6 @@ function OAuthSetupContent({
         Connect with {providerName}
       </Button>
 
-      {scopes.length > 0 && (
-        <p className="text-muted-foreground text-sm">
-          Permissions requested: {scopes.join(", ")}
-        </p>
-      )}
     </div>
   );
 }
