@@ -1,5 +1,7 @@
 # GitHub Connector
 
+**Status:** 🟢 Tested · 🟡 Early access
+
 The GitHub connector integrates Permission Slip with the [GitHub REST API](https://docs.github.com/en/rest). It uses plain `net/http` — no third-party GitHub SDK.
 
 ## Connector ID
