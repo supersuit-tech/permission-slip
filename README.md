@@ -63,8 +63,10 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 
 | Connector | Status |
 |-----------|--------|
-| GitHub | ✅ Tested |
-| Google | ✅ Tested |
+| GitHub | 🟢 Tested |
+| Google | 🟢 Tested |
+| Microsoft | 🟡 In Progress |
+| Slack | 🟡 In Progress |
 | Airtable | ❌ Untested |
 | Amadeus | ❌ Untested |
 | Asana | ❌ Untested |
@@ -86,7 +88,6 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 | LinkedIn | ❌ Untested |
 | Make | ❌ Untested |
 | Meta | ❌ Untested |
-| Microsoft | ❌ Untested |
 | Monday | ❌ Untested |
 | MongoDB | ❌ Untested |
 | MySQL | ❌ Untested |
@@ -100,7 +101,6 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 | Salesforce | ❌ Untested |
 | SendGrid | ❌ Untested |
 | Shopify | ❌ Untested |
-| Slack | ❌ Untested |
 | Square | ❌ Untested |
 | Stripe | ❌ Untested |
 | Supabase | ❌ Untested |
