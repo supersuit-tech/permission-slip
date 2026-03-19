@@ -106,9 +106,9 @@ Permission Slip supports four notification channels. Channels are active only wh
 
 ### SMS Notifications (Optional)
 
-**SMS notifications** deliver approval requests as text messages via Twilio. SMS delivery is gated behind paid subscription tiers when billing is enabled.
+**SMS notifications** deliver approval requests as text messages via Amazon SNS. SMS delivery is gated behind paid subscription tiers when billing is enabled.
 
-**Configuration:** Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER`. All three are required; partial configuration disables the channel.
+**Configuration:** Set `AWS_REGION` to enable SMS. Optionally set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for static credentials (the AWS SDK falls back to IAM roles when omitted). See `.env.example` for all variables.
 
 **Requirement Level:** Services MAY support SMS as an optional enhancement.
 
