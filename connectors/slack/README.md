@@ -90,7 +90,7 @@ Creates a new Slack channel.
 
 ### `slack.list_channels`
 
-Lists Slack channels visible to the bot.
+Lists Slack channels visible to the bot. When listing private channel types (`private_channel`, `mpim`, `im`), results are filtered to channels the executing user belongs to.
 
 **Risk level:** low
 
@@ -129,7 +129,7 @@ Lists Slack channels visible to the bot.
 
 ### `slack.read_channel_messages`
 
-Reads recent messages from a Slack channel.
+Reads recent messages from a Slack channel. For private channels, DMs, and group DMs, verifies the executing user is a member before allowing access.
 
 **Risk level:** low
 
@@ -169,7 +169,7 @@ Reads recent messages from a Slack channel.
 
 ### `slack.read_thread`
 
-Reads replies in a Slack message thread.
+Reads replies in a Slack message thread. For private channels, DMs, and group DMs, verifies the executing user is a member of the parent channel before allowing access.
 
 **Risk level:** low
 
@@ -484,7 +484,7 @@ Lists workspace users visible to the bot, with cursor-based pagination.
 
 ### `slack.search_messages`
 
-Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the granular `search:read.*` scopes (`search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`) — bot tokens (`xoxb-`) do not support this endpoint.
+Searches messages across Slack channels. Requires the executing user to have a verified Slack identity (email match). Results are post-filtered to only include matches from channels the user belongs to. **Requires a user token** (`xoxp-`) with the granular `search:read.*` scopes (`search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`) — bot tokens (`xoxb-`) do not support this endpoint.
 
 **Risk level:** low
 
@@ -523,6 +523,36 @@ Searches messages across Slack channels. **Requires a user token** (`xoxp-`) wit
 **Required scopes:** `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files` (user token only)
 
 > **Note:** This action will return a `missing_scope` error when invoked with a bot token. To use it, the OAuth flow must persist the user's access token (the `authed_user.access_token` field from Slack's OAuth v2 response).
+
+---
+
+### Access Control (Private Channels, DMs, Group DMs)
+
+Read actions (`read_channel_messages`, `read_thread`, `list_channels`, `search_messages`) enforce per-user access control to prevent users from reading private content they don't belong to. The bot token has workspace-wide scopes, so without this check any Permission Slip user could read any DM or private channel.
+
+**How it works:**
+
+1. The executing user's Permission Slip profile email is resolved from the database.
+2. For private channels, DMs (`D`-prefixed), and group DMs (`G`-prefixed), the email is mapped to a Slack user ID via `users.lookupByEmail`.
+3. Channel membership is verified via `conversations.members`.
+4. Public channels (`C`-prefixed, `is_private: false`) are accessible without verification.
+
+**Requirements:**
+
+- The user must have an email set on their Permission Slip profile.
+- The email must match their Slack workspace account.
+- The bot token must have the `users:read.email` scope for email-based lookups.
+
+**Behavior by action:**
+
+| Action | Access check |
+|--------|-------------|
+| `read_channel_messages` | Verifies membership before fetching history |
+| `read_thread` | Verifies membership in the parent channel |
+| `list_channels` | Filters results to channels the user belongs to (when listing private types) |
+| `search_messages` | Requires email; post-filters results by channel membership |
+
+If access is denied, the action returns a `ValidationError` with a message describing the channel type and what the user needs to do (e.g., add an email to their profile).
 
 ---
 
@@ -621,6 +651,7 @@ When adding a new action, add it to the `Manifest()` return value in `manifest.g
 connectors/slack/
 ├── slack.go                        # SlackConnector, New(), Actions(), doPost(), shared validators
 ├── manifest.go                     # Manifest() — action schemas, templates, credentials
+├── channel_membership.go           # Per-user access control: verifyChannelAccess, hasChannelAccess, lookupSlackUserByEmail
 ├── messages.go                     # Shared types: slackMessage, messageSummary, messagesResponse
 ├── send_message.go                 # slack.send_message action
 ├── create_channel.go               # slack.create_channel action

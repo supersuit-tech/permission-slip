@@ -87,11 +87,28 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 		}
 	}
 
+	// Resolve the executing user's email for connectors that enforce
+	// per-user access checks (e.g., Slack channel membership verification).
+	// Fail the request on DB errors rather than continuing with an empty email,
+	// which would cause misleading "add an email" validation errors for users
+	// who already have an email configured.
+	var userEmail string
+	if userID != "" {
+		profile, profileErr := db.GetProfileByUserID(ctx, deps.DB, userID)
+		if profileErr != nil {
+			return nil, fmt.Errorf("resolving user profile for connector execution: %w", profileErr)
+		}
+		if profile != nil && profile.Email != nil {
+			userEmail = *profile.Email
+		}
+	}
+
 	result, err := action.Execute(ctx, connectors.ActionRequest{
 		ActionType:  actionType,
 		Parameters:  parameters,
 		Credentials: creds,
 		Payment:     paymentInfo,
+		UserEmail:   userEmail,
 	})
 	if err != nil {
 		return nil, err

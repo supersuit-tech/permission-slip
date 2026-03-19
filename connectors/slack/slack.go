@@ -52,10 +52,13 @@ var OAuthScopes = []string{
 	"groups:history",
 	"groups:read",
 	"im:history",
+	"im:read",
+	"im:write",
 	"mpim:history",
+	"mpim:read",
 	"reactions:write",
 	"users:read",
-	"im:write",
+	"users:read.email",
 }
 
 // OAuthUserScopes is the list of user-level OAuth scopes requested via the
@@ -302,6 +305,47 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	// Handle HTTP-level errors before attempting JSON unmarshal.
 	// Slack normally returns 200 with {"ok": false} for app-level errors,
 	// but can return non-200 for rate limits, auth failures, and server errors.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return checkHTTPStatus(resp.StatusCode, resp.Header, respBody)
+	}
+
+	if err := json.Unmarshal(respBody, dest); err != nil {
+		return &connectors.ExternalError{
+			StatusCode: resp.StatusCode,
+			Message:    "failed to decode Slack API response",
+		}
+	}
+
+	return nil
+}
+
+// doGetURL sends a GET request to the given full URL with Bearer auth and
+// unmarshals the JSON response into dest. Used for Slack endpoints that
+// require query parameters (e.g., users.lookupByEmail).
+func (c *SlackConnector) doGetURL(ctx context.Context, url, token string, dest any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		if connectors.IsTimeout(err) {
+			return &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.TimeoutError{Message: "Slack API request canceled"}
+		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return checkHTTPStatus(resp.StatusCode, resp.Header, respBody)
 	}
