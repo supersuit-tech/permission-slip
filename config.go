@@ -208,25 +208,25 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
-	// Twilio SMS — if any Twilio var is set, all three are required.
-	hasTwilioSID := os.Getenv("TWILIO_ACCOUNT_SID") != ""
-	hasTwilioToken := os.Getenv("TWILIO_AUTH_TOKEN") != ""
-	hasTwilioFrom := os.Getenv("TWILIO_FROM_NUMBER") != ""
-	anyTwilio := hasTwilioSID || hasTwilioToken || hasTwilioFrom
-	if anyTwilio && (!hasTwilioSID || !hasTwilioToken || !hasTwilioFrom) {
-		missing := []string{}
-		if !hasTwilioSID {
-			missing = append(missing, "TWILIO_ACCOUNT_SID")
-		}
-		if !hasTwilioToken {
-			missing = append(missing, "TWILIO_AUTH_TOKEN")
-		}
-		if !hasTwilioFrom {
-			missing = append(missing, "TWILIO_FROM_NUMBER")
+	// SMS (Amazon SNS) — AWS_REGION is required; credentials are optional
+	// (the AWS SDK falls back to IAM roles, shared config, etc.).
+	hasAWSRegion := os.Getenv("AWS_REGION") != ""
+	hasAWSKeyID := os.Getenv("AWS_ACCESS_KEY_ID") != ""
+	hasAWSSecret := os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
+	if !hasAWSRegion && (hasAWSKeyID || hasAWSSecret) {
+		warnings = append(warnings, configError{
+			envVar:  "AWS_REGION",
+			message: "not set; AWS credentials are configured but AWS_REGION is required for SMS (SNS)",
+		})
+	}
+	if hasAWSRegion && (hasAWSKeyID != hasAWSSecret) {
+		missing := "AWS_SECRET_ACCESS_KEY"
+		if !hasAWSKeyID {
+			missing = "AWS_ACCESS_KEY_ID"
 		}
 		warnings = append(warnings, configError{
-			envVar:  strings.Join(missing, " / "),
-			message: "not set; SMS notifications partially configured — all three Twilio vars are required",
+			envVar:  missing,
+			message: "not set; AWS credentials are partially configured — set both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or neither (to use IAM roles)",
 		})
 	}
 

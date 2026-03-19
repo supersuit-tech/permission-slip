@@ -181,11 +181,11 @@ fly secrets set \
   SMTP_PASSWORD="app-password" \
   NOTIFICATION_EMAIL_FROM="you@gmail.com"
 
-# SMS via Twilio
+# SMS via Amazon SNS
 fly secrets set \
-  TWILIO_ACCOUNT_SID="ACxxxx" \
-  TWILIO_AUTH_TOKEN="xxxx" \
-  TWILIO_FROM_NUMBER="+15551234567"
+  AWS_REGION="us-east-1" \
+  AWS_ACCESS_KEY_ID="AKIAxxxx" \
+  AWS_SECRET_ACCESS_KEY="xxxx"
 ```
 
 ## DNS Configuration

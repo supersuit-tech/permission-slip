@@ -137,7 +137,7 @@ export function PrivacyPolicyPage() {
             <td>Contact email, notification content</td>
           </tr>
           <tr>
-            <td>Twilio (optional)</td>
+            <td>Amazon SNS (optional)</td>
             <td>SMS notifications</td>
             <td>Phone number, notification content</td>
           </tr>

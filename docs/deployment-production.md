@@ -24,10 +24,10 @@
         ┌──────────────┬───────────┼───────────┐
         │              │           │           │
  ┌──────▼───┐  ┌──────▼────┐  ┌──▼────┐  ┌───▼─────┐
- │ Supabase  │  │  Sentry   │  │Twilio │  │ PostHog │
- │ - Auth    │  │  - Errors │  │-SGrid │  │-Analytics│
- │ - Postgres│  │  - Perf   │  │- SMS  │  │-Replays │
- │ - Vault   │  │  - CSP    │  │       │  │         │
+ │ Supabase  │  │  Sentry   │  │SGrid  │  │ PostHog │
+ │ - Auth    │  │  - Errors │  │-Email │  │-Analytics│
+ │ - Postgres│  │  - Perf   │  │AWS SNS│  │-Replays │
+ │ - Vault   │  │  - CSP    │  │- SMS  │  │         │
  └───────────┘  └───────────┘  └───────┘  └─────────┘
                                                 ┌───────────────┐
                                                 │  UptimeRobot  │
@@ -47,7 +47,7 @@ Quick reference of every service in the production stack. See detailed sections 
 | 3 | [**Cloudflare**](#cloudflare-dns--proxy--web-analytics) | DNS proxy, TLS termination, Web Analytics | Live |
 | 4 | [**Sentry**](#sentry-error-tracking) | Error tracking (backend + frontend) + CSP violation reports | Live |
 | 5 | [**Twilio SendGrid**](#notification-services) | Email delivery for approval notifications | Live |
-| 6 | [**Twilio**](#notification-services) | SMS delivery for approval notifications | Live |
+| 6 | [**Amazon SNS**](#notification-services) | SMS delivery for approval notifications | Live |
 | 7 | [**VAPID / Web Push**](#notification-services) | Browser push notifications (FCM / Mozilla Push) | Live |
 | 8 | [**Expo Push Service**](#notification-services) | Mobile push notifications (iOS + Android via Expo) | Live |
 | 9 | [**GitHub Actions**](#cicd-pipeline) | CI (tests, build, audit) + planned CD | Live |
@@ -185,9 +185,10 @@ fly deploy \
 - Used for approval request notifications
 - Requires a verified sender domain and API key
 
-**SMS — Twilio:**
+**SMS — Amazon SNS:**
 - Used for SMS approval notifications
-- Requires a Twilio account with a phone number
+- Requires an AWS account with SNS access and `sns:Publish` IAM permission
+- **Important:** New AWS accounts are in the [SMS Sandbox](https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) by default. Request production SMS access in the SNS console before deploying, or SMS will only reach verified destination numbers.
 
 **Web Push — VAPID:**
 - Browser push notifications via FCM / Mozilla Push Service
@@ -209,11 +210,12 @@ fly secrets set \
   SENDGRID_API_KEY="SG.xxxx" \
   NOTIFICATION_EMAIL_FROM="approvals@permissionslip.dev"
 
-# SMS (Twilio)
+# SMS (Amazon SNS)
 fly secrets set \
-  TWILIO_ACCOUNT_SID="ACxxxx" \
-  TWILIO_AUTH_TOKEN="xxxx" \
-  TWILIO_FROM_NUMBER="+15551234567"
+  AWS_REGION="us-east-1" \
+  AWS_ACCESS_KEY_ID="AKIAxxxx" \
+  AWS_SECRET_ACCESS_KEY="xxxx"
+# Optional: SNS_SMS_SENDER_ID="PermSlip" SNS_SMS_ORIGINATION_NUMBER="+15551234567"
 
 # Web Push (VAPID) — generate keys first: go run ./cmd/generate-vapid-keys --format=fly
 fly secrets set \
@@ -404,12 +406,14 @@ fly secrets set \
   SENDGRID_API_KEY="SG.xxxx" \
   NOTIFICATION_EMAIL_FROM="approvals@permissionslip.dev"
 
-# ── SMS (Twilio) ─────────────────────────────────────────────────────────
+# ── SMS (Amazon SNS) ──────────────────────────────────────────────────────
 
 fly secrets set \
-  TWILIO_ACCOUNT_SID="ACxxxx" \
-  TWILIO_AUTH_TOKEN="xxxx" \
-  TWILIO_FROM_NUMBER="+15551234567"
+  AWS_REGION="us-east-1" \
+  AWS_ACCESS_KEY_ID="AKIAxxxx" \
+  AWS_SECRET_ACCESS_KEY="xxxx"
+# Optional:
+# fly secrets set SNS_SMS_SENDER_ID="PermSlip" SNS_SMS_ORIGINATION_NUMBER="+15551234567"
 
 # ── Error Tracking (Sentry) ──────────────────────────────────────────────
 
@@ -483,9 +487,9 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `NOTIFICATION_EMAIL_PROVIDER` | Runtime secret | **Set** | `twilio-sendgrid` |
 | `SENDGRID_API_KEY` | Runtime secret | **Set** | SendGrid API key |
 | `NOTIFICATION_EMAIL_FROM` | Runtime secret | **Set** | Sender address |
-| `TWILIO_ACCOUNT_SID` | Runtime secret | **Set if SMS** | Twilio SID |
-| `TWILIO_AUTH_TOKEN` | Runtime secret | **Set if SMS** | Twilio auth token |
-| `TWILIO_FROM_NUMBER` | Runtime secret | **Set if SMS** | Twilio phone number |
+| `AWS_REGION` | Runtime secret | **Set if SMS** | AWS region for SNS (e.g. `us-east-1`); IAM user/role needs `sns:Publish` |
+| `AWS_ACCESS_KEY_ID` | Runtime secret | **Optional** | AWS access key (omit to use IAM roles) |
+| `AWS_SECRET_ACCESS_KEY` | Runtime secret | **Optional** | AWS secret key (omit to use IAM roles) |
 | `SENTRY_DSN` | Runtime secret | **Set** | Backend error tracking DSN |
 | `SENTRY_CSP_ENDPOINT` | Runtime secret | **Set** | CSP violation reporting |
 | `CLOUDFLARE_INSIGHTS` | Runtime env | **Set** | `true` — allows Cloudflare Web Analytics beacon in CSP |
@@ -700,7 +704,7 @@ Setting any secret via `fly secrets set` triggers an automatic redeploy.
 | `DATABASE_URL_APP` (password) | Every 90 days | None — rotate via Supabase SQL Editor (`ALTER ROLE app_backend PASSWORD '...'`), then update Fly secret |
 | `INVITE_HMAC_KEY` | Every 90 days | **Invalidates pending (unused) invite links.** Accepted invites are unaffected |
 | `SENDGRID_API_KEY` | Every 90 days | None — revoke the old key in SendGrid after deploying the new one |
-| `TWILIO_AUTH_TOKEN` | Every 90 days | None — regenerate in Twilio console, then update Fly |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Every 90 days | None — rotate in AWS IAM console, then update Fly |
 | `STRIPE_SECRET_KEY` | Every 90 days | None — roll the key in Stripe dashboard, update Fly, then revoke the old key |
 | `STRIPE_WEBHOOK_SECRET` | Every 90 days | None — create a new webhook endpoint in Stripe, update Fly, then delete the old endpoint |
 | `SENTRY_DSN` | Rarely (only if compromised) | None — DSNs are project-scoped and low-risk |
@@ -752,13 +756,14 @@ fly secrets set INVITE_HMAC_KEY="$(openssl rand -hex 32)"
    ```
 3. After verifying email still works, revoke the old key in SendGrid
 
-**Twilio auth token:**
+**AWS access keys (for SNS SMS):**
 
-1. In the [Twilio console](https://console.twilio.com), go to Account > API keys and tokens and regenerate the auth token
-2. Deploy the new token:
+1. In the [AWS IAM console](https://console.aws.amazon.com/iam/), create a new access key for the SNS user
+2. Deploy the new credentials:
    ```bash
-   fly secrets set TWILIO_AUTH_TOKEN="new-token"
+   fly secrets set AWS_ACCESS_KEY_ID="AKIAnew" AWS_SECRET_ACCESS_KEY="new-secret"
    ```
+3. Delete the old access key in IAM after verifying SMS still works
 
 **Stripe keys:**
 
@@ -845,7 +850,7 @@ Quick reference for what's live vs. planned.
 | **Supabase** | Auth + Postgres + Vault | Live | — |
 | **Sentry** | Error tracking (backend + frontend) | Live | [#329](https://github.com/supersuit-tech/permission-slip-web/issues/329), [#330](https://github.com/supersuit-tech/permission-slip-web/issues/330) |
 | **SendGrid** | Email notifications | Live | — |
-| **Twilio** | SMS notifications | Live | — |
+| **Amazon SNS** | SMS notifications | Live | — |
 | **VAPID / Web Push** | Browser push notifications | Live | — |
 | **Expo Push Service** | Mobile push notifications (iOS + Android) | Live | — |
 | **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352) |

@@ -169,15 +169,19 @@ Pick one provider:
 | `SMTP_PASSWORD` | SMTP password or app password |
 | `NOTIFICATION_EMAIL_FROM` | Sender address |
 
-### SMS Notifications (Twilio)
+### SMS Notifications (Amazon SNS)
 
 | Variable | Description |
 |---|---|
-| `TWILIO_ACCOUNT_SID` | Twilio Account SID (`ACxxxx`) |
-| `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
-| `TWILIO_FROM_NUMBER` | Twilio phone number (`+15551234567`) |
+| `AWS_REGION` | AWS region for SNS (e.g. `us-east-1`) — **required** |
+| `AWS_ACCESS_KEY_ID` | AWS access key (optional — omit to use IAM roles) |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional — omit to use IAM roles) |
+| `SNS_SMS_SENDER_ID` | Optional alphanumeric sender ID (not supported in all countries) |
+| `SNS_SMS_ORIGINATION_NUMBER` | Optional origination phone number in E.164 format |
 
-All three are required to enable SMS. If partially configured, SMS is disabled with a warning.
+`AWS_REGION` is required to enable SMS. Credentials are optional when running on AWS with an IAM role. The IAM user/role needs `sns:Publish` permission.
+
+> **Important:** New AWS accounts are in the [SMS Sandbox](https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) by default. Request production SMS access in the SNS console before deploying, or SMS will only reach verified destination numbers.
 
 ### Error Tracking (Sentry)
 
@@ -393,7 +397,8 @@ Rotate secrets on a regular cadence (every 90 days recommended for API keys and 
 
 - **`DATABASE_URL`** — change the password in your database provider, then update the env var. No downtime.
 - **`INVITE_HMAC_KEY`** — regenerate with `openssl rand -hex 32`. **Invalidates pending invite links** (accepted invites are unaffected).
-- **`SENDGRID_API_KEY` / `TWILIO_AUTH_TOKEN`** — create a new key in the provider console, deploy it, then revoke the old key.
+- **`SENDGRID_API_KEY`** — create a new key in the SendGrid console, deploy it, then revoke the old key.
+- **`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`** — rotate in AWS IAM console, deploy new credentials, then delete the old access key.
 - **`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`** — only rotate if compromised. **Invalidates all push subscriptions** (users must re-subscribe).
 - **`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`** — roll keys in Stripe dashboard (supports overlap periods), update env var, then revoke old key.
 
@@ -449,9 +454,9 @@ Migrations run automatically on startup. If they fail, check database connectivi
 | `SMTP_PORT` | For SMTP | Runtime | SMTP port (default: `587`) |
 | `SMTP_USERNAME` | For SMTP | Runtime | SMTP username |
 | `SMTP_PASSWORD` | For SMTP | Runtime | SMTP password |
-| `TWILIO_ACCOUNT_SID` | For SMS | Runtime | Twilio Account SID |
-| `TWILIO_AUTH_TOKEN` | For SMS | Runtime | Twilio Auth Token |
-| `TWILIO_FROM_NUMBER` | For SMS | Runtime | Twilio sender phone number |
+| `AWS_REGION` | For SMS | Runtime | AWS region for SNS (e.g. `us-east-1`) |
+| `AWS_ACCESS_KEY_ID` | For SMS | Runtime | AWS access key (optional with IAM roles) |
+| `AWS_SECRET_ACCESS_KEY` | For SMS | Runtime | AWS secret key (optional with IAM roles) |
 | `SENTRY_DSN` | No | Runtime | Backend error tracking |
 | `SENTRY_CSP_ENDPOINT` | No | Runtime | CSP violation reporting |
 | `VITE_SENTRY_DSN` | No | Build | Frontend error tracking |

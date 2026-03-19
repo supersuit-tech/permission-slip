@@ -18,9 +18,9 @@ You need **two** external accounts:
 | Service | Why | Cost |
 |---|---|---|
 | [Supabase](https://supabase.com) | User authentication (login, MFA, JWTs) | Free tier is sufficient |
-| [Twilio](https://www.twilio.com) | SMS notifications for approval requests | Pay-as-you-go (~$0.0079/SMS) |
+| [AWS](https://aws.amazon.com) | SMS notifications via Amazon SNS | Pay-as-you-go (~$0.0075/SMS in the US) |
 
-Twilio ensures approvers get notified on their phone immediately — even without the app installed, without a browser open, and regardless of iOS vs Android. PostgreSQL runs locally on the Pi — no managed database needed.
+Amazon SNS ensures approvers get notified on their phone immediately — even without the app installed, without a browser open, and regardless of iOS vs Android. PostgreSQL runs locally on the Pi — no managed database needed.
 
 ## Step 1: Set Up Your Raspberry Pi
 
@@ -96,21 +96,21 @@ SQL
 
 Permission Slip is an approval system — approvers need to know when something's waiting for them. Without notifications, they'd have to keep checking the web UI manually.
 
-### Twilio SMS (works on any phone)
+### Amazon SNS SMS (works on any phone)
 
 SMS is the most reliable way to reach approvers on the go. It works on every phone — no app to install, no browser to keep open.
 
-1. Sign up at [twilio.com](https://www.twilio.com) (pay-as-you-go, ~$0.0079/SMS in the US)
-2. From the Twilio console, get your **Account SID** and **Auth Token**
-3. Buy a phone number (or use the trial number to test)
+1. Sign up for an [AWS account](https://aws.amazon.com) if you don't have one
+2. Create an IAM user with `sns:Publish` permission and generate access keys
+3. In the SNS console, request to move out of the SMS sandbox for production use
 
 You'll add these values to your environment in the next step:
 
 | Variable | Value |
 |---|---|
-| `TWILIO_ACCOUNT_SID` | Your Account SID (`ACxxxx`) |
-| `TWILIO_AUTH_TOKEN` | Your Auth Token |
-| `TWILIO_FROM_NUMBER` | Your Twilio phone number (`+15551234567`) |
+| `AWS_REGION` | AWS region (e.g. `us-east-1`) |
+| `AWS_ACCESS_KEY_ID` | Your IAM access key (`AKIAxxxx`) |
+| `AWS_SECRET_ACCESS_KEY` | Your IAM secret key |
 
 > For more notification options (web push, email, mobile app), see the [Self-Hosted Deployment Guide](deployment-self-hosted.md).
 
@@ -135,10 +135,10 @@ ALLOWED_ORIGINS=http://raspberrypi.local:8080
 # Generate with: openssl rand -hex 32
 INVITE_HMAC_KEY=generate-me
 
-# SMS (Twilio) — paste your values from Step 5
-TWILIO_ACCOUNT_SID=ACxxxx
-TWILIO_AUTH_TOKEN=your-auth-token
-TWILIO_FROM_NUMBER=+15551234567
+# SMS (Amazon SNS) — paste your values from Step 5
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=AKIAxxxx
+AWS_SECRET_ACCESS_KEY=your-secret-key
 EOF
 ```
 
@@ -221,9 +221,9 @@ export SUPABASE_URL="https://abcdefgh.supabase.co"
 export BASE_URL="http://raspberrypi.local:8080"
 export ALLOWED_ORIGINS="http://raspberrypi.local:8080"
 export INVITE_HMAC_KEY="$(openssl rand -hex 32)"
-export TWILIO_ACCOUNT_SID="ACxxxx"
-export TWILIO_AUTH_TOKEN="your-auth-token"
-export TWILIO_FROM_NUMBER="+15551234567"
+export AWS_REGION="us-east-1"
+export AWS_ACCESS_KEY_ID="AKIAxxxx"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
 ./bin/server
 ```
 
