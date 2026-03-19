@@ -395,3 +395,58 @@ func TestListChannels_InvalidJSON(t *testing.T) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
+
+func TestListChannels_DefaultFallbackWithoutEmail(t *testing.T) {
+	t.Parallel()
+
+	// When no types are specified (using the default) and no UserEmail is set,
+	// list_channels should gracefully fall back to public_channel only instead
+	// of returning a ValidationError. This preserves backward compatibility.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/conversations.list" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		var body listChannelsRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode: %v", err)
+		}
+		if body.Types != "public_channel" {
+			t.Errorf("expected fallback types 'public_channel', got %q", body.Types)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"channels": []map[string]any{
+				{"id": "C001", "name": "general", "is_private": false, "num_members": 5},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+
+	// No types param, no UserEmail — should fall back to public_channel.
+	params, _ := json.Marshal(listChannelsParams{})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("expected graceful fallback, got error: %v", err)
+	}
+
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if len(data.Channels) != 1 {
+		t.Fatalf("expected 1 channel, got %d", len(data.Channels))
+	}
+	if data.Channels[0].ID != "C001" {
+		t.Errorf("expected channel C001, got %q", data.Channels[0].ID)
+	}
+}
