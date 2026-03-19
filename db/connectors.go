@@ -291,6 +291,8 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	}
 
 	// Upsert the connector record.
+	// Status is always set by ToDBManifest, but default defensively in case
+	// ExternalConnectorManifest is constructed directly by other callers.
 	status := m.Status
 	if status == "" {
 		status = "untested"

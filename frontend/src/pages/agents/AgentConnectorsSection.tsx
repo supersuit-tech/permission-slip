@@ -58,35 +58,35 @@ export function AgentConnectorsSection({
 
   const enabledIds = new Set(enabledConnectors.map((c) => c.id));
 
-  const query = search.trim().toLowerCase();
-  const filtered = (
-    query
-      ? allConnectors.filter(
-          (c) =>
-            c.name.toLowerCase().includes(query) ||
-            c.description?.toLowerCase().includes(query),
-        )
-      : allConnectors
-  )
-    .slice()
-    .sort((a, b) => {
-      const aEnabled = enabledIds.has(a.id) ? 0 : 1;
-      const bEnabled = enabledIds.has(b.id) ? 0 : 1;
-      return aEnabled - bEnabled;
-    });
+  const { filtered, groupedByStatus } = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const result = (
+      query
+        ? allConnectors.filter(
+            (c) =>
+              c.name.toLowerCase().includes(query) ||
+              c.description?.toLowerCase().includes(query),
+          )
+        : allConnectors
+    )
+      .slice()
+      .sort((a, b) => {
+        const aEnabled = enabledIds.has(a.id) ? 0 : 1;
+        const bEnabled = enabledIds.has(b.id) ? 0 : 1;
+        return aEnabled - bEnabled;
+      });
 
-  const groupedByStatus = useMemo(() => {
     const groups: Record<string, ConnectorSummary[]> = {};
     for (const section of STATUS_SECTIONS) {
       groups[section.key] = [];
     }
-    for (const connector of filtered) {
+    for (const connector of result) {
       const status = connector.status ?? "untested";
       const bucket = groups[status] ?? groups["untested"];
       bucket?.push(connector);
     }
-    return groups;
-  }, [filtered]);
+    return { filtered: result, groupedByStatus: groups };
+  }, [allConnectors, enabledConnectors, search]);
 
   async function handleClick(connector: ConnectorSummary) {
     if (enabledIds.has(connector.id)) {
@@ -265,7 +265,9 @@ function ConnectorCard({
   );
 }
 
-function StatusBadge({ status, label }: { status: string; label: string }) {
+type ConnectorStatus = "tested" | "early_preview" | "untested";
+
+function StatusBadge({ status, label }: { status: ConnectorStatus; label: string }) {
   const variant =
     status === "tested"
       ? "default"
