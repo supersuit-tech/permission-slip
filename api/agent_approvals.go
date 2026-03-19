@@ -129,6 +129,17 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Reject action types that don't map to a registered connector action.
+		// Without this check, agents can create approvals with bogus action types
+		// (e.g. "gmail.list_messages" instead of "google.list_emails") that store
+		// successfully but fail at execution time when the user approves them.
+		if deps.Connectors != nil {
+			if _, ok := deps.Connectors.GetAction(actionType); !ok {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, fmt.Sprintf("unknown action type %q", actionType)))
+				return
+			}
+		}
+
 		// Normalize parameters before storage so canonical keys are stored.
 		// First rewrites flat aliases (ParameterAliaser), then applies nested
 		// normalization (Normalizer). Must run before ValidateConfigurationReference

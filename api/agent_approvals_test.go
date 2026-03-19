@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
@@ -66,6 +67,45 @@ func TestAgentRequestApproval_Success(t *testing.T) {
 	}
 	if resp.CreatedAt.IsZero() {
 		t.Error("expected created_at to be set")
+	}
+}
+
+func TestAgentRequestApproval_UnknownActionType(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	// Set up a connector registry with only "google" connector registered.
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector("google", "google.list_emails"))
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	// Use "gmail.list_messages" — a plausible but unregistered action type.
+	reqBody := `{"request_id":"req_bad","action":{"type":"gmail.list_messages","parameters":{}},"context":{"description":"List emails"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown action type, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if resp.Error.Message == "" {
+		t.Error("expected error message in response")
 	}
 }
 
