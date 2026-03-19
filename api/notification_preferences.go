@@ -58,14 +58,11 @@ var allChannels = func() []string {
 }()
 
 // paidOnlyChannels lists channels that require a paid plan.
-var paidOnlyChannels = map[string]bool{
-	"sms": true,
-}
+var paidOnlyChannels = map[string]bool{}
 
 // betaDisabledChannels lists channels that are disabled during the beta period.
 // These channels are always unavailable regardless of plan.
 var betaDisabledChannels = map[string]bool{
-	"sms":      true,
 	"web-push": true,
 }
 
@@ -84,7 +81,7 @@ func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 		planID := userPlanID(r.Context(), deps.DB, profile.ID)
 
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs, planID),
+			Preferences: buildPreferencesResponse(prefs, planID, deps.SMSEnabled),
 		})
 	}
 }
@@ -127,6 +124,15 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Gate SMS: reject enabling SMS when the server has no SMS sender configured
+		// or the operator has explicitly hidden SMS (SMS_NOTIFICATIONS_HIDDEN=true).
+		for _, p := range req.Preferences {
+			if p.Enabled && p.Channel == "sms" && !deps.SMSEnabled {
+				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelUnavailableBeta, "SMS notifications are not configured on this server."))
+				return
+			}
+		}
+
 		// Look up plan for the response (SMS availability in response payload).
 		planID := userPlanID(r.Context(), deps.DB, profile.ID)
 
@@ -149,7 +155,7 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs, planID),
+			Preferences: buildPreferencesResponse(prefs, planID, deps.SMSEnabled),
 		})
 	}
 }
@@ -177,8 +183,9 @@ func isPaidPlan(planID string) bool {
 
 // buildPreferencesResponse converts DB preferences into the API response,
 // defaulting missing channels to enabled. The planID controls whether
-// plan-gated channels (SMS) are marked as available.
-func buildPreferencesResponse(prefs []db.NotificationPreference, planID string) []notificationPreferenceResponse {
+// plan-gated channels are marked as available. SMS is excluded entirely
+// when smsEnabled is false (server has no SMS sender or operator hid it).
+func buildPreferencesResponse(prefs []db.NotificationPreference, planID string, smsEnabled bool) []notificationPreferenceResponse {
 	channelMap := make(map[string]bool)
 	for _, p := range prefs {
 		channelMap[p.Channel] = p.Enabled
@@ -187,6 +194,10 @@ func buildPreferencesResponse(prefs []db.NotificationPreference, planID string) 
 	paid := isPaidPlan(planID)
 	result := make([]notificationPreferenceResponse, 0, len(allChannels))
 	for _, ch := range allChannels {
+		// Skip SMS entirely when the server doesn't have it configured.
+		if ch == "sms" && !smsEnabled {
+			continue
+		}
 		enabled, exists := channelMap[ch]
 		if !exists {
 			if betaDisabledChannels[ch] {

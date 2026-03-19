@@ -14,18 +14,19 @@ import { NotificationSection } from "../NotificationSection";
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
+// Default fixture: SMS not configured on server, so excluded from response.
 const allEnabled = [
   { channel: "email", enabled: true, available: true },
   { channel: "web-push", enabled: true, available: true },
-  { channel: "sms", enabled: false, available: false },
   { channel: "mobile-push", enabled: true, available: true },
 ];
 
-const smsGated = [
+// Fixture: SMS configured on server and included.
+const withSmsEnabled = [
   { channel: "email", enabled: true, available: true },
-  { channel: "web-push", enabled: true, available: true },
-  { channel: "sms", enabled: false, available: false },
   { channel: "mobile-push", enabled: true, available: true },
+  { channel: "sms", enabled: true, available: true },
+  { channel: "web-push", enabled: true, available: true },
 ];
 
 interface MockProfile {
@@ -88,7 +89,7 @@ describe("NotificationSection", () => {
     });
   });
 
-  it("renders all four channels", async () => {
+  it("renders channels returned by server (no SMS when not configured)", async () => {
     mockApiFetch();
 
     render(<NotificationSection />, { wrapper });
@@ -97,8 +98,19 @@ describe("NotificationSection", () => {
       expect(screen.getByText("Email")).toBeInTheDocument();
     });
     expect(screen.getByText("Web Push")).toBeInTheDocument();
-    expect(screen.getByText("SMS")).toBeInTheDocument();
     expect(screen.getByText("Mobile Push")).toBeInTheDocument();
+    expect(screen.queryByText("SMS")).not.toBeInTheDocument();
+  });
+
+  it("renders SMS channel when configured on server", async () => {
+    mockApiFetch(profileWithContact, withSmsEnabled);
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("SMS")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Email")).toBeInTheDocument();
   });
 
   it("shows loading state", () => {
@@ -118,7 +130,6 @@ describe("NotificationSection", () => {
     const prefs = [
       { channel: "email", enabled: true, available: true },
       { channel: "web-push", enabled: false, available: true },
-      { channel: "sms", enabled: false, available: false },
       { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileWithContact, prefs);
@@ -134,7 +145,6 @@ describe("NotificationSection", () => {
         (s) => s.getAttribute("data-state") === "unchecked",
       );
       // 2 channels enabled (email, mobile-push) + 2 unchecked (web-push, product updates)
-      // SMS has no switch (beta-disabled)
       expect(checked).toHaveLength(2);
       expect(unchecked).toHaveLength(2);
     });
@@ -154,18 +164,32 @@ describe("NotificationSection", () => {
     });
   });
 
-  it("does not show phone warning when SMS is beta-disabled", async () => {
+  it("does not show phone warning when SMS is not configured", async () => {
     mockApiFetch(profileNoContact, allEnabled);
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Email")).toBeInTheDocument();
+    });
+    // SMS is excluded from response when not configured, so no phone warning.
+    expect(screen.queryByText("SMS")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Add a phone number/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows phone warning when SMS is configured and phone is missing", async () => {
+    mockApiFetch(profileNoContact, withSmsEnabled);
 
     render(<NotificationSection />, { wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("SMS")).toBeInTheDocument();
     });
-    // SMS is gated during beta, so no phone warning should appear.
     expect(
-      screen.queryByText(/Add a phone number/),
-    ).not.toBeInTheDocument();
+      screen.getByText(/Add a phone number/),
+    ).toBeInTheDocument();
   });
 
   it("does not show warnings when contact info is present", async () => {
@@ -188,7 +212,6 @@ describe("NotificationSection", () => {
     const prefs = [
       { channel: "email", enabled: false, available: true },
       { channel: "web-push", enabled: true, available: true },
-      { channel: "sms", enabled: false, available: false },
       { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileNoContact, prefs);
@@ -327,20 +350,8 @@ describe("NotificationSection", () => {
     });
   });
 
-  it("shows SMS as coming soon during beta", async () => {
-    mockApiFetch(profileWithContact, smsGated);
-
-    render(<NotificationSection />, { wrapper });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Coming soon"),
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("does not show toggle button for plan-gated SMS", async () => {
-    mockApiFetch(profileWithContact, smsGated);
+  it("shows toggle for SMS when configured", async () => {
+    mockApiFetch(profileWithContact, withSmsEnabled);
 
     render(<NotificationSection />, { wrapper });
 
@@ -348,22 +359,8 @@ describe("NotificationSection", () => {
       expect(screen.getByText("SMS")).toBeInTheDocument();
     });
 
-    // Should have 3 channel switches (email, web-push, mobile-push) + 1 product updates = 4
-    // SMS should not have a switch (beta-disabled)
-    const switches = screen.getAllByRole("switch");
-    expect(switches).toHaveLength(4);
-  });
-
-  it("does not show missing phone warning for plan-gated SMS", async () => {
-    mockApiFetch(profileNoContact, smsGated);
-
-    render(<NotificationSection />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText("SMS")).toBeInTheDocument();
-    });
-    expect(
-      screen.queryByText(/Add a phone number/),
-    ).not.toBeInTheDocument();
+    // SMS should have a toggle (available=true), not "Coming soon"
+    expect(screen.getByRole("switch", { name: /sms notifications/i })).toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 });

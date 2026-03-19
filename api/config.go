@@ -6,9 +6,10 @@ import "net/http"
 // Add new fields here as more server config needs to be exposed
 // (e.g., feature flags for upcoming features).
 type configResponse struct {
-	BillingEnabled       bool `json:"billing_enabled"`
+	BillingEnabled           bool `json:"billing_enabled"`
 	GoogleOAuthConfigured    bool `json:"google_oauth_configured"`
 	MicrosoftOAuthConfigured bool `json:"microsoft_oauth_configured"`
+	SMSEnabled               bool `json:"sms_enabled"`
 }
 
 func init() {
@@ -38,6 +39,7 @@ func handleGetConfig(deps *Deps) http.HandlerFunc {
 			BillingEnabled:           deps.BillingEnabled,
 			GoogleOAuthConfigured:    googleConfigured,
 			MicrosoftOAuthConfigured: microsoftConfigured,
+			SMSEnabled:               deps.SMSEnabled,
 		})
 	}
 }

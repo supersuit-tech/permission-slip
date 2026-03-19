@@ -309,7 +309,7 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -324,8 +324,9 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if len(resp.Preferences) != len(allChannels) {
-		t.Fatalf("expected %d preferences, got %d", len(allChannels), len(resp.Preferences))
+	// SMS is excluded when SMSEnabled=false, so expect 3 channels (email, mobile-push, web-push).
+	if len(resp.Preferences) != 3 {
+		t.Fatalf("expected 3 preferences (SMS excluded), got %d", len(resp.Preferences))
 	}
 
 	// Index preferences by channel for explicit assertions.
@@ -334,16 +335,16 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 		prefsByChannel[p.Channel] = p
 	}
 
-	// All channels default to enabled when no preferences are set.
-	// SMS and web-push are unavailable during beta regardless of plan.
-	requiredChannels := []string{"email", "web-push", "sms", "mobile-push"}
+	// All non-beta channels default to enabled. web-push is unavailable during beta.
+	// SMS is excluded entirely when SMSEnabled=false.
+	requiredChannels := []string{"email", "web-push", "mobile-push"}
 	for _, ch := range requiredChannels {
 		p, ok := prefsByChannel[ch]
 		if !ok {
 			t.Errorf("expected preference for channel %q", ch)
 			continue
 		}
-		if ch == "sms" || ch == "web-push" {
+		if ch == "web-push" {
 			if p.Enabled {
 				t.Errorf("expected %q to default to disabled during beta", ch)
 			}
@@ -353,11 +354,14 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 		} else if !p.Enabled {
 			t.Errorf("expected channel %q to default to enabled", ch)
 		}
-		if ch != "sms" && ch != "web-push" {
+		if ch != "web-push" {
 			if !p.Available {
 				t.Errorf("expected channel %q to be available", ch)
 			}
 		}
+	}
+	if _, ok := prefsByChannel["sms"]; ok {
+		t.Error("expected SMS to be excluded when SMSEnabled=false")
 	}
 }
 

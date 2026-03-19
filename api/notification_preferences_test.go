@@ -10,14 +10,14 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 )
 
-func TestUpdateNotificationPreferences_EnableSMS_FreeTier_Rejected(t *testing.T) {
+func TestUpdateNotificationPreferences_EnableSMS_WhenNotConfigured_Rejected(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled defaults to false
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -38,14 +38,14 @@ func TestUpdateNotificationPreferences_EnableSMS_FreeTier_Rejected(t *testing.T)
 	}
 }
 
-func TestUpdateNotificationPreferences_EnableSMS_PaidTier_RejectedDuringBeta(t *testing.T) {
+func TestUpdateNotificationPreferences_EnableSMS_WhenConfigured_Allowed(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -53,9 +53,8 @@ func TestUpdateNotificationPreferences_EnableSMS_PaidTier_RejectedDuringBeta(t *
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	// SMS is disabled during beta regardless of plan.
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -80,14 +79,15 @@ func TestUpdateNotificationPreferences_DisableSMS_FreeTier_Allowed(t *testing.T)
 	}
 }
 
-func TestUpdateNotificationPreferences_EnableSMS_NoSubscription_Rejected(t *testing.T) {
+func TestUpdateNotificationPreferences_EnableSMS_NoSubscription_WhenConfigured_Allowed(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	// No subscription row — should be treated as not allowed.
+	// No subscription row — SMS is no longer plan-gated, so this should succeed
+	// when the server has SMS configured.
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -95,8 +95,8 @@ func TestUpdateNotificationPreferences_EnableSMS_NoSubscription_Rejected(t *test
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -121,17 +121,17 @@ func TestUpdateNotificationPreferences_EnableEmail_FreeTier_Allowed(t *testing.T
 	}
 }
 
-func TestUpdateNotificationPreferences_MixedChannels_FreeTier_SMSBlocked(t *testing.T) {
+func TestUpdateNotificationPreferences_MixedChannels_SMSBlocked_WhenNotConfigured(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
-	// Enabling email (allowed) + SMS (blocked) in a single request should fail.
+	// Enabling email (allowed) + SMS (blocked when not configured) in a single request should fail.
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
 		`{"preferences":[{"channel":"email","enabled":true},{"channel":"sms","enabled":true}]}`)
 	w := httptest.NewRecorder()
@@ -142,14 +142,14 @@ func TestUpdateNotificationPreferences_MixedChannels_FreeTier_SMSBlocked(t *test
 	}
 }
 
-func TestGetNotificationPreferences_SMSUnavailable_PaidTier_DuringBeta(t *testing.T) {
+func TestGetNotificationPreferences_SMSExcluded_WhenNotConfigured(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -165,31 +165,28 @@ func TestGetNotificationPreferences_SMSUnavailable_PaidTier_DuringBeta(t *testin
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	// SMS and web-push are unavailable during beta regardless of plan.
+	// SMS should be excluded entirely when not configured on the server.
+	// web-push is still present but unavailable (beta-disabled).
 	for _, p := range resp.Preferences {
-		if p.Channel == "sms" || p.Channel == "web-push" {
+		if p.Channel == "sms" {
+			t.Error("expected SMS to be excluded from response when not configured")
+		}
+		if p.Channel == "web-push" {
 			if p.Available {
-				t.Errorf("expected %q unavailable during beta even on paid plan", p.Channel)
-			}
-			if p.Enabled {
-				t.Errorf("expected %q to default to disabled during beta", p.Channel)
-			}
-		} else {
-			if !p.Available {
-				t.Errorf("expected %q available on paid plan", p.Channel)
+				t.Error("expected web-push unavailable during beta")
 			}
 		}
 	}
 }
 
-func TestGetNotificationPreferences_SMSUnavailable_FreeTier(t *testing.T) {
+func TestGetNotificationPreferences_SMSAvailable_WhenConfigured(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -205,16 +202,20 @@ func TestGetNotificationPreferences_SMSUnavailable_FreeTier(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
+	found := false
 	for _, p := range resp.Preferences {
-		if p.Channel == "sms" || p.Channel == "web-push" {
-			if p.Available {
-				t.Errorf("expected %q unavailable (beta-disabled or plan-gated)", p.Channel)
-			}
-		} else {
+		if p.Channel == "sms" {
+			found = true
 			if !p.Available {
-				t.Errorf("expected %q available on free tier", p.Channel)
+				t.Error("expected SMS to be available when configured")
+			}
+			if !p.Enabled {
+				t.Error("expected SMS to default to enabled when configured")
 			}
 		}
+	}
+	if !found {
+		t.Error("expected SMS channel in preferences response when configured")
 	}
 }
 

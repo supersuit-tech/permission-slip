@@ -264,6 +264,17 @@ func main() {
 	})
 
 	notify.LogChannelSummary(senders)
+
+	// SMS is available when a sender named "sms" was built and the server
+	// operator hasn't explicitly hidden it (e.g. on app.permissionslip.dev).
+	smsConfigured := false
+	for _, s := range senders {
+		if s.Name() == "sms" {
+			smsConfigured = true
+			break
+		}
+	}
+	deps.SMSEnabled = smsConfigured && os.Getenv("SMS_NOTIFICATIONS_HIDDEN") != "true"
 	if deps.DB != nil && len(senders) > 0 {
 		deps.Notifier = notify.NewDispatcher(senders, &notify.DBPreferenceChecker{DB: deps.DB})
 	} else if len(senders) > 0 {
