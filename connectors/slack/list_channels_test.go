@@ -67,7 +67,9 @@ func TestListChannels_Success(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &listChannelsAction{conn: conn}
 
-	params, _ := json.Marshal(listChannelsParams{})
+	// Pass types explicitly — the new default includes private types which
+	// require UserEmail and access-control mocks.
+	params, _ := json.Marshal(listChannelsParams{Types: "public_channel"})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "slack.list_channels",
@@ -102,6 +104,175 @@ func TestListChannels_Success(t *testing.T) {
 	}
 }
 
+func TestListChannels_DefaultTypes(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "C001"},
+					{"id": "D001"},
+				},
+			})
+		case "/conversations.list":
+			var body listChannelsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode: %v", err)
+			}
+			if body.Types != "public_channel,private_channel,mpim,im" {
+				t.Errorf("expected default types 'public_channel,private_channel,mpim,im', got %q", body.Types)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "C001", "name": "general", "is_private": false, "num_members": 10},
+					{"id": "D001", "user": "U_OTHER", "is_private": true, "num_members": 0},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+
+	// No types param — should use the new default (all types).
+	params, _ := json.Marshal(listChannelsParams{})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(data.Channels) != 2 {
+		t.Fatalf("expected 2 channels, got %d", len(data.Channels))
+	}
+	if data.Channels[0].ID != "C001" {
+		t.Errorf("expected first channel C001, got %q", data.Channels[0].ID)
+	}
+	if data.Channels[1].ID != "D001" {
+		t.Errorf("expected second channel D001, got %q", data.Channels[1].ID)
+	}
+}
+
+func TestListChannels_IMChannels(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			// Return the IM channel as one the caller belongs to.
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "D001"},
+					{"id": "D002"},
+				},
+			})
+		case "/conversations.list":
+			var body listChannelsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode: %v", err)
+			}
+			if body.Types != "im" {
+				t.Errorf("expected types 'im', got %q", body.Types)
+			}
+			// IM channels have no name — they have a user field instead.
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{
+						"id":         "D001",
+						"user":       "U_OTHER",
+						"is_private": true,
+						"num_members": 0,
+					},
+					{
+						"id":         "D002",
+						"user":       "U_ANOTHER",
+						"is_private": true,
+						"num_members": 0,
+					},
+					{
+						// DM the caller is NOT a member of — should be filtered out.
+						"id":         "D999",
+						"user":       "U_STRANGER",
+						"is_private": true,
+						"num_members": 0,
+					},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	// D999 should be filtered out (not in caller's membership set).
+	if len(data.Channels) != 2 {
+		t.Fatalf("expected 2 IM channels, got %d", len(data.Channels))
+	}
+	if data.Channels[0].ID != "D001" {
+		t.Errorf("expected first channel D001, got %q", data.Channels[0].ID)
+	}
+	if data.Channels[0].User != "U_OTHER" {
+		t.Errorf("expected user field 'U_OTHER', got %q", data.Channels[0].User)
+	}
+	if data.Channels[0].Name != "" {
+		t.Errorf("expected empty name for IM channel, got %q", data.Channels[0].Name)
+	}
+	if data.Channels[1].ID != "D002" {
+		t.Errorf("expected second channel D002, got %q", data.Channels[1].ID)
+	}
+}
+
 func TestListChannels_WithPagination(t *testing.T) {
 	t.Parallel()
 
@@ -132,6 +303,7 @@ func TestListChannels_WithPagination(t *testing.T) {
 	action := &listChannelsAction{conn: conn}
 
 	params, _ := json.Marshal(listChannelsParams{
+		Types:  "public_channel",
 		Limit:  10,
 		Cursor: "dGVhbTpDMDI=",
 	})
@@ -169,7 +341,7 @@ func TestListChannels_SlackAPIError(t *testing.T) {
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &listChannelsAction{conn: conn}
 
-	params, _ := json.Marshal(listChannelsParams{})
+	params, _ := json.Marshal(listChannelsParams{Types: "public_channel"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "slack.list_channels",

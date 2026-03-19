@@ -92,6 +92,86 @@ func TestSendDM_Success(t *testing.T) {
 	}
 }
 
+func TestSendDM_SelfDM(t *testing.T) {
+	t.Parallel()
+
+	// Slack supports DM-ing yourself by passing your own user ID to
+	// conversations.open. The code path is identical — no special-casing needed.
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/conversations.open":
+			callCount++
+			var body conversationsOpenRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode conversations.open body: %v", err)
+			}
+			// The user ID is the caller's own — Slack returns a self-DM channel.
+			if body.Users != "U_MYSELF" {
+				t.Errorf("expected users 'U_MYSELF', got %q", body.Users)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"channel": map[string]string{"id": "D_SELF"},
+			})
+
+		case "/chat.postMessage":
+			callCount++
+			var body sendMessageRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode chat.postMessage body: %v", err)
+			}
+			if body.Channel != "D_SELF" {
+				t.Errorf("expected channel 'D_SELF', got %q", body.Channel)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"ts":      "1700000000.000001",
+				"channel": "D_SELF",
+			})
+
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendDMAction{conn: conn}
+
+	params, _ := json.Marshal(sendDMParams{
+		UserID:  "U_MYSELF",
+		Message: "Note to self",
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.send_dm",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls, got %d", callCount)
+	}
+
+	var data map[string]string
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["channel"] != "D_SELF" {
+		t.Errorf("expected channel 'D_SELF', got %q", data["channel"])
+	}
+}
+
 func TestSendDM_MissingUserID(t *testing.T) {
 	t.Parallel()
 

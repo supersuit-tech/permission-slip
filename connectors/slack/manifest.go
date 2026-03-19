@@ -69,15 +69,15 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.list_channels",
 				Name:        "List Channels",
-				Description: "List Slack channels visible to the bot",
+				Description: "List Slack channels visible to the bot. Returns all channel types (public, private, group DMs, DMs) by default.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
 						"types": {
 							"type": "string",
-							"default": "public_channel",
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im"
+							"default": "public_channel,private_channel,mpim,im",
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types."
 						},
 						"limit": {
 							"type": "integer",

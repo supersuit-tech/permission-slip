@@ -48,6 +48,7 @@ type listChannelsResponse struct {
 type listChannelEntry struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
+	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
 	IsArchived bool   `json:"is_archived"`
 	NumMembers int    `json:"num_members"`
@@ -67,7 +68,8 @@ type listChannelsResult struct {
 
 type listChannelSummary struct {
 	ID         string `json:"id"`
-	Name       string `json:"name"`
+	Name       string `json:"name,omitempty"`
+	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
 	Topic      string `json:"topic,omitempty"`
 	Purpose    string `json:"purpose,omitempty"`
@@ -88,7 +90,7 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 
 	types := params.Types
 	if types == "" {
-		types = "public_channel"
+		types = "public_channel,private_channel,mpim,im"
 	}
 
 	// When listing private channels, group DMs, or DMs, resolve the user's
@@ -150,6 +152,7 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		result.Channels = append(result.Channels, listChannelSummary{
 			ID:         ch.ID,
 			Name:       ch.Name,
+			User:       ch.User,
 			IsPrivate:  ch.IsPrivate,
 			Topic:      ch.Topic.Value,
 			Purpose:    ch.Purpose.Value,
