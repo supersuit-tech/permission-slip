@@ -387,6 +387,22 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 		}
 	}
 
+	// Resolve the user access token from vault if present (e.g. Slack OAuth v2
+	// stores both a bot token and a user token). The vault ID is stored in
+	// extra_data and must not leak into the credential map.
+	if userVaultID, ok := creds[userTokenVaultIDKey]; ok {
+		delete(creds, userTokenVaultIDKey)
+		userTokenBytes, readErr := deps.Vault.ReadSecret(ctx, deps.DB, userVaultID)
+		if readErr != nil {
+			// Log but don't fail — the user token is optional for most actions.
+			// Actions that require it (e.g. search_messages) will return a clear
+			// error when the credential is missing.
+			log.Printf("failed to read user access token from vault %s: %v", userVaultID, readErr)
+		} else {
+			creds["user_access_token"] = string(userTokenBytes)
+		}
+	}
+
 	// Set access_token AFTER merging extra_data so that a tampered extra_data
 	// field cannot overwrite the vault-sourced access token.
 	creds["access_token"] = string(accessTokenBytes)
