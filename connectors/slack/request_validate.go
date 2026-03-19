@@ -38,7 +38,7 @@ type userIDParams struct {
 func validateChannelFromRaw(params json.RawMessage) error {
 	var p channelParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
 	}
 	if p.Channel == "" {
 		return nil // required-field check is handled by schema validation
@@ -50,7 +50,7 @@ func validateChannelFromRaw(params json.RawMessage) error {
 func validateChannelAndTSFromRaw(params json.RawMessage) error {
 	var p channelAndTSParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
 	}
 	if p.Channel != "" {
 		if err := validateChannelID(p.Channel); err != nil {
@@ -82,7 +82,7 @@ func (a *scheduleMessageAction) ValidateRequest(params json.RawMessage) error {
 func (a *inviteToChannelAction) ValidateRequest(params json.RawMessage) error {
 	var p inviteParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
 	}
 	if p.Channel != "" {
 		if err := validateChannelID(p.Channel); err != nil {
@@ -113,7 +113,7 @@ func (a *readThreadAction) ValidateRequest(params json.RawMessage) error {
 		ThreadTS string `json:"thread_ts"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
-		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
 	}
 	if p.Channel != "" {
 		if err := validateChannelID(p.Channel); err != nil {
@@ -135,7 +135,24 @@ func (a *uploadFileAction) ValidateRequest(params json.RawMessage) error {
 // --- Channel + timestamp actions ---
 
 func (a *addReactionAction) ValidateRequest(params json.RawMessage) error {
-	return validateChannelAndTSFromRaw(params)
+	var p struct {
+		Channel   string `json:"channel"`
+		Timestamp string `json:"timestamp"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
+	}
+	if p.Channel != "" {
+		if err := validateChannelID(p.Channel); err != nil {
+			return err
+		}
+	}
+	if p.Timestamp != "" {
+		if err := validateMessageTS(p.Timestamp); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *updateMessageAction) ValidateRequest(params json.RawMessage) error {
@@ -151,7 +168,7 @@ func (a *deleteMessageAction) ValidateRequest(params json.RawMessage) error {
 func (a *sendDMAction) ValidateRequest(params json.RawMessage) error {
 	var p userIDParams
 	if err := json.Unmarshal(params, &p); err != nil {
-		return &connectors.ValidationError{Message: "invalid parameters: " + err.Error()}
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
 	}
 	if p.UserID == "" {
 		return nil // required-field check is handled by schema validation

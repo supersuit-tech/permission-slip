@@ -156,6 +156,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 				}
 				// Validate parameters early so the agent gets an immediate error
 				// instead of the approval failing at execution time.
+				// If "parameters" is absent entirely, skip — schema validation
+				// (validateActionParameters below) catches missing required fields.
 				if rv, ok := action.(connectors.RequestValidator); ok {
 					if rawParams, hasParams := actionObj["parameters"]; hasParams {
 						if err := rv.ValidateRequest(json.RawMessage(rawParams)); err != nil {

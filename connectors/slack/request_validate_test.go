@@ -70,7 +70,6 @@ func TestRequestValidator_ChannelAndTSActions(t *testing.T) {
 	actions := c.Actions()
 
 	tsActions := []string{
-		"slack.add_reaction",
 		"slack.update_message",
 		"slack.delete_message",
 	}
@@ -148,6 +147,44 @@ func TestRequestValidator_SendDM(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			params, _ := json.Marshal(map[string]string{"user_id": tt.userID})
+			err := rv.ValidateRequest(params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T", err)
+			}
+		})
+	}
+}
+
+// TestRequestValidator_AddReaction verifies that add_reaction validates both channel
+// and the "timestamp" parameter (not "ts") at request time.
+func TestRequestValidator_AddReaction(t *testing.T) {
+	t.Parallel()
+	c := New()
+	action := c.Actions()["slack.add_reaction"]
+
+	rv, ok := action.(connectors.RequestValidator)
+	if !ok {
+		t.Fatal("slack.add_reaction does not implement RequestValidator")
+	}
+
+	tests := []struct {
+		name    string
+		params  map[string]string
+		wantErr bool
+	}{
+		{name: "valid channel and timestamp", params: map[string]string{"channel": "C01234567", "timestamp": "1234567890.123456"}, wantErr: false},
+		{name: "invalid channel", params: map[string]string{"channel": "general", "timestamp": "1234567890.123456"}, wantErr: true},
+		{name: "invalid timestamp", params: map[string]string{"channel": "C01234567", "timestamp": "not-a-timestamp"}, wantErr: true},
+		{name: "empty timestamp is ok", params: map[string]string{"channel": "C01234567", "timestamp": ""}, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(tt.params)
 			err := rv.ValidateRequest(params)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
