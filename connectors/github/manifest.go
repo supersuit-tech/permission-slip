@@ -18,6 +18,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "github",
 		Name:        "GitHub",
 		Description: "GitHub integration for repository management",
+		Status:      "tested",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{

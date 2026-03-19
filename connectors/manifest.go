@@ -21,6 +21,7 @@ type ConnectorManifest struct {
 	ID                  string                  `json:"id"`
 	Name                string                  `json:"name"`
 	Description         string                  `json:"description"`
+	Status              string                  `json:"status,omitempty"`
 	LogoSVG             string                  `json:"logo_svg,omitempty"`
 	Actions             []ManifestAction        `json:"actions"`
 	RequiredCredentials []ManifestCredential    `json:"required_credentials"`
@@ -90,6 +91,13 @@ const maxInstructionsURLLen = 2048
 
 // idPattern matches valid connector IDs: lowercase alphanumeric with hyphens/underscores.
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
+
+// validStatuses are the allowed values for connector status.
+var validStatuses = map[string]bool{
+	"tested":        true,
+	"early_preview": true,
+	"untested":      true,
+}
 
 // validRiskLevels are the allowed values for action risk levels.
 var validRiskLevels = map[string]bool{
@@ -195,6 +203,9 @@ func (m *ConnectorManifest) Validate() error {
 	}
 	if m.Name == "" {
 		return fmt.Errorf("manifest validation: name is required")
+	}
+	if m.Status != "" && !validStatuses[m.Status] {
+		return fmt.Errorf("manifest validation: status %q must be tested, early_preview, or untested", m.Status)
 	}
 	if len(m.Actions) == 0 {
 		return fmt.Errorf("manifest validation: at least one action is required")
@@ -581,10 +592,15 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 // struct the DB upsert layer expects. This centralises the conversion so callers
 // (main.go, cmd/seed, etc.) don't duplicate the field-mapping logic.
 func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
+	status := m.Status
+	if status == "" {
+		status = "untested"
+	}
 	out := db.ExternalConnectorManifest{
 		ID:          m.ID,
 		Name:        m.Name,
 		Description: m.Description,
+		Status:      status,
 		LogoSVG:     m.LogoSVG,
 	}
 	for _, a := range m.Actions {

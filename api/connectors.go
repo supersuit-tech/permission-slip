@@ -15,6 +15,7 @@ type connectorSummaryResponse struct {
 	ID                  string   `json:"id"`
 	Name                string   `json:"name"`
 	Description         *string  `json:"description,omitempty"`
+	Status              string   `json:"status"`
 	LogoSVG             *string  `json:"logo_svg,omitempty"`
 	Actions             []string `json:"actions"`
 	RequiredCredentials []string `json:"required_credentials"`
@@ -47,6 +48,7 @@ type connectorDetailResponse struct {
 	ID                  string                      `json:"id"`
 	Name                string                      `json:"name"`
 	Description         *string                     `json:"description,omitempty"`
+	Status              string                      `json:"status"`
 	LogoSVG             *string                     `json:"logo_svg,omitempty"`
 	Actions             []connectorActionResponse   `json:"actions"`
 	RequiredCredentials []requiredCredentialResponse `json:"required_credentials"`
@@ -111,6 +113,7 @@ func toConnectorSummaryResponse(c db.ConnectorSummary) connectorSummaryResponse 
 		ID:                  c.ID,
 		Name:                c.Name,
 		Description:         c.Description,
+		Status:              c.Status,
 		LogoSVG:             c.LogoSVG,
 		Actions:             c.Actions,
 		RequiredCredentials: c.RequiredCredentials,
@@ -162,6 +165,7 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 		ID:                  c.ID,
 		Name:                c.Name,
 		Description:         c.Description,
+		Status:              c.Status,
 		LogoSVG:             c.LogoSVG,
 		Actions:             actions,
 		RequiredCredentials: creds,

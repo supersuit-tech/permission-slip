@@ -13,6 +13,7 @@ type ConnectorSummary struct {
 	ID                  string
 	Name                string
 	Description         *string
+	Status              string
 	LogoSVG             *string
 	Actions             []string // action_type values
 	RequiredCredentials []string // service values
@@ -23,6 +24,7 @@ type ConnectorDetail struct {
 	ID                  string
 	Name                string
 	Description         *string
+	Status              string
 	LogoSVG             *string
 	Actions             []ConnectorAction
 	RequiredCredentials []RequiredCredential
@@ -52,13 +54,13 @@ type RequiredCredential struct {
 // ListConnectors returns all connectors with their action types and required credential services.
 func ListConnectors(ctx context.Context, db DBTX) ([]ConnectorSummary, error) {
 	rows, err := db.Query(ctx, `
-		SELECT c.id, c.name, c.description, c.logo_svg,
+		SELECT c.id, c.name, c.description, c.status, c.logo_svg,
 		       COALESCE(array_agg(DISTINCT ca.action_type ORDER BY ca.action_type) FILTER (WHERE ca.action_type IS NOT NULL), '{}'),
 		       COALESCE(array_agg(DISTINCT crc.service ORDER BY crc.service) FILTER (WHERE crc.service IS NOT NULL), '{}')
 		FROM connectors c
 		LEFT JOIN connector_actions ca ON ca.connector_id = c.id
 		LEFT JOIN connector_required_credentials crc ON crc.connector_id = c.id
-		GROUP BY c.id, c.name, c.description, c.logo_svg
+		GROUP BY c.id, c.name, c.description, c.status, c.logo_svg
 		ORDER BY c.id`)
 	if err != nil {
 		return nil, err
@@ -68,7 +70,7 @@ func ListConnectors(ctx context.Context, db DBTX) ([]ConnectorSummary, error) {
 	var connectors []ConnectorSummary
 	for rows.Next() {
 		var cs ConnectorSummary
-		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.LogoSVG, &cs.Actions, &cs.RequiredCredentials); err != nil {
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.Status, &cs.LogoSVG, &cs.Actions, &cs.RequiredCredentials); err != nil {
 			return nil, err
 		}
 		connectors = append(connectors, cs)
@@ -82,9 +84,9 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 	// Fetch the connector row.
 	var cd ConnectorDetail
 	err := db.QueryRow(ctx,
-		`SELECT id, name, description, logo_svg FROM connectors WHERE id = $1`,
+		`SELECT id, name, description, status, logo_svg FROM connectors WHERE id = $1`,
 		connectorID,
-	).Scan(&cd.ID, &cd.Name, &cd.Description, &cd.LogoSVG)
+	).Scan(&cd.ID, &cd.Name, &cd.Description, &cd.Status, &cd.LogoSVG)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -237,6 +239,7 @@ type ExternalConnectorManifest struct {
 	ID          string
 	Name        string
 	Description string
+	Status      string
 	LogoSVG     string
 	Actions     []ExternalConnectorAction
 	Credentials []ExternalConnectorCredential
@@ -288,11 +291,15 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	}
 
 	// Upsert the connector record.
+	status := m.Status
+	if status == "" {
+		status = "untested"
+	}
 	_, err = tx.Exec(ctx, `
-		INSERT INTO connectors (id, name, description, logo_svg)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, logo_svg = EXCLUDED.logo_svg`,
-		m.ID, m.Name, nilIfEmpty(m.Description), nilIfEmpty(m.LogoSVG))
+		INSERT INTO connectors (id, name, description, status, logo_svg)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, status = EXCLUDED.status, logo_svg = EXCLUDED.logo_svg`,
+		m.ID, m.Name, nilIfEmpty(m.Description), status, nilIfEmpty(m.LogoSVG))
 	if err != nil {
 		return err
 	}
