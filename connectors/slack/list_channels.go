@@ -47,6 +47,9 @@ type listChannelsResponse struct {
 	Meta     *paginationMeta    `json:"response_metadata,omitempty"`
 }
 
+// listChannelEntry maps the Slack API response for a single channel from
+// conversations.list. IM channels (DMs) omit Name and instead populate User
+// with the other participant's Slack user ID.
 type listChannelEntry struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
@@ -68,6 +71,9 @@ type listChannelsResult struct {
 	NextCursor string               `json:"next_cursor,omitempty"`
 }
 
+// listChannelSummary is the user-facing output for a single channel. For IM
+// channels, Name is empty and User contains the other participant's Slack user
+// ID. Both fields use omitempty so the JSON output only includes relevant fields.
 type listChannelSummary struct {
 	ID         string `json:"id"`
 	Name       string `json:"name,omitempty"`

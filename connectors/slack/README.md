@@ -369,7 +369,7 @@ Adds an emoji reaction to a Slack message.
 
 ### `slack.send_dm`
 
-Sends a direct message to a Slack user. Opens (or reuses) a DM channel with the user, then posts the message.
+Sends a direct message to a Slack user. Opens (or reuses) a DM channel with the user, then posts the message. Self-DMs are supported — passing your own user ID opens a "note to self" channel.
 
 **Risk level:** low
 
