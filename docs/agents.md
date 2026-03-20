@@ -482,11 +482,13 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 {
   "agent_id": 42,
   "request_id": "unique-uuid-here",
-  "configuration_id": "ac_9f8e7d6c5b4a39281706f5e4d3c2b1a0",
-  "parameters": {
-    "to": ["coworker@mycompany.com"],
-    "subject": "Meeting notes",
-    "body": "Here are the notes from today's meeting."
+  "action": {
+    "type": "email.send",
+    "parameters": {
+      "to": ["coworker@mycompany.com"],
+      "subject": "Meeting notes",
+      "body": "Here are the notes from today's meeting."
+    }
   },
   "context": {
     "description": "Sending meeting notes",
@@ -507,6 +509,10 @@ When a standing approval matches, the response returns `status: "approved"` with
   "executions_remaining": 87
 }
 ```
+
+- **`standing_approval_id`** — identifies which pre-approval authorized this execution (useful for audit tracking and logging).
+- **`executions_remaining`** — how many more times this standing approval can be used. `null` means unlimited. Track this value to avoid hitting the limit unexpectedly.
+- **Idempotency** — if you receive `status: "approved"`, the action has already executed. Do not retry with the same `request_id` — you'll get `409 Conflict`.
 
 If no standing approval matches, the response returns `status: "pending"` and the standard one-off approval flow begins (user receives a notification for review).
 

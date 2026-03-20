@@ -983,6 +983,8 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
   - `description` (string, required): Brief action summary
   - `risk_level` (string, optional): `low`, `medium`, or `high`
   - `details` (object, optional): Additional context for UI display
+- `payment_method_id` (string, optional): Payment method ID for payment-required actions. Forwarded to the connector when a standing approval auto-approves.
+- `amount_cents` (integer, optional): Transaction amount in cents. Required when `payment_method_id` is provided.
 
 **Validation:**
 
