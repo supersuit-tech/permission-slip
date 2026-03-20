@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Slack, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -87,6 +87,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `SQUARE_CLIENT_ID` | Production Application ID from Square Developer Dashboard |
 | `SQUARE_CLIENT_SECRET` | Production Application Secret from Square Developer Dashboard |
+
+### Slack OAuth
+
+| Variable | Description |
+|---|---|
+| `SLACK_CLIENT_ID` | Client ID from [Your Apps](https://api.slack.com/apps) (App Credentials) |
+| `SLACK_CLIENT_SECRET` | Client Secret from the same Slack app |
 
 ### Stripe OAuth
 
@@ -543,6 +550,56 @@ SQUARE_CLIENT_SECRET=your-production-application-secret
 
 > **Note:** The Square connector supports both OAuth and API key authentication. OAuth is recommended for production use. API keys can be generated from the Square Developer Dashboard under **Credentials > Production Access Token**.
 
+## Slack OAuth Setup
+
+Slack uses [OAuth 2.0 with the V2 flow](https://api.slack.com/authentication/oauth-v2): bot scopes produce a bot user token (`xoxb-`), and user scopes produce a user token (`xoxp-`) used for APIs that only accept user tokens (for example `search.messages`).
+
+### 1. Create a Slack app
+
+1. Go to [Your Apps](https://api.slack.com/apps)
+2. Click **Create New App** and choose **From scratch**
+3. Name the app (e.g., "Permission Slip") and pick a development workspace
+
+### 2. Configure redirect URL
+
+1. Open **OAuth & Permissions**
+2. Under **Redirect URLs**, add:
+   ```
+   https://your-domain.com/api/v1/oauth/slack/callback
+   ```
+
+### 3. Configure scopes
+
+Under **Scopes**, add **Bot Token Scopes** and **User Token Scopes** to match what the connector requests:
+
+**Bot Token Scopes**
+
+- `channels:history`, `channels:join`, `channels:manage`, `channels:read`
+- `chat:write`
+- `files:write`
+- `groups:history`, `groups:read`
+- `im:history`, `im:read`, `im:write`
+- `mpim:history`, `mpim:read`
+- `reactions:write`
+- `users:read`, `users:read.email`
+
+**User Token Scopes** (required for search actions that only work with user tokens)
+
+- `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`
+
+### 4. Configure environment
+
+```bash
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+```
+
+Find **Client ID** and **Client Secret** under **Basic Information > App Credentials**.
+
+### 5. Install to workspace
+
+When a user connects Slack from Permission Slip, they complete Slack’s OAuth consent and install the app to their workspace. No manual “reinstall” is required beyond that flow unless you change scopes—in that case, users may need to **Re-authorize** from the connector settings.
+
 ## Stripe OAuth Setup
 
 Stripe uses [Stripe Connect](https://docs.stripe.com/connect) OAuth to authorize access to Stripe accounts. This lets users connect their Stripe account without manually creating and pasting API keys.
@@ -771,6 +828,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
 - PagerDuty: `https://your-domain.com/api/v1/oauth/pagerduty/callback`
+- Slack: `https://your-domain.com/api/v1/oauth/slack/callback`
 - Square: `https://your-domain.com/api/v1/oauth/square/callback`
 - Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
