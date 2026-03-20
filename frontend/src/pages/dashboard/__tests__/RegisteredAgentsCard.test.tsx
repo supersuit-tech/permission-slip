@@ -35,7 +35,7 @@ const freePlanResponse = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 250 as number | null,
+    max_requests_per_month: 1000 as number | null,
     max_agents: 3 as number | null,
     max_standing_approvals: 5 as number | null,
     max_credentials: 5 as number | null,

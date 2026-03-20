@@ -15,8 +15,8 @@ func TestGetPlan_Free(t *testing.T) {
 	if p.Name != "Free" {
 		t.Errorf("expected Name 'Free', got %q", p.Name)
 	}
-	if p.MaxRequestsPerMonth == nil || *p.MaxRequestsPerMonth != 250 {
-		t.Errorf("expected MaxRequestsPerMonth=250, got %v", p.MaxRequestsPerMonth)
+	if p.MaxRequestsPerMonth == nil || *p.MaxRequestsPerMonth != 1000 {
+		t.Errorf("expected MaxRequestsPerMonth=1000, got %v", p.MaxRequestsPerMonth)
 	}
 	if p.MaxAgents == nil || *p.MaxAgents != 3 {
 		t.Errorf("expected MaxAgents=3, got %v", p.MaxAgents)

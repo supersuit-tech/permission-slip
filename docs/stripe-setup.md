@@ -19,7 +19,7 @@ Billing is gated behind `BILLING_ENABLED` (defaults to `false`). When disabled, 
 
 ### 2. Create a metered Price for per-request billing
 
-This creates a usage-based price so users are charged based on API request volume (250 free per month, then $0.005/request). See `config/plans.json` for the current free-tier limit.
+This creates a usage-based price so users are charged based on API request volume (1000 free per month, then $0.005/request). See `config/plans.json` for the current free-tier limit.
 
 1. Go to [Stripe Dashboard → Products](https://dashboard.stripe.com/products)
 2. Click **+ Add product**
@@ -227,8 +227,8 @@ After setup (local or production), verify the end-to-end flow:
 
 | Plan | Included requests | Overage cost | Audit retention |
 |---|---|---|---|
-| `free` | 250/month | N/A (blocked) | 7 days |
-| `pay_as_you_go` | Unlimited | $0.005/request | 90 days |
+| `free` | 1000/month | N/A (blocked) | 7 days |
+| `pay_as_you_go` | 1000/mo free, then metered | $0.005/request | 90 days |
 
 > **Source of truth:** Plan limits are defined in `config/plans.json`. The values above reflect that config at time of writing.
 

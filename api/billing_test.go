@@ -187,8 +187,8 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	if resp.Pricing == nil {
 		t.Fatal("expected pricing to be present for paid plan")
 	}
-	if resp.Pricing.FreeRequestAllowance != 250 {
-		t.Errorf("expected free_request_allowance=250, got %d", resp.Pricing.FreeRequestAllowance)
+	if resp.Pricing.FreeRequestAllowance != 1000 {
+		t.Errorf("expected free_request_allowance=1000, got %d", resp.Pricing.FreeRequestAllowance)
 	}
 	if resp.Pricing.PricePerRequestDisplay != "$0.005" {
 		t.Errorf("expected price_per_request_display=$0.005, got %s", resp.Pricing.PricePerRequestDisplay)
@@ -222,8 +222,8 @@ func TestGetBillingPlan_FreePlan_IncludesPricing(t *testing.T) {
 	if resp.Pricing == nil {
 		t.Fatal("expected pricing to be present for free plan (for upgrade flow)")
 	}
-	if resp.Pricing.FreeRequestAllowance != 250 {
-		t.Errorf("expected free_request_allowance=250, got %d", resp.Pricing.FreeRequestAllowance)
+	if resp.Pricing.FreeRequestAllowance != 1000 {
+		t.Errorf("expected free_request_allowance=1000, got %d", resp.Pricing.FreeRequestAllowance)
 	}
 }
 
@@ -404,7 +404,7 @@ func TestGetSubscription_WithUsage(t *testing.T) {
 		t.Errorf("expected request_count=5, got %d", resp.Usage.RequestCount)
 	}
 	if resp.Usage.OverLimit {
-		t.Error("expected over_limit=false for 5 requests on free plan (250 limit)")
+		t.Error("expected over_limit=false for 5 requests on free plan (1000 limit)")
 	}
 }
 
@@ -538,8 +538,8 @@ func TestGetUsage_ReturnsUsage(t *testing.T) {
 	if resp.Requests.Total != 5 {
 		t.Errorf("expected requests.total=5, got %d", resp.Requests.Total)
 	}
-	if resp.Requests.Included != 250 {
-		t.Errorf("expected requests.included=250, got %d", resp.Requests.Included)
+	if resp.Requests.Included != 1000 {
+		t.Errorf("expected requests.included=1000, got %d", resp.Requests.Included)
 	}
 	if resp.Requests.Overage != 0 {
 		t.Errorf("expected requests.overage=0, got %d", resp.Requests.Overage)
@@ -600,8 +600,8 @@ func TestGetUsage_ZeroUsage(t *testing.T) {
 	if resp.Requests.Total != 0 {
 		t.Errorf("expected requests.total=0, got %d", resp.Requests.Total)
 	}
-	if resp.Requests.Included != 250 {
-		t.Errorf("expected requests.included=250 (free plan), got %d", resp.Requests.Included)
+	if resp.Requests.Included != 1000 {
+		t.Errorf("expected requests.included=1000 (free plan), got %d", resp.Requests.Included)
 	}
 }
 
@@ -613,11 +613,11 @@ func TestGetUsage_WithOverage(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	// Insert usage that exceeds the free limit (250) directly.
+	// Insert usage that exceeds the free limit (1000) directly.
 	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
 	testhelper.MustExec(t, tx,
 		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count)
-		 VALUES ($1, $2, $3, 300)`,
+		 VALUES ($1, $2, $3, 1050)`,
 		uid, periodStart, periodEnd)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
@@ -635,8 +635,8 @@ func TestGetUsage_WithOverage(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if resp.Requests.Total != 300 {
-		t.Errorf("expected requests.total=300, got %d", resp.Requests.Total)
+	if resp.Requests.Total != 1050 {
+		t.Errorf("expected requests.total=1050, got %d", resp.Requests.Total)
 	}
 	if resp.Requests.Overage != 50 {
 		t.Errorf("expected requests.overage=50, got %d", resp.Requests.Overage)

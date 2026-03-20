@@ -9,7 +9,7 @@ export const freePlanResponse = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 250,
+    max_requests_per_month: 1000,
     max_agents: 3,
     max_standing_approvals: 5,
     max_credentials: 5,
@@ -74,7 +74,7 @@ export const overLimitPaidPlanResponse = {
 export const atLimitPaidPlanResponse = {
   ...paidPlanResponse,
   usage: {
-    requests: 250,
+    requests: 1000,
     agents: 3,
     standing_approvals: 5,
     credentials: 5,
@@ -84,7 +84,7 @@ export const atLimitPaidPlanResponse = {
 export const usageDetailResponse = {
   period_start: "2026-03-01T00:00:00Z",
   period_end: "2026-04-01T00:00:00Z",
-  requests: { total: 1542, included: 250, overage: 1292, cost_cents: 646 },
+  requests: { total: 1542, included: 1000, overage: 542, cost_cents: 271 },
   sms: { total: 5, cost_cents: 5 },
   breakdown: {
     by_agent: { "1": 500, "2": 1042 },
@@ -97,7 +97,7 @@ export const usageDetailResponse = {
 export const paidUnderAllowanceUsageResponse = {
   period_start: "2026-03-01T00:00:00Z",
   period_end: "2026-04-01T00:00:00Z",
-  requests: { total: 80, included: 250, overage: 0, cost_cents: 0 },
+  requests: { total: 80, included: 1000, overage: 0, cost_cents: 0 },
   sms: { total: 0, cost_cents: 0 },
   breakdown: {
     by_agent: { "1": 80 },
@@ -109,7 +109,7 @@ export const paidUnderAllowanceUsageResponse = {
 export const freeUsageDetailResponse = {
   period_start: "2026-03-01T00:00:00Z",
   period_end: "2026-04-01T00:00:00Z",
-  requests: { total: 150, included: 250, overage: 0, cost_cents: 0 },
+  requests: { total: 150, included: 1000, overage: 0, cost_cents: 0 },
   sms: { total: 0, cost_cents: 0 },
   breakdown: {
     by_agent: { "1": 80, "2": 70 },

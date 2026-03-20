@@ -19,11 +19,11 @@ We use **calendar-month cycles with the full allowance** for all free-tier users
 
 ## Rationale
 
-**Per-user anchors create confusing UX on the free tier.** Showing users "your 250 requests reset on the 23rd" feels arbitrary and is harder to reason about. Clean calendar boundaries ("resets on the 1st") are simple to communicate and understand.
+**Per-user anchors create confusing UX on the free tier.** Showing users "your 1000 requests reset on the 23rd" feels arbitrary and is harder to reason about. Clean calendar boundaries ("resets on the 1st") are simple to communicate and understand.
 
 **Proration punishes new users.** If someone signs up on March 25 and gets prorated to ~40 requests for the rest of the month, their first impression is hitting a paywall almost immediately. Generous first experiences convert better — the whole point of a free tier is to let people evaluate the product without friction.
 
-**The "exploit" isn't worth optimizing against.** The worst case is someone signing up on March 31, using 250 requests, then getting another 250 on April 1. That's 500 free requests — a negligible cost that doesn't justify the added complexity of proration or per-user anchors.
+**The "exploit" isn't worth optimizing against.** The worst case is someone signing up on March 31, using 1000 requests, then getting another 1000 on April 1. That's 2000 free requests — a negligible cost that doesn't justify the added complexity of proration or per-user anchors.
 
 **Simplicity reduces bugs.** Calendar-month alignment means one function (`BillingPeriodBounds`) handles all period calculations. No per-user state to track, no edge cases around anchor dates falling on the 29th/30th/31st, no timezone confusion.
 

@@ -1,7 +1,7 @@
 import { freePlan, paidPlan, formatLimit, PRICE_PER_REQUEST } from "@/config/plans";
 
 /** Number of free requests included per month for all plans. */
-export const FREE_REQUEST_ALLOWANCE: number = freePlan.max_requests_per_month ?? 250;
+export const FREE_REQUEST_ALLOWANCE: number = freePlan.max_requests_per_month ?? 1000;
 
 // Re-export for backward compatibility — canonical definition is in @/config/plans.
 export { PRICE_PER_REQUEST };

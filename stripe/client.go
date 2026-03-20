@@ -205,7 +205,7 @@ var freeRequestAllowance = func() int64 {
 	if p != nil && p.MaxRequestsPerMonth != nil {
 		return int64(*p.MaxRequestsPerMonth)
 	}
-	return 250 // fallback
+	return 1000 // fallback
 }()
 
 // FreeRequestAllowance returns the number of free requests per billing period.

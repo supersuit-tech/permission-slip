@@ -5011,7 +5011,7 @@ paths:
                 has_payment_method: false
                 can_upgrade: true
                 plan_limits:
-                  max_requests_per_month: 250
+                  max_requests_per_month: 1000
                   max_agents: 5
                   max_standing_approvals: 10
                   max_credentials: 5
@@ -5019,7 +5019,7 @@ paths:
                 usage:
                   request_count: 42
                   sms_count: 0
-                  request_limit: 250
+                  request_limit: 1000
                   over_limit: false
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -5066,9 +5066,9 @@ paths:
                 period_end: '2026-04-01T00:00:00Z'
                 requests:
                   total: 1542
-                  included: 250
-                  overage: 1292
-                  cost_cents: 646
+                  included: 1000
+                  overage: 542
+                  cost_cents: 271
                 sms:
                   total: 5
                   cost_cents: 5
@@ -5396,7 +5396,7 @@ paths:
                 plan:
                   id: free
                   name: Free
-                  max_requests_per_month: 250
+                  max_requests_per_month: 1000
                   max_agents: 3
                   max_standing_approvals: 5
                   max_credentials: 5
@@ -9820,7 +9820,7 @@ components:
           type: integer
           nullable: true
           description: Monthly request limit for the current plan (null = unlimited)
-          example: 250
+          example: 1000
         over_limit:
           type: boolean
           description: Whether current usage exceeds the plan's request limit
@@ -9860,7 +9860,7 @@ components:
         included:
           type: integer
           description: Number of requests included in the plan for free (0 = unlimited on paid plans)
-          example: 250
+          example: 1000
         overage:
           type: integer
           description: Number of requests exceeding the included allowance
@@ -10122,7 +10122,7 @@ components:
           description: |
             Number of requests included in the plan at no extra cost.
             0 when the plan has no request limit (e.g. pay-as-you-go).
-          example: 250
+          example: 1000
         overage:
           type: integer
           description: |
@@ -10263,12 +10263,12 @@ components:
       example:
         error:
           code: monthly_quota_exceeded
-          message: Free tier limit of 250 requests/month reached. Upgrade to continue.
+          message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
           retryable: true
           retry_after: 2419200
           details:
-            limit: 250
-            current_usage: 250
+            limit: 1000
+            current_usage: 1000
             plan_id: free
             reset_at: '2026-04-01T00:00:00Z'
     QuotaExceededDetails:
@@ -10278,7 +10278,7 @@ components:
         limit:
           type: integer
           description: The plan's request limit
-          example: 250
+          example: 1000
         current_count:
           type: integer
           description: Current usage count
@@ -11340,7 +11340,7 @@ components:
           type: integer
           nullable: true
           description: Monthly request limit (null = unlimited)
-          example: 250
+          example: 1000
         max_agents:
           type: integer
           nullable: true
@@ -11801,12 +11801,12 @@ components:
               value:
                 error:
                   code: monthly_quota_exceeded
-                  message: Free tier limit of 250 requests/month reached. Upgrade to continue.
+                  message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
                   retryable: true
                   retry_after: 86400
                   details:
-                    current_usage: 250
-                    limit: 250
+                    current_usage: 1000
+                    limit: 1000
                     plan_id: free
                     reset_at: '2026-04-01T00:00:00Z'
                   trace_id: trace_xyz789
