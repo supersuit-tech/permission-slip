@@ -53,7 +53,7 @@ Standing approvals are agent-specific and require authentication, so they are **
 ```
 Agent                          Permission Slip                    Gmail
   │                                  │                              │
-  │  POST /v1/actions/execute        │                              │
+  │  POST /v1/approvals/request      │                              │
   │  {request_id: "...",             │                              │
   │   action: {type: "email.read",   │                              │
   │    parameters: {sender: "*@github.com"}}} │                     │
@@ -221,7 +221,7 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 
 ## Consequences
 
-- The `/v1/actions/execute` endpoint now supports two authorization modes, distinguished by the presence of the `Authorization: Bearer` header: bearer token (one-off) and agent signature + standing approval match. Both modes use the same request body structure.
+- The `POST /v1/approvals/request` endpoint now handles both flows: it checks for matching standing approvals before creating a pending approval. If a standing approval matches, the action is auto-approved and executed immediately (returning `status: "approved"` with the result inline). If no standing approval matches, a pending approval is created as before (`status: "pending"`).
 - The web interface needs a standing approval management UI (create, list, revoke).
 - A new authenticated endpoint is needed for agents to discover their active standing approvals (separate from the unauthenticated `GET /v1/connectors` discovery endpoint).
 - Audit queries need to distinguish one-off executions from standing executions.

@@ -189,7 +189,7 @@ sequenceDiagram
         Note over PS: Verify code, issue<br/>single-use JWT token
         PS-->>-Agent: {status: "approved",<br/>token: {access_token, expires_at}}
 
-        Agent->>+PS: POST /v1/actions/execute<br/>Authorization: Bearer <token><br/>{to, subject, body}
+        Agent->>+PS: POST /v1/approvals/request<br/>(with token)<br/>{to, subject, body}
         Note over PS: Verify JWT signature,<br/>check jti (single-use),<br/>verify params_hash
         PS->>+Ext: Gmail API call<br/>(using stored credentials)
         Ext-->>-PS: {message_id, status: "sent"}

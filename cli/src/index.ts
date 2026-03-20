@@ -11,9 +11,8 @@
  *   status        Show registration state, or check approval status
  *   capabilities  List available action configurations and standing approvals
  *   connectors    List available connectors
- *   request        Request approval for an action (auto-executes on approval)
+ *   request        Request approval for an action (auto-approves if standing approval matches)
  *   request-status Check the status/outcome of an approval request
- *   execute        Execute an action using a standing approval
  *   config        Show saved configuration and registrations
  *   whoami        Show agent identity and registration info
  *
@@ -28,7 +27,6 @@ import { capabilitiesCommand } from "./commands/capabilities.js";
 import { connectorsCommand } from "./commands/connectors.js";
 import { requestCommand } from "./commands/request.js";
 import { requestStatusCommand } from "./commands/request-status.js";
-import { executeCommand } from "./commands/execute.js";
 import { configCommand } from "./commands/config.js";
 import { whoamiCommand } from "./commands/whoami.js";
 
@@ -53,7 +51,6 @@ capabilitiesCommand(program);
 connectorsCommand(program);
 requestCommand(program);
 requestStatusCommand(program);
-executeCommand(program);
 configCommand(program);
 whoamiCommand(program);
 

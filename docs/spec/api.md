@@ -796,8 +796,8 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", timestamp="1707
 
 1. **Check `connectors`**: What services are available?
 2. **Check `credentials_ready`**: If `false`, prompt user to visit `credentials_setup_url`
-3. **Check `standing_approvals`** for desired action: If non-empty with matching constraints, execute directly via `POST /v1/actions/execute` (no token needed)
-4. **If no matching standing approval**: Use one-off flow via `POST /v1/approvals/request`
+3. **Check `standing_approvals`** for desired action: If non-empty with matching constraints, `POST /v1/approvals/request` will auto-approve and execute immediately
+4. **If no matching standing approval**: Use one-off flow via `POST /v1/approvals/request` (creates a pending approval for user review)
 
 **Error Responses:**
 
@@ -983,12 +983,16 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
   - `description` (string, required): Brief action summary
   - `risk_level` (string, optional): `low`, `medium`, or `high`
   - `details` (object, optional): Additional context for UI display
+- `payment_method_id` (string, optional): Payment method ID for payment-required actions. Forwarded to the connector when a standing approval auto-approves.
+- `amount_cents` (integer, optional): Transaction amount in cents. Required when `payment_method_id` is provided.
 
 **Validation:**
 
 Services MUST verify that the `agent_id` in the request body matches the `agent_id` in the `X-Permission-Slip-Signature` header. If they do not match, return `400 Bad Request` with error code `agent_id_mismatch`.
 
-**Response (200 OK):**
+**Response (200 OK — Pending Approval):**
+
+When no matching standing approval exists, a pending approval is created for user review:
 
 ```json
 {
@@ -1004,7 +1008,21 @@ Services MUST verify that the `agent_id` in the request body matches the `agent_
 }
 ```
 
-**Fields:**
+**Response (200 OK — Auto-Approved via Standing Approval):**
+
+When a matching standing approval exists, the action is auto-approved and executed immediately:
+
+```json
+{
+  "status": "approved",
+  "result": {
+    "emails": [...]
+  },
+  "standing_approval_id": "sa_abc123"
+}
+```
+
+**Fields (pending response):**
 
 - `approval_id` (string, required): Unique approval identifier
 - `approval_url` (string, required): Primary approval URL (universal link)
@@ -1012,6 +1030,15 @@ Services MUST verify that the `agent_id` in the request body matches the `agent_
 - `status` (string, required): Approval status (`pending`)
 - `expires_at` (string, required): ISO 8601 timestamp when approval expires
 - `verification_required` (boolean, required): Always `true` (confirmation code required)
+
+**Fields (auto-approved response):**
+
+- `status` (string, required): Approval status (`approved`)
+- `result` (object, required): Action result from the external service
+- `standing_approval_id` (string, required): Which standing approval authorized this execution
+- `executions_remaining` (integer, optional): Remaining executions. Present only when the standing approval has a finite `max_executions`; absent when unlimited.
+
+> **Execution slot consumption on error:** When a standing approval matches, the execution slot is consumed _before_ the connector action runs. If the connector fails (network timeout, upstream error, etc.), the slot is still consumed. On untyped 500 errors, the response includes `executions_remaining` and `standing_approval_id` in the error `details` so agents can track quota erosion. Agents should monitor `executions_remaining` and request a new standing approval if the quota runs low due to transient failures.
 
 **Error Responses:**
 
@@ -1194,32 +1221,9 @@ After receiving an approval token from the one-off flow, the agent uses it to pe
 
 ### Using the Token
 
-The agent presents the token in the `Authorization: Bearer` header when calling Permission Slip's **action execution endpoint**. The request body uses the same structure as all other action requests. Permission Slip validates the token, then executes the action by calling the appropriate external service API using the user's stored credentials.
+After receiving an approval token from the one-off flow, the agent presents it in a subsequent `POST /v1/approvals/request` call. Permission Slip validates the token, then executes the action by calling the appropriate external service API using the user's stored credentials.
 
-**Example Request:**
-
-```http
-POST https://app.permissionslip.dev/permission-slip/v1/actions/execute
-Authorization: Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", timestamp="1707667200", signature="..."
-
-{
-  "request_id": "550e8400-e29b-41d4-a716-446655440001",
-  "action": {
-    "type": "email.send",
-    "version": "1",
-    "parameters": {
-      "from": "alice@example.com",
-      "to": ["recipient@example.com"],
-      "subject": "Hello World",
-      "body": "This is a test email."
-    }
-  }
-}
-```
-
-**Note:** The agent sends the token back to Permission Slip — not to the external service. Permission Slip validates the token, verifies the `params_hash` claim against the `action.parameters` object, then uses the user's stored credentials to call the external service's API (e.g., Gmail API) and returns the result to the agent.
+**Note:** For actions covered by a standing approval, no token is needed. When `POST /v1/approvals/request` is called and a matching standing approval exists, the action is auto-approved and executed immediately — the response includes the result inline with `status: "approved"`. See [Standing Approvals](#standing-approvals) for details.
 
 ### Token Signature Verification (JWKS)
 
@@ -1538,111 +1542,26 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
 
 ---
 
-### POST /v1/actions/execute (Standing Approval Mode)
+### Standing Approval Matching via POST /v1/approvals/request
 
-When a standing approval covers the requested action, the agent can call the execution endpoint directly using its agent signature (no bearer token).
-
-**Request:**
-
-```http
-POST /v1/actions/execute
-Content-Type: application/json
-X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", timestamp="1707667200", signature="..."
-
-{
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "action": {
-    "type": "email.read",
-    "version": "1",
-    "parameters": {
-      "sender": "*@github.com",
-      "max_results": 10
-    }
-  }
-}
-```
-
-**Fields:**
-
-- `request_id` (string, required): Unique request identifier for replay protection (UUID v4 recommended)
-- `action` (object, required): Action to execute
-  - `type` (string, required): Action type identifier
-  - `version` (string, optional): Action type version (default: "1")
-  - `parameters` (object, required): Action-specific parameters
+Standing approval matching and execution is handled automatically by `POST /v1/approvals/request`. When an agent submits an approval request, Permission Slip checks for matching standing approvals before creating a pending approval:
 
 **Execution Flow:**
 
 1. **Verify agent signature** (Ed25519, same as all requests)
 2. **Match standing approval:** Find an active standing approval for this agent + action type
 3. **Validate constraints:** Verify parameters fall within the standing approval's constraint bounds
-4. **Check expiration:** Verify standing approval has not expired (or has no expiration)
+4. **Check expiration:** Verify standing approval has not expired
 5. **Check execution count:** If `max_executions` is set, verify count has not been exceeded
 6. **Execute action:** Call external service API using stored credentials
 7. **Increment execution count** and **create audit log entry**
-8. **Return result** to agent
+8. **Return result** to agent with `status: "approved"`
 
-**Response (200 OK):**
-
-```json
-{
-  "result": {
-    "emails": [...]
-  },
-  "standing_approval_id": "sa_abc123",
-  "executions_remaining": null
-}
-```
-
-**Fields:**
-
-- `result` (object, required): Action result from the external service
-- `standing_approval_id` (string, required): Which standing approval authorized this execution
-- `executions_remaining` (integer or null, required): Remaining executions (`null` = unlimited)
+If a matching standing approval is found, the response includes the action result inline (see the auto-approved response format in the [POST /v1/approvals/request](#post-v1approvalsrequest) section above).
 
 **Fallthrough Behavior:**
 
-If no standing approval matches (wrong action type, parameters outside constraints, expired, or exhausted), Permission Slip returns `404 Not Found` with error code `no_matching_standing_approval`. The agent should then fall through to the one-off approval flow (`POST /v1/approvals/request`).
-
-**Error Responses:**
-
-- `400 Bad Request` - `invalid_request`: Malformed request
-- `401 Unauthorized` - `invalid_signature`: Signature verification failed
-- `403 Forbidden` - `standing_approval_exhausted`: Execution count exceeded
-- `403 Forbidden` - `constraint_violation`: Parameters violate standing approval constraints
-- `404 Not Found` - `no_matching_standing_approval`: No active standing approval matches
-- `410 Gone` - `standing_approval_expired`: Standing approval has expired
-
-### Two Authorization Modes
-
-The `/v1/actions/execute` endpoint supports two authorization modes. Both use the same request body structure.
-
-| Mode | When | Authorization | Flow |
-|---|---|---|---|
-| **Bearer token** (one-off) | Agent has a single-use JWT from the approval flow | `Authorization: Bearer <jwt>` header + `X-Permission-Slip-Signature` header | One-off approval → confirmation code → token → execute |
-| **Agent signature** (standing approval) | Agent has an active standing approval covering this action | `X-Permission-Slip-Signature` header only (no `Authorization` header) | Execute immediately, no approval prompt |
-
-**Request body (both modes):**
-
-```json
-{
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "action": {
-    "type": "email.send",
-    "version": "1",
-    "parameters": { ... }
-  }
-}
-```
-
-**Mode detection:** Permission Slip distinguishes the mode by the presence of the `Authorization: Bearer` header. If the header is present, one-off token verification is used. If absent, standing approval matching is attempted using the agent signature.
-
-**Fields (both modes):**
-
-- `request_id` (string, required): Unique request identifier for replay protection (UUID v4 recommended)
-- `action` (object, required): Action to execute
-  - `type` (string, required): Action type identifier
-  - `version` (string, optional): Action type version (default: "1")
-  - `parameters` (object, required): Action-specific parameters
+If no standing approval matches (wrong action type, parameters outside constraints, expired, or exhausted), Permission Slip creates a pending approval as usual and returns `status: "pending"`. The agent then proceeds with the standard one-off approval flow (user review, confirmation code, token).
 
 ---
 
@@ -2134,30 +2053,7 @@ X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", times
 
 **Step 4: Agent uses token to execute action**
 
-The agent presents the token to Permission Slip's action execution endpoint:
-
-```http
-POST https://app.permissionslip.dev/permission-slip/v1/actions/execute
-Authorization: Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", timestamp="1707667340", signature="..."
-
-{
-  "request_id": "req_exec_a1b2c3d4",
-  "action": {
-    "type": "email.send",
-    "version": "1",
-    "parameters": {
-      "from": "alice@example.com",
-      "to": ["bob@example.com"],
-      "subject": "Meeting tomorrow",
-      "body": "Let's meet at 3pm."
-    }
-  }
-}
-```
-
-**Note:** The agent sends this request to Permission Slip, not to Gmail. Permission Slip validates the JWT, verifies the `params_hash` claim against the `action.parameters` object, then calls the Gmail API using the user's stored credentials and returns the result.
+The agent presents the token back to Permission Slip via `POST /v1/approvals/request` with the token included. Permission Slip validates the JWT, verifies the `params_hash` claim against the `action.parameters` object, then calls the Gmail API using the user's stored credentials and returns the result.
 
 **Response:**
 

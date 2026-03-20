@@ -18,11 +18,13 @@ import (
 // ── Request/response types ─────────────────────────────────────────────────
 
 type agentRequestApprovalRequest struct {
-	RequestID     string          `json:"request_id" validate:"required"`
-	Action        json.RawMessage `json:"action" validate:"required"`
-	Context       json.RawMessage `json:"context" validate:"required"`
-	ExpiresIn     *int            `json:"expires_in,omitempty" validate:"omitempty,gte=60,lte=86400"`
-	Configuration *agentApprovalConfigRef `json:"configuration,omitempty"`
+	RequestID       string                 `json:"request_id" validate:"required"`
+	Action          json.RawMessage        `json:"action" validate:"required"`
+	Context         json.RawMessage        `json:"context" validate:"required"`
+	ExpiresIn       *int                   `json:"expires_in,omitempty" validate:"omitempty,gte=60,lte=86400"`
+	Configuration   *agentApprovalConfigRef `json:"configuration,omitempty"`
+	PaymentMethodID string                 `json:"payment_method_id,omitempty"`
+	AmountCents     *int                   `json:"amount_cents,omitempty"`
 }
 
 type agentApprovalConfigRef struct {
@@ -30,11 +32,24 @@ type agentApprovalConfigRef struct {
 }
 
 type agentRequestApprovalResponse struct {
-	ApprovalID  string    `json:"approval_id"`
-	ApprovalURL string    `json:"approval_url"`
-	Status      string    `json:"status"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	// ── Pending fields (status="pending") ──
+	// Present only when no standing approval matched and a pending approval
+	// was created. The agent should poll GET /approvals/{approval_id}/status.
+	ApprovalID  string     `json:"approval_id,omitempty"`
+	ApprovalURL string     `json:"approval_url,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+
+	// ── Common field ──
+	// "pending" = awaiting human approval; "approved" = auto-approved via standing approval.
+	Status string `json:"status"`
+
+	// ── Auto-approved fields (status="approved") ──
+	// Present only when a standing approval matched and the action was
+	// executed immediately. No polling needed — the result is inline.
+	Result              *json.RawMessage `json:"result,omitempty"`              // Connector execution output (may be null if connector returns no data).
+	StandingApprovalID  string           `json:"standing_approval_id,omitempty"` // Which standing approval authorized this execution (useful for audit tracking).
+	ExecutionsRemaining *int             `json:"executions_remaining,omitempty"` // Remaining uses of this standing approval; absent = unlimited.
 }
 
 type agentCancelApprovalResponse struct {
@@ -204,6 +219,16 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// ── Check for matching standing approval (auto-approve) ─────
+		//
+		// Before creating a pending approval, check if an active standing
+		// approval matches this agent + action type + parameters. If so,
+		// execute immediately and return the result — no human review needed.
+		pp := &paymentParams{PaymentMethodID: req.PaymentMethodID, AmountCents: req.AmountCents}
+		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID, pp); handled {
+			return
+		}
+
 		// Compute expiration.
 		expiresAt := time.Now().UTC().Add(db.DefaultApprovalTTL)
 		if req.ExpiresIn != nil {
@@ -277,7 +302,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 
 		// Update agent's last_active_at (best-effort).
 		if err := db.TouchAgentLastActive(r.Context(), deps.DB, agent.AgentID); err != nil {
-			log.Printf("agent_approvals: failed to update last_active_at for agent %d: %v", agent.AgentID, err)
+			log.Printf("[%s] AgentRequestApproval: failed to update last_active_at for agent %d: %v", TraceID(r.Context()), agent.AgentID, err)
 		}
 
 		// Fire notification to approver (best-effort, async).
@@ -295,8 +320,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			ApprovalID:  approval.ApprovalID,
 			ApprovalURL: approvalURL,
 			Status:      approval.Status,
-			ExpiresAt:   approval.ExpiresAt,
-			CreatedAt:   approval.CreatedAt,
+			ExpiresAt:   &approval.ExpiresAt,
+			CreatedAt:   &approval.CreatedAt,
 		})
 	}
 }

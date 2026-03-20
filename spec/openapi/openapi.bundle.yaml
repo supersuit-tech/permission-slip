@@ -46,8 +46,9 @@ info:
     ### Standing Approval (pre-authorized)
 
     1. **User creates standing approval**: Via web UI — specifies agent, action type, constraints, duration, and optional execution cap
-    2. **Agent executes**: Calls `POST /v1/actions/execute` with agent signature (no token) — Permission Slip matches the standing approval and executes immediately
-    3. **Fallthrough**: If no standing approval matches, falls through to the one-off flow above
+    2. **Agent requests**: Calls `POST /v1/approvals/request` — Permission Slip checks for a matching standing approval
+    3. **Auto-approve**: If a standing approval matches, the action is executed immediately and the result is returned inline with `status: "approved"`
+    4. **Fallthrough**: If no standing approval matches, creates a pending approval for human review (one-off flow above)
 
     ## Architecture
 
@@ -2056,14 +2057,27 @@ paths:
       operationId: requestApproval
       summary: Request Approval for Action
       description: |
-        Request approval for a specific one-off action. The designated approver must review 
-        and approve the action before the agent can execute it.
+        Request approval for an action. If a matching standing approval exists, the action
+        is auto-approved and executed immediately — the result is returned inline with
+        `status: "approved"`. Otherwise, creates a pending approval for human review.
 
-        ## Approval Request Flow
+        ## Auto-Approval (Standing Approval Match)
+
+        Before creating a pending approval, Permission Slip checks for an active standing
+        approval that matches the agent, action type, and parameters. If found:
+
+        1. **Parameters validated**: Against standing approval constraints
+        2. **Action executed**: Immediately via the connector using stored credentials
+        3. **Result returned**: Response has `status: "approved"` with `result`, `standing_approval_id`, and `executions_remaining`
+        4. **No polling needed**: The agent has the result immediately
+
+        ## One-off Approval (No Standing Approval Match)
+
+        If no standing approval matches, the request follows the standard flow:
 
         1. **Agent requests**: Sends action details, parameters, and context
         2. **Permission Slip validates**: Verifies agent is registered, signature is valid
-        3. **Permission Slip responds**: Returns approval URL with unique approval_id
+        3. **Permission Slip responds**: Returns approval URL with unique approval_id and `status: "pending"`
         4. **Notification sent**: Permission Slip notifies approver (push notification)
         5. **Approver reviews**: Visits URL, sees full action details, approves/denies
         6. **Direct execution**: If approved, Permission Slip immediately executes the action via the connector
@@ -2174,29 +2188,32 @@ paths:
                       estimated_downtime: 2 minutes
       responses:
         '200':
-          description: Approval request created successfully
+          description: |
+            Approval request processed. Check `status` to determine the outcome:
+            - `approved` — auto-approved via standing approval, result inline
+            - `pending` — awaiting human review
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalRequestResponse'
               examples:
-                basic:
-                  summary: Basic approval response
+                pending:
+                  summary: Pending — awaiting human approval
                   value:
                     approval_id: appr_xyz789
                     approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
                     status: pending
                     expires_at: '2026-02-11T13:25:00Z'
-                with_alternative_urls:
-                  summary: Response with cross-platform URLs
+                    created_at: '2026-02-11T13:20:00Z'
+                auto_approved:
+                  summary: Auto-approved via standing approval
                   value:
-                    approval_id: appr_xyz789
-                    approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
-                    alternative_urls:
-                      deeplink: permissionslip://permission-slip/approve/appr_xyz789
-                      web: https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789
-                    status: pending
-                    expires_at: '2026-02-11T13:25:00Z'
+                    status: approved
+                    result:
+                      message_id: msg_abc123
+                      delivery_status: queued
+                    standing_approval_id: sa_abc123
+                    executions_remaining: 47
         '400':
           description: Invalid request or unsupported action type
           content:
@@ -3435,272 +3452,6 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /v1/actions/execute:
-    post:
-      operationId: executeAction
-      summary: Execute Action
-      description: |
-        Execute an action via Permission Slip using a standing approval. The agent provides
-        action details and Permission Slip matches an active standing approval to authorize
-        execution.
-
-        ## Standing Approval Flow
-
-        1. **Agent submits action**: Provides action type, parameters, and request_id (no token)
-        2. **Permission Slip matches**: Finds an active standing approval for this agent + action type + constraints
-        3. **Permission Slip validates**: Verifies parameters fall within standing approval constraints
-        4. **Permission Slip executes**: Calls the external service API using stored credentials
-        5. **Result returned**: Returns `StandingApprovalExecuteResponse` with `standing_approval_id` and `executions_remaining`
-
-        ## One-off Approvals
-
-        One-off approval actions are executed automatically when the user approves. Agents
-        should poll `GET /v1/approvals/{approval_id}/status` for results instead of calling
-        this endpoint. If no standing approval matches, Permission Slip returns `404 Not Found`
-        with a hint to use `POST /v1/approvals/request` for one-off approval.
-
-        ## Standing Approval Validation
-
-        Permission Slip verifies:
-        - **Agent signature**: Valid Ed25519/ECDSA signature
-        - **Standing approval match**: Active standing approval for this agent + action type
-        - **Constraint compliance**: Parameters fall within standing approval constraints
-        - **Expiration**: Standing approval has not expired (or has no expiration)
-        - **Execution count**: Max executions not exceeded (if set)
-
-        ## Credential Lookup
-
-        Permission Slip determines which external service to call based on the action type
-        (via connector configuration) and retrieves the user's stored credentials from the
-        encrypted vault. The agent never sees these credentials.
-
-        ## Idempotency
-
-        Executions support idempotency via the `request_id` field. If the same `request_id`
-        is submitted again for the same standing approval, Permission Slip returns
-        `409 Conflict` with error code `duplicate_request_id`.
-
-        ## Error Handling
-
-        If the external service returns an error, Permission Slip returns a `502 Bad Gateway`
-        with details about the upstream failure. The execution count is still incremented to
-        prevent unbounded retry loops; the agent should use a new `request_id` for each
-        retry attempt.
-
-        ## Security
-
-        - Request MUST include valid `X-Permission-Slip-Signature` header
-        - Constraints are enforced on every execution
-        - Agent never sees user credentials
-      tags:
-        - Actions
-      security:
-        - PermissionSlipSignature: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExecuteActionRequest'
-            examples:
-              email_read_standing:
-                summary: 'Standing approval: Read emails'
-                value:
-                  request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
-                  action:
-                    type: email.read
-                    version: '1'
-                    parameters:
-                      sender: '*@github.com'
-                      max_results: 10
-              email_send_standing:
-                summary: 'Standing approval: Send email'
-                value:
-                  request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
-                  action:
-                    type: email.send
-                    version: '1'
-                    parameters:
-                      from: alice@example.com
-                      to:
-                        - bob@example.com
-                      subject: Meeting tomorrow
-                      body: Let's meet at 3pm.
-      responses:
-        '200':
-          description: Action executed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExecuteActionResponse'
-              examples:
-                email_read_standing:
-                  summary: 'Standing approval: Emails read successfully'
-                  value:
-                    result:
-                      emails:
-                        - id: msg_001
-                          subject: PR merged
-                          sender: noreply@github.com
-                    standing_approval_id: sa_abc123
-                    executions_remaining: null
-                email_sent_standing:
-                  summary: 'Standing approval: Email sent successfully'
-                  value:
-                    result:
-                      message_id: msg_abc123
-                      delivery_status: queued
-                    standing_approval_id: sa_def456
-                    executions_remaining: 47
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_request
-                  message: 'Missing required field: action'
-                  retryable: false
-                  details:
-                    field: action
-                  trace_id: trace_xyz789
-        '401':
-          description: Invalid signature or OAuth authorization required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                invalid_signature:
-                  summary: Agent signature verification failed
-                  value:
-                    error:
-                      code: invalid_signature
-                      message: Signature verification failed
-                      retryable: false
-                      trace_id: trace_xyz789
-                oauth_refresh_failed:
-                  summary: OAuth token expired or revoked — user must re-authorize
-                  value:
-                    error:
-                      code: oauth_refresh_failed
-                      message: OAuth authorization required — user must re-connect the provider in Settings
-                      retryable: false
-                      details:
-                        provider: google
-                        action_required: reauthorize
-                      trace_id: trace_xyz789
-        '403':
-          description: Standing approval exhausted or constraint violation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                standing_approval_exhausted:
-                  summary: Standing approval execution count exceeded
-                  value:
-                    error:
-                      code: standing_approval_exhausted
-                      message: Standing approval max execution count has been reached
-                      retryable: false
-                      details:
-                        standing_approval_id: sa_abc123
-                        max_executions: 100
-                        execution_count: 100
-                      trace_id: trace_xyz789
-                constraint_violation:
-                  summary: Parameters violate standing approval constraints
-                  value:
-                    error:
-                      code: constraint_violation
-                      message: Request parameters violate standing approval constraints
-                      retryable: false
-                      details:
-                        standing_approval_id: sa_abc123
-                        violated_constraint: sender
-                        expected: '*@github.com'
-                        actual: '*@competitor.com'
-                      trace_id: trace_xyz789
-        '404':
-          description: Credentials not found or no matching standing approval
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                credentials_not_found:
-                  summary: Credentials not found for the required service
-                  value:
-                    error:
-                      code: credentials_not_found
-                      message: No stored credentials found for the required service
-                      retryable: false
-                      details:
-                        required_service: gmail
-                      trace_id: trace_xyz789
-                no_matching_standing_approval:
-                  summary: No active standing approval matches this request
-                  value:
-                    error:
-                      code: no_matching_standing_approval
-                      message: No active standing approval matches this agent, action type, and parameters
-                      retryable: false
-                      details:
-                        action_type: email.read
-                        hint: Use POST /v1/approvals/request for one-off approval
-                      trace_id: trace_xyz789
-        '409':
-          description: Duplicate request_id
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: duplicate_request_id
-                  message: A request with this request_id has already been executed
-                  retryable: false
-                  trace_id: trace_xyz789
-        '410':
-          description: Standing approval has expired
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: standing_approval_expired
-                  message: Standing approval has expired
-                  retryable: false
-                  details:
-                    standing_approval_id: sa_abc123
-                    expired_at: '2026-02-14T00:00:00Z'
-                  trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '502':
-          description: External service error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: upstream_error
-                  message: External service returned an error
-                  retryable: false
-                  details:
-                    service: gmail
-                    upstream_status: 503
-                    upstream_message: Service temporarily unavailable
-                  trace_id: trace_xyz789
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
   /v1/credentials:
     post:
       operationId: storeCredential
@@ -6862,6 +6613,21 @@ components:
           $ref: '#/components/schemas/Action'
         context:
           $ref: '#/components/schemas/ActionContext'
+        payment_method_id:
+          type: string
+          description: |
+            Optional payment method ID for actions that require payment (e.g., `requires_payment_method: true`
+            in the connector action definition). When a standing approval auto-approves the request, this
+            value is forwarded to the connector for payment processing.
+          example: pm_abc123
+        amount_cents:
+          type: integer
+          minimum: 0
+          description: |
+            Optional transaction amount in cents for payment-required actions. Required when
+            `payment_method_id` is provided. Validated against per-transaction and monthly spending
+            limits configured on the payment method.
+          example: 9900
       example:
         agent_id: 42
         request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
@@ -6884,22 +6650,25 @@ components:
     ApprovalRequestResponse:
       type: object
       description: |
-        Response after submitting an approval request. The agent should use the `approval_id`
-        to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
-        or listen for real-time updates via `GET /v1/approvals/events` (SSE).
+        Response after submitting an approval request. Two possible outcomes:
+
+        **Auto-approved** (`status: "approved"`): A matching standing approval was found.
+        The action was executed immediately. The response includes `result`,
+        `standing_approval_id`, and optionally `executions_remaining`. No `approval_id`
+        or `approval_url` is returned.
+
+        **Pending** (`status: "pending"`): No standing approval matched. A pending approval
+        was created. The agent should poll `GET /v1/approvals/{approval_id}/status` for the
+        result, or listen via `GET /v1/approvals/events` (SSE).
       required:
-        - approval_id
-        - approval_url
         - status
-        - expires_at
       properties:
         approval_id:
           type: string
           pattern: ^appr_[a-zA-Z0-9]{6,64}$
           maxLength: 70
           description: |
-            Unique approval identifier assigned by Permission Slip. Used to reference this approval
-            in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
+            Unique approval identifier. Present only when `status` is `pending`.
           example: appr_xyz789
         approval_url:
           type: string
@@ -6907,11 +6676,7 @@ components:
           maxLength: 4096
           pattern: ^https://
           description: |
-            Primary approval URL (universal link) that the approver must visit to review and
-            approve/deny the action. This is the canonical URL that clients MUST support.
-
-            The URL contains context about the approval request and allows the approver to see
-            full action details before making a decision.
+            Approval URL for the approver to review. Present only when `status` is `pending`.
           example: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
         alternative_urls:
           $ref: '#/components/schemas/AlternativeUrls'
@@ -6919,26 +6684,42 @@ components:
           type: string
           enum:
             - pending
+            - approved
           description: |
-            Approval status. Always `pending` when first created. Status changes to `approved`
-            or `denied` after approver makes a decision.
+            `pending` — approval created, awaiting human review.
+            `approved` — auto-approved via standing approval, result is inline.
           example: pending
         expires_at:
           type: string
           format: date-time
           description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when approval expires. After this time,
-            the approval becomes invalid and cannot be approved.
-
-            Typically set to 5 minutes from creation, but may vary based on configuration
-            or action risk level.
+            When the pending approval expires. Present only when `status` is `pending`.
           example: '2026-02-11T13:25:00Z'
+        created_at:
+          type: string
+          format: date-time
+          description: |
+            When the approval was created. Present only when `status` is `pending`.
+          example: '2026-02-11T13:20:00Z'
+        result:
+          description: |
+            Execution result from the connector. Present only when `status` is `approved`
+            (auto-approved via standing approval).
+        standing_approval_id:
+          type: string
+          description: |
+            ID of the standing approval that matched. Present only when `status` is `approved`.
+          example: sa_abc123
+        executions_remaining:
+          type: integer
+          description: |
+            Number of executions remaining on the standing approval.
+            Present only when `status` is `approved` and the standing approval has a
+            finite `max_executions`. Absent when unlimited.
+          example: 47
       example:
         approval_id: appr_xyz789
         approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
-        alternative_urls:
-          deeplink: permissionslip://permission-slip/approve/appr_xyz789
-          web: https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789
         status: pending
         expires_at: '2026-02-11T13:25:00Z'
     CancelApprovalRequest:
@@ -7560,24 +7341,6 @@ components:
       example:
         id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         deleted_at: '2026-02-25T15:00:00Z'
-    ExecuteActionRequest:
-      allOf:
-        - $ref: '#/components/schemas/StandingApprovalExecuteRequest'
-        - description: |
-            Execute an action via Permission Slip using a standing approval.
-
-            The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
-            Permission Slip matches an active standing approval for the agent + action type + constraints
-            and executes the action using the user's stored credentials.
-
-            One-off approvals are executed directly when the user approves — agents receive results
-            via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
-    ExecuteActionResponse:
-      allOf:
-        - $ref: '#/components/schemas/StandingApprovalExecuteResponse'
-        - description: |
-            Response from executing an action via a standing approval. Returns the action result,
-            the standing approval that authorized execution, and the remaining execution count.
     StoreCredentialRequest:
       type: object
       required:

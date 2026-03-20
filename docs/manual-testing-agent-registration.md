@@ -430,40 +430,9 @@ Note the `access_token` from the response — you'll need it in step 11.
 
 ## Step 11: Execute the Action (Agent Side)
 
-Use the token to execute the approved action:
+> **Note:** The separate `/actions/execute` endpoint has been removed. Execution now happens through `POST /approvals/request` — if a standing approval matches, the action is auto-approved and executed immediately. For the one-off token flow, the token is presented in a follow-up request to the same endpoint.
 
-```bash
-ACTION_TOKEN="eyJhbGciOi..."  # replace with access_token from step 10 response
-BODY=$(cat <<EOF
-{
-  "token": "$ACTION_TOKEN",
-  "action_id": "email.send",
-  "parameters": {
-    "to": ["test@example.com"],
-    "subject": "Test from Permission Slip agent",
-    "body": "This is a test email sent via the Permission Slip protocol."
-  }
-}
-EOF
-)
-
-bash ps_curl.sh POST "/actions/execute" "$BODY" "$AGENT_ID"
-```
-
-**Expected response** (200):
-
-```json
-{
-    "status": "success",
-    "action_id": "email.send",
-    "executed_at": "2026-02-23T12:26:00Z",
-    "result": {
-        "message_id": "msg_abc123"
-    }
-}
-```
-
-**Important**: The token is single-use. If you need to execute the same action again, you must request a new approval.
+The token from step 10 is single-use. If you need to execute the same action again, you must request a new approval.
 
 ---
 

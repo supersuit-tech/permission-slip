@@ -145,7 +145,7 @@ Accepted
 After approval, the agent needs something to present to trigger execution. Options included session tokens, long-lived API keys, or single-use tokens.
 
 ### Decision
-Approved actions produce a **single-use JWT** (ES256) that the agent presents to the `/v1/actions/execute` endpoint. The token is:
+Approved actions produce a **single-use JWT** (ES256) that the agent presents back to `POST /v1/approvals/request` for execution. The token is:
 - **Single-use:** tracked by `jti` claim with atomic check-and-set
 - **Time-bound:** expires with the approval TTL (default 5 minutes)
 - **Parameter-bound:** `params_hash` (SHA-256 of JCS-canonicalized parameters) prevents tampering

@@ -244,27 +244,38 @@ export class ApiClient {
     });
   }
 
-  /** POST /approvals/request */
+  /** POST /approvals/request — may auto-approve if a standing approval matches */
   async requestApproval(
     actionId: string,
     params: unknown,
     context?: { description?: string; risk_level?: string },
+    payment?: { paymentMethodId?: string; amountCents?: number },
   ) {
     const requestId = crypto.randomUUID();
+    const body: Record<string, unknown> = {
+      request_id: requestId,
+      action: { type: actionId, parameters: params },
+      context: context ?? {},
+    };
+    if (payment?.paymentMethodId) {
+      body.payment_method_id = payment.paymentMethodId;
+    }
+    if (payment?.amountCents !== undefined) {
+      body.amount_cents = payment.amountCents;
+    }
     return this.request<{
-      approval_id: string;
-      approval_url: string;
+      approval_id?: string;
+      approval_url?: string;
       status: string;
-      expires_at: string;
-      verification_required: boolean;
+      expires_at?: string;
+      created_at?: string;
+      result?: unknown;
+      standing_approval_id?: string;
+      executions_remaining?: number | null;
     }>({
       method: "POST",
       routerPath: "/approvals/request",
-      body: {
-        request_id: requestId,
-        action: { type: actionId, parameters: params },
-        context: context ?? {},
-      },
+      body,
     });
   }
 
@@ -273,30 +284,6 @@ export class ApiClient {
     return this.request<ApprovalStatusResult>({
       method: "GET",
       routerPath: `/approvals/${approvalId}/status`,
-    });
-  }
-
-  /** POST /actions/execute */
-  async execute(
-    tokenOrConfigId: { token: string } | { configuration_id: string; request_id?: string },
-    actionId: string | undefined,
-    params: unknown,
-  ) {
-    const requestId = crypto.randomUUID();
-    let body: Record<string, unknown>;
-    if ("token" in tokenOrConfigId) {
-      body = { token: tokenOrConfigId.token, action_id: actionId, parameters: params };
-    } else {
-      body = {
-        request_id: tokenOrConfigId.request_id ?? requestId,
-        configuration_id: tokenOrConfigId.configuration_id,
-        parameters: params,
-      };
-    }
-    return this.request<unknown>({
-      method: "POST",
-      routerPath: "/actions/execute",
-      body,
     });
   }
 }

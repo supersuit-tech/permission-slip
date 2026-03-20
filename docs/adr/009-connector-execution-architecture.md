@@ -303,8 +303,9 @@ Bringing it together, here's how an approved action executes:
 ```
 Agent                          Permission Slip                        External Service
   │                                  │                                      │
-  │  POST /v1/actions/execute        │                                      │
-  │  (or standing approval execute)  │                                      │
+  │  POST /v1/approvals/request      │                                      │
+  │  (standing approval auto-exec    │                                      │
+  │   or one-off token execution)    │                                      │
   │─────────────────────────────────>│                                      │
   │                                  │                                      │
   │                   1. Verify authorization (token or standing approval)  │
@@ -366,7 +367,7 @@ Actions should return typed errors (e.g., `*connectors.ExternalError`, `*connect
 
 - A new top-level `connectors/` directory is added to the project.
 - `api.Deps` gains a `Connectors` field of type `*connectors.Registry`.
-- The execution endpoints (`/v1/actions/execute` and standing approval execute) gain a code path that calls `registry.GetAction(actionType)` and invokes the action with decrypted credentials.
+- The `POST /v1/approvals/request` endpoint gains a code path that calls `registry.GetAction(actionType)` and invokes the action with decrypted credentials when a standing approval matches or a one-off token is presented.
 - Each connector needs a corresponding entry in the database (`connectors` + `connector_actions` tables). If a connector is registered in code but not in the database (or vice versa), the system should log a warning at startup.
 - Connector implementations need their own test suites. Unit tests mock the HTTP client; integration tests (optional, not in CI) hit real APIs with test credentials.
 - The `connectors/` package has no dependency on `api/` or `db/` — it only depends on standard library and external service SDKs. The API layer depends on `connectors/`, not the reverse.
