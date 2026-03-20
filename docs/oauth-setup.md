@@ -81,19 +81,19 @@ Permission Slip supports two modes for OAuth provider credentials:
 | `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
 | `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
 
-### Square OAuth
-
-| Variable | Description |
-|---|---|
-| `SQUARE_CLIENT_ID` | Production Application ID from Square Developer Dashboard |
-| `SQUARE_CLIENT_SECRET` | Production Application Secret from Square Developer Dashboard |
-
 ### Slack OAuth
 
 | Variable | Description |
 |---|---|
 | `SLACK_CLIENT_ID` | Client ID from [Your Apps](https://api.slack.com/apps) (App Credentials) |
 | `SLACK_CLIENT_SECRET` | Client Secret from the same Slack app |
+
+### Square OAuth
+
+| Variable | Description |
+|---|---|
+| `SQUARE_CLIENT_ID` | Production Application ID from Square Developer Dashboard |
+| `SQUARE_CLIENT_SECRET` | Production Application Secret from Square Developer Dashboard |
 
 ### Stripe OAuth
 
@@ -512,44 +512,6 @@ If you don't need OAuth, you can use an internal integration token instead:
 
 The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
 
-## Square OAuth Setup
-
-### 1. Create a Square Developer Application
-
-1. Go to [Square Developer Dashboard](https://developer.squareup.com/apps)
-2. Click **+** to create a new application
-3. Fill in the application name (e.g., "Permission Slip")
-
-### 2. Configure OAuth Settings
-
-1. Navigate to **OAuth** in the left sidebar
-2. Add the redirect URI:
-   ```
-   https://your-domain.com/api/v1/oauth/square/callback
-   ```
-3. Select the required OAuth permissions (scopes):
-   - `ORDERS_READ`, `ORDERS_WRITE`
-   - `PAYMENTS_READ`, `PAYMENTS_WRITE`
-   - `ITEMS_READ`, `ITEMS_WRITE`
-   - `CUSTOMERS_READ`, `CUSTOMERS_WRITE`
-   - `APPOINTMENTS_READ`, `APPOINTMENTS_WRITE`
-   - `INVOICES_READ`, `INVOICES_WRITE`
-   - `INVENTORY_READ`, `INVENTORY_WRITE`
-
-### 3. Get Credentials
-
-1. Navigate to **Credentials** in the left sidebar
-2. Copy the **Production Application ID** and **Production Application Secret**
-
-### 4. Configure Environment
-
-```bash
-SQUARE_CLIENT_ID=your-production-application-id
-SQUARE_CLIENT_SECRET=your-production-application-secret
-```
-
-> **Note:** The Square connector supports both OAuth and API key authentication. OAuth is recommended for production use. API keys can be generated from the Square Developer Dashboard under **Credentials > Production Access Token**.
-
 ## Slack OAuth Setup
 
 Slack uses [OAuth 2.0 with the V2 flow](https://api.slack.com/authentication/oauth-v2): bot scopes produce a bot user token (`xoxb-`), and user scopes produce a user token (`xoxp-`) used for APIs that only accept user tokens (for example `search.messages`).
@@ -599,6 +561,44 @@ Find **Client ID** and **Client Secret** under **Basic Information > App Credent
 ### 5. Install to workspace
 
 When a user connects Slack from Permission Slip, they complete Slack’s OAuth consent and install the app to their workspace. No manual “reinstall” is required beyond that flow unless you change scopes—in that case, users may need to **Re-authorize** from the connector settings.
+
+## Square OAuth Setup
+
+### 1. Create a Square Developer Application
+
+1. Go to [Square Developer Dashboard](https://developer.squareup.com/apps)
+2. Click **+** to create a new application
+3. Fill in the application name (e.g., "Permission Slip")
+
+### 2. Configure OAuth Settings
+
+1. Navigate to **OAuth** in the left sidebar
+2. Add the redirect URI:
+   ```
+   https://your-domain.com/api/v1/oauth/square/callback
+   ```
+3. Select the required OAuth permissions (scopes):
+   - `ORDERS_READ`, `ORDERS_WRITE`
+   - `PAYMENTS_READ`, `PAYMENTS_WRITE`
+   - `ITEMS_READ`, `ITEMS_WRITE`
+   - `CUSTOMERS_READ`, `CUSTOMERS_WRITE`
+   - `APPOINTMENTS_READ`, `APPOINTMENTS_WRITE`
+   - `INVOICES_READ`, `INVOICES_WRITE`
+   - `INVENTORY_READ`, `INVENTORY_WRITE`
+
+### 3. Get Credentials
+
+1. Navigate to **Credentials** in the left sidebar
+2. Copy the **Production Application ID** and **Production Application Secret**
+
+### 4. Configure Environment
+
+```bash
+SQUARE_CLIENT_ID=your-production-application-id
+SQUARE_CLIENT_SECRET=your-production-application-secret
+```
+
+> **Note:** The Square connector supports both OAuth and API key authentication. OAuth is recommended for production use. API keys can be generated from the Square Developer Dashboard under **Credentials > Production Access Token**.
 
 ## Stripe OAuth Setup
 
@@ -834,6 +834,12 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
+
+### Slack API errors (`missing_scope`, `invalid_auth`, search without user token)
+
+- **`missing_scope`** — The Slack app is missing bot or user scopes listed in [Slack OAuth Setup](#slack-oauth-setup). Add them under **OAuth & Permissions**, then have the user **Re-authorize** so Slack issues new tokens.
+- **`invalid_auth` / `token_revoked`** — The workspace uninstalled the app or tokens were rotated. **Re-authorize** from the connector settings.
+- **Search actions fail but messaging works** — Search uses a user token (`xoxp-`). Ensure **User Token Scopes** (especially `search:read.*`) are configured in the Slack app and the user completed consent for user scopes.
 
 ### "Failed to initiate OAuth flow" error
 
