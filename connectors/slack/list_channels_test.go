@@ -2,6 +2,7 @@ package slack
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -456,5 +457,28 @@ func TestListChannels_DefaultFallbackWithoutEmail(t *testing.T) {
 	}
 	if data.Channels[0].ID != "C001" {
 		t.Errorf("expected channel C001, got %q", data.Channels[0].ID)
+	}
+}
+
+func TestListChannels_ExplicitPrivateTypesWithoutEmail(t *testing.T) {
+	t.Parallel()
+
+	// When the caller explicitly requests private types (e.g. types=im) but
+	// has no UserEmail set, list_channels must return a ValidationError —
+	// not silently fall back to public_channel.
+	conn := newForTest(http.DefaultClient, "http://unused")
+	action := &listChannelsAction{conn: conn}
+
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		// UserEmail intentionally omitted
+	})
+	var valErr *connectors.ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("expected ValidationError for explicit private types without email, got: %v", err)
 	}
 }
