@@ -64,7 +64,7 @@ type auditEventListResponse struct {
 }
 
 var validOutcomeValues = []string{
-	"approved", "auto_executed", "cancelled", "charged", "deactivated", "denied", "expired", "pending", "registered",
+	"approved", "auto_executed", "cancelled", "charged", "deactivated", "denied", "expired", "pending", "registered", "updated",
 }
 
 var validOutcomeFilters = func() map[string]bool {

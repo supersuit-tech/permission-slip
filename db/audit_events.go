@@ -52,7 +52,7 @@ type AuditEvent struct {
 	AgentID         int64
 	AgentMeta       []byte  // raw JSONB (agent metadata snapshot at event time)
 	Action          []byte  // raw JSONB (approval action details, nullable)
-	Outcome         string  // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
+	Outcome         string  // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired", "charged", "updated"
 	SourceID        string  // unique ID per event source (e.g. approval_id)
 	SourceType      string  // "approval", "standing_approval", "agent", "payment_method_transaction"
 	ConnectorID     *string // which connector handled the action (nullable for lifecycle events)
@@ -78,7 +78,7 @@ type AuditEventCursor struct {
 type AuditEventFilter struct {
 	AgentID     *int64
 	EventTypes  []AuditEventType // if non-empty, include only these types
-	Outcome     string           // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired"
+	Outcome     string           // "approved", "denied", "cancelled", "auto_executed", "registered", "deactivated", "pending", "expired", "charged", "updated"
 	ConnectorID *string          // if non-nil, include only events for this connector
 }
 
@@ -100,6 +100,11 @@ const (
 const (
 	OutcomeCharged            = "charged"
 	SourceTypePaymentMethodTx = "payment_method_transaction"
+)
+
+// Standing approval audit event constants.
+const (
+	OutcomeUpdated = "updated"
 )
 
 // InsertAuditEventParams holds the parameters for inserting an audit event.

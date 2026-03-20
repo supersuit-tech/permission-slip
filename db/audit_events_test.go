@@ -1034,6 +1034,49 @@ func TestInsertAuditEvent(t *testing.T) {
 		}
 	})
 
+	t.Run("StandingApprovalUpdated", func(t *testing.T) {
+		t.Parallel()
+		tx := testhelper.SetupTestDB(t)
+		uid := testhelper.GenerateUID(t)
+		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+		testhelper.InsertConnector(t, tx, "github")
+		saID := testhelper.GenerateID(t, "sa_")
+		connectorID := "github"
+		actionJSON := []byte(`{"type":"github.create_issue"}`)
+
+		err := db.InsertAuditEvent(ctx, tx, db.InsertAuditEventParams{
+			UserID:      uid,
+			AgentID:     agentID,
+			EventType:   db.AuditEventStandingUpdated,
+			Outcome:     db.OutcomeUpdated,
+			SourceID:    saID,
+			SourceType:  "standing_approval",
+			Action:      actionJSON,
+			ConnectorID: &connectorID,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		page, err := db.ListAuditEvents(ctx, tx, uid, 20, nil, nil, 0)
+		if err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+		if len(page.Events) != 1 {
+			t.Fatalf("expected 1 event, got %d", len(page.Events))
+		}
+		e := page.Events[0]
+		if e.EventType != db.AuditEventStandingUpdated {
+			t.Errorf("expected standing_approval.updated, got %s", e.EventType)
+		}
+		if e.Outcome != db.OutcomeUpdated {
+			t.Errorf("expected outcome updated, got %q", e.Outcome)
+		}
+		if e.SourceID != saID {
+			t.Errorf("expected source_id %q, got %q", saID, e.SourceID)
+		}
+	})
+
 	t.Run("NilAction", func(t *testing.T) {
 		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
