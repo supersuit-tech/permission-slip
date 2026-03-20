@@ -99,8 +99,12 @@ const (
 // Payment audit event constants.
 const (
 	OutcomeCharged            = "charged"
-	OutcomeUpdated            = "updated"
 	SourceTypePaymentMethodTx = "payment_method_transaction"
+)
+
+// Standing approval audit event constants.
+const (
+	OutcomeUpdated = "updated"
 )
 
 // InsertAuditEventParams holds the parameters for inserting an audit event.
