@@ -1039,6 +1039,8 @@ When a matching standing approval exists, the action is auto-approved and execut
 - `standing_approval_id` (string, required): Which standing approval authorized this execution
 - `executions_remaining` (integer or null, required): Remaining executions (`null` = unlimited)
 
+> **Execution slot consumption on error:** When a standing approval matches, the execution slot is consumed _before_ the connector action runs. If the connector fails (network timeout, upstream error, etc.), the slot is still consumed. On untyped 500 errors, the response includes `executions_remaining` and `standing_approval_id` in the error `details` so agents can track quota erosion. Agents should monitor `executions_remaining` and request a new standing approval if the quota runs low due to transient failures.
+
 **Error Responses:**
 
 - `400 Bad Request` - `invalid_request`: Malformed request

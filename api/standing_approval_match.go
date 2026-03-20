@@ -80,6 +80,14 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 	}
 
 	// Execute the action via connector.
+	//
+	// NOTE: The execution slot was already consumed by RecordStandingApprovalExecutionByAgent
+	// above. If the connector fails (network timeout, upstream 503, payment gateway error),
+	// the slot is permanently consumed even though no action succeeded. This is intentional:
+	// reversing the atomic CTE would require a compensating transaction and could mask abuse
+	// (an agent retrying indefinitely to bypass rate limits). The trade-off is that transient
+	// failures erode the execution quota. To mitigate, we include executions_remaining in
+	// error responses so agents can observe quota consumption and refresh approvals if needed.
 	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, actionType, params, pp)
 
 	// Emit audit event (best-effort).
@@ -92,7 +100,22 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 		}
 		log.Printf("[%s] AutoApprove: connector execution: %v", TraceID(r.Context()), execErr)
 		CaptureConnectorError(r.Context(), execErr, cc)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute connector action"))
+		resp := InternalError("Failed to execute connector action")
+		// Include executions_remaining so agents can track quota erosion on failure.
+		// The execution slot was consumed by RecordStandingApprovalExecutionByAgent
+		// before the connector call, so agents need visibility into remaining quota
+		// even when the action itself failed.
+		if exec.MaxExecutions != nil {
+			remaining := *exec.MaxExecutions - exec.ExecutionCount
+			if remaining < 0 {
+				remaining = 0
+			}
+			resp.Error.Details = map[string]any{
+				"standing_approval_id": sa.StandingApprovalID,
+				"executions_remaining": remaining,
+			}
+		}
+		RespondError(w, r, http.StatusInternalServerError, resp)
 		return true
 	}
 

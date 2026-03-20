@@ -348,10 +348,14 @@ func TestRequestApproval_AutoApprove_SecondApprovalMatchesWhenFirstDoesNot(t *te
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if resp.StandingApprovalID != sa1ID {
-		t.Errorf("expected standing_approval_id %q (older approval), got %q", sa1ID, resp.StandingApprovalID)
+	if resp.Status != "approved" {
+		t.Errorf("expected status \"approved\", got %q", resp.Status)
 	}
 
+	// Assert based on execution counts rather than standing_approval_id, since
+	// the query tiebreaker (standing_approval_id DESC) over random IDs makes
+	// the iteration order non-deterministic. What matters: the github.com
+	// constraint matched (execution_count=1) and competitor.com did not (0).
 	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa1ID, "execution_count", "1")
 	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa2ID, "execution_count", "0")
 }
