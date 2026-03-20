@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
+
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
@@ -369,8 +371,8 @@ func TestManifest_Valid(t *testing.T) {
 	if len(m.Templates) != 8 {
 		t.Errorf("Manifest().Templates has %d entries, want 8", len(m.Templates))
 	}
-	if len(m.OAuthProviders) != 1 {
-		t.Errorf("Manifest().OAuthProviders has %d entries, want 1", len(m.OAuthProviders))
+	if len(m.OAuthProviders) != 0 {
+		t.Errorf("Manifest().OAuthProviders has %d entries, want 0 (quickbooks is now a built-in provider)", len(m.OAuthProviders))
 	}
 }
 

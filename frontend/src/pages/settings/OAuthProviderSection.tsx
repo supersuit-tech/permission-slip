@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { KeyRound, Loader2, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfig } from "@/hooks/useConfig";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
 import { useOAuthProviderConfigs } from "@/hooks/useOAuthProviderConfigs";
 import { useDeleteOAuthProviderConfig } from "@/hooks/useDeleteOAuthProviderConfig";
@@ -18,6 +19,7 @@ import { providerLabel } from "@/lib/labels";
 import { BYOAConfigDialog } from "./BYOAConfigDialog";
 
 export function OAuthProviderSection() {
+  const { config } = useConfig();
   const { providers, isLoading: providersLoading } = useOAuthProviders();
   const { configs, isLoading: configsLoading } = useOAuthProviderConfigs();
   const { deleteConfig, isLoading: isDeleting } =
@@ -44,6 +46,11 @@ export function OAuthProviderSection() {
         err instanceof Error ? err.message : "Failed to remove credentials.";
       toast.error(message);
     }
+  }
+
+  // BYOA is only available on self-hosted deployments
+  if (config?.byoa_enabled === false) {
+    return null;
   }
 
   // Don't render this section if there are no BYOA configs and no unconfigured providers

@@ -33,6 +33,15 @@ function setupMockGet(overrides: Record<string, unknown> = {}) {
         ],
       },
     },
+    "/v1/config": {
+      data: {
+        billing_enabled: false,
+        google_oauth_configured: false,
+        microsoft_oauth_configured: false,
+        sms_enabled: false,
+        byoa_enabled: true,
+      },
+    },
     ...overrides,
   };
   mockGet.mockImplementation((path: string, ..._args: unknown[]) => {
@@ -228,6 +237,15 @@ describe("BYOASetupBanner", () => {
       "/v1/credentials": { data: { credentials: [] } },
       "/v1/oauth/connections": { data: { connections: [] } },
       "/v1/oauth/provider-configs": { data: { configs: [] } },
+      "/v1/config": {
+        data: {
+          billing_enabled: false,
+          google_oauth_configured: false,
+          microsoft_oauth_configured: false,
+          sms_enabled: false,
+          byoa_enabled: true,
+        },
+      },
     };
     mockGet.mockImplementation((path: string, ..._args: unknown[]) => {
       if (

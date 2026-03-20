@@ -449,14 +449,6 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 				InstructionsURL: "https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization",
 			},
 		},
-		OAuthProviders: []connectors.ManifestOAuthProvider{
-			{
-				ID:           "quickbooks",
-				AuthorizeURL: "https://appcenter.intuit.com/connect/oauth2",
-				TokenURL:     "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
-				Scopes:       []string{"com.intuit.quickbooks.accounting"},
-			},
-		},
 		Templates: quickbooksTemplates(),
 	}
 }

@@ -26,6 +26,17 @@ function mockApiFetch(
     if (url === "/v1/oauth/provider-configs") {
       return Promise.resolve({ data: { configs } });
     }
+    if (url === "/v1/config") {
+      return Promise.resolve({
+        data: {
+          billing_enabled: false,
+          google_oauth_configured: false,
+          microsoft_oauth_configured: false,
+          sms_enabled: false,
+          byoa_enabled: true,
+        },
+      });
+    }
     return Promise.resolve({ data: null });
   });
 }
