@@ -17,7 +17,9 @@ type listChannelsAction struct {
 // listChannelsParams defines the user-facing parameter schema.
 type listChannelsParams struct {
 	// Types filters by channel type. Comma-separated list of:
-	// public_channel, private_channel, mpim, im. Defaults to public_channel.
+	// public_channel, private_channel, mpim, im.
+	// Defaults to all types: public_channel,private_channel,mpim,im.
+	// Falls back to public_channel if UserEmail is not set (required for private types).
 	Types string `json:"types,omitempty"`
 	// Limit is the max number of channels to return (1-1000, default 100).
 	Limit int `json:"limit,omitempty"`
@@ -45,9 +47,13 @@ type listChannelsResponse struct {
 	Meta     *paginationMeta    `json:"response_metadata,omitempty"`
 }
 
+// listChannelEntry maps the Slack API response for a single channel from
+// conversations.list. IM channels (DMs) omit Name and instead populate User
+// with the other participant's Slack user ID.
 type listChannelEntry struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
+	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
 	IsArchived bool   `json:"is_archived"`
 	NumMembers int    `json:"num_members"`
@@ -65,9 +71,13 @@ type listChannelsResult struct {
 	NextCursor string               `json:"next_cursor,omitempty"`
 }
 
+// listChannelSummary is the user-facing output for a single channel. For IM
+// channels, Name is empty and User contains the other participant's Slack user
+// ID. Both fields use omitempty so the JSON output only includes relevant fields.
 type listChannelSummary struct {
 	ID         string `json:"id"`
-	Name       string `json:"name"`
+	Name       string `json:"name,omitempty"`
+	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
 	Topic      string `json:"topic,omitempty"`
 	Purpose    string `json:"purpose,omitempty"`
@@ -87,33 +97,48 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	types := params.Types
+	explicitTypes := types != ""
 	if types == "" {
-		types = "public_channel"
+		types = "public_channel,private_channel,mpim,im"
 	}
 
 	// When listing private channels, group DMs, or DMs, resolve the user's
 	// Slack identity and pre-fetch their channel memberships so we can filter
 	// results efficiently. Uses users.conversations (one paginated call) instead
 	// of per-channel isUserInChannel to avoid N+1 API calls.
+	//
+	// If the caller didn't explicitly request private types (using the default)
+	// and has no email set, gracefully fall back to public_channel only instead
+	// of returning an error. This preserves backward compatibility for callers
+	// that previously relied on the old public_channel-only default.
 	var userChannelIDs map[string]bool
 	if channelTypesIncludePrivate(types) {
 		if req.UserEmail == "" {
-			return nil, &connectors.ValidationError{
-				Message: "listing private channels, group DMs, or DMs requires your Permission Slip profile to have an email address matching your Slack account",
+			if explicitTypes {
+				return nil, &connectors.ValidationError{
+					Message: "listing private channels, group DMs, or DMs requires your Permission Slip profile to have an email address matching your Slack account",
+				}
 			}
-		}
-		slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
-		if err != nil {
-			return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
-		}
-		if slackUserID == "" {
-			return nil, &connectors.ValidationError{
-				Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account", req.UserEmail),
+			// Graceful fallback: caller used the default, so fall back to
+			// public channels only rather than breaking existing integrations.
+			types = "public_channel"
+		} else {
+			slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
+			if err != nil {
+				return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
 			}
-		}
-		userChannelIDs, err = a.conn.getUserChannelIDs(ctx, req.Credentials, slackUserID, types)
-		if err != nil {
-			return nil, fmt.Errorf("fetching user channel memberships: %w", err)
+			if slackUserID == "" {
+				return nil, &connectors.ValidationError{
+					Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account", req.UserEmail),
+				}
+			}
+			// Only fetch memberships for private channel types — public channels
+			// are never filtered, so including them wastes API quota.
+			privateTypes := filterPrivateTypes(types)
+			userChannelIDs, err = a.conn.getUserChannelIDs(ctx, req.Credentials, slackUserID, privateTypes)
+			if err != nil {
+				return nil, fmt.Errorf("fetching user channel memberships: %w", err)
+			}
 		}
 	}
 
@@ -150,6 +175,7 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		result.Channels = append(result.Channels, listChannelSummary{
 			ID:         ch.ID,
 			Name:       ch.Name,
+			User:       ch.User,
 			IsPrivate:  ch.IsPrivate,
 			Topic:      ch.Topic.Value,
 			Purpose:    ch.Purpose.Value,

@@ -98,7 +98,7 @@ Lists Slack channels visible to the bot. When listing private channel types (`pr
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `types` | string | No | `public_channel` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im` |
+| `types` | string | No | `public_channel,private_channel,mpim,im` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im`. Defaults to all types when user email is available; falls back to `public_channel` only when no email is set. |
 | `limit` | integer | No | `100` | Max channels to return (1–1000) |
 | `cursor` | string | No | — | Pagination cursor from a previous response |
 | `exclude_archived` | boolean | No | `true` | Exclude archived channels from results |
@@ -115,15 +115,23 @@ Lists Slack channels visible to the bot. When listing private channel types (`pr
       "topic": "General discussion",
       "purpose": "Company-wide announcements",
       "num_members": 42
+    },
+    {
+      "id": "D09876543",
+      "user": "U001",
+      "is_private": true,
+      "num_members": 0
     }
   ],
   "next_cursor": "dGVhbTpDMDI="
 }
 ```
 
+> **Note:** IM channels (DMs) don't have a `name` field. Instead, they include a `user` field with the other participant's Slack user ID.
+
 **Slack API:** `POST /conversations.list` ([docs](https://api.slack.com/methods/conversations.list))
 
-**Required bot token scopes:** `channels:read` (public), `groups:read` (private)
+**Required bot token scopes:** `channels:read` (public), `groups:read` (private), `im:read` (DMs), `mpim:read` (group DMs)
 
 ---
 
@@ -361,7 +369,7 @@ Adds an emoji reaction to a Slack message.
 
 ### `slack.send_dm`
 
-Sends a direct message to a Slack user. Opens (or reuses) a DM channel with the user, then posts the message.
+Sends a direct message to a Slack user. Opens (or reuses) a DM channel with the user, then posts the message. Self-DMs are supported — passing your own user ID opens a "note to self" channel.
 
 **Risk level:** low
 
@@ -383,7 +391,7 @@ Sends a direct message to a Slack user. Opens (or reuses) a DM channel with the 
 
 **Slack API:** `POST /conversations.open` + `POST /chat.postMessage` ([docs](https://api.slack.com/methods/conversations.open))
 
-**Required bot token scopes:** `im:write`, `chat:write`
+**Required bot token scopes:** `im:write`, `mpim:write`, `chat:write`
 
 ---
 
@@ -673,6 +681,42 @@ connectors/slack/
 ├── *_test.go                       # Per-action test files (one per action)
 └── README.md                       # This file
 ```
+
+## Required OAuth Scopes (Complete Reference)
+
+When connecting via OAuth, scopes are requested automatically. If you're creating a Slack app manually (bot token flow), add all the scopes below to your app's **Bot Token Scopes** in the [Slack App Dashboard](https://api.slack.com/apps).
+
+**Bot token scopes (`xoxb-`):**
+
+| Scope | Purpose |
+|-------|---------|
+| `channels:history` | Read messages in public channels |
+| `channels:join` | Join public channels |
+| `channels:manage` | Create/archive/rename public channels |
+| `channels:read` | List public channels |
+| `chat:write` | Send messages, update/delete bot messages |
+| `files:write` | Upload files |
+| `groups:history` | Read messages in private channels |
+| `groups:read` | List private channels |
+| `im:history` | Read DM messages |
+| `im:read` | List DM channels |
+| `im:write` | Open DM conversations |
+| `mpim:history` | Read group DM messages |
+| `mpim:read` | List group DM channels |
+| `mpim:write` | Open group DM conversations |
+| `reactions:write` | Add emoji reactions |
+| `users:read` | List workspace users |
+| `users:read.email` | Access user email addresses (needed for identity verification) |
+
+**User token scopes (`xoxp-`)** — only needed for `search_messages`:
+
+| Scope | Purpose |
+|-------|---------|
+| `search:read.public` | Search public channel messages |
+| `search:read.private` | Search private channel messages |
+| `search:read.im` | Search DM messages |
+| `search:read.mpim` | Search group DM messages |
+| `search:read.files` | Search shared files |
 
 ## Testing
 

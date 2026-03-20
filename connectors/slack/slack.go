@@ -56,6 +56,7 @@ var OAuthScopes = []string{
 	"im:write",
 	"mpim:history",
 	"mpim:read",
+	"mpim:write",
 	"reactions:write",
 	"users:read",
 	"users:read.email",
