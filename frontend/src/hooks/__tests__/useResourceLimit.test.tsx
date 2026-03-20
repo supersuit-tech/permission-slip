@@ -12,7 +12,7 @@ const freePlan = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 250,
+    max_requests_per_month: 1000,
     max_agents: 3,
     max_standing_approvals: 5,
     max_credentials: 5,

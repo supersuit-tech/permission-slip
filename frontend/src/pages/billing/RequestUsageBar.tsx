@@ -3,7 +3,7 @@ import { PRICE_PER_REQUEST } from "./constants";
 interface RequestUsageBarProps {
   total: number;
   limit: number | null;
-  /** Free request allowance for paid plans (e.g. 250). */
+  /** Free request allowance for paid plans (e.g. 1000). */
   included?: number;
   /** Per-request price display string from API (e.g. "$0.005"). Falls back to config constant. */
   priceDisplay?: string;
@@ -17,7 +17,7 @@ function PaidRequestBar({ total, included, priceDisplay }: { total: number; incl
   const overage = Math.max(0, total - included);
   const hasOverage = overage > 0;
 
-  // Bar is measured against included allowance (e.g. 250).
+  // Bar is measured against included allowance (e.g. 1000).
   // When under: green bar grows toward 100%.
   // When over: green fills 100%, amber extends proportionally.
   const freePercent = Math.min((total / included) * 100, 100);

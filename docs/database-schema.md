@@ -338,7 +338,7 @@ Defines pricing tiers and resource limits. Seeded with two built-in plans.
 | `price_per_request_millicents` | integer | NOT NULL, DEFAULT 0 |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 
-**Seed data:** `free` (250 req/mo, 7-day audit, $0/req), `pay_as_you_go` (unlimited, 90-day audit, $0.005/req). Source of truth for current limits: `config/plans.json`.
+**Seed data:** `free` (1000 req/mo, 7-day audit, $0/req), `pay_as_you_go` (unlimited, 90-day audit, $0.005/req). Source of truth for current limits: `config/plans.json`.
 
 ### `subscriptions`
 

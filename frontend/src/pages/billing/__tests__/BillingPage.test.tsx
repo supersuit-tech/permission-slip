@@ -292,7 +292,7 @@ describe("BillingPage", () => {
       await waitFor(() => {
         expect(screen.getByText("Usage")).toBeInTheDocument();
       });
-      // Paid plan shows requests against the 250 free allowance with billed count
+      // Paid plan shows requests against the 1000 free allowance with billed count
       expect(screen.getByText(/billed/)).toBeInTheDocument();
       expect(screen.getByText(/\$0.005\/request/)).toBeInTheDocument();
     });
@@ -528,8 +528,8 @@ describe("BillingPage", () => {
       await waitFor(() => {
         expect(screen.getByText("Estimated cost")).toBeInTheDocument();
       });
-      // $6.46 requests + $0.05 SMS = $6.51 (shown in both UsageDashboard and PlanDetailsCard)
-      expect(screen.getAllByText("$6.51").length).toBeGreaterThanOrEqual(1);
+      // $2.71 requests + $0.05 SMS = $2.76 (shown in both UsageDashboard and PlanDetailsCard)
+      expect(screen.getAllByText("$2.76").length).toBeGreaterThanOrEqual(1);
     });
 
     it("shows free requests remaining when under allowance", async () => {

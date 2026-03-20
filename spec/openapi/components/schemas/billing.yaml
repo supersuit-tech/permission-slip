@@ -57,7 +57,7 @@ PlanLimits:
       type: integer
       nullable: true
       description: Monthly request limit (null = unlimited)
-      example: 250
+      example: 1000
     max_agents:
       type: integer
       nullable: true
@@ -97,7 +97,7 @@ UsageInfo:
       type: integer
       nullable: true
       description: Monthly request limit for the current plan (null = unlimited)
-      example: 250
+      example: 1000
     over_limit:
       type: boolean
       description: Whether current usage exceeds the plan's request limit
@@ -139,7 +139,7 @@ RequestsUsage:
     included:
       type: integer
       description: Number of requests included in the plan for free (0 = unlimited on paid plans)
-      example: 250
+      example: 1000
     overage:
       type: integer
       description: Number of requests exceeding the included allowance
@@ -379,7 +379,7 @@ BillingPricing:
     free_request_allowance:
       type: integer
       description: Number of requests included free each billing period before per-request charges apply.
-      example: 250
+      example: 1000
     price_per_request_display:
       type: string
       description: Human-readable per-request price string (e.g. "$0.005"), sourced from the Stripe price object.
@@ -442,7 +442,7 @@ RequestUsageDetail:
       description: |
         Number of requests included in the plan at no extra cost.
         0 when the plan has no request limit (e.g. pay-as-you-go).
-      example: 250
+      example: 1000
     overage:
       type: integer
       description: |
@@ -657,12 +657,12 @@ QuotaExceededError:
   example:
     error:
       code: monthly_quota_exceeded
-      message: Free tier limit of 250 requests/month reached. Upgrade to continue.
+      message: Free tier limit of 1000 requests/month reached. Upgrade to continue.
       retryable: true
       retry_after: 2419200
       details:
-        limit: 250
-        current_usage: 250
+        limit: 1000
+        current_usage: 1000
         plan_id: free
         reset_at: '2026-04-01T00:00:00Z'
 
@@ -673,7 +673,7 @@ QuotaExceededDetails:
     limit:
       type: integer
       description: The plan's request limit
-      example: 250
+      example: 1000
     current_count:
       type: integer
       description: Current usage count
