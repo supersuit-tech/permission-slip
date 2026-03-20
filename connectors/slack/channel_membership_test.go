@@ -439,25 +439,24 @@ func TestSearchMessages_FiltersPrivateResults(t *testing.T) {
 	}
 }
 
-func TestListChannels_PrivateTypesRequireEmail(t *testing.T) {
+func TestFilterPrivateTypes(t *testing.T) {
 	t.Parallel()
 
-	conn := New()
-	action := &listChannelsAction{conn: conn}
-
-	params, _ := json.Marshal(listChannelsParams{
-		Types: "im",
-	})
-
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "slack.list_channels",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err == nil {
-		t.Fatal("expected error for listing DMs without email")
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"public_channel,private_channel,mpim,im", "private_channel,mpim,im"},
+		{"public_channel", ""},
+		{"im", "im"},
+		{"private_channel,mpim", "private_channel,mpim"},
+		{"public_channel, im", "im"},
+		{"", ""},
 	}
-	if !connectors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %T", err)
+	for _, tt := range tests {
+		got := filterPrivateTypes(tt.input)
+		if got != tt.want {
+			t.Errorf("filterPrivateTypes(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }
