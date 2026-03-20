@@ -685,6 +685,9 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 				stateExtraData = make(map[string]string)
 			}
 			for k, v := range softExtra {
+				// Soft enrichers provide supplemental display info; they must not
+				// overwrite hard-enricher fields (e.g. team_name, account_id, base_url)
+				// that are authoritative for connection routing and display.
 				if _, exists := stateExtraData[k]; !exists {
 					stateExtraData[k] = v
 				}
@@ -1064,6 +1067,11 @@ func displayNameFromExtraData(extraData json.RawMessage) string {
 		identifier = extra["email"]
 	}
 	if identifier == "" {
+		// Fall back to workspace name alone when no personal identifier is available
+		// (e.g. Slack OIDC enricher failed but team_name was captured from the token).
+		if teamName := extra["team_name"]; teamName != "" {
+			return teamName
+		}
 		return ""
 	}
 
