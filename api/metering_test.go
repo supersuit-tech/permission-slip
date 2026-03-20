@@ -147,8 +147,8 @@ func TestMetering_AgentStandingExecutionIncrementsUsage(t *testing.T) {
 	// No usage before execution.
 	testhelper.RequireUsageCount(t, tx, uid, 0)
 
-	reqBody := `{"request_id":"meter_sa_001","action":{"type":"email.read","version":"1","parameters":{}}}`
-	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
+	reqBody := `{"request_id":"meter_sa_001","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -226,10 +226,10 @@ func TestMetering_DuplicateStandingExecutionDoesNotDoubleCount(t *testing.T) {
 	deps := testDepsForDB(t, pu.Pool)
 	router := NewRouter(deps)
 
-	reqBody := `{"request_id":"dedup_sa_001","action":{"type":"email.read","version":"1","parameters":{}}}`
+	reqBody := `{"request_id":"dedup_sa_001","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
 
 	// First execution succeeds.
-	r1 := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, pu.AgentID)
+	r1 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, pu.AgentID)
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, r1)
 
@@ -239,7 +239,7 @@ func TestMetering_DuplicateStandingExecutionDoesNotDoubleCount(t *testing.T) {
 	testhelper.RequireUsageCount(t, pu.Pool, pu.UserID, 1)
 
 	// Second execution with same request_id returns 409 Conflict.
-	r2 := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, pu.AgentID)
+	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, pu.AgentID)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 
@@ -328,9 +328,9 @@ func TestMetering_MultipleEventsAccumulate(t *testing.T) {
 		t.Fatalf("approval request: expected 200, got %d: %s", w1.Code, w1.Body.String())
 	}
 
-	// 2. Execute standing approval via agent path (billable).
-	reqBody2 := `{"request_id":"multi_002","action":{"type":"email.read","version":"1","parameters":{}}}`
-	r2 := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody2, privKey, agentID)
+	// 2. Execute standing approval via agent path (billable — auto-approves).
+	reqBody2 := `{"request_id":"multi_002","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
+	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody2, privKey, agentID)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {

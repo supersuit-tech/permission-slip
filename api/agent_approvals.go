@@ -30,11 +30,16 @@ type agentApprovalConfigRef struct {
 }
 
 type agentRequestApprovalResponse struct {
-	ApprovalID  string    `json:"approval_id"`
-	ApprovalURL string    `json:"approval_url"`
-	Status      string    `json:"status"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	ApprovalID  string     `json:"approval_id,omitempty"`
+	ApprovalURL string     `json:"approval_url,omitempty"`
+	Status      string     `json:"status"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+
+	// Fields populated when a standing approval auto-approves the request.
+	Result              *json.RawMessage `json:"result,omitempty"`
+	StandingApprovalID  string           `json:"standing_approval_id,omitempty"`
+	ExecutionsRemaining *int             `json:"executions_remaining,omitempty"`
 }
 
 type agentCancelApprovalResponse struct {
@@ -204,6 +209,15 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// ── Check for matching standing approval (auto-approve) ─────
+		//
+		// Before creating a pending approval, check if an active standing
+		// approval matches this agent + action type + parameters. If so,
+		// execute immediately and return the result — no human review needed.
+		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID); handled {
+			return
+		}
+
 		// Compute expiration.
 		expiresAt := time.Now().UTC().Add(db.DefaultApprovalTTL)
 		if req.ExpiresIn != nil {
@@ -295,8 +309,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			ApprovalID:  approval.ApprovalID,
 			ApprovalURL: approvalURL,
 			Status:      approval.Status,
-			ExpiresAt:   approval.ExpiresAt,
-			CreatedAt:   approval.CreatedAt,
+			ExpiresAt:   &approval.ExpiresAt,
+			CreatedAt:   &approval.CreatedAt,
 		})
 	}
 }

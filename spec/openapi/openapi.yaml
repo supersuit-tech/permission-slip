@@ -46,8 +46,9 @@ info:
     ### Standing Approval (pre-authorized)
 
     1. **User creates standing approval**: Via web UI — specifies agent, action type, constraints, duration, and optional execution cap
-    2. **Agent executes**: Calls `POST /v1/actions/execute` with agent signature (no token) — Permission Slip matches the standing approval and executes immediately
-    3. **Fallthrough**: If no standing approval matches, falls through to the one-off flow above
+    2. **Agent requests**: Calls `POST /v1/approvals/request` — Permission Slip checks for a matching standing approval
+    3. **Auto-approve**: If a standing approval matches, the action is executed immediately and the result is returned inline with `status: "approved"`
+    4. **Fallthrough**: If no standing approval matches, creates a pending approval for human review (one-off flow above)
     
     ## Architecture
     
@@ -196,9 +197,6 @@ paths:
 
   /v1/action-configurations/{config_id}:
     $ref: './components/paths/action_configurations.yaml#/actionConfigurationById'
-
-  /v1/actions/execute:
-    $ref: './components/paths/actions.yaml#/execute'
 
   /v1/credentials:
     $ref: './components/paths/credentials.yaml#/credentials'
@@ -384,12 +382,6 @@ components:
     DeleteActionConfigResponse:
       $ref: './components/schemas/action_configurations.yaml#/DeleteActionConfigResponse'
 
-    # Actions
-    ExecuteActionRequest:
-      $ref: './components/schemas/actions.yaml#/ExecuteActionRequest'
-    ExecuteActionResponse:
-      $ref: './components/schemas/actions.yaml#/ExecuteActionResponse'
-    
     # Credentials
     StoreCredentialRequest:
       $ref: './components/schemas/credentials.yaml#/StoreCredentialRequest'

@@ -300,8 +300,8 @@ func TestQuota_AgentStandingExecution_FreePlan_AtLimit_Returns429(t *testing.T) 
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 	testhelper.SetUsageCount(t, tx, uid, 250)
 
-	reqBody := `{"request_id":"quota_sa_001","action":{"type":"email.read","version":"1","parameters":{}}}`
-	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
+	reqBody := `{"request_id":"quota_sa_001","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -319,8 +319,8 @@ func TestQuota_AgentStandingExecution_FreePlan_UnderLimit_Succeeds(t *testing.T)
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 	testhelper.SetUsageCount(t, tx, uid, 249)
 
-	reqBody := `{"request_id":"quota_sa_ok_001","action":{"type":"email.read","version":"1","parameters":{}}}`
-	r := signedJSONRequest(t, http.MethodPost, "/actions/execute", reqBody, privKey, agentID)
+	reqBody := `{"request_id":"quota_sa_ok_001","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 

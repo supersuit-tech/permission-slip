@@ -94,22 +94,25 @@ ApprovalRequest:
 ApprovalRequestResponse:
   type: object
   description: |
-    Response after submitting an approval request. The agent should use the `approval_id`
-    to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
-    or listen for real-time updates via `GET /v1/approvals/events` (SSE).
+    Response after submitting an approval request. Two possible outcomes:
+
+    **Auto-approved** (`status: "approved"`): A matching standing approval was found.
+    The action was executed immediately. The response includes `result`,
+    `standing_approval_id`, and optionally `executions_remaining`. No `approval_id`
+    or `approval_url` is returned.
+
+    **Pending** (`status: "pending"`): No standing approval matched. A pending approval
+    was created. The agent should poll `GET /v1/approvals/{approval_id}/status` for the
+    result, or listen via `GET /v1/approvals/events` (SSE).
   required:
-    - approval_id
-    - approval_url
     - status
-    - expires_at
   properties:
     approval_id:
       type: string
       pattern: '^appr_[a-zA-Z0-9]{6,64}$'
       maxLength: 70
       description: |
-        Unique approval identifier assigned by Permission Slip. Used to reference this approval
-        in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
+        Unique approval identifier. Present only when `status` is `pending`.
       example: "appr_xyz789"
 
     approval_url:
@@ -118,11 +121,7 @@ ApprovalRequestResponse:
       maxLength: 4096
       pattern: '^https://'
       description: |
-        Primary approval URL (universal link) that the approver must visit to review and
-        approve/deny the action. This is the canonical URL that clients MUST support.
-
-        The URL contains context about the approval request and allows the approver to see
-        full action details before making a decision.
+        Approval URL for the approver to review. Present only when `status` is `pending`.
       example: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
 
     alternative_urls:
@@ -132,28 +131,48 @@ ApprovalRequestResponse:
       type: string
       enum:
         - pending
+        - approved
       description: |
-        Approval status. Always `pending` when first created. Status changes to `approved`
-        or `denied` after approver makes a decision.
+        `pending` — approval created, awaiting human review.
+        `approved` — auto-approved via standing approval, result is inline.
       example: "pending"
 
     expires_at:
       type: string
       format: date-time
       description: |
-        ISO 8601 timestamp (RFC 3339 format, UTC) when approval expires. After this time,
-        the approval becomes invalid and cannot be approved.
-
-        Typically set to 5 minutes from creation, but may vary based on configuration
-        or action risk level.
+        When the pending approval expires. Present only when `status` is `pending`.
       example: "2026-02-11T13:25:00Z"
+
+    created_at:
+      type: string
+      format: date-time
+      description: |
+        When the approval was created. Present only when `status` is `pending`.
+      example: "2026-02-11T13:20:00Z"
+
+    result:
+      description: |
+        Execution result from the connector. Present only when `status` is `approved`
+        (auto-approved via standing approval).
+
+    standing_approval_id:
+      type: string
+      description: |
+        ID of the standing approval that matched. Present only when `status` is `approved`.
+      example: "sa_abc123"
+
+    executions_remaining:
+      type: integer
+      nullable: true
+      description: |
+        Number of executions remaining on the standing approval, or null if unlimited.
+        Present only when `status` is `approved`.
+      example: 47
 
   example:
     approval_id: "appr_xyz789"
     approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
-    alternative_urls:
-      deeplink: "permissionslip://permission-slip/approve/appr_xyz789"
-      web: "https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789"
     status: "pending"
     expires_at: "2026-02-11T13:25:00Z"
 

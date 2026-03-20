@@ -893,7 +893,7 @@ func TestHandleConnectorError_OAuthRefreshError_Returns401(t *testing.T) {
 	t.Parallel()
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_test123"))
 
 	oauthErr := &connectors.OAuthRefreshError{
@@ -929,7 +929,7 @@ func TestHandleConnectorError_OAuthRefreshError_Microsoft(t *testing.T) {
 	t.Parallel()
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_msft"))
 
 	oauthErr := &connectors.OAuthRefreshError{
@@ -961,7 +961,7 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 	t.Parallel()
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_other"))
 
 	handled := handleConnectorError(w, r, context.DeadlineExceeded, ConnectorContext{ActionType: "test.action"})
@@ -975,7 +975,7 @@ func TestHandleConnectorError_NonOAuthError_NotHandled(t *testing.T) {
 func TestHandleConnectorError_ExternalError_SurfacesMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_ext"))
 
 	extErr := &connectors.ExternalError{StatusCode: 404, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
@@ -998,7 +998,7 @@ func TestHandleConnectorError_ExternalError_SurfacesMessage(t *testing.T) {
 func TestHandleConnectorError_AuthError_SurfacesMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_auth"))
 
 	authErr := &connectors.AuthError{Message: "GitHub API auth error (403): Resource not accessible by integration"}
@@ -1021,7 +1021,7 @@ func TestHandleConnectorError_AuthError_SurfacesMessage(t *testing.T) {
 func TestHandleConnectorError_TimeoutError_SurfacesMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_timeout"))
 
 	timeoutErr := &connectors.TimeoutError{Message: "Slack API request timed out: context deadline exceeded"}
@@ -1046,7 +1046,7 @@ func TestHandleConnectorError_TimeoutError_SurfacesMessage(t *testing.T) {
 func TestHandleConnectorError_RateLimitError_SurfacesMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_rl"))
 
 	rlErr := &connectors.RateLimitError{Message: "GitHub API rate limit exceeded — resets in 42 minutes", RetryAfter: 42 * time.Minute}
@@ -1069,7 +1069,7 @@ func TestHandleConnectorError_RateLimitError_SurfacesMessage(t *testing.T) {
 func TestHandleConnectorError_ValidationError_SurfacesMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_val"))
 
 	valErr := &connectors.ValidationError{Message: "channel_id is required"}
@@ -1092,7 +1092,7 @@ func TestHandleConnectorError_ValidationError_SurfacesMessage(t *testing.T) {
 func TestHandleConnectorError_OAuthRefreshError_SurfacesMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_oauth"))
 
 	oauthErr := &connectors.OAuthRefreshError{Provider: "google", Message: "Google OAuth token expired — user must re-authorize in Settings"}
@@ -1117,7 +1117,7 @@ func TestHandleConnectorError_OAuthRefreshError_SurfacesMessage(t *testing.T) {
 func TestHandleConnectorError_RateLimitError_FallbackMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_rl_fallback"))
 
 	rlErr := &connectors.RateLimitError{RetryAfter: 30 * time.Second} // no Message
@@ -1140,7 +1140,7 @@ func TestHandleConnectorError_RateLimitError_FallbackMessage(t *testing.T) {
 func TestHandleConnectorError_ValidationError_FallbackMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_val_fallback"))
 
 	valErr := &connectors.ValidationError{} // no Message
@@ -1163,7 +1163,7 @@ func TestHandleConnectorError_ValidationError_FallbackMessage(t *testing.T) {
 func TestHandleConnectorError_OAuthRefreshError_FallbackMessage(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_oauth_fallback"))
 
 	oauthErr := &connectors.OAuthRefreshError{Provider: "google"} // no Message
@@ -1509,7 +1509,7 @@ func (a *paymentCapturingAction) Execute(_ context.Context, req connectors.Actio
 func TestHandleConnectorError_PaymentError_Missing(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm1"))
 
 	pe := &connectors.PaymentError{Code: connectors.PaymentErrMissing, Message: "payment_method_id required"}
@@ -1525,7 +1525,7 @@ func TestHandleConnectorError_PaymentError_Missing(t *testing.T) {
 func TestHandleConnectorError_PaymentError_LimitExceeded(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm2"))
 
 	pe := &connectors.PaymentError{Code: connectors.PaymentErrPerTxLimit, Message: "exceeds limit"}
@@ -1541,7 +1541,7 @@ func TestHandleConnectorError_PaymentError_LimitExceeded(t *testing.T) {
 func TestHandleConnectorError_PaymentError_InvalidAmount(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/actions/execute", nil)
+	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
 	r = r.WithContext(context.WithValue(r.Context(), traceIDKey{}, "trace_pm3"))
 
 	pe := &connectors.PaymentError{Code: connectors.PaymentErrInvalidAmount, Message: "amount_cents must be non-negative"}

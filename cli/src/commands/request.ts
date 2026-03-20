@@ -1,9 +1,10 @@
 /**
  * permission-slip request --action <action_id> [--params '{}'] [--server <url>]
  *
- * Requests one-off approval for an action. Always returns immediately
- * with the approval_id and a next_step hint. Use `permission-slip status`
- * to check the result later.
+ * Requests approval for an action. If a matching standing approval exists,
+ * the action is auto-approved and executed immediately — the result is
+ * returned inline. Otherwise, creates a pending approval and returns
+ * an approval_id to poll via `permission-slip status`.
  */
 
 import type { Command } from "commander";
@@ -15,7 +16,7 @@ import { shellQuote } from "../util/shell.js";
 export function requestCommand(program: Command): void {
   program
     .command("request")
-    .description("Request approval for an action")
+    .description("Request approval for an action (auto-approves if a standing approval matches)")
     .requiredOption("--action <action_id>", "Action type (e.g. email.send)")
     .option("--params <json>", "Action parameters as JSON string", "{}")
     .option("--description <text>", "Human-readable description of the action")
@@ -58,16 +59,22 @@ export function requestCommand(program: Command): void {
 
         const result = await client.requestApproval(opts.action, params, context);
 
-        output(
-          {
-            ...result,
-            next_step:
-              "Approval requested. To check the result, run: " +
-              `permission-slip status ${shellQuote(result.approval_id)}` +
-              (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
-          },
-          outputOpts,
-        );
+        if (result.status === "approved") {
+          // Auto-approved via standing approval — result is inline.
+          output(result, outputOpts);
+        } else {
+          // Pending — tell the user how to check the result.
+          output(
+            {
+              ...result,
+              next_step:
+                "Approval requested. To check the result, run: " +
+                `permission-slip status ${shellQuote(result.approval_id ?? "")}` +
+                (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
+            },
+            outputOpts,
+          );
+        }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);

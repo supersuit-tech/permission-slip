@@ -3,14 +3,27 @@ request:
     operationId: requestApproval
     summary: Request Approval for Action
     description: |
-      Request approval for a specific one-off action. The designated approver must review 
-      and approve the action before the agent can execute it.
-      
-      ## Approval Request Flow
-      
+      Request approval for an action. If a matching standing approval exists, the action
+      is auto-approved and executed immediately — the result is returned inline with
+      `status: "approved"`. Otherwise, creates a pending approval for human review.
+
+      ## Auto-Approval (Standing Approval Match)
+
+      Before creating a pending approval, Permission Slip checks for an active standing
+      approval that matches the agent, action type, and parameters. If found:
+
+      1. **Parameters validated**: Against standing approval constraints
+      2. **Action executed**: Immediately via the connector using stored credentials
+      3. **Result returned**: Response has `status: "approved"` with `result`, `standing_approval_id`, and `executions_remaining`
+      4. **No polling needed**: The agent has the result immediately
+
+      ## One-off Approval (No Standing Approval Match)
+
+      If no standing approval matches, the request follows the standard flow:
+
       1. **Agent requests**: Sends action details, parameters, and context
       2. **Permission Slip validates**: Verifies agent is registered, signature is valid
-      3. **Permission Slip responds**: Returns approval URL with unique approval_id
+      3. **Permission Slip responds**: Returns approval URL with unique approval_id and `status: "pending"`
       4. **Notification sent**: Permission Slip notifies approver (push notification)
       5. **Approver reviews**: Visits URL, sees full action details, approves/denies
       6. **Direct execution**: If approved, Permission Slip immediately executes the action via the connector
@@ -127,30 +140,33 @@ request:
     
     responses:
       '200':
-        description: Approval request created successfully
+        description: |
+          Approval request processed. Check `status` to determine the outcome:
+          - `approved` — auto-approved via standing approval, result inline
+          - `pending` — awaiting human review
         content:
           application/json:
             schema:
               $ref: '../schemas/approvals.yaml#/ApprovalRequestResponse'
             examples:
-              basic:
-                summary: Basic approval response
+              pending:
+                summary: Pending — awaiting human approval
                 value:
                   approval_id: "appr_xyz789"
                   approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
                   status: "pending"
                   expires_at: "2026-02-11T13:25:00Z"
-              
-              with_alternative_urls:
-                summary: Response with cross-platform URLs
+                  created_at: "2026-02-11T13:20:00Z"
+
+              auto_approved:
+                summary: Auto-approved via standing approval
                 value:
-                  approval_id: "appr_xyz789"
-                  approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
-                  alternative_urls:
-                    deeplink: "permissionslip://permission-slip/approve/appr_xyz789"
-                    web: "https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789"
-                  status: "pending"
-                  expires_at: "2026-02-11T13:25:00Z"
+                  status: "approved"
+                  result:
+                    message_id: "msg_abc123"
+                    delivery_status: "queued"
+                  standing_approval_id: "sa_abc123"
+                  executions_remaining: 47
       
       '400':
         description: Invalid request or unsupported action type

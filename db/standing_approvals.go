@@ -500,7 +500,7 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 
 // RecordStandingApprovalExecutionByAgent atomically increments the standing
 // approval's execution_count and inserts an execution record, scoped by
-// agent_id. This is used by the agent-facing POST /actions/execute endpoint
+// agent_id. This is used by the auto-approval logic in POST /approvals/request
 // where authentication is via agent signature rather than user session.
 //
 // The requestID is stored in the execution record and enforced via a unique
