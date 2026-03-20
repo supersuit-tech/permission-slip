@@ -169,7 +169,26 @@ Pick one provider:
 | `SMTP_PASSWORD` | SMTP password or app password |
 | `NOTIFICATION_EMAIL_FROM` | Sender address |
 
-### SMS Notifications (Amazon SNS)
+### SMS Notifications (Amazon SNS) — Recommended for Self-Hosted
+
+SMS is the primary notification channel for self-hosted deployments. When configured, it appears automatically in each user's notification preferences — no plan or subscription required.
+
+You'll need an AWS account with Amazon SNS access. Here's how to set it up:
+
+1. **Create an AWS account** (if you don't have one) at [aws.amazon.com](https://aws.amazon.com)
+2. **Create an IAM user** (or use an existing one) with the `sns:Publish` permission. The minimal IAM policy:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Effect": "Allow",
+       "Action": "sns:Publish",
+       "Resource": "*"
+     }]
+   }
+   ```
+3. **Request production SMS access** — new AWS accounts are in the [SMS Sandbox](https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) by default. Go to the SNS console → Text messaging (SMS) → Exit sandbox. Until approved, SMS only reaches verified destination numbers.
+4. **Set the environment variables:**
 
 | Variable | Description |
 |---|---|
@@ -179,9 +198,11 @@ Pick one provider:
 | `SNS_SMS_SENDER_ID` | Optional alphanumeric sender ID (not supported in all countries) |
 | `SNS_SMS_ORIGINATION_NUMBER` | Optional origination phone number in E.164 format |
 
-`AWS_REGION` is required to enable SMS. Credentials are optional when running on AWS with an IAM role. The IAM user/role needs `sns:Publish` permission.
+`AWS_REGION` is required to enable SMS. Credentials are optional when running on AWS with an IAM role (EC2, ECS, Lambda).
 
-> **Important:** New AWS accounts are in the [SMS Sandbox](https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html) by default. Request production SMS access in the SNS console before deploying, or SMS will only reach verified destination numbers.
+> **Tip:** For US destinations, you'll likely need a toll-free number or 10DLC registration. Set `SNS_SMS_ORIGINATION_NUMBER` to your registered number in E.164 format (e.g., `+15551234567`).
+
+To hide SMS from the UI (e.g., on a hosted platform), set `SMS_NOTIFICATIONS_HIDDEN=true`. Self-hosted deployments should leave this unset.
 
 ### Error Tracking (Sentry)
 
@@ -232,6 +253,7 @@ When `BILLING_ENABLED=false` (the default), all users get an unlimited plan, Str
 | `SHUTDOWN_TIMEOUT` | `30s` | Graceful shutdown timeout for in-flight requests |
 | `CONNECTORS_DIR` | `~/.permission_slip/connectors/` | Directory for external connector plugins |
 | `CUSTOM_CONNECTORS_JSON` | (empty) | Inline JSON connector config (alternative to file on disk) |
+| `SMS_NOTIFICATIONS_HIDDEN` | `false` | Set to `true` to hide SMS from notification preferences UI even when SNS is configured |
 | `SUPABASE_JWT_SECRET` | (empty) | Legacy HS256 JWT secret (only for Supabase CLI v1 — not needed with modern Supabase) |
 | `SUPABASE_JWKS_URL` | (auto-derived) | Override JWKS endpoint URL (auto-derived from `SUPABASE_URL` if not set) |
 
@@ -457,6 +479,9 @@ Migrations run automatically on startup. If they fail, check database connectivi
 | `AWS_REGION` | For SMS | Runtime | AWS region for SNS (e.g. `us-east-1`) |
 | `AWS_ACCESS_KEY_ID` | For SMS | Runtime | AWS access key (optional with IAM roles) |
 | `AWS_SECRET_ACCESS_KEY` | For SMS | Runtime | AWS secret key (optional with IAM roles) |
+| `SNS_SMS_SENDER_ID` | No | Runtime | Alphanumeric SMS sender ID (not supported in all countries) |
+| `SNS_SMS_ORIGINATION_NUMBER` | No | Runtime | Origination phone number in E.164 format |
+| `SMS_NOTIFICATIONS_HIDDEN` | No | Runtime | Hide SMS from notification preferences UI (`true`/`false`, default: `false`) |
 | `SENTRY_DSN` | No | Runtime | Backend error tracking |
 | `SENTRY_CSP_ENDPOINT` | No | Runtime | CSP violation reporting |
 | `VITE_SENTRY_DSN` | No | Build | Frontend error tracking |

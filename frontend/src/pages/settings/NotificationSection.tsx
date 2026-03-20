@@ -28,7 +28,7 @@ const CHANNEL_LABELS: Record<string, { name: string; description: string }> = {
   },
   sms: {
     name: "SMS",
-    description: "Text message notifications for urgent approval requests. Available after the beta.",
+    description: "Text message notifications for urgent approval requests.",
   },
   "mobile-push": {
     name: "Mobile Push",

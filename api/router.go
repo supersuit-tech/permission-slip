@@ -32,6 +32,7 @@ type Deps struct {
 	OAuthStateSecret      string               // HMAC-SHA256 secret for signing OAuth CSRF state tokens; if empty, falls back to SupabaseJWTSecret
 	Stripe                *pstripe.Client      // Stripe API client; nil when billing is disabled or Stripe keys not set
 	BillingEnabled        bool                 // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
+	SMSEnabled            bool                 // true when SMS sender is configured AND SMS_NOTIFICATIONS_HIDDEN != "true"; gates SMS preference visibility
 	DevMode               bool                 // true when MODE=development; disables rate limiting
 	RateLimiter           *RateLimiter         // pre-auth rate limiter (per-IP + global); nil disables
 	AgentRateLimiter      *RateLimiter         // post-auth rate limiter (per verified agent); nil disables
