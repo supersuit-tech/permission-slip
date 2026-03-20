@@ -26,6 +26,17 @@ function mockApiFetch(
     if (url === "/v1/oauth/provider-configs") {
       return Promise.resolve({ data: { configs } });
     }
+    if (url === "/v1/config") {
+      return Promise.resolve({
+        data: {
+          billing_enabled: false,
+          google_oauth_configured: false,
+          microsoft_oauth_configured: false,
+          sms_enabled: false,
+          byoa_enabled: true,
+        },
+      });
+    }
     return Promise.resolve({ data: null });
   });
 }
@@ -37,6 +48,44 @@ describe("OAuthProviderSection", () => {
     vi.restoreAllMocks();
     resetClientMocks();
     wrapper = createAuthWrapper(["/settings"]);
+  });
+
+  it("renders nothing when byoa_enabled is false", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/oauth/providers") {
+        return Promise.resolve({
+          data: {
+            providers: [
+              { id: "salesforce", scopes: ["api"], source: "manifest", has_credentials: false },
+            ],
+          },
+        });
+      }
+      if (url === "/v1/config") {
+        return Promise.resolve({
+          data: {
+            billing_enabled: true,
+            byoa_enabled: false,
+            google_oauth_configured: false,
+            microsoft_oauth_configured: false,
+            sms_enabled: false,
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    const { container } = render(<OAuthProviderSection />, { wrapper });
+
+    await waitFor(() =>
+      expect(mockGet).toHaveBeenCalledWith("/v1/config", expect.anything()),
+    );
+    await waitFor(() => {
+      expect(
+        container.querySelector("[data-slot='card']"),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("does not render when no BYOA configs or unconfigured providers", async () => {

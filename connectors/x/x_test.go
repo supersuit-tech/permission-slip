@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
 )
 
 func TestXConnector_ID(t *testing.T) {
@@ -103,10 +104,8 @@ func TestXConnector_Manifest(t *testing.T) {
 	if len(m.Templates) != 16 {
 		t.Errorf("Manifest().Templates has %d templates, want 16", len(m.Templates))
 	}
-	if len(m.OAuthProviders) != 1 {
-		t.Errorf("Manifest().OAuthProviders has %d providers, want 1", len(m.OAuthProviders))
-	} else if m.OAuthProviders[0].ID != "x" {
-		t.Errorf("OAuthProviders[0].ID = %q, want %q", m.OAuthProviders[0].ID, "x")
+	if len(m.OAuthProviders) != 0 {
+		t.Errorf("Manifest().OAuthProviders has %d providers, want 0 (x is now a built-in provider)", len(m.OAuthProviders))
 	}
 	if len(m.RequiredCredentials) != 1 {
 		t.Errorf("Manifest().RequiredCredentials has %d credentials, want 1", len(m.RequiredCredentials))

@@ -1,14 +1,16 @@
 // BYOA (Bring Your Own OAuth App) endpoints.
 //
-// These endpoints let users register their own OAuth client credentials for
-// any provider declared in a connector manifest. This is needed when a
-// connector's OAuth provider has no platform-level credentials — i.e. the
-// manifest declares endpoints and scopes but no client ID/secret (e.g.
-// Salesforce, X/Twitter). Users create an OAuth app in the provider's
-// developer console, then enter the client ID and secret here.
+// These endpoints let self-hosted users register their own OAuth client
+// credentials for any provider declared in a connector manifest or built-in
+// config. This is useful when a provider has no platform-level credentials —
+// the manifest declares endpoints and scopes but no client ID/secret (e.g.
+// Salesforce). Users create an OAuth app in the provider's developer console,
+// then enter the client ID and secret here.
 //
-// Self-hosted deployments do NOT need BYOA — they should set provider
-// credentials via environment variables (GOOGLE_CLIENT_ID, etc.) instead.
+// BYOA is DISABLED on the hosted platform (app.permissionslip.dev) where
+// BillingEnabled is true. All providers ship with platform-level credentials
+// on the hosted platform. On self-hosted deployments, users can either set
+// provider credentials via environment variables or use BYOA.
 //
 // Provider resolution order: platform-level built-in → user-level BYOA config.
 // BYOA credentials are merged into the existing provider config (preserving
@@ -76,7 +78,26 @@ func init() {
 }
 
 // RegisterOAuthBYOARoutes adds BYOA provider management endpoints to the mux.
+// BYOA is only available on self-hosted deployments (BillingEnabled == false).
+// On the hosted platform (app.permissionslip.dev), all providers ship with
+// platform-level credentials so BYOA is unnecessary.
 func RegisterOAuthBYOARoutes(mux *http.ServeMux, deps *Deps) {
+	if deps.BillingEnabled {
+		// Hosted deployment — BYOA is disabled. Register handlers that
+		// return 404 so the endpoints don't leak into the hosted API.
+		// Wrap in requireProfile so unauthenticated callers get 401 (same
+		// as self-hosted), preventing deployment-type fingerprinting.
+		requireProfile := RequireProfile(deps)
+		byoaDisabled := requireProfile(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrConfigurationDisabled, "BYOA is not available on hosted deployments"))
+		}))
+		mux.Handle("POST /oauth/provider-configs", byoaDisabled)
+		mux.Handle("GET /oauth/provider-configs", byoaDisabled)
+		mux.Handle("PUT /oauth/provider-configs/{provider}", byoaDisabled)
+		mux.Handle("DELETE /oauth/provider-configs/{provider}", byoaDisabled)
+		return
+	}
+
 	requireProfile := RequireProfile(deps)
 
 	mux.Handle("POST /oauth/provider-configs", requireProfile(handleCreateOAuthProviderConfig(deps)))

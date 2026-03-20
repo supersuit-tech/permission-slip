@@ -366,14 +366,6 @@ func (c *XConnector) Manifest() *connectors.ConnectorManifest {
 				OAuthScopes:   []string{"tweet.read", "tweet.write", "users.read", "dm.read", "dm.write", "offline.access", "like.read", "like.write", "follows.read", "follows.write"},
 			},
 		},
-		OAuthProviders: []connectors.ManifestOAuthProvider{
-			{
-				ID:           "x",
-				AuthorizeURL: "https://x.com/i/oauth2/authorize",
-				TokenURL:     "https://api.x.com/2/oauth2/token",
-				Scopes:       []string{"tweet.read", "tweet.write", "users.read", "dm.read", "dm.write", "offline.access", "like.read", "like.write", "follows.read", "follows.write"},
-			},
-		},
 		Templates: []connectors.ManifestTemplate{
 			{
 				ID:          "tpl_x_post_tweet",

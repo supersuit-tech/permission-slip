@@ -8,6 +8,7 @@ ConfigResponse:
     - google_oauth_configured
     - microsoft_oauth_configured
     - sms_enabled
+    - byoa_enabled
   properties:
     billing_enabled:
       type: boolean
@@ -44,3 +45,12 @@ ConfigResponse:
         this set automatically; the hosted platform (app.permissionslip.dev)
         sets `SMS_NOTIFICATIONS_HIDDEN=true` to hide SMS from users.
       example: false
+    byoa_enabled:
+      type: boolean
+      description: |
+        Whether BYOA (Bring Your Own App) OAuth credential management is
+        available. BYOA is enabled on self-hosted deployments (where users
+        may need to supply their own OAuth client credentials) and disabled
+        on the hosted platform (app.permissionslip.dev) where all providers
+        ship with platform-level credentials.
+      example: true
