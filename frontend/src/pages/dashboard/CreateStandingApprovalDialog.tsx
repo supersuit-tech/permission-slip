@@ -417,8 +417,8 @@ export function CreateStandingApprovalDialog({
         });
         toast.success("Standing approval updated");
         resetForm();
-        onOpenChange(false);
         onUpdated?.();
+        onOpenChange(false);
       } else {
         await createStandingApproval({
           agent_id: agentId,
@@ -431,8 +431,8 @@ export function CreateStandingApprovalDialog({
         });
         toast.success("Standing approval created");
         resetForm();
-        onOpenChange(false);
         onCreated?.();
+        onOpenChange(false);
       }
     } catch (err) {
       toast.error(

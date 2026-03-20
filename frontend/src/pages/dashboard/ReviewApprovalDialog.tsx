@@ -196,7 +196,10 @@ export function ReviewApprovalDialog({
 
   function handleStandingDialogChange(nextOpen: boolean) {
     setStandingDialogOpen(nextOpen);
-    if (!nextOpen && !standingApprovalCreated) {
+    // Unblock parent auto-close whenever the nested wizard closes (cancel or success).
+    // Do not gate on standingApprovalCreated — that state updates after this handler runs,
+    // so a closure check would always see the pre-create value.
+    if (!nextOpen) {
       setAutoCloseBlocked(false);
     }
   }
