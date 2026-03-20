@@ -59,6 +59,12 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 	}
 
 	// Record the execution against the standing approval.
+	//
+	// KNOWN LIMITATION: request_id uniqueness is enforced per-table, not
+	// cross-flow. A request_id used in standing_approval_executions can be
+	// reused in approvals (and vice versa) if the flow changes between calls
+	// (e.g., standing approval revoked between first and second call). A
+	// cross-flow deduplication table would fix this — tracked separately.
 	exec, err := db.RecordStandingApprovalExecutionByAgent(r.Context(), deps.DB, sa.StandingApprovalID, agent.AgentID, requestID, params)
 	if err != nil {
 		var saErr *db.StandingApprovalError
