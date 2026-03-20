@@ -9,6 +9,7 @@ import {
   TimerOff,
   CreditCard,
   HelpCircle,
+  PencilLine,
 } from "lucide-react";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import type { VariantProps } from "class-variance-authority";
@@ -38,7 +39,7 @@ export const OUTCOME_FILTERS: { label: string; value: OutcomeFilter }[] = [
  * when no explicit event_type filter is set.
  */
 export const ACTION_EVENT_TYPES =
-  "approval.requested,approval.approved,approval.denied,approval.cancelled,action.executed,standing_approval.executed,payment_method.charged";
+  "approval.requested,approval.approved,approval.denied,approval.cancelled,action.executed,standing_approval.executed,standing_approval.updated,payment_method.charged";
 
 interface OutcomeStyle {
   label: string;
@@ -56,6 +57,7 @@ export const OUTCOME_CONFIG: Record<string, OutcomeStyle> = {
   pending: { label: "Pending", variant: "warning", Icon: Clock },
   expired: { label: "Expired", variant: "outline", Icon: TimerOff },
   charged: { label: "Charged", variant: "info", Icon: CreditCard },
+  updated: { label: "Updated", variant: "secondary", Icon: PencilLine },
 };
 
 /** All outcome values (derived from OUTCOME_CONFIG) plus "all", for the full activity page. */

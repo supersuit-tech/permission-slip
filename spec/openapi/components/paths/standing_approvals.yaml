@@ -401,6 +401,8 @@ updateStandingApproval:
       `execution_count`. The update is rejected atomically at the database level to prevent
       a race condition where concurrent executions could otherwise create a zombie approval.
 
+      Emits a `standing_approval.updated` audit event on success.
+
     tags:
       - Standing Approvals
 

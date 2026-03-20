@@ -16,6 +16,7 @@ AuditEvent:
         - approval.cancelled
         - action.executed
         - standing_approval.executed
+        - standing_approval.updated
         - agent.registered
         - agent.deactivated
         - payment_method.charged
@@ -45,7 +46,8 @@ AuditEvent:
         approvals, contains `type`, `version`, and `parameters`. For standing
         approval executions, contains `type`, `version`, `parameters` (the
         actual parameters used in the execution), and `constraints` (the
-        boundary rules from the standing approval). For payment_method.charged
+        boundary rules from the standing approval). For standing_approval.updated,
+        contains `type` (action type) only. For payment_method.charged
         events, contains `type`, `payment_method_id`, `brand`, `last4`,
         `amount_cents`, `currency`, and optionally `description` (a human-readable
         summary of the charge). Never includes raw card details.
@@ -62,6 +64,7 @@ AuditEvent:
         - pending
         - expired
         - charged
+        - updated
       description: The outcome of the event.
       example: "approved"
     source_id:
@@ -131,6 +134,7 @@ AuditLogEvent:
         - approval.cancelled
         - action.executed
         - standing_approval.executed
+        - standing_approval.updated
         - agent.registered
         - agent.deactivated
         - payment_method.charged
@@ -171,6 +175,7 @@ AuditLogEvent:
         - pending
         - expired
         - charged
+        - updated
       description: The outcome of the event.
       example: "approved"
     source_id:
