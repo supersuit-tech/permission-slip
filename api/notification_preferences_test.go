@@ -58,17 +58,39 @@ func TestUpdateNotificationPreferences_EnableSMS_WhenConfigured_Allowed(t *testi
 	}
 }
 
-func TestUpdateNotificationPreferences_DisableSMS_FreeTier_Allowed(t *testing.T) {
+func TestUpdateNotificationPreferences_DisableSMS_WhenNotConfigured_Rejected(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
-	// Disabling SMS should work even on free tier (no plan check needed).
+	// Any SMS preference change should be rejected when SMS is not configured,
+	// including disabling — to prevent stale rows that override defaults.
+	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
+		`{"preferences":[{"channel":"sms","enabled":false}]}`)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateNotificationPreferences_DisableSMS_WhenConfigured_Allowed(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
+	router := NewRouter(deps)
+
+	// Disabling SMS should work when SMS is configured on the server.
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
 		`{"preferences":[{"channel":"sms","enabled":false}]}`)
 	w := httptest.NewRecorder()

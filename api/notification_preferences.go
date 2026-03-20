@@ -15,7 +15,9 @@ import (
 
 // notificationPreferenceResponse is a single channel preference.
 // The Available field indicates whether the channel can be used;
-// when false, the frontend should show a "coming soon" badge instead of a toggle.
+// when false, the frontend shows a "coming soon" badge instead of a toggle.
+// Note: SMS is excluded from the response entirely (not just marked unavailable)
+// when the server has no SMS sender configured.
 type notificationPreferenceResponse struct {
 	Channel   string `json:"channel"`
 	Enabled   bool   `json:"enabled"`
@@ -118,10 +120,12 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Gate SMS: reject enabling SMS when the server has no SMS sender configured
+		// Gate SMS: reject any SMS preference change when the server has no SMS sender configured
 		// or the operator has explicitly hidden SMS (SMS_NOTIFICATIONS_HIDDEN=true).
+		// This prevents stale clients from writing sms=false rows that would override the
+		// "missing rows default to enabled" behaviour when SMS is later configured.
 		for _, p := range req.Preferences {
-			if p.Enabled && p.Channel == "sms" && !deps.SMSEnabled {
+			if p.Channel == "sms" && !deps.SMSEnabled {
 				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelNotConfigured, "SMS notifications are not configured on this server."))
 				return
 			}
