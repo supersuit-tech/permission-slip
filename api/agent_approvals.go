@@ -129,46 +129,53 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Normalize parameters before storage so canonical keys are stored.
-		// First rewrites flat aliases (ParameterAliaser), then applies nested
+		// Validate action type and normalize parameters before storage.
+		// Rejects unregistered action types immediately so agents get a clear
+		// error instead of approvals that silently fail at execution time.
+		// Then rewrites flat aliases (ParameterAliaser) and applies nested
 		// normalization (Normalizer). Must run before ValidateConfigurationReference
 		// so constraints are evaluated against canonical keys.
 		if deps.Connectors != nil {
-			if action, ok := deps.Connectors.GetAction(actionType); ok {
-				if aliaser, ok := action.(connectors.ParameterAliaser); ok {
-					if aliases := aliaser.ParameterAliases(); len(aliases) > 0 {
-						if rawParams, hasParams := actionObj["parameters"]; hasParams {
-							normalized := connectors.NormalizeParameters(aliases, rawParams)
-							actionObj["parameters"] = normalized
-							if updated, err := json.Marshal(actionObj); err == nil {
-								req.Action = updated
-							}
-						}
-					}
-				}
-				if normalizer, ok := action.(connectors.Normalizer); ok {
+			action, ok := deps.Connectors.GetAction(actionType)
+			if !ok {
+				errResp := BadRequest(ErrUnsupportedActionType, fmt.Sprintf("unknown action type %q", actionType))
+				errResp.Error.Details = map[string]any{"action_type": actionType}
+				RespondError(w, r, http.StatusBadRequest, errResp)
+				return
+			}
+			if aliaser, ok := action.(connectors.ParameterAliaser); ok {
+				if aliases := aliaser.ParameterAliases(); len(aliases) > 0 {
 					if rawParams, hasParams := actionObj["parameters"]; hasParams {
-						actionObj["parameters"] = normalizer.Normalize(rawParams)
+						normalized := connectors.NormalizeParameters(aliases, rawParams)
+						actionObj["parameters"] = normalized
 						if updated, err := json.Marshal(actionObj); err == nil {
 							req.Action = updated
 						}
 					}
 				}
-				// Validate parameters early so the agent gets an immediate error
-				// instead of the approval failing at execution time.
-				// If "parameters" is absent entirely, skip — schema validation
-				// (validateActionParameters below) catches missing required fields.
-				if rv, ok := action.(connectors.RequestValidator); ok {
-					if rawParams, hasParams := actionObj["parameters"]; hasParams {
-						if err := rv.ValidateRequest(json.RawMessage(rawParams)); err != nil {
-							var ve *connectors.ValidationError
-							if errors.As(err, &ve) {
-								RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, ve.Message))
-							} else {
-								RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid action parameters"))
-							}
-							return
+			}
+			if normalizer, ok := action.(connectors.Normalizer); ok {
+				if rawParams, hasParams := actionObj["parameters"]; hasParams {
+					actionObj["parameters"] = normalizer.Normalize(rawParams)
+					if updated, err := json.Marshal(actionObj); err == nil {
+						req.Action = updated
+					}
+				}
+			}
+			// Validate parameters early so the agent gets an immediate error
+			// instead of the approval failing at execution time.
+			// If "parameters" is absent entirely, skip — schema validation
+			// (validateActionParameters below) catches missing required fields.
+			if rv, ok := action.(connectors.RequestValidator); ok {
+				if rawParams, hasParams := actionObj["parameters"]; hasParams {
+					if err := rv.ValidateRequest(json.RawMessage(rawParams)); err != nil {
+						var ve *connectors.ValidationError
+						if errors.As(err, &ve) {
+							RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, ve.Message))
+						} else {
+							RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid action parameters"))
 						}
+						return
 					}
 				}
 			}
