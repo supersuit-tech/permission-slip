@@ -299,3 +299,17 @@ func channelTypesIncludePrivate(types string) bool {
 	}
 	return false
 }
+
+// filterPrivateTypes strips public_channel from a comma-separated types string,
+// returning only private types. Used to avoid fetching unnecessary public channel
+// memberships from users.conversations.
+func filterPrivateTypes(types string) string {
+	var private []string
+	for _, t := range strings.Split(types, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" && t != "public_channel" {
+			private = append(private, t)
+		}
+	}
+	return strings.Join(private, ",")
+}

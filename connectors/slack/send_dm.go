@@ -8,7 +8,8 @@ import (
 
 // sendDMAction implements connectors.Action for slack.send_dm.
 // It opens (or reuses) a DM channel with a user and sends a message
-// via conversations.open + chat.postMessage.
+// via conversations.open + chat.postMessage. Self-DMs (passing your own
+// user ID) are supported — Slack opens a "note to self" channel.
 type sendDMAction struct {
 	conn *SlackConnector
 }
