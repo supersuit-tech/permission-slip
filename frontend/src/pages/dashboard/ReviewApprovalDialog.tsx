@@ -144,12 +144,14 @@ export function ReviewApprovalDialog({
   );
   const showAlwaysAllow = hasParams && !standingApprovalsLoading && !hasExistingStandingApproval;
 
-  // Auto-close dialog after successful approval
+  // Auto-close dialog after successful approval (never while the nested standing-approval
+  // wizard is open — a render with isApproved true before autoCloseBlocked flips true
+  // would otherwise start the timer and unmount the child dialog).
   useEffect(() => {
-    if (!isApproved || autoCloseBlocked) return;
+    if (!isApproved || autoCloseBlocked || standingDialogOpen) return;
     const timer = setTimeout(() => onOpenChange(false), SUCCESS_AUTO_CLOSE_MS);
     return () => clearTimeout(timer);
-  }, [isApproved, autoCloseBlocked, onOpenChange]);
+  }, [isApproved, autoCloseBlocked, standingDialogOpen, onOpenChange]);
 
   const handleApprove = useCallback(async () => {
     setPendingAction("approve");
@@ -175,14 +177,17 @@ export function ReviewApprovalDialog({
 
   const handleAlwaysAllow = useCallback(async () => {
     setPendingAction("alwaysAllow");
+    setAutoCloseBlocked(true);
     try {
       const result = await approveApproval(approval.approval_id);
       setApproveResult(result);
-      setAutoCloseBlocked(true);
-      if (result.execution_status !== "error") {
+      if (result.execution_status === "error") {
+        setAutoCloseBlocked(false);
+      } else {
         setStandingDialogOpen(true);
       }
     } catch {
+      setAutoCloseBlocked(false);
       toast.error("Failed to approve request. Please try again.");
     } finally {
       setPendingAction(null);
