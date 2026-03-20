@@ -138,7 +138,9 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		if deps.Connectors != nil {
 			action, ok := deps.Connectors.GetAction(actionType)
 			if !ok {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrUnsupportedActionType, fmt.Sprintf("unknown action type %q", actionType)))
+				errResp := BadRequest(ErrUnsupportedActionType, fmt.Sprintf("unknown action type %q", actionType))
+				errResp.Error.Details = map[string]any{"action_type": actionType}
+				RespondError(w, r, http.StatusBadRequest, errResp)
 				return
 			}
 			if aliaser, ok := action.(connectors.ParameterAliaser); ok {
