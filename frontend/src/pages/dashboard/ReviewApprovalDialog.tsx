@@ -216,7 +216,10 @@ export function ReviewApprovalDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+        onInteractOutside={standingDialogOpen ? (e) => e.preventDefault() : undefined}
+      >
         {/* Connector header with logo, action name, and connector name */}
         <DialogHeader>
           <div className="flex items-center gap-3">
