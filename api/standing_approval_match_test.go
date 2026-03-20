@@ -347,3 +347,28 @@ func TestRequestApproval_AutoApprove_SecondApprovalMatchesWhenFirstDoesNot(t *te
 	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa1ID, "execution_count", "1")
 	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa2ID, "execution_count", "0")
 }
+
+func TestRequestApproval_AutoApprove_RevokedApproval_FallsThroughToPending(t *testing.T) {
+	t.Parallel()
+	_, _, router, agentID, privKey, _, _ := setupStandingApprovalTest(t, "test.action", testhelper.StandingApprovalOpts{
+		Status: "revoked",
+	})
+
+	reqBody := `{"request_id":"revoked-sa-test-001","action":{"type":"test.action","parameters":{}},"context":{"description":"test"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	// Revoked standing approval should not auto-approve — must fall through to pending.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (pending), got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected status \"pending\" (revoked SA), got %q", resp.Status)
+	}
+}

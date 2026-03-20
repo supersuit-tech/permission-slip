@@ -249,8 +249,20 @@ export class ApiClient {
     actionId: string,
     params: unknown,
     context?: { description?: string; risk_level?: string },
+    payment?: { paymentMethodId?: string; amountCents?: number },
   ) {
     const requestId = crypto.randomUUID();
+    const body: Record<string, unknown> = {
+      request_id: requestId,
+      action: { type: actionId, parameters: params },
+      context: context ?? {},
+    };
+    if (payment?.paymentMethodId) {
+      body.payment_method_id = payment.paymentMethodId;
+    }
+    if (payment?.amountCents !== undefined) {
+      body.amount_cents = payment.amountCents;
+    }
     return this.request<{
       approval_id?: string;
       approval_url?: string;
@@ -263,11 +275,7 @@ export class ApiClient {
     }>({
       method: "POST",
       routerPath: "/approvals/request",
-      body: {
-        request_id: requestId,
-        action: { type: actionId, parameters: params },
-        context: context ?? {},
-      },
+      body,
     });
   }
 

@@ -14,7 +14,7 @@ import (
 // is executed immediately and the result is written to w. Returns true if the
 // response was written (either success or error), false if no standing approval
 // matched and the caller should fall through to the pending approval flow.
-func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string) bool {
+func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string, pp *paymentParams) bool {
 	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, actionType)
 	if err != nil {
 		log.Printf("[%s] AutoApprove: find standing approvals: %v", TraceID(r.Context()), err)
@@ -38,7 +38,12 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 			if errors.As(err, &configErr) {
 				continue
 			}
-			// Corrupt constraint JSON — log and skip this candidate.
+			// Corrupt constraint JSON — log, report to error tracker, and skip
+			// this candidate. We prefer availability over correctness here: falling
+			// through to the pending approval flow is safer than returning 500,
+			// because the human approver can still review the request. The error
+			// tracker alert should prompt an admin to repair the stored constraints.
+			// TODO: surface corrupt standing approvals in the approver dashboard.
 			log.Printf("[%s] AutoApprove: constraint validation for %s: %v",
 				TraceID(r.Context()), candidate.StandingApprovalID, err)
 			CaptureError(r.Context(), err)
@@ -75,7 +80,7 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 	}
 
 	// Execute the action via connector.
-	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, actionType, params, &paymentParams{})
+	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, actionType, params, pp)
 
 	// Emit audit event (best-effort).
 	emitStandingApprovalAuditEvent(r.Context(), deps.DB, exec.UserID, exec.AgentID, sa.StandingApprovalID, exec.ActionType, exec.AgentMeta, execErr)

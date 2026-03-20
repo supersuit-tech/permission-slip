@@ -27,6 +27,8 @@ export function requestCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
+    .option("--payment-method-id <id>", "Payment method ID for payment-required actions")
+    .option("--amount-cents <cents>", "Transaction amount in cents (required with --payment-method-id)", parseInt)
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       action: string;
@@ -35,6 +37,8 @@ export function requestCommand(program: Command): void {
       riskLevel?: string;
       server: string;
       agentId?: string;
+      paymentMethodId?: string;
+      amountCents?: number;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
@@ -57,7 +61,10 @@ export function requestCommand(program: Command): void {
               }
             : undefined;
 
-        const result = await client.requestApproval(opts.action, params, context);
+        const result = await client.requestApproval(opts.action, params, context, {
+          paymentMethodId: opts.paymentMethodId,
+          amountCents: opts.amountCents,
+        });
 
         if (result.status === "approved") {
           // Auto-approved via standing approval — result is inline.

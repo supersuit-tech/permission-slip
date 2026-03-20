@@ -71,6 +71,23 @@ ApprovalRequest:
     context:
       $ref: './shared.yaml#/ActionContext'
 
+    payment_method_id:
+      type: string
+      description: |
+        Optional payment method ID for actions that require payment (e.g., `requires_payment_method: true`
+        in the connector action definition). When a standing approval auto-approves the request, this
+        value is forwarded to the connector for payment processing.
+      example: "pm_abc123"
+
+    amount_cents:
+      type: integer
+      minimum: 0
+      description: |
+        Optional transaction amount in cents for payment-required actions. Required when
+        `payment_method_id` is provided. Validated against per-transaction and monthly spending
+        limits configured on the payment method.
+      example: 9900
+
   example:
     agent_id: 42
     request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"

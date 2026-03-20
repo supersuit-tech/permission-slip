@@ -18,11 +18,13 @@ import (
 // ── Request/response types ─────────────────────────────────────────────────
 
 type agentRequestApprovalRequest struct {
-	RequestID     string          `json:"request_id" validate:"required"`
-	Action        json.RawMessage `json:"action" validate:"required"`
-	Context       json.RawMessage `json:"context" validate:"required"`
-	ExpiresIn     *int            `json:"expires_in,omitempty" validate:"omitempty,gte=60,lte=86400"`
-	Configuration *agentApprovalConfigRef `json:"configuration,omitempty"`
+	RequestID       string                 `json:"request_id" validate:"required"`
+	Action          json.RawMessage        `json:"action" validate:"required"`
+	Context         json.RawMessage        `json:"context" validate:"required"`
+	ExpiresIn       *int                   `json:"expires_in,omitempty" validate:"omitempty,gte=60,lte=86400"`
+	Configuration   *agentApprovalConfigRef `json:"configuration,omitempty"`
+	PaymentMethodID string                 `json:"payment_method_id,omitempty"`
+	AmountCents     *int                   `json:"amount_cents,omitempty"`
 }
 
 type agentApprovalConfigRef struct {
@@ -214,7 +216,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		// Before creating a pending approval, check if an active standing
 		// approval matches this agent + action type + parameters. If so,
 		// execute immediately and return the result — no human review needed.
-		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID); handled {
+		pp := &paymentParams{PaymentMethodID: req.PaymentMethodID, AmountCents: req.AmountCents}
+		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID, pp); handled {
 			return
 		}
 
