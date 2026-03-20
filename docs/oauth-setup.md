@@ -541,7 +541,7 @@ Under **Scopes**, add **Bot Token Scopes** and **User Token Scopes** to match wh
 - `files:write`
 - `groups:history`, `groups:read`
 - `im:history`, `im:read`, `im:write`
-- `mpim:history`, `mpim:read`
+- `mpim:history`, `mpim:read`, `mpim:write`
 - `reactions:write`
 - `users:read`, `users:read.email`
 
