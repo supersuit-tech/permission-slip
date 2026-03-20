@@ -25,5 +25,6 @@ config:
               $ref: '../schemas/config.yaml#/ConfigResponse'
             example:
               billing_enabled: false
+              sms_enabled: false
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
