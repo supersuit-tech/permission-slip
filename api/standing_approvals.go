@@ -541,7 +541,7 @@ func emitStandingApprovalUpdateAuditEvent(ctx context.Context, d db.DBTX, userID
 		UserID:      userID,
 		AgentID:     agentID,
 		EventType:   db.AuditEventStandingUpdated,
-		Outcome:     "updated",
+		Outcome:     db.OutcomeUpdated,
 		SourceID:    saID,
 		SourceType:  "standing_approval",
 		Action:      actionJSON,
