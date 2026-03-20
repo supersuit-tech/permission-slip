@@ -34,9 +34,8 @@ npx @permission-slip/cli verify --code <confirmation_code>
 # Step 3: Discover what you can do
 npx @permission-slip/cli capabilities
 
-# Step 4: Request approval and execute
+# Step 4: Request approval (auto-executes if standing approval matches)
 npx @permission-slip/cli request --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
-npx @permission-slip/cli execute --token <token> --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
 ```
 
 Run `npx @permission-slip/cli --help` for all available commands.
@@ -465,73 +464,51 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 
 #### 4a-4. Execute with Token
 
-```http
-POST /actions/execute
-Content-Type: application/json
-X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
-
-{
-  "token": "eyJhbGciOi...",
-  "action_id": "email.send",
-  "parameters": {
-    "to": ["recipient@example.com"],
-    "subject": "Hello from your agent",
-    "body": "This email was sent on your behalf."
-  }
-}
-```
+> **Note:** The separate `/actions/execute` endpoint has been removed. Token-based execution is now handled through `POST /approvals/request` with the token included in the request.
 
 **Important**: The `parameters` must be **exactly** the same as what you submitted in the approval request. Permission Slip hashes them and compares against the approved hash.
-
-**Response** (200):
-
-```json
-{
-  "status": "success",
-  "action_id": "email.send",
-  "executed_at": "2026-02-23T12:26:00Z",
-  "result": {
-    "message_id": "msg_abc123",
-    "delivery_status": "queued"
-  }
-}
-```
 
 The token is consumed on use (even if the external service errors). To retry, request a new approval.
 
 ### Option B: Standing Approval (Pre-Authorized)
 
-If the capabilities endpoint shows a standing approval that matches your action and parameters, you can execute directly without per-request approval. Reference the `configuration_id` to specify which configuration you're operating under:
+If the capabilities endpoint shows a standing approval that matches your action and parameters, you can use the same `POST /approvals/request` endpoint — Permission Slip will automatically match the standing approval, execute the action, and return the result inline without requiring user intervention:
 
 ```http
-POST /actions/execute
+POST /approvals/request
 Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 
 {
+  "agent_id": 42,
   "request_id": "unique-uuid-here",
   "configuration_id": "ac_9f8e7d6c5b4a39281706f5e4d3c2b1a0",
   "parameters": {
     "to": ["coworker@mycompany.com"],
     "subject": "Meeting notes",
     "body": "Here are the notes from today's meeting."
+  },
+  "context": {
+    "description": "Sending meeting notes",
+    "risk_level": "low"
   }
 }
 ```
 
-No `token` field — Permission Slip matches the request against active standing approvals automatically. The `configuration_id` identifies which action configuration the agent is operating under; the `parameters` supply values for any wildcard fields.
+When a standing approval matches, the response returns `status: "approved"` with the result inline:
 
 **Response** (200):
 
 ```json
 {
+  "status": "approved",
   "result": { "message_id": "msg_def456" },
   "standing_approval_id": "sa_def456",
   "executions_remaining": 87
 }
 ```
 
-If no standing approval matches, you get a `404` with a hint to use the one-off approval flow.
+If no standing approval matches, the response returns `status: "pending"` and the standard one-off approval flow begins (user receives a notification for review).
 
 ---
 
@@ -681,7 +658,7 @@ Use `GET /connectors` to see which action types are available.
 7. REQUEST          POST /approvals/request          (planned) → reference configuration_id
 8. GET CODE         User approves, shares confirmation code
 9. VERIFY APPROVAL  POST /approvals/{id}/verify      (planned) → get token
-10. EXECUTE         POST /actions/execute            (planned) → action result
+10. EXECUTE         POST /approvals/request           → action result (via token or standing approval)
 ```
 
 Steps 6-10 repeat for each action. With standing approvals, steps 7-9 are skipped. If no configuration matches, ask the user to create one.
@@ -698,10 +675,9 @@ Steps 6-10 repeat for each action. With standing approvals, steps 7-9 are skippe
 | `POST /agents/{id}/verify` | Signature | Implemented | Verify registration with confirmation code |
 | `GET /agents/me` | Signature | Implemented | Get your own agent record (status, metadata, timestamps) |
 | `GET /agents/{id}/capabilities` | Signature | Implemented | Discover action configurations, connectors, actions, and standing approvals |
-| `POST /approvals/request` | Signature | Implemented | Request one-off approval for an action |
+| `POST /approvals/request` | Signature | Implemented | Request approval; auto-executes if standing approval matches, otherwise creates pending approval |
 | `GET /approvals/{id}/status` | Signature | Implemented | Poll approval status (pending → approved/denied/cancelled/expired) |
 | `POST /approvals/{id}/cancel` | Signature | Implemented | Cancel a pending approval request |
 | `POST /approvals/{id}/verify` | Signature | Planned | Submit approval confirmation code, get execution token |
-| `POST /actions/execute` | Signature | Planned | Execute an action (with token or standing approval) |
 
 Full machine-readable spec: [`spec/openapi/`](../spec/openapi/)
