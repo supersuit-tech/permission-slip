@@ -49,7 +49,7 @@ type agentRequestApprovalResponse struct {
 	// executed immediately. No polling needed — the result is inline.
 	Result              *json.RawMessage `json:"result,omitempty"`              // Connector execution output (may be null if connector returns no data).
 	StandingApprovalID  string           `json:"standing_approval_id,omitempty"` // Which standing approval authorized this execution (useful for audit tracking).
-	ExecutionsRemaining *int             `json:"executions_remaining,omitempty"` // Remaining uses of this standing approval; nil = unlimited.
+	ExecutionsRemaining *int             `json:"executions_remaining,omitempty"` // Remaining uses of this standing approval; absent = unlimited.
 }
 
 type agentCancelApprovalResponse struct {

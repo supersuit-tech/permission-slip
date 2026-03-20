@@ -181,10 +181,10 @@ ApprovalRequestResponse:
 
     executions_remaining:
       type: integer
-      nullable: true
       description: |
-        Number of executions remaining on the standing approval, or null if unlimited.
-        Present only when `status` is `approved`.
+        Number of executions remaining on the standing approval.
+        Present only when `status` is `approved` and the standing approval has a
+        finite `max_executions`. Absent when unlimited.
       example: 47
 
   example:

@@ -360,6 +360,41 @@ func TestRequestApproval_AutoApprove_SecondApprovalMatchesWhenFirstDoesNot(t *te
 	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa2ID, "execution_count", "0")
 }
 
+func TestRequestApproval_AutoApprove_ExhaustedBetweenFindAndRecord_FallsThroughToPending(t *testing.T) {
+	t.Parallel()
+	maxExec := 1
+	tx, _, router, agentID, privKey, saID, _ := setupStandingApprovalTest(t, "email.read", testhelper.StandingApprovalOpts{
+		MaxExecutions: &maxExec,
+	})
+
+	// Simulate race: the standing approval was found by FindActiveStandingApprovalsForAgent
+	// (status=active, execution_count < max_executions), but between that query and
+	// RecordStandingApprovalExecutionByAgent, another request exhausted the quota.
+	// Set execution_count = max_executions to trigger StandingApprovalErrNotActive.
+	testhelper.InsertStandingApprovalExecution(t, tx, saID)
+
+	reqBody := `{"request_id":"exhausted-race-test-001","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	// Should fall through to pending (exhausted SA triggers StandingApprovalErrNotActive).
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (pending), got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected status \"pending\" (exhausted SA race), got %q", resp.Status)
+	}
+	if resp.ApprovalID == "" {
+		t.Error("expected non-empty approval_id for pending request")
+	}
+}
+
 func TestRequestApproval_AutoApprove_RevokedApproval_FallsThroughToPending(t *testing.T) {
 	t.Parallel()
 	_, _, router, agentID, privKey, _, _ := setupStandingApprovalTest(t, "test.action", testhelper.StandingApprovalOpts{
