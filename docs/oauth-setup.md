@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Slack, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -80,6 +80,13 @@ Permission Slip supports two modes for OAuth provider credentials:
 |---|---|
 | `NOTION_CLIENT_ID` | OAuth Client ID from [Notion Integrations](https://www.notion.so/my-integrations) |
 | `NOTION_CLIENT_SECRET` | OAuth Client Secret from Notion Integrations |
+
+### Slack OAuth
+
+| Variable | Description |
+|---|---|
+| `SLACK_CLIENT_ID` | Client ID from [Your Apps](https://api.slack.com/apps) (App Credentials) |
+| `SLACK_CLIENT_SECRET` | Client Secret from the same Slack app |
 
 ### Square OAuth
 
@@ -505,6 +512,56 @@ If you don't need OAuth, you can use an internal integration token instead:
 
 The Notion connector accepts either auth method. When both are configured, OAuth is preferred.
 
+## Slack OAuth Setup
+
+Slack uses [OAuth 2.0 with the V2 flow](https://api.slack.com/authentication/oauth-v2): bot scopes produce a bot user token (`xoxb-`), and user scopes produce a user token (`xoxp-`) used for APIs that only accept user tokens (for example `search.messages`).
+
+### 1. Create a Slack app
+
+1. Go to [Your Apps](https://api.slack.com/apps)
+2. Click **Create New App** and choose **From scratch**
+3. Name the app (e.g., "Permission Slip") and pick a development workspace
+
+### 2. Configure redirect URL
+
+1. Open **OAuth & Permissions**
+2. Under **Redirect URLs**, add:
+   ```
+   https://your-domain.com/api/v1/oauth/slack/callback
+   ```
+
+### 3. Configure scopes
+
+Under **Scopes**, add **Bot Token Scopes** and **User Token Scopes** to match what the connector requests:
+
+**Bot Token Scopes**
+
+- `channels:history`, `channels:join`, `channels:manage`, `channels:read`
+- `chat:write`
+- `files:write`
+- `groups:history`, `groups:read`
+- `im:history`, `im:read`, `im:write`
+- `mpim:history`, `mpim:read`, `mpim:write`
+- `reactions:write`
+- `users:read`, `users:read.email`
+
+**User Token Scopes** (required for search actions that only work with user tokens)
+
+- `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`
+
+### 4. Configure environment
+
+```bash
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+```
+
+Find **Client ID** and **Client Secret** under **Basic Information > App Credentials**.
+
+### 5. Install to workspace
+
+When a user connects Slack from Permission Slip, they complete Slack’s OAuth consent and install the app to their workspace. No manual “reinstall” is required beyond that flow unless you change scopes—in that case, users may need to **Re-authorize** from the connector settings.
+
 ## Square OAuth Setup
 
 ### 1. Create a Square Developer Application
@@ -771,11 +828,18 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - Microsoft: `https://your-domain.com/api/v1/oauth/microsoft/callback`
 - Notion: `https://your-domain.com/api/v1/oauth/notion/callback`
 - PagerDuty: `https://your-domain.com/api/v1/oauth/pagerduty/callback`
+- Slack: `https://your-domain.com/api/v1/oauth/slack/callback`
 - Square: `https://your-domain.com/api/v1/oauth/square/callback`
 - Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 
 If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_URL}/v1/oauth/{provider}/callback`.
+
+### Slack API errors (`missing_scope`, `invalid_auth`, search without user token)
+
+- **`missing_scope`** — The Slack app is missing bot or user scopes listed in [Slack OAuth Setup](#slack-oauth-setup). Add them under **OAuth & Permissions**, then have the user **Re-authorize** so Slack issues new tokens.
+- **`invalid_auth` / `token_revoked`** — The workspace uninstalled the app or tokens were rotated. **Re-authorize** from the connector settings.
+- **Search actions fail but messaging works** — Search uses a user token (`xoxp-`). Ensure **User Token Scopes** (especially `search:read.*`) are configured in the Slack app and the user completed consent for user scopes.
 
 ### "Failed to initiate OAuth flow" error
 
