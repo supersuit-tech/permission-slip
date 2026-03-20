@@ -7,6 +7,7 @@ ConfigResponse:
     - billing_enabled
     - google_oauth_configured
     - microsoft_oauth_configured
+    - sms_enabled
   properties:
     billing_enabled:
       type: boolean
@@ -32,3 +33,14 @@ ConfigResponse:
         without BYOA setup. When `false`, users must provide their own Microsoft
         OAuth app credentials via the BYOA configuration UI.
       example: true
+    sms_enabled:
+      type: boolean
+      description: |
+        Whether SMS notifications are configured and available on this server.
+        When `true`, users can enable SMS notifications in their preferences.
+        SMS is enabled when the server has a working AWS SNS sender configured
+        (`AWS_REGION` is set) and the `SMS_NOTIFICATIONS_HIDDEN` env var is not
+        set to `"true"`. Self-hosted deployments that configure SNS will have
+        this set automatically; the hosted platform (app.permissionslip.dev)
+        sets `SMS_NOTIFICATIONS_HIDDEN=true` to hide SMS from users.
+      example: false

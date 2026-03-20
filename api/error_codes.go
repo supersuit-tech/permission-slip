@@ -54,6 +54,7 @@ const (
 	ErrBillingNotEnabled        ErrorCode = "billing_not_enabled"
 	ErrSMSRequiresPaidPlan      ErrorCode = "sms_requires_paid_plan"
 	ErrChannelUnavailableBeta   ErrorCode = "channel_unavailable_beta"
+	ErrChannelNotConfigured     ErrorCode = "channel_not_configured"
 	// OAuth
 	ErrOAuthProviderNotFound     ErrorCode = "oauth_provider_not_found"
 	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"
